@@ -1,0 +1,46 @@
+{
+	"name": "nextcloud/arbeitszeitcheck",
+	"description": "Legally compliant time tracking system for German labor law (ArbZG) and GDPR",
+	"type": "project",
+	"license": "AGPL-3.0-or-later",
+	"authors": [
+		{
+			"name": "Alexander Mähl",
+			"email": "alexander.maehl@example.com"
+		}
+	],
+	"require": {
+		"php": ">=8.1",
+		"ext-json": "*",
+		"ext-pdo": "*",
+		"ext-mbstring": "*"
+	},
+	"require-dev": {
+		"phpunit/phpunit": "^9.5"
+	},
+	"scripts": {
+		"test": "phpunit",
+		"test:unit": "phpunit --testsuite unit",
+		"test:integration": "phpunit --testsuite integration",
+		"test:coverage": "phpunit --coverage-html tests/coverage",
+		"lint": "@php -l lib",
+		"analyze": "@php -l lib"
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"classmap-authoritative": true,
+		"platform": {
+			"php": "8.1"
+		}
+	},
+	"autoload": {
+		"psr-4": {
+			"OCA\\ArbeitszeitCheck\\": "lib/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"OCA\\ArbeitszeitCheck\\Tests\\": "tests/"
+		}
+	}
+}

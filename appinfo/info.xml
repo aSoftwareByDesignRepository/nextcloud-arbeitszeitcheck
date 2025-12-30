@@ -1,0 +1,114 @@
+<?xml version="1.0"?>
+<!--
+  - SPDX-FileCopyrightText: 2024 Nextcloud GmbH and Nextcloud contributors
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>arbeitszeitcheck</id>
+	<name>ArbeitszeitCheck / TimeGuard</name>
+	<summary>Legally compliant time tracking system for German labor law (ArbZG) and GDPR</summary>
+	<description>
+		ArbeitszeitCheck is a comprehensive, legally compliant time tracking system specifically designed for German organizations.
+		It fully implements German labor law (Arbeitszeitgesetz - ArbZG) requirements including mandatory break times,
+		maximum working hours, rest periods, and Sunday/holiday work tracking.
+
+		Key features:
+		- German labor law compliance (ArbZG, ECJ C-55/18)
+		- GDPR compliant data processing and employee rights
+		- Real-time compliance monitoring and violation alerts
+		- Employee self-service portal with dashboard
+		- Manager approval workflows
+		- Vacation and absence management
+		- Project time tracking integration (optional)
+		- Comprehensive reporting and exports
+		- WCAG 2.1 AAA accessibility compliance
+		- Mobile-responsive design
+		- Audit logging and data retention management
+
+		This system ensures organizations meet all legal requirements while providing employees with
+		full transparency and control over their working time data.
+	</description>
+
+	<version>1.0.0</version>
+	<licence>agpl</licence>
+	<author>Alexander Mähl</author>
+
+	<namespace>ArbeitszeitCheck</namespace>
+
+	<category>organization</category>
+	<category>productivity</category>
+
+	<website>https://github.com/nextcloud/arbeitszeitcheck</website>
+	<bugs>https://github.com/nextcloud/arbeitszeitcheck/issues</bugs>
+	<repository>https://github.com/nextcloud/arbeitszeitcheck.git</repository>
+
+	<dependencies>
+		<!-- Compatible with Nextcloud 27, 28, 29 and future versions -->
+		<nextcloud min-version="27" max-version="29"/>
+	</dependencies>
+
+	<optional-dependencies>
+		<!-- Optional integration with ProjectCheck app -->
+		<app min-version="2.0.0">projectcheck</app>
+	</optional-dependencies>
+
+	<navigations>
+		<navigation>
+			<name>ArbeitszeitCheck</name>
+			<route>arbeitszeitcheck.page.index</route>
+			<icon>app.svg</icon>
+			<order>15</order>
+		</navigation>
+	</navigations>
+
+	<screenshots>
+		<screenshot>screenshots/dashboard.png</screenshot>
+		<screenshot>screenshots/time-tracking.png</screenshot>
+		<screenshot>screenshots/compliance.png</screenshot>
+		<screenshot>screenshots/reports.png</screenshot>
+	</screenshots>
+
+	<keywords>
+		<keyword>time tracking</keyword>
+		<keyword>arbeitszeit</keyword>
+		<keyword>labor law</keyword>
+		<keyword>german law</keyword>
+		<keyword>arbzg</keyword>
+		<keyword>gdpr</keyword>
+		<keyword>compliance</keyword>
+		<keyword>work hours</keyword>
+		<keyword>breaks</keyword>
+		<keyword>overtime</keyword>
+		<keyword>vacation</keyword>
+		<keyword>absence</keyword>
+		<keyword>audit</keyword>
+		<keyword>reporting</keyword>
+		<keyword>accessibility</keyword>
+	</keywords>
+
+	<release>
+		<databases>
+			<database>mysql</database>
+			<database>pgsql</database>
+			<database>sqlite</database>
+		</databases>
+		<php min-version="8.1" max-version="8.4"/>
+		<platforms>
+			<platform>linux</platform>
+			<platform>mac</platform>
+			<platform>windows</platform>
+		</platforms>
+	</release>
+
+	<settings>
+		<admin>ArbeitszeitCheck\Settings\AdminSettings</admin>
+		<personal>ArbeitszeitCheck\Settings\PersonalSettings</personal>
+	</settings>
+
+	<background-jobs>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\DailyComplianceCheckJob</job>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\ClockOutReminderJob</job>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\MissingTimeEntryJob</job>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\BreakReminderJob</job>
+	</background-jobs>
+</info>

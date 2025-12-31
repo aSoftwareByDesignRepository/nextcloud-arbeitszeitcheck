@@ -58,6 +58,7 @@ return [
 
 		// API routes for absences (specific routes must come before parameterized routes)
 		['name' => 'absence#stats', 'url' => '/api/absences/stats', 'verb' => 'GET'],
+		['name' => 'absence#users', 'url' => '/api/users', 'verb' => 'GET'],
 		['name' => 'absence#index', 'url' => '/api/absences', 'verb' => 'GET'],
 		['name' => 'absence#store', 'url' => '/api/absences', 'verb' => 'POST'],
 		['name' => 'absence#show', 'url' => '/api/absences/{id}', 'verb' => 'GET'],

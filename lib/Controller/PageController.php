@@ -42,8 +42,13 @@ class PageController extends Controller
 	{
 		// Load translations for the app
 		Util::addTranslations('arbeitszeitcheck');
-		// Add CSS stylesheet (extracted by webpack)
-		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		// Try to add CSS stylesheet if it exists (extracted by webpack)
+		// CSS may be embedded in JS until MiniCssExtractPlugin is properly configured
+		try {
+			Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		} catch (\Exception $e) {
+			// CSS not found, might be embedded in JS - this is OK
+		}
 		// Add script using modern API (replaces deprecated script() function in template)
 		Util::addScript('arbeitszeitcheck', 'arbeitszeitcheck-main');
 		
@@ -96,7 +101,11 @@ class PageController extends Controller
 	public function calendar(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
-		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		try {
+			Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		} catch (\Exception $e) {
+			// CSS not found, might be embedded in JS
+		}
 		Util::addScript('arbeitszeitcheck', 'arbeitszeitcheck-main');
 		$response = new TemplateResponse('arbeitszeitcheck', 'index');
 		$response->cacheFor(0);
@@ -112,7 +121,11 @@ class PageController extends Controller
 	public function timeline(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
-		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		try {
+			Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		} catch (\Exception $e) {
+			// CSS not found, might be embedded in JS
+		}
 		Util::addScript('arbeitszeitcheck', 'arbeitszeitcheck-main');
 		$response = new TemplateResponse('arbeitszeitcheck', 'index');
 		$response->cacheFor(0);

@@ -30,7 +30,14 @@ fi
 
 echo -e "${BLUE}[INFO]${NC} Using container: $CONTAINER_NAME"
 echo -e "${BLUE}[INFO]${NC} Installing dependencies (if needed)..."
-docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && npm install"
+# Find npm/node in common locations
+docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && \
+	(NPM_CMD=\$(which npm 2>/dev/null || find /usr -name npm 2>/dev/null | head -1 || find /opt -name npm 2>/dev/null | head -1 || echo 'npm'); \
+	if [ -x \"\$NPM_CMD\" ] || command -v npm >/dev/null 2>&1; then \
+		npm install; \
+	else \
+		echo -e \"${YELLOW}[WARNING]${NC} npm not found, skipping dependency installation\"; \
+	fi)"
 
 # Ensure webpack cache directory exists in container
 echo -e "${BLUE}[INFO]${NC} Setting up webpack cache for incremental builds..."
@@ -79,7 +86,24 @@ EOFCONFIG"
     # Build with reduced memory (1.5GB per entry) and incremental cache
     # Use production mode to avoid CSP violations (no eval in source maps)
     # Cache is enabled in webpack.config.js for incremental builds
-    if docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && DOCKER_BUILD=1 NODE_ENV=production NODE_OPTIONS='--max-old-space-size=1536' npx webpack --config webpack-entry-temp.config.js --mode=production 2>&1 | tail -10"; then
+    # Remove source map references after build for CSP compliance
+    # Try multiple methods to find and run webpack
+    if docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && \
+		export PATH=\"/var/www/html/custom_apps/arbeitszeitcheck/node_modules/.bin:\$PATH\" && \
+		if command -v npx >/dev/null 2>&1; then \
+			DOCKER_BUILD=1 NODE_ENV=production NODE_OPTIONS='--max-old-space-size=1536' npx webpack --config webpack-entry-temp.config.js --mode=production 2>&1 | tail -10; \
+		elif [ -f node_modules/.bin/webpack ]; then \
+			DOCKER_BUILD=1 NODE_ENV=production NODE_OPTIONS='--max-old-space-size=1536' ./node_modules/.bin/webpack --config webpack-entry-temp.config.js --mode=production 2>&1 | tail -10; \
+		elif [ -f /usr/local/bin/npx ]; then \
+			DOCKER_BUILD=1 NODE_ENV=production NODE_OPTIONS='--max-old-space-size=1536' /usr/local/bin/npx webpack --config webpack-entry-temp.config.js --mode=production 2>&1 | tail -10; \
+		else \
+			echo -e \"${YELLOW}[ERROR]${NC} Cannot find npx or webpack. Please ensure Node.js is installed in the container.\"; \
+			false; \
+		fi"; then
+        # Remove source map references from JS files for CSP compliance
+        docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && sed -i 's/sourceMappingURL.*//g' js/${ENTRY_NAME}.js 2>/dev/null || true"
+        # Remove source map files
+        docker-compose exec -T nextcloud bash -c "cd /var/www/html/custom_apps/arbeitszeitcheck && rm -f js/${ENTRY_NAME}.js.map 2>/dev/null || true"
         echo -e "${GREEN}[SUCCESS]${NC} Built ${ENTRY_NAME}"
     else
         echo -e "${YELLOW}[WARNING]${NC} Failed to build ${ENTRY_NAME}, continuing with next entry..."

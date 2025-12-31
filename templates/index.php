@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @license AGPL-3.0-or-later
  */
 
-// style('arbeitszeitcheck', 'arbeitszeitcheck-main'); // CSS not yet generated
+// CSS is loaded via Util::addStyle() in PageController.php
 ?>
 
 <div id="arbeitszeitcheck-content">
@@ -34,83 +34,10 @@ declare(strict_types=1);
 		window.__NC_APP_NAME__ = 'arbeitszeitcheck';
 		window.__NC_APP_VERSION__ = '1.0.0';
 		
-		// Load translations from JSON file and register with OC.L10N
-		// This ensures translations are available before Vue components load
-		// Wait for OC to be available before loading translations
-		(function() {
-			function loadTranslations() {
-				if (typeof OC === 'undefined' || !OC || typeof OC.L10N === 'undefined') {
-					// Retry after a short delay
-					setTimeout(loadTranslations, 100);
-					return;
-				}
-				
-				var docEl = document.documentElement || {};
-				var locale = (docEl.dataset && (docEl.dataset.locale || docEl.locale)) || docEl.lang || 'en';
-				var shortLocale = (locale || '').toLowerCase().split('-')[0] || 'en';
-				
-				// Build translation URL - try both /apps/ and /custom_apps/ paths
-				var currentPath = window.location.pathname;
-				var basePath = currentPath.split('/apps/')[0] || currentPath.split('/custom_apps/')[0] || '';
-				
-				// Try both paths
-				var candidates = [
-					basePath + '/apps/arbeitszeitcheck/l10n/' + shortLocale + '.json',
-					basePath + '/custom_apps/arbeitszeitcheck/l10n/' + shortLocale + '.json'
-				];
-				
-				// Add English fallback if not already English
-				if (shortLocale !== 'en') {
-					candidates.push(
-						basePath + '/apps/arbeitszeitcheck/l10n/en.json',
-						basePath + '/custom_apps/arbeitszeitcheck/l10n/en.json'
-					);
-				}
-				
-				// Function to try loading from candidates
-				function loadFirstAvailable(candidates, index) {
-					if (index >= candidates.length) {
-						// All candidates failed - silently fail
-						return Promise.reject(new Error('No translation file found'));
-					}
-					
-					return fetch(candidates[index])
-						.then(function(response) {
-							if (!response.ok) {
-								// Try next candidate
-								return loadFirstAvailable(candidates, index + 1);
-							}
-							return response.json();
-						})
-						.catch(function() {
-							// Try next candidate
-							return loadFirstAvailable(candidates, index + 1);
-						});
-				}
-				
-				if (typeof fetch !== 'undefined') {
-					loadFirstAvailable(candidates, 0)
-						.then(function(bundle) {
-							if (bundle && bundle.translations && typeof OC !== 'undefined' && OC.L10N && typeof OC.L10N.register === 'function') {
-								var pluralForm = bundle.pluralForm || 'nplurals=2; plural=(n != 1);';
-								OC.L10N.register('arbeitszeitcheck', bundle.translations, pluralForm);
-								console.log('[ArbeitszeitCheck] Translations registered for locale:', shortLocale, Object.keys(bundle.translations).length, 'keys');
-							}
-						})
-						.catch(function(err) {
-							// Silently fail - translations will fall back to English or key names
-							console.debug('[ArbeitszeitCheck] Translation loading failed (will use fallback):', err.message);
-						});
-				}
-			}
-			
-			// Start loading translations
-			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', loadTranslations);
-			} else {
-				loadTranslations();
-			}
-		})();
+		// Translations are loaded via Util::addTranslations() in PageController
+		// This ensures OC.L10N is properly initialized before Vue components load
+		// No manual translation loading needed - Nextcloud handles it automatically
+		// Note: Font CSP errors for Mulish are from Nextcloud core, not this app
 		
 		// Vue 2 compatibility shim for @nextcloud/vue v8 (until build succeeds with v9+)
 		// This adds Vue.extend to Vue 3 for compatibility

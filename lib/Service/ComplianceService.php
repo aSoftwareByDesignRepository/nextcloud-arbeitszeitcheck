@@ -113,13 +113,58 @@ class ComplianceService
     {
         $issues = [];
 
-        // Check rest period (11 hours between shifts)
+        // Check rest period (11 hours between shifts) - CRITICAL: Always enforce (ArbZG §5)
+        // This checks both completed entries (with endTime) and paused entries (with updatedAt as "end time")
         if (!$this->checkRestPeriod($userId)) {
-            $issues[] = [
-                'type' => ComplianceViolation::TYPE_INSUFFICIENT_REST_PERIOD,
-                'severity' => ComplianceViolation::SEVERITY_ERROR,
-                'message' => $this->l10n->t('Minimum 11-hour rest period required between shifts')
-            ];
+            // Get last completed entry (with endTime)
+            $lastCompletedEntry = $this->getLastCompletedEntry($userId);
+            $lastEndTime = $lastCompletedEntry && $lastCompletedEntry->getEndTime() 
+                ? $lastCompletedEntry->getEndTime() 
+                : null;
+            
+            // Also check for paused entries (clocked out but not completed)
+            // Use updatedAt as the "end time" for rest period calculation
+            if (!$lastEndTime) {
+                $allEntries = $this->timeEntryMapper->findByUser($userId);
+                $lastPausedEntry = null;
+                foreach ($allEntries as $entry) {
+                    if ($entry->getStatus() === TimeEntry::STATUS_PAUSED && $entry->getUpdatedAt() !== null) {
+                        if ($lastPausedEntry === null || $entry->getUpdatedAt() > $lastPausedEntry->getUpdatedAt()) {
+                            $lastPausedEntry = $entry;
+                        }
+                    }
+                }
+                if ($lastPausedEntry && $lastPausedEntry->getUpdatedAt()) {
+                    $lastEndTime = $lastPausedEntry->getUpdatedAt();
+                }
+            }
+            
+            if ($lastEndTime) {
+                // Calculate when user can clock in again
+                $earliestClockIn = clone $lastEndTime;
+                $earliestClockIn->modify('+11 hours');
+                $now = new \DateTime();
+                $hoursRemaining = ($earliestClockIn->getTimestamp() - $now->getTimestamp()) / 3600;
+                
+                $issues[] = [
+                    'type' => ComplianceViolation::TYPE_INSUFFICIENT_REST_PERIOD,
+                    'severity' => ComplianceViolation::SEVERITY_ERROR,
+                    'message' => $this->l10n->t(
+                        'Minimum 11-hour rest period required between shifts (ArbZG §5). Your last shift ended at %s. You can clock in after %s (in %.1f hours).',
+                        [
+                            $lastEndTime->format('H:i'),
+                            $earliestClockIn->format('H:i'),
+                            max(0, $hoursRemaining)
+                        ]
+                    )
+                ];
+            } else {
+                $issues[] = [
+                    'type' => ComplianceViolation::TYPE_INSUFFICIENT_REST_PERIOD,
+                    'severity' => ComplianceViolation::SEVERITY_ERROR,
+                    'message' => $this->l10n->t('Minimum 11-hour rest period required between shifts (ArbZG §5)')
+                ];
+            }
         }
 
         // Check daily working hours limit
@@ -155,26 +200,361 @@ class ComplianceService
         $this->checkExcessiveWorkingHours($timeEntry);
         $this->checkNightWork($timeEntry);
         $this->checkSundayAndHolidayWork($timeEntry);
+        
+        // Check 6-month average and weekly hours (ArbZG §3) - warnings to manager only
+        // These are warnings, not blocking violations
+        $this->checkSixMonthAverageAndWeeklyHours($timeEntry);
+    }
+
+    /**
+     * Check compliance for a completed time entry (real-time check)
+     * 
+     * This method is called immediately when a time entry is completed (status = COMPLETED).
+     * It performs all compliance checks and creates violations if necessary.
+     * 
+     * Based on industry best practices (Personio, Flintec, etc.), real-time compliance
+     * checking ensures immediate detection of violations and proactive compliance management.
+     * 
+     * @param TimeEntry $timeEntry The completed time entry to check
+     * @param bool $strictMode If true, throws exception on critical violations (prevents saving)
+     * @return array Array of detected violations (empty if compliant)
+     * @throws \Exception If strict mode is enabled and critical violations are found
+     */
+    public function checkComplianceForCompletedEntry(TimeEntry $timeEntry, bool $strictMode = false): array
+    {
+        // Only check completed entries with end time
+        if ($timeEntry->getStatus() !== TimeEntry::STATUS_COMPLETED || !$timeEntry->getEndTime()) {
+            return [];
+        }
+
+        $violations = [];
+        $criticalViolations = [];
+
+        // Check mandatory breaks (ArbZG §4)
+        $breakViolations = $this->checkMandatoryBreaksWithResult($timeEntry);
+        if (!empty($breakViolations)) {
+            $violations = array_merge($violations, $breakViolations);
+            $criticalViolations = array_merge($criticalViolations, array_filter($breakViolations, fn($v) => $v['severity'] === ComplianceViolation::SEVERITY_ERROR));
+        }
+
+        // Check excessive working hours (ArbZG §3)
+        $hoursViolations = $this->checkExcessiveWorkingHoursWithResult($timeEntry);
+        if (!empty($hoursViolations)) {
+            $violations = array_merge($violations, $hoursViolations);
+            $criticalViolations = array_merge($criticalViolations, array_filter($hoursViolations, fn($v) => $v['severity'] === ComplianceViolation::SEVERITY_ERROR));
+        }
+
+        // Check night work (ArbZG §6) - informational
+        $this->checkNightWork($timeEntry);
+
+        // Check Sunday and holiday work (ArbZG §9) - warnings
+        $this->checkSundayAndHolidayWork($timeEntry);
+
+        // Check 6-month average and weekly hours (ArbZG §3) - warnings to manager only
+        // These are warnings, not blocking violations
+        $this->checkSixMonthAverageAndWeeklyHours($timeEntry);
+
+        // In strict mode, throw exception if critical violations found
+        if ($strictMode && !empty($criticalViolations)) {
+            $firstCritical = reset($criticalViolations);
+            throw new \Exception($firstCritical['message']);
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Check 6-month average and weekly hours (ArbZG §3)
+     * Sends warnings to manager if limits are exceeded (non-blocking)
+     * 
+     * @param TimeEntry $timeEntry
+     * @return void
+     */
+    private function checkSixMonthAverageAndWeeklyHours(TimeEntry $timeEntry): void
+    {
+        if (!$timeEntry->getEndTime()) {
+            return; // Only check completed entries
+        }
+
+        $userId = $timeEntry->getUserId();
+        $entryDate = clone $timeEntry->getEndTime();
+        $entryDate->setTime(0, 0, 0);
+        $todayKey = $entryDate->format('Y-m-d');
+
+        // Check if we already sent a warning today (to avoid spam)
+        // Use a simple cache key based on date
+        static $warningsSentToday = [];
+        $cacheKey = $userId . '_' . $todayKey;
+
+        // Check 6-month average (for 10-hour days)
+        $workingHours = $timeEntry->getWorkingDurationHours();
+        if ($workingHours !== null && $workingHours >= 8.0) {
+            // Only check if working 8+ hours (approaching 10-hour limit)
+            $sixMonthCheck = $this->checkSixMonthAverage($userId, $entryDate);
+            if (!$sixMonthCheck['valid'] && !isset($warningsSentToday[$cacheKey . '_6month'])) {
+                // Send warning to manager (non-blocking)
+                if ($this->notificationService) {
+                    $this->notificationService->notifyManagerWorkingTimeWarning($userId, 'six_month_average', [
+                        'message' => $sixMonthCheck['message'],
+                        'current_value' => $sixMonthCheck['average'],
+                        'limit' => $sixMonthCheck['limit'],
+                        'date' => $todayKey
+                    ]);
+                }
+                $warningsSentToday[$cacheKey . '_6month'] = true;
+            }
+        }
+
+        // Check weekly hours average
+        $weeklyCheck = $this->checkWeeklyHoursAverage($userId, $entryDate);
+        if (!$weeklyCheck['valid'] && !isset($warningsSentToday[$cacheKey . '_weekly'])) {
+            // Send warning to manager (non-blocking)
+            if ($this->notificationService) {
+                $this->notificationService->notifyManagerWorkingTimeWarning($userId, 'weekly_hours', [
+                    'message' => $weeklyCheck['message'],
+                    'current_value' => $weeklyCheck['average'],
+                    'limit' => $weeklyCheck['limit'],
+                    'date' => $todayKey
+                ]);
+            }
+            $warningsSentToday[$cacheKey . '_weekly'] = true;
+        }
+    }
+
+    /**
+     * Check mandatory breaks and return violations as array
+     * 
+     * @param TimeEntry $timeEntry
+     * @return array Array of violation information
+     */
+    private function checkMandatoryBreaksWithResult(TimeEntry $timeEntry): array
+    {
+        $violations = [];
+        $duration = $timeEntry->getDurationHours();
+        $breakDuration = $timeEntry->getBreakDurationHours();
+
+        if ($duration >= 6 && $breakDuration < 0.5) { // 30 minutes break required
+            $violation = $this->violationMapper->createViolation(
+                $timeEntry->getUserId(),
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
+                $timeEntry->getEndTime() ?: new \DateTime(),
+                $timeEntry->getId(),
+                ComplianceViolation::SEVERITY_ERROR
+            );
+            
+            $violations[] = [
+                'id' => $violation->getId(),
+                'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                'severity' => ComplianceViolation::SEVERITY_ERROR,
+                'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work')
+            ];
+            
+            // Send notification
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                    'id' => $violation->getId(),
+                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                    'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
+                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                    'severity' => ComplianceViolation::SEVERITY_ERROR
+                ]);
+            }
+        } elseif ($duration >= 9 && $breakDuration < 0.75) { // 45 minutes break required
+            $violation = $this->violationMapper->createViolation(
+                $timeEntry->getUserId(),
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $this->l10n->t('Mandatory 45-minute break missing after 9 hours of work'),
+                $timeEntry->getEndTime() ?: new \DateTime(),
+                $timeEntry->getId(),
+                ComplianceViolation::SEVERITY_ERROR
+            );
+            
+            $violations[] = [
+                'id' => $violation->getId(),
+                'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                'severity' => ComplianceViolation::SEVERITY_ERROR,
+                'message' => $this->l10n->t('Mandatory 45-minute break missing after 9 hours of work')
+            ];
+            
+            // Send notification
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                    'id' => $violation->getId(),
+                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                    'message' => $this->l10n->t('Mandatory 45-minute break missing after 9 hours of work'),
+                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                    'severity' => ComplianceViolation::SEVERITY_ERROR
+                ]);
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Check excessive working hours and return violations as array
+     * 
+     * @param TimeEntry $timeEntry
+     * @return array Array of violation information
+     */
+    private function checkExcessiveWorkingHoursWithResult(TimeEntry $timeEntry): array
+    {
+        $violations = [];
+        // Use working duration (excluding breaks) - this is the actual work time according to ArbZG
+        $workingDuration = $timeEntry->getWorkingDurationHours();
+
+        if ($workingDuration !== null && $workingDuration > 10) {
+            $violation = $this->violationMapper->createViolation(
+                $timeEntry->getUserId(),
+                ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,
+                $this->l10n->t('Working hours exceeded 10 hours in a single day'),
+                $timeEntry->getEndTime() ?: new \DateTime(),
+                $timeEntry->getId(),
+                ComplianceViolation::SEVERITY_ERROR
+            );
+            
+            $violations[] = [
+                'id' => $violation->getId(),
+                'type' => ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,
+                'severity' => ComplianceViolation::SEVERITY_ERROR,
+                'message' => $this->l10n->t('Working hours exceeded 10 hours in a single day')
+            ];
+            
+            // Send notification
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                    'id' => $violation->getId(),
+                    'type' => ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,
+                    'message' => $this->l10n->t('Working hours exceeded 10 hours in a single day'),
+                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                    'severity' => ComplianceViolation::SEVERITY_ERROR
+                ]);
+            }
+        }
+
+        return $violations;
     }
 
     /**
      * Check if minimum rest period is met (11 hours between shifts)
+     * 
+     * Checks both completed entries (with endTime) and paused entries (with updatedAt as "end time")
      *
      * @param string $userId
      * @return bool
      */
     private function checkRestPeriod(string $userId): bool
     {
+        // First check completed entries
         $lastCompletedEntry = $this->getLastCompletedEntry($userId);
-        if (!$lastCompletedEntry || !$lastCompletedEntry->getEndTime()) {
+        $lastEndTime = $lastCompletedEntry && $lastCompletedEntry->getEndTime() 
+            ? $lastCompletedEntry->getEndTime() 
+            : null;
+        
+        // Also check for paused entries (clocked out but not completed)
+        // Use updatedAt as the "end time" for rest period calculation
+        if (!$lastEndTime) {
+            $allEntries = $this->timeEntryMapper->findByUser($userId);
+            $lastPausedEntry = null;
+            foreach ($allEntries as $entry) {
+                if ($entry->getStatus() === TimeEntry::STATUS_PAUSED && $entry->getUpdatedAt() !== null) {
+                    if ($lastPausedEntry === null || $entry->getUpdatedAt() > $lastPausedEntry->getUpdatedAt()) {
+                        $lastPausedEntry = $entry;
+                    }
+                }
+            }
+            if ($lastPausedEntry && $lastPausedEntry->getUpdatedAt()) {
+                $lastEndTime = $lastPausedEntry->getUpdatedAt();
+            }
+        }
+        
+        if (!$lastEndTime) {
             return true; // No previous entry to check against
         }
 
-        $lastEndTime = $lastCompletedEntry->getEndTime();
         $now = new \DateTime();
         $hoursSinceLastEntry = ($now->getTimestamp() - $lastEndTime->getTimestamp()) / 3600;
 
         return $hoursSinceLastEntry >= 11;
+    }
+
+    /**
+     * Check if minimum rest period is met for a specific start time (11 hours between shifts)
+     * 
+     * This method is used for validating manual time entries before they are saved.
+     * It checks if the provided start time violates the 11-hour rest period requirement
+     * since the last completed entry's end time.
+     *
+     * @param string $userId
+     * @param \DateTime $startTime The start time to check
+     * @param int|null $excludeEntryId Optional: exclude this entry ID from the check (for updates)
+     * @return array Array with 'valid' (bool) and 'message' (string) if invalid
+     */
+    public function checkRestPeriodForStartTime(string $userId, \DateTime $startTime, ?int $excludeEntryId = null): array
+    {
+        $lastCompletedEntry = $this->getLastCompletedEntry($userId);
+        if (!$lastCompletedEntry || !$lastCompletedEntry->getEndTime()) {
+            return ['valid' => true, 'message' => null]; // No previous entry to check against
+        }
+
+        // Exclude the current entry if updating (to avoid false positives)
+        if ($excludeEntryId !== null && $lastCompletedEntry->getId() === $excludeEntryId) {
+            // Find the second-to-last completed entry
+            $allEntries = $this->timeEntryMapper->findByUser($userId);
+            $lastCompletedEntry = null;
+            foreach ($allEntries as $entry) {
+                if ($entry->getId() === $excludeEntryId) {
+                    continue; // Skip the entry being updated
+                }
+                if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && $entry->getEndTime() !== null) {
+                    if ($lastCompletedEntry === null || $entry->getEndTime() > $lastCompletedEntry->getEndTime()) {
+                        $lastCompletedEntry = $entry;
+                    }
+                }
+            }
+            
+            if (!$lastCompletedEntry || !$lastCompletedEntry->getEndTime()) {
+                return ['valid' => true, 'message' => null]; // No other previous entry
+            }
+        }
+
+        $lastEndTime = $lastCompletedEntry->getEndTime();
+        
+        // IMPORTANT: Check if it's the same day
+        // ArbZG §5 (11-hour rest period) applies between different work days, not within the same day
+        // On the same day, multiple work periods are allowed (work interruptions, not separate shifts)
+        $isSameDay = $lastEndTime->format('Y-m-d') === $startTime->format('Y-m-d');
+        
+        if ($isSameDay) {
+            // Same day: No rest period check required (it's a work interruption, not a new shift)
+            // However, we still need to check if maximum daily hours would be exceeded
+            // This check is done separately in TimeEntry::validate() and TimeTrackingService::clockIn()
+            return ['valid' => true, 'message' => null];
+        }
+
+        // Different day: Check 11-hour rest period (ArbZG §5)
+        $hoursSinceLastEntry = ($startTime->getTimestamp() - $lastEndTime->getTimestamp()) / 3600;
+
+        if ($hoursSinceLastEntry < 11) {
+            $earliestStartTime = clone $lastEndTime;
+            $earliestStartTime->modify('+11 hours');
+            $hoursRemaining = ($earliestStartTime->getTimestamp() - $startTime->getTimestamp()) / 3600;
+            
+            return [
+                'valid' => false,
+                'message' => $this->l10n->t(
+                    'Minimum 11-hour rest period required between shifts (ArbZG §5). Your last shift ended at %s. This entry cannot start before %s (%.1f hours required).',
+                    [
+                        $lastEndTime->format('H:i'),
+                        $earliestStartTime->format('Y-m-d H:i'),
+                        max(0, $hoursRemaining)
+                    ]
+                )
+            ];
+        }
+
+        return ['valid' => true, 'message' => null];
     }
 
     /**
@@ -280,9 +660,10 @@ class ComplianceService
      */
     private function checkExcessiveWorkingHours(TimeEntry $timeEntry): void
     {
-        $duration = $timeEntry->getDurationHours();
+        // Use working duration (excluding breaks) - this is the actual work time according to ArbZG
+        $workingDuration = $timeEntry->getWorkingDurationHours();
 
-        if ($duration > 10) {
+        if ($workingDuration !== null && $workingDuration > 10) {
             $violation = $this->violationMapper->createViolation(
                 $timeEntry->getUserId(),
                 ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,

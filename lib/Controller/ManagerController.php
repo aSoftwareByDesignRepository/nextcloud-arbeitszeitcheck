@@ -663,6 +663,32 @@ class ManagerController extends Controller
 
 			$updatedEntry = $timeEntryMapper->update($entry);
 
+			// Real-time compliance check when approving a time entry
+			// Based on industry best practices: immediate compliance checking upon approval
+			if ($updatedEntry->getStatus() === \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED && $updatedEntry->getEndTime() !== null) {
+				try {
+					$config = \OCP\Server::get(\OCP\IConfig::class);
+					$realTimeComplianceEnabled = $config->getAppValue('arbeitszeitcheck', 'realtime_compliance_check', '1') === '1';
+					
+					if ($realTimeComplianceEnabled && $this->complianceService) {
+						$strictMode = $config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+						$this->complianceService->checkComplianceForCompletedEntry($updatedEntry, $strictMode);
+						
+						\OCP\Log\logger('arbeitszeitcheck')->info('Real-time compliance check performed on approved entry', [
+							'time_entry_id' => $updatedEntry->getId(),
+							'user_id' => $updatedEntry->getUserId(),
+							'approved_by' => $managerId
+						]);
+					}
+				} catch (\Throwable $e) {
+					// Log error but don't fail the approval
+					\OCP\Log\logger('arbeitszeitcheck')->error('Error in compliance check during approval: ' . $e->getMessage(), [
+						'time_entry_id' => $updatedEntry->getId(),
+						'exception' => $e
+					]);
+				}
+			}
+
 			// Create audit log
 			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
 			$auditLogMapper->logAction(

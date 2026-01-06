@@ -70,8 +70,94 @@ class TimeTrackingService
 		// Check if there's a paused or unfinished entry for today that we can resume
 		$pausedEntry = $this->timeEntryMapper->findPausedOrUnfinishedTodayByUser($userId);
 		if ($pausedEntry !== null) {
-			// Resume the paused entry
 			$now = new \DateTime();
+			$pausedEntryStartTime = $pausedEntry->getStartTime();
+			$pausedEntryUpdatedAt = $pausedEntry->getUpdatedAt();
+			
+			// Check if it's the same day as the paused entry
+			$isSameDay = $pausedEntryStartTime && 
+				$pausedEntryStartTime->format('Y-m-d') === $now->format('Y-m-d');
+			
+			// Calculate total working hours for today (only from COMPLETED entries)
+			// This excludes the paused entry, which we'll add separately
+			$today = new \DateTime();
+			$today->setTime(0, 0, 0);
+			$tomorrow = clone $today;
+			$tomorrow->modify('+1 day');
+			$todayHours = $this->timeEntryMapper->getTotalHoursByUserAndDateRange($userId, $today, $tomorrow);
+			
+			// Calculate working hours from the paused entry (if it was worked on)
+			$pausedEntryWorkingHours = 0.0;
+			if ($pausedEntryStartTime && $pausedEntryUpdatedAt) {
+				// Calculate duration from start to when it was paused (clock-out time)
+				$pausedDuration = ($pausedEntryUpdatedAt->getTimestamp() - $pausedEntryStartTime->getTimestamp()) / 3600;
+				
+				// Subtract break time from paused entry
+				$pausedBreakHours = $pausedEntry->getBreakDurationHours();
+				$pausedEntryWorkingHours = max(0, $pausedDuration - $pausedBreakHours);
+			}
+			
+			// Total working hours if we resume this entry (completed hours + paused entry hours)
+			$maxDailyHours = 10.0; // ArbZG §3 maximum
+			$totalWorkingHoursIfResumed = $todayHours + $pausedEntryWorkingHours;
+			
+			// Check if resuming would exceed maximum daily hours (ArbZG §3)
+			// This check is always enforced, regardless of same day or different day
+			if ($totalWorkingHoursIfResumed > $maxDailyHours) {
+				throw new \Exception($this->l10n->t(
+					'Cannot resume: Maximum daily working hours (10h) would be exceeded. Current: %.1f hours, would be: %.1f hours (ArbZG §3).',
+					[
+						$todayHours,
+						$totalWorkingHoursIfResumed
+					]
+				));
+			}
+			
+			// Check rest period (ArbZG §5): Only required between different days
+			// On the same day, resuming is allowed without 11h rest period (it's a work interruption, not a new shift)
+			if (!$isSameDay && $pausedEntryUpdatedAt) {
+				$hoursSincePause = ($now->getTimestamp() - $pausedEntryUpdatedAt->getTimestamp()) / 3600;
+				
+				if ($hoursSincePause < 11) {
+					// Calculate when user can clock in again
+					$earliestClockIn = clone $pausedEntryUpdatedAt;
+					$earliestClockIn->modify('+11 hours');
+					$hoursRemaining = ($earliestClockIn->getTimestamp() - $now->getTimestamp()) / 3600;
+					
+					throw new \Exception($this->l10n->t(
+						'Minimum 11-hour rest period required between shifts (ArbZG §5). Your last shift ended at %s. You can clock in after %s (in %.1f hours).',
+						[
+							$pausedEntryUpdatedAt->format('H:i'),
+							$earliestClockIn->format('H:i'),
+							max(0, $hoursRemaining)
+						]
+					));
+				}
+			}
+			
+			// Resume the paused entry
+			// IMPORTANT: Track the pause period (time between clock-out and clock-in) in breaks JSON
+			// This ensures that the pause time is correctly subtracted from total working time
+			$pauseStartTime = $pausedEntryUpdatedAt; // When user clocked out (paused)
+			$pauseEndTime = $now; // When user clocked in again (resumed)
+			
+			// Get existing breaks
+			$breaksJson = $pausedEntry->getBreaks();
+			$breaks = [];
+			if ($breaksJson !== null && $breaksJson !== '') {
+				$breaks = json_decode($breaksJson, true) ?? [];
+			}
+			
+			// Add the pause period as a break (clock-out to clock-in)
+			$breaks[] = [
+				'start' => $pauseStartTime->format('c'),
+				'end' => $pauseEndTime->format('c'),
+				'duration_minutes' => round(($pauseEndTime->getTimestamp() - $pauseStartTime->getTimestamp()) / 60),
+				'automatic' => true,
+				'reason' => $this->l10n->t('Automatic pause: Clock-out period (resumed entry)')
+			];
+			
+			$pausedEntry->setBreaks(json_encode($breaks));
 			$pausedEntry->setStatus(TimeEntry::STATUS_ACTIVE);
 			$pausedEntry->setUpdatedAt($now);
 			
@@ -154,28 +240,38 @@ class TimeTrackingService
 	 */
 	public function clockOut(string $userId): TimeEntry
 	{
+		// Check for active entry OR break entry (user can clock out during break)
 		$activeEntry = $this->timeEntryMapper->findActiveByUser($userId);
-		if ($activeEntry === null) {
+		$breakEntry = $this->timeEntryMapper->findOnBreakByUser($userId);
+		
+		$currentEntry = $activeEntry ?: $breakEntry;
+		if ($currentEntry === null) {
 			throw new \Exception($this->l10n->t('User is not currently clocked in'));
 		}
 
 		$now = new \DateTime();
+		
+		// If user is on break, end the break first
+		if ($currentEntry->getStatus() === TimeEntry::STATUS_BREAK) {
+			$currentEntry->setBreakEndTime($now);
+		}
+		
 		// Don't set endTime - allow user to resume work later
 		// Only set status to paused so user can continue working later
-		$activeEntry->setStatus(TimeEntry::STATUS_PAUSED);
-		$activeEntry->setUpdatedAt($now);
+		$currentEntry->setStatus(TimeEntry::STATUS_PAUSED);
+		$currentEntry->setUpdatedAt($now);
 
-		$updatedEntry = $this->timeEntryMapper->update($activeEntry);
+		$updatedEntry = $this->timeEntryMapper->update($currentEntry);
 
 		// Note: We don't check compliance after clocking out since the entry is not completed
 		// Compliance will be checked when the entry is actually completed (endTime is set)
 
 		// Log the action
 		try {
-			$oldSummary = $activeEntry->getSummary();
+			$oldSummary = $currentEntry->getSummary();
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting old summary for clock_out audit log: ' . $e->getMessage(), ["exception" => $e]);
-			$oldSummary = ['id' => $activeEntry->getId(), 'userId' => $userId];
+			$oldSummary = ['id' => $currentEntry->getId(), 'userId' => $userId];
 		}
 		try {
 			$newSummary = $updatedEntry->getSummary();
@@ -335,33 +431,16 @@ class TimeTrackingService
 
 			$now = new \DateTime();
 			$sessionStart = $currentEntry->getStartTime();
+			
+			// Calculate session duration from start time to now
 			$sessionDuration = $sessionStart ? ($now->getTimestamp() - $sessionStart->getTimestamp()) : 0;
 			
 			// Subtract all break time from session duration
-			$totalBreakDuration = 0;
-			
-			// Add duration from stored breaks (JSON)
-			$breaksJson = $currentEntry->getBreaks();
-			if ($breaksJson !== null && $breaksJson !== '') {
-				$breaks = json_decode($breaksJson, true) ?? [];
-				foreach ($breaks as $break) {
-					if (isset($break['start']) && isset($break['end'])) {
-						$start = new \DateTime($break['start']);
-						$end = new \DateTime($break['end']);
-						$totalBreakDuration += ($end->getTimestamp() - $start->getTimestamp());
-					}
-				}
-			}
-			
-			// Add current active break if exists
-			$breakStartTime = $currentEntry->getBreakStartTime();
-			$breakEndTime = $currentEntry->getBreakEndTime();
-			
-			if ($breakStartTime !== null) {
-				// If break is active (no end time), subtract time from break start to now
-				$breakEnd = $breakEndTime ?? $now;
-				$totalBreakDuration += ($breakEnd->getTimestamp() - $breakStartTime->getTimestamp());
-			}
+			// This includes regular breaks AND pause periods (clock-out to clock-in)
+			// IMPORTANT: Use getBreakDurationHours() which correctly handles overlapping breaks
+			// by merging them, so overlapping time periods are counted only once
+			$totalBreakDurationHours = $currentEntry->getBreakDurationHours();
+			$totalBreakDuration = $totalBreakDurationHours * 3600; // Convert hours to seconds
 			
 			$sessionDuration -= $totalBreakDuration;
 			
@@ -403,6 +482,7 @@ class TimeTrackingService
 
 	/**
 	 * Get hours worked today by a user
+	 * Includes both completed entries and active/paused entries
 	 *
 	 * @param string $userId
 	 * @return float
@@ -415,7 +495,41 @@ class TimeTrackingService
 			$tomorrow = clone $today;
 			$tomorrow->modify('+1 day');
 
-			return $this->timeEntryMapper->getTotalHoursByUserAndDateRange($userId, $today, $tomorrow);
+			// Get hours from completed entries
+			$totalHours = $this->timeEntryMapper->getTotalHoursByUserAndDateRange($userId, $today, $tomorrow);
+			
+			// Add hours from active/paused entries (not yet completed)
+			$activeEntry = $this->timeEntryMapper->findActiveByUser($userId);
+			$breakEntry = $this->timeEntryMapper->findOnBreakByUser($userId);
+			$pausedEntry = $this->timeEntryMapper->findPausedOrUnfinishedTodayByUser($userId);
+			
+			$currentEntry = $activeEntry ?: $breakEntry ?: $pausedEntry;
+			
+			if ($currentEntry && $currentEntry->getStartTime()) {
+				$entryStart = $currentEntry->getStartTime();
+				$entryStart->setTime(0, 0, 0);
+				
+				// Only count if entry started today
+				if ($entryStart->format('Y-m-d') === $today->format('Y-m-d')) {
+					$now = new \DateTime();
+					$sessionStart = $currentEntry->getStartTime();
+					
+					// Calculate session duration from start time to now
+					$sessionDuration = $sessionStart ? ($now->getTimestamp() - $sessionStart->getTimestamp()) : 0;
+					
+					// Subtract all break time from session duration
+					$totalBreakDurationHours = $currentEntry->getBreakDurationHours();
+					$totalBreakDuration = $totalBreakDurationHours * 3600; // Convert hours to seconds
+					
+					$sessionDuration -= $totalBreakDuration;
+					$sessionDuration = max(0, $sessionDuration);
+					
+					// Add to total hours
+					$totalHours += $sessionDuration / 3600;
+				}
+			}
+
+			return $totalHours;
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting today hours for user ' . $userId . ': ' . $e->getMessage(), ["exception" => $e]);
 			return 0.0;
@@ -472,6 +586,125 @@ class TimeTrackingService
 		}
 		
 		return 0; // No break required if less than 6 hours
+	}
+
+	/**
+	 * Calculate and set automatic break if no break was entered and break is legally required
+	 * 
+	 * Automatically calculates the legally required break time (ArbZG §4) and adds it to the time entry
+	 * if no break was manually entered. The break is placed in the middle of the working period.
+	 * 
+	 * @param TimeEntry $timeEntry The time entry to process
+	 * @return bool True if automatic break was added, false otherwise
+	 */
+	public function calculateAndSetAutomaticBreak(TimeEntry $timeEntry): bool
+	{
+		// Only process completed entries with start and end time
+		if (!$timeEntry->getStartTime() || !$timeEntry->getEndTime()) {
+			return false;
+		}
+
+		// Check if break was already manually entered
+		$hasManualBreak = false;
+		
+		// Check for breakStartTime/breakEndTime (single break)
+		if ($timeEntry->getBreakStartTime() !== null && $timeEntry->getBreakEndTime() !== null) {
+			$hasManualBreak = true;
+		}
+		
+		// Check for breaks in JSON (multiple breaks)
+		$breaksJson = $timeEntry->getBreaks();
+		if ($breaksJson !== null && $breaksJson !== '') {
+			$breaks = json_decode($breaksJson, true) ?? [];
+			if (!empty($breaks)) {
+				$hasManualBreak = true;
+			}
+		}
+
+		// If break was already entered, don't add automatic break
+		if ($hasManualBreak) {
+			return false;
+		}
+
+		// Calculate total duration (including any breaks that might be in the future)
+		$startTime = $timeEntry->getStartTime();
+		$endTime = $timeEntry->getEndTime();
+		$totalDurationSeconds = $endTime->getTimestamp() - $startTime->getTimestamp();
+		$totalDurationHours = $totalDurationSeconds / 3600;
+
+		// IMPORTANT: For entries that span multiple work periods (e.g., paused and resumed),
+		// we need to calculate the required break based on TOTAL WORKING TIME OF THE DAY,
+		// not just the duration of this single entry.
+		// This is because ArbZG §4 requires breaks based on total working hours per day.
+		
+		// Get total working hours for the day (including this entry and any other completed entries)
+		$userId = $timeEntry->getUserId();
+		$entryDate = clone $startTime;
+		$entryDate->setTime(0, 0, 0);
+		$entryDateEnd = clone $entryDate;
+		$entryDateEnd->modify('+1 day');
+		
+		// Get all completed entries for this day
+		$dayEntries = $this->timeEntryMapper->findByUserAndDateRange($userId, $entryDate, $entryDateEnd);
+		$totalWorkingHoursForDay = 0.0;
+		foreach ($dayEntries as $dayEntry) {
+			if ($dayEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $dayEntry->getEndTime() !== null) {
+				// Exclude this entry (we'll add it separately)
+				if ($dayEntry->getId() !== $timeEntry->getId()) {
+					$totalWorkingHoursForDay += $dayEntry->getWorkingDurationHours() ?? 0.0;
+				}
+			}
+		}
+		
+		// Add working hours from this entry (excluding breaks)
+		// For entries that were paused and resumed, we need to calculate working time correctly
+		// Working time = total duration - break time
+		$entryBreakHours = $timeEntry->getBreakDurationHours();
+		$entryWorkingHours = max(0, $totalDurationHours - $entryBreakHours);
+		$totalWorkingHoursForDay += $entryWorkingHours;
+
+		// Calculate required break based on TOTAL working hours of the day (ArbZG §4)
+		$requiredBreakMinutes = $this->calculateRequiredBreakMinutes($totalWorkingHoursForDay);
+
+		// If no break is required, nothing to do
+		if ($requiredBreakMinutes <= 0) {
+			return false;
+		}
+
+		// Calculate break duration in seconds
+		$breakDurationSeconds = $requiredBreakMinutes * 60;
+
+		// Place break in the middle of the working period
+		$workDurationSeconds = $totalDurationSeconds;
+		$breakStartOffset = ($workDurationSeconds - $breakDurationSeconds) / 2;
+		$breakStartTime = clone $startTime;
+		$breakStartTime->modify('+' . round($breakStartOffset) . ' seconds');
+		$breakEndTime = clone $breakStartTime;
+		$breakEndTime->modify('+' . $breakDurationSeconds . ' seconds');
+
+		// Store automatic break in breaks JSON array (for multiple breaks support)
+		$breaks = [];
+		$breaks[] = [
+			'start' => $breakStartTime->format('c'),
+			'end' => $breakEndTime->format('c'),
+			'duration_minutes' => $requiredBreakMinutes,
+			'automatic' => true, // Mark as automatically generated
+			'reason' => $this->l10n->t('Automatically added: Legal break requirement (ArbZG §4)')
+		];
+
+		$timeEntry->setBreaks(json_encode($breaks));
+
+		// Log the automatic break addition
+		\OCP\Log\logger('arbeitszeitcheck')->info('Automatic break added to time entry', [
+			'time_entry_id' => $timeEntry->getId(),
+			'user_id' => $timeEntry->getUserId(),
+			'total_duration_hours' => round($totalDurationHours, 2),
+			'required_break_minutes' => $requiredBreakMinutes,
+			'break_start' => $breakStartTime->format('c'),
+			'break_end' => $breakEndTime->format('c')
+		]);
+
+		return true;
 	}
 
 	/**

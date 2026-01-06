@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\AppInfo;
 
 use OCA\ArbeitszeitCheck\Capabilities;
 use OCA\ArbeitszeitCheck\Listener\LoadSidebarScripts;
+use OCA\ArbeitszeitCheck\Listener\CSPListener;
 use OCA\ArbeitszeitCheck\Notification\Notifier;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
@@ -30,6 +31,7 @@ use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
 use OCP\Notification\IManager as INotificationManager;
+use OCP\Security\CSP\AddContentSecurityPolicyEvent;
 
 /**
  * Class Application
@@ -55,6 +57,7 @@ class Application extends App implements IBootstrap {
 
 		// Register event listeners
 		$context->registerEventListener(LoadSidebar::class, LoadSidebarScripts::class);
+		$context->registerEventListener(AddContentSecurityPolicyEvent::class, CSPListener::class);
 
 		// Register mappers
 		$context->registerService(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class, function($c) {
@@ -196,9 +199,27 @@ class Application extends App implements IBootstrap {
 		});
 
 		// Load CSS and JS files ONLY on arbeitszeitcheck routes to avoid leaking into other apps
+		// Use a safer approach that doesn't fail if IRequest is not available (e.g., during migrations)
 		try {
-			$request = $this->getContainer()->get(\OCP\IRequest::class);
+			$container = $this->getContainer();
+			
+			// Try to get IRequest - if it fails, we're likely in CLI or migration context
+			try {
+				$request = $container->get(\OCP\IRequest::class);
+			} catch (\Throwable $e) {
+				// Request not available (e.g., during CLI operations or migrations)
+				return;
+			}
+			
+			if ($request === null) {
+				return;
+			}
+			
 			$path = $request->getPathInfo();
+			if ($path === null || $path === '') {
+				return;
+			}
+			
 			if (strpos($path, '/apps/arbeitszeitcheck') === 0 || strpos($path, '/index.php/apps/arbeitszeitcheck') === 0) {
 				\OCP\Util::addStyle(self::APP_ID, 'common/base');
 				\OCP\Util::addStyle(self::APP_ID, 'common/components');
@@ -212,7 +233,8 @@ class Application extends App implements IBootstrap {
 				\OCP\Util::addScript(self::APP_ID, 'common/validation');
 			}
 		} catch (\Throwable $e) {
-			// If request is unavailable, do nothing to keep other apps safe
+			// If request is unavailable or any error occurs, do nothing to keep other apps safe
+			// This is expected during migrations, CLI operations, etc.
 		}
 	}
 }

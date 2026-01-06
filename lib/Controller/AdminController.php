@@ -396,6 +396,8 @@ class AdminController extends Controller
 			// List of allowed admin settings keys
 			$allowedKeys = [
 				'autoComplianceCheck' => 'auto_compliance_check',
+				'realtimeComplianceCheck' => 'realtime_compliance_check',
+				'complianceStrictMode' => 'compliance_strict_mode',
 				'requireBreakJustification' => 'require_break_justification',
 				'enableViolationNotifications' => 'enable_violation_notifications',
 				'maxDailyHours' => 'max_daily_hours',
@@ -413,7 +415,7 @@ class AdminController extends Controller
 					$value = $params[$paramKey];
 
 					// Validate and convert value based on type
-					if ($paramKey === 'autoComplianceCheck' || $paramKey === 'requireBreakJustification' || $paramKey === 'enableViolationNotifications') {
+					if ($paramKey === 'autoComplianceCheck' || $paramKey === 'realtimeComplianceCheck' || $paramKey === 'complianceStrictMode' || $paramKey === 'requireBreakJustification' || $paramKey === 'enableViolationNotifications') {
 						$value = ($value === true || $value === 'true' || $value === '1') ? '1' : '0';
 					} elseif ($paramKey === 'maxDailyHours' || $paramKey === 'minRestPeriod' || $paramKey === 'defaultWorkingHours') {
 						$value = (string)max(0, (float)$value);

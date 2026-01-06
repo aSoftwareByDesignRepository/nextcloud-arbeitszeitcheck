@@ -257,6 +257,37 @@
     color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
 }
 
+/* Timer warnings for maximum working hours (ArbZG §3) */
+.timer-value.timer-warning {
+    color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+.timer-value.timer-error {
+    color: var(--arbeitszeitcheck-color-error, var(--color-error, #e9322d));
+    animation: pulse-error 1s ease-in-out infinite;
+}
+
+.session-timer.timer-warning {
+    border-color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+    background: color-mix(in srgb, var(--arbeitszeitcheck-color-warning, #ffa726) 15%, var(--arbeitszeitcheck-color-background-elevated, #fff));
+}
+
+.session-timer.timer-exceeded {
+    border-color: var(--arbeitszeitcheck-color-error, var(--color-error, #e9322d));
+    background: color-mix(in srgb, var(--arbeitszeitcheck-color-error, #e9322d) 15%, var(--arbeitszeitcheck-color-background-elevated, #fff));
+}
+
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes pulse-error {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 .dashboard-status-card__meta {
     margin-top: var(--space-2, 0.5rem);
     font-size: 0.85rem;

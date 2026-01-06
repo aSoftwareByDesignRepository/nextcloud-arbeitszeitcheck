@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -110,17 +111,17 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                             </li>
                         </ol>
                         <div class="card-actions">
-                            <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>" 
-                               class="btn btn--primary"
-                               aria-label="<?php p($l->t('Go to time entries to see how to add entries manually')); ?>"
-                               title="<?php p($l->t('Click to learn more about adding time entries manually')); ?>">
+                            <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
+                                class="btn btn--primary"
+                                aria-label="<?php p($l->t('Go to time entries to see how to add entries manually')); ?>"
+                                title="<?php p($l->t('Click to learn more about adding time entries manually')); ?>">
                                 <?php p($l->t('Learn More About Time Entries')); ?>
                             </a>
-                            <button type="button" 
-                                    class="btn btn--secondary" 
-                                    id="dismiss-welcome"
-                                    aria-label="<?php p($l->t('Dismiss this welcome message')); ?>"
-                                    title="<?php p($l->t('Click to hide this welcome message')); ?>">
+                            <button type="button"
+                                class="btn btn--secondary"
+                                id="dismiss-welcome"
+                                aria-label="<?php p($l->t('Dismiss this welcome message')); ?>"
+                                title="<?php p($l->t('Click to hide this welcome message')); ?>">
                                 <?php p($l->t('Got it, thanks!')); ?>
                             </button>
                         </div>
@@ -154,7 +155,11 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                 $startedAt = null;
                 if (!empty($status['current_entry']['startTime'])) {
                     try {
-                        $startedAt = (new \DateTime($status['current_entry']['startTime']))->format('H:i');
+                        // Get user timezone
+                        $userTimezone = \OC::$server->get(\OCP\IDateTimeZone::class)->getTimeZone();
+                        $startTime = new \DateTime($status['current_entry']['startTime']);
+                        $startTime->setTimezone($userTimezone);
+                        $startedAt = $startTime->format('H:i');
                     } catch (\Throwable $e) {
                         $startedAt = null;
                     }
@@ -179,7 +184,16 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                                     <span class="timer-value" id="break-timer-value"><?php p($breakDurationFormatted); ?></span>
                                     <?php if ($breakStartTime !== null): ?>
                                         <div class="dashboard-status-card__meta">
-                                            <?php p($l->t('Break started at')); ?> <?php p($breakStartTime->format('H:i')); ?>
+                                            <?php
+                                            try {
+                                                // Get user timezone
+                                                $userTimezone = \OC::$server->get(\OCP\IDateTimeZone::class)->getTimeZone();
+                                                $breakStartTime->setTimezone($userTimezone);
+                                                p($l->t('Break started at')); ?> <?php p($breakStartTime->format('H:i'));
+                                                                                } catch (\Throwable $e) {
+                                                                                    p($l->t('Break started at')); ?> <?php p($breakStartTime->format('H:i'));
+                                                                                }
+                                                                                    ?>
                                         </div>
                                     <?php endif; ?>
                                 </div>
@@ -204,41 +218,41 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
 
                         <div class="card-actions">
                             <?php if (($status['status'] ?? 'clocked_out') === 'clocked_out' || ($status['status'] ?? 'clocked_out') === 'paused'): ?>
-                                <button id="btn-clock-in" 
-                                        class="btn btn--primary" 
-                                        type="button"
-                                        aria-label="<?php p($l->t('Clock in to start tracking your working time')); ?>"
-                                        title="<?php p($l->t('Click to clock in and start tracking your working time')); ?>">
+                                <button id="btn-clock-in"
+                                    class="btn btn--primary"
+                                    type="button"
+                                    aria-label="<?php p($l->t('Clock in to start tracking your working time')); ?>"
+                                    title="<?php p($l->t('Click to clock in and start tracking your working time')); ?>">
                                     <?php p($l->t('Clock In')); ?>
                                 </button>
                             <?php elseif (($status['status'] ?? 'clocked_out') === 'active'): ?>
-                                <button id="btn-start-break" 
-                                        class="btn btn--secondary" 
-                                        type="button"
-                                        aria-label="<?php p($l->t('Start a break from work')); ?>"
-                                        title="<?php p($l->t('Click to start a break. You must take breaks according to German labor law.')); ?>">
+                                <button id="btn-start-break"
+                                    class="btn btn--secondary"
+                                    type="button"
+                                    aria-label="<?php p($l->t('Start a break from work')); ?>"
+                                    title="<?php p($l->t('Click to start a break. You must take breaks according to German labor law.')); ?>">
                                     <?php p($l->t('Start Break')); ?>
                                 </button>
-                                <button id="btn-clock-out" 
-                                        class="btn btn--danger" 
-                                        type="button"
-                                        aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
-                                        title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">
+                                <button id="btn-clock-out"
+                                    class="btn btn--danger"
+                                    type="button"
+                                    aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
+                                    title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">
                                     <?php p($l->t('Clock Out')); ?>
                                 </button>
                             <?php elseif (($status['status'] ?? 'clocked_out') === 'break'): ?>
-                                <button id="btn-end-break" 
-                                        class="btn btn--primary" 
-                                        type="button"
-                                        aria-label="<?php p($l->t('End your break and return to work')); ?>"
-                                        title="<?php p($l->t('Click to end your break and continue working')); ?>">
+                                <button id="btn-end-break"
+                                    class="btn btn--primary"
+                                    type="button"
+                                    aria-label="<?php p($l->t('End your break and return to work')); ?>"
+                                    title="<?php p($l->t('Click to end your break and continue working')); ?>">
                                     <?php p($l->t('End Break')); ?>
                                 </button>
-                                <button id="btn-clock-out" 
-                                        class="btn btn--danger" 
-                                        type="button"
-                                        aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
-                                        title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">
+                                <button id="btn-clock-out"
+                                    class="btn btn--danger"
+                                    type="button"
+                                    aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
+                                    title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">
                                     <?php p($l->t('Clock Out')); ?>
                                 </button>
                             <?php endif; ?>
@@ -273,104 +287,217 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
 
         <!-- Recent Entries Section -->
         <div class="section">
-                <div class="section-header">
-                    <h3><?php p($l->t('Recent Entries')); ?></h3>
-                    <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>" 
-                       class="btn btn--secondary">
-                        <?php p($l->t('View All')); ?>
-                    </a>
-                </div>
-                
-                <div class="table-container">
-                    <table class="table table--hover">
-                        <thead>
-                            <tr>
-                                <th><?php p($l->t('Date')); ?></th>
-                                <th><?php p($l->t('Start')); ?></th>
-                                <th><?php p($l->t('End')); ?></th>
-                                <th><?php p($l->t('Duration')); ?></th>
-                                <th><?php p($l->t('Break')); ?></th>
-                                <th><?php p($l->t('Status')); ?></th>
-                                <th><?php p($l->t('Actions')); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($recentEntries)): ?>
-                                <?php foreach ($recentEntries as $entry): ?>
-                                    <tr>
-                                        <td><?php p($entry->getStartTime()->format('d.m.Y')); ?></td>
-                                        <td><?php p($entry->getStartTime()->format('H:i')); ?></td>
-                                        <td><?php 
-                                            if ($entry->getEndTime()) {
-                                                $endTime = $entry->getEndTime();
-                                                $startDate = $entry->getStartTime()->format('Y-m-d');
-                                                $endDate = $endTime->format('Y-m-d');
-                                                // Show date if end time is on a different day
-                                                if ($startDate !== $endDate) {
-                                                    p($endTime->format('d.m.Y H:i'));
-                                                } else {
-                                                    p($endTime->format('H:i'));
-                                                }
+            <div class="section-header">
+                <h3><?php p($l->t('Recent Entries')); ?></h3>
+                <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
+                    class="btn btn--secondary">
+                    <?php p($l->t('View All')); ?>
+                </a>
+            </div>
+
+            <div class="table-container">
+                <table class="table table--hover">
+                    <thead>
+                        <tr>
+                            <th><?php p($l->t('Date')); ?></th>
+                            <th><?php p($l->t('Start')); ?></th>
+                            <th><?php p($l->t('End')); ?></th>
+                            <th><?php p($l->t('Duration')); ?></th>
+                            <th><?php p($l->t('Break')); ?></th>
+                            <th><?php p($l->t('Status')); ?></th>
+                            <th><?php p($l->t('Actions')); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($recentEntries)): ?>
+                            <?php
+                            // Get user timezone once for all entries
+                            try {
+                                $userTimezone = \OC::$server->get(\OCP\IDateTimeZone::class)->getTimeZone();
+                            } catch (\Throwable $e) {
+                                $userTimezone = new \DateTimeZone(date_default_timezone_get());
+                            }
+                            foreach ($recentEntries as $entry):
+                                // Convert times to user timezone
+                                $startTime = clone $entry->getStartTime();
+                                $startTime->setTimezone($userTimezone);
+                                $endTime = $entry->getEndTime() ? clone $entry->getEndTime() : null;
+                                if ($endTime) {
+                                    $endTime->setTimezone($userTimezone);
+                                }
+                            ?>
+                                <tr>
+                                    <td><?php p($startTime->format('d.m.Y')); ?></td>
+                                    <td><?php p($startTime->format('H:i')); ?></td>
+                                    <td><?php
+                                        if ($endTime) {
+                                            $startDate = $startTime->format('Y-m-d');
+                                            $endDate = $endTime->format('Y-m-d');
+                                            // Show date if end time is on a different day
+                                            if ($startDate !== $endDate) {
+                                                p($endTime->format('d.m.Y H:i'));
                                             } else {
-                                                p('-');
+                                                p($endTime->format('H:i'));
                                             }
+                                        } else {
+                                            p('-');
+                                        }
                                         ?></td>
-                                        <td><?php p(round($entry->getWorkingDurationHours() ?? 0, 2)); ?> h</td>
-                                        <td><?php p(round($entry->getBreakDurationHours() ?? 0, 2)); ?> h</td>
-                                        <td>
-                                            <span class="badge badge--<?php 
-                                                echo match($entry->getStatus()) {
-                                                    'completed' => 'success',
-                                                    'active' => 'primary',
-                                                    'pending_approval' => 'warning',
-                                                    default => 'secondary'
-                                                };
-                                            ?>">
-                                                <?php 
-                                                $statusKey = $entry->getStatus();
-                                                $statusLabel = match($statusKey) {
-                                                    'completed' => $l->t('Completed'),
-                                                    'active' => $l->t('Active'),
-                                                    'pending_approval' => $l->t('Pending Approval'),
-                                                    default => $statusKey
-                                                };
-                                                p($statusLabel);
-                                                ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn--sm btn--secondary" 
-                                                    data-entry-id="<?php p($entry->getId()); ?>"
-                                                    type="button"
-                                                    aria-label="<?php p($l->t('Edit this time entry')); ?>"
-                                                    title="<?php p($l->t('Click to edit this time entry')); ?>">
+                                    <td>
+                                        <?php
+                                        // For active/paused entries, calculate duration manually
+                                        if (!$entry->getEndTime() && $entry->getStartTime()) {
+                                            $now = new \DateTime();
+                                            $sessionStart = $entry->getStartTime();
+                                            $sessionDuration = $sessionStart ? ($now->getTimestamp() - $sessionStart->getTimestamp()) : 0;
+
+                                            // Subtract break time
+                                            $totalBreakDurationHours = $entry->getBreakDurationHours();
+                                            $totalBreakDuration = $totalBreakDurationHours * 3600;
+                                            $sessionDuration -= $totalBreakDuration;
+                                            $sessionDuration = max(0, $sessionDuration);
+
+                                            $workingHours = $sessionDuration / 3600;
+                                            p(round($workingHours, 2)); ?> h
+                                        <?php } else {
+                                            p(round($entry->getWorkingDurationHours() ?? 0, 2)); ?> h
+                                        <?php } ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        // Display break times (start and end) if available
+                                        $breakTimes = [];
+
+                                        // Check for breaks in JSON array (multiple breaks)
+                                        $breaksJson = $entry->getBreaks();
+                                        if ($breaksJson !== null && $breaksJson !== '') {
+                                            $breaks = json_decode($breaksJson, true) ?? [];
+                                            foreach ($breaks as $break) {
+                                                if (isset($break['start']) && isset($break['end'])) {
+                                                    try {
+                                                        $breakStart = new \DateTime($break['start']);
+                                                        $breakStart->setTimezone($userTimezone);
+                                                        $breakEnd = new \DateTime($break['end']);
+                                                        $breakEnd->setTimezone($userTimezone);
+                                                        $breakTimes[] = $breakStart->format('H:i') . ' - ' . $breakEnd->format('H:i');
+                                                    } catch (\Exception $e) {
+                                                        // Skip invalid break times
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Check for single break (breakStartTime/breakEndTime)
+                                        if ($entry->getBreakStartTime() !== null && $entry->getBreakEndTime() !== null) {
+                                            $breakStart = clone $entry->getBreakStartTime();
+                                            $breakStart->setTimezone($userTimezone);
+                                            $breakEnd = clone $entry->getBreakEndTime();
+                                            $breakEnd->setTimezone($userTimezone);
+
+                                            // Only include breaks that are at least 15 minutes (ArbZG §4)
+                                            $breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
+                                            $minBreakDurationSeconds = 900; // 15 minutes
+
+                                            if ($breakDurationSeconds >= $minBreakDurationSeconds) {
+                                                $breakTimes[] = $breakStart->format('H:i') . ' - ' . $breakEnd->format('H:i');
+                                            }
+                                        }
+
+                                        if (!empty($breakTimes)) {
+                                            // Show break times with duration
+                                            $breakDuration = round($entry->getBreakDurationHours() ?? 0, 2);
+                                            echo '<div title="' . htmlspecialchars(implode(', ', $breakTimes)) . '">';
+                                            echo htmlspecialchars(implode(', ', $breakTimes));
+                                            echo ' <span class="text-muted">(' . $breakDuration . ' h)</span>';
+                                            echo '</div>';
+                                        } else {
+                                            // Only show duration if no times available
+                                            $breakDuration = round($entry->getBreakDurationHours() ?? 0, 2);
+                                            if ($breakDuration > 0) {
+                                                echo $breakDuration . ' h';
+                                            } else {
+                                                echo '-';
+                                            }
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge--<?php
+                                                                    echo match ($entry->getStatus()) {
+                                                                        'completed' => 'success',
+                                                                        'active' => 'primary',
+                                                                        'pending_approval' => 'warning',
+                                                                        default => 'secondary'
+                                                                    };
+                                                                    ?>">
+                                            <?php
+                                            $statusKey = $entry->getStatus();
+                                            $statusLabel = match ($statusKey) {
+                                                'completed' => $l->t('Completed'),
+                                                'active' => $l->t('Active'),
+                                                'pending_approval' => $l->t('Pending Approval'),
+                                                default => $statusKey
+                                            };
+                                            p($statusLabel);
+                                            ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        // Show edit button only if entry can be edited
+                                        // Same logic as in time-entries.php:
+                                        // 1. Manual entries (not approved)
+                                        // 2. Entries with pending approval
+                                        // 3. Completed automatic entries (not yet approved)
+                                        // 4. Only entries from the last 2 weeks (14 days) - for data integrity and compliance
+                                        // Do NOT show if entry is already approved or older than 2 weeks
+                                        $isApproved = $entry->getApprovedBy() !== null;
+                                        $entryDate = $entry->getStartTime();
+                                        $twoWeeksAgo = new \DateTime();
+                                        $twoWeeksAgo->modify('-14 days');
+                                        $twoWeeksAgo->setTime(0, 0, 0); // Start of day
+                                        $isWithinTwoWeeks = $entryDate && $entryDate >= $twoWeeksAgo;
+
+                                        $canEdit = !$isApproved && $isWithinTwoWeeks && (
+                                            $entry->getIsManualEntry()
+                                            || $entry->getStatus() === \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL
+                                            || ($entry->getStatus() === \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED && !$entry->getIsManualEntry())
+                                        );
+                                        if ($canEdit):
+                                        ?>
+                                            <button class="btn btn--sm btn--secondary"
+                                                data-entry-id="<?php p($entry->getId()); ?>"
+                                                type="button"
+                                                aria-label="<?php p($l->t('Edit this time entry')); ?>"
+                                                title="<?php p($l->t('Click to edit this time entry')); ?>">
                                                 <?php p($l->t('Edit')); ?>
                                             </button>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="7" class="empty-state">
-                                        <div class="empty-state">
-                                            <p><?php p($l->t('No recent entries found')); ?></p>
-                                            <p class="empty-state-description">
-                                                <?php p($l->t('Your recent time entries will appear here. Start by clocking in to track your working time.')); ?>
-                                            </p>
-                                            <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>" 
-                                               class="btn btn--primary">
-                                                <?php p($l->t('View All Time Entries')); ?>
-                                            </a>
-                                        </div>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="7" class="empty-state">
+                                    <div class="empty-state">
+                                        <p><?php p($l->t('No recent entries found')); ?></p>
+                                        <p class="empty-state-description">
+                                            <?php p($l->t('Your recent time entries will appear here. Start by clocking in to track your working time.')); ?>
+                                        </p>
+                                        <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
+                                            class="btn btn--primary">
+                                            <?php p($l->t('View All Time Entries')); ?>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Initialize JavaScript -->
@@ -380,7 +507,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
     window.ArbeitszeitCheck.status = <?php echo json_encode($status, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.overtime = <?php echo json_encode($overtime, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.page = 'dashboard';
-    
+
     // L10n strings
     window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
     window.ArbeitszeitCheck.l10n.clockIn = <?php echo json_encode($l->t('Clock In'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -388,7 +515,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
     window.ArbeitszeitCheck.l10n.startBreak = <?php echo json_encode($l->t('Start Break'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.endBreak = <?php echo json_encode($l->t('End Break'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.error = <?php echo json_encode($l->t('An error occurred'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    
+
     // API URLs
     window.ArbeitszeitCheck.apiUrl = {
         clockIn: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.time_tracking.clockIn'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,

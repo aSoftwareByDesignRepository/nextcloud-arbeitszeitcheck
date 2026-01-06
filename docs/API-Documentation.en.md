@@ -396,7 +396,7 @@ Create a manual time entry (for retroactive entries or corrections).
 
 Update an existing time entry (only if editable).
 
-**Endpoint:** `PUT /apps/arbeitszeitcheck/api/time-entries/{id}`
+**Endpoint:** `PUT /apps/arbeitszeitcheck/api/time-entries/{id}` or `POST /apps/arbeitszeitcheck/api/time-entries/{id}`
 
 **Path Parameters:**
 - `id` (integer, required) - Time entry ID
@@ -413,6 +413,11 @@ Update an existing time entry (only if editable).
 
 **Note:** All fields are optional. Only provided fields will be updated.
 
+**Editing Restrictions:**
+- Only entries from the last 2 weeks (14 days) can be edited
+- Only manual entries, entries with pending approval, or completed automatic entries can be edited
+- Approved entries cannot be edited (use "Request Correction" instead)
+
 **Success Response (200):**
 ```json
 {
@@ -427,7 +432,7 @@ Update an existing time entry (only if editable).
 
 **Error Responses:**
 - `404` - Time entry not found
-- `403` - Access denied or entry not editable (e.g., already approved)
+- `403` - Access denied or entry not editable (e.g., already approved or older than 2 weeks)
 - `400` - Invalid parameters
 
 ---

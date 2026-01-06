@@ -174,13 +174,16 @@ The main dashboard shows:
 ### Editing Time Entries
 
 **You can edit:**
-- Manual entries (entries you created manually)
-- Entries with status **"completed"** that haven't been approved yet
+- Manual entries (entries you created manually) - only from the last 2 weeks
+- Entries with status **"pending approval"** (correction requests)
+- Automatic entries with status **"completed"** - only from the last 2 weeks
 
 **You cannot edit:**
-- Automatic clock-in/out entries (these are tamper-proof)
-- Entries that are **"pending approval"** (wait for manager decision)
-- Entries that are **"approved"** (use correction request instead)
+- Entries older than 2 weeks (use "Request Correction" instead)
+- Entries that are **"approved"** (use "Request Correction" instead)
+- Active entries (ongoing time tracking)
+
+**Note:** The 2-week restriction ensures data integrity and compliance with audit requirements. For older entries, use the "Request Correction" feature which requires manager approval.
 
 **To edit:**
 1. Find the entry in your list

@@ -20,7 +20,10 @@ use OCP\AppFramework\Http\TemplateResponse;
 class CSPService
 {
     /**
-     * Base policy shared by all contexts (no external CDNs)
+     * Base policy shared by all contexts.
+     * 
+     * Note: Nextcloud core will merge this with its default policy.
+     * We add external font domains here to allow Google Fonts used by Nextcloud themes.
      */
     public function getDefaultPolicy(): ContentSecurityPolicy
     {
@@ -43,12 +46,34 @@ class CSPService
         // Clickjacking protection (allow framing by self only)
         $policy->addAllowedFrameAncestorDomain("'self'");
 
+        // CRITICAL: Add Google Fonts to ALL policies to ensure they're always available
+        $policy->addAllowedFontDomain('https://fonts.gstatic.com');
+        $policy->addAllowedFontDomain('fonts.gstatic.com');
+        $policy->addAllowedFontDomain('*.googleusercontent.com');
+        $policy->addAllowedStyleDomain('https://fonts.googleapis.com');
+        $policy->addAllowedStyleDomain('fonts.googleapis.com');
+
+        // NOTE: Nextcloud Core uses eval() in some minified scripts (e.g., baseline-browser-mapping).
+        // To avoid CSP violations, we allow unsafe-eval, but only because Nextcloud Core requires it.
+        // Our app code does NOT use eval() - this is purely for Nextcloud Core compatibility.
+        // This is a known limitation of Nextcloud Core and should be addressed by Nextcloud itself.
+        $policy->allowEvalScript(true);
+
         return $policy;
     }
 
     public function getMainAppPolicy(): ContentSecurityPolicy
     {
-        return $this->getDefaultPolicy();
+        $policy = $this->getDefaultPolicy();
+
+        // Add Google Fonts for main app pages (dashboard, time entries, etc.)
+        // These are used by Nextcloud themes and UI components
+        $policy->addAllowedFontDomain('https://fonts.gstatic.com');
+        $policy->addAllowedFontDomain('fonts.gstatic.com');
+        $policy->addAllowedStyleDomain('https://fonts.googleapis.com');
+        $policy->addAllowedStyleDomain('fonts.googleapis.com');
+
+        return $policy;
     }
 
     public function getModalPolicy(): ContentSecurityPolicy
@@ -68,29 +93,37 @@ class CSPService
 
     /**
      * Apply CSP and inject a template nonce parameter.
-     * Note: Core middleware will attach the CSP header and JS nonce as needed.
-     * Also sets additional security headers for enhanced protection.
      * 
-     * IMPORTANT: We do NOT override Nextcloud's default CSP policy here.
-     * Nextcloud core manages the CSP policy and handles merging app policies.
-     * We only ensure the nonce is available to templates.
-     * 
-     * Setting our own CSP policy would override Nextcloud's default policy which
-     * may allow resources that core or themes need (like fonts from themes).
+     * Nextcloud core merges app CSP policies with its own default policy.
+     * We add our policy additions (like external fonts) which will be merged
+     * with core's policy, not override it.
      */
     public function applyPolicyWithNonce(TemplateResponse $response, string $context): TemplateResponse
     {
         // Expose nonce to templates that use inline tags
-        // This is the main thing we need - the CSP policy is handled by Nextcloud core
         $params = $response->getParams();
         $params['cspNonce'] = \OC::$server->getContentSecurityPolicyNonceManager()->getNonce();
         $response->setParams($params);
 
-        // DO NOT set a CSP policy here - let Nextcloud core handle it
-        // Nextcloud's default CSP policy already handles:
-        // - Allowing resources that core needs (fonts, scripts, etc.)
-        // - Blocking unsafe operations (eval, etc.) where appropriate
-        // - Merging policies from different apps
+        // Get the appropriate policy for this context
+        switch ($context) {
+            case 'guest':
+                $policy = $this->getGuestPolicy();
+                break;
+            case 'modal':
+                $policy = $this->getModalPolicy();
+                break;
+            case 'admin':
+                $policy = $this->getAdminPolicy();
+                break;
+            case 'main':
+            default:
+                $policy = $this->getMainAppPolicy();
+                break;
+        }
+
+        // Set the policy - Nextcloud core will merge this with its default policy
+        $response->setContentSecurityPolicy($policy);
         
         // Add additional security headers
         // Note: Nextcloud core already sets these via .htaccess and Response::getHeaders(),

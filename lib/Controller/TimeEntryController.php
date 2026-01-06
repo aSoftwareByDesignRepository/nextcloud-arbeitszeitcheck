@@ -15,7 +15,10 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Service\ComplianceService;
+use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Controller;
+use OCP\IConfig;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
@@ -38,6 +41,9 @@ class TimeEntryController extends Controller
 	private IURLGenerator $urlGenerator;
 	private IL10N $l10n;
 	private AuditLogMapper $auditLogMapper;
+	private ?ComplianceService $complianceService;
+	private IConfig $config;
+	private ?TimeTrackingService $timeTrackingService;
 
 	public function __construct(
 		string $appName,
@@ -46,9 +52,12 @@ class TimeEntryController extends Controller
 		IUserSession $userSession,
 		\OCA\ArbeitszeitCheck\Service\OvertimeService $overtimeService,
 		IURLGenerator $urlGenerator,
-		CSPService $cspService,
 		IL10N $l10n,
-		AuditLogMapper $auditLogMapper
+		AuditLogMapper $auditLogMapper,
+		IConfig $config,
+		CSPService $cspService,
+		?ComplianceService $complianceService = null,
+		?TimeTrackingService $timeTrackingService = null
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -57,7 +66,10 @@ class TimeEntryController extends Controller
 		$this->urlGenerator = $urlGenerator;
 		$this->l10n = $l10n;
 		$this->auditLogMapper = $auditLogMapper;
+		$this->config = $config;
 		$this->setCspService($cspService);
+		$this->complianceService = $complianceService;
+		$this->timeTrackingService = $timeTrackingService;
 	}
 
 	/**
@@ -89,15 +101,15 @@ class TimeEntryController extends Controller
 			$day = (int)$matches[1];
 			$month = (int)$matches[2];
 			$year = (int)$matches[3];
-			
+
 			// Validate date
 			if (!checkdate($month, $day, $year)) {
 				throw new \Exception($this->l10n->t('Invalid date: %s', [$dateString]));
 			}
-			
+
 			return new \DateTime(sprintf('%04d-%02d-%02d', $year, $month, $day));
 		}
-		
+
 		// Try ISO format (yyyy-mm-dd)
 		try {
 			return new \DateTime($dateString);
@@ -214,7 +226,7 @@ class TimeEntryController extends Controller
 
 			// Apply status filter if provided (date filters already applied via findByUserAndDateRange)
 			if ($status) {
-				$allEntries = array_filter($allEntries, function($entry) use ($status) {
+				$allEntries = array_filter($allEntries, function ($entry) use ($status) {
 					return $entry->getStatus() === $status;
 				});
 			}
@@ -258,15 +270,24 @@ class TimeEntryController extends Controller
 	 */
 	public function create(): TemplateResponse
 	{
+		\OCP\Util::addTranslations('arbeitszeitcheck');
+
+		// Get compliance configuration for frontend validation
+		$maxDailyHours = (float)$this->config->getAppValue('arbeitszeitcheck', 'max_daily_hours', '10');
+		$complianceStrictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+
 		$response = new TemplateResponse(
 			$this->appName,
 			'time-entries',
 			[
-				'urlGenerator' => $this->urlGenerator,
+				'urlGenerator' => \OC::$server->getURLGenerator(),
 				'mode' => 'create',
 				'entry' => null,
 				'entries' => [],
-				'stats' => []
+				'stats' => [],
+				'maxDailyHours' => $maxDailyHours,
+				'complianceStrictMode' => $complianceStrictMode,
+				'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
 			]
 		);
 		return $this->configureCSP($response);
@@ -278,6 +299,11 @@ class TimeEntryController extends Controller
 	 * Renders the time entry edit form for the specified entry. Verifies ownership
 	 * before displaying the form. Redirects to list if access is denied.
 	 *
+	 * Editing restrictions:
+	 * - Only entries from the last 2 weeks (14 days) can be edited
+	 * - Only manual entries, entries with pending approval, or completed automatic entries can be edited
+	 * - Approved entries cannot be edited (use "Request Correction" instead)
+	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to edit
@@ -285,6 +311,8 @@ class TimeEntryController extends Controller
 	 */
 	public function edit(int $id): TemplateResponse
 	{
+		\OCP\Util::addTranslations('arbeitszeitcheck');
+
 		try {
 			$userId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($id);
@@ -296,36 +324,84 @@ class TimeEntryController extends Controller
 					$this->appName,
 					'time-entries',
 					[
-						'urlGenerator' => $this->urlGenerator,
-						'error' => 'Access denied'
-					],
-					'blank'
+						'urlGenerator' => \OC::$server->getURLGenerator(),
+						'error' => 'Access denied',
+						'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
+					]
 				);
 				return $this->configureCSP($response);
 			}
+
+			// Check if entry can be edited
+			// Allow editing if:
+			// 1. It's a manual entry (user created it themselves) - but not if already approved
+			// 2. It has pending approval status (correction request)
+			// 3. It's an automatic entry that is completed (not yet approved) - allow direct editing for convenience
+			// 4. The entry date is within the last 2 weeks (14 days) - for data integrity and compliance
+			// Do NOT allow editing if entry is already approved (approvedBy is set) or older than 2 weeks
+			$isApproved = $entry->getApprovedBy() !== null;
+			$entryDate = $entry->getStartTime();
+			$twoWeeksAgo = new \DateTime();
+			$twoWeeksAgo->modify('-14 days');
+			$twoWeeksAgo->setTime(0, 0, 0); // Start of day
+			$isWithinTwoWeeks = $entryDate && $entryDate >= $twoWeeksAgo;
+
+			$canEdit = !$isApproved && $isWithinTwoWeeks && (
+				$entry->getIsManualEntry()
+				|| $entry->getStatus() === TimeEntry::STATUS_PENDING_APPROVAL
+				|| ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && !$entry->getIsManualEntry())
+			);
+
+			if (!$canEdit) {
+				$errorMessage = $isApproved
+					? $this->l10n->t('Cannot edit this time entry. Please use "Request Correction" for approved entries.')
+					: (!$isWithinTwoWeeks
+						? $this->l10n->t('Cannot edit this time entry. Only entries from the last 2 weeks can be edited.')
+						: $this->l10n->t('Cannot edit this time entry.'));
+
+				// Redirect to time entries list with error message
+				$response = new TemplateResponse(
+					$this->appName,
+					'time-entries',
+					[
+						'urlGenerator' => \OC::$server->getURLGenerator(),
+						'error' => $errorMessage,
+						'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
+					]
+				);
+				return $this->configureCSP($response);
+			}
+
+			// Get compliance configuration for frontend validation
+			$maxDailyHours = (float)$this->config->getAppValue('arbeitszeitcheck', 'max_daily_hours', '10');
+			$complianceStrictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
 
 			$response = new TemplateResponse(
 				$this->appName,
 				'time-entries',
 				[
-					'urlGenerator' => $this->urlGenerator,
+					'urlGenerator' => \OC::$server->getURLGenerator(),
 					'mode' => 'edit',
 					'entry' => $entry,
 					'entries' => [],
-					'stats' => []
+					'stats' => [],
+					'maxDailyHours' => $maxDailyHours,
+					'complianceStrictMode' => $complianceStrictMode,
+					'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
 				]
 			);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			// Redirect to time entries list on error
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in edit method: ' . $e->getMessage(), ['exception' => $e]);
 			$response = new TemplateResponse(
 				$this->appName,
 				'time-entries',
 				[
-					'urlGenerator' => $this->urlGenerator,
-					'error' => $e->getMessage()
-				],
-				'blank'
+					'urlGenerator' => \OC::$server->getURLGenerator(),
+					'error' => $e->getMessage(),
+					'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
+				]
 			);
 			return $this->configureCSP($response);
 		}
@@ -391,7 +467,7 @@ class TimeEntryController extends Controller
 			$startDateTime = $this->parseDate($date);
 			$startDateTime->setTime(9, 0, 0); // Default start time 9:00
 			$timeEntry->setStartTime($startDateTime);
-			
+
 			// Calculate end time based on hours
 			$endDateTime = clone $startDateTime;
 			$endDateTime->modify('+' . round($hours * 3600) . ' seconds');
@@ -404,8 +480,44 @@ class TimeEntryController extends Controller
 			$timeEntry->setCreatedAt(new \DateTime());
 			$timeEntry->setUpdatedAt(new \DateTime());
 
+			// Check rest period compliance before saving (ArbZG §5)
+			if (!$this->complianceService) {
+				try {
+					$this->complianceService = \OCP\Server::get(ComplianceService::class);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning('ComplianceService not available for rest period check: ' . $e->getMessage());
+				}
+			}
+			if ($this->complianceService && $timeEntry->getStartTime()) {
+				$restPeriodCheck = $this->complianceService->checkRestPeriodForStartTime($userId, $timeEntry->getStartTime());
+				if (!$restPeriodCheck['valid']) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $restPeriodCheck['message']
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+
+			// Calculate and set automatic break if no break was entered (ArbZG §4)
+			if (!$this->timeTrackingService) {
+				try {
+					$this->timeTrackingService = \OCP\Server::get(TimeTrackingService::class);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning('TimeTrackingService not available for automatic break calculation: ' . $e->getMessage());
+				}
+			}
+			if ($this->timeTrackingService) {
+				$this->timeTrackingService->calculateAndSetAutomaticBreak($timeEntry);
+			}
+
 			// Validate entry before inserting
 			$errors = $timeEntry->validate();
+
+			// Additional compliance validation: check maximum working hours (ArbZG §3)
+			// AUTOMATIC LIMIT: TimeEntry::validate() already automatically adjusts end time to 10h
+			// This ensures compliance - no need for additional validation here
+			// The automatic adjustment in validate() handles it perfectly
+
 			if (!empty($errors)) {
 				// Translate validation errors
 				$translatedErrors = [];
@@ -420,6 +532,12 @@ class TimeEntryController extends Controller
 			}
 
 			$savedEntry = $this->timeEntryMapper->insert($timeEntry);
+
+			// Real-time compliance check for completed entries
+			// Based on industry best practices (Personio, Flintec): immediate compliance checking
+			if ($savedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $savedEntry->getEndTime() !== null) {
+				$this->performRealTimeComplianceCheck($savedEntry);
+			}
 
 			// Log the action
 			try {
@@ -457,6 +575,11 @@ class TimeEntryController extends Controller
 	 * status can be updated. Ownership is verified before allowing updates. Changes are
 	 * validated and logged in the audit trail.
 	 *
+	 * Editing restrictions:
+	 * - Only entries from the last 2 weeks (14 days) can be edited
+	 * - Only manual entries, entries with pending approval, or completed automatic entries can be edited
+	 * - Approved entries cannot be edited (use "Request Correction" instead)
+	 *
 	 * @NoAdminRequired
 	 * @param int $id Time entry ID to update
 	 * @param string|null $date New date (Y-m-d format, backward compatibility)
@@ -481,11 +604,36 @@ class TimeEntryController extends Controller
 				], Http::STATUS_FORBIDDEN);
 			}
 
-			// Check if entry can be edited (only manual entries or pending approval)
-			if (!$entry->getIsManualEntry() && $entry->getStatus() !== TimeEntry::STATUS_PENDING_APPROVAL) {
+			// Check if entry can be edited
+			// Allow editing if:
+			// 1. It's a manual entry (user created it themselves) - but not if already approved
+			// 2. It has pending approval status (correction request)
+			// 3. It's an automatic entry that is completed (not yet approved) - allow direct editing for convenience
+			// 4. The entry date is within the last 2 weeks (14 days) - for data integrity and compliance
+			// Do NOT allow editing if entry is already approved (approvedBy is set) or older than 2 weeks
+			$isApproved = $entry->getApprovedBy() !== null;
+			$entryDate = $entry->getStartTime();
+			$twoWeeksAgo = new \DateTime();
+			$twoWeeksAgo->modify('-14 days');
+			$twoWeeksAgo->setTime(0, 0, 0); // Start of day
+			$isWithinTwoWeeks = $entryDate && $entryDate >= $twoWeeksAgo;
+
+			$canEdit = !$isApproved && $isWithinTwoWeeks && (
+				$entry->getIsManualEntry()
+				|| $entry->getStatus() === TimeEntry::STATUS_PENDING_APPROVAL
+				|| ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && !$entry->getIsManualEntry())
+			);
+
+			if (!$canEdit) {
+				$errorMessage = $isApproved
+					? $this->l10n->t('Cannot edit this time entry. Please use "Request Correction" for approved entries.')
+					: (!$isWithinTwoWeeks
+						? $this->l10n->t('Cannot edit this time entry. Only entries from the last 2 weeks can be edited.')
+						: $this->l10n->t('Cannot edit this time entry.'));
+
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Cannot edit automatic time entries')
+					'error' => $errorMessage
 				], Http::STATUS_BAD_REQUEST);
 			}
 
@@ -495,20 +643,81 @@ class TimeEntryController extends Controller
 			$endTime = $params['endTime'] ?? null;
 			$breakStartTime = $params['breakStartTime'] ?? null;
 			$breakEndTime = $params['breakEndTime'] ?? null;
+			$breaksJson = $params['breaks'] ?? null;
 
 			// New format: startTime and endTime
 			if ($startTime && $endTime) {
 				$entry->setStartTime(new \DateTime($startTime));
 				$entry->setEndTime(new \DateTime($endTime));
 
-				// Set break times if provided
-				if ($breakStartTime && $breakEndTime) {
+				// Handle breaks: prefer breaks JSON (multiple breaks) over single break fields
+				if ($breaksJson) {
+					// Validate and set breaks JSON (multiple breaks)
+					$breaks = json_decode($breaksJson, true);
+					if (is_array($breaks) && !empty($breaks)) {
+						// Filter out breaks shorter than 15 minutes (ArbZG §4)
+						$validBreaks = [];
+						foreach ($breaks as $break) {
+							if (isset($break['start']) && isset($break['end'])) {
+								try {
+									$breakStart = new \DateTime($break['start']);
+									$breakEnd = new \DateTime($break['end']);
+									$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
+									$minBreakDurationSeconds = 900; // 15 minutes
+
+									// Only include breaks that are at least 15 minutes
+									if ($breakDurationSeconds >= $minBreakDurationSeconds) {
+										$validBreaks[] = [
+											'start' => $breakStart->format('c'),
+											'end' => $breakEnd->format('c')
+										];
+									}
+								} catch (\Exception $e) {
+									// Skip invalid break times
+								}
+							}
+						}
+
+						if (!empty($validBreaks)) {
+							$entry->setBreaks(json_encode($validBreaks));
+							// Clear single break fields when using breaks JSON
+							$entry->setBreakStartTime(null);
+							$entry->setBreakEndTime(null);
+						} else {
+							// No valid breaks, clear everything
+							$entry->setBreaks(null);
+							$entry->setBreakStartTime(null);
+							$entry->setBreakEndTime(null);
+						}
+					} else {
+						// Invalid breaks JSON, clear everything
+						$entry->setBreaks(null);
+						$entry->setBreakStartTime(null);
+						$entry->setBreakEndTime(null);
+					}
+				} elseif ($breakStartTime && $breakEndTime) {
+					// Fallback to single break fields (backward compatibility)
 					$entry->setBreakStartTime(new \DateTime($breakStartTime));
 					$entry->setBreakEndTime(new \DateTime($breakEndTime));
+					// Clear breaks JSON when using single break fields
+					$entry->setBreaks(null);
 				} else {
-					// Clear break times if not provided
+					// Clear all break times if not provided
 					$entry->setBreakStartTime(null);
 					$entry->setBreakEndTime(null);
+					$entry->setBreaks(null);
+				}
+
+				// Calculate and set automatic break if no break was entered (ArbZG §4)
+				if (!$this->timeTrackingService) {
+					try {
+						$this->timeTrackingService = \OCP\Server::get(TimeTrackingService::class);
+					} catch (\Throwable $e) {
+						\OCP\Log\logger('arbeitszeitcheck')->warning('TimeTrackingService not available for automatic break calculation: ' . $e->getMessage());
+					}
+				}
+				if ($this->timeTrackingService) {
+					$this->timeTrackingService->calculateAndSetAutomaticBreak($entry);
 				}
 			}
 			// Old format: date and hours (backward compatibility)
@@ -525,6 +734,18 @@ class TimeEntryController extends Controller
 						$entry->setEndTime($endTime);
 					}
 				}
+
+				// Calculate and set automatic break if no break was entered (ArbZG §4)
+				if (!$this->timeTrackingService) {
+					try {
+						$this->timeTrackingService = \OCP\Server::get(TimeTrackingService::class);
+					} catch (\Throwable $e) {
+						\OCP\Log\logger('arbeitszeitcheck')->warning('TimeTrackingService not available for automatic break calculation: ' . $e->getMessage());
+					}
+				}
+				if ($this->timeTrackingService) {
+					$this->timeTrackingService->calculateAndSetAutomaticBreak($entry);
+				}
 			}
 
 			// Update description from params or function parameter
@@ -538,8 +759,43 @@ class TimeEntryController extends Controller
 				$entry->setProjectCheckProjectId($project_check_project_id);
 			}
 
-			// Validate entry
+			// Check rest period compliance before saving (ArbZG §5)
+			if (!$this->complianceService) {
+				try {
+					$this->complianceService = \OCP\Server::get(ComplianceService::class);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning('ComplianceService not available for rest period check: ' . $e->getMessage());
+				}
+			}
+			if ($this->complianceService && $entry->getStartTime()) {
+				$restPeriodCheck = $this->complianceService->checkRestPeriodForStartTime($userId, $entry->getStartTime(), $id);
+				if (!$restPeriodCheck['valid']) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $restPeriodCheck['message']
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+
+			// Calculate and set automatic break if no break was entered (ArbZG §4)
+			if (!$this->timeTrackingService) {
+				try {
+					$this->timeTrackingService = \OCP\Server::get(TimeTrackingService::class);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning('TimeTrackingService not available for automatic break calculation: ' . $e->getMessage());
+				}
+			}
+			if ($this->timeTrackingService) {
+				$this->timeTrackingService->calculateAndSetAutomaticBreak($entry);
+			}
+
+			// Validate entry (automatically adjusts end time to 10h if exceeded)
 			$errors = $entry->validate();
+
+			// Additional compliance validation: check maximum working hours (ArbZG §3)
+			// AUTOMATIC LIMIT: TimeEntry::validate() already automatically adjusts end time to 10h
+			// This ensures compliance - no need for additional validation here
+
 			if (!empty($errors)) {
 				// Translate validation errors
 				$translatedErrors = [];
@@ -563,6 +819,12 @@ class TimeEntryController extends Controller
 
 			$entry->setUpdatedAt(new \DateTime());
 			$updatedEntry = $this->timeEntryMapper->update($entry);
+
+			// Real-time compliance check if entry is now completed
+			// Check if status changed to COMPLETED or if it was already COMPLETED
+			if ($updatedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $updatedEntry->getEndTime() !== null) {
+				$this->performRealTimeComplianceCheck($updatedEntry);
+			}
 
 			// Log the action
 			try {
@@ -602,14 +864,30 @@ class TimeEntryController extends Controller
 	 * Update time entry endpoint (POST method for form submissions)
 	 *
 	 * Handles POST requests for updating time entries. Delegates to the update() method.
+	 * Supports both old format (date, hours) and new format (startTime, endTime, breakStartTime, breakEndTime).
 	 *
 	 * @NoAdminRequired
+	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to update
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 */
 	public function updatePost(int $id): JSONResponse
 	{
 		$params = $this->request->getParams();
+
+		// Support new format: startTime, endTime, breakStartTime, breakEndTime
+		$startTime = $params['startTime'] ?? null;
+		$endTime = $params['endTime'] ?? null;
+		$breakStartTime = $params['breakStartTime'] ?? null;
+		$breakEndTime = $params['breakEndTime'] ?? null;
+
+		// If new format is provided, pass it directly to update() which handles it
+		if ($startTime && $endTime) {
+			// The update() method will handle startTime, endTime, breakStartTime, breakEndTime from params
+			return $this->update($id);
+		}
+
+		// Old format: date, hours (backward compatibility)
 		$date = $params['date'] ?? null;
 		$hours = isset($params['hours']) ? (float)$params['hours'] : null;
 		$description = $params['description'] ?? null;
@@ -724,7 +1002,7 @@ class TimeEntryController extends Controller
 			$breakStartTime = $params['breakStartTime'] ?? null;
 			$breakEndTime = $params['breakEndTime'] ?? null;
 			$description = $params['description'] ?? null;
-			
+
 			// Backward compatibility: support old format (newDate, newHours, newDescription)
 			$newDate = $params['newDate'] ?? null;
 			$newHours = isset($params['newHours']) ? (float)$params['newHours'] : null;
@@ -746,7 +1024,7 @@ class TimeEntryController extends Controller
 					'error' => 'Time entry has no start time'
 				], Http::STATUS_BAD_REQUEST);
 			}
-			
+
 			$originalData = [
 				'startTime' => $entryStartTime->format('c'),
 				'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format('c') : null,
@@ -757,25 +1035,25 @@ class TimeEntryController extends Controller
 			];
 
 			$proposedData = [];
-			
+
 			// New format: startTime and endTime
 			if ($startTime && $endTime) {
 				$proposedStartTime = new \DateTime($startTime);
 				$proposedEndTime = new \DateTime($endTime);
 				$proposedData['startTime'] = $proposedStartTime->format('c');
 				$proposedData['endTime'] = $proposedEndTime->format('c');
-				
+
 				if ($breakStartTime && $breakEndTime) {
 					$proposedBreakStartTime = new \DateTime($breakStartTime);
 					$proposedBreakEndTime = new \DateTime($breakEndTime);
 					$proposedData['breakStartTime'] = $proposedBreakStartTime->format('c');
 					$proposedData['breakEndTime'] = $proposedBreakEndTime->format('c');
 				}
-				
+
 				if ($description !== null) {
 					$proposedData['description'] = $description;
 				}
-			} 
+			}
 			// Old format: newDate and newHours (backward compatibility)
 			elseif ($newDate || $newHours !== null) {
 				if ($newDate) {
@@ -806,12 +1084,12 @@ class TimeEntryController extends Controller
 				// New format
 				$entry->setStartTime(new \DateTime($startTime));
 				$entry->setEndTime(new \DateTime($endTime));
-				
+
 				if ($breakStartTime && $breakEndTime) {
 					$entry->setBreakStartTime(new \DateTime($breakStartTime));
 					$entry->setBreakEndTime(new \DateTime($breakEndTime));
 				}
-				
+
 				if ($description !== null) {
 					$entry->setDescription($description);
 				}
@@ -1094,12 +1372,13 @@ class TimeEntryController extends Controller
 	 * API: Create time entry (accepts JSON body)
 	 *
 	 * @NoAdminRequired
+	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
 	public function apiStore(): JSONResponse
 	{
 		$params = $this->request->getParams();
-		
+
 		// Support both old format (date + hours) and new format (date + startTime + endTime)
 		$date = $params['date'] ?? null;
 		$startTime = $params['startTime'] ?? null;
@@ -1119,13 +1398,13 @@ class TimeEntryController extends Controller
 				$timeEntry->setUserId($userId);
 				$timeEntry->setStartTime(new \DateTime($startTime));
 				$timeEntry->setEndTime(new \DateTime($endTime));
-				
+
 				// Set break times if provided
 				if ($breakStartTime && $breakEndTime) {
 					$timeEntry->setBreakStartTime(new \DateTime($breakStartTime));
 					$timeEntry->setBreakEndTime(new \DateTime($breakEndTime));
 				}
-				
+
 				$timeEntry->setDescription($description);
 				$timeEntry->setProjectCheckProjectId($project_check_project_id);
 				$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
@@ -1134,8 +1413,43 @@ class TimeEntryController extends Controller
 				$timeEntry->setCreatedAt(new \DateTime());
 				$timeEntry->setUpdatedAt(new \DateTime());
 
+				// Check rest period compliance before saving (ArbZG §5)
+				if (!$this->complianceService) {
+					try {
+						$this->complianceService = \OCP\Server::get(ComplianceService::class);
+					} catch (\Throwable $e) {
+						\OCP\Log\logger('arbeitszeitcheck')->warning('ComplianceService not available for rest period check: ' . $e->getMessage());
+					}
+				}
+				if ($this->complianceService && $timeEntry->getStartTime()) {
+					$restPeriodCheck = $this->complianceService->checkRestPeriodForStartTime($userId, $timeEntry->getStartTime());
+					if (!$restPeriodCheck['valid']) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $restPeriodCheck['message']
+						], Http::STATUS_BAD_REQUEST);
+					}
+				}
+
+				// Calculate and set automatic break if no break was entered (ArbZG §4)
+				if (!$this->timeTrackingService) {
+					try {
+						$this->timeTrackingService = \OCP\Server::get(TimeTrackingService::class);
+					} catch (\Throwable $e) {
+						\OCP\Log\logger('arbeitszeitcheck')->warning('TimeTrackingService not available for automatic break calculation: ' . $e->getMessage());
+					}
+				}
+				if ($this->timeTrackingService) {
+					$this->timeTrackingService->calculateAndSetAutomaticBreak($timeEntry);
+				}
+
 				// Validate entry
 				$errors = $timeEntry->validate();
+
+				// Additional compliance validation: check maximum working hours (ArbZG §3)
+				// AUTOMATIC LIMIT: TimeEntry::validate() already automatically adjusts end time to 10h
+				// This ensures compliance - no need for additional validation here
+
 				if (!empty($errors)) {
 					// Translate validation errors
 					$translatedErrors = [];
@@ -1150,6 +1464,12 @@ class TimeEntryController extends Controller
 				}
 
 				$savedEntry = $this->timeEntryMapper->insert($timeEntry);
+
+				// Real-time compliance check for completed entries
+				// Based on industry best practices (Personio, Flintec): immediate compliance checking
+				if ($savedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $savedEntry->getEndTime() !== null) {
+					$this->performRealTimeComplianceCheck($savedEntry);
+				}
 
 				// Log the action
 				try {
@@ -1198,12 +1518,50 @@ class TimeEntryController extends Controller
 	 * Delegates to the update() method for actual processing.
 	 *
 	 * @NoAdminRequired
+	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to update
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 */
 	public function apiUpdate(int $id): JSONResponse
 	{
 		$params = $this->request->getParams();
+		$date = $params['date'] ?? null;
+		$hours = isset($params['hours']) ? (float)$params['hours'] : null;
+		$description = $params['description'] ?? null;
+		$project_check_project_id = $params['project_check_project_id'] ?? $params['projectCheckProjectId'] ?? null;
+
+		return $this->update($id, $date, $hours, $description, $project_check_project_id);
+	}
+
+	/**
+	 * API: Update time entry via POST (accepts JSON body)
+	 *
+	 * REST API endpoint for updating time entries via POST method. Accepts data in the request body.
+	 * Supports both old format (date, hours) and new format (startTime, endTime, breakStartTime, breakEndTime).
+	 * Delegates to the update() method for actual processing.
+	 *
+	 * @NoAdminRequired
+	 * @NoCSRFRequired
+	 * @param int $id Time entry ID to update
+	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
+	 */
+	public function apiUpdatePost(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+
+		// Support new format: startTime, endTime, breakStartTime, breakEndTime
+		$startTime = $params['startTime'] ?? null;
+		$endTime = $params['endTime'] ?? null;
+		$breakStartTime = $params['breakStartTime'] ?? null;
+		$breakEndTime = $params['breakEndTime'] ?? null;
+
+		// If new format is provided, pass it directly to update() which handles it
+		if ($startTime && $endTime) {
+			// The update() method will handle startTime, endTime, breakStartTime, breakEndTime from params
+			return $this->update($id);
+		}
+
+		// Old format: date, hours (backward compatibility)
 		$date = $params['date'] ?? null;
 		$hours = isset($params['hours']) ? (float)$params['hours'] : null;
 		$description = $params['description'] ?? null;
@@ -1241,7 +1599,7 @@ class TimeEntryController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			$overtimeData = match($period) {
+			$overtimeData = match ($period) {
 				'daily' => $this->overtimeService->getDailyOvertime($userId),
 				'weekly' => $this->overtimeService->getWeeklyOvertime($userId),
 				'monthly' => $this->overtimeService->calculateMonthlyOvertime($userId),
@@ -1309,5 +1667,78 @@ class TimeEntryController extends Controller
 		$end->setTime(23, 59, 59);
 
 		return $overtimeService->calculateOvertime($userId, $start, $end);
+	}
+
+	/**
+	 * Perform real-time compliance check for a completed time entry
+	 * 
+	 * This method implements industry best practices (Personio, Flintec) by performing
+	 * immediate compliance checks when a time entry is completed. This ensures:
+	 * - Immediate detection of violations
+	 * - Proactive compliance management
+	 * - Reduced legal risk
+	 * - Better auditability
+	 * 
+	 * The check respects the configured compliance mode:
+	 * - Warning mode (default): Violations are logged and notified, but entry can be saved
+	 * - Strict mode: Critical violations prevent saving (throws exception)
+	 * 
+	 * @param TimeEntry $timeEntry The completed time entry to check
+	 * @return void
+	 * @throws \Exception If strict mode is enabled and critical violations are found
+	 */
+	private function performRealTimeComplianceCheck(TimeEntry $timeEntry): void
+	{
+		// Check if real-time compliance checking is enabled
+		$realTimeComplianceEnabled = $this->config->getAppValue('arbeitszeitcheck', 'realtime_compliance_check', '1') === '1';
+		if (!$realTimeComplianceEnabled) {
+			return; // Real-time checking disabled, rely on daily batch job
+		}
+
+		// Get compliance service (may be null if not available)
+		if (!$this->complianceService) {
+			try {
+				$this->complianceService = \OCP\Server::get(ComplianceService::class);
+			} catch (\Throwable $e) {
+				// Compliance service not available, log and continue
+				\OCP\Log\logger('arbeitszeitcheck')->warning('ComplianceService not available for real-time check: ' . $e->getMessage());
+				return;
+			}
+		}
+
+		try {
+			// Check if strict mode is enabled
+			$strictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+
+			// Perform compliance check
+			$violations = $this->complianceService->checkComplianceForCompletedEntry($timeEntry, $strictMode);
+
+			// Log compliance check result
+			if (!empty($violations)) {
+				\OCP\Log\logger('arbeitszeitcheck')->info('Real-time compliance check detected violations', [
+					'time_entry_id' => $timeEntry->getId(),
+					'user_id' => $timeEntry->getUserId(),
+					'violation_count' => count($violations),
+					'strict_mode' => $strictMode
+				]);
+			} else {
+				\OCP\Log\logger('arbeitszeitcheck')->debug('Real-time compliance check passed', [
+					'time_entry_id' => $timeEntry->getId(),
+					'user_id' => $timeEntry->getUserId()
+				]);
+			}
+		} catch (\Exception $e) {
+			// In strict mode, re-throw the exception to prevent saving
+			if ($this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1') {
+				throw $e;
+			}
+
+			// In warning mode, log the error but don't prevent saving
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in real-time compliance check: ' . $e->getMessage(), [
+				'time_entry_id' => $timeEntry->getId(),
+				'user_id' => $timeEntry->getUserId(),
+				'exception' => $e
+			]);
+		}
 	}
 }

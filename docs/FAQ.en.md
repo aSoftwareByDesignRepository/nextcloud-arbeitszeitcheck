@@ -81,7 +81,12 @@ You can create a **manual time entry**:
 
 ### Can I edit my time entries?
 
-- **Manual entries**: Yes, you can edit or delete them
+- **Manual entries**: Yes, you can edit or delete them (only entries from the last 2 weeks)
+- **Automatic entries**: Yes, you can edit completed automatic entries (only entries from the last 2 weeks)
+- **Older entries**: For entries older than 2 weeks, use "Request Correction" which requires manager approval
+- **Approved entries**: Cannot be edited directly, use "Request Correction" instead
+
+**Note:** The 2-week restriction ensures data integrity and compliance with audit requirements.
 - **Automatic entries** (clock-in/out): No, these are tamper-proof for legal compliance
 - **Completed entries**: You can request a correction (requires manager approval)
 

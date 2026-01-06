@@ -315,6 +315,43 @@ class NotificationService
 	}
 
 	/**
+	 * Send a warning notification to manager about working time compliance issues
+	 * 
+	 * @param string $userId User ID who has the compliance issue
+	 * @param string $warningType Type of warning ('six_month_average' or 'weekly_hours')
+	 * @param array $warningData Warning data (average, limit, etc.)
+	 * @return void
+	 */
+	public function notifyManagerWorkingTimeWarning(string $userId, string $warningType, array $warningData): void
+	{
+		$managerId = $this->getManagerId($userId);
+		if (!$managerId) {
+			return; // No manager to notify
+		}
+
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($managerId)
+			->setDateTime(new \DateTime())
+			->setObject('working_time_warning', $userId . '_' . $warningType . '_' . date('Y-m-d'))
+			->setSubject('working_time_warning', [
+				'user_id' => $userId,
+				'warning_type' => $warningType,
+				'date' => $warningData['date'] ?? date('Y-m-d')
+			])
+			->setMessage('working_time_warning', [
+				'user_id' => $userId,
+				'warning_type' => $warningType,
+				'message' => $warningData['message'] ?? '',
+				'current_value' => $warningData['current_value'] ?? 0,
+				'limit' => $warningData['limit'] ?? 0,
+				'date' => $warningData['date'] ?? date('Y-m-d')
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
 	 * Send a notification about time entry correction rejection
 	 *
 	 * @param string $userId User ID to notify

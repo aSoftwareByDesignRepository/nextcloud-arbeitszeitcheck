@@ -182,6 +182,11 @@ class PageController extends Controller
 			
 			$timeEntryCount = $this->timeEntryMapper->countByUser($userId);
 			
+			// Get compliance configuration for frontend validation
+			$appConfig = \OC::$server->get(\OCP\IConfig::class);
+			$maxDailyHours = (float)$appConfig->getAppValue('arbeitszeitcheck', 'max_daily_hours', '10');
+			$complianceStrictMode = $appConfig->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+			
 			$params = [
 				'entries' => $entries,
 				'stats' => [
@@ -193,6 +198,8 @@ class PageController extends Controller
 						return $sum + $entry->getWorkingDurationHours();
 					}, 0)
 				],
+				'maxDailyHours' => $maxDailyHours,
+				'complianceStrictMode' => $complianceStrictMode,
 				'urlGenerator' => \OC::$server->getURLGenerator(),
 				'cspNonce' => \OC::$server->getContentSecurityPolicyNonceManager()->getNonce(),
 			];

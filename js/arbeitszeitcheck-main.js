@@ -63,7 +63,9 @@
                 const timerEl = sessionTimerEl.querySelector('.timer-value');
                 if (timerEl) {
                     const startTimeStr = sessionTimerEl.dataset.startTime;
-                    if (startTimeStr) {
+                    // Only start timer if user is actually clocked in (active or on break)
+                    // Don't start timer if clocked out or paused
+                    if (startTimeStr && (currentStatus === 'active' || currentStatus === 'break')) {
                         // Use backend-calculated duration (already excludes breaks) as base
                         let baseWorkingSeconds = 0;
                         if (status.current_session_duration !== null && status.current_session_duration !== undefined) {
@@ -78,15 +80,83 @@
                         // Track when timer was last updated (for incrementing)
                         let lastUpdateTime = new Date().getTime();
                         let isOnBreak = (currentStatus === 'break');
+                        let isClockedIn = (currentStatus === 'active' || currentStatus === 'break');
+                        let lastStatusCheck = new Date().getTime();
+                        const STATUS_CHECK_INTERVAL = 5000; // Check status every 5 seconds
 
                         // Clear any existing timer
                         if (this.timers.session) {
                             clearInterval(this.timers.session);
                         }
 
+                        // Don't start timer if already clocked out or paused
+                        if (!isClockedIn) {
+                            return;
+                        }
+
                         // Update timer every second
                         this.timers.session = setInterval(() => {
                             const now = new Date().getTime();
+                            
+                            // Periodically check status from backend to update isOnBreak and isClockedIn
+                            // This ensures the timer correctly pauses/resumes when break status changes
+                            // and stops when user clocks out
+                            if (now - lastStatusCheck >= STATUS_CHECK_INTERVAL) {
+                                lastStatusCheck = now;
+                                this.getStatus()
+                                    .then(response => {
+                                        if (response && response.success && response.status) {
+                                            const newStatus = response.status.status || 'clocked_out';
+                                            const wasOnBreak = isOnBreak;
+                                            const wasClockedIn = isClockedIn;
+                                            
+                                            isOnBreak = (newStatus === 'break');
+                                            isClockedIn = (newStatus === 'active' || newStatus === 'break');
+                                            
+                                            // CRITICAL: Stop timer if user clocked out or paused
+                                            if (wasClockedIn && !isClockedIn) {
+                                                // User clocked out or paused - stop the timer immediately
+                                                if (this.timers.session) {
+                                                    clearInterval(this.timers.session);
+                                                    this.timers.session = null;
+                                                }
+                                                // Don't return here - we need to continue to update the display
+                                                // The timer interval will be stopped, so no more updates will occur
+                                            }
+                                            
+                                            // If break status changed, update lastUpdateTime to prevent time jumps
+                                            if (wasOnBreak !== isOnBreak) {
+                                                // If break just ended, reset lastUpdateTime to now
+                                                if (wasOnBreak && !isOnBreak) {
+                                                    lastUpdateTime = now;
+                                                }
+                                                // If break just started, update lastUpdateTime to prevent incrementing
+                                                if (!wasOnBreak && isOnBreak) {
+                                                    lastUpdateTime = now;
+                                                }
+                                                
+                                                // Update baseWorkingSeconds from backend if available
+                                                if (response.status.current_session_duration !== null && response.status.current_session_duration !== undefined) {
+                                                    baseWorkingSeconds = Math.floor(response.status.current_session_duration);
+                                                }
+                                            }
+                                        }
+                                    })
+                                    .catch(error => {
+                                        // Silently fail - don't interrupt timer if status check fails
+                                        console.debug('Status check failed (non-critical):', error);
+                                    });
+                            }
+                            
+                            // CRITICAL: Stop timer if user is no longer clocked in (double-check)
+                            if (!isClockedIn) {
+                                if (this.timers.session) {
+                                    clearInterval(this.timers.session);
+                                    this.timers.session = null;
+                                }
+                                return; // Exit early, timer is stopped
+                            }
+                            
                             let workingSeconds = baseWorkingSeconds;
                             
                             // Only increment timer if not on break
@@ -95,6 +165,9 @@
                                 workingSeconds = baseWorkingSeconds + elapsed;
                                 // Update base for next iteration
                                 baseWorkingSeconds = workingSeconds;
+                                lastUpdateTime = now;
+                            } else {
+                                // If on break, update lastUpdateTime to prevent time accumulation when break ends
                                 lastUpdateTime = now;
                             }
                             // If on break, timer is paused (workingSeconds stays at baseWorkingSeconds)
@@ -110,6 +183,80 @@
                                 String(hours).padStart(2, '0') + ':' +
                                 String(minutes).padStart(2, '0') + ':' +
                                 String(seconds).padStart(2, '0');
+                            
+                            // Warning for maximum working hours (ArbZG §3: max 10 hours)
+                            // Show visual warning when approaching/exceeding 10 hours
+                            const workingHours = workingSeconds / 3600;
+                            const maxWorkingHours = 10; // ArbZG §3 maximum
+                            
+                            // Remove previous warning classes
+                            timerEl.classList.remove('timer-warning', 'timer-error');
+                            
+                            if (workingHours >= maxWorkingHours) {
+                                // Exceeded 10 hours - show error state
+                                timerEl.classList.add('timer-error');
+                                if (sessionTimerEl) {
+                                    sessionTimerEl.classList.add('timer-exceeded');
+                                }
+                                
+                                // AUTOMATIC CLOCK-OUT: Stop timer and clock out automatically (ArbZG §3)
+                                // This ensures compliance with German labor law - maximum 10 hours per day
+                                if (!timerEl.dataset.autoClockOutTriggered) {
+                                    timerEl.dataset.autoClockOutTriggered = 'true';
+                                    
+                                    // Stop the timer
+                                    if (this.timers.session) {
+                                        clearInterval(this.timers.session);
+                                        this.timers.session = null;
+                                    }
+                                    
+                                    // Show critical notification
+                                    if (window.OC && OC.Notification) {
+                                        const criticalMsg = (window.t && window.t('arbeitszeitcheck', 
+                                            'CRITICAL: Maximum working hours (10h) exceeded! Automatically clocking out to comply with German labor law (ArbZG §3).')) ||
+                                            'CRITICAL: Maximum working hours (10h) exceeded! Automatically clocking out to comply with German labor law (ArbZG §3).';
+                                        OC.Notification.showTemporary(criticalMsg, { 
+                                            type: 'error', 
+                                            timeout: 20000 
+                                        });
+                                    }
+                                    
+                                    // Automatically clock out after a short delay to show the notification
+                                    setTimeout(() => {
+                                        this.clockOut()
+                                            .then(() => {
+                                                // Reload page to show updated status
+                                                window.location.reload();
+                                            })
+                                            .catch(error => {
+                                                console.error('Error during automatic clock-out:', error);
+                                                // Still reload to show error state
+                                                window.location.reload();
+                                            });
+                                    }, 2000); // 2 second delay to show notification
+                                }
+                            } else if (workingHours >= 8) {
+                                // Approaching 10 hours (8+ hours) - show warning state
+                                timerEl.classList.add('timer-warning');
+                                if (sessionTimerEl) {
+                                    sessionTimerEl.classList.add('timer-warning');
+                                }
+                                
+                                // Show info notification when reaching 8 hours (only once)
+                                if (!timerEl.dataset.infoShown) {
+                                    timerEl.dataset.infoShown = 'true';
+                                    
+                                    if (window.OC && OC.Notification) {
+                                        const infoMsg = (window.t && window.t('arbeitszeitcheck', 
+                                            'Note: You are approaching the maximum working hours. Extended hours must be compensated within 6 months (ArbZG §3).')) ||
+                                            'Note: You are approaching the maximum working hours. Extended hours must be compensated within 6 months (ArbZG §3).';
+                                        OC.Notification.showTemporary(infoMsg, { 
+                                            type: 'info', 
+                                            timeout: 10000 
+                                        });
+                                    }
+                                }
+                            }
                         }, 1000);
                     }
                 }
@@ -537,6 +684,18 @@
          * Clock out action
          */
         clockOut: function() {
+            // Stop timer immediately when clocking out
+            if (this.timers.session) {
+                clearInterval(this.timers.session);
+                this.timers.session = null;
+            }
+            
+            // Stop break timer if running
+            if (this.timers.break) {
+                clearInterval(this.timers.break);
+                this.timers.break = null;
+            }
+            
             this.callApi('/apps/arbeitszeitcheck/api/clock/out', 'POST');
         },
 
@@ -570,9 +729,17 @@
          */
         callApi: function(endpoint, method = 'POST', data = null, reloadOnSuccess = true) {
             // Build full URL
-            const url = endpoint.startsWith('http')
-                ? endpoint
-                : OC.generateUrl(endpoint);
+            // If endpoint already starts with /apps/, use it directly
+            // Otherwise, use OC.generateUrl to build the URL
+            let url;
+            if (endpoint.startsWith('http')) {
+                url = endpoint;
+            } else if (endpoint.startsWith('/apps/')) {
+                // Already a full path, use it directly
+                url = endpoint;
+            } else {
+                url = OC.generateUrl(endpoint);
+            }
 
             // Build request options
             const options = {
@@ -592,8 +759,10 @@
             this.setLoadingState(true);
 
             // Make the API call
+            console.log('API Call:', { url, method, data, options });
             return fetch(url, options)
                 .then(response => {
+                    console.log('API Response:', { status: response.status, statusText: response.statusText, url: response.url });
                     // Check if response is JSON
                     const contentType = response.headers.get('content-type');
                     if (contentType && contentType.includes('application/json')) {

@@ -386,6 +386,13 @@
 .form-group textarea {
   min-height: 100px;
   resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-textarea--large {
+  min-height: 150px;
+  width: 100%;
 }
 
 /* Form Select */
@@ -464,6 +471,30 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 .form-radio input[type="radio"]:focus {
   outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
   outline-offset: 2px;
+}
+
+/* Form Input Group (for inputs with buttons) */
+.form-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.form-input-group .form-input {
+  flex: 1;
+}
+
+.form-input-group .btn {
+  flex-shrink: 0;
+}
+
+/* Break Entry Styling */
+.break-entry {
+  margin-bottom: var(--space-4);
+}
+
+.break-entry:last-of-type {
+  margin-bottom: 0;
 }
 
 /* Form Validation */

@@ -261,6 +261,69 @@
     opacity: 1;
 }
 
+/* Form Enhancements */
+.form-section {
+    margin-bottom: var(--space-8, 2rem);
+    padding-bottom: var(--space-6, 1.5rem);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.form-section-title {
+    font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-semibold, 600);
+    color: var(--arbeitszeitcheck-color-text, var(--color-main-text, #000));
+    margin: 0 0 var(--space-2, 0.5rem) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+}
+
+.form-section-description {
+    font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    margin: 0 0 var(--space-4, 1rem) 0;
+    line-height: var(--arbeitszeitcheck-line-height-relaxed, 1.6);
+}
+
+.form-grid {
+    display: grid;
+    gap: var(--space-4, 1rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.form-grid--2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.form-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.form-label-icon {
+    display: inline-block;
+    margin-right: var(--space-1, 0.25rem);
+    font-size: 1.1em;
+    vertical-align: middle;
+}
+
+.card {
+    padding: var(--space-6, 1.5rem);
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: var(--radius-xl, 12px);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+.card--elevated {
+    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     #app-content-wrapper {
@@ -291,5 +354,22 @@
 
     .table-container {
         border-radius: var(--radius-base, 8px);
+    }
+
+    .form-grid--2,
+    .form-grid--3 {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        padding: var(--space-4, 1rem);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
     }
 }

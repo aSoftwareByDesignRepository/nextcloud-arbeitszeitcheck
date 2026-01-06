@@ -46,6 +46,7 @@ return [
 		['name' => 'time_entry#apiShow', 'url' => '/api/time-entries/{id}', 'verb' => 'GET'],
 		['name' => 'time_entry#apiStore', 'url' => '/api/time-entries', 'verb' => 'POST'],
 		['name' => 'time_entry#apiUpdate', 'url' => '/api/time-entries/{id}', 'verb' => 'PUT'],
+		['name' => 'time_entry#apiUpdatePost', 'url' => '/api/time-entries/{id}', 'verb' => 'POST'],
 		['name' => 'time_entry#apiDelete', 'url' => '/api/time-entries/{id}', 'verb' => 'DELETE'],
 		['name' => 'time_entry#requestCorrection', 'url' => '/api/time-entries/{id}/request-correction', 'verb' => 'POST'],
 

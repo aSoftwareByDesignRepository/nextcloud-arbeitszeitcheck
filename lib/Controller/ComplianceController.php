@@ -17,6 +17,8 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -74,9 +76,9 @@ class ComplianceController extends Controller
 	/**
 	 * Compliance dashboard page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -134,9 +136,9 @@ class ComplianceController extends Controller
 	/**
 	 * Get violations page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function violations(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -198,9 +200,9 @@ class ComplianceController extends Controller
 	/**
 	 * Compliance reports page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function reports(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -276,7 +278,6 @@ class ComplianceController extends Controller
 	/**
 	 * Get compliance violations API endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $userId Filter by user ID (admin only)
 	 * @param string|null $violationType Filter by violation type
 	 * @param bool|null $resolved Filter by resolved status
@@ -287,6 +288,7 @@ class ComplianceController extends Controller
 	 * @param int|null $offset Pagination offset
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getViolations(
 		?string $userId = null,
 		?string $violationType = null,
@@ -381,10 +383,10 @@ class ComplianceController extends Controller
 	/**
 	 * Get single violation by ID
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Violation ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getViolation(int $id): JSONResponse
 	{
 		try {
@@ -425,10 +427,10 @@ class ComplianceController extends Controller
 	/**
 	 * Resolve a violation
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Violation ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function resolveViolation(int $id): JSONResponse
 	{
 		try {
@@ -482,9 +484,9 @@ class ComplianceController extends Controller
 	/**
 	 * Get compliance status for current user
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getStatus(): JSONResponse
 	{
 		try {
@@ -512,11 +514,11 @@ class ComplianceController extends Controller
 	/**
 	 * Generate compliance report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getReport(?string $startDate = null, ?string $endDate = null): JSONResponse
 	{
 		try {
@@ -554,9 +556,9 @@ class ComplianceController extends Controller
 	/**
 	 * Manually trigger compliance check (admin only)
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function runCheck(): JSONResponse
 	{
 		try {

@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -57,9 +58,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * Clock in endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function clockIn(?string $projectCheckProjectId = null, ?string $description = null): JSONResponse
 	{
 		try {
@@ -95,9 +95,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * Clock out endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function clockOut(): JSONResponse
 	{
 		try {
@@ -133,9 +132,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * Get current status endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function getStatus(): JSONResponse
 	{
 		try {
@@ -157,9 +155,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * Start break endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function startBreak(): JSONResponse
 	{
 		try {
@@ -195,9 +192,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * End break endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function endBreak(): JSONResponse
 	{
 		try {
@@ -233,9 +229,8 @@ class TimeTrackingController extends Controller
 
 	/**
 	 * Get break status endpoint
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function getBreakStatus(): JSONResponse
 	{
 		try {

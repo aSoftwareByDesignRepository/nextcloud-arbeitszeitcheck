@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -60,9 +61,8 @@ class GdprController extends Controller
 
 	/**
 	 * Export all user data for GDPR compliance (Art. 15 GDPR - Right to access)
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function export(): DataDownloadResponse
 	{
 		try {
@@ -234,9 +234,8 @@ class GdprController extends Controller
 	/**
 	 * Delete all user data (GDPR Art. 17 - Right to erasure)
 	 * Note: This respects legal retention periods (2 years minimum for time records per German labor law)
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function delete(): JSONResponse
 	{
 		try {

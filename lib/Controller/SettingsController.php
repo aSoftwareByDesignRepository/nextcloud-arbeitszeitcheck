@@ -16,6 +16,8 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\DB\Exception as DBException;
@@ -58,9 +60,9 @@ class SettingsController extends Controller
 	 *
 	 * Legacy endpoint for backward compatibility. Returns settings data as JSON.
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function index_api(): JSONResponse
 	{
 		try {
@@ -101,10 +103,9 @@ class SettingsController extends Controller
 
 	/**
 	 * Personal settings page
-	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -131,9 +132,8 @@ class SettingsController extends Controller
 
 	/**
 	 * Update personal settings
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function update(): JSONResponse
 	{
 		try {
@@ -216,9 +216,9 @@ class SettingsController extends Controller
 	/**
 	 * Check if user has completed onboarding tour
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getOnboardingCompleted(): JSONResponse
 	{
 		try {
@@ -263,9 +263,9 @@ class SettingsController extends Controller
 	/**
 	 * Mark onboarding tour as completed
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function setOnboardingCompleted(): JSONResponse
 	{
 		try {

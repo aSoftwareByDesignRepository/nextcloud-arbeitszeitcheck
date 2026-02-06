@@ -20,6 +20,7 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -74,8 +75,8 @@ class AdminController extends Controller
 	/**
 	 * Admin dashboard page
 	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -148,8 +149,8 @@ class AdminController extends Controller
 	/**
 	 * Admin users management page
 	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function users(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -210,8 +211,8 @@ class AdminController extends Controller
 	/**
 	 * Admin settings page
 	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function settings(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -251,8 +252,8 @@ class AdminController extends Controller
 	/**
 	 * Admin working time models management page
 	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function workingTimeModels(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -295,8 +296,8 @@ class AdminController extends Controller
 	/**
 	 * Admin audit log viewer page
 	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function auditLog(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -353,9 +354,9 @@ class AdminController extends Controller
 	/**
 	 * Get admin settings
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getAdminSettings(): JSONResponse
 	{
 		try {
@@ -385,9 +386,9 @@ class AdminController extends Controller
 	/**
 	 * Update admin settings
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function updateAdminSettings(): JSONResponse
 	{
 		try {
@@ -475,9 +476,9 @@ class AdminController extends Controller
 	/**
 	 * Get admin dashboard statistics
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getStatistics(): JSONResponse
 	{
 		try {
@@ -532,7 +533,6 @@ class AdminController extends Controller
 	/**
 	 * Get list of all users with their working time models
 	 *
-	 * @NoCSRFRequired
 	 * @param string|null $search Search query
 	 * @param int|null $limit
 	 * @param int|null $offset
@@ -607,7 +607,6 @@ class AdminController extends Controller
 	/**
 	 * Get user details including working time model
 	 *
-	 * @NoCSRFRequired
 	 * @param string $userId
 	 * @return JSONResponse
 	 */
@@ -675,10 +674,10 @@ class AdminController extends Controller
 	/**
 	 * Update user working time model assignment
 	 *
-	 * @NoCSRFRequired
 	 * @param string $userId
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function updateUserWorkingTimeModel(string $userId): JSONResponse
 	{
 		try {
@@ -795,9 +794,9 @@ class AdminController extends Controller
 	/**
 	 * Get all available working time models
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getWorkingTimeModels(): JSONResponse
 	{
 		try {
@@ -828,10 +827,10 @@ class AdminController extends Controller
 	/**
 	 * Get working time model by ID
 	 *
-	 * @NoCSRFRequired
 	 * @param int $id
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getWorkingTimeModel(int $id): JSONResponse
 	{
 		try {
@@ -867,9 +866,9 @@ class AdminController extends Controller
 	/**
 	 * Create a new working time model
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function createWorkingTimeModel(): JSONResponse
 	{
 		try {
@@ -943,10 +942,10 @@ class AdminController extends Controller
 	/**
 	 * Update a working time model
 	 *
-	 * @NoCSRFRequired
 	 * @param int $id
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function updateWorkingTimeModel(int $id): JSONResponse
 	{
 		try {
@@ -1035,10 +1034,10 @@ class AdminController extends Controller
 	/**
 	 * Delete a working time model
 	 *
-	 * @NoCSRFRequired
 	 * @param int $id
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function deleteWorkingTimeModel(int $id): JSONResponse
 	{
 		try {
@@ -1075,10 +1074,10 @@ class AdminController extends Controller
 	/**
 	 * Export users data
 	 *
-	 * @NoCSRFRequired
 	 * @param string $format Format: csv, json
 	 * @return DataDownloadResponse
 	 */
+	#[NoCSRFRequired]
 	public function exportUsers(string $format = 'csv'): DataDownloadResponse
 	{
 		try {
@@ -1177,9 +1176,9 @@ class AdminController extends Controller
 	/**
 	 * Get audit logs with filters
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getAuditLogs(): JSONResponse
 	{
 		try {
@@ -1276,9 +1275,9 @@ class AdminController extends Controller
 	/**
 	 * Get audit log statistics
 	 *
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoCSRFRequired]
 	public function getAuditLogStats(): JSONResponse
 	{
 		try {
@@ -1309,10 +1308,10 @@ class AdminController extends Controller
 	/**
 	 * Export audit logs
 	 *
-	 * @NoCSRFRequired
 	 * @param string $format Format: csv, json
 	 * @return DataDownloadResponse
 	 */
+	#[NoCSRFRequired]
 	public function exportAuditLogs(string $format = 'csv'): DataDownloadResponse
 	{
 		try {

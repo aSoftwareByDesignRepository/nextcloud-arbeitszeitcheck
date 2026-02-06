@@ -16,6 +16,8 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -75,13 +77,14 @@ class AbsenceController extends Controller
 	 *
 	 * Legacy endpoint for backward compatibility. Delegates to the index() method.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $status Filter by status
 	 * @param string|null $type Filter by type
 	 * @param int|null $limit
 	 * @param int|null $offset
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function index_api(?string $status = null, ?string $type = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		return $this->index($status, $type, $limit, $offset);
@@ -90,13 +93,14 @@ class AbsenceController extends Controller
 	/**
 	 * Get absences endpoint
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $status Filter by status
 	 * @param string|null $type Filter by type
 	 * @param int|null $limit
 	 * @param int|null $offset
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function index(?string $status = null, ?string $type = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		try {
@@ -138,10 +142,10 @@ class AbsenceController extends Controller
 	/**
 	 * Show create absence form page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @return TemplateResponse
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function create(): TemplateResponse
 	{
 		$response = new TemplateResponse(
@@ -161,11 +165,11 @@ class AbsenceController extends Controller
 	/**
 	 * Show edit absence form page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param int $id Absence ID
 	 * @return TemplateResponse
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function edit(int $id): TemplateResponse
 	{
 		try {
@@ -228,10 +232,10 @@ class AbsenceController extends Controller
 	/**
 	 * Get absence by ID endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function show(int $id): JSONResponse
 	{
 		try {
@@ -260,9 +264,9 @@ class AbsenceController extends Controller
 	/**
 	 * Create absence endpoint
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function store(): JSONResponse
 	{
 		try {
@@ -314,10 +318,10 @@ class AbsenceController extends Controller
 	 *
 	 * Handles POST requests for updating absences. Delegates to the update() method.
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function updatePost(int $id): JSONResponse
 	{
 		$params = $this->request->getParams();
@@ -331,13 +335,13 @@ class AbsenceController extends Controller
 	/**
 	 * Update absence endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @param string|null $start_date New start date
 	 * @param string|null $end_date New end date
 	 * @param string|null $reason New reason
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function update(int $id, ?string $start_date = null, ?string $end_date = null, ?string $reason = null): JSONResponse
 	{
 		try {
@@ -371,10 +375,10 @@ class AbsenceController extends Controller
 	/**
 	 * Delete absence endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function delete(int $id): JSONResponse
 	{
 		try {
@@ -395,11 +399,11 @@ class AbsenceController extends Controller
 	/**
 	 * Approve absence endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @param string|null $comment Approval comment
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function approve(int $id, ?string $comment = null): JSONResponse
 	{
 		try {
@@ -421,11 +425,11 @@ class AbsenceController extends Controller
 	/**
 	 * Reject absence endpoint
 	 *
-	 * @NoAdminRequired
 	 * @param int $id Absence ID
 	 * @param string|null $comment Rejection comment
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function reject(int $id, ?string $comment = null): JSONResponse
 	{
 		try {
@@ -445,12 +449,11 @@ class AbsenceController extends Controller
 	}
 
 	/**
-	 * Get absence statistics endpoint
+	 * Get users list (for absence assignment etc.)
 	 *
-	 * @NoAdminRequired
-	 * @param int|null $year Year for statistics (defaults to current year)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function users(): JSONResponse
 	{
 		try {
@@ -481,6 +484,13 @@ class AbsenceController extends Controller
 		}
 	}
 
+	/**
+	 * Get absence statistics endpoint
+	 *
+	 * @param int|null $year Year for statistics (defaults to current year)
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
 	public function stats(?int $year = null): JSONResponse
 	{
 		try {

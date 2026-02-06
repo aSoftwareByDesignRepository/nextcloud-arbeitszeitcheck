@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -58,11 +59,11 @@ class ReportController extends Controller
 	/**
 	 * Generate daily report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $date Date (Y-m-d format, defaults to today)
 	 * @param string|null $userId User ID (admin only, defaults to current user)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function daily(?string $date = null, ?string $userId = null): JSONResponse
 	{
 		try {
@@ -92,11 +93,11 @@ class ReportController extends Controller
 	/**
 	 * Generate weekly report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $weekStart Week start date (Y-m-d format, defaults to current week)
 	 * @param string|null $userId User ID (admin only, defaults to current user)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function weekly(?string $weekStart = null, ?string $userId = null): JSONResponse
 	{
 		try {
@@ -134,11 +135,11 @@ class ReportController extends Controller
 	/**
 	 * Generate monthly report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $month Month (Y-m format, defaults to current month)
 	 * @param string|null $userId User ID (admin only, defaults to current user)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function monthly(?string $month = null, ?string $userId = null): JSONResponse
 	{
 		try {
@@ -173,12 +174,12 @@ class ReportController extends Controller
 	/**
 	 * Generate overtime report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @param string|null $userId User ID (admin only, defaults to current user)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function overtime(?string $startDate = null, ?string $endDate = null, ?string $userId = null): JSONResponse
 	{
 		try {
@@ -212,12 +213,12 @@ class ReportController extends Controller
 	/**
 	 * Generate absence report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @param string|null $userId User ID (admin only, defaults to current user)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function absence(?string $startDate = null, ?string $endDate = null, ?string $userId = null): JSONResponse
 	{
 		try {
@@ -251,12 +252,12 @@ class ReportController extends Controller
 	/**
 	 * Generate team report
 	 *
-	 * @NoAdminRequired
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @param string|null $userIds Comma-separated user IDs (defaults to manager's team)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function team(?string $startDate = null, ?string $endDate = null, ?string $userIds = null): JSONResponse
 	{
 		try {

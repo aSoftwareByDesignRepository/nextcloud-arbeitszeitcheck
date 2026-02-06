@@ -19,6 +19,8 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -135,9 +137,9 @@ class ManagerController extends Controller
 	/**
 	 * Manager dashboard page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -219,11 +221,12 @@ class ManagerController extends Controller
 	/**
 	 * Get team overview data
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int|null $limit
 	 * @param int|null $offset
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getTeamOverview(?int $limit = 50, ?int $offset = 0): JSONResponse
 	{
 		try {
@@ -307,12 +310,13 @@ class ManagerController extends Controller
 	/**
 	 * Get pending approvals
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $type Filter by type ('absence', 'time_entry', or null for all)
 	 * @param int|null $limit
 	 * @param int|null $offset
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getPendingApprovals(?string $type = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		try {
@@ -420,9 +424,10 @@ class ManagerController extends Controller
 	/**
 	 * Get team compliance overview
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getTeamCompliance(): JSONResponse
 	{
 		try {
@@ -492,10 +497,11 @@ class ManagerController extends Controller
 	/**
 	 * Get team hours summary
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $period Period: 'today', 'week', 'month'
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getTeamHoursSummary(?string $period = 'today'): JSONResponse
 	{
 		try {
@@ -561,11 +567,12 @@ class ManagerController extends Controller
 	/**
 	 * Approve an absence request
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $absenceId
 	 * @param string|null $comment
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function approveAbsence(int $absenceId, ?string $comment = null): JSONResponse
 	{
 		try {
@@ -588,11 +595,12 @@ class ManagerController extends Controller
 	/**
 	 * Reject an absence request
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $absenceId
 	 * @param string|null $comment
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function rejectAbsence(int $absenceId, ?string $comment = null): JSONResponse
 	{
 		try {
@@ -615,11 +623,12 @@ class ManagerController extends Controller
 	/**
 	 * Approve a time entry correction
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $timeEntryId Time entry ID
 	 * @param string|null $comment Optional approval comment
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function approveTimeEntryCorrection(int $timeEntryId, ?string $comment = null): JSONResponse
 	{
 		try {
@@ -733,11 +742,12 @@ class ManagerController extends Controller
 	/**
 	 * Reject a time entry correction
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $timeEntryId Time entry ID
 	 * @param string|null $reason Rejection reason
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function rejectTimeEntryCorrection(int $timeEntryId, ?string $reason = null): JSONResponse
 	{
 		try {
@@ -838,9 +848,10 @@ class ManagerController extends Controller
 	/**
 	 * Get pending time entry corrections for manager's team
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getPendingTimeEntryCorrections(): JSONResponse
 	{
 		try {
@@ -914,11 +925,12 @@ class ManagerController extends Controller
 	/**
 	 * Get team absence calendar
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getTeamAbsenceCalendar(?string $startDate = null, ?string $endDate = null): JSONResponse
 	{
 		try {

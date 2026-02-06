@@ -15,6 +15,8 @@ use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IL10N;
@@ -44,10 +46,10 @@ class HealthController extends Controller
 	/**
 	 * Health check endpoint
 	 *
-	 * @PublicPage
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[PublicPage]
+	#[NoCSRFRequired]
 	public function check(): JSONResponse
 	{
 		try {

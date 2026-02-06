@@ -18,6 +18,8 @@ use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -97,9 +99,9 @@ class PageController extends Controller
 	/**
 	 * Main index page - redirects to dashboard
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): TemplateResponse
 	{
 		return $this->dashboard();
@@ -108,9 +110,9 @@ class PageController extends Controller
 	/**
 	 * Dashboard page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -169,9 +171,9 @@ class PageController extends Controller
 	/**
 	 * Time entries page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function timeEntries(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -226,9 +228,9 @@ class PageController extends Controller
 	/**
 	 * Absences page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function absences(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -288,9 +290,9 @@ class PageController extends Controller
 	/**
 	 * Reports page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function reports(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -351,9 +353,9 @@ class PageController extends Controller
 	/**
 	 * Calendar page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function calendar(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -404,9 +406,9 @@ class PageController extends Controller
 	/**
 	 * Timeline page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function timeline(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
@@ -448,9 +450,9 @@ class PageController extends Controller
 	/**
 	 * Settings page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function settings(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');

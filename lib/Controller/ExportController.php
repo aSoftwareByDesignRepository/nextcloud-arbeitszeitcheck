@@ -17,6 +17,8 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -57,12 +59,12 @@ class ExportController extends Controller
 	/**
 	 * Export time entries
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param string $format Format: csv, json, pdf, datev
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function timeEntries(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {
@@ -134,12 +136,12 @@ class ExportController extends Controller
 	/**
 	 * Export absences
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param string $format Format: csv, json, pdf
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function absences(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {
@@ -206,12 +208,12 @@ class ExportController extends Controller
 	/**
 	 * Export compliance reports
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param string $format Format: csv, json, pdf
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function compliance(string $format = 'pdf', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {
@@ -365,12 +367,12 @@ class ExportController extends Controller
 	/**
 	 * Export time entries in DATEV format
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 * @return DataDownloadResponse
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function datev(?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {
@@ -403,9 +405,9 @@ class ExportController extends Controller
 	/**
 	 * Get DATEV export configuration status
 	 *
-	 * @NoAdminRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function datevConfig(): JSONResponse
 	{
 		try {

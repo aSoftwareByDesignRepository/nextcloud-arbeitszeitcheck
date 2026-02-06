@@ -21,6 +21,8 @@ use OCP\AppFramework\Controller;
 use OCP\IConfig;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -124,7 +126,7 @@ class TimeEntryController extends Controller
 	 * Retrieves time entries for the current user with optional filtering by date range and status.
 	 * Supports pagination for large datasets.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $start_date Start date filter (Y-m-d format)
 	 * @param string|null $end_date End date filter (Y-m-d format)
 	 * @param string|null $status Status filter (active, completed, break, pending_approval, rejected)
@@ -132,6 +134,7 @@ class TimeEntryController extends Controller
 	 * @param int|null $offset Number of entries to skip for pagination (default: 0)
 	 * @return JSONResponse JSON response with 'success', 'entries' array, and 'total' count
 	 */
+	#[NoAdminRequired]
 	public function index(?string $start_date = null, ?string $end_date = null, ?string $status = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		try {
@@ -264,10 +267,10 @@ class TimeEntryController extends Controller
 	/**
 	 * Show create time entry form page
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @return TemplateResponse
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function create(): TemplateResponse
 	{
 		\OCP\Util::addTranslations('arbeitszeitcheck');
@@ -304,11 +307,11 @@ class TimeEntryController extends Controller
 	 * - Only manual entries, entries with pending approval, or completed automatic entries can be edited
 	 * - Approved entries cannot be edited (use "Request Correction" instead)
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to edit
 	 * @return TemplateResponse Template response with time-entries template and entry data, or error message
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function edit(int $id): TemplateResponse
 	{
 		\OCP\Util::addTranslations('arbeitszeitcheck');
@@ -410,10 +413,11 @@ class TimeEntryController extends Controller
 	/**
 	 * Get time entry by ID endpoint
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id Time entry ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function show(int $id): JSONResponse
 	{
 		try {
@@ -449,13 +453,14 @@ class TimeEntryController extends Controller
 	/**
 	 * Create time entry endpoint (manual entry)
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string $date Date (Y-m-d)
 	 * @param float $hours Hours worked
 	 * @param string|null $description Description
 	 * @param string|null $project_check_project_id Project ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function store(string $date, float $hours, ?string $description = null, ?string $project_check_project_id = null): JSONResponse
 	{
 		try {
@@ -612,7 +617,7 @@ class TimeEntryController extends Controller
 	 * - Only manual entries, entries with pending approval, or completed automatic entries can be edited
 	 * - Approved entries cannot be edited (use "Request Correction" instead)
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id Time entry ID to update
 	 * @param string|null $date New date (Y-m-d format, backward compatibility)
 	 * @param float|null $hours New hours worked (backward compatibility)
@@ -622,6 +627,7 @@ class TimeEntryController extends Controller
 	 * @throws DoesNotExistException If time entry not found
 	 * @throws \Exception If user doesn't own the entry, entry cannot be edited, or validation fails
 	 */
+	#[NoAdminRequired]
 	public function update(int $id, ?string $date = null, ?float $hours = null, ?string $description = null, ?string $project_check_project_id = null): JSONResponse
 	{
 		try {
@@ -927,11 +933,11 @@ class TimeEntryController extends Controller
 	 * Handles POST requests for updating time entries. Delegates to the update() method.
 	 * Supports both old format (date, hours) and new format (startTime, endTime, breakStartTime, breakEndTime).
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to update
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function updatePost(int $id): JSONResponse
 	{
 		$params = $this->request->getParams();
@@ -963,10 +969,11 @@ class TimeEntryController extends Controller
 	 * Returns information about what will be affected if the time entry is deleted,
 	 * such as related compliance violations, reports, or other dependencies.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id Time entry ID
 	 * @return JSONResponse JSON response with 'success' and 'impact' information
 	 */
+	#[NoAdminRequired]
 	public function getDeletionImpact(int $id): JSONResponse
 	{
 		try {
@@ -1026,12 +1033,13 @@ class TimeEntryController extends Controller
 	 * Supports both old format (newDate, newHours) and new format (startTime, endTime)
 	 * for backward compatibility.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id Time entry ID to request correction for
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 * @throws DoesNotExistException If time entry not found
 	 * @throws \Exception If user doesn't own the entry, correction already pending, or validation fails
 	 */
+	#[NoAdminRequired]
 	public function requestCorrection(int $id): JSONResponse
 	{
 		try {
@@ -1225,10 +1233,11 @@ class TimeEntryController extends Controller
 	/**
 	 * Delete time entry endpoint
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id Time entry ID
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function delete(int $id): JSONResponse
 	{
 		try {
@@ -1301,11 +1310,12 @@ class TimeEntryController extends Controller
 	/**
 	 * Get time entry statistics endpoint
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $start_date Start date for statistics
 	 * @param string|null $end_date End date for statistics
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getStats(?string $start_date = null, ?string $end_date = null): JSONResponse
 	{
 		try {
@@ -1386,7 +1396,7 @@ class TimeEntryController extends Controller
 	 *
 	 * Legacy endpoint for backward compatibility. Delegates to the index() method.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $start_date Start date filter (Y-m-d format)
 	 * @param string|null $end_date End date filter (Y-m-d format)
 	 * @param string|null $status Status filter
@@ -1394,6 +1404,7 @@ class TimeEntryController extends Controller
 	 * @param int|null $offset Number of entries to skip for pagination (default: 0)
 	 * @return JSONResponse JSON response with 'success', 'entries' array, and 'total' count
 	 */
+	#[NoAdminRequired]
 	public function index_api(?string $start_date = null, ?string $end_date = null, ?string $status = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		return $this->index($start_date, $end_date, $status, $limit, $offset);
@@ -1404,7 +1415,7 @@ class TimeEntryController extends Controller
 	 *
 	 * REST API endpoint for retrieving time entries. Delegates to the index() method.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $start_date Start date filter (Y-m-d format)
 	 * @param string|null $end_date End date filter (Y-m-d format)
 	 * @param string|null $status Status filter
@@ -1412,6 +1423,7 @@ class TimeEntryController extends Controller
 	 * @param int|null $offset Number of entries to skip for pagination (default: 0)
 	 * @return JSONResponse JSON response with 'success', 'entries' array, and 'total' count
 	 */
+	#[NoAdminRequired]
 	public function apiIndex(?string $start_date = null, ?string $end_date = null, ?string $status = null, ?int $limit = 25, ?int $offset = 0): JSONResponse
 	{
 		return $this->index($start_date, $end_date, $status, $limit, $offset);
@@ -1420,10 +1432,11 @@ class TimeEntryController extends Controller
 	/**
 	 * API: Get time entry by ID (alias for show)
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function apiShow(int $id): JSONResponse
 	{
 		return $this->show($id);
@@ -1432,10 +1445,10 @@ class TimeEntryController extends Controller
 	/**
 	 * API: Create time entry (accepts JSON body)
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function apiStore(): JSONResponse
 	{
 		$params = $this->request->getParams();
@@ -1690,8 +1703,6 @@ class TimeEntryController extends Controller
 	 * REST API endpoint for updating time entries. Accepts data in the request body.
 	 * Delegates to the update() method for actual processing.
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to update
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 */
@@ -1713,8 +1724,6 @@ class TimeEntryController extends Controller
 	 * Supports both old format (date, hours) and new format (startTime, endTime, breakStartTime, breakEndTime).
 	 * Delegates to the update() method for actual processing.
 	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 * @param int $id Time entry ID to update
 	 * @return JSONResponse JSON response with 'success' and updated 'entry' data, or 'error' on failure
 	 */
@@ -1746,10 +1755,11 @@ class TimeEntryController extends Controller
 	/**
 	 * API: Delete time entry (alias for delete)
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param int $id
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function apiDelete(int $id): JSONResponse
 	{
 		return $this->delete($id);
@@ -1761,7 +1771,7 @@ class TimeEntryController extends Controller
 	 * Calculates and returns overtime information for the current user for the specified period.
 	 * Overtime is calculated based on working time models and actual hours worked.
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @param string|null $period Period type: 'daily', 'weekly', 'monthly', 'yearly', or 'custom' (default: 'monthly')
 	 * @param string|null $start_date Start date for custom period (Y-m-d format, required if period is 'custom')
 	 * @param string|null $end_date End date for custom period (Y-m-d format, required if period is 'custom')
@@ -1797,9 +1807,10 @@ class TimeEntryController extends Controller
 	/**
 	 * Get overtime balance (cumulative)
 	 *
-	 * @NoAdminRequired
+	 *
 	 * @return JSONResponse
 	 */
+	#[NoAdminRequired]
 	public function getOvertimeBalance(): JSONResponse
 	{
 		try {

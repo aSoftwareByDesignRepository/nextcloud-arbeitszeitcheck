@@ -90,7 +90,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('approved_at', Types::DATETIME, [
 				'notnull' => false,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_entries_pk');
 			$table->addIndex(['user_id'], 'at_entries_user_idx');
 			$table->addIndex(['start_time'], 'at_entries_start_time_idx');
 			$table->addIndex(['status'], 'at_entries_status_idx');
@@ -150,7 +150,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('updated_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_absences_pk');
 			$table->addIndex(['user_id'], 'at_absences_user_idx');
 			$table->addIndex(['type'], 'at_absences_type_idx');
 			$table->addIndex(['status'], 'at_absences_status_idx');
@@ -203,7 +203,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_violations_pk');
 			$table->addIndex(['user_id'], 'at_violations_user_idx');
 			$table->addIndex(['violation_type'], 'at_violations_type_idx');
 			$table->addIndex(['date'], 'at_violations_date_idx');
@@ -256,7 +256,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_audit_pk');
 			$table->addIndex(['user_id'], 'at_audit_user_idx');
 			$table->addIndex(['action'], 'at_audit_action_idx');
 			$table->addIndex(['entity_type'], 'at_audit_entity_type_idx');
@@ -289,7 +289,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('updated_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_settings_pk');
 			$table->addIndex(['user_id'], 'at_settings_user_idx');
 			$table->addIndex(['user_id', 'setting_key'], 'at_settings_user_key_idx');
 			// Add unique constraint: each user can only have one setting per key
@@ -345,7 +345,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('updated_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_models_pk');
 			$table->addIndex(['type'], 'at_models_type_idx');
 			$table->addIndex(['is_default'], 'at_models_default_idx');
 		}
@@ -382,7 +382,7 @@ class Version1000Date20241229000000 extends SimpleMigrationStep {
 			$table->addColumn('updated_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'at_user_models_pk');
 			$table->addIndex(['user_id'], 'at_user_models_user_idx');
 			$table->addIndex(['working_time_model_id'], 'at_user_models_model_idx');
 			$table->addIndex(['user_id', 'start_date'], 'at_user_models_user_date_idx');

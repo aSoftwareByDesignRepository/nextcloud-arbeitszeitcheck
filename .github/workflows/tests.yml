@@ -27,6 +27,7 @@ jobs:
           php-version: "8.1"
           coverage: none
           tools: composer
+          extensions: pdo_sqlite
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
@@ -57,7 +58,7 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: apps/arbeitszeitcheck/package-lock.json
+          cache-dependency-path: apps/arbeitszeitcheck/package.json
 
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
@@ -88,7 +89,7 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: apps/arbeitszeitcheck/package-lock.json
+          cache-dependency-path: apps/arbeitszeitcheck/package.json
 
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund

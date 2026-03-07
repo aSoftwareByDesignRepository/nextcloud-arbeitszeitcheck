@@ -1,0 +1,11 @@
+{
+  "extends": ["stylelint-config-recommended"],
+  "ignoreFiles": ["**/*.js", "**/*.ts"],
+  "rules": {
+    "no-descending-specificity": null,
+    "media-feature-name-value-no-unknown": null,
+    "declaration-block-no-duplicate-properties": null,
+    "no-duplicate-selectors": null,
+    "declaration-property-value-keyword-no-deprecated": null
+  }
+}

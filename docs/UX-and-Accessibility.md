@@ -76,7 +76,15 @@ This plan keeps the app predictable, maintainable, and safe while staying simple
 
 ---
 
-## 8. Weaknesses and mitigations
+## 8. Layout and navigation
+
+- **App wrapper** — All pages that include the sidebar use `<div id="arbeitszeitcheck-app">` to wrap navigation + content. This provides a flex container for desktop (sidebar + content side-by-side) and mobile (stacked layout with hamburger menu).
+- **Navigation script** — `common/navigation.js` is loaded automatically when `common/navigation.php` is included, so mobile menu toggle and keyboard navigation work on every page.
+- **Mobile overlay** — When the hamburger menu is open, an overlay appears and closes the menu on click; it uses `pointer-events: none` when closed to avoid blocking interaction.
+
+---
+
+## 9. Weaknesses and mitigations
 
 | Risk | Mitigation |
 |------|------------|
@@ -86,3 +94,26 @@ This plan keeps the app predictable, maintainable, and safe while staying simple
 | **Section identification** | Sections use border + left accent bar (not only color); headings use bold and size; optional `.section__title` for extra clarity. |
 | **Form errors** | Errors shown as text + `aria-invalid` and `aria-describedby` where applicable; not only red border. |
 | **Global styles leaking** | App CSS is scoped (e.g. `#app-content-wrapper`, `#app-navigation`) so Nextcloud core and other apps are not overridden. |
+
+---
+
+## 10. Audit findings and implementation notes
+
+### Clock / break API error handling
+
+- **Risk** — If `clockIn`, `clockOut`, `startBreak`, or `endBreak` fail (network, server error), the user previously received no feedback.
+- **Mitigation** — Each of these actions now chains `.catch()` on `callApi()` and calls `showError()` with the error message, so users see an `OC.Notification` or alert on failure.
+
+### API URL handling
+
+- **Risk** — Paths like `/apps/arbeitszeitcheck/api/clock/in` may not resolve correctly in setups with custom webroot or `index.php` in the path.
+- **Mitigation** — `callApi()` uses `OC.generateUrl()` for non-absolute URLs so Nextcloud generates the correct base path.
+
+### Absence approval audit trail
+
+- **Note** — `approvedBy` is not stored on the absence record; approver identity is recorded in the audit log. Schema and business logic remain consistent with this choice.
+
+### Production recommendations
+
+- Remove or guard `console.warn` / `console.error` in production if they log sensitive or noisy data.
+- Ensure all API endpoints validate CSRF via `requesttoken`; the app uses headers and body for this.

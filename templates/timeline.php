@@ -72,6 +72,7 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

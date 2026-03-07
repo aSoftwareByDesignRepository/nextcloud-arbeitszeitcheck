@@ -106,3 +106,4 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

@@ -12,6 +12,11 @@ declare(strict_types=1);
  * @license AGPL-3.0-or-later
  */
 
+use OCP\Util;
+
+// Ensure navigation.js loads on all pages with sidebar (mobile menu, keyboard nav)
+Util::addScript('arbeitszeitcheck', 'common/navigation');
+
 // Get URL generator and translation from controller params or OCP API
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
 $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
@@ -61,6 +66,8 @@ if ($showManagerLink === null) {
 }
 ?>
 
+<!-- App layout wrapper: flex container for sidebar + content (desktop), stacked (mobile) -->
+<div id="arbeitszeitcheck-app" class="arbeitszeitcheck-app">
 <!-- Mobile hamburger menu button -->
 <button class="nav-mobile-toggle" 
         id="nav-mobile-toggle" 

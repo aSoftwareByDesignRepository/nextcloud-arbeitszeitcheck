@@ -76,7 +76,7 @@
                     tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(window.t ? window.t('arbeitszeitcheck', 'Failed to load users. Please try again.') : 'Failed to load users. Please try again.');
@@ -148,7 +148,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 Messaging.showError('Failed to load user details');
             }
         });
@@ -175,7 +175,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 Messaging.showError('Failed to load working time models');
             }
         });
@@ -315,7 +315,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to update user')) || window.ArbeitszeitCheck?.l10n?.failedToUpdateUser || 'Failed to update user';
                 Messaging.showError(errorMsg);
             }

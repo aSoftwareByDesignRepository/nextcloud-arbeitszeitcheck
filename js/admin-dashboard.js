@@ -66,7 +66,7 @@
                     updateStatisticsDisplay(data.statistics);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 if (Messaging && Messaging.showError) {
                     Messaging.showError('Failed to refresh statistics. Please try again.');
                 }

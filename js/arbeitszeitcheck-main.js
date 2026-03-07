@@ -726,7 +726,9 @@
             if (projectCheckProjectId) data.projectCheckProjectId = projectCheckProjectId;
             if (description) data.description = description;
 
-            this.callApi('/apps/arbeitszeitcheck/api/clock/in', 'POST', data);
+            this.callApi('/apps/arbeitszeitcheck/api/clock/in', 'POST', data).catch((err) => {
+                this.showError(err && err.message ? err.message : (this.config.l10n?.error || 'An error occurred'));
+            });
         },
 
         /**
@@ -745,21 +747,27 @@
                 this.timers.break = null;
             }
             
-            this.callApi('/apps/arbeitszeitcheck/api/clock/out', 'POST');
+            this.callApi('/apps/arbeitszeitcheck/api/clock/out', 'POST').catch((err) => {
+                this.showError(err && err.message ? err.message : (this.config.l10n?.error || 'An error occurred'));
+            });
         },
 
         /**
          * Start break action
          */
         startBreak: function() {
-            this.callApi('/apps/arbeitszeitcheck/api/break/start', 'POST');
+            this.callApi('/apps/arbeitszeitcheck/api/break/start', 'POST').catch((err) => {
+                this.showError(err && err.message ? err.message : (this.config.l10n?.error || 'An error occurred'));
+            });
         },
 
         /**
          * End break action
          */
         endBreak: function() {
-            this.callApi('/apps/arbeitszeitcheck/api/break/end', 'POST');
+            this.callApi('/apps/arbeitszeitcheck/api/break/end', 'POST').catch((err) => {
+                this.showError(err && err.message ? err.message : (this.config.l10n?.error || 'An error occurred'));
+            });
         },
 
         /**
@@ -789,15 +797,15 @@
          * @param {boolean} reloadOnSuccess - Whether to reload page on success (default: true)
          */
         callApi: function(endpoint, method = 'POST', data = null, reloadOnSuccess = true) {
-            // Build full URL: absolute paths (from linkToRoute) or OC.generateUrl for app-relative
+            // Build full URL: use OC.generateUrl for app paths so Nextcloud base (index.php) is correct
             let url;
             if (endpoint.startsWith('http')) {
                 url = endpoint;
-            } else if (endpoint.startsWith('/')) {
-                // Absolute path from linkToRoute - use as is
-                url = endpoint;
+            } else if (typeof OC !== 'undefined' && OC.generateUrl) {
+                // Use Nextcloud's URL generator for correct base path
+                url = OC.generateUrl(endpoint.startsWith('/') ? endpoint : ('/' + endpoint));
             } else {
-                url = OC.generateUrl(endpoint);
+                url = endpoint.startsWith('/') ? endpoint : ('/' + endpoint);
             }
 
             // Build request options (requesttoken required for CSRF)
@@ -1356,7 +1364,7 @@
             const end = endDate ? new Date(endDate) : null;
             
             // Format dates using translated month names
-            const months = this.config.l10n?.months || [
+            const _months = this.config.l10n?.months || [
                 (window.t && window.t('arbeitszeitcheck', 'January')) || 'January',
                 (window.t && window.t('arbeitszeitcheck', 'February')) || 'February',
                 (window.t && window.t('arbeitszeitcheck', 'March')) || 'March',
@@ -1691,7 +1699,6 @@
             let workingDays = 0;
             let absenceDays = 0;
             
-            const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
             const daysInMonth = lastDay.getDate();
             
@@ -1930,7 +1937,6 @@
             
             if (this.calendarData.currentView === 'month') {
                 // Use German date format (MM.YYYY for month view)
-                const month = String(date.getMonth() + 1).padStart(2, '0');
                 label.textContent = `${months[date.getMonth()]} ${date.getFullYear()}`;
             } else {
                 const weekStart = new Date(date);
@@ -1953,30 +1959,13 @@
 
             const date = new Date(dateKey);
             const dayData = this.getDayData(dateKey);
-            
-            // Format date using translated month and weekday names
-            const months = this.config.l10n?.months || [
-                (window.t && window.t('arbeitszeitcheck', 'January')) || 'January',
-                (window.t && window.t('arbeitszeitcheck', 'February')) || 'February',
-                (window.t && window.t('arbeitszeitcheck', 'March')) || 'March',
-                (window.t && window.t('arbeitszeitcheck', 'April')) || 'April',
-                (window.t && window.t('arbeitszeitcheck', 'May')) || 'May',
-                (window.t && window.t('arbeitszeitcheck', 'June')) || 'June',
-                (window.t && window.t('arbeitszeitcheck', 'July')) || 'July',
-                (window.t && window.t('arbeitszeitcheck', 'August')) || 'August',
-                (window.t && window.t('arbeitszeitcheck', 'September')) || 'September',
-                (window.t && window.t('arbeitszeitcheck', 'October')) || 'October',
-                (window.t && window.t('arbeitszeitcheck', 'November')) || 'November',
-                (window.t && window.t('arbeitszeitcheck', 'December')) || 'December'
-            ];
+
             const weekdays = this.config.l10n?.weekdays || ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const weekdayName = weekdays[date.getDay()];
-            const monthName = months[date.getMonth()];
-                // Use German date format (DD.MM.YYYY)
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                label.textContent = `${weekdayName}, ${day}.${month}.${year}`;
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            label.textContent = `${weekdayName}, ${day}.${month}.${year}`;
 
             let html = '';
             

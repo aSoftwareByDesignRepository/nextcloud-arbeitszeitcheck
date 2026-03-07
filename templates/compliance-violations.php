@@ -96,3 +96,4 @@ $total = $_['total'] ?? 0;
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

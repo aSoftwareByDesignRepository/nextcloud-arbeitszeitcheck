@@ -83,7 +83,7 @@
                     Messaging.showError(data.error || 'Failed to save settings');
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 Messaging.showError('An error occurred while saving settings');
             }
         });

@@ -11,25 +11,15 @@
 
 /* Desktop: Side-by-side layout */
 @media (min-width: 769px) {
-  /* Create flex container when both navigation and content exist */
+  /* Flex container: sidebar + content */
+  #arbeitszeitcheck-app,
   #app,
   .arbeitszeitcheck-app {
     display: flex;
     flex-direction: row;
-    min-height: 100vh;
+    min-height: 100%;
     height: auto;
     overflow: visible;
-  }
-
-  /* If no #app wrapper exists, use body as flex container (with :has support) */
-  @supports selector(:has(*)) {
-    body:has(#app-navigation):has(#app-content):not(:has(#app)) {
-      display: flex;
-      flex-direction: row;
-      min-height: 100vh;
-      height: auto;
-      overflow: visible;
-    }
   }
 
   #app-navigation,
@@ -60,22 +50,13 @@
 
 /* Mobile: Stacked layout with mobile menu */
 @media (max-width: 768px) {
+  #arbeitszeitcheck-app,
   #app,
   .arbeitszeitcheck-app {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    min-height: 100%;
     overflow-x: hidden;
-  }
-
-  /* If no #app wrapper exists, use body as flex container (with :has support) */
-  @supports selector(:has(*)) {
-    body:has(#app-navigation):has(#app-content):not(:has(#app)) {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
   }
 
   /* Navigation is hidden by default, shown via mobile menu */
@@ -128,36 +109,36 @@
 /* ===== PAGE-SPECIFIC RESPONSIVE ADJUSTMENTS ===== */
 
 @media (max-width: 768px) {
-  /* Section adjustments */
+  /* Section adjustments - clear spacing even on small screens */
   .section {
-    padding: var(--space-4);
-    margin-bottom: var(--space-4);
-    border-radius: var(--radius-base);
+    padding: var(--space-6);
+    margin-bottom: var(--space-8);
+    border-radius: var(--radius-xl);
   }
 
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-2);
-    padding-bottom: var(--space-3);
+    gap: var(--space-3);
+    padding-bottom: var(--space-4);
   }
 
   .section-header h2,
   .section-header h3 {
-    font-size: var(--arbeitszeitcheck-font-size-lg);
+    font-size: var(--arbeitszeitcheck-font-size-xl);
   }
 
-  /* Grid adjustments */
+  /* Grid adjustments - single column, generous spacing */
   .arbeitszeitcheck-dashboard__grid,
   .stats-grid {
     grid-template-columns: 1fr;
-    gap: var(--space-4);
+    gap: var(--space-6);
   }
 
-  /* Card adjustments */
+  /* Card adjustments - comfortable padding on mobile */
   .arbeitszeitcheck-card,
   .card {
-    padding: var(--space-4);
+    padding: var(--space-6);
   }
 
   /* Form adjustments */
@@ -183,12 +164,17 @@
     margin-bottom: 0;
   }
 
-  /* Header content adjustments */
+  /* Header content adjustments - clear stacking on mobile */
   .header-content {
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    align-items: stretch;
+    gap: var(--space-5);
+    padding: var(--space-5);
+  }
+
+  /* Page header - readable typography on small screens */
+  .page-header-section .header-text h2 {
+    font-size: var(--arbeitszeitcheck-font-size-2xl);
   }
 
   /* Stat card adjustments */

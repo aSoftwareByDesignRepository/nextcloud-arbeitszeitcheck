@@ -101,3 +101,4 @@ $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

@@ -24,11 +24,11 @@
   gap: 0;
 }
 
-/* ===== BREADCRUMB ===== */
+/* ===== BREADCRUMB - Clear navigation context ===== */
 
 .breadcrumb-container {
-  margin-bottom: var(--space-4);
-  padding: 0 var(--space-1);
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-2);
 }
 
 .breadcrumb ol {
@@ -36,7 +36,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
-  font-size: var(--arbeitszeitcheck-font-size-sm);
+  font-size: var(--arbeitszeitcheck-font-size-base);
   line-height: var(--arbeitszeitcheck-line-height-normal);
 }
 
@@ -71,8 +71,8 @@
 /* ===== PAGE HEADER SECTION (clear hierarchy: one title + short description) ===== */
 
 .page-header-section {
-  margin-bottom: var(--space-8);
-  padding: var(--space-6) 0;
+  margin-bottom: var(--space-10);
+  padding: var(--space-8) 0;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -80,6 +80,7 @@
 
 .page-header-section .header-text p {
   max-width: 52ch;
+  line-height: 1.6;
 }
 
 .page-header-section .header-content {
@@ -87,21 +88,22 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  gap: var(--space-6);
+  gap: var(--space-8);
 }
 
 .page-header-section .header-text h2 {
-  font-size: var(--arbeitszeitcheck-font-size-2xl);
+  font-size: var(--arbeitszeitcheck-font-size-3xl);
   font-weight: var(--arbeitszeitcheck-font-weight-bold);
   line-height: var(--arbeitszeitcheck-line-height-tight);
   color: var(--arbeitszeitcheck-color-text);
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-3) 0;
+  letter-spacing: -0.02em;
 }
 
 .page-header-section .header-text p,
 .page-description {
-  font-size: var(--arbeitszeitcheck-font-size-base);
-  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  line-height: 1.6;
   color: var(--arbeitszeitcheck-color-text-secondary);
   margin: 0;
   max-width: 60ch;
@@ -118,29 +120,35 @@
   gap: var(--space-3);
 }
 
-/* ===== SECTIONS (clear, easy-to-identify blocks — simple UX) ===== */
+/* ===== SECTIONS (clear, easy-to-identify blocks — simple UX, WCAG 2.1 AA) ===== */
 
 #app-content-wrapper > .section {
-  margin-bottom: var(--space-10);
-  padding: var(--space-6) var(--space-6);
-  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-12);
+  padding: var(--space-8) var(--space-8);
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--arbeitszeitcheck-color-border);
   background-color: var(--arbeitszeitcheck-color-background-elevated);
   box-shadow: var(--shadow-sm);
   position: relative;
+  /* Generous spacing: easy to scan, even for users with low vision */
 }
 
-/* Section left accent: quick visual scanning (border + bar, not only color — WCAG) */
+#app-content-wrapper > .section:focus-within {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Section left accent: quick visual scanning (border + bar, not only color — WCAG 1.4.11) */
 #app-content-wrapper > .section:not(.page-header-section)::before {
   content: '';
   position: absolute;
   left: 0;
-  top: var(--space-4);
-  bottom: var(--space-4);
-  width: 4px;
+  top: var(--space-5);
+  bottom: var(--space-5);
+  width: 5px;
   border-radius: 0 var(--radius-full) var(--radius-full) 0;
   background: var(--arbeitszeitcheck-color-primary);
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 /* Section title: large and bold so sections are easy to identify */
@@ -260,19 +268,19 @@
 
 @media (max-width: 768px) {
   #app-content-wrapper {
-    padding: var(--space-4) var(--space-4) var(--space-12);
+    padding: var(--space-5) var(--space-4) var(--space-12);
   }
 
   #app-content-wrapper > .section {
-    padding: var(--space-4) var(--space-4);
-    margin-bottom: var(--space-8);
-    border-radius: var(--radius-lg);
+    padding: var(--space-6) var(--space-5);
+    margin-bottom: var(--space-10);
+    border-radius: var(--radius-xl);
   }
 
   #app-content-wrapper > .section::before {
-    top: var(--space-3);
-    bottom: var(--space-3);
-    width: 3px;
+    top: var(--space-4);
+    bottom: var(--space-4);
+    width: 4px;
   }
 
   .page-header-section {

@@ -35,12 +35,12 @@
 /* Section Styling - Clear, easy-to-identify blocks (WCAG 2.1 AA friendly) */
 .section {
     background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-    border-radius: var(--radius-2xl, 16px);
-    margin-bottom: var(--space-10);
+    border-radius: var(--radius-2xl);
+    margin-bottom: var(--space-12);
     padding: var(--space-8);
     overflow: visible;
-    box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    box-shadow: var(--shadow-base);
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
     position: relative;
     height: auto;
     visibility: visible;
@@ -79,16 +79,16 @@
     line-height: var(--arbeitszeitcheck-line-height-relaxed);
 }
 
-/* Section Header - Clear visual separation (easy to identify sections) */
+/* Section Header - Clear visual separation (easy to identify sections, WCAG heading hierarchy) */
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--space-4);
+    gap: var(--space-6);
     margin-bottom: var(--space-6);
-    padding-bottom: var(--space-4);
-    border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    padding-bottom: var(--space-5);
+    border-bottom: 3px solid var(--arbeitszeitcheck-color-border, var(--color-border));
     visibility: visible;
     opacity: 1;
 }
@@ -96,38 +96,39 @@
 .section-header h3 {
     margin: 0;
     font-size: var(--arbeitszeitcheck-font-size-2xl);
-    font-weight: var(--arbeitszeitcheck-font-weight-semibold);
-    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    font-weight: var(--arbeitszeitcheck-font-weight-bold);
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
     visibility: visible;
     opacity: 1;
 }
 
 .section-header p {
-    margin: var(--space-1) 0 0 0;
+    margin: var(--space-2) 0 0 0;
     font-size: var(--arbeitszeitcheck-font-size-base);
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    line-height: 1.5;
     visibility: visible;
     opacity: 1;
 }
 
-/* Dashboard Grid - Clear spacing between cards */
+/* Dashboard Grid - Clear spacing between cards (generous gaps for clarity) */
 .arbeitszeitcheck-dashboard__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-    gap: var(--space-8);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: var(--space-10);
     margin-bottom: 0;
     visibility: visible;
     opacity: 1;
     width: 100%;
 }
 
-/* Cards - Clear boundaries, comfortable padding (simple UX) */
+/* Cards - Clear boundaries, comfortable padding (simple UX, foolproof) */
 .card {
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
-    border-radius: var(--radius-xl, 12px);
-    padding: var(--space-6);
-    box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    border-radius: var(--radius-xl);
+    padding: var(--space-8);
+    box-shadow: var(--shadow-base);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
     visibility: visible;
     opacity: 1;
@@ -135,12 +136,21 @@
 }
 
 .card:hover {
-    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+    box-shadow: var(--shadow-md);
 }
 
 @media (prefers-reduced-motion: no-preference) {
     .card:hover {
         transform: translateY(-2px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card {
+        transition: none;
+    }
+    .card:hover {
+        transform: none;
     }
 }
 
@@ -167,20 +177,28 @@
     opacity: 1;
 }
 
-/* Welcome message: step list — clear spacing, no inline styles (WCAG, maintainability) */
+/* Welcome message: step list — clear, simple, easy for anyone to follow */
 .welcome-steps {
-    margin: var(--space-4) 0;
-    padding-left: var(--space-6);
+    margin: var(--space-6) 0;
+    padding-left: var(--space-8);
     list-style: decimal;
+    font-size: var(--arbeitszeitcheck-font-size-lg);
+    line-height: 1.7;
 }
 
 .welcome-steps li {
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-4);
     line-height: var(--arbeitszeitcheck-line-height-relaxed);
 }
 
 .welcome-steps li:last-child {
     margin-bottom: 0;
+}
+
+/* Welcome alert card - visually distinct, welcoming */
+.card.alert--info {
+    border-width: 2px;
+    border-color: var(--arbeitszeitcheck-color-info);
 }
 
 /* ===== Current Status Card (Dashboard) ===== */
@@ -345,13 +363,13 @@
     min-height: 44px;
 }
 
-/* Stat Items */
+/* Stat Items - clear label/value pairs, easy to scan */
 .stat-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-3, 0.75rem) 0;
-    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border, #ddd));
+    padding: var(--space-4) 0;
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border));
     visibility: visible;
     opacity: 1;
 }
@@ -361,18 +379,19 @@
 }
 
 .stat-label {
-    font-size: 0.9rem;
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    color: var(--arbeitszeitcheck-color-text-secondary);
     visibility: visible;
     opacity: 1;
 }
 
 .stat-value {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    font-size: var(--arbeitszeitcheck-font-size-xl);
+    font-weight: 700;
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
     visibility: visible;
     opacity: 1;
+    font-variant-numeric: tabular-nums;
 }
 
 .stat-value.positive {
@@ -449,15 +468,33 @@
     background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
 }
 
-/* Empty State - Additional styles for nested structure */
+/* Empty State - Clear, welcoming, easy to understand (simple UX) */
 .empty-state {
     text-align: center;
-    padding: var(--space-12, 3rem) var(--space-4, 1rem);
+    padding: var(--space-12) var(--space-6);
+}
+
+.empty-state p:first-child,
+.empty-state__title {
+    font-size: var(--arbeitszeitcheck-font-size-xl);
+    font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+    color: var(--arbeitszeitcheck-color-text);
 }
 
 .empty-state-description {
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary)));
-    margin: var(--space-2, 0.5rem) 0;
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    margin: var(--space-3) 0 var(--space-6);
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    line-height: 1.6;
+    max-width: 40ch;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.empty-state .btn {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--arbeitszeitcheck-font-size-base);
 }
 
 /* Responsive - Clear layout on small screens */

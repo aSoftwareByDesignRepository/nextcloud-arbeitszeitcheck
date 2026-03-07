@@ -92,5 +92,6 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <div role="status" aria-live="polite" id="admin-teams-status" class="visually-hidden"></div>

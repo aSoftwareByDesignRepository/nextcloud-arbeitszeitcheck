@@ -230,8 +230,9 @@
 
         /**
          * Check if mobile menu is open
+         * @returns {boolean}
          */
-        isMobileMenuOpen() {
+        getIsMobileMenuOpen() {
             return this.isMobileMenuOpen;
         }
     };

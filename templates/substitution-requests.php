@@ -51,3 +51,4 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

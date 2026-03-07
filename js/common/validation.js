@@ -298,8 +298,8 @@ const ArbeitszeitCheckValidation = {
     let day, month, year;
     
     // Try dd.mm.yyyy or dd-mm-yyyy first
-    const dotFormat = /^(\d{1,2})[.\-](\d{1,2})[.\-](\d{4})$/;
-    const isoFormat = /^(\d{4})[.\-](\d{1,2})[.\-](\d{1,2})$/;
+    const dotFormat = /^(\d{1,2})[.-](\d{1,2})[.-](\d{4})$/;
+    const isoFormat = /^(\d{4})[.-](\d{1,2})[.-](\d{1,2})$/;
     
     let match = dateStr.match(dotFormat);
     if (match) {
@@ -471,7 +471,7 @@ const ArbeitszeitCheckValidation = {
    * Check rest period (11 hours between end of last entry and start of new) - ArbZG §5
    */
   async checkRestPeriod(userId, startDateTime, excludeEntryId = null) {
-    const l10n = window.ArbeitszeitCheck?.l10n || {};
+    const _l10n = window.ArbeitszeitCheck?.l10n || {};
     
     try {
       // Call backend API to check rest period
@@ -510,7 +510,7 @@ const ArbeitszeitCheckValidation = {
    * Check for overlapping entries
    */
   async checkOverlappingEntries(userId, startDateTime, endDateTime, excludeEntryId = null) {
-    const l10n = window.ArbeitszeitCheck?.l10n || {};
+    const _l10n = window.ArbeitszeitCheck?.l10n || {};
     
     try {
       const response = await fetch(
@@ -558,7 +558,7 @@ const ArbeitszeitCheckValidation = {
   /**
    * Validate break times
    */
-  validateBreak(breakStartTime, breakEndTime, workStartDateTime, workEndDateTime, index = 0) {
+  validateBreak(breakStartTime, breakEndTime, workStartDateTime, workEndDateTime, _index = 0) {
     const errors = [];
     const l10n = window.ArbeitszeitCheck?.l10n || {};
     const minBreakDurationMs = 15 * 60 * 1000; // 15 minutes

@@ -100,6 +100,7 @@ $total = $_['total'] ?? 0;
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

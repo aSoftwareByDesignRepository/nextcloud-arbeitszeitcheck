@@ -191,9 +191,9 @@ textarea:focus:not(:focus-visible) {
   }
 }
 
-/* ===== TOUCH TARGET SIZE (WCAG 2.5.5 - minimum 44x44px) ===== */
+/* ===== TOUCH TARGET SIZE (WCAG 2.5.5 - minimum 44x44px, prefer 48x48) ===== */
 
-/* Ensure all interactive elements meet minimum touch target size */
+/* Ensure all interactive elements meet minimum touch target size for security-critical app */
 .btn,
 .nav-link,
 .nav-menu a,
@@ -204,6 +204,13 @@ input[type="submit"],
 input[type="reset"] {
   min-height: 44px;
   min-width: 44px;
+}
+
+/* Primary actions: larger for clarity and reduced mis-taps */
+.btn--primary,
+.card-actions .btn--primary {
+  min-height: 48px;
+  padding: var(--space-3) var(--space-6);
 }
 
 /* Small buttons still accessible but can be smaller */

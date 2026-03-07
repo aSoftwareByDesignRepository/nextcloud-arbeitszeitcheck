@@ -218,6 +218,7 @@ $canAccessReports = $isAdmin || $isManager;
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

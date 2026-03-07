@@ -101,7 +101,7 @@
          * Save working time preferences
          */
         saveWorkingTimeSettings: function(form) {
-            const formData = new FormData(form);
+            const _formData = new FormData(form);
             const data = {
                 auto_break_calculation: form.querySelector('#auto-break-calculation').checked
             };
@@ -113,7 +113,7 @@
          * Save notification settings
          */
         saveNotificationSettings: function(form) {
-            const formData = new FormData(form);
+            const _formData = new FormData(form);
             const data = {
                 notifications_enabled: form.querySelector('#notifications-enabled').checked,
                 break_reminders_enabled: form.querySelector('#break-reminders').checked

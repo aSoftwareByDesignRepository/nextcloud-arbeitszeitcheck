@@ -148,7 +148,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 const errorMsg = (window.ArbeitszeitCheck?.l10n?.failedToLoadModel || (window.t && window.t('arbeitszeitcheck', 'Failed to load model'))) || 'Failed to load model';
                 Messaging.showError(errorMsg);
             }
@@ -282,7 +282,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToCreateModel || (window.t && window.t('arbeitszeitcheck', 'Failed to create model')) || 'Failed to create model';
                 Messaging.showError(errorMsg);
             }
@@ -320,7 +320,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToUpdateModel || (window.t && window.t('arbeitszeitcheck', 'Failed to update model')) || 'Failed to update model';
                 Messaging.showError(errorMsg);
             }
@@ -355,7 +355,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to delete model')) || window.ArbeitszeitCheck?.l10n?.failedToDeleteModel || 'Failed to delete model';
                 Messaging.showError(errorMsg);
             }

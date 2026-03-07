@@ -113,3 +113,4 @@ $recentViolations = $_['recentViolations'] ?? [];
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

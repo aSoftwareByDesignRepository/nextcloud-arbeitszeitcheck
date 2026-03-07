@@ -8,8 +8,8 @@
 (function() {
     'use strict';
 
-    const Utils = window.ArbeitszeitCheckUtils || {};
-    const Messaging = window.ArbeitszeitCheckMessaging || {};
+    const _Utils = window.ArbeitszeitCheckUtils || {};
+    const _Messaging = window.ArbeitszeitCheckMessaging || {};
 
     /**
      * Initialize reports page

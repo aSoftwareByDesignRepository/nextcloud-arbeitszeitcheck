@@ -111,7 +111,7 @@
       );
       
       // Set tabindex if needed (but preserve natural order)
-      interactiveElements.forEach((el, index) => {
+      interactiveElements.forEach((el, _index) => {
         // Only set tabindex if element doesn't naturally have one
         if (!el.hasAttribute('tabindex') && 
             (el.disabled || el.getAttribute('aria-hidden') === 'true')) {

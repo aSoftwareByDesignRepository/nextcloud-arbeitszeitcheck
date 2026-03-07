@@ -518,6 +518,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

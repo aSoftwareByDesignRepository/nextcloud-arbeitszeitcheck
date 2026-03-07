@@ -137,3 +137,4 @@ $teamMembers = $_['teamMembers'] ?? [];
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

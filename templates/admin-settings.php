@@ -279,3 +279,4 @@ $settings = $_['settings'] ?? [];
         </div>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->

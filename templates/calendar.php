@@ -139,6 +139,7 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
         </section>
     </div>
 </div>
+</div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

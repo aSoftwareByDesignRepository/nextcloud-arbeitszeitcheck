@@ -64,7 +64,7 @@
                     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading audit logs') : 'Error loading audit logs') + '</td></tr>';
                 }
             },
-            onError: function(error) {
+            onError: function(_error) {
                 if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading audit logs') : 'Error loading audit logs') + '</td></tr>';
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(window.t ? window.t('arbeitszeitcheck', 'Failed to load audit logs. Please try again.') : 'Failed to load audit logs. Please try again.');

@@ -59,7 +59,7 @@
                     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 }
             },
-            onError: function (error) {
+            onError: function (_error) {
                 const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Error loading violations')) || 'Error loading violations';
                 if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 if (Messaging && Messaging.showError) {

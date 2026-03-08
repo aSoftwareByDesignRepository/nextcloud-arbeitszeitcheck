@@ -35,10 +35,17 @@ jobs:
       - name: Run PHP syntax check
         run: composer lint
 
+      - name: Create test data directory
+        run: mkdir -p ${{ github.workspace }}/data
+
       - name: Run PHP unit tests
+        env:
+          NC_datadirectory: ${{ github.workspace }}/data
         run: composer test
 
       - name: Run PHP integration tests
+        env:
+          NC_datadirectory: ${{ github.workspace }}/data
         run: composer test:integration
 
   js-tests:

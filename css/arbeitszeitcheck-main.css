@@ -48,9 +48,9 @@
 }
 
 /* -------------------------------------------------------------------------
-   Global app content layout
+   Manager/Admin content layout (page-specific, uses app-layout base)
    ------------------------------------------------------------------------- */
-#app-content.manager-dashboard,
-#app-content.admin-teams {
+#content.app-arbeitszeitcheck #app-content.manager-dashboard,
+#content.app-arbeitszeitcheck #app-content.admin-teams {
   min-height: 100%;
 }

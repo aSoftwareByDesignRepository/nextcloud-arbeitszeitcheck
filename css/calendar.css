@@ -1,35 +1,13 @@
 /**
  * Calendar CSS for arbeitszeitcheck app
- * Matches projectcheck styling
+ * Layout: app-layout.css (single source of truth)
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */
 
-/* Main Content Area */
-#app-content {
-	background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	min-height: 100%;
-	overflow-y: scroll;
-	overflow-x: auto;
-	height: auto;
+#content.app-arbeitszeitcheck #app-content {
 	padding-bottom: 20px;
-}
-
-#app-content-wrapper {
-	margin: 0 auto;
-	padding: var(--space-8, 2rem) var(--space-8, 2rem) var(--space-16, 4rem) var(--space-8, 2rem);
-	width: 100%;
-	display: flex;
-	flex-direction: column;
-	min-height: auto;
-	flex-shrink: 0;
-	overflow: visible;
-	background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-	/* Ensure content can expand beyond viewport - don't use flex: 1 as it constrains height */
 }
 
 /* Section Styling */
@@ -205,7 +183,7 @@
 }
 
 .calendar-day--today {
-	background: rgba(0, 130, 201, 0.1);
+	background: color-mix(in srgb, var(--arbeitszeitcheck-color-primary, var(--color-primary)) 10%, transparent);
 	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
 	border-width: 2px;
 }
@@ -335,7 +313,7 @@
 }
 
 .legend-color--today {
-	background: rgba(0, 130, 201, 0.15);
+	background: color-mix(in srgb, var(--arbeitszeitcheck-color-primary, var(--color-primary)) 15%, transparent);
 	border: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 
@@ -352,7 +330,7 @@
 	width: 400px;
 	height: 100vh;
 	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-	box-shadow: var(--shadow-lg, -4px 0 20px rgba(0, 0, 0, 0.1));
+	box-shadow: var(--shadow-lg, -4px 0 20px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow)));
 	z-index: 1000;
 	display: flex;
 	flex-direction: column;
@@ -441,10 +419,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-	#app-content-wrapper {
-		padding: var(--space-4, 1rem);
-	}
-
 	.section {
 		padding: var(--space-4, 1rem);
 	}

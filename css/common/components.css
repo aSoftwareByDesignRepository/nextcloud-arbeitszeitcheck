@@ -1482,11 +1482,12 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 /* ===== APP CONTENT LAYOUT (clear sections, simple UX) ===== */
 
-/* Main content wrapper: readable line length, clear padding */
+/* Main content wrapper: full width on desktop, clear padding */
 #app-content-wrapper {
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  min-width: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* Content section: clearly separated blocks for easy scanning */

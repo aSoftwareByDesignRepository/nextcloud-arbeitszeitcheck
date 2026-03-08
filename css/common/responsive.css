@@ -7,19 +7,23 @@
  * @license AGPL-3.0-or-later
  */
 
-/* ===== MAIN APP LAYOUT RESPONSIVE ===== */
+/* ===== MAIN APP LAYOUT RESPONSIVE (100% SCREEN) ===== */
+/* Use 100dvh where supported for mobile viewport; fallback to 100vh. */
 
-/* Desktop: Side-by-side layout */
+/* Desktop: Side-by-side layout, 100% width, scrollable content */
 @media (min-width: 769px) {
-  /* Flex container: sidebar + content */
+  /* Flex container: fills #content (below 50px header) */
   #arbeitszeitcheck-app,
-  #app,
+  #app.arbeitszeitcheck-app,
   .arbeitszeitcheck-app {
     display: flex;
     flex-direction: row;
-    min-height: 100%;
-    height: auto;
-    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
   }
 
   #app-navigation,
@@ -27,35 +31,41 @@
     width: 280px;
     min-width: 280px;
     flex-shrink: 0;
-    min-height: 100vh;
-    max-height: 100vh;
+    height: calc(100vh - 50px); /* Below header */
+    max-height: calc(100vh - 50px);
     overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
+  /* Content: fills remaining width, scrolls when content overflows */
   #app-content,
   .arbeitszeitcheck-content-wrapper {
+    flex: 1 1 0;
     min-width: 0;
-    overflow-y: scroll;
-    overflow-x: auto;
-    /* Use min-height to ensure it takes at least full viewport height */
-    min-height: 100%;
-    /* Allow height to grow with content */
-    height: auto;
-    /* Ensure content can scroll when it exceeds viewport */
-    align-self: stretch;
-    padding-bottom: 20px;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--space-8);
+    box-sizing: border-box;
   }
 }
 
-/* Mobile: Stacked layout with mobile menu */
+/* Mobile: Stacked layout, 100% width, scrollable, mobile menu */
 @media (max-width: 768px) {
   #arbeitszeitcheck-app,
   #app,
   .arbeitszeitcheck-app {
     display: flex;
     flex-direction: column;
-    min-height: 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
     overflow-x: hidden;
   }
 
@@ -79,19 +89,27 @@
     transform: translateX(0);
   }
 
-  /* Content takes full width on mobile */
+  /* Content: 100% width, scrollable, clear of header + mobile menu button */
   #app-content,
   .arbeitszeitcheck-content-wrapper {
-    width: 100%;
+    width: 100% !important;
+    max-width: 100vw !important;
     min-width: 0;
-    padding-top: calc(var(--space-4) + 44px + var(--space-2)); /* Space for mobile menu button */
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-top: calc(var(--space-4) + 44px + var(--space-2)); /* Space for mobile menu button */
+    box-sizing: border-box;
   }
 
   #app-content-wrapper,
   .arbeitszeitcheck-content {
-    padding: var(--space-4);
+    width: 100%;
     max-width: 100%;
+    padding: var(--space-4);
+    box-sizing: border-box;
   }
 
   /* Prevent horizontal scrolling */
@@ -273,8 +291,11 @@
 /* ===== PREVENT HORIZONTAL SCROLLING ===== */
 
 @media (max-width: 768px) {
-  * {
+  /* Scoped to app content only - avoid breaking flex/grid layouts globally */
+  #app-content,
+  #app-content-wrapper {
     max-width: 100%;
+    min-width: 0;
   }
 
   img,
@@ -314,14 +335,17 @@
 /* ===== TOUCH TARGET ENHANCEMENTS ===== */
 
 @media (max-width: 768px) {
-  /* Ensure interactive elements have touch-friendly targets (WCAG 2.5.5) */
+  /* Primary interactive elements: touch-friendly targets (WCAG 2.5.5 AA) */
   button,
   .btn,
-  a,
   input[type="button"],
   input[type="submit"],
   input[type="reset"],
-  select {
+  select,
+  .nav-menu a,
+  .card-actions a,
+  .form-actions a,
+  .action-buttons a {
     min-height: 44px;
     min-width: 44px;
   }

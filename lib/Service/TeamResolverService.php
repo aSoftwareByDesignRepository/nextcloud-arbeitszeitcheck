@@ -54,7 +54,16 @@ class TeamResolverService
 	public function getTeamMemberIds(string $managerUserId): array
 	{
 		if ($this->useAppTeams()) {
-			return $this->getTeamMemberIdsFromAppTeams($managerUserId);
+			try {
+				return $this->getTeamMemberIdsFromAppTeams($managerUserId);
+			} catch (\Throwable $e) {
+				// at_teams/at_team_members/at_team_managers may not exist if migration hasn't run
+				$msg = $e->getMessage();
+				if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_team')) {
+					return [];
+				}
+				throw $e;
+			}
 		}
 		return $this->getTeamMemberIdsFromGroups($managerUserId);
 	}
@@ -113,6 +122,56 @@ class TeamResolverService
 			}
 		}
 		return $teamMemberIds;
+	}
+
+	/**
+	 * Get colleague user IDs (users in same team/group) for substitute selection.
+	 * Used when an employee selects who will cover for them during absence (Vertretung).
+	 * If use_app_teams: members of all teams where user is a member (excluding self).
+	 * Else: same Nextcloud group members (excluding self).
+	 *
+	 * @param string $userId Current user ID (the employee creating the absence)
+	 * @return list<string> User IDs of colleagues who can be selected as substitute
+	 */
+	public function getColleagueIds(string $userId): array
+	{
+		if ($this->useAppTeams()) {
+			try {
+				return $this->getColleagueIdsFromAppTeams($userId);
+			} catch (\Throwable $e) {
+				$msg = $e->getMessage();
+				if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_team')) {
+					return [];
+				}
+				throw $e;
+			}
+		}
+		return $this->getTeamMemberIdsFromGroups($userId);
+	}
+
+	/**
+	 * Colleagues from app-owned teams: all members of teams where user is a member.
+	 *
+	 * @return list<string>
+	 */
+	private function getColleagueIdsFromAppTeams(string $userId): array
+	{
+		$memberships = $this->teamMemberMapper->findByUserId($userId);
+		if (empty($memberships)) {
+			return [];
+		}
+		$teamIds = [];
+		foreach ($memberships as $m) {
+			$teamIds[] = $m->getTeamId();
+		}
+		$memberIds = $this->teamMemberMapper->getMemberUserIdsByTeamIds($teamIds);
+		$result = [];
+		foreach ($memberIds as $uid) {
+			if ($uid !== $userId && !in_array($uid, $result, true)) {
+				$result[] = $uid;
+			}
+		}
+		return $result;
 	}
 
 	/**

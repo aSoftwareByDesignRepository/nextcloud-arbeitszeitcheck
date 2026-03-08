@@ -216,7 +216,9 @@
 }
 
 .arbeitszeitcheck-content {
-    margin: 0 auto;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Responsive design */

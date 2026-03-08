@@ -1,23 +1,10 @@
 /**
  * Reports – Clear, accessible, responsive layout
- * WCAG 2.1 AA: contrast, focus, semantics. Theming via CSS variables only.
+ * Layout: app-layout.css (single source of truth for #app-content-wrapper)
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */
-
-/* ========== Layout ========== */
-#app-content {
-	background: var(--color-main-background);
-	min-height: 100%;
-}
-
-#app-content-wrapper {
-	margin: 0 auto;
-	padding: var(--space-6, 1.5rem) var(--space-4, 1rem) var(--space-12, 3rem);
-	max-width: 56rem;
-	width: 100%;
-}
 
 /* ========== Sections ========== */
 .reports-section {
@@ -44,7 +31,7 @@
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-large, 10px);
 	padding: var(--space-6, 1.5rem);
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+	box-shadow: 0 1px 3px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow));
 }
 
 .page-header-section {
@@ -95,7 +82,7 @@
 
 .report-type-card:hover {
 	border-color: var(--color-primary-element);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	box-shadow: 0 2px 8px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow));
 }
 
 .report-type-card:focus-within {
@@ -292,7 +279,7 @@
 	margin: 0;
 	padding: var(--space-3, 0.75rem);
 	background: var(--color-error);
-	color: var(--color-error-text, #fff);
+	color: var(--color-error-text, var(--color-primary-text));
 	border-radius: var(--border-radius);
 	font-weight: 500;
 }
@@ -371,10 +358,6 @@
 
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
-	#app-content-wrapper {
-		padding: var(--space-4, 1rem) var(--space-3, 0.75rem);
-	}
-
 	.report-types-grid {
 		grid-template-columns: 1fr;
 		gap: var(--space-3, 0.75rem);

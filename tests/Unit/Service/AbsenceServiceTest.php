@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -40,6 +41,9 @@ class AbsenceServiceTest extends TestCase
 	/** @var UserSettingsMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $userSettingsMapper;
 
+	/** @var TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamResolver;
+
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
@@ -59,6 +63,10 @@ class AbsenceServiceTest extends TestCase
 		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
 		$this->userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+		$this->teamResolver = $this->createMock(TeamResolverService::class);
+		$this->teamResolver->method('getColleagueIds')->willReturnCallback(function ($userId) {
+			return ['colleague1', 'colleague2'];
+		});
 		$this->config = $this->createMock(IConfig::class);
 		$this->config->method('getAppValue')->with('arbeitszeitcheck', 'require_substitute_types', '[]')->willReturn('[]');
 		$this->userManager = $this->createMock(IUserManager::class);
@@ -74,6 +82,7 @@ class AbsenceServiceTest extends TestCase
 			$this->absenceMapper,
 			$this->auditLogMapper,
 			$this->userSettingsMapper,
+			$this->teamResolver,
 			$this->config,
 			$this->userManager,
 			$this->l10n,

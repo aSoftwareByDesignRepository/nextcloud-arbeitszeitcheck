@@ -122,12 +122,17 @@ class ManagerController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 		
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts across all views)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
 		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 		Util::addStyle('arbeitszeitcheck', 'manager-dashboard');
 		

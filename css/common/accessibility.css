@@ -36,7 +36,7 @@ textarea:focus-visible,
 .card-actions .btn:focus-visible,
 .form-actions .btn:focus-visible,
 .form-actions a:focus-visible {
-  outline: 2px solid var(--arbeitszeitcheck-color-primary);
+  outline: 2px solid var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
   outline-offset: 2px;
 }
 
@@ -57,7 +57,7 @@ textarea:focus:not(:focus-visible) {
   select:focus,
   textarea:focus,
   [tabindex="0"]:focus {
-    outline: 2px solid var(--arbeitszeitcheck-color-primary);
+    outline: 2px solid var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
     outline-offset: 2px;
   }
 }
@@ -191,13 +191,13 @@ textarea:focus:not(:focus-visible) {
   }
 }
 
-/* ===== TOUCH TARGET SIZE (WCAG 2.5.5 - minimum 44x44px, prefer 48x48) ===== */
+/* ===== TOUCH TARGET SIZE (WCAG 2.5.5 AA - minimum 44x44px, prefer 48x48) ===== */
 
-/* Ensure all interactive elements meet minimum touch target size for security-critical app */
-.btn,
+/* Ensure all interactive elements meet minimum touch target for security-critical time tracking */
+.btn:not(.btn--sm),
 .nav-link,
 .nav-menu a,
-button,
+button:not(.btn--sm),
 a[role="button"],
 input[type="button"],
 input[type="submit"],
@@ -206,9 +206,12 @@ input[type="reset"] {
   min-width: 44px;
 }
 
-/* Primary actions: larger for clarity and reduced mis-taps */
+/* Primary/danger actions: larger for clarity and reduced mis-taps (WCAG 2.5.5) */
 .btn--primary,
-.card-actions .btn--primary {
+.btn--danger,
+.card-actions .btn--primary,
+.card-actions .btn--danger,
+.btn-clock-out {
   min-height: 48px;
   padding: var(--space-3) var(--space-6);
 }

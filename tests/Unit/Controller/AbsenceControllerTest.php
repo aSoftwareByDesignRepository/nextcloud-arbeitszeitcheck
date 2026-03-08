@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IL10N;
@@ -51,6 +52,9 @@ class AbsenceControllerTest extends TestCase
 	/** @var PermissionService|\PHPUnit\Framework\MockObject\MockObject */
 	private $permissionService;
 
+	/** @var TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamResolver;
+
 	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
 	private $urlGenerator;
 
@@ -70,6 +74,7 @@ class AbsenceControllerTest extends TestCase
 		$this->absenceService = $this->createMock(AbsenceService::class);
 		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
+		$this->teamResolver = $this->createMock(TeamResolverService::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->userManager = $this->createMock(IUserManager::class);
@@ -84,6 +89,7 @@ class AbsenceControllerTest extends TestCase
 			$this->absenceService,
 			$this->absenceMapper,
 			$this->permissionService,
+			$this->teamResolver,
 			$this->userSession,
 			$this->urlGenerator,
 			$this->userManager,

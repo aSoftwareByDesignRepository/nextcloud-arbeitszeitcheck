@@ -78,6 +78,7 @@
         Utils.ajax('/apps/arbeitszeitcheck/api/manager/pending-approvals?type=absence', {
             method: 'GET',
             onSuccess: function(data) {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 const list = (data && data.pendingApprovals) ? data.pendingApprovals : [];
                 const absences = list.filter(function(item) { return item.type === 'absence'; });
@@ -93,6 +94,7 @@
                 }
             },
             onError: function() {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 itemsEl.setAttribute('aria-hidden', 'true');
                 emptyEl.classList.remove('visually-hidden');
@@ -234,6 +236,7 @@
         Utils.ajax('/apps/arbeitszeitcheck/api/manager/pending-approvals?type=time_entry', {
             method: 'GET',
             onSuccess: function(data) {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 const list = (data && data.pendingApprovals) ? data.pendingApprovals : [];
                 const timeEntries = list.filter(function(item) { return item.type === 'time_entry'; });
@@ -249,6 +252,7 @@
                 }
             },
             onError: function() {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 itemsEl.setAttribute('aria-hidden', 'true');
                 emptyEl.classList.remove('visually-hidden');
@@ -396,6 +400,7 @@
         Utils.ajax('/apps/arbeitszeitcheck/api/manager/team-compliance', {
             method: 'GET',
             onSuccess: function(data) {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 if (data.success && data.compliance) {
                     summaryEl.classList.remove('visually-hidden');
@@ -407,6 +412,7 @@
                 }
             },
             onError: function() {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 summaryEl.innerHTML = '<p class="team-compliance-empty">' + escapeHtml(t('Error loading team compliance.', 'Error loading team compliance.')) + '</p>';
                 summaryEl.classList.remove('visually-hidden');

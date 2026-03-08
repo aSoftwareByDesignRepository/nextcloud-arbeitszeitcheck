@@ -338,12 +338,17 @@
          * Initialize clock in/out and break buttons
          */
         initClockButtons: function() {
+            /* Use class .btn-clock-out for all clock-out buttons (no duplicate IDs).
+               Multiple clock-out buttons may exist when on break (End Break + Clock Out). */
             const buttons = {
                 clockIn: document.getElementById('btn-clock-in'),
-                clockOut: document.getElementById('btn-clock-out'),
+                clockOut: document.querySelector('.btn-clock-out'),  /* First match; all share same handler */
                 startBreak: document.getElementById('btn-start-break'),
                 endBreak: document.getElementById('btn-end-break')
             };
+
+            /* Attach clock-out handler to all clock-out buttons (when on break there are two) */
+            const clockOutButtons = document.querySelectorAll('.btn-clock-out');
 
             if (buttons.clockIn) {
                 buttons.clockIn.addEventListener('click', (e) => {
@@ -352,12 +357,12 @@
                 });
             }
 
-            if (buttons.clockOut) {
-                buttons.clockOut.addEventListener('click', (e) => {
+            clockOutButtons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
                     e.preventDefault();
                     this.clockOut();
-                });
-            }
+                }.bind(this));
+            }.bind(this));
 
             if (buttons.startBreak) {
                 buttons.startBreak.addEventListener('click', (e) => {

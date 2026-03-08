@@ -169,8 +169,8 @@ class Absence extends Entity
 		// New Year's Day
 		$holidays[$year . '-01-01'] = 'New Year\'s Day';
 
-		// Easter-based: PHP easter_days($year) = days after March 21
-		$easterDays = easter_days($year);
+		// Easter-based: PHP easter_days($year) = days after March 21 (use \ for global)
+		$easterDays = function_exists('easter_days') ? \easter_days($year) : $this->easterDaysGauss($year);
 		$march21 = new \DateTime($year . '-03-21');
 		$easter = clone $march21;
 		$easter->modify('+' . $easterDays . ' days');
@@ -203,6 +203,36 @@ class Absence extends Entity
 		$holidays[$year . '-12-26'] = 'Second Christmas Day';
 
 		return $holidays;
+	}
+
+	/**
+	 * Gauss algorithm: days after March 21 for Easter (fallback when easter_days extension not loaded)
+	 *
+	 * @param int $year
+	 * @return int
+	 */
+	private function easterDaysGauss(int $year): int
+	{
+		$a = $year % 19;
+		$b = (int)($year / 100);
+		$c = $year % 100;
+		$d = (int)($b / 4);
+		$e = $b % 4;
+		$f = (int)(($b + 8) / 25);
+		$g = (int)(($b - $f + 1) / 3);
+		$h = (19 * $a + $b - $d - $g + 15) % 30;
+		$i = (int)($c / 4);
+		$k = $c % 4;
+		$l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
+		$m = (int)(($a + 11 * $h + 22 * $l) / 451);
+		$month = (int)(($h + $l - 7 * $m + 114) / 31);
+		$day = (($h + $l - 7 * $m + 114) % 31) + 1;
+
+		$march21 = new \DateTime($year . '-03-21');
+		$easterDate = new \DateTime("$year-$month-$day");
+		$diff = $march21->diff($easterDate);
+
+		return (int)$diff->days;
 	}
 
 	/**

@@ -16,6 +16,9 @@ $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
 
 $complianceStatus = $_['complianceStatus'] ?? [];
 $recentViolations = $_['recentViolations'] ?? [];
+$error = $_['error'] ?? null;
+$loadError = $complianceStatus['load_error'] ?? false;
+$hasData = $complianceStatus['has_data'] ?? true;
 ?>
 
 <?php include __DIR__ . '/common/navigation.php'; ?>
@@ -34,34 +37,62 @@ $recentViolations = $_['recentViolations'] ?? [];
                     <h3 class="card-title"><?php p($l->t('Compliance Status')); ?></h3>
                 </div>
                 <div class="card-content">
-                    <?php if ($complianceStatus['compliant'] ?? false): ?>
-                        <div class="alert alert--success">
-                            <span class="alert-icon" aria-hidden="true">✅</span>
+                    <?php if ($loadError): ?>
+                        <div class="alert alert--error">
+                            <span class="alert-icon" aria-hidden="true">❌</span>
                             <div class="alert-content">
-                                <strong class="alert-title"><?php p($l->t('Everything looks good!')); ?></strong>
+                                <strong class="alert-title"><?php p($l->t('Could not load compliance status')); ?></strong>
                                 <p class="alert-message">
-                                    <?php p($l->t('Your working time follows all German labor law rules. Keep up the good work!')); ?>
+                                    <?php p($l->t('Please refresh the page to try again.')); ?>
                                 </p>
                             </div>
                         </div>
+                    <?php elseif ($complianceStatus['compliant'] ?? false): ?>
+                        <?php if (!$hasData): ?>
+                            <div class="alert alert--info">
+                                <span class="alert-icon" aria-hidden="true">ℹ️</span>
+                                <div class="alert-content">
+                                    <strong class="alert-title"><?php p($l->t('Not enough data yet')); ?></strong>
+                                    <p class="alert-message">
+                                        <?php p($l->t('Create time entries to get your compliance status. Once you have recorded working hours, we can check them against German labor law.')); ?>
+                                    </p>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert--success">
+                                <span class="alert-icon" aria-hidden="true">✅</span>
+                                <div class="alert-content">
+                                    <strong class="alert-title"><?php p($l->t('Everything looks good!')); ?></strong>
+                                    <p class="alert-message">
+                                        <?php p($l->t('Your working time follows all German labor law rules. Keep up the good work!')); ?>
+                                    </p>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="alert alert--warning">
                             <span class="alert-icon" aria-hidden="true">⚠️</span>
                             <div class="alert-content">
                                 <strong class="alert-title"><?php p($l->t('Some problems found')); ?></strong>
                                 <p class="alert-message">
-                                    <?php p($l->t('There are some issues with your working time that need attention. Please check the list below and fix them.')); ?>
+                                    <?php p($l->t('There are issues with your working time that need attention. Please check the list below and fix them.')); ?>
                                 </p>
                             </div>
                         </div>
                     <?php endif; ?>
+                    <?php if (!$loadError): ?>
                     <p>
                         <strong><?php p($l->t('How well you follow the rules:')); ?></strong>
-                        <?php p($complianceStatus['score'] ?? 0); ?>%
+                        <?php if ($hasData): ?>
+                            <?php p($complianceStatus['score'] ?? 0); ?>%
+                        <?php else: ?>
+                            — <?php p($l->t('(no data yet)')); ?>
+                        <?php endif; ?>
                         <span class="form-help" style="display: block; margin-top: var(--space-1);">
                             <?php p($l->t('This shows how well your working time follows German labor law. 100% means everything is perfect.')); ?>
                         </span>
                     </p>
+                    <?php endif; ?>
                 </div>
             </div>
 

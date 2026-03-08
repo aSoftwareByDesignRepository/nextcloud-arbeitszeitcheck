@@ -1,35 +1,13 @@
 /**
  * Timeline CSS for arbeitszeitcheck app
- * Matches projectcheck styling
+ * Layout: app-layout.css (single source of truth)
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */
 
-/* Main Content Area */
-#app-content {
-	background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	min-height: 100%;
-	overflow-y: scroll;
-	overflow-x: auto;
-	height: auto;
+#content.app-arbeitszeitcheck #app-content {
 	padding-bottom: 20px;
-}
-
-#app-content-wrapper {
-	margin: 0 auto;
-	padding: var(--space-8, 2rem) var(--space-8, 2rem) var(--space-16, 4rem) var(--space-8, 2rem);
-	width: 100%;
-	display: flex;
-	flex-direction: column;
-	min-height: auto;
-	flex-shrink: 0;
-	overflow: visible;
-	background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-	/* Ensure content can expand beyond viewport - don't use flex: 1 as it constrains height */
 }
 
 /* Section Styling */
@@ -258,10 +236,6 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-	#app-content-wrapper {
-		padding: var(--space-4, 1rem);
-	}
-
 	.section {
 		padding: var(--space-4, 1rem);
 	}

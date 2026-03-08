@@ -217,7 +217,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                             <?php endif; ?>
                         <?php endif; ?>
 
-                        <div class="card-actions">
+                        <div class="card-actions" role="group" aria-label="<?php p($l->t('Time tracking actions')); ?>">
                             <?php if (($status['status'] ?? 'clocked_out') === 'clocked_out' || ($status['status'] ?? 'clocked_out') === 'paused'): ?>
                                 <button id="btn-clock-in"
                                     class="btn btn--primary"
@@ -234,8 +234,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                                     title="<?php p($l->t('Click to start a break. You must take breaks according to German labor law.')); ?>">
                                     <?php p($l->t('Start Break')); ?>
                                 </button>
-                                <button id="btn-clock-out"
-                                    class="btn btn--danger"
+                                <button class="btn btn--danger btn-clock-out"
                                     type="button"
                                     aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
                                     title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">
@@ -249,8 +248,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                                     title="<?php p($l->t('Click to end your break and continue working')); ?>">
                                     <?php p($l->t('End Break')); ?>
                                 </button>
-                                <button id="btn-clock-out"
-                                    class="btn btn--danger"
+                                <button class="btn btn--danger btn-clock-out"
                                     type="button"
                                     aria-label="<?php p($l->t('Clock out to end your working day')); ?>"
                                     title="<?php p($l->t('Click to clock out and end your working time for today')); ?>">

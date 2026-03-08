@@ -30,6 +30,7 @@
         const emptyEl = document.getElementById('substitution-requests-empty');
         if (!loadingEl || !itemsEl || !emptyEl) return;
 
+        loadingEl.classList.remove('visually-hidden');
         loadingEl.setAttribute('aria-hidden', 'false');
         itemsEl.setAttribute('aria-hidden', 'true');
         emptyEl.classList.add('visually-hidden');
@@ -37,6 +38,7 @@
         Utils.ajax('/apps/arbeitszeitcheck/api/substitution-requests', {
             method: 'GET',
             onSuccess: function(data) {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 const list = (data && data.requests) ? data.requests : [];
                 if (list.length === 0) {
@@ -51,6 +53,7 @@
                 }
             },
             onError: function() {
+                loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 emptyEl.classList.remove('visually-hidden');
                 emptyEl.querySelector('p').textContent = t('Error loading substitution requests.', 'Error loading substitution requests.');

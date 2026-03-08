@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -39,6 +40,7 @@ class AbsenceController extends Controller
 	private AbsenceService $absenceService;
 	private AbsenceMapper $absenceMapper;
 	private PermissionService $permissionService;
+	private TeamResolverService $teamResolver;
 	private IUserSession $userSession;
 	private IURLGenerator $urlGenerator;
 	private IUserManager $userManager;
@@ -50,6 +52,7 @@ class AbsenceController extends Controller
 		AbsenceService $absenceService,
 		AbsenceMapper $absenceMapper,
 		PermissionService $permissionService,
+		TeamResolverService $teamResolver,
 		IUserSession $userSession,
 		IURLGenerator $urlGenerator,
 		IUserManager $userManager,
@@ -60,6 +63,7 @@ class AbsenceController extends Controller
 		$this->absenceService = $absenceService;
 		$this->absenceMapper = $absenceMapper;
 		$this->permissionService = $permissionService;
+		$this->teamResolver = $teamResolver;
 		$this->userSession = $userSession;
 		$this->urlGenerator = $urlGenerator;
 		$this->userManager = $userManager;
@@ -592,7 +596,8 @@ class AbsenceController extends Controller
 	}
 
 	/**
-	 * Get users list (for absence assignment etc.)
+	 * Get substitute candidates (colleagues in same team/group).
+	 * Restricted to team members for data minimization and security.
 	 *
 	 * @return JSONResponse
 	 */
@@ -601,19 +606,19 @@ class AbsenceController extends Controller
 	public function users(): JSONResponse
 	{
 		try {
-			// Get users from Nextcloud (limit 500; null limit can return 0 in some backends)
-			$users = $this->userManager->search('', 500, 0);
+			$userId = $this->getUserId();
+			$colleagueIds = $this->teamResolver->getColleagueIds($userId);
 
 			$usersData = [];
-			foreach ($users as $user) {
-				if (!$user->isEnabled()) {
-					continue;
+			foreach ($colleagueIds as $uid) {
+				$user = $this->userManager->get($uid);
+				if ($user !== null && $user->isEnabled()) {
+					$usersData[] = [
+						'userId' => $user->getUID(),
+						'displayName' => $user->getDisplayName(),
+						'display_name' => $user->getDisplayName()
+					];
 				}
-				$usersData[] = [
-					'userId' => $user->getUID(),
-					'displayName' => $user->getDisplayName(),
-					'display_name' => $user->getDisplayName()
-				];
 			}
 
 			return new JSONResponse([

@@ -66,13 +66,21 @@ class UserSettingsMapper extends QBMapper
 	 */
 	public function getUserSettings(string $userId): array
 	{
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('*')
-			->from($this->getTableName())
-			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-			->orderBy('setting_key', 'ASC');
+		try {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('*')
+				->from($this->getTableName())
+				->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+				->orderBy('setting_key', 'ASC');
 
-		return $this->findEntities($qb);
+			return $this->findEntities($qb);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Error loading user settings: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return [];
+		}
 	}
 
 	/**

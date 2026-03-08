@@ -85,7 +85,12 @@ class SettingsController extends Controller
 					$settings[$setting->getSettingKey()] = $setting->getSettingValue();
 				}
 			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->warning('Error getting settings: ' . $e->getMessage(), ['exception' => $e]);
+				$msg = $e->getMessage();
+				if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_settings')) {
+					\OCP\Log\logger('arbeitszeitcheck')->info('Settings table not found: ' . $msg);
+				} else {
+					\OCP\Log\logger('arbeitszeitcheck')->warning('Error getting settings: ' . $msg, ['exception' => $e]);
+				}
 			}
 
 			return new JSONResponse([
@@ -93,11 +98,13 @@ class SettingsController extends Controller
 				'settings' => $settings
 			]);
 		} catch (\Throwable $e) {
-			\OCP\Log\logger('arbeitszeitcheck')->error('Error in SettingsController::index_api: ' . $e->getMessage(), ['exception' => $e]);
-			return new JSONResponse([
-				'success' => false,
-				'error' => $e->getMessage()
-			], Http::STATUS_INTERNAL_SERVER_ERROR);
+			$msg = $e->getMessage();
+			if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_settings')) {
+				\OCP\Log\logger('arbeitszeitcheck')->info('Settings API: table not found, returning empty: ' . $msg);
+				return new JSONResponse(['success' => true, 'settings' => []]);
+			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in SettingsController::index_api: ' . $msg, ['exception' => $e]);
+			return new JSONResponse(['success' => false, 'error' => $msg], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -110,11 +117,17 @@ class SettingsController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including app-layout for full-width layout)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files

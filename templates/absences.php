@@ -140,7 +140,7 @@ $usersUrl = $_['usersUrl'] ?? '';
                 <h3 id="form-title" class="section__title visually-hidden"><?php p($l->t('Absence request details')); ?></h3>
                 <p id="form-desc" class="section__desc visually-hidden"><?php p($l->t('Fill in the type, dates, and optional reason and substitute.')); ?></p>
                 <?php if ($error): ?>
-                    <div class="alert alert--error">
+                    <div class="alert alert--error" role="alert" aria-live="polite" id="absence-form-error">
                         <p><?php p($error); ?></p>
                     </div>
                 <?php endif; ?>
@@ -244,7 +244,8 @@ $usersUrl = $_['usersUrl'] ?? '';
                             <option value=""><?php p($l->t('None')); ?></option>
                             <!-- Options filled by JavaScript from /api/users -->
                         </select>
-                        <p id="absence-substitute-help" class="form-help"><?php p($l->t('Optionally choose a colleague who will cover your tasks during your absence.')); ?></p>
+                        <p id="absence-substitute-help" class="form-help"><?php p($l->t('Choose a colleague from your team who will cover your tasks during your absence. Only team members appear in this list.')); ?></p>
+                        <p id="absence-substitute-empty" class="form-help form-help--info" style="display: none;" role="status"><?php p($l->t('No team members found. Add yourself to a team or group to select a substitute.')); ?></p>
                     </div>
 
                     <div class="form-actions">
@@ -448,12 +449,23 @@ $usersUrl = $_['usersUrl'] ?? '';
         const selectedSubstituteId = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.selectedSubstituteId) || '';
         if (substituteSelect && usersUrl) {
             var requestToken = (typeof OC !== 'undefined' && OC.requestToken) ? OC.requestToken : (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) || '';
-            fetch(usersUrl, { headers: { requesttoken: requestToken } })
-                .then(function(r) { return r.json(); })
+            fetch(usersUrl, {
+                headers: { 'requesttoken': requestToken },
+                credentials: 'same-origin'
+            })
+                .then(function(r) {
+                    if (!r.ok) return null;
+                    return r.json();
+                })
                 .then(function(data) {
-                    if (!data || !Array.isArray(data.users)) return;
                     var opts = substituteSelect.querySelectorAll('option[value!=""]');
                     opts.forEach(function(o) { o.remove(); });
+                    var emptyHint = document.getElementById('absence-substitute-empty');
+                    if (!data || !Array.isArray(data.users)) {
+                        if (emptyHint) emptyHint.style.display = 'block';
+                        return;
+                    }
+                    var count = 0;
                     data.users.forEach(function(u) {
                         if (u.userId === currentUserId) return;
                         var opt = document.createElement('option');
@@ -461,7 +473,9 @@ $usersUrl = $_['usersUrl'] ?? '';
                         opt.textContent = u.displayName || u.display_name || u.userId;
                         if (u.userId === selectedSubstituteId) opt.selected = true;
                         substituteSelect.appendChild(opt);
+                        count++;
                     });
+                    if (emptyHint) emptyHint.style.display = count === 0 ? 'block' : 'none';
                 })
                 .catch(function() {});
         }
@@ -541,7 +555,8 @@ $usersUrl = $_['usersUrl'] ?? '';
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'requesttoken': requestToken },
                     body: body.toString(),
-                    redirect: 'follow'
+                    redirect: 'follow',
+                    credentials: 'same-origin'
                 })
                     .then(function(response) {
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalText; }

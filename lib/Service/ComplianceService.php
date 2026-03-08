@@ -1138,36 +1138,49 @@ class ComplianceService
      * Get compliance status for a user
      *
      * @param string $userId
-     * @return array
+     * @return array{compliant: bool, score: int, violation_count: int, critical_violations: int, warning_violations: int, info_violations: int, has_data: bool, last_check: \DateTime}
      */
     public function getComplianceStatus(string $userId): array
     {
         $unresolvedViolations = $this->violationMapper->findByUser($userId, false);
 
-        $status = [
-            'compliant' => empty($unresolvedViolations),
-            'violation_count' => count($unresolvedViolations),
-            'critical_violations' => 0,
-            'warning_violations' => 0,
-            'info_violations' => 0,
-            'last_check' => new \DateTime()
-        ];
-
+        $critical = 0;
+        $warning = 0;
+        $info = 0;
         foreach ($unresolvedViolations as $violation) {
             switch ($violation->getSeverity()) {
                 case ComplianceViolation::SEVERITY_ERROR:
-                    $status['critical_violations']++;
+                    $critical++;
                     break;
                 case ComplianceViolation::SEVERITY_WARNING:
-                    $status['warning_violations']++;
+                    $warning++;
                     break;
                 case ComplianceViolation::SEVERITY_INFO:
-                    $status['info_violations']++;
+                    $info++;
                     break;
             }
         }
 
-        return $status;
+        $compliant = empty($unresolvedViolations);
+
+        // Score: 100 = perfect, reduced by severity-weighted violations (max -100)
+        $score = 100;
+        $score -= min(100, ($critical * 25) + ($warning * 10) + ($info * 5));
+
+        // Check if we have analyzable data (time entries exist)
+        $timeEntryCount = $this->timeEntryMapper->countByUser($userId);
+        $hasData = $timeEntryCount > 0;
+
+        return [
+            'compliant' => $compliant,
+            'score' => max(0, $score),
+            'violation_count' => count($unresolvedViolations),
+            'critical_violations' => $critical,
+            'warning_violations' => $warning,
+            'info_violations' => $info,
+            'has_data' => $hasData,
+            'last_check' => new \DateTime()
+        ];
     }
 
     /**

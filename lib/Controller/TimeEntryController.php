@@ -16,6 +16,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Controller;
 use OCP\IConfig;
@@ -46,6 +47,7 @@ class TimeEntryController extends Controller
 	private ComplianceService $complianceService;
 	private IConfig $config;
 	private TimeTrackingService $timeTrackingService;
+	private TeamResolverService $teamResolver;
 
 	public function __construct(
 		string $appName,
@@ -59,7 +61,8 @@ class TimeEntryController extends Controller
 		IConfig $config,
 		CSPService $cspService,
 		ComplianceService $complianceService,
-		TimeTrackingService $timeTrackingService
+		TimeTrackingService $timeTrackingService,
+		TeamResolverService $teamResolver
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -72,6 +75,7 @@ class TimeEntryController extends Controller
 		$this->setCspService($cspService);
 		$this->complianceService = $complianceService;
 		$this->timeTrackingService = $timeTrackingService;
+		$this->teamResolver = $teamResolver;
 	}
 
 	/**
@@ -1183,6 +1187,16 @@ class TimeEntryController extends Controller
 				\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send correction request notification', ['exception' => $e]);
 			}
 
+			// Auto-approve when employee has no manager (no colleagues in team/groups)
+			if (!$this->employeeHasManager($userId)) {
+				$updatedEntry = $this->autoApproveTimeEntryCorrection($updatedEntry, $auditLogMapper);
+				return new JSONResponse([
+					'success' => true,
+					'entry' => $updatedEntry->getSummary(),
+					'message' => $this->l10n->t('Correction request submitted and auto-approved (no manager in your team).')
+				]);
+			}
+
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
@@ -1200,6 +1214,78 @@ class TimeEntryController extends Controller
 				'error' => $e->getMessage()
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Whether the employee has at least one manager (colleague in same team/group).
+	 * Used for auto-approving time entry corrections when no one would see them.
+	 */
+	private function employeeHasManager(string $employeeUserId): bool
+	{
+		$colleagueIds = $this->teamResolver->getColleagueIds($employeeUserId);
+		return !empty($colleagueIds);
+	}
+
+	/**
+	 * Auto-approve a time entry correction when the employee has no manager.
+	 * Ensures corrections are not stuck in pending_approval for solo users.
+	 *
+	 * @param TimeEntry $entry Entry in pending_approval status
+	 * @param AuditLogMapper $auditLogMapper
+	 * @return TimeEntry Updated entry (status completed)
+	 */
+	private function autoApproveTimeEntryCorrection(TimeEntry $entry, AuditLogMapper $auditLogMapper): TimeEntry
+	{
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setApprovedByUserId(null);
+		$entry->setApprovedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+
+		// Preserve justification with auto-approval marker
+		$justificationData = json_decode($entry->getJustification() ?? '{}', true);
+		if (is_array($justificationData)) {
+			$justificationData['approval_comment'] = $this->l10n->t('Auto-approved: no manager assigned in your team.');
+			$justificationData['approved_at'] = date('c');
+			$justificationData['approved_by'] = 'system';
+			$entry->setJustification(json_encode($justificationData));
+		}
+
+		$updatedEntry = $this->timeEntryMapper->update($entry);
+
+		// Compliance check (same as ManagerController::approveTimeEntryCorrection)
+		if ($updatedEntry->getEndTime() !== null) {
+			try {
+				$strictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+				$realTimeEnabled = $this->config->getAppValue('arbeitszeitcheck', 'realtime_compliance_check', '1') === '1';
+				if ($realTimeEnabled) {
+					$this->complianceService->checkComplianceForCompletedEntry($updatedEntry, $strictMode);
+				}
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning('Compliance check failed on auto-approved correction: ' . $e->getMessage(), ['exception' => $e]);
+			}
+		}
+
+		$auditLogMapper->logAction(
+			$entry->getUserId(),
+			'time_entry_correction_auto_approved',
+			'time_entry',
+			$updatedEntry->getId(),
+			null,
+			['approved_by' => 'system'],
+			'system'
+		);
+
+		try {
+			$notificationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\NotificationService::class);
+			$notificationService->notifyTimeEntryCorrectionApproved(
+				$entry->getUserId(),
+				$updatedEntry->getSummary()
+			);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send auto-approval notification: ' . $e->getMessage(), ['exception' => $e]);
+		}
+
+		return $updatedEntry;
 	}
 
 	/**

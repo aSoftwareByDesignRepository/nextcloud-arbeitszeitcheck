@@ -80,15 +80,15 @@ $content = '';
                                 </div>
                             <?php endif; ?>
 
-                            <div class="card-actions">
+                            <div class="card-actions" role="group" aria-label="<?php p($l->t('Time tracking actions')); ?>">
                                 <?php if ($status['status'] === 'clocked_out'): ?>
                                     <button id="btn-clock-in" class="btn btn--primary" type="button"><?php p($l->t('Clock In')); ?></button>
                                 <?php elseif ($status['status'] === 'active'): ?>
                                     <button id="btn-start-break" class="btn btn--secondary" type="button"><?php p($l->t('Start Break')); ?></button>
-                                    <button id="btn-clock-out" class="btn btn--danger" type="button"><?php p($l->t('Clock Out')); ?></button>
+                                    <button class="btn btn--danger btn-clock-out" type="button"><?php p($l->t('Clock Out')); ?></button>
                                 <?php elseif ($status['status'] === 'break'): ?>
                                     <button id="btn-end-break" class="btn btn--primary" type="button"><?php p($l->t('End Break')); ?></button>
-                                    <button id="btn-clock-out" class="btn btn--danger" type="button"><?php p($l->t('Clock Out')); ?></button>
+                                    <button class="btn btn--danger btn-clock-out" type="button"><?php p($l->t('Clock Out')); ?></button>
                                 <?php endif; ?>
                             </div>
                         </div>

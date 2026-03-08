@@ -20,7 +20,7 @@ Roles are **not** stored in the database. They are derived from:
 |------|------------|------------------------|
 | **Admin** | Nextcloud administrator | User is in the Nextcloud admin group (`groupManager->isAdmin($userId)`). |
 | **Manager** | User who may approve/reject absences and time-entry corrections for a set of employees | User shares at least one group with those employees (team membership). Admins are also treated as managers for all users. |
-| **Substitute** | User designated to approve/decline a specific absence request (Vertretungs-Freigabe) | Stored on the absence record (`absence.substitute_user_id`). Only that user may approve or decline that absence while it is in status `substitute_pending`. |
+| **Substitute** | User designated to approve/decline a specific absence request (Vertretungs-Freigabe) | Stored on the absence record (`absence.substitute_user_id`). Only colleagues in the same team/group may be selected as substitute. Only the designated substitute may approve or decline that absence while it is in status `substitute_pending`. |
 | **Employee** | Any authenticated user of the app | Logged-in user. Can manage only their own time entries, absences, and view their own reports/compliance. |
 
 **Important:** A user can hold multiple roles (e.g. Admin and Manager, or Employee and Substitute for a given absence).

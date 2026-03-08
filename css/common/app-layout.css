@@ -3,25 +3,70 @@
  * Clear sections, simple UX, WCAG 2.1 AA friendly.
  * Easy to identify blocks, generous spacing, readable hierarchy.
  *
+ * Pattern: TicketCheck-style full-width layout. Uses #content.app-arbeitszeitcheck
+ * as ancestor for higher specificity so our rules win over page-specific CSS.
+ *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */
 
-/* ===== CONTENT WRAPPER ===== */
+/* ===== FULL VIEWPORT LAYOUT (100% WIDTH, BELOW HEADER, SCROLLABLE) ===== */
+/* Override Nextcloud theming. Nextcloud #header is 50px; #content needs margin-top to sit below it.
+   We set --body-container-margin: 0 for full width but preserve margin-top for header clearance. */
 
-#app-content {
-  background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-  min-height: 100%;
+#content.app-arbeitszeitcheck {
+  --body-container-margin: 0;
+  --body-container-radius: 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  margin-top: 50px !important; /* Clear Nextcloud header (--header-height) */
+  padding: 0 !important;
+  overflow: hidden; /* Contain flex children; scrolling happens in #app-content */
 }
 
-#app-content-wrapper {
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
+/* ===== APP WRAPPER: FILL #content, ENABLE SCROLL IN CHILDREN ===== */
+#content.app-arbeitszeitcheck #arbeitszeitcheck-app,
+#content.app-arbeitszeitcheck .arbeitszeitcheck-app {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== APP-CONTENT & WRAPPER (100% WIDTH, SCROLLABLE) ===== */
+/* Content area fills remaining space; scrolls when content overflows.
+   min-height: 0 is critical for flex children to allow overflow/scroll. */
+
+#content.app-arbeitszeitcheck #app-content {
+  background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+  flex: 1 1 0;
+  min-height: 0; /* Allow flex child to shrink; enables overflow-y: auto */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+#content.app-arbeitszeitcheck #app-content-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
   padding: var(--space-6) var(--space-6) var(--space-16);
   display: flex;
   flex-direction: column;
   gap: 0;
+  box-sizing: border-box;
 }
 
 /* ===== BREADCRUMB - Clear navigation context ===== */

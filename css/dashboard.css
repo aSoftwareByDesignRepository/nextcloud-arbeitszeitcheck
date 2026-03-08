@@ -1,35 +1,14 @@
 /**
  * Dashboard CSS for arbeitszeitcheck app
- * Matches projectcheck styling
+ * Layout: app-layout.css (single source of truth for #app-content, #app-content-wrapper)
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */
 
-/* Main Content Area */
-#app-content {
-    background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-height: 100%;
-    overflow-y: scroll;
-    overflow-x: auto;
-    height: auto;
+/* Dashboard-specific: extra bottom padding for scroll */
+#content.app-arbeitszeitcheck #app-content {
     padding-bottom: var(--space-12);
-}
-
-#app-content-wrapper {
-    margin: 0 auto;
-    padding: var(--space-8) var(--space-6) var(--space-16) var(--space-6);
-    width: 100%;
-    max-width: 1200px;
-    display: flex;
-    flex-direction: column;
-    min-height: auto;
-    flex-shrink: 0;
-    overflow: visible;
-    background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
 }
 
 /* Section Styling - Clear, easy-to-identify blocks (WCAG 2.1 AA friendly) */
@@ -497,12 +476,8 @@
     font-size: var(--arbeitszeitcheck-font-size-base);
 }
 
-/* Responsive - Clear layout on small screens */
+/* Responsive - Clear layout on small screens (100% width, no overflow) */
 @media (max-width: 768px) {
-    #app-content-wrapper {
-        padding: var(--space-4);
-    }
-
     .section {
         padding: var(--space-5);
         margin-bottom: var(--space-8);
@@ -525,5 +500,15 @@
 
     .page-header-section .header-text h2 {
         font-size: var(--arbeitszeitcheck-font-size-2xl);
+    }
+
+    /* Full-width action buttons on mobile; stack vertically for clarity */
+    .dashboard-status-card .card-actions {
+        flex-direction: column;
+    }
+
+    .dashboard-status-card .card-actions .btn {
+        flex: 1 1 100%;
+        width: 100%;
     }
 }

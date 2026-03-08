@@ -94,11 +94,17 @@ class AdminController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files
@@ -168,11 +174,17 @@ class AdminController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files
@@ -231,11 +243,17 @@ class AdminController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files
@@ -280,11 +298,17 @@ class AdminController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files
@@ -324,11 +348,17 @@ class AdminController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 
 		// Add common JavaScript files
@@ -1438,11 +1468,16 @@ class AdminController extends Controller
 	public function teams(): TemplateResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
 		Util::addStyle('arbeitszeitcheck', 'common/utilities');
 		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
 		Util::addStyle('arbeitszeitcheck', 'admin-teams');
 		Util::addScript('arbeitszeitcheck', 'common/utils');
@@ -1465,8 +1500,14 @@ class AdminController extends Controller
 			$tree = $this->buildTeamTree($teams, null);
 			return new JSONResponse(['success' => true, 'teams' => $tree]);
 		} catch (\Throwable $e) {
-			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::getTeams: ' . $e->getMessage(), ['exception' => $e]);
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+			// Table oc_at_teams may not exist if migration hasn't run yet
+			$msg = $e->getMessage();
+			if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_teams')) {
+				\OCP\Log\logger('arbeitszeitcheck')->info('Admin teams table not found, returning empty: ' . $msg);
+				return new JSONResponse(['success' => true, 'teams' => []]);
+			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::getTeams: ' . $msg, ['exception' => $e]);
+			return new JSONResponse(['success' => false, 'error' => $msg], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 

@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -28,6 +29,7 @@ class AbsenceService
 	private AbsenceMapper $absenceMapper;
 	private AuditLogMapper $auditLogMapper;
 	private UserSettingsMapper $userSettingsMapper;
+	private TeamResolverService $teamResolver;
 	private IConfig $config;
 	private IUserManager $userManager;
 	private IL10N $l10n;
@@ -38,6 +40,7 @@ class AbsenceService
 		AbsenceMapper $absenceMapper,
 		AuditLogMapper $auditLogMapper,
 		UserSettingsMapper $userSettingsMapper,
+		TeamResolverService $teamResolver,
 		IConfig $config,
 		IUserManager $userManager,
 		IL10N $l10n,
@@ -47,6 +50,7 @@ class AbsenceService
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
 		$this->userSettingsMapper = $userSettingsMapper;
+		$this->teamResolver = $teamResolver;
 		$this->config = $config;
 		$this->userManager = $userManager;
 		$this->l10n = $l10n;
@@ -85,6 +89,20 @@ class AbsenceService
 
 		$savedAbsence = $this->absenceMapper->insert($absence);
 
+		$this->auditLogMapper->logAction(
+			$userId,
+			'absence_created',
+			'absence',
+			$savedAbsence->getId(),
+			null,
+			$savedAbsence->getSummary()
+		);
+
+		// Auto-approve when employee has no manager (no colleagues in team/groups)
+		if ($savedAbsence->getStatus() === Absence::STATUS_PENDING && !$this->employeeHasManager($userId)) {
+			return $this->autoApproveForNoManager($savedAbsence);
+		}
+
 		// Notify substitute when they need to approve (Vertretungs-Freigabe)
 		if ($substituteUserId && $this->notificationService) {
 			$startDate = $savedAbsence->getStartDate();
@@ -101,16 +119,6 @@ class AbsenceService
 				]
 			);
 		}
-
-		// Log the action
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_created',
-			'absence',
-			$savedAbsence->getId(),
-			null,
-			$savedAbsence->getSummary()
-		);
 
 		return $savedAbsence;
 	}
@@ -430,6 +438,11 @@ class AbsenceService
 			$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
 		}
 
+		// Auto-approve when employee has no manager (no colleagues in team/groups)
+		if (!$this->employeeHasManager($absence->getUserId())) {
+			return $this->autoApproveForNoManager($updatedAbsence);
+		}
+
 		return $updatedAbsence;
 	}
 
@@ -658,7 +671,7 @@ class AbsenceService
 			}
 		}
 
-		// Validate substitute: must be another existing, enabled user (not self)
+		// Validate substitute: must be a colleague (same team/group), existing and enabled (not self)
 		$substituteId = isset($data['substitute_user_id']) ? trim((string)$data['substitute_user_id']) : '';
 		if ($substituteId !== '') {
 			if ($substituteId === $userId) {
@@ -667,6 +680,10 @@ class AbsenceService
 			$substituteUser = $this->userManager->get($substituteId);
 			if ($substituteUser === null || !$substituteUser->isEnabled()) {
 				throw new \Exception($this->l10n->t('Substitute must be an existing user'));
+			}
+			$colleagueIds = $this->teamResolver->getColleagueIds($userId);
+			if (!in_array($substituteId, $colleagueIds, true)) {
+				throw new \Exception($this->l10n->t('Substitute must be a colleague in your team. Please select someone who shares a team or group with you.'));
 			}
 		}
 	}
@@ -725,6 +742,60 @@ class AbsenceService
 				}
 				break;
 		}
+	}
+
+	/**
+	 * Whether the employee has at least one manager (colleague in same team/group who could approve).
+	 * Used to auto-approve absences when no one would see them in the manager dashboard.
+	 */
+	private function employeeHasManager(string $employeeUserId): bool
+	{
+		$colleagueIds = $this->teamResolver->getColleagueIds($employeeUserId);
+		return !empty($colleagueIds);
+	}
+
+	/**
+	 * Auto-approve an absence when the employee has no manager (no colleagues).
+	 * Ensures absences are not stuck in PENDING forever for solo users or users alone in their team.
+	 */
+	private function autoApproveForNoManager(Absence $absence): Absence
+	{
+		$oldData = $absence->getSummary();
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setApproverComment($this->l10n->t('Auto-approved: no manager assigned in your team.'));
+		$absence->setApprovedBy(null);
+		$absence->setApprovedAt(new \DateTime());
+		$absence->setUpdatedAt(new \DateTime());
+
+		$updatedAbsence = $this->absenceMapper->update($absence);
+
+		$this->auditLogMapper->logAction(
+			$absence->getUserId(),
+			'absence_auto_approved',
+			'absence',
+			$updatedAbsence->getId(),
+			$oldData,
+			$updatedAbsence->getSummary(),
+			'system'
+		);
+
+		if ($this->notificationService) {
+			$startDate = $updatedAbsence->getStartDate();
+			$endDate = $updatedAbsence->getEndDate();
+			$this->notificationService->notifyAbsenceApproved($updatedAbsence->getUserId(), [
+				'id' => $updatedAbsence->getId(),
+				'type' => $updatedAbsence->getType(),
+				'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+				'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
+				'days' => $updatedAbsence->getDays()
+			]);
+		}
+
+		if ($this->absenceIcalMailService) {
+			$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
+		}
+
+		return $updatedAbsence;
 	}
 
 	/**

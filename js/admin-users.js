@@ -98,7 +98,7 @@
         }
 
         tbody.innerHTML = users.map(user => `
-            <tr data-user-id="${user.userId}">
+            <tr data-user-id="${Utils.escapeHtml(user.userId)}">
                 <td>${Utils.escapeHtml(user.displayName)}</td>
                 <td>${Utils.escapeHtml(user.email || '-')}</td>
                 <td>
@@ -116,7 +116,7 @@
                 <td>
                     <button type="button" class="button small" 
                         data-action="edit-user" 
-                        data-user-id="${user.userId}">
+                        data-user-id="${Utils.escapeHtml(user.userId)}">
                         ${(window.t && window.t('arbeitszeitcheck', 'Edit')) || window.ArbeitszeitCheck?.l10n?.edit || 'Edit'}
                     </button>
                 </td>

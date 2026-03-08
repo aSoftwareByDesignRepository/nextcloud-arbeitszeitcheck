@@ -1409,6 +1409,17 @@
 		"Select the day you worked (format: dd.mm.yyyy, e.g. 15.01.2024). You can also click \"Today\" to quickly set today's date.": "Wählen Sie den Arbeitstag (Format: tt.mm.jjjj, z.B. 15.01.2024). Oder klicken Sie auf „Heute“.",
 		"What time did you finish working? (24-hour format, e.g. 17:00 for 5 PM. For night shifts, enter the next day's time)": "Wann haben Sie die Arbeit beendet? (24h-Format, z.B. 17:00 für 17 Uhr. Bei Nachtschicht die Uhrzeit des Folgetags eingeben)",
 		"What time did you start working? (24-hour format, e.g. 09:00 for 9 AM or 17:30 for 5:30 PM)": "Wann haben Sie die Arbeit begonnen? (24h-Format, z.B. 09:00 oder 17:30)",
-		"When enabled, breaks required by German law are automatically added. Disable to manage breaks manually.": "Wenn aktiviert, werden rechtlich erforderliche Pausen automatisch ergänzt. Deaktivieren Sie dies für manuelle Pausenverwaltung."
+		"When enabled, breaks required by German law are automatically added. Disable to manage breaks manually.": "Wenn aktiviert, werden rechtlich erforderliche Pausen automatisch ergänzt. Deaktivieren Sie dies für manuelle Pausenverwaltung.",
+		"Overview": "Übersicht",
+		"Compliance sections": "Compliance-Bereiche",
+		"View All Violations": "Alle Verstöße anzeigen",
+		"View all compliance violations": "Alle Compliance-Verstöße anzeigen",
+		"View compliance reports": "Compliance-Berichte anzeigen",
+		"Compliance overview": "Compliance-Übersicht",
+		"See your compliance status and recent problems": "Ihr Compliance-Status und aktuelle Probleme",
+		"List of all compliance problems": "Liste aller Compliance-Probleme",
+		"See all working time rule violations": "Alle Arbeitszeit-Verstöße anzeigen",
+		"Compliance reports and statistics": "Compliance-Berichte und Statistiken",
+		"See reports and statistics": "Berichte und Statistiken anzeigen"
 	}
 }

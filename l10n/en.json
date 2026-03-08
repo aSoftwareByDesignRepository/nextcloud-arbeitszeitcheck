@@ -1423,6 +1423,17 @@
 		"Select the day you worked (format: dd.mm.yyyy, e.g. 15.01.2024). You can also click \"Today\" to quickly set today's date.": "Select the day you worked (format: dd.mm.yyyy, e.g. 15.01.2024). You can also click \"Today\" to quickly set today's date.",
 		"What time did you finish working? (24-hour format, e.g. 17:00 for 5 PM. For night shifts, enter the next day's time)": "What time did you finish working? (24-hour format, e.g. 17:00 for 5 PM. For night shifts, enter the next day's time)",
 		"What time did you start working? (24-hour format, e.g. 09:00 for 9 AM or 17:30 for 5:30 PM)": "What time did you start working? (24-hour format, e.g. 09:00 for 9 AM or 17:30 for 5:30 PM)",
-		"When enabled, breaks required by German law are automatically added. Disable to manage breaks manually.": "When enabled, breaks required by German law are automatically added. Disable to manage breaks manually."
+		"When enabled, breaks required by German law are automatically added. Disable to manage breaks manually.": "When enabled, breaks required by German law are automatically added. Disable to manage breaks manually.",
+		"Overview": "Overview",
+		"Compliance sections": "Compliance sections",
+		"View All Violations": "View All Violations",
+		"View all compliance violations": "View all compliance violations",
+		"View compliance reports": "View compliance reports",
+		"Compliance overview": "Compliance overview",
+		"See your compliance status and recent problems": "See your compliance status and recent problems",
+		"List of all compliance problems": "List of all compliance problems",
+		"See all working time rule violations": "See all working time rule violations",
+		"Compliance reports and statistics": "Compliance reports and statistics",
+		"See reports and statistics": "See reports and statistics"
 	}
 }

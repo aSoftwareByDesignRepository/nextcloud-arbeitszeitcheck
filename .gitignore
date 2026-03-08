@@ -1,5 +1,6 @@
 # Dependencies
 vendor/
+node_modules/
 
 # Test coverage and results
 tests/coverage/

@@ -23,8 +23,8 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUserSession;
-use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\Util;
 
@@ -39,6 +39,7 @@ class ComplianceController extends Controller
 	private ComplianceViolationMapper $violationMapper;
 	private PermissionService $permissionService;
 	private IUserSession $userSession;
+	private IURLGenerator $urlGenerator;
 	private IL10N $l10n;
 
 	public function __construct(
@@ -48,6 +49,7 @@ class ComplianceController extends Controller
 		ComplianceViolationMapper $violationMapper,
 		PermissionService $permissionService,
 		IUserSession $userSession,
+		IURLGenerator $urlGenerator,
 		CSPService $cspService,
 		IL10N $l10n
 	) {
@@ -56,6 +58,7 @@ class ComplianceController extends Controller
 		$this->violationMapper = $violationMapper;
 		$this->permissionService = $permissionService;
 		$this->userSession = $userSession;
+		$this->urlGenerator = $urlGenerator;
 		$this->l10n = $l10n;
 		$this->setCspService($cspService);
 	}
@@ -139,6 +142,7 @@ class ComplianceController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-dashboard', [
 				'complianceStatus' => $complianceStatus,
 				'recentViolations' => $violationsData,
+				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 			]);
 			return $this->configureCSP($response);
@@ -151,6 +155,7 @@ class ComplianceController extends Controller
 					'load_error' => true,
 				],
 				'recentViolations' => [],
+				'urlGenerator' => $this->urlGenerator,
 				'error' => $e->getMessage(),
 				'l' => $this->l10n,
 			]);
@@ -213,6 +218,7 @@ class ComplianceController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-violations', [
 				'violations' => $violationsData,
 				'total' => count($violations),
+				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 			]);
 			return $this->configureCSP($response);
@@ -220,6 +226,7 @@ class ComplianceController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-violations', [
 				'violations' => [],
 				'total' => 0,
+				'urlGenerator' => $this->urlGenerator,
 				'error' => $e->getMessage(),
 				'l' => $this->l10n,
 			]);
@@ -289,6 +296,7 @@ class ComplianceController extends Controller
 				'reportData' => $reportData,
 				'startDate' => $startDate->format('Y-m-d'),
 				'endDate' => $endDate->format('Y-m-d'),
+				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 			]);
 			return $this->configureCSP($response);
@@ -302,6 +310,7 @@ class ComplianceController extends Controller
 				],
 				'startDate' => date('Y-m-d', strtotime('-30 days')),
 				'endDate' => date('Y-m-d'),
+				'urlGenerator' => $this->urlGenerator,
 				'error' => $e->getMessage(),
 				'l' => $this->l10n,
 			]);

@@ -48,6 +48,57 @@
 }
 
 /* -------------------------------------------------------------------------
+   Compliance sub-navigation tabs
+   ------------------------------------------------------------------------- */
+.compliance-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-4, 1rem);
+  padding-bottom: var(--space-3, 0.75rem);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.compliance-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--color-text-lighter);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base, 6px);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.compliance-tab:hover,
+.compliance-tab:focus {
+  color: var(--color-main-text);
+  background: var(--color-background-hover);
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus, var(--color-primary));
+  outline-offset: 2px;
+}
+
+.compliance-tab--active {
+  color: var(--color-primary);
+  font-weight: 600;
+  border-color: var(--color-border);
+  background: var(--color-background-hover);
+}
+
+.section-header--with-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+/* -------------------------------------------------------------------------
    Manager/Admin content layout (page-specific, uses app-layout base)
    ------------------------------------------------------------------------- */
 #content.app-arbeitszeitcheck #app-content.manager-dashboard,

@@ -25,6 +25,7 @@ $hasData = $complianceStatus['has_data'] ?? true;
 
 <div id="app-content">
     <div id="app-content-wrapper">
+        <?php include __DIR__ . '/common/compliance-tabs.php'; ?>
         <div class="section">
             <div class="section-header">
                 <h2><?php p($l->t('Compliance Dashboard')); ?></h2>
@@ -97,9 +98,24 @@ $hasData = $complianceStatus['has_data'] ?? true;
             </div>
 
             <!-- Recent Violations -->
+            <?php
+            $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
+            ?>
             <div class="section">
-                <div class="section-header">
+                <div class="section-header section-header--with-actions">
                     <h3><?php p($l->t('Recent Violations')); ?></h3>
+                    <div class="flex flex--gap">
+                        <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.violations')); ?>"
+                           class="btn btn--secondary btn--sm"
+                           aria-label="<?php p($l->t('View all compliance violations')); ?>">
+                            <?php p($l->t('View All Violations')); ?>
+                        </a>
+                        <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.reports')); ?>"
+                           class="btn btn--secondary btn--sm"
+                           aria-label="<?php p($l->t('View compliance reports')); ?>">
+                            <?php p($l->t('Reports')); ?>
+                        </a>
+                    </div>
                 </div>
 
                 <?php if (empty($recentViolations)): ?>

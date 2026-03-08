@@ -23,6 +23,7 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
 
 <div id="app-content">
     <div id="app-content-wrapper">
+        <?php include __DIR__ . '/common/compliance-tabs.php'; ?>
         <div class="section">
             <div class="section-header">
                 <h2><?php p($l->t('Working Time Reports')); ?></h2>

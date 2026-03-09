@@ -20,7 +20,7 @@
     "arbzg",
     "gdpr"
   ],
-  "author": "Alexander Mähl",
+  "author": "Alexander Mäule <info@software-by-design.de> (https://software-by-design.de)",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "@nextcloud/eslint-config": "^8.3.0",

@@ -38,7 +38,7 @@ make release
 ## Before Submitting
 
 - [ ] Replace placeholder `screenshots/dashboard.png` with real screenshots (see `screenshots/README.md`)
-- [ ] Update `appinfo/info.xml` author `mail` attribute with your contact email
+- [x] `appinfo/info.xml` author set: Alexander Mäule <info@software-by-design.de>
 - [ ] Ensure all tests pass: `composer test`
 - [ ] Run `occ integrity:check-app --path=./apps/arbeitszeitcheck` to verify signing
 

@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <!--
+  - SPDX-FileCopyrightText: 2024-2025 Alexander Mäule &lt;info@software-by-design.de&gt;
   - SPDX-FileCopyrightText: 2024 Nextcloud GmbH and Nextcloud contributors
   - SPDX-License-Identifier: AGPL-3.0-or-later
 -->
@@ -31,16 +32,16 @@
 
 	<version>1.1.1</version>
 	<licence>agpl</licence>
-	<author mail="github@example.com" homepage="https://github.com/nextcloud/arbeitszeitcheck">Alexander Mähl</author>
+	<author mail="info@software-by-design.de" homepage="https://software-by-design.de">Alexander Mäule</author>
 
 	<namespace>ArbeitszeitCheck</namespace>
 
 	<category>organization</category>
 	<category>productivity</category>
 
-	<website>https://github.com/nextcloud/arbeitszeitcheck</website>
-	<bugs>https://github.com/nextcloud/arbeitszeitcheck/issues</bugs>
-	<repository>https://github.com/nextcloud/arbeitszeitcheck.git</repository>
+	<website>https://software-by-design.de</website>
+	<bugs>https://software-by-design.de</bugs>
+	<repository>https://github.com/aSoftwareByDesignRepository/nextcloud-projectcontroll.git</repository>
 
 	<dependencies>
 		<!-- Compatible with Nextcloud 32, 33, 34, 35, 36 (current and future releases) -->

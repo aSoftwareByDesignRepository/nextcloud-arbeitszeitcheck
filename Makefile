@@ -17,7 +17,6 @@ release:
 		--exclude='node_modules' \
 		--exclude='tests' \
 		--exclude='.phpunit.result.cache' \
-		--exclude='complete_arbeitszeit_refactoring_ui_refactoring_prompt.txt' \
 		--transform 's,^,$(app_name)/,' \
 		.
 	@echo "Created $(release_dir)/$(app_name).tar.gz"

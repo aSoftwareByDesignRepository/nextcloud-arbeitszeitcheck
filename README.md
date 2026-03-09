@@ -30,14 +30,12 @@ Die App läuft vollständig innerhalb Ihrer selbst gehosteten Nextcloud‑Instan
 **Manuelle Installation aus Git**
 
 ```bash
-cd /path/to/nextcloud/apps/
-git clone https://github.com/nextcloud/arbeitszeitcheck.git
-cd arbeitszeitcheck
+git clone https://github.com/aSoftwareByDesignRepository/nextcloud-projectcontroll.git /tmp/arbeitszeitcheck-src
+cp -r /tmp/arbeitszeitcheck-src/apps/arbeitszeitcheck /path/to/nextcloud/apps/
 
-# Optional: PHP‑/JS‑Abhängigkeiten bauen (falls nicht über Release‑Tarball installiert)
-composer install        # falls composer.json verwendet wird
-npm install && npm run build
-
+cd /path/to/nextcloud
+# Optional: PHP‑/JS‑Abhängigkeiten (falls nicht über Release‑Tarball installiert)
+# cd apps/arbeitszeitcheck && composer install && npm install
 php occ app:enable arbeitszeitcheck
 ```
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * Application class for the arbeitszeitcheck app
  *
+ * @copyright Copyright (c) 2024-2025 Alexander Mäule <info@software-by-design.de>
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
  */

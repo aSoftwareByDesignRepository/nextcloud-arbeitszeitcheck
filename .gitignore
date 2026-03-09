@@ -28,3 +28,6 @@ config/config.php
 # Temporary files
 *.tmp
 *.temp
+
+# Build output
+build/

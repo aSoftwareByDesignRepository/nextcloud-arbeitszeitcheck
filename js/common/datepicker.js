@@ -151,7 +151,7 @@ function initializeDatepicker(input, options = {}) {
 
 		const container = document.createElement('div');
 		container.className = 'arbeitszeitcheck-datepicker';
-		container.style.cssText = 'position:absolute;z-index:10000;background:var(--color-main-background);border:1px solid var(--color-border);border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:280px;';
+		container.style.cssText = 'position:fixed;z-index:10000;background:var(--color-main-background);border:1px solid var(--color-border);border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:280px;';
 
 		const header = document.createElement('div');
 		header.className = 'arbeitszeitcheck-datepicker-header';
@@ -195,11 +195,30 @@ function initializeDatepicker(input, options = {}) {
 		calendarElement = container;
 		calendarOpen = true;
 
-		const rect = element.getBoundingClientRect();
-		container.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-		container.style.left = (rect.left + window.scrollX) + 'px';
-
 		renderCalendarInto(container);
+
+		/* Position with position:fixed (viewport-relative) so the calendar stays
+		 * visible when #app-content scrolls. Use getBoundingClientRect() directly
+		 * (no scrollY/scrollX) and flip above the input if there's no room below. */
+		container.style.position = 'fixed';
+		const rect = element.getBoundingClientRect();
+		const calHeight = container.offsetHeight || 320;
+		const spaceBelow = window.innerHeight - rect.bottom;
+		const showAbove = spaceBelow < calHeight && rect.top > calHeight;
+		let top;
+		if (showAbove) {
+			top = Math.max(8, rect.top - calHeight - 4);
+		} else {
+			top = Math.min(window.innerHeight - calHeight - 8, rect.bottom + 4);
+			if (top < 8) top = 8;
+		}
+		container.style.top = top + 'px';
+		/* Keep within viewport horizontally */
+		let left = rect.left;
+		const calWidth = container.offsetWidth || 280;
+		if (left + calWidth > window.innerWidth) left = window.innerWidth - calWidth - 8;
+		if (left < 8) left = 8;
+		container.style.left = left + 'px';
 
 		setTimeout(function () {
 			function closeOnOutside(e) {

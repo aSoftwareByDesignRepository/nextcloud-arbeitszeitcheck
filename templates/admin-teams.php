@@ -34,13 +34,13 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
                 <div class="form-checkbox form-checkbox--switch">
                     <input type="checkbox" id="use-app-teams" name="useAppTeams" class="config-toggle"
                            aria-describedby="use-app-teams-desc"
-                           aria-label="<?php p($l->t('Use app teams for manager resolution')); ?>">
+                           aria-label="<?php p($l->t('Use ArbeitszeitCheck teams instead of Nextcloud groups')); ?>">
                     <label for="use-app-teams" class="form-label">
-                        <?php p($l->t('Use app teams for approvals')); ?>
+                        <?php p($l->t('Use ArbeitszeitCheck teams for approvals')); ?>
                     </label>
                 </div>
                 <p id="use-app-teams-desc" class="form-help">
-                    <?php p($l->t('When on: only users assigned as managers of a team below can approve that team\'s members. When off: managers are determined by shared Nextcloud groups (previous behaviour).')); ?>
+                    <?php p($l->t('When on: managers are taken from the ArbeitszeitCheck teams you define below. When off: managers are determined from shared Nextcloud groups (default behaviour).')); ?>
                 </p>
             </div>
         </section>

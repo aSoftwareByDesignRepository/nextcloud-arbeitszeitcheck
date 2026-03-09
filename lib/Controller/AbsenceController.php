@@ -189,6 +189,8 @@ class AbsenceController extends Controller
 	{
 		try {
 			$userId = $this->getUserId();
+			$limit = $limit !== null ? min(max(1, (int)$limit), 500) : 25;
+			$offset = $offset !== null ? max(0, (int)$offset) : 0;
 			$filters = [];
 
 			if ($status) {

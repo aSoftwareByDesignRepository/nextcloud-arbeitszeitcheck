@@ -441,9 +441,9 @@ class Version1000Date20241229000000 extends SimpleMigrationStep
    }
    ```
 
-3. **Document in API docs:**
-   - Update `docs/API-Documentation.en.md`
-   - Include request/response examples
+3. **Document behaviour where relevant:**
+   - If the endpoint is public or security‑relevant, add a short note to `README.md` or the appropriate doc in `docs/` (z. B. Rollen/Compliance)
+   - Include request/response examples in code comments or tests if they are non‑obvious
 
 ### Error Handling
 

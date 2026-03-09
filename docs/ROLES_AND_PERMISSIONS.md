@@ -103,7 +103,7 @@ User A may act as manager for employee E if and only if:
 
 - Controllers **must** use PermissionService (or, for substitute, the absence’s `substitute_user_id`) for any permission check. They must **not** duplicate logic (e.g. ad-hoc `groupManager->isAdmin` + `teamResolver->getTeamMemberIds`).
 
-- **Audit logging:** All approval/rejection and other sensitive actions are already logged (e.g. audit log, justification on time entries). Permission denials can be logged by PermissionService for a clear audit trail.
+- **Audit logging:** All approval/rejection and other sensitive actions are logged (e.g. audit log, justification on time entries). Permission denials can be logged by PermissionService. The following are audited with old/new values and `performedBy`: working time model CRUD; user working time model assignments (work schedule, vacation days); team CRUD and team member/manager add/remove; compliance violation resolution; time entry correction approve/reject (full before/after); time entry auto-completion at ArbZG 10h daily limit.
 
 ---
 

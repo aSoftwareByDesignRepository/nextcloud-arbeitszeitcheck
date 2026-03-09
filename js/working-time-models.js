@@ -69,9 +69,11 @@
                 <div class="form-group">
                     <label for="model-type" class="form-label">${typeLabel}</label>
                     <select id="model-type" name="type" class="form-select">
-                        <option value="full-time">Full-Time</option>
-                        <option value="part-time">Part-Time</option>
+                        <option value="full_time">Full-Time</option>
+                        <option value="part_time">Part-Time</option>
                         <option value="flexible">Flexible</option>
+                        <option value="trust_based">Trust-Based</option>
+                        <option value="shift_work">Shift Work</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -191,9 +193,11 @@
                 <div class="form-group">
                     <label for="edit-model-type" class="form-label">${typeLabel}</label>
                     <select id="edit-model-type" name="type" class="form-select">
-                        <option value="full-time" ${model.type === 'full-time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.fullTime || (window.t && window.t('arbeitszeitcheck', 'Full-Time')) || 'Full-Time'}</option>
-                        <option value="part-time" ${model.type === 'part-time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.partTime || (window.t && window.t('arbeitszeitcheck', 'Part-Time')) || 'Part-Time'}</option>
+                        <option value="full_time" ${model.type === 'full_time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.fullTime || (window.t && window.t('arbeitszeitcheck', 'Full-Time')) || 'Full-Time'}</option>
+                        <option value="part_time" ${model.type === 'part_time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.partTime || (window.t && window.t('arbeitszeitcheck', 'Part-Time')) || 'Part-Time'}</option>
                         <option value="flexible" ${model.type === 'flexible' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.flexible || (window.t && window.t('arbeitszeitcheck', 'Flexible')) || 'Flexible'}</option>
+                        <option value="trust_based" ${model.type === 'trust_based' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.trustBased || (window.t && window.t('arbeitszeitcheck', 'Trust-Based')) || 'Trust-Based'}</option>
+                        <option value="shift_work" ${model.type === 'shift_work' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.shiftWork || (window.t && window.t('arbeitszeitcheck', 'Shift Work')) || 'Shift Work'}</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -261,7 +265,7 @@
         const data = {
             name: formData.get('name'),
             description: formData.get('description') || null,
-            type: formData.get('type') || 'full-time',
+            type: formData.get('type') || 'full_time',
             weeklyHours: parseFloat(formData.get('weeklyHours')) || 40,
             dailyHours: parseFloat(formData.get('dailyHours')) || 8,
             isDefault: formData.get('isDefault') === '1'
@@ -297,7 +301,7 @@
         const data = {
             name: formData.get('name'),
             description: formData.get('description') || null,
-            type: formData.get('type') || 'full-time',
+            type: formData.get('type') || 'full_time',
             weeklyHours: parseFloat(formData.get('weeklyHours')) || 40,
             dailyHours: parseFloat(formData.get('dailyHours')) || 8,
             isDefault: formData.get('isDefault') === '1'

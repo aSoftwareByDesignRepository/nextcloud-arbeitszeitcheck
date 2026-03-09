@@ -34,6 +34,7 @@ $isSubstitutionRequests = strpos($currentPage, '/substitution-requests') !== fal
 $isCompliance = strpos($currentPage, '/compliance') !== false;
 $isAdmin = strpos($currentPage, '/admin') !== false;
 $isAdminTeams = strpos($currentPage, '/admin/teams') !== false;
+$isAdminUsers = strpos($currentPage, '/admin/users') !== false;
 // Dashboard is active if URL contains /dashboard OR if it's the base app URL without any specific section
 $isDashboard = strpos($currentPage, '/dashboard') !== false || 
                (!$isTimeEntries && !$isAbsences && !$isReports && !$isCompliance && !$isCalendar && !$isTimeline && !$isSettings && 
@@ -187,7 +188,15 @@ if ($showManagerLink === null) {
                 <span><?php p($l->t('Organization')); ?></span>
             </a>
         </li>
-        <li class="<?php p($isAdmin && !$isAdminTeams ? 'active' : ''); ?>" <?php p($isAdmin && !$isAdminTeams ? 'aria-current="page"' : ''); ?>>
+        <li class="<?php p($isAdminUsers ? 'active' : ''); ?>" <?php p($isAdminUsers ? 'aria-current="page"' : ''); ?>>
+            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.users')); ?>"
+               title="<?php p($l->t('Manage Employees')); ?>"
+               aria-label="<?php p($l->t('Go to employees to assign working time models and vacation days')); ?>">
+                <i data-lucide="users-2" class="lucide-icon" aria-hidden="true"></i>
+                <span><?php p($l->t('Manage Employees')); ?></span>
+            </a>
+        </li>
+        <li class="<?php p($isAdmin && !$isAdminTeams && !$isAdminUsers ? 'active' : ''); ?>" <?php p($isAdmin && !$isAdminTeams && !$isAdminUsers ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard')); ?>"
                title="<?php p($l->t('Admin Dashboard')); ?>"
                aria-label="<?php p($l->t('Go to admin dashboard')); ?>">

@@ -85,15 +85,19 @@
             return;
         }
 
-        tbody.innerHTML = logs.map(log => `
-            <tr>
-                <td>${log.createdAt || '-'}</td>
-                <td>${Utils.escapeHtml(log.userDisplayName || log.userId)}</td>
-                <td>${Utils.escapeHtml(log.action)}</td>
-                <td>${Utils.escapeHtml(log.entityType)}</td>
-                <td>${Utils.escapeHtml(log.performedByDisplayName || log.performedBy || '-')}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = logs.map(log => {
+            const created = log.created_at || log.createdAt || '-';
+            const user = log.user_display_name || log.userDisplayName || log.user_id || log.userId;
+            const performed = log.performed_by_display_name || log.performedByDisplayName || log.performed_by || log.performedBy || '-';
+            const entity = log.entity_type || log.entityType;
+            return `<tr>
+                <td>${Utils.escapeHtml(String(created))}</td>
+                <td>${Utils.escapeHtml(String(user))}</td>
+                <td>${Utils.escapeHtml(String(log.action))}</td>
+                <td>${Utils.escapeHtml(String(entity))}</td>
+                <td>${Utils.escapeHtml(String(performed))}</td>
+            </tr>`;
+        }).join('');
     }
 
     /**

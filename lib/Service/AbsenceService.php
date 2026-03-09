@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
@@ -30,6 +31,7 @@ class AbsenceService
 	private AuditLogMapper $auditLogMapper;
 	private UserSettingsMapper $userSettingsMapper;
 	private TeamResolverService $teamResolver;
+	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private IConfig $config;
 	private IUserManager $userManager;
 	private IL10N $l10n;
@@ -41,6 +43,7 @@ class AbsenceService
 		AuditLogMapper $auditLogMapper,
 		UserSettingsMapper $userSettingsMapper,
 		TeamResolverService $teamResolver,
+		UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		IConfig $config,
 		IUserManager $userManager,
 		IL10N $l10n,
@@ -51,6 +54,7 @@ class AbsenceService
 		$this->auditLogMapper = $auditLogMapper;
 		$this->userSettingsMapper = $userSettingsMapper;
 		$this->teamResolver = $teamResolver;
+		$this->userWorkingTimeModelMapper = $userWorkingTimeModelMapper;
 		$this->config = $config;
 		$this->userManager = $userManager;
 		$this->l10n = $l10n;
@@ -171,12 +175,12 @@ class AbsenceService
 
 		$oldData = $absence->getSummary();
 
-		// Update allowed fields
+		// Update allowed fields (use parseDate for consistent validation)
 		if (isset($data['start_date'])) {
-			$absence->setStartDate(new \DateTime($data['start_date']));
+			$absence->setStartDate($this->parseDate($data['start_date']));
 		}
 		if (isset($data['end_date'])) {
-			$absence->setEndDate(new \DateTime($data['end_date']));
+			$absence->setEndDate($this->parseDate($data['end_date']));
 		}
 		if (isset($data['reason'])) {
 			$absence->setReason($data['reason']);
@@ -578,16 +582,24 @@ class AbsenceService
 			$sickDays = 0.0;
 		}
 
-		// Get total vacation entitlement from user settings (default to 25 if not set)
+		// Get total vacation entitlement from the assigned working time model (single source of truth),
+		// falling back to user setting or a safe default of 25 days.
+		$totalEntitlement = 25;
 		try {
-			$totalEntitlement = $this->userSettingsMapper->getIntegerSetting(
-				$userId,
-				'vacation_days_per_year',
-				25 // Default value if not set
-			);
+			$currentModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+			if ($currentModel !== null && $currentModel->getVacationDaysPerYear() !== null) {
+				$totalEntitlement = $currentModel->getVacationDaysPerYear();
+			} else {
+				// Legacy / fallback: read from user settings if present
+				$totalEntitlement = $this->userSettingsMapper->getIntegerSetting(
+					$userId,
+					'vacation_days_per_year',
+					25
+				);
+			}
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting vacation entitlement: ' . $e->getMessage(), ['exception' => $e]);
-			$totalEntitlement = 25; // Default value on error
+			$totalEntitlement = 25;
 		}
 
 		return [
@@ -660,6 +672,43 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Invalid absence type'));
 		}
 		$this->validateAbsenceTypeRules($type, $startDate, $endDate);
+
+		// Vacation entitlement: ensure user has enough remaining days
+		// (getVacationStats only counts approved absences; when updating, add back old absence's days)
+		if ($type === Absence::TYPE_VACATION) {
+			$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate);
+			$addBackPerYear = [];
+			if ($excludeAbsenceId !== null) {
+				try {
+					$oldAbsence = $this->absenceMapper->find($excludeAbsenceId);
+					if ($oldAbsence->getUserId() === $userId && $oldAbsence->getType() === Absence::TYPE_VACATION) {
+						$oldStart = $oldAbsence->getStartDate();
+						$oldEnd = $oldAbsence->getEndDate();
+						if ($oldStart && $oldEnd) {
+							$addBackPerYear = $this->computeWorkingDaysPerYear($oldStart, $oldEnd);
+						}
+					}
+				} catch (DoesNotExistException $e) {
+					// Absence no longer exists, no days to add back
+				}
+			}
+			foreach ($requestedWorkingDaysPerYear as $year => $requestedDays) {
+				if ($requestedDays <= 0) {
+					continue;
+				}
+				$stats = $this->getVacationStats($userId, (int)$year);
+				$remaining = (float)($stats['remaining'] ?? 0);
+				$addBack = isset($addBackPerYear[$year]) ? (float)$addBackPerYear[$year] : 0.0;
+				$effectiveRemaining = $remaining + $addBack;
+				if ($effectiveRemaining < $requestedDays) {
+					$msg = $this->l10n->t(
+						'Not enough vacation days remaining. You have %1$s days left for %2$s but requested %3$s days.',
+						[(string)round($effectiveRemaining, 1), (string)$year, (string)round($requestedDays, 1)]
+					);
+					throw new \Exception($msg);
+				}
+			}
+		}
 
 		// Require substitute for configured types (admin setting)
 		$requireSubstituteTypesJson = $this->config->getAppValue('arbeitszeitcheck', 'require_substitute_types', '[]');
@@ -827,5 +876,96 @@ class AbsenceService
 		} catch (\Throwable $e) {
 			throw new \Exception($this->l10n->t('Invalid date format. Expected yyyy-mm-dd or dd.mm.yyyy: %s', [$dateString]));
 		}
+	}
+
+	/**
+	 * Compute working days per year for a date range (excludes weekends and German public holidays)
+	 *
+	 * @param \DateTime $start
+	 * @param \DateTime $end
+	 * @return array<int, float> year => working days
+	 */
+	private function computeWorkingDaysPerYear(\DateTime $start, \DateTime $end): array
+	{
+		$start = clone $start;
+		$end = clone $end;
+		$result = [];
+		$startYear = (int)$start->format('Y');
+		$endYear = (int)$end->format('Y');
+		$holidays = [];
+		for ($y = $startYear; $y <= $endYear; $y++) {
+			$holidays[$y] = $this->getGermanPublicHolidaysForYear($y);
+		}
+		while ($start <= $end) {
+			if ($start->format('N') < 6) {
+				$dateStr = $start->format('Y-m-d');
+				$year = (int)$start->format('Y');
+				if (!isset($holidays[$year][$dateStr])) {
+					$result[$year] = ($result[$year] ?? 0) + 1;
+				}
+			}
+			$start->modify('+1 day');
+		}
+		foreach (array_keys($result) as $y) {
+			$result[$y] = (float)$result[$y];
+		}
+		return $result;
+	}
+
+	/**
+	 * Get German public holidays for a year (for working-days calculation)
+	 *
+	 * @param int $year
+	 * @return array<string, string> date (Y-m-d) => name
+	 */
+	private function getGermanPublicHolidaysForYear(int $year): array
+	{
+		$holidays = [];
+		$holidays[$year . '-01-01'] = 'New Year';
+		$easterDays = function_exists('easter_days') ? \easter_days($year) : $this->easterDaysGauss($year);
+		$march21 = new \DateTime($year . '-03-21');
+		$easter = clone $march21;
+		$easter->modify('+' . $easterDays . ' days');
+		$easter->modify('-2 days');
+		$holidays[$easter->format('Y-m-d')] = 'Good Friday';
+		$easter->modify('+3 days');
+		$holidays[$easter->format('Y-m-d')] = 'Easter Monday';
+		$easter->modify('+38 days');
+		$holidays[$easter->format('Y-m-d')] = 'Ascension';
+		$easter->modify('+11 days');
+		$holidays[$easter->format('Y-m-d')] = 'Whit Monday';
+		$easter->modify('+10 days');
+		$holidays[$easter->format('Y-m-d')] = 'Corpus Christi';
+		$holidays[$year . '-05-01'] = 'Labour Day';
+		$holidays[$year . '-10-03'] = 'Unity Day';
+		$holidays[$year . '-10-31'] = 'Reformation Day';
+		$holidays[$year . '-11-01'] = 'All Saints';
+		$holidays[$year . '-12-25'] = 'Christmas';
+		$holidays[$year . '-12-26'] = 'Second Christmas';
+		return $holidays;
+	}
+
+	/**
+	 * Gauss algorithm for Easter (fallback when easter_days not available)
+	 */
+	private function easterDaysGauss(int $year): int
+	{
+		$a = $year % 19;
+		$b = (int)($year / 100);
+		$c = $year % 100;
+		$d = (int)($b / 4);
+		$e = $b % 4;
+		$f = (int)(($b + 8) / 25);
+		$g = (int)(($b - $f + 1) / 3);
+		$h = (19 * $a + $b - $d - $g + 15) % 30;
+		$i = (int)($c / 4);
+		$k = $c % 4;
+		$l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
+		$m = (int)(($a + 11 * $h + 22 * $l) / 451);
+		$month = (int)(($h + $l - 7 * $m + 114) / 31);
+		$day = (($h + $l - 7 * $m + 114) % 31) + 1;
+		$march21 = new \DateTime($year . '-03-21');
+		$easterDate = new \DateTime("$year-$month-$day");
+		return (int)$march21->diff($easterDate)->days;
 	}
 }

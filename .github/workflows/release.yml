@@ -10,10 +10,6 @@ jobs:
     name: Build and release
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: apps/arbeitszeitcheck
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,7 +57,6 @@ jobs:
       #       --privateKey=$HOME/.nextcloud/certificates/arbeitszeitcheck.key \
       #       --certificate=$HOME/.nextcloud/certificates/arbeitszeitcheck.crt \
       #       --path=.
-      #   working-directory: apps/arbeitszeitcheck
 
       # Optional: Push to Nextcloud App Store (uncomment when configured)
       # - name: Upload to Nextcloud App Store

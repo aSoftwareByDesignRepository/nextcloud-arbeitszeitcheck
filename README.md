@@ -30,9 +30,7 @@ Die App läuft vollständig innerhalb Ihrer selbst gehosteten Nextcloud‑Instan
 **Manuelle Installation aus Git**
 
 ```bash
-git clone https://github.com/aSoftwareByDesignRepository/nextcloud-projectcontroll.git /tmp/arbeitszeitcheck-src
-cp -r /tmp/arbeitszeitcheck-src/apps/arbeitszeitcheck /path/to/nextcloud/apps/
-
+git clone https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git /path/to/nextcloud/apps/arbeitszeitcheck
 cd /path/to/nextcloud
 # Optional: PHP‑/JS‑Abhängigkeiten (falls nicht über Release‑Tarball installiert)
 # cd apps/arbeitszeitcheck && composer install && npm install
@@ -47,29 +45,22 @@ Unterstützte Umgebungen:
 
 ### Dokumentation
 
-Alle Dokumente liegen im Ordner `apps/arbeitszeitcheck/docs` und sind zweisprachig (DE/EN), soweit sinnvoll.
+Die wichtigsten Begleitdokumente liegen im Ordner `docs/`:
 
-- **Benutzer‑Doku**
-  - `Benutzerhandbuch.de.md` – User Guide für Mitarbeiter
-  - `User-Manual.en.md` – User Guide (English)
-  - `FAQ.de.md` / `FAQ.en.md` – Häufige Fragen
-- **Admin‑Doku**
-  - `Administrator-Handbuch.de.md` – Admin‑Handbuch (DE)
-  - `Administrator-Guide.en.md` – Admin Guide (EN)
-  - `Troubleshooting-Guide.en.md` – Fehlerbehebung
-- **Entwickler & API**
-  - `Developer-Documentation.en.md` – Architektur, Code‑Struktur, Tests
-  - `API-Documentation.en.md` – REST‑API‑Referenz
-- **Compliance & Datenschutz**
-  - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – Technische Umsetzung der ArbZG‑Regeln
-  - `ArbZG-Compliance-Analyse.md` – Aktueller Abdeckungsgrad der ArbZG‑Paragraphen (Überblick)
-  - `DSGVO-Compliance-Guide.de.md` / `GDPR-Compliance-Guide.en.md` – Betrieb unter DSGVO
-  - `Datenschutzerklaerung.de.md` / `Privacy-Policy.en.md` – anpassbare Datenschutz‑Vorlagen
-  - `DPIA-Template.en.md` – Vorlage für Datenschutz‑Folgenabschätzung (Art. 35 DSGVO)
-  - `Processing-Activities-Record-Template.en.md` – Vorlage Verzeichnis der Verarbeitungstätigkeiten (Art. 30 DSGVO)
-  - `Works-Council-Agreement-Template.de.md` – Muster‑Betriebsvereinbarung
+- **Architektur & Rollen**
+  - `VIEWS_ANALYSIS.md` – Überblick über alle Seiten und Routen
+  - `ROLES_AND_PERMISSIONS.md` – Rollen‑ und Berechtigungsmodell (Single Source of Truth)
+- **Compliance**
+  - `ArbZG-Compliance-Analyse.md` – Abdeckung der ArbZG‑Paragraphen
+  - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – technische Umsetzung der ArbZG‑Regeln
+  - `GDPR-Compliance-Guide.en.md` – Betrieb der App im Einklang mit DSGVO/GDPR
+- **Implementierung**
+  - `TRANSLATIONS.md` – Übersetzungskonzept und verwendete Keys
+  - `UX-and-Accessibility.md` – UX‑/WCAG‑Leitlinien und Designentscheidungen
+  - `Developer-Documentation.en.md` – Architekturüberblick und Hinweise für Beitragende
+  - `Store-Publishing.md` – Ablauf für Releases in den Nextcloud App Store
 
-Interne technische Notizen (z. B. `Automatische-Pausenberechnung.md`, `Maximale-Arbeitszeit-10-Stunden.md`, `Compliance-Umsetzung-Status.md`, `Timer-Resume-Verhalten.md`) dokumentieren die detaillierte Logik der Compliance‑Engine und sind primär für Entwickler/Reviewer gedacht.
+Die Endnutzer‑Oberfläche ist so gestaltet, dass sie ohne separates Handbuch verständlich ist; zusätzliche Handbücher oder rechtliche Vorlagen werden bewusst nicht mit ausgeliefert und können organisationsspezifisch ergänzt werden.
 
 ### Nextcloud App Store Assets
 

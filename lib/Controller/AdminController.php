@@ -32,6 +32,7 @@ use OCP\AppFramework\Services\IAppConfig;
 use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUser;
+use OCP\IUserSession;
 use OCP\IL10N;
 use OCP\Util;
 
@@ -53,6 +54,7 @@ class AdminController extends Controller
 	private TeamMapper $teamMapper;
 	private TeamMemberMapper $teamMemberMapper;
 	private TeamManagerMapper $teamManagerMapper;
+	private IUserSession $userSession;
 
 	public function __construct(
 		string $appName,
@@ -67,6 +69,7 @@ class AdminController extends Controller
 		TeamMapper $teamMapper,
 		TeamMemberMapper $teamMemberMapper,
 		TeamManagerMapper $teamManagerMapper,
+		IUserSession $userSession,
 		CSPService $cspService,
 		IL10N $l10n
 	) {
@@ -81,8 +84,71 @@ class AdminController extends Controller
 		$this->teamMapper = $teamMapper;
 		$this->teamMemberMapper = $teamMemberMapper;
 		$this->teamManagerMapper = $teamManagerMapper;
+		$this->userSession = $userSession;
 		$this->l10n = $l10n;
 		$this->setCspService($cspService);
+	}
+
+	/**
+	 * Get the current admin's user ID for audit logging (performedBy).
+	 * Falls back to 'system' if session is unavailable (e.g. CLI).
+	 */
+	private function getPerformedBy(): string
+	{
+		$user = $this->userSession->getUser();
+		return $user !== null ? $user->getUID() : 'system';
+	}
+
+	/**
+	 * Convert UserWorkingTimeModel to JSON-serializable array for audit log.
+	 */
+	private function userWorkingTimeModelToAuditValues(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel $model): array
+	{
+		$start = $model->getStartDate();
+		$end = $model->getEndDate();
+		return [
+			'id' => $model->getId(),
+			'userId' => $model->getUserId(),
+			'workingTimeModelId' => $model->getWorkingTimeModelId(),
+			'vacationDaysPerYear' => $model->getVacationDaysPerYear(),
+			'startDate' => $start ? $start->format('Y-m-d') : null,
+			'endDate' => $end ? $end->format('Y-m-d') : null,
+		];
+	}
+
+	/**
+	 * Convert WorkingTimeModel to JSON-serializable array for audit log.
+	 */
+	private function workingTimeModelToAuditValues(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model): array
+	{
+		$created = $model->getCreatedAt();
+		$updated = $model->getUpdatedAt();
+		return [
+			'id' => $model->getId(),
+			'name' => $model->getName(),
+			'description' => $model->getDescription(),
+			'type' => $model->getType(),
+			'weeklyHours' => $model->getWeeklyHours(),
+			'dailyHours' => $model->getDailyHours(),
+			'breakRules' => $model->getBreakRulesArray(),
+			'overtimeRules' => $model->getOvertimeRulesArray(),
+			'isDefault' => $model->getIsDefault(),
+			'createdAt' => $created ? $created->format('c') : null,
+			'updatedAt' => $updated ? $updated->format('c') : null,
+		];
+	}
+
+	/**
+	 * Normalize working time model type from API (accepts full-time/part-time for backward compat).
+	 */
+	private function normalizeWorkingTimeModelType(string $type): string
+	{
+		$type = trim($type);
+		if ($type === '') {
+			return \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_FULL_TIME;
+		}
+		$hyphenToUnderscore = ['full-time' => 'full_time', 'part-time' => 'part_time'];
+		return $hyphenToUnderscore[$type] ?? $type;
 	}
 
 	/**
@@ -360,6 +426,7 @@ class AdminController extends Controller
 		Util::addStyle('arbeitszeitcheck', 'common/responsive');
 		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		Util::addStyle('arbeitszeitcheck', 'audit-log');
 
 		// Add common JavaScript files
 		Util::addScript('arbeitszeitcheck', 'common/utils');
@@ -387,7 +454,7 @@ class AdminController extends Controller
 				'id' => $log->getId(),
 				'userId' => $log->getUserId(),
 				'userDisplayName' => $user ? $user->getDisplayName() : $log->getUserId(),
-				'action' => $log->getAction(),
+				'action' => $this->l10n->t($log->getAction()),
 				'entityType' => $log->getEntityType(),
 				'entityId' => $log->getEntityId(),
 				'performedBy' => $log->getPerformedBy(),
@@ -399,6 +466,8 @@ class AdminController extends Controller
 		$response = new TemplateResponse('arbeitszeitcheck', 'audit-log', [
 			'logs' => $logsData,
 			'total' => count($logs),
+			'startDate' => $startDate->format('d.m.Y'),
+			'endDate' => $endDate->format('d.m.Y'),
 			'l' => $this->l10n,
 		]);
 		return $this->configureCSP($response, 'admin');
@@ -761,6 +830,13 @@ class AdminController extends Controller
 			$startDate = isset($params['startDate']) ? $params['startDate'] : null;
 			$endDate = isset($params['endDate']) ? $params['endDate'] : null;
 
+			if ($vacationDaysPerYear !== null && ($vacationDaysPerYear < 0 || $vacationDaysPerYear > 366)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Vacation days per year must be between 0 and 366')
+				], Http::STATUS_BAD_REQUEST);
+			}
+
 			// Validate user exists
 			$user = $this->userManager->get($userId);
 			if (!$user) {
@@ -780,15 +856,18 @@ class AdminController extends Controller
 						'error' => $this->l10n->t('Working time model not found')
 					], Http::STATUS_NOT_FOUND);
 				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->error('Error validating working time model: ' . $e->getMessage(), ['exception' => $e]);
 					return new JSONResponse([
 						'success' => false,
-						'error' => 'Error validating working time model: ' . $e->getMessage()
+						'error' => $this->l10n->t('Validation failed. Please check your input.')
 					], Http::STATUS_BAD_REQUEST);
 				}
 			}
 
 			// Get current assignment
 			$currentModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+
+			$oldValues = $currentModel ? $this->userWorkingTimeModelToAuditValues($currentModel) : null;
 
 			if ($currentModel && $workingTimeModelId !== null) {
 				// Update existing assignment
@@ -822,6 +901,16 @@ class AdminController extends Controller
 				}
 
 				$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+				$newValues = $this->userWorkingTimeModelToAuditValues($updated);
+				$this->auditLogMapper->logAction(
+					$userId,
+					'user_working_time_model_updated',
+					'user_working_time_model',
+					$updated->getId(),
+					$oldValues,
+					$newValues,
+					$this->getPerformedBy()
+				);
 			} elseif ($workingTimeModelId !== null && $workingTimeModelId > 0) {
 				// Create new assignment
 				$newModel = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
@@ -846,6 +935,16 @@ class AdminController extends Controller
 				}
 
 				$updated = $this->userWorkingTimeModelMapper->insert($newModel);
+				$newValues = $this->userWorkingTimeModelToAuditValues($updated);
+				$this->auditLogMapper->logAction(
+					$userId,
+					'user_working_time_model_created',
+					'user_working_time_model',
+					$updated->getId(),
+					null,
+					$newValues,
+					$this->getPerformedBy()
+				);
 			} else {
 				return new JSONResponse([
 					'success' => false,
@@ -951,7 +1050,7 @@ class AdminController extends Controller
 			$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
 			$model->setName($params['name'] ?? '');
 			$model->setDescription($params['description'] ?? null);
-			$model->setType($params['type'] ?? \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_FULL_TIME);
+			$model->setType($this->normalizeWorkingTimeModelType($params['type'] ?? ''));
 			$model->setWeeklyHours(isset($params['weeklyHours']) ? (float)$params['weeklyHours'] : 40.0);
 			$model->setDailyHours(isset($params['dailyHours']) ? (float)$params['dailyHours'] : 8.0);
 			$model->setIsDefault(isset($params['isDefault']) ? (bool)$params['isDefault'] : false);
@@ -992,6 +1091,16 @@ class AdminController extends Controller
 			}
 
 			$savedModel = $this->workingTimeModelMapper->insert($model);
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'working_time_model_created',
+				'working_time_model',
+				$savedModel->getId(),
+				null,
+				$this->workingTimeModelToAuditValues($savedModel),
+				$performedBy
+			);
 
 			return new JSONResponse([
 				'success' => true,
@@ -1024,6 +1133,7 @@ class AdminController extends Controller
 	{
 		try {
 			$model = $this->workingTimeModelMapper->find($id);
+			$oldValues = $this->workingTimeModelToAuditValues($model);
 			$params = $this->request->getParams();
 
 			if (isset($params['name'])) {
@@ -1033,7 +1143,7 @@ class AdminController extends Controller
 				$model->setDescription($params['description']);
 			}
 			if (isset($params['type'])) {
-				$model->setType($params['type']);
+				$model->setType($this->normalizeWorkingTimeModelType($params['type']));
 			}
 			if (isset($params['weeklyHours'])) {
 				$model->setWeeklyHours((float)$params['weeklyHours']);
@@ -1079,6 +1189,17 @@ class AdminController extends Controller
 			}
 
 			$updatedModel = $this->workingTimeModelMapper->update($model);
+			$newValues = $this->workingTimeModelToAuditValues($updatedModel);
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'working_time_model_updated',
+				'working_time_model',
+				$updatedModel->getId(),
+				$oldValues,
+				$newValues,
+				$performedBy
+			);
 
 			return new JSONResponse([
 				'success' => true,
@@ -1126,7 +1247,18 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			$oldValues = $this->workingTimeModelToAuditValues($model);
+			$performedBy = $this->getPerformedBy();
 			$this->workingTimeModelMapper->delete($model);
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'working_time_model_deleted',
+				'working_time_model',
+				$id,
+				$oldValues,
+				null,
+				$performedBy
+			);
 
 			return new JSONResponse([
 				'success' => true,
@@ -1318,7 +1450,7 @@ class AdminController extends Controller
 					'id' => $log->getId(),
 					'user_id' => $log->getUserId(),
 					'user_display_name' => $user ? $user->getDisplayName() : $log->getUserId(),
-					'action' => $log->getAction(),
+					'action' => $this->l10n->t($log->getAction()),
 					'entity_type' => $log->getEntityType(),
 					'entity_id' => $log->getEntityId(),
 					'old_values' => $log->getOldValues() ? json_decode($log->getOldValues(), true) : null,
@@ -1545,6 +1677,16 @@ class AdminController extends Controller
 			$team->setSortOrder($sortOrder);
 			$team->setCreatedAt(new \DateTime());
 			$inserted = $this->teamMapper->insert($team);
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'team_created',
+				'team',
+				$inserted->getId(),
+				null,
+				$inserted->getSummary(),
+				$performedBy
+			);
 			return new JSONResponse(['success' => true, 'team' => $inserted->getSummary()], Http::STATUS_CREATED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::createTeam: ' . $e->getMessage(), ['exception' => $e]);
@@ -1569,10 +1711,22 @@ class AdminController extends Controller
 			if ($parentId === $id) {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('A team cannot be its own parent')], Http::STATUS_BAD_REQUEST);
 			}
+			$oldValues = $team->getSummary();
 			$team->setName($name);
 			$team->setParentId($parentId);
 			$team->setSortOrder($sortOrder);
 			$this->teamMapper->update($team);
+			$newValues = $team->getSummary();
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'team_updated',
+				'team',
+				$id,
+				$oldValues,
+				$newValues,
+				$performedBy
+			);
 			return new JSONResponse(['success' => true, 'team' => $team->getSummary()]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
@@ -1593,9 +1747,20 @@ class AdminController extends Controller
 					'error' => $this->l10n->t('Cannot delete a team that has sub-teams. Move or delete sub-teams first.')
 				], Http::STATUS_BAD_REQUEST);
 			}
+			$oldValues = $team->getSummary();
+			$performedBy = $this->getPerformedBy();
 			$this->teamMemberMapper->deleteByTeamId($id);
 			$this->teamManagerMapper->deleteByTeamId($id);
 			$this->teamMapper->delete($team);
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'team_deleted',
+				'team',
+				$id,
+				$oldValues,
+				null,
+				$performedBy
+			);
 			return new JSONResponse(['success' => true]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
@@ -1628,7 +1793,7 @@ class AdminController extends Controller
 			if ($userId === '') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User is required')], Http::STATUS_BAD_REQUEST);
 			}
-			$this->teamMapper->find($id);
+			$team = $this->teamMapper->find($id);
 			if ($this->userManager->get($userId) === null) {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_BAD_REQUEST);
 			}
@@ -1640,6 +1805,16 @@ class AdminController extends Controller
 			}
 			$this->teamMemberMapper->addMember($id, $userId);
 			$u = $this->userManager->get($userId);
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$userId,
+				'team_member_added',
+				'team_member',
+				$id,
+				null,
+				['teamId' => $id, 'teamName' => $team->getName(), 'userId' => $userId],
+				$performedBy
+			);
 			return new JSONResponse(['success' => true, 'member' => ['userId' => $userId, 'displayName' => $u ? $u->getDisplayName() : $userId]]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
@@ -1652,8 +1827,18 @@ class AdminController extends Controller
 	public function removeTeamMember(int $id, string $userId): JSONResponse
 	{
 		try {
-			$this->teamMapper->find($id);
+			$team = $this->teamMapper->find($id);
+			$performedBy = $this->getPerformedBy();
 			$this->teamMemberMapper->removeMember($id, $userId);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'team_member_removed',
+				'team_member',
+				$id,
+				['teamId' => $id, 'teamName' => $team->getName(), 'userId' => $userId],
+				null,
+				$performedBy
+			);
 			return new JSONResponse(['success' => true]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
@@ -1676,14 +1861,14 @@ class AdminController extends Controller
 		}
 	}
 
-	public function addTeamManager(int $id, string $userId): JSONResponse
+	public function addTeamManager(int $id): JSONResponse
 	{
 		try {
 			$userId = (string)($this->request->getParams()['userId'] ?? '');
 			if ($userId === '') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User is required')], Http::STATUS_BAD_REQUEST);
 			}
-			$this->teamMapper->find($id);
+			$team = $this->teamMapper->find($id);
 			if ($this->userManager->get($userId) === null) {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_BAD_REQUEST);
 			}
@@ -1695,6 +1880,16 @@ class AdminController extends Controller
 			}
 			$this->teamManagerMapper->addManager($id, $userId);
 			$u = $this->userManager->get($userId);
+			$performedBy = $this->getPerformedBy();
+			$this->auditLogMapper->logAction(
+				$userId,
+				'team_manager_added',
+				'team_manager',
+				$id,
+				null,
+				['teamId' => $id, 'teamName' => $team->getName(), 'userId' => $userId],
+				$performedBy
+			);
 			return new JSONResponse(['success' => true, 'manager' => ['userId' => $userId, 'displayName' => $u ? $u->getDisplayName() : $userId]]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
@@ -1707,8 +1902,18 @@ class AdminController extends Controller
 	public function removeTeamManager(int $id, string $userId): JSONResponse
 	{
 		try {
-			$this->teamMapper->find($id);
+			$team = $this->teamMapper->find($id);
+			$performedBy = $this->getPerformedBy();
 			$this->teamManagerMapper->removeManager($id, $userId);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'team_manager_removed',
+				'team_manager',
+				$id,
+				['teamId' => $id, 'teamName' => $team->getName(), 'userId' => $userId],
+				null,
+				$performedBy
+			);
 			return new JSONResponse(['success' => true]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);

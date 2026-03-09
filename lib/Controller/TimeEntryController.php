@@ -207,7 +207,7 @@ class TimeEntryController extends Controller
 						\OCP\Log\logger('arbeitszeitcheck')->error('Invalid start_date format: ' . $start_date, ['exception' => $e]);
 						return new JSONResponse([
 							'success' => false,
-							'error' => 'Invalid start date format'
+							'error' => $this->l10n->t('Invalid start date format')
 						], Http::STATUS_BAD_REQUEST);
 					}
 					try {
@@ -218,6 +218,12 @@ class TimeEntryController extends Controller
 						return new JSONResponse([
 							'success' => false,
 							'error' => $this->l10n->t('Invalid end date format')
+						], Http::STATUS_BAD_REQUEST);
+					}
+					if ($startDateTime > $endDateTime) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('Start date cannot be after end date')
 						], Http::STATUS_BAD_REQUEST);
 					}
 					$allEntries = $this->timeEntryMapper->findByUserAndDateRange($userId, $startDateTime, $endDateTime);
@@ -424,6 +430,9 @@ class TimeEntryController extends Controller
 	public function show(int $id): JSONResponse
 	{
 		try {
+			if ($id <= 0) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Invalid entry ID')], Http::STATUS_BAD_REQUEST);
+			}
 			$userId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($id);
 
@@ -469,6 +478,14 @@ class TimeEntryController extends Controller
 	{
 		try {
 			$userId = $this->getUserId();
+
+			// Reject invalid hours (ArbZG §3: max 10h/day, no negative/zero manual entries)
+			if ($hours <= 0 || $hours > 24) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Hours must be between 0.01 and 24')
+				], Http::STATUS_BAD_REQUEST);
+			}
 
 			$timeEntry = new TimeEntry();
 			$timeEntry->setUserId($userId);
@@ -622,6 +639,9 @@ class TimeEntryController extends Controller
 	public function update(int $id, ?string $date = null, ?float $hours = null, ?string $description = null, ?string $project_check_project_id = null): JSONResponse
 	{
 		try {
+			if ($id <= 0) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Invalid entry ID')], Http::STATUS_BAD_REQUEST);
+			}
 			$userId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($id);
 
@@ -860,6 +880,12 @@ class TimeEntryController extends Controller
 					$entry->setStartTime(new \DateTime($date));
 				}
 				if ($hours !== null) {
+					if ($hours <= 0 || $hours > 24) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('Hours must be between 0.01 and 24')
+						], Http::STATUS_BAD_REQUEST);
+					}
 					// Calculate end time based on hours from start time
 					if ($entry->getStartTime()) {
 						$startTime = clone $entry->getStartTime();
@@ -1397,6 +1423,9 @@ class TimeEntryController extends Controller
 	public function delete(int $id): JSONResponse
 	{
 		try {
+			if ($id <= 0) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Invalid entry ID')], Http::STATUS_BAD_REQUEST);
+			}
 			$userId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($id);
 
@@ -1477,10 +1506,24 @@ class TimeEntryController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			$start = $start_date ? new \DateTime($start_date) : (new \DateTime())->modify('-30 days');
-			$end = $end_date ? new \DateTime($end_date) : new \DateTime();
+			try {
+				$start = $start_date ? new \DateTime($start_date) : (new \DateTime())->modify('-30 days');
+				$end = $end_date ? new \DateTime($end_date) : new \DateTime();
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->error('Invalid date in getStats: ' . $e->getMessage(), ['exception' => $e]);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date format. Expected yyyy-mm-dd')
+				], Http::STATUS_BAD_REQUEST);
+			}
 			$start->setTime(0, 0, 0);
 			$end->setTime(23, 59, 59);
+			if ($start > $end) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Start date cannot be after end date')
+				], Http::STATUS_BAD_REQUEST);
+			}
 
 			$totalHours = $this->timeEntryMapper->getTotalHoursByUserAndDateRange($userId, $start, $end);
 			$totalBreakHours = $this->timeEntryMapper->getTotalBreakHoursByUserAndDateRange($userId, $start, $end);
@@ -2085,12 +2128,17 @@ class TimeEntryController extends Controller
 		if (!$start_date || !$end_date) {
 			throw new \Exception($this->l10n->t('Start date and end date are required for custom period'));
 		}
-
-		$start = new \DateTime($start_date);
+		try {
+			$start = new \DateTime($start_date);
+			$end = new \DateTime($end_date);
+		} catch (\Throwable $e) {
+			throw new \Exception($this->l10n->t('Invalid date format. Expected yyyy-mm-dd'));
+		}
 		$start->setTime(0, 0, 0);
-		$end = new \DateTime($end_date);
 		$end->setTime(23, 59, 59);
-
+		if ($start > $end) {
+			throw new \Exception($this->l10n->t('Start date cannot be after end date'));
+		}
 		return $overtimeService->calculateOvertime($userId, $start, $end);
 	}
 

@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCP\AppFramework\Controller;
@@ -37,6 +38,7 @@ class ComplianceController extends Controller
 
 	private ComplianceService $complianceService;
 	private ComplianceViolationMapper $violationMapper;
+	private AuditLogMapper $auditLogMapper;
 	private PermissionService $permissionService;
 	private IUserSession $userSession;
 	private IURLGenerator $urlGenerator;
@@ -47,6 +49,7 @@ class ComplianceController extends Controller
 		IRequest $request,
 		ComplianceService $complianceService,
 		ComplianceViolationMapper $violationMapper,
+		AuditLogMapper $auditLogMapper,
 		PermissionService $permissionService,
 		IUserSession $userSession,
 		IURLGenerator $urlGenerator,
@@ -56,6 +59,7 @@ class ComplianceController extends Controller
 		parent::__construct($appName, $request);
 		$this->complianceService = $complianceService;
 		$this->violationMapper = $violationMapper;
+		$this->auditLogMapper = $auditLogMapper;
 		$this->permissionService = $permissionService;
 		$this->userSession = $userSession;
 		$this->urlGenerator = $urlGenerator;
@@ -523,11 +527,25 @@ class ComplianceController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			$oldValues = $violation->getSummary();
+
 			// Mark as resolved using mapper's resolveViolation method
 			// Note: resolvedBy field is int, but Nextcloud user IDs are strings
 			// We set it to a hash of the user ID for tracking purposes
 			$resolvedByHash = abs(crc32($userId)) % PHP_INT_MAX; // Convert string to positive int
 			$updatedViolation = $this->violationMapper->resolveViolation($id, $resolvedByHash);
+
+			$newValues = $updatedViolation->getSummary();
+			$newValues['resolved_by_user_id'] = $userId;
+			$this->auditLogMapper->logAction(
+				$violationOwnerId,
+				'compliance_violation_resolved',
+				'compliance_violation',
+				$id,
+				$oldValues,
+				$newValues,
+				$userId
+			);
 
 			return new JSONResponse([
 				'success' => true,

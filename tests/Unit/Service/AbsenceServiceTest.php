@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
@@ -56,6 +57,9 @@ class AbsenceServiceTest extends TestCase
 	/** @var IUserManager|\PHPUnit\Framework\MockObject\MockObject */
 	private $userManager;
 
+	/** @var UserWorkingTimeModelMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $userWorkingTimeModelMapper;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -70,6 +74,7 @@ class AbsenceServiceTest extends TestCase
 		$this->config = $this->createMock(IConfig::class);
 		$this->config->method('getAppValue')->with('arbeitszeitcheck', 'require_substitute_types', '[]')->willReturn('[]');
 		$this->userManager = $this->createMock(IUserManager::class);
+		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
 
@@ -83,6 +88,7 @@ class AbsenceServiceTest extends TestCase
 			$this->auditLogMapper,
 			$this->userSettingsMapper,
 			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
 			$this->config,
 			$this->userManager,
 			$this->l10n,
@@ -108,6 +114,13 @@ class AbsenceServiceTest extends TestCase
 			->method('findOverlapping')
 			->with($userId, $this->isInstanceOf(\DateTime::class), $this->isInstanceOf(\DateTime::class), $this->anything())
 			->willReturn([]);
+
+		// Mock vacation entitlement (5 days requested, 10 remaining)
+		$this->absenceMapper->method('getVacationDaysUsed')->willReturn(15.0);
+		$this->absenceMapper->method('getSickLeaveDays')->willReturn(0.0);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userSettingsMapper->method('getIntegerSetting')
+			->with($userId, 'vacation_days_per_year', 25)->willReturn(25);
 
 		// Mock absence creation
 		$absence = $this->createMock(Absence::class);
@@ -214,6 +227,33 @@ class AbsenceServiceTest extends TestCase
 
 		$this->expectException(\Exception::class);
 		$this->expectExceptionMessage('Vacation cannot exceed 30 days');
+
+		$this->service->createAbsence($data, $userId);
+	}
+
+	/**
+	 * Test creating vacation absence when entitlement exceeded
+	 */
+	public function testCreateAbsenceVacationEntitlementExceeded(): void
+	{
+		$userId = 'testuser';
+		$data = [
+			'type' => Absence::TYPE_VACATION,
+			'start_date' => '2024-06-01',
+			'end_date' => '2024-06-05',
+			'reason' => 'No days left'
+		];
+
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		// 24 days used, 25 entitlement => 1 day remaining, but 5 requested
+		$this->absenceMapper->method('getVacationDaysUsed')->willReturn(24.0);
+		$this->absenceMapper->method('getSickLeaveDays')->willReturn(0.0);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userSettingsMapper->method('getIntegerSetting')
+			->with($userId, 'vacation_days_per_year', 25)->willReturn(25);
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('Not enough vacation days remaining');
 
 		$this->service->createAbsence($data, $userId);
 	}

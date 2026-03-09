@@ -41,7 +41,7 @@
 
 	<website>https://software-by-design.de</website>
 	<bugs>https://software-by-design.de</bugs>
-	<repository>https://github.com/aSoftwareByDesignRepository/nextcloud-projectcontroll.git</repository>
+	<repository>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git</repository>
 
 	<dependencies>
 		<!-- Compatible with Nextcloud 32, 33, 34, 35, 36 (current and future releases) -->

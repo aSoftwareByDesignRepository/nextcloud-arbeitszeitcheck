@@ -25,6 +25,62 @@ $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
                 <p><?php p($l->t('See how many employees are using the system and check for any problems with working time rules')); ?></p>
             </div>
 
+            <!-- Quick admin actions: make core HR tasks obvious -->
+            <div class="section-content admin-quick-actions">
+                <div class="card admin-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><?php p($l->t('Employees & Work Schedules')); ?></h3>
+                    </div>
+                    <div class="card-body">
+                        <p><?php p($l->t('Assign working time models and set vacation days per year for each employee.')); ?></p>
+                    </div>
+                    <div class="card-actions">
+                        <a href="<?php p(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.admin.users')); ?>"
+                           class="btn btn--primary"
+                           aria-label="<?php p($l->t('Open employee management to assign working time models and vacation entitlements')); ?>">
+                            <?php p($l->t('Manage Employees')); ?>
+                        </a>
+                        <a href="<?php p(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.admin.workingTimeModels')); ?>"
+                           class="btn btn--secondary"
+                           aria-label="<?php p($l->t('Open working time models to define standard schedules')); ?>">
+                            <?php p($l->t('Working Time Models')); ?>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card admin-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><?php p($l->t('Organization & Teams')); ?></h3>
+                    </div>
+                    <div class="card-body">
+                        <p><?php p($l->t('Configure teams and managers for approvals and compliance responsibilities.')); ?></p>
+                    </div>
+                    <div class="card-actions">
+                        <a href="<?php p(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.admin.teams')); ?>"
+                           class="btn btn--secondary"
+                           aria-label="<?php p($l->t('Open organization settings to configure teams and hierarchy')); ?>">
+                            <?php p($l->t('Open Organization')); ?>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card admin-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><?php p($l->t('Compliance & App Settings')); ?></h3>
+                    </div>
+                    <div class="card-body">
+                        <p><?php p($l->t('Adjust global compliance rules, notifications, and integration settings.')); ?></p>
+                    </div>
+                    <div class="card-actions">
+                        <a href="<?php p(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.admin.settings')); ?>"
+                           class="btn btn--secondary"
+                           aria-label="<?php p($l->t('Open admin settings to configure compliance and app behaviour')); ?>">
+                            <?php p($l->t('Admin Settings')); ?>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Statistics Cards -->
             <div class="stats-grid">
                 <div class="stat-card" 

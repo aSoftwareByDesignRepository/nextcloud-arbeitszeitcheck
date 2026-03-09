@@ -30,7 +30,7 @@ clean:
 sign:
 	@test -f ~/.nextcloud/certificates/$(app_name).key || (echo "Error: Run 'make release' first, then obtain certificate from https://github.com/nextcloud/app-certificate-requests"; exit 1)
 	@test -f ~/.nextcloud/certificates/$(app_name).crt || (echo "Error: Store signed certificate at ~/.nextcloud/certificates/$(app_name).crt"; exit 1)
-	php ../nextcloud/occ integrity:sign-app \
+	php ../../occ integrity:sign-app \
 		--privateKey=$$HOME/.nextcloud/certificates/$(app_name).key \
 		--certificate=$$HOME/.nextcloud/certificates/$(app_name).crt \
 		--path=$$(pwd)

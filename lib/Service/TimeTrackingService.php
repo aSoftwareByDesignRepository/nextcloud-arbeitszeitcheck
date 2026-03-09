@@ -896,6 +896,9 @@ class TimeTrackingService
 		
 		// If total daily working hours exceeds maximum, complete the entry automatically
 		if ($totalDailyWorkingHours >= $maxWorkingHours) {
+			$oldValues = $timeEntry->getSummary();
+			$oldValues['_reason'] = 'ArbZG §3: Auto-completing due to daily maximum (10h)';
+
 			// Calculate maximum allowed working hours for this entry
 			$maxAllowedWorkingHoursForEntry = max(0, $maxWorkingHours - $totalWorkingHoursFromPreviousEntries);
 			
@@ -964,6 +967,18 @@ class TimeTrackingService
 				'final_break_hours' => round($finalBreakHoursAfterCalculation, 2),
 				'required_break_minutes' => $requiredBreakMinutes
 			]);
+
+			$newValues = $timeEntry->getSummary();
+			$newValues['_reason'] = 'ArbZG §3: Auto-completed at daily maximum (10h)';
+			$this->auditLogMapper->logAction(
+				$userId,
+				'time_entry_auto_completed_daily_max',
+				'time_entry',
+				$timeEntry->getId(),
+				$oldValues,
+				$newValues,
+				'system'
+			);
 			
 			return true;
 		}

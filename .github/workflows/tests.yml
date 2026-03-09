@@ -2,20 +2,12 @@ name: ArbeitszeitCheck Tests
 
 on:
   push:
-    paths:
-      - "apps/arbeitszeitcheck/**"
   pull_request:
-    paths:
-      - "apps/arbeitszeitcheck/**"
 
 jobs:
   php-tests:
     name: PHP tests (ArbeitszeitCheck)
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: apps/arbeitszeitcheck
 
     steps:
       - name: Checkout repository
@@ -49,12 +41,8 @@ jobs:
         run: composer test:integration
 
   js-tests:
-    name: JavaScript/Vue tests (ArbeitszeitCheck)
+    name: JavaScript tests (ArbeitszeitCheck)
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: apps/arbeitszeitcheck
 
     steps:
       - name: Checkout repository
@@ -65,7 +53,6 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: apps/arbeitszeitcheck/package.json
 
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
@@ -83,10 +70,6 @@ jobs:
     name: Accessibility tests (ArbeitszeitCheck)
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: apps/arbeitszeitcheck
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -96,7 +79,6 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: apps/arbeitszeitcheck/package.json
 
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund

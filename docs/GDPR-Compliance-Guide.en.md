@@ -97,19 +97,14 @@ You must inform employees in clear language about:
 
 Recommended steps:
 
-1. Create an **internal data protection information sheet** for employees
-2. Reference ArbeitszeitCheck explicitly as the time tracking system
+1. Create an **internal data protection information sheet** for employees.
+2. Reference ArbeitszeitCheck explicitly as the time tracking system.
 3. Provide links to:
    - Internal documentation / intranet pages
    - The DPIA (summary) where appropriate
    - This GDPR compliance guide
 
-ArbeitszeitCheck does not automatically generate privacy notices, but the provided:
-
-- `docs/DPIA-Template.en.md`
-- `docs/Processing-Activities-Record-Template.en.md`
-
-can be used as a basis for your documentation.
+ArbeitszeitCheck does not generate privacy notices or legal templates. Reuse your organisation’s existing GDPR documentation (privacy notices, records of processing, DPIA) and add ArbeitszeitCheck there as the system used for time tracking and compliance.
 
 ## 5. Data Subject Rights in ArbeitszeitCheck
 
@@ -185,22 +180,15 @@ Map these to your Art. 32 TOMs document, including:
 
 ## 7. Documentation Obligations (Art. 30, 35 GDPR)
 
-ArbeitszeitCheck ships with documentation templates under `apps/arbeitszeitcheck/docs/`:
-
-- **DPIA template** (Art. 35 GDPR)
-  - `DPIA-Template.en.md`
-- **Record of processing activities template** (Art. 30 GDPR)
-  - `Processing-Activities-Record-Template.en.md`
-- **Works council agreement template (German)** (BetrVG §87)
-  - `Works-Council-Agreement-Template.de.md`
+ArbeitszeitCheck fits into your existing GDPR documentation; it does not replace it or ship legal templates.
 
 Recommended workflow:
 
-1. Complete the **record of processing activities** for time tracking
-2. Perform and document a **DPIA** if your DPO deems it necessary (often yes for employee time tracking)
-3. If a works council exists, adapt and negotiate the **Betriebsvereinbarung** template
+1. Extend your **record of processing activities** (Art. 30) to include ArbeitszeitCheck as a processing activity (time tracking, absence management, compliance monitoring).
+2. Perform and document a **DPIA** (Art. 35) if your DPO deems it necessary (often yes for employee time tracking) and explicitly reference ArbeitszeitCheck in scope and risk analysis.
+3. If a works council exists, document co-determination and any works council agreements (BetrVG §87) in your internal documentation.
 
-Store signed versions and final documents in your internal documentation system.
+Store signed versions and final documents in your internal documentation system (not in this app repository).
 
 ## 8. Works Council and Co-Determination (BetrVG §87)
 

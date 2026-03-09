@@ -5,8 +5,9 @@
 	"license": "AGPL-3.0-or-later",
 	"authors": [
 		{
-			"name": "Alexander Mähl",
-			"email": "alexander.maehl@example.com"
+			"name": "Alexander Mäule",
+			"email": "info@software-by-design.de",
+			"homepage": "https://software-by-design.de"
 		}
 	],
 	"require": {

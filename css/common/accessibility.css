@@ -1,0 +1,380 @@
+/**
+ * Accessibility Styles for ArbeitszeitCheck App
+ * 
+ * WCAG 2.1 AAA compliance styles:
+ * - Focus indicators
+ * - Screen reader utilities
+ * - Skip links
+ * - High contrast mode
+ * - Reduced motion
+ * 
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* ===== FOCUS INDICATORS (WCAG 2.1 AA 2.4.7 – Focus Visible) ===== */
+
+/* Focus-visible for keyboard navigation (WCAG 2.1 AA 2.4.7): 2px outline, 2px offset */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible,
+.btn:focus-visible,
+.form-input:focus-visible,
+.form-select:focus-visible,
+.form-textarea:focus-visible,
+.form-checkbox input:focus-visible,
+.form-radio input:focus-visible,
+.nav-link:focus-visible,
+.nav-menu a:focus-visible,
+.header__nav-link:focus-visible,
+.breadcrumb a:focus-visible,
+.btn-nav:focus-visible,
+.btn-close:focus-visible,
+.card-actions .btn:focus-visible,
+.form-actions .btn:focus-visible,
+.form-actions a:focus-visible {
+  outline: 2px solid var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
+  outline-offset: 2px;
+}
+
+/* Remove outline on mouse click only; keyboard keeps visible focus (WCAG 2.4.7) */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Fallback: when :focus-visible not supported, all focus gets outline so keyboard users aren't lost */
+@supports not selector(:focus-visible) {
+  a:focus,
+  button:focus,
+  input:focus,
+  select:focus,
+  textarea:focus,
+  [tabindex="0"]:focus {
+    outline: 2px solid var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
+    outline-offset: 2px;
+  }
+}
+
+/* Ensure focus indicators are visible in all themes */
+@media (prefers-color-scheme: dark) {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-color: var(--arbeitszeitcheck-color-primary);
+  }
+}
+
+/* ===== SCREEN READER UTILITIES ===== */
+
+/* Screen Reader Only (visually hidden but available to assistive tech) */
+.sr-only,
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
+}
+
+/* Screen Reader Only - Focusable (visible when focused) */
+.sr-only-focusable:active,
+.sr-only-focusable:focus,
+.visually-hidden-focusable:active,
+.visually-hidden-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  clip-path: none !important;
+  white-space: normal !important;
+}
+
+/* ===== SKIP LINKS ===== */
+
+/* Skip link is already styled in base.css, but ensure it's accessible */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--arbeitszeitcheck-color-primary);
+  color: var(--arbeitszeitcheck-color-text-inverse);
+  padding: var(--space-2) var(--space-4);
+  text-decoration: none;
+  border-radius: var(--radius-base);
+  z-index: 10000;
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  transition: top 0.2s ease-in-out;
+  min-height: 44px; /* WCAG touch target size */
+  display: flex;
+  align-items: center;
+}
+
+.skip-link:focus {
+  top: 6px;
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ===== HIGH CONTRAST MODE SUPPORT ===== */
+
+@media (prefers-contrast: high) {
+  /* Increase border visibility */
+  .btn,
+  .form-input,
+  .form-select,
+  .form-textarea {
+    border-width: 2px;
+  }
+
+  /* Ensure navigation links have visible borders */
+  .nav-link,
+  .nav-menu a {
+    border: 1px solid transparent;
+  }
+
+  .nav-link:hover,
+  .nav-menu a:hover {
+    border-color: var(--arbeitszeitcheck-color-text);
+  }
+
+  .nav-link.active,
+  .nav-menu a.active,
+  [aria-current="page"] {
+    border-color: var(--arbeitszeitcheck-color-primary);
+    border-width: 2px;
+  }
+
+  /* Ensure buttons have visible borders */
+  .btn {
+    border: 2px solid var(--arbeitszeitcheck-color-text);
+  }
+
+  /* Increase focus indicator visibility */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+}
+
+/* ===== REDUCED MOTION SUPPORT ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential transitions for usability */
+  .skip-link:focus {
+    transition: top 0.01ms !important;
+  }
+}
+
+/* ===== TOUCH TARGET SIZE (WCAG 2.5.5 AA - minimum 44x44px, prefer 48x48) ===== */
+
+/* Ensure all interactive elements meet minimum touch target for security-critical time tracking */
+.btn:not(.btn--sm),
+.nav-link,
+.nav-menu a,
+button:not(.btn--sm),
+a[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Primary/danger actions: larger for clarity and reduced mis-taps (WCAG 2.5.5) */
+.btn--primary,
+.btn--danger,
+.card-actions .btn--primary,
+.card-actions .btn--danger,
+.btn-clock-out {
+  min-height: 48px;
+  padding: var(--space-3) var(--space-6);
+}
+
+/* Small buttons still accessible but can be smaller */
+.btn--sm {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+/* Ensure sufficient spacing between interactive elements */
+.nav-item + .nav-item,
+.nav-menu li + li {
+  margin-top: var(--space-1); /* Small gap between touch targets */
+}
+
+/* ===== FOCUS-WITHIN FOR CONTAINERS ===== */
+
+/* Form groups with focus */
+.form-group:focus-within {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-base);
+}
+
+/* Card focus */
+.card:focus-within {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ===== ARIA LIVE REGIONS ===== */
+
+/* Ensure live regions are properly styled */
+[role="status"],
+[role="alert"],
+[aria-live] {
+  /* Live regions should be visible but can be styled as needed */
+}
+
+[aria-live="polite"] {
+  /* Polite announcements - less intrusive */
+}
+
+[aria-live="assertive"] {
+  /* Assertive announcements - more prominent */
+}
+
+/* ===== LANDMARK ROLES ===== */
+
+/* Ensure landmarks are properly identified */
+[role="navigation"],
+[role="main"],
+[role="complementary"],
+[role="contentinfo"],
+[role="banner"],
+nav,
+main,
+aside,
+footer,
+header {
+  /* Landmarks should be properly styled */
+}
+
+/* ===== KEYBOARD NAVIGATION ENHANCEMENTS ===== */
+
+/* Ensure focusable elements are visible when focused */
+[tabindex="-1"]:focus {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Modal focus trap - ensure focus stays within modal */
+.modal[aria-modal="true"]:focus-within {
+  /* Modal should trap focus */
+}
+
+/* ===== COLOR CONTRAST ENHANCEMENTS (WCAG 2.1 AA) ===== */
+
+/* Ensure text has sufficient contrast - scoped to app content only */
+#app-content-wrapper .text-muted,
+#app-content-wrapper .text-secondary {
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+/* Links: sufficient contrast, scoped to app so we don't override Nextcloud UI */
+#app-content-wrapper a:not(.btn) {
+  color: var(--arbeitszeitcheck-color-primary);
+  text-decoration: underline;
+}
+
+#app-content-wrapper a:not(.btn):hover,
+#app-content-wrapper a:not(.btn):focus {
+  color: var(--arbeitszeitcheck-color-primary-hover);
+  text-decoration: underline;
+}
+
+/* ===== FORM ACCESSIBILITY ===== */
+
+/* Required field indicators */
+.form-label .required,
+.form-required {
+  color: var(--arbeitszeitcheck-color-error);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+}
+
+/* Error states should be clearly visible */
+.form-input--error,
+.form-group--error input,
+.form-group--error select,
+.form-group--error textarea {
+  border-color: var(--arbeitszeitcheck-color-error);
+  border-width: 2px;
+}
+
+/* Error messages should be associated */
+.form-error[role="alert"] {
+  color: var(--arbeitszeitcheck-color-error);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+}
+
+/* ===== TABLE ACCESSIBILITY ===== */
+
+/* Ensure tables are accessible */
+table[role="table"] {
+  /* Tables should have proper structure */
+}
+
+th[scope] {
+  /* Table headers should have scope attributes */
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+}
+
+/* ===== ICON ACCESSIBILITY ===== */
+
+/* Icon-only buttons should have proper labels */
+.icon-only,
+[aria-label] {
+  /* Icon-only buttons should have aria-label */
+}
+
+/* Decorative icons should be hidden from screen readers */
+.icon-decorative,
+[aria-hidden="true"] {
+  /* Decorative elements should be hidden */
+}
+
+/* ===== RESPONSIVE ACCESSIBILITY ===== */
+
+@media (max-width: 768px) {
+  /* Ensure touch targets remain accessible on mobile */
+  .btn,
+  .nav-link,
+  button,
+  a[role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Increase spacing between touch targets on mobile */
+  .nav-item + .nav-item,
+  .btn + .btn {
+    margin-top: var(--space-2);
+  }
+}

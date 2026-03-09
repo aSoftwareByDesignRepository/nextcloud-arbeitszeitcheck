@@ -1,0 +1,276 @@
+/**
+ * ArbeitszeitCheck Vanilla CSS
+ * Clean, minimal styles for the PHP-based dashboard
+ */
+
+.arbeitszeitcheck-dashboard {
+    padding: 20px;
+}
+
+.arbeitszeitcheck-dashboard__header {
+    margin-bottom: 20px;
+}
+
+.arbeitszeitcheck-dashboard__header h2 {
+    margin: 0 0 10px 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.arbeitszeitcheck-dashboard__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.arbeitszeitcheck-card {
+    background: var(--color-main-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    padding: 20px;
+    box-shadow: 0 2px 4px var(--color-box-shadow);
+}
+
+.arbeitszeitcheck-card__title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--color-main-text);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    margin-bottom: 15px;
+}
+
+.status-badge.active { background-color: var(--color-success-background); color: var(--color-success-text); }
+.status-badge.break { background-color: var(--color-warning-background); color: var(--color-warning-text); }
+.status-badge.clocked_out { background-color: var(--color-background-darker); color: var(--color-text-maxcontrast); }
+
+.session-timer {
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+}
+
+.timer-value {
+    font-family: monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    display: block;
+    margin-top: 5px;
+    color: var(--color-primary);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.action-buttons button {
+    padding: 8px 16px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--color-border);
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.action-buttons button:hover {
+    background: var(--color-background-hover);
+}
+
+.action-buttons button.primary {
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+    border-color: var(--color-primary);
+}
+
+.action-buttons button.primary:hover {
+    background: var(--color-primary-element);
+}
+
+.action-buttons button.error {
+    background: var(--color-error);
+    color: white;
+    border-color: var(--color-error);
+}
+
+.action-buttons button.error:hover {
+    background: var(--color-error-dark, var(--color-error));
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.stat-value {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.stat-value.positive { color: var(--color-success); }
+.stat-value.negative { color: var(--color-error); }
+
+.arbeitszeitcheck-section {
+    margin-bottom: 30px;
+}
+
+.arbeitszeitcheck-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.arbeitszeitcheck-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: var(--color-main-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.arbeitszeitcheck-table th,
+.arbeitszeitcheck-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.arbeitszeitcheck-table th {
+    background-color: var(--color-background-hover);
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.arbeitszeitcheck-table tbody tr:hover {
+    background-color: var(--color-background-hover);
+}
+
+.badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    /* Use Nextcloud standard variables for theme compatibility */
+    background-color: var(--color-background-hover, var(--color-background-dark, #f0f0f0));
+    color: var(--color-main-text, var(--color-text, #000));
+}
+
+.badge.status-completed,
+.badge--success { 
+    background-color: var(--color-success, #46ba61); 
+    color: var(--color-success-text, var(--color-main-background, #ffffff)); 
+}
+
+.badge.status-active,
+.badge--primary { 
+    background-color: var(--color-primary-element, var(--color-primary, #0082c9)); 
+    color: var(--color-primary-element-text, var(--color-primary-text, #ffffff)); 
+}
+
+.badge.status-break,
+.badge--warning { 
+    background-color: var(--color-warning, #eca700); 
+    color: var(--color-warning-text, var(--color-main-background, #ffffff)); 
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--color-text-maxcontrast);
+    font-style: italic;
+    padding: 20px;
+}
+
+.arbeitszeitcheck-header {
+    margin-bottom: 20px;
+}
+
+.arbeitszeitcheck-header h2 {
+    margin: 0 0 10px 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.arbeitszeitcheck-content {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .arbeitszeitcheck-dashboard__grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .arbeitszeitcheck-card {
+        padding: 15px;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .action-buttons button {
+        width: 100%;
+    }
+
+    .arbeitszeitcheck-table {
+        font-size: 0.9rem;
+    }
+
+    .arbeitszeitcheck-table th,
+    .arbeitszeitcheck-table td {
+        padding: 8px;
+    }
+
+    .arbeitszeitcheck-placeholder {
+        padding: 20px 15px;
+    }
+}
+
+/* Placeholder styling */
+.arbeitszeitcheck-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    background: var(--color-main-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.arbeitszeitcheck-placeholder h2 {
+    color: var(--color-main-text);
+    margin-bottom: 20px;
+}
+
+.arbeitszeitcheck-placeholder p {
+    color: var(--color-text-maxcontrast);
+    line-height: 1.6;
+}

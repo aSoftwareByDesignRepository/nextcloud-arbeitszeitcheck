@@ -1,0 +1,2088 @@
+/* Component Library for ArbeitszeitCheck App
+ * Provides reusable UI components with consistent styling and behavior
+ * Follows projectcheck pattern with arbeitszeitcheck-specific CSS variables
+ */
+
+/* ===== BUTTON COMPONENTS ===== */
+
+/* Button Base Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px; /* Minimum touch target size for accessibility (WCAG 2.5.5) */
+  min-width: 44px; /* Minimum touch target size for accessibility */
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.btn:focus {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Button Variants */
+.btn--primary {
+  background-color: var(--arbeitszeitcheck-color-button-primary);
+  border-color: var(--arbeitszeitcheck-color-button-primary);
+  color: var(--arbeitszeitcheck-color-button-primary-text);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-primary-hover);
+  border-color: var(--arbeitszeitcheck-color-button-primary-hover);
+}
+
+.btn--primary:active:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-primary-active);
+  border-color: var(--arbeitszeitcheck-color-button-primary-active);
+}
+
+.btn--secondary {
+  background-color: var(--arbeitszeitcheck-color-button-secondary);
+  border-color: var(--arbeitszeitcheck-color-border);
+  color: var(--arbeitszeitcheck-color-button-secondary-text);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-secondary-hover);
+  border-color: var(--arbeitszeitcheck-color-border);
+}
+
+.btn--secondary:active:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-secondary-active);
+  border-color: var(--arbeitszeitcheck-color-border);
+}
+
+.btn--tertiary {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--arbeitszeitcheck-color-primary);
+}
+
+.btn--tertiary:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-primary-light);
+  border-color: transparent;
+}
+
+.btn--danger {
+  background-color: var(--arbeitszeitcheck-color-button-danger);
+  border-color: var(--arbeitszeitcheck-color-button-danger);
+  color: var(--arbeitszeitcheck-color-button-danger-text);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-danger-hover);
+  border-color: var(--arbeitszeitcheck-color-button-danger-hover);
+}
+
+.btn--success {
+  background-color: var(--arbeitszeitcheck-color-success);
+  border-color: var(--arbeitszeitcheck-color-success);
+  color: var(--arbeitszeitcheck-color-text-inverse);
+}
+
+.btn--success:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-success-hover);
+  border-color: var(--arbeitszeitcheck-color-success-hover);
+}
+
+.btn--warning {
+  background-color: var(--arbeitszeitcheck-color-warning);
+  border-color: var(--arbeitszeitcheck-color-warning);
+  color: var(--arbeitszeitcheck-color-text-inverse);
+}
+
+.btn--warning:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-warning-hover);
+  border-color: var(--arbeitszeitcheck-color-warning-hover);
+}
+
+/* Button Sizes */
+.btn--sm {
+  min-height: 36px; /* Slightly smaller but still accessible */
+  min-width: 36px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  border-radius: var(--radius-sm);
+}
+
+.btn--lg {
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  border-radius: var(--radius-lg);
+}
+
+/* Button States */
+.btn--loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn--loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: btn-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Button Groups */
+.btn-group {
+  display: inline-flex;
+  border-radius: var(--radius-base);
+  overflow: hidden;
+}
+
+.btn-group .btn {
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: var(--radius-base);
+  border-bottom-left-radius: var(--radius-base);
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: var(--radius-base);
+  border-bottom-right-radius: var(--radius-base);
+  border-right-width: 1px;
+}
+
+/* Legacy button class support */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.button.primary,
+.btn-primary {
+  background-color: var(--arbeitszeitcheck-color-button-primary);
+  border-color: var(--arbeitszeitcheck-color-button-primary);
+  color: var(--arbeitszeitcheck-color-button-primary-text);
+}
+
+.button.primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-primary-hover);
+  border-color: var(--arbeitszeitcheck-color-button-primary-hover);
+}
+
+.button.secondary,
+.btn-secondary {
+  background-color: var(--arbeitszeitcheck-color-button-secondary);
+  border-color: var(--arbeitszeitcheck-color-border);
+  color: var(--arbeitszeitcheck-color-button-secondary-text);
+}
+
+.button.secondary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-secondary-hover);
+}
+
+.button.error,
+.btn-danger {
+  background-color: var(--arbeitszeitcheck-color-button-danger);
+  border-color: var(--arbeitszeitcheck-color-button-danger);
+  color: var(--arbeitszeitcheck-color-button-danger-text);
+}
+
+.button.error:hover:not(:disabled),
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--arbeitszeitcheck-color-button-danger-hover);
+  border-color: var(--arbeitszeitcheck-color-button-danger-hover);
+}
+
+.button.small,
+.btn-small {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+/* ===== FORM COMPONENTS ===== */
+
+/* Form Container */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form--horizontal {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.form--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Form Group */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-6, 1.5rem);
+  position: relative;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group--horizontal {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Form Label */
+.form-label,
+.form-group label {
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  color: var(--arbeitszeitcheck-color-form-label);
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+  display: block;
+  margin-bottom: var(--space-2, 0.5rem);
+  margin-top: 0;
+}
+
+.form-label--required::after,
+.form-group label.required::after {
+  content: ' *';
+  color: var(--arbeitszeitcheck-color-form-required);
+}
+
+.form-required {
+  color: var(--arbeitszeitcheck-color-error);
+  margin-left: var(--space-1);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+}
+
+/* Form Input */
+.form-input,
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group input[type="time"],
+.form-group input[type="datetime-local"],
+.form-group input[type="password"],
+.form-group input[type="url"],
+.form-group input[type="tel"] {
+  display: block;
+  width: 100%;
+  min-height: 44px; /* Minimum touch target size for accessibility (WCAG 2.5.5) */
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+  color: var(--arbeitszeitcheck-color-text);
+  background-color: var(--arbeitszeitcheck-color-form-background);
+  border: 1px solid var(--arbeitszeitcheck-color-form-border);
+  border-radius: var(--radius-base);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  box-sizing: border-box;
+}
+
+.form-input:focus,
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--arbeitszeitcheck-color-form-border-focus);
+  box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-primary-light);
+  outline: none;
+}
+
+.form-input:disabled,
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+  color: var(--arbeitszeitcheck-color-text-muted);
+  cursor: not-allowed;
+}
+
+.form-input--error,
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: var(--arbeitszeitcheck-color-form-border-error);
+}
+
+.form-input--error:focus,
+.form-group input.error:focus,
+.form-group select.error:focus,
+.form-group textarea.error:focus {
+  border-color: var(--arbeitszeitcheck-color-form-border-error);
+  box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-error-light);
+}
+
+.form-input--success {
+  border-color: var(--arbeitszeitcheck-color-form-border-success);
+}
+
+.form-input--success:focus {
+  border-color: var(--arbeitszeitcheck-color-form-border-success);
+  box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-success-light);
+}
+
+.form-input--warning {
+  border-color: var(--arbeitszeitcheck-color-border-warning);
+}
+
+.form-input--warning:focus {
+  border-color: var(--arbeitszeitcheck-color-border-warning);
+  box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-warning-light);
+}
+
+/* Form Textarea */
+.form-textarea,
+.form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-textarea--large {
+  min-height: 150px;
+  width: 100%;
+}
+
+/* Form Select */
+.form-select,
+.form-group select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right var(--space-2) center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: var(--space-8);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  height: 48px;
+  line-height: 48px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.form-input.form-select {
+  padding: 0 1rem;
+  padding-right: 2.5rem;
+  background-position: right 0.75rem center;
+  background-size: 1.25em 1.25em;
+  height: 48px;
+  line-height: 48px;
+  vertical-align: middle;
+}
+
+.form-select::-ms-expand {
+  display: none;
+}
+
+.form-select option {
+  padding: 0.5rem;
+  line-height: 1.4;
+  background-color: var(--arbeitszeitcheck-color-background);
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+html[data-theme="dark"] .form-select,
+html[data-theme="dark"] .form-select option,
+html[data-theme="dark"] .form-input.form-select,
+html[data-theme="dark"] .form-input.form-select option,
+body[data-theme-dark] .form-select,
+body[data-theme-dark] .form-select option,
+body[data-theme-dark-highcontrast] .form-select,
+body[data-theme-dark-highcontrast] .form-select option,
+body[data-theme-dark] .form-input.form-select,
+body[data-theme-dark] .form-input.form-select option,
+body[data-theme-dark-highcontrast] .form-input.form-select,
+body[data-theme-dark-highcontrast] .form-input.form-select option {
+  background-color: var(--arbeitszeitcheck-color-background);
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+/* Form Checkbox and Radio */
+.form-checkbox,
+.form-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.form-checkbox input[type="checkbox"],
+.form-radio input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.form-checkbox input[type="checkbox"]:focus,
+.form-radio input[type="radio"]:focus {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Form Input Group (for inputs with buttons) */
+.form-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.form-input-group .form-input {
+  flex: 1;
+}
+
+.form-input-group .btn {
+  flex-shrink: 0;
+}
+
+/* Break Entry Styling - Base styles, can be overridden in page-specific CSS */
+.break-entry {
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.break-entry:last-child,
+.break-entry:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Form Validation */
+.form-error-container {
+  margin-top: var(--space-2);
+}
+
+.form-error,
+.field-error {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-error);
+  background-color: var(--arbeitszeitcheck-color-error-light);
+  border: 1px solid var(--arbeitszeitcheck-color-border-error);
+  border-radius: var(--radius-base);
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.form-error__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.form-error__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-error__title {
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-error);
+  margin: 0;
+}
+
+.form-error__description {
+  margin: 0;
+  color: var(--arbeitszeitcheck-color-text);
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* Input error state */
+.form-input--error,
+.form-input.form-input--error,
+.form-select.form-input--error {
+  border-color: var(--arbeitszeitcheck-color-border-error);
+  background-color: var(--arbeitszeitcheck-color-error-light);
+}
+
+.form-input--error:focus,
+.form-input.form-input--error:focus,
+.form-select.form-input--error:focus {
+  border-color: var(--arbeitszeitcheck-color-border-error);
+  box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-error-light);
+  outline: none;
+}
+
+/* Legacy support */
+.form-error::before,
+.field-error::before {
+  content: '';
+  width: 1rem;
+  height: 1rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3e%3cpath stroke='%23ef4444' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: contain;
+  flex-shrink: 0;
+  display: none; /* Hide if using new structure with icon */
+}
+
+.form-warning {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-warning);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.form-warning::before {
+  content: '';
+  width: 1rem;
+  height: 1rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3e%3cpath stroke='%23f59e0b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
+.form-success {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-success);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.form-success::before {
+  content: '';
+  width: 1rem;
+  height: 1rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3e%3cpath stroke='%2310b981' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
+.form-help,
+.setting-hint {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-form-help);
+  margin-top: var(--space-2, 0.5rem);
+  margin-bottom: 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed, 1.6);
+}
+
+.form-group--error .form-label {
+  color: var(--arbeitszeitcheck-color-error);
+}
+
+.form-group--warning .form-label {
+  color: var(--arbeitszeitcheck-color-warning);
+}
+
+.form-group--success .form-label {
+  color: var(--arbeitszeitcheck-color-success);
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--arbeitszeitcheck-color-border);
+}
+
+.form-actions--left {
+  justify-content: flex-start;
+}
+
+.form-actions--center {
+  justify-content: center;
+}
+
+.form-actions--space-between {
+  justify-content: space-between;
+}
+
+/* ===== CARD COMPONENTS ===== */
+
+/* Card Base */
+.card {
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.15s ease-in-out;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Card Variants */
+.card--elevated {
+  box-shadow: var(--shadow-md);
+}
+
+.card--elevated:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.card--outlined {
+  box-shadow: none;
+  border-width: 2px;
+}
+
+.card--flat {
+  box-shadow: none;
+  border: none;
+}
+
+/* Card Header */
+.card-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.card-header--compact {
+  padding: var(--space-3);
+}
+
+.card-title {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: var(--space-1) 0 0 0;
+}
+
+/* Card Body */
+.card-body,
+.card-content {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.card-body--compact {
+  padding: var(--space-3);
+}
+
+/* Card Footer */
+.card-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+}
+
+.card-footer--compact {
+  padding: var(--space-3);
+}
+
+/* Card Actions */
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.card-actions--left {
+  justify-content: flex-start;
+}
+
+.card-actions--center {
+  justify-content: center;
+}
+
+.card-actions--space-between {
+  justify-content: space-between;
+}
+
+/* ===== TABLE COMPONENTS ===== */
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Table Base */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+/* Table Header */
+.table thead {
+  background-color: var(--arbeitszeitcheck-color-table-header-background);
+}
+
+.table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-table-border);
+  white-space: nowrap;
+}
+
+.table th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+
+.table th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* Table Body */
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-table-border);
+  color: var(--arbeitszeitcheck-color-text);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Table Variants */
+.table--striped tbody tr:nth-child(even) {
+  background-color: var(--arbeitszeitcheck-color-table-stripe);
+}
+
+.table--bordered td,
+.table--bordered th {
+  border: 1px solid var(--arbeitszeitcheck-color-table-border);
+}
+
+.table--compact td,
+.table--compact th {
+  padding: var(--space-2) var(--space-3);
+}
+
+.table--hover tbody tr:hover {
+  background-color: var(--arbeitszeitcheck-color-table-row-hover);
+}
+
+/* Table Responsive */
+@media (max-width: 768px) {
+  .table-responsive,
+  .table-container {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-responsive .table,
+  .table-container .table {
+    min-width: 600px;
+  }
+}
+
+/* ===== MODAL COMPONENTS ===== */
+
+/* Modal Backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--arbeitszeitcheck-color-modal-overlay);
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+/* Modal */
+.modal {
+  background-color: var(--arbeitszeitcheck-color-modal-background);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2xl);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-modal);
+}
+
+/* Modal Variants */
+.modal--sm {
+  width: 400px;
+}
+
+.modal--md {
+  width: 600px;
+}
+
+.modal--lg {
+  width: 800px;
+}
+
+.modal--xl {
+  width: 1000px;
+}
+
+.modal--fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Modal Responsive */
+@media (max-width: 768px) {
+  .modal {
+    max-width: 95vw;
+    max-height: 95vh;
+    margin: var(--space-2);
+  }
+
+  .modal--sm,
+  .modal--md,
+  .modal--lg,
+  .modal--xl {
+    width: 100%;
+    max-width: 95vw;
+  }
+
+  .modal-header {
+    padding: var(--space-3);
+  }
+
+  .modal-body {
+    padding: var(--space-3);
+  }
+
+  .modal-footer {
+    padding: var(--space-3);
+  }
+
+  .modal-title {
+    font-size: var(--arbeitszeitcheck-font-size-base);
+  }
+
+  .modal-close {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-modal-border);
+  background-color: var(--arbeitszeitcheck-color-modal-header-background);
+}
+
+.modal-title {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+  color: var(--arbeitszeitcheck-color-text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-base);
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: var(--arbeitszeitcheck-color-text);
+  background-color: var(--arbeitszeitcheck-color-background-tertiary);
+}
+
+/* Modal Body */
+.modal-body {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Modal Footer */
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-top: 1px solid var(--arbeitszeitcheck-color-modal-border);
+  background-color: var(--arbeitszeitcheck-color-modal-footer-background);
+}
+
+.modal-footer--left {
+  justify-content: flex-start;
+}
+
+.modal-footer--center {
+  justify-content: center;
+}
+
+.modal-footer--space-between {
+  justify-content: space-between;
+}
+
+/* ===== ALERT COMPONENTS ===== */
+
+/* Alert Base */
+.alert {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Alert Variants */
+.alert--success {
+  background-color: var(--arbeitszeitcheck-color-notification-success-background);
+  border-color: var(--arbeitszeitcheck-color-notification-success);
+  color: var(--arbeitszeitcheck-color-success-dark);
+}
+
+.alert--error {
+  background-color: var(--arbeitszeitcheck-color-notification-error-background);
+  border-color: var(--arbeitszeitcheck-color-notification-error);
+  color: var(--arbeitszeitcheck-color-error-dark);
+}
+
+.alert--warning {
+  background-color: var(--arbeitszeitcheck-color-notification-warning-background);
+  border-color: var(--arbeitszeitcheck-color-notification-warning);
+  color: var(--arbeitszeitcheck-color-warning-dark);
+}
+
+.alert--info {
+  background-color: var(--arbeitszeitcheck-color-notification-info-background);
+  border-color: var(--arbeitszeitcheck-color-notification-info);
+  color: var(--arbeitszeitcheck-color-info-dark);
+}
+
+/* Alert Icon */
+.alert-icon {
+  flex-shrink: 0;
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+}
+
+/* Alert Content */
+.alert-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-title {
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.alert-message {
+  margin: 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* Alert Dismissible */
+.alert--dismissible {
+  padding-right: var(--space-8);
+  position: relative;
+}
+
+.alert-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: none;
+  border: none;
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  color: currentColor;
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-base);
+  opacity: 0.7;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.alert-close:hover {
+  opacity: 1;
+}
+
+/* ===== TOAST COMPONENTS ===== */
+
+/* Toast Container */
+.toast-container {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 400px;
+}
+
+/* Toast */
+.toast {
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  animation: toast-slide-in 0.3s ease-out;
+  max-width: 100%;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+}
+
+.toast--show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast--removing {
+  animation: toast-slide-out 0.3s ease-in forwards;
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Toast Variants */
+.toast--success {
+  border-left: 4px solid var(--arbeitszeitcheck-color-success);
+}
+
+.toast--error {
+  border-left: 4px solid var(--arbeitszeitcheck-color-error);
+}
+
+.toast--warning {
+  border-left: 4px solid var(--arbeitszeitcheck-color-warning);
+}
+
+.toast--info {
+  border-left: 4px solid var(--arbeitszeitcheck-color-info);
+}
+
+/* Toast Icon */
+.toast-icon {
+  flex-shrink: 0;
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+}
+
+.toast--success .toast-icon {
+  color: var(--arbeitszeitcheck-color-success);
+}
+
+.toast--error .toast-icon {
+  color: var(--arbeitszeitcheck-color-error);
+}
+
+.toast--warning .toast-icon {
+  color: var(--arbeitszeitcheck-color-warning);
+}
+
+.toast--info .toast-icon {
+  color: var(--arbeitszeitcheck-color-info);
+}
+
+/* Toast Content */
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  margin: 0 0 var(--space-1) 0;
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+.toast-message {
+  margin: 0;
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* Toast Close */
+.toast-close {
+  background: none;
+  border: none;
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  color: var(--arbeitszeitcheck-color-text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-base);
+  opacity: 0.7;
+  transition: opacity 0.15s ease-in-out;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  opacity: 1;
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+/* ===== LOADING COMPONENTS ===== */
+
+/* Loading Spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--arbeitszeitcheck-color-border);
+  border-radius: 50%;
+  border-top-color: var(--arbeitszeitcheck-color-loading-spinner);
+  animation: spinner-spin 0.6s linear infinite;
+}
+
+@keyframes spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner--sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 1.5px;
+}
+
+.loading-spinner--lg {
+  width: 2rem;
+  height: 2rem;
+  border-width: 3px;
+}
+
+/* Legacy loading class */
+.loading {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--arbeitszeitcheck-color-background-secondary);
+  border-top: 2px solid var(--arbeitszeitcheck-color-loading-spinner);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--arbeitszeitcheck-color-background-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+/* Loading Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--arbeitszeitcheck-color-background-secondary) 25%, var(--arbeitszeitcheck-color-background-tertiary) 50%, var(--arbeitszeitcheck-color-background-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: var(--radius-base);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton--text {
+  height: 1em;
+  margin-bottom: var(--space-2);
+}
+
+.skeleton--title {
+  height: 1.5em;
+  margin-bottom: var(--space-3);
+}
+
+.skeleton--button {
+  height: 2.5rem;
+  width: 100px;
+}
+
+.skeleton--avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+}
+
+/* ===== UTILITY COMPONENTS ===== */
+
+/* Divider */
+.divider {
+  height: 1px;
+  background-color: var(--arbeitszeitcheck-color-border);
+  margin: var(--space-4) 0;
+  border: none;
+}
+
+.divider--vertical {
+  width: 1px;
+  height: auto;
+  margin: 0 var(--space-4);
+}
+
+/* Badge - Compatible with all Nextcloud themes */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  font-size: var(--arbeitszeitcheck-font-size-xs, 0.75rem);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
+  line-height: var(--arbeitszeitcheck-line-height-none, 1);
+  border-radius: var(--radius-full, 9999px);
+  white-space: nowrap;
+  /* Nextcloud theme variables only (no hex fallbacks for theme compatibility) */
+  background-color: var(--color-background-hover);
+  color: var(--color-main-text);
+}
+
+.badge--primary {
+  background-color: var(--color-primary-element);
+  color: var(--color-primary-element-text);
+}
+
+.badge--secondary {
+  background-color: var(--color-background-hover);
+  color: var(--color-text-maxcontrast);
+}
+
+.badge--success {
+  background-color: var(--color-success);
+  color: var(--color-success-text);
+}
+
+.badge--warning {
+  background-color: var(--color-warning);
+  color: var(--color-warning-text);
+}
+
+.badge--error {
+  background-color: var(--color-error);
+  color: var(--color-error-text);
+}
+
+/* Avatar */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: var(--arbeitszeitcheck-color-primary);
+  color: var(--arbeitszeitcheck-color-text-inverse);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  overflow: hidden;
+}
+
+.avatar--sm {
+  width: 2rem;
+  height: 2rem;
+  font-size: var(--arbeitszeitcheck-font-size-xs);
+}
+
+.avatar--lg {
+  width: 3rem;
+  height: 3rem;
+  font-size: var(--arbeitszeitcheck-font-size-base);
+}
+
+.avatar--xl {
+  width: 4rem;
+  height: 4rem;
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Tooltip */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--arbeitszeitcheck-color-gray-900);
+  color: var(--arbeitszeitcheck-color-text-inverse);
+  font-size: var(--arbeitszeitcheck-font-size-xs);
+  border-radius: var(--radius-base);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+  z-index: var(--z-tooltip);
+  margin-bottom: var(--space-1);
+}
+
+.tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--arbeitszeitcheck-color-gray-900);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+  z-index: var(--z-tooltip);
+  margin-bottom: var(--space-1);
+}
+
+.tooltip:hover::after,
+.tooltip:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ===== APP CONTENT LAYOUT (clear sections, simple UX) ===== */
+
+/* Main content wrapper: full width on desktop, clear padding */
+#app-content-wrapper {
+  width: 100%;
+  min-width: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Content section: clearly separated blocks for easy scanning */
+#app-content-wrapper .section {
+  margin-bottom: var(--space-10);
+  padding: var(--space-8);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+#app-content-wrapper .section:last-child {
+  margin-bottom: 0;
+}
+
+/* Section header: obvious title + optional description */
+#app-content-wrapper .section-header {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--arbeitszeitcheck-color-border);
+}
+
+#app-content-wrapper .section-header h2,
+#app-content-wrapper .section-header h3 {
+  font-size: var(--arbeitszeitcheck-font-size-2xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+#app-content-wrapper .section-header p {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* ===== BREADCRUMBS ===== */
+.breadcrumb-container {
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-4);
+}
+
+.breadcrumb {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.breadcrumb ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+.breadcrumb li {
+  display: flex;
+  align-items: center;
+  color: var(--arbeitszeitcheck-color-text-tertiary);
+}
+
+.breadcrumb li:not(:last-child)::after {
+  content: '/';
+  margin-left: var(--space-2);
+  color: var(--arbeitszeitcheck-color-text-tertiary);
+  opacity: 0.5;
+}
+
+.breadcrumb a {
+  color: var(--arbeitszeitcheck-color-primary);
+  text-decoration: none;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  transition: color 0.2s ease;
+}
+
+.breadcrumb a:hover {
+  color: var(--arbeitszeitcheck-color-primary-hover);
+  text-decoration: underline;
+}
+
+.breadcrumb li[aria-current="page"] {
+  color: var(--arbeitszeitcheck-color-text);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+}
+
+/* ===== PAGE HEADER SECTION ===== */
+.page-header-section {
+  background: linear-gradient(135deg,
+          var(--arbeitszeitcheck-color-primary-lighter) 0%,
+          var(--arbeitszeitcheck-color-background-secondary) 100%);
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin-bottom: var(--space-12);
+  overflow: visible !important;
+}
+
+.section.page-header-section {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--space-10) var(--space-8);
+  gap: var(--space-8);
+}
+
+.header-text {
+  flex: 1;
+}
+
+.header-text h2 {
+  font-size: var(--arbeitszeitcheck-font-size-4xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+  margin: 0 0 var(--space-3) 0;
+  color: var(--arbeitszeitcheck-color-text);
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+}
+
+.header-text p {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* ===== EMPTY STATE COMPONENTS ===== */
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  color: var(--arbeitszeitcheck-color-text-tertiary);
+}
+
+.empty-state__icon {
+  width: 4rem;
+  height: 4rem;
+  background-color: var(--arbeitszeitcheck-color-primary-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-6) auto;
+  font-size: 2rem;
+  color: var(--arbeitszeitcheck-color-primary);
+  opacity: 0.6;
+}
+
+.empty-state__title {
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  margin: 0 0 var(--space-2) 0;
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+.empty-state__description {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  margin: 0 0 var(--space-6) 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  max-width: 32rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.empty-state .btn {
+  margin-top: var(--space-4);
+}
+
+/* Responsive Components */
+@media (max-width: 768px) {
+  .form--horizontal,
+  .form--inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-group--horizontal {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .card-actions {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .modal-footer {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .toast-container {
+    left: var(--space-4);
+    right: var(--space-4);
+    max-width: none;
+  }
+
+  .header-content {
+    flex-direction: column;
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .empty-state {
+    padding: var(--space-8) var(--space-4);
+  }
+}
+
+/* ===== PENDING APPROVALS (MANAGER DASHBOARD) ===== */
+.pending-approvals-list {
+  margin-top: var(--space-4);
+}
+
+.pending-approvals-loading {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.pending-approvals-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pending-approval-card {
+  background: var(--arbeitszeitcheck-color-background-card, var(--color-main-background));
+  border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  border-radius: var(--radius-base);
+  padding: var(--space-4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.pending-approval-card__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.pending-approval-card__title {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  flex: 1 1 100%;
+}
+
+.pending-approval-card__meta {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  flex: 1 1 100%;
+}
+
+.pending-approval-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+  margin-top: var(--space-2);
+}
+
+.pending-approval-card__meta--small {
+  font-size: var(--arbeitszeitcheck-font-size-xs, 0.8125rem);
+}
+
+.pending-approval-card__reason {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  flex: 1 1 100%;
+}
+
+@media (min-width: 640px) {
+  .pending-approval-card__title { flex: 1 1 auto; }
+  .pending-approval-card__meta { flex: 0 0 auto; }
+  .pending-approval-card__actions { flex: 0 0 auto; margin-top: 0; }
+}
+
+/* Manager dashboard: tabs */
+.pending-approvals-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+}
+
+.pending-approvals-tab {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  cursor: pointer;
+  margin-bottom: -1px;
+  border-radius: 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pending-approvals-tab:hover {
+  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+}
+
+.pending-approvals-tab--active {
+  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+  border-bottom-color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+  font-weight: 600;
+}
+
+.pending-approvals-tab:focus-visible {
+  outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+  outline-offset: 2px;
+}
+
+.pending-approvals-panel {
+  padding-top: var(--space-2);
+}
+
+.pending-approvals-panel--hidden {
+  display: none;
+}
+
+/* Manager dashboard: layout & stats */
+.manager-dashboard__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.manager-dashboard__header {
+  margin-bottom: 0;
+}
+
+.manager-dashboard__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 var(--space-2);
+}
+
+.manager-dashboard__subtitle {
+  margin: 0;
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.manager-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+
+.manager-stat-card {
+  min-width: 0;
+}
+
+/* Team compliance */
+.team-compliance-content {
+  margin-top: var(--space-4);
+}
+
+.team-compliance-loading {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary)));
+}
+
+.team-compliance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.team-compliance-stat {
+  background: var(--arbeitszeitcheck-color-background-card, var(--color-main-background));
+  border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  border-radius: var(--radius-base);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.team-compliance-stat__value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--color-main-text)));
+}
+
+.team-compliance-stat__label {
+  display: block;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+.team-compliance-stat--ok {
+  border-left-width: 4px;
+  border-left-color: var(--color-success, #2fb344);
+}
+
+.team-compliance-stat--warning {
+  border-left-width: 4px;
+  border-left-color: var(--color-warning, #eca700);
+}
+
+.team-compliance-stat--error {
+  border-left-width: 4px;
+  border-left-color: var(--color-error, #e9322d);
+}
+
+.team-compliance-stat--info {
+  border-left-width: 4px;
+  border-left-color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+}
+
+.team-compliance-stat--has-issues {
+  border-color: var(--color-warning, #eca700);
+}
+
+.team-compliance-stat.team-compliance-stat--error.team-compliance-stat--has-issues {
+  border-color: var(--color-error, #e9322d);
+}
+
+.team-compliance-note {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.team-compliance-note--success {
+  color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary)));
+  border-left: 3px solid var(--color-success, #2fb344);
+  padding-left: var(--space-2);
+}
+
+.team-compliance-empty {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+/* Reject modal */
+.reject-modal-desc {
+  margin: 0 0 var(--space-3);
+}
+
+.reject-modal-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  border-radius: var(--radius-base);
+  font-family: inherit;
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  margin-bottom: var(--space-4);
+  resize: vertical;
+}
+
+.reject-modal-textarea:focus {
+  outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+  outline-offset: 2px;
+}
+
+.reject-modal-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Section spacing */
+.manager-dashboard .section {
+  margin-bottom: var(--space-6);
+}
+
+.manager-dashboard .section:last-child {
+  margin-bottom: 0;
+}
+
+.manager-dashboard .section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+
+.manager-dashboard .section-header .section__desc {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+@media (min-width: 640px) {
+  .manager-dashboard__title {
+    font-size: 2rem;
+  }
+}
+
+/* ===== SUBSTITUTION REQUESTS (Vertretungs-Freigabe) ===== */
+.substitution-requests-page .substitution-requests__header {
+  margin-bottom: var(--space-6);
+}
+
+.substitution-requests__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 var(--space-2);
+}
+
+.substitution-requests__desc {
+  margin: 0;
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.substitution-requests-content {
+  margin-top: var(--space-4);
+}
+
+.substitution-requests-loading {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.substitution-requests-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.substitution-request-card {
+  background: var(--arbeitszeitcheck-color-background-card, var(--color-main-background));
+  border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  border-radius: var(--radius-base);
+  padding: var(--space-4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.substitution-request-card__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.substitution-request-card__title {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  flex: 1 1 100%;
+}
+
+.substitution-request-card__meta {
+  margin: 0;
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  flex: 1 1 100%;
+}
+
+.substitution-request-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+  margin-top: var(--space-2);
+}
+
+.substitution-requests-empty {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.substitution-requests-empty p {
+  margin: 0 0 var(--space-2);
+}
+
+.substitution-requests-empty__hint {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+@media (min-width: 640px) {
+  .substitution-request-card__title { flex: 1 1 auto; }
+  .substitution-request-card__meta { flex: 0 0 auto; }
+  .substitution-request-card__actions { flex: 0 0 auto; margin-top: 0; }
+  .substitution-requests__title { font-size: 2rem; }
+}

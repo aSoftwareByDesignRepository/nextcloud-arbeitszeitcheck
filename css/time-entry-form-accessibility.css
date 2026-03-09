@@ -1,0 +1,403 @@
+/**
+ * Time Entry Form Accessibility Styles
+ * 
+ * WCAG 2.1 AAA compliance styles for the time entry form
+ * 
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* ===== FOCUS INDICATORS (WCAG 2.1 AAA requires 2px minimum) ===== */
+
+/* Focus-visible for keyboard navigation (modern browsers) */
+#time-entry-form a:focus-visible,
+#time-entry-form button:focus-visible,
+#time-entry-form input:focus-visible,
+#time-entry-form select:focus-visible,
+#time-entry-form textarea:focus-visible,
+#time-entry-form [tabindex]:focus-visible,
+#time-entry-form .btn:focus-visible,
+#time-entry-form .form-input:focus-visible,
+#time-entry-form .form-select:focus-visible,
+#time-entry-form .form-textarea:focus-visible,
+#time-entry-form .time-input-group select:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Fallback for older browsers */
+#time-entry-form a:focus:not(:focus-visible),
+#time-entry-form button:focus:not(:focus-visible),
+#time-entry-form input:focus:not(:focus-visible),
+#time-entry-form select:focus:not(:focus-visible),
+#time-entry-form textarea:focus:not(:focus-visible) {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  #time-entry-form a:focus-visible,
+  #time-entry-form button:focus-visible,
+  #time-entry-form input:focus-visible,
+  #time-entry-form select:focus-visible,
+  #time-entry-form textarea:focus-visible {
+    outline: 3px solid;
+    outline-offset: 3px;
+  }
+}
+
+/* ===== TOUCH TARGETS (WCAG 2.1 AAA requires minimum 44x44px) ===== */
+
+#time-entry-form .btn,
+#time-entry-form .form-input,
+#time-entry-form .form-select,
+#time-entry-form .time-input-group select {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+#time-entry-form .time-input-group select {
+  min-width: 60px; /* Wider for time selects */
+}
+
+/* ===== COLOR CONTRAST (WCAG 2.1 AAA: 7:1 for normal text, 4.5:1 for large) ===== */
+
+/* Ensure error messages have high contrast */
+#time-entry-form .form-error {
+  color: var(--color-error);
+  background-color: var(--color-background-dark);
+  border: 1px solid var(--color-error);
+}
+
+#time-entry-form .form-error__title {
+  font-weight: 600;
+  color: var(--color-error);
+}
+
+/* Success messages */
+#time-entry-form .form-success {
+  color: var(--color-main-text);
+  background-color: var(--color-background-dark);
+  border: 1px solid var(--color-success);
+}
+
+/* Warning messages */
+#time-entry-form .form-warning {
+  color: var(--color-main-text);
+  background-color: var(--color-background-dark);
+  border: 1px solid var(--color-warning);
+}
+
+/* ===== NO COLOR-ONLY INFORMATION ===== */
+
+/* Ensure error states use icons + text, not just color */
+#time-entry-form .form-input--error {
+  border-color: var(--color-error);
+  border-width: 2px;
+}
+
+#time-entry-form .form-input--error::before {
+  content: "⚠ ";
+  color: var(--color-error);
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+/* Status indicators with icons and text */
+#time-entry-form .compliance-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+#time-entry-form .compliance-status.compliant::before {
+  content: "✓ ";
+  font-weight: bold;
+}
+
+#time-entry-form .compliance-status.warning::before {
+  content: "⚠ ";
+  font-weight: bold;
+}
+
+#time-entry-form .compliance-status.violation::before {
+  content: "✗ ";
+  font-weight: bold;
+}
+
+/* ===== TEXT RESIZING (WCAG 2.1 AAA: must work at 200% zoom) ===== */
+
+/* Ensure form remains usable at 200% zoom */
+@media screen and (min-resolution: 192dpi) {
+  #time-entry-form {
+    max-width: 100%;
+  }
+  
+  #time-entry-form .form-grid {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  
+  #time-entry-form .time-input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* ===== HIGH CONTRAST MODE ===== */
+
+@media (prefers-contrast: high) {
+  #time-entry-form .form-input,
+  #time-entry-form .form-select,
+  #time-entry-form .form-textarea {
+    border: 2px solid;
+  }
+  
+  #time-entry-form .btn {
+    border: 2px solid;
+  }
+  
+  #time-entry-form .form-label {
+    font-weight: 600;
+  }
+}
+
+/* ===== REDUCED MOTION ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  #time-entry-form *,
+  #time-entry-form *::before,
+  #time-entry-form *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  #time-entry-form .form-error {
+    transition: none;
+  }
+}
+
+/* ===== SCREEN READER UTILITIES ===== */
+
+#time-entry-form .sr-only,
+#time-entry-form .visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
+}
+
+#time-entry-form .sr-only-focusable:focus,
+#time-entry-form .visually-hidden-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip-path: none !important;
+  white-space: normal !important;
+}
+
+/* ===== LIVE REGIONS ===== */
+
+#time-entry-form [role="status"],
+#time-entry-form [role="alert"],
+#time-entry-form [aria-live] {
+  /* Ensure live regions are properly announced */
+  position: relative;
+}
+
+/* ===== TIME INPUT GROUP ACCESSIBILITY ===== */
+
+#time-entry-form .time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#time-entry-form .time-separator {
+  font-weight: bold;
+  font-size: 1.2em;
+  padding: 0 2px;
+}
+
+/* Ensure time selects are properly labeled */
+#time-entry-form .time-input-group[aria-label] {
+  /* Group label for screen readers */
+}
+
+/* ===== REAL-TIME FEEDBACK ===== */
+
+#time-entry-form #time-summary,
+#time-entry-form .time-summary-card {
+  background-color: var(--color-main-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 1px 3px var(--color-border);
+}
+
+#time-entry-form .time-summary-title {
+  margin: 0 0 12px 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--color-main-text);
+}
+
+#time-entry-form #time-summary .summary-row,
+#time-entry-form .time-summary-card .summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+#time-entry-form #time-summary .summary-row:last-child,
+#time-entry-form .time-summary-card .summary-row:last-child {
+  border-bottom: none;
+}
+
+#time-entry-form #time-summary .summary-label,
+#time-entry-form .time-summary-card .summary-label {
+  font-weight: 500;
+  color: var(--color-main-text);
+}
+
+#time-entry-form #time-summary .summary-value,
+#time-entry-form .time-summary-card .summary-value {
+  font-weight: 600;
+  color: var(--color-main-text);
+  font-size: 1.1em;
+}
+
+#time-entry-form .compliance-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#time-entry-form .compliance-status.compliant {
+  background-color: var(--color-background-dark);
+  color: var(--color-main-text);
+  border: 1px solid var(--color-success);
+}
+
+#time-entry-form .compliance-status.warning {
+  background-color: var(--color-background-dark);
+  color: var(--color-main-text);
+  border: 1px solid var(--color-warning);
+}
+
+#time-entry-form .compliance-status.violation {
+  background-color: var(--color-background-dark);
+  color: var(--color-main-text);
+  border: 1px solid var(--color-error);
+}
+
+/* Warning messages */
+#time-entry-form .form-warning,
+#time-entry-form .compliance-warning {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+#time-entry-form .form-warning__icon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+#time-entry-form .form-warning__content {
+  flex: 1;
+}
+
+#time-entry-form .form-warning__content strong {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+#time-entry-form .form-warning__content p {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+/* ===== SKIP LINK ===== */
+
+#time-entry-form-skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-primary-element);
+  color: var(--color-primary-element-text);
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 100;
+  border-radius: 4px;
+}
+
+#time-entry-form-skip-link:focus {
+  top: 0;
+}
+
+/* ===== FORM INPUT WRAPPER (for Today button) ===== */
+
+#time-entry-form .form-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#time-entry-form .form-input-wrapper .form-input {
+  flex: 1;
+}
+
+#time-entry-form .form-input-wrapper .btn {
+  flex-shrink: 0;
+  min-width: auto;
+  padding: 8px 16px;
+}
+
+/* ===== MOBILE ACCESSIBILITY ===== */
+
+@media (max-width: 768px) {
+  /* Ensure all interactive elements are easily tappable on mobile */
+  #time-entry-form .btn {
+    min-height: 48px; /* Larger on mobile for easier tapping */
+    padding: 12px 16px;
+  }
+  
+  #time-entry-form .form-input,
+  #time-entry-form .form-select {
+    min-height: 48px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  #time-entry-form .time-input-group select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+}

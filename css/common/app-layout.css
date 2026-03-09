@@ -1,0 +1,491 @@
+/**
+ * App layout and section styling for ArbeitszeitCheck
+ * Clear sections, simple UX, WCAG 2.1 AA friendly.
+ * Easy to identify blocks, generous spacing, readable hierarchy.
+ *
+ * Pattern: TicketCheck-style full-width layout. Uses #content.app-arbeitszeitcheck
+ * as ancestor for higher specificity so our rules win over page-specific CSS.
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* ===== FULL VIEWPORT LAYOUT (100% WIDTH, BELOW HEADER, SCROLLABLE) ===== */
+/* Override Nextcloud theming. Nextcloud #header is 50px; #content needs margin-top to sit below it.
+   We set --body-container-margin: 0 for full width but preserve margin-top for header clearance. */
+
+#content.app-arbeitszeitcheck {
+  --body-container-margin: 0;
+  --body-container-radius: 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  margin-top: 50px !important; /* Clear Nextcloud header (--header-height) */
+  padding: 0 !important;
+  overflow: hidden; /* Contain flex children; scrolling happens in #app-content */
+}
+
+/* ===== APP WRAPPER: FILL #content, ENABLE SCROLL IN CHILDREN ===== */
+#content.app-arbeitszeitcheck #arbeitszeitcheck-app,
+#content.app-arbeitszeitcheck .arbeitszeitcheck-app {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== APP-CONTENT & WRAPPER (100% WIDTH, SCROLLABLE) ===== */
+/* Content area fills remaining space; scrolls when content overflows.
+   min-height: 0 is critical for flex children to allow overflow/scroll. */
+
+#content.app-arbeitszeitcheck #app-content {
+  background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+  flex: 1 1 0;
+  min-height: 0; /* Allow flex child to shrink; enables overflow-y: auto */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+#content.app-arbeitszeitcheck #app-content-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-6) var(--space-6) var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-sizing: border-box;
+}
+
+/* ===== BREADCRUMB - Clear navigation context ===== */
+
+.breadcrumb-container {
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-2);
+}
+
+.breadcrumb ol {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+}
+
+.breadcrumb a {
+  color: var(--arbeitszeitcheck-color-primary);
+  text-decoration: none;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-base);
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb a:focus-visible {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+.breadcrumb li[aria-current="page"] {
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+}
+
+.breadcrumb li:not(:last-child)::after {
+  content: '/';
+  margin-left: var(--space-2);
+  color: var(--arbeitszeitcheck-color-text-tertiary);
+  font-weight: normal;
+}
+
+/* ===== PAGE HEADER SECTION (clear hierarchy: one title + short description) ===== */
+
+.page-header-section {
+  margin-bottom: var(--space-10);
+  padding: var(--space-8) 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.page-header-section .header-text p {
+  max-width: 52ch;
+  line-height: 1.6;
+}
+
+.page-header-section .header-content {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.page-header-section .header-text h2 {
+  font-size: var(--arbeitszeitcheck-font-size-3xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0 0 var(--space-3) 0;
+  letter-spacing: -0.02em;
+}
+
+.page-header-section .header-text p,
+.page-description {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  line-height: 1.6;
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.page-description {
+  margin-top: var(--space-1);
+}
+
+.page-header-section .header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ===== SECTIONS (clear, easy-to-identify blocks — simple UX, WCAG 2.1 AA) ===== */
+
+#app-content-wrapper > .section {
+  margin-bottom: var(--space-12);
+  padding: var(--space-8) var(--space-8);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  /* Generous spacing: easy to scan, even for users with low vision */
+}
+
+#app-content-wrapper > .section:focus-within {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Section left accent: quick visual scanning (border + bar, not only color — WCAG 1.4.11) */
+#app-content-wrapper > .section:not(.page-header-section)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--space-5);
+  bottom: var(--space-5);
+  width: 5px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--arbeitszeitcheck-color-primary);
+  opacity: 0.85;
+}
+
+/* Section title: large and bold so sections are easy to identify */
+#app-content-wrapper .section__title {
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0 0 var(--space-2) 0;
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-tight);
+}
+
+#app-content-wrapper > .section:last-child {
+  margin-bottom: 0;
+}
+
+/* Page header is a section but without card look */
+#app-content-wrapper > .section.page-header-section {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: var(--space-4) 0;
+}
+
+#app-content-wrapper > .section.page-header-section::before {
+  display: none;
+}
+
+/* Section header: title + optional description */
+#app-content-wrapper .section-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--arbeitszeitcheck-color-border);
+}
+
+#app-content-wrapper .section-header h2,
+#app-content-wrapper .section-header h3 {
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0;
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+}
+
+#app-content-wrapper .section-header p {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: var(--space-1) 0 0 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* ===== CARDS INSIDE SECTIONS ===== */
+
+#app-content-wrapper .card {
+  margin-bottom: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+#app-content-wrapper .card:last-child {
+  margin-bottom: 0;
+}
+
+#app-content-wrapper .card-header {
+  margin-bottom: var(--space-4);
+}
+
+#app-content-wrapper .card-title {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0;
+}
+
+#app-content-wrapper .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ===== EMPTY STATE ===== */
+
+#app-content-wrapper .empty-state {
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+}
+
+#app-content-wrapper .empty-state__title,
+#app-content-wrapper .empty-state p:first-child {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+#app-content-wrapper .empty-state__description,
+#app-content-wrapper .empty-state-description,
+#app-content-wrapper .empty-state p.empty-state-description {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  margin: 0 0 var(--space-4) 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+  max-width: 40ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 768px) {
+  #app-content-wrapper {
+    padding: var(--space-5) var(--space-4) var(--space-12);
+  }
+
+  #app-content-wrapper > .section {
+    padding: var(--space-6) var(--space-5);
+    margin-bottom: var(--space-10);
+    border-radius: var(--radius-xl);
+  }
+
+  #app-content-wrapper > .section::before {
+    top: var(--space-4);
+    bottom: var(--space-4);
+    width: 4px;
+  }
+
+  .page-header-section {
+    margin-bottom: var(--space-6);
+    padding: var(--space-4) 0;
+  }
+
+  .page-header-section .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+
+  .page-header-section .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header-section .header-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #app-content-wrapper .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  #app-content-wrapper .section__title {
+    font-size: var(--arbeitszeitcheck-font-size-lg);
+  }
+
+  .settings-container {
+    gap: var(--space-8);
+  }
+
+  .settings-section {
+    padding: var(--space-4) 0;
+  }
+
+  #app-content-wrapper .section-title,
+  #app-content-wrapper .settings-section .section-title {
+    font-size: var(--arbeitszeitcheck-font-size-base);
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .info-box {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app-content-wrapper > .section::before {
+    transition: none;
+  }
+}
+
+/* ===== SETTINGS & SUBSECTIONS (clear, scannable blocks) ===== */
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  max-width: 52rem;
+}
+
+.settings-section {
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-section:first-child {
+  padding-top: 0;
+}
+
+/* Section title: one clear heading per block (WCAG: heading hierarchy) */
+#app-content-wrapper .section-title,
+#app-content-wrapper .settings-section .section-title {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+  color: var(--arbeitszeitcheck-color-text);
+  margin: 0 0 var(--space-4) 0;
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+  letter-spacing: -0.01em;
+}
+
+.setting-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.setting-item:last-child {
+  margin-bottom: 0;
+}
+
+.setting-item label {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+  color: var(--arbeitszeitcheck-color-text-secondary);
+  min-width: 10ch;
+}
+
+.setting-value {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+/* Info box: read-only notice (e.g. "assigned by admin") — high visibility, not only color */
+.info-box {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--arbeitszeitcheck-color-border);
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+  color: var(--arbeitszeitcheck-color-text);
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+.info-box h4 {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  margin: 0 0 var(--space-2) 0;
+  color: var(--arbeitszeitcheck-color-text);
+}
+
+.info-box p,
+.info-box ul {
+  margin: 0 0 var(--space-2) 0;
+}
+
+.info-box ul:last-child,
+.info-box p:last-child {
+  margin-bottom: 0;
+}
+
+.info-box ul {
+  padding-left: var(--space-6);
+}
+
+/* Spacing between section content and next section title */
+.settings-section .form,
+.settings-section .card-actions,
+.settings-section .form-actions {
+  margin-top: 0;
+}
+
+.settings-section .section-title + .form,
+.settings-section .section-title + .info-box {
+  margin-top: var(--space-2);
+}

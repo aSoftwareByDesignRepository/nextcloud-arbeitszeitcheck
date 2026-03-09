@@ -1,0 +1,555 @@
+/* Typography System for ArbeitszeitCheck App
+ * Follows Nextcloud's design system and ensures readability across all devices
+ */
+
+:root {
+  /* Font Family Variables */
+  --arbeitszeitcheck-font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --arbeitszeitcheck-font-family-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --arbeitszeitcheck-font-family-serif: Georgia, Cambria, "Times New Roman", Times, serif;
+
+  /* Font Size Scale */
+  --arbeitszeitcheck-font-size-xs: 0.75rem; /* 12px */
+  --arbeitszeitcheck-font-size-sm: 0.875rem; /* 14px */
+  --arbeitszeitcheck-font-size-base: 1rem; /* 16px */
+  --arbeitszeitcheck-font-size-lg: 1.125rem; /* 18px */
+  --arbeitszeitcheck-font-size-xl: 1.25rem; /* 20px */
+  --arbeitszeitcheck-font-size-2xl: 1.5rem; /* 24px */
+  --arbeitszeitcheck-font-size-3xl: 1.875rem; /* 30px */
+  --arbeitszeitcheck-font-size-4xl: 2.25rem; /* 36px */
+  --arbeitszeitcheck-font-size-5xl: 3rem; /* 48px */
+  --arbeitszeitcheck-font-size-6xl: 3.75rem; /* 60px */
+
+  /* Font Weight Scale */
+  --arbeitszeitcheck-font-weight-thin: 100;
+  --arbeitszeitcheck-font-weight-extralight: 200;
+  --arbeitszeitcheck-font-weight-light: 300;
+  --arbeitszeitcheck-font-weight-normal: 400;
+  --arbeitszeitcheck-font-weight-medium: 500;
+  --arbeitszeitcheck-font-weight-semibold: 600;
+  --arbeitszeitcheck-font-weight-bold: 700;
+  --arbeitszeitcheck-font-weight-extrabold: 800;
+  --arbeitszeitcheck-font-weight-black: 900;
+
+  /* Line Height Scale */
+  --arbeitszeitcheck-line-height-none: 1;
+  --arbeitszeitcheck-line-height-tight: 1.25;
+  --arbeitszeitcheck-line-height-snug: 1.375;
+  --arbeitszeitcheck-line-height-normal: 1.5;
+  --arbeitszeitcheck-line-height-relaxed: 1.625;
+  --arbeitszeitcheck-line-height-loose: 2;
+
+  /* Letter Spacing */
+  --arbeitszeitcheck-letter-spacing-tighter: -0.05em;
+  --arbeitszeitcheck-letter-spacing-tight: -0.025em;
+  --arbeitszeitcheck-letter-spacing-normal: 0em;
+  --arbeitszeitcheck-letter-spacing-wide: 0.025em;
+  --arbeitszeitcheck-letter-spacing-wider: 0.05em;
+  --arbeitszeitcheck-letter-spacing-widest: 0.1em;
+
+  /* Text Colors - Reference arbeitszeitcheck color variables */
+  --arbeitszeitcheck-text-color-primary: var(--arbeitszeitcheck-color-text);
+  --arbeitszeitcheck-text-color-secondary: var(--arbeitszeitcheck-color-text-secondary);
+  --arbeitszeitcheck-text-color-tertiary: var(--arbeitszeitcheck-color-text-tertiary);
+  --arbeitszeitcheck-text-color-muted: var(--arbeitszeitcheck-color-text-muted);
+  --arbeitszeitcheck-text-color-inverse: var(--arbeitszeitcheck-color-text-inverse);
+  --arbeitszeitcheck-text-color-link: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-text-color-link-hover: var(--arbeitszeitcheck-color-primary-hover);
+
+  /* Heading Styles */
+  --arbeitszeitcheck-heading-font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+  --arbeitszeitcheck-heading-line-height: var(--arbeitszeitcheck-line-height-tight);
+  --arbeitszeitcheck-heading-letter-spacing: var(--arbeitszeitcheck-letter-spacing-tight);
+  --arbeitszeitcheck-heading-color: var(--arbeitszeitcheck-text-color-primary);
+
+  /* Body Text Styles */
+  --arbeitszeitcheck-body-font-size: var(--arbeitszeitcheck-font-size-base);
+  --arbeitszeitcheck-body-font-weight: var(--arbeitszeitcheck-font-weight-normal);
+  --arbeitszeitcheck-body-line-height: var(--arbeitszeitcheck-line-height-normal);
+  --arbeitszeitcheck-body-color: var(--arbeitszeitcheck-text-color-primary);
+
+  /* Link Styles */
+  --arbeitszeitcheck-link-color: var(--arbeitszeitcheck-text-color-link);
+  --arbeitszeitcheck-link-color-hover: var(--arbeitszeitcheck-text-color-link-hover);
+  --arbeitszeitcheck-link-decoration: underline;
+  --arbeitszeitcheck-link-decoration-hover: none;
+  --arbeitszeitcheck-link-transition: color 0.15s ease-in-out;
+}
+
+/* Base Typography */
+html {
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: 16px;
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-size: var(--arbeitszeitcheck-body-font-size);
+  font-weight: var(--arbeitszeitcheck-body-font-weight);
+  line-height: var(--arbeitszeitcheck-body-line-height);
+  color: var(--arbeitszeitcheck-body-color);
+  text-rendering: optimizeLegibility;
+}
+
+/* Heading Styles */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+  font-weight: var(--arbeitszeitcheck-heading-font-weight);
+  line-height: var(--arbeitszeitcheck-heading-line-height);
+  letter-spacing: var(--arbeitszeitcheck-heading-letter-spacing);
+  color: var(--arbeitszeitcheck-heading-color);
+  margin: 0 0 1rem 0;
+}
+
+h1 {
+  font-size: var(--arbeitszeitcheck-font-size-4xl);
+  margin-bottom: 1.5rem;
+}
+
+h2 {
+  font-size: var(--arbeitszeitcheck-font-size-3xl);
+  margin-bottom: 1.25rem;
+}
+
+h3 {
+  font-size: var(--arbeitszeitcheck-font-size-2xl);
+  margin-bottom: 1rem;
+}
+
+h4 {
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+  margin-bottom: 0.75rem;
+}
+
+h5 {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+  margin-bottom: 0.5rem;
+}
+
+h6 {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-wide);
+}
+
+/* Paragraph Styles */
+p {
+  margin: 0 0 1rem 0;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+/* Link Styles - Scoped to app content only to avoid affecting Nextcloud navigation */
+#app-content-wrapper a {
+  color: var(--arbeitszeitcheck-link-color);
+  text-decoration: var(--arbeitszeitcheck-link-decoration);
+  transition: var(--arbeitszeitcheck-link-transition);
+}
+
+#app-content-wrapper a:hover {
+  color: var(--arbeitszeitcheck-link-color-hover);
+  text-decoration: var(--arbeitszeitcheck-link-decoration-hover);
+}
+
+#app-content-wrapper a:focus {
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* List Styles - Scoped to app content only to avoid affecting Nextcloud navigation */
+#app-content-wrapper ul,
+#app-content-wrapper ol {
+  margin: 0 0 1rem 0;
+  padding-left: 1.5rem;
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+#app-content-wrapper ul {
+  list-style-type: disc;
+}
+
+#app-content-wrapper ol {
+  list-style-type: decimal;
+}
+
+#app-content-wrapper li {
+  margin-bottom: 0.25rem;
+}
+
+#app-content-wrapper li:last-child {
+  margin-bottom: 0;
+}
+
+/* Code Styles */
+code {
+  font-family: var(--arbeitszeitcheck-font-family-mono);
+  font-size: 0.875em;
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  color: var(--arbeitszeitcheck-text-color-primary);
+}
+
+pre {
+  font-family: var(--arbeitszeitcheck-font-family-mono);
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+  background-color: var(--arbeitszeitcheck-color-background-secondary);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0 0 1rem 0;
+}
+
+pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Blockquote Styles */
+blockquote {
+  margin: 0 0 1rem 0;
+  padding: 0 1rem;
+  border-left: 4px solid var(--arbeitszeitcheck-color-primary);
+  font-style: italic;
+  color: var(--arbeitszeitcheck-text-color-secondary);
+}
+
+/* Small Text */
+small {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+  color: var(--arbeitszeitcheck-text-color-muted);
+}
+
+/* Strong and Emphasis */
+strong,
+b {
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+}
+
+em,
+i {
+  font-style: italic;
+}
+
+/* Text Alignment Utilities */
+.arbeitszeitcheck-text-left {
+  text-align: left;
+}
+
+.arbeitszeitcheck-text-center {
+  text-align: center;
+}
+
+.arbeitszeitcheck-text-right {
+  text-align: right;
+}
+
+.arbeitszeitcheck-text-justify {
+  text-align: justify;
+}
+
+/* Text Decoration Utilities */
+.arbeitszeitcheck-text-underline {
+  text-decoration: underline;
+}
+
+.arbeitszeitcheck-text-no-underline {
+  text-decoration: none;
+}
+
+.arbeitszeitcheck-text-line-through {
+  text-decoration: line-through;
+}
+
+/* Text Transform Utilities */
+.arbeitszeitcheck-text-uppercase {
+  text-transform: uppercase;
+}
+
+.arbeitszeitcheck-text-lowercase {
+  text-transform: lowercase;
+}
+
+.arbeitszeitcheck-text-capitalize {
+  text-transform: capitalize;
+}
+
+.arbeitszeitcheck-text-normal-case {
+  text-transform: none;
+}
+
+/* Font Size Utilities */
+.arbeitszeitcheck-text-xs {
+  font-size: var(--arbeitszeitcheck-font-size-xs);
+}
+
+.arbeitszeitcheck-text-sm {
+  font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+.arbeitszeitcheck-text-base {
+  font-size: var(--arbeitszeitcheck-font-size-base);
+}
+
+.arbeitszeitcheck-text-lg {
+  font-size: var(--arbeitszeitcheck-font-size-lg);
+}
+
+.arbeitszeitcheck-text-xl {
+  font-size: var(--arbeitszeitcheck-font-size-xl);
+}
+
+.arbeitszeitcheck-text-2xl {
+  font-size: var(--arbeitszeitcheck-font-size-2xl);
+}
+
+.arbeitszeitcheck-text-3xl {
+  font-size: var(--arbeitszeitcheck-font-size-3xl);
+}
+
+.arbeitszeitcheck-text-4xl {
+  font-size: var(--arbeitszeitcheck-font-size-4xl);
+}
+
+.arbeitszeitcheck-text-5xl {
+  font-size: var(--arbeitszeitcheck-font-size-5xl);
+}
+
+.arbeitszeitcheck-text-6xl {
+  font-size: var(--arbeitszeitcheck-font-size-6xl);
+}
+
+/* Font Weight Utilities */
+.arbeitszeitcheck-font-thin {
+  font-weight: var(--arbeitszeitcheck-font-weight-thin);
+}
+
+.arbeitszeitcheck-font-extralight {
+  font-weight: var(--arbeitszeitcheck-font-weight-extralight);
+}
+
+.arbeitszeitcheck-font-light {
+  font-weight: var(--arbeitszeitcheck-font-weight-light);
+}
+
+.arbeitszeitcheck-font-normal {
+  font-weight: var(--arbeitszeitcheck-font-weight-normal);
+}
+
+.arbeitszeitcheck-font-medium {
+  font-weight: var(--arbeitszeitcheck-font-weight-medium);
+}
+
+.arbeitszeitcheck-font-semibold {
+  font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+}
+
+.arbeitszeitcheck-font-bold {
+  font-weight: var(--arbeitszeitcheck-font-weight-bold);
+}
+
+.arbeitszeitcheck-font-extrabold {
+  font-weight: var(--arbeitszeitcheck-font-weight-extrabold);
+}
+
+.arbeitszeitcheck-font-black {
+  font-weight: var(--arbeitszeitcheck-font-weight-black);
+}
+
+/* Line Height Utilities */
+.arbeitszeitcheck-leading-none {
+  line-height: var(--arbeitszeitcheck-line-height-none);
+}
+
+.arbeitszeitcheck-leading-tight {
+  line-height: var(--arbeitszeitcheck-line-height-tight);
+}
+
+.arbeitszeitcheck-leading-snug {
+  line-height: var(--arbeitszeitcheck-line-height-snug);
+}
+
+.arbeitszeitcheck-leading-normal {
+  line-height: var(--arbeitszeitcheck-line-height-normal);
+}
+
+.arbeitszeitcheck-leading-relaxed {
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+.arbeitszeitcheck-leading-loose {
+  line-height: var(--arbeitszeitcheck-line-height-loose);
+}
+
+/* Letter Spacing Utilities */
+.arbeitszeitcheck-tracking-tighter {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-tighter);
+}
+
+.arbeitszeitcheck-tracking-tight {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-tight);
+}
+
+.arbeitszeitcheck-tracking-normal {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-normal);
+}
+
+.arbeitszeitcheck-tracking-wide {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-wide);
+}
+
+.arbeitszeitcheck-tracking-wider {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-wider);
+}
+
+.arbeitszeitcheck-tracking-widest {
+  letter-spacing: var(--arbeitszeitcheck-letter-spacing-widest);
+}
+
+/* Font Family Utilities */
+.arbeitszeitcheck-font-sans {
+  font-family: var(--arbeitszeitcheck-font-family-sans);
+}
+
+.arbeitszeitcheck-font-mono {
+  font-family: var(--arbeitszeitcheck-font-family-mono);
+}
+
+.arbeitszeitcheck-font-serif {
+  font-family: var(--arbeitszeitcheck-font-family-serif);
+}
+
+/* Text Color Utilities */
+.arbeitszeitcheck-text-primary {
+  color: var(--arbeitszeitcheck-text-color-primary);
+}
+
+.arbeitszeitcheck-text-secondary {
+  color: var(--arbeitszeitcheck-text-color-secondary);
+}
+
+.arbeitszeitcheck-text-tertiary {
+  color: var(--arbeitszeitcheck-text-color-tertiary);
+}
+
+.arbeitszeitcheck-text-muted {
+  color: var(--arbeitszeitcheck-text-color-muted);
+}
+
+.arbeitszeitcheck-text-inverse {
+  color: var(--arbeitszeitcheck-text-color-inverse);
+}
+
+/* Responsive Typography */
+@media (max-width: 640px) {
+  :root {
+    --arbeitszeitcheck-font-size-4xl: 2rem; /* 32px */
+    --arbeitszeitcheck-font-size-3xl: 1.75rem; /* 28px */
+    --arbeitszeitcheck-font-size-2xl: 1.375rem; /* 22px */
+    --arbeitszeitcheck-font-size-xl: 1.125rem; /* 18px */
+  }
+
+  h1 {
+    font-size: var(--arbeitszeitcheck-font-size-3xl);
+  }
+
+  h2 {
+    font-size: var(--arbeitszeitcheck-font-size-2xl);
+  }
+
+  h3 {
+    font-size: var(--arbeitszeitcheck-font-size-xl);
+  }
+
+  h4 {
+    font-size: var(--arbeitszeitcheck-font-size-lg);
+  }
+
+  h5 {
+    font-size: var(--arbeitszeitcheck-font-size-base);
+  }
+
+  h6 {
+    font-size: var(--arbeitszeitcheck-font-size-sm);
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  p,
+  blockquote,
+  ul,
+  ol {
+    orphans: 3;
+    widows: 3;
+  }
+
+  a {
+    color: var(--arbeitszeitcheck-text-color-primary) !important;
+    text-decoration: underline !important;
+  }
+
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: var(--arbeitszeitcheck-text-color-muted);
+  }
+}
+
+/* Accessibility: High Contrast Mode */
+@media (prefers-contrast: high) {
+  :root {
+    --arbeitszeitcheck-text-color-primary: #000000;
+    --arbeitszeitcheck-text-color-secondary: #000000;
+    --arbeitszeitcheck-text-color-tertiary: #000000;
+    --arbeitszeitcheck-text-color-muted: #000000;
+    --arbeitszeitcheck-text-color-inverse: #ffffff;
+  }
+
+  html[data-theme="dark"],
+  body[data-theme-dark],
+  body[data-theme-dark-highcontrast] {
+    --arbeitszeitcheck-text-color-primary: #ffffff;
+    --arbeitszeitcheck-text-color-secondary: #ffffff;
+    --arbeitszeitcheck-text-color-tertiary: #ffffff;
+    --arbeitszeitcheck-text-color-muted: #ffffff;
+    --arbeitszeitcheck-text-color-inverse: #000000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  a {
+    transition: none;
+  }
+}

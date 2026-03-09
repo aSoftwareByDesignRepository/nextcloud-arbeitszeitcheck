@@ -1,0 +1,355 @@
+/**
+ * Admin Organizational Structure (Organigram) — layout, tree, detail panel.
+ * Theme-safe (CSS variables only). WCAG 2.1 AA friendly. Responsive.
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* -------------------------------------------------------------------------
+   Sections — clear visual hierarchy, generous spacing
+   ------------------------------------------------------------------------- */
+.admin-teams .section {
+  margin-bottom: 2.5rem;
+}
+
+.admin-teams .section--teams-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-teams .section__title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.625rem;
+  font-weight: 600;
+  color: var(--color-main-text);
+  line-height: 1.3;
+}
+
+.admin-teams .section__desc {
+  margin: 0;
+  color: var(--color-text-lighter);
+  font-size: var(--default-font-size, 1rem);
+  line-height: 1.6;
+  max-width: 56em;
+}
+
+.admin-teams .section__heading {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-main-text);
+  line-height: 1.3;
+}
+
+.admin-teams .section__header {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+/* -------------------------------------------------------------------------
+   Config card (Use app teams toggle)
+   ------------------------------------------------------------------------- */
+.admin-teams .config-card {
+  padding: 1.25rem 1.5rem;
+  background: var(--color-background-dark);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-large, 8px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.admin-teams .config-card:focus-within {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+.admin-teams .config-toggle {
+  margin-right: 0.5rem;
+  min-width: var(--default-clickable-area, 44px);
+  min-height: var(--default-clickable-area, 44px);
+}
+
+.admin-teams .form-help {
+  margin: 0.75rem 0 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-lighter);
+  line-height: 1.5;
+}
+
+/* -------------------------------------------------------------------------
+   Organization tree (organigram)
+   ------------------------------------------------------------------------- */
+.admin-teams .teams-tree {
+  min-height: 140px;
+  padding: 1.25rem 1rem;
+  background: var(--color-background-dark);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-large, 8px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.admin-teams .org-tree .teams-tree__root {
+  padding-left: 0;
+}
+
+.admin-teams .teams-loading,
+.admin-teams .teams-empty {
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  color: var(--color-text-lighter);
+  line-height: 1.5;
+}
+
+.admin-teams .teams-tree__label[role="button"] {
+  cursor: pointer;
+  border-radius: var(--border-radius, 4px);
+  padding: 0.35rem 0.6rem;
+  margin: -0.35rem -0.6rem;
+}
+
+.admin-teams .teams-tree__label[role="button"]:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+.admin-teams .teams-tree__root {
+  padding: 0 0.5rem;
+}
+
+.admin-teams .teams-tree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-teams .teams-tree__item .teams-tree__list {
+  margin-left: 0.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-border);
+}
+
+.admin-teams .teams-tree__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--default-clickable-area, 44px);
+  margin: 0.25rem 0;
+  padding: 0.35rem 0.5rem;
+  padding-left: 0.75rem;
+  border-radius: var(--border-radius);
+  color: var(--color-main-text);
+  cursor: pointer;
+  background: var(--color-main-background);
+  border: 1px solid var(--color-border);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-teams .teams-tree__item:hover,
+.admin-teams .teams-tree__item:focus-within {
+  background: var(--color-background-hover);
+}
+
+.admin-teams .teams-tree__item--selected {
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary-element);
+}
+
+.admin-teams .teams-tree__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.admin-teams .teams-tree__actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.admin-teams .teams-tree__item:hover .teams-tree__actions,
+.admin-teams .teams-tree__item:focus-within .teams-tree__actions {
+  opacity: 1;
+}
+
+.admin-teams .teams-tree__edit,
+.admin-teams .teams-tree__delete {
+  min-width: var(--default-clickable-area, 44px);
+  min-height: var(--default-clickable-area, 44px);
+}
+
+.admin-teams .teams-tree__edit:focus-visible,
+.admin-teams .teams-tree__delete:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------------------
+   Team detail (selected team)
+   ------------------------------------------------------------------------- */
+.admin-teams .section--team-detail {
+  padding: 1.25rem;
+  background: var(--color-background-dark);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-large);
+}
+
+.admin-teams #team-detail-name {
+  font-weight: 600;
+  color: var(--color-main-text);
+}
+
+.admin-teams .team-detail-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 1rem 0 0 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-teams .team-detail-tabs [role="tab"] {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-lighter);
+  font-size: var(--default-font-size);
+  cursor: pointer;
+  min-height: var(--default-clickable-area, 44px);
+}
+
+.admin-teams .team-detail-tabs [role="tab"]:hover {
+  color: var(--color-main-text);
+}
+
+.admin-teams .team-detail-tabs [role="tab"][aria-selected="true"] {
+  color: var(--color-primary-element);
+  border-bottom-color: var(--color-primary-element);
+  font-weight: 600;
+}
+
+.admin-teams .team-detail-tabs [role="tab"]:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+.admin-teams .team-panel {
+  margin-top: 1rem;
+}
+
+.admin-teams .panel-actions {
+  margin-bottom: 0.75rem;
+}
+
+.admin-teams .team-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-main-background);
+}
+
+.admin-teams .team-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--default-clickable-area, 44px);
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-main-text);
+}
+
+.admin-teams .team-list__item:last-child {
+  border-bottom: none;
+}
+
+.admin-teams .team-list__item:hover .team-list__remove,
+.admin-teams .team-list__item:focus-within .team-list__remove {
+  opacity: 1;
+}
+
+.admin-teams .team-list__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-teams .team-list__remove {
+  opacity: 0;
+  transition: opacity 0.15s;
+  min-width: var(--default-clickable-area, 44px);
+  min-height: var(--default-clickable-area, 44px);
+}
+
+.admin-teams .team-list__remove:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+.admin-teams .team-list__loading,
+.admin-teams .team-list__empty,
+.admin-teams .team-list__error {
+  padding: 1rem;
+  color: var(--color-text-lighter);
+  text-align: center;
+}
+
+.admin-teams .team-list__error {
+  color: var(--color-error);
+}
+
+/* -------------------------------------------------------------------------
+   Responsive — mobile-first, clear touch targets
+   ------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .admin-teams .section {
+    margin-bottom: 1.75rem;
+  }
+
+  .admin-teams .section__title {
+    font-size: 1.375rem;
+  }
+
+  .admin-teams .section--teams-header {
+    padding-bottom: 0.75rem;
+  }
+
+  .admin-teams .section--team-detail {
+    padding: 1.25rem;
+  }
+
+  .admin-teams .team-detail-tabs [role="tab"] {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .admin-teams .teams-tree__item {
+    flex-wrap: wrap;
+  }
+
+  .admin-teams .teams-tree__actions {
+    opacity: 1;
+  }
+
+  .admin-teams .config-card {
+    padding: 1rem;
+  }
+}
+
+/* Ensure disabled toggle is visually distinct */
+.admin-teams #use-app-teams:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

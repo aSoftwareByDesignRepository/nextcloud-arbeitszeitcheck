@@ -1,0 +1,361 @@
+/* Color System for ArbeitszeitCheck App
+ * Supports both light and dark themes
+ * Follows Nextcloud's design system and WCAG accessibility guidelines
+ */
+
+:root {
+  /* Map Nextcloud CSS variables to arbeitszeitcheck variables for compatibility */
+  --arbeitszeitcheck-color-main-background: var(--color-main-background, var(--arbeitszeitcheck-color-background));
+  --arbeitszeitcheck-color-background-hover: var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary));
+  --arbeitszeitcheck-color-background-dark: var(--color-background-dark, var(--arbeitszeitcheck-color-gray-200));
+  --arbeitszeitcheck-color-main-text: var(--color-main-text, var(--arbeitszeitcheck-color-text));
+  --arbeitszeitcheck-color-text-maxcontrast: var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary));
+  --arbeitszeitcheck-color-primary-text: var(--color-primary-text, var(--arbeitszeitcheck-color-white));
+  --arbeitszeitcheck-color-primary-element: var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
+  --arbeitszeitcheck-color-primary-element-light: var(--color-primary-element-light, var(--arbeitszeitcheck-color-primary-light));
+  --arbeitszeitcheck-color-primary-element-text: var(--color-primary-element-text, var(--arbeitszeitcheck-color-white));
+  --arbeitszeitcheck-color-primary-background: var(--color-primary-background, var(--arbeitszeitcheck-color-primary-lighter));
+  
+  /* Primary Colors - Nextcloud Blue */
+  --arbeitszeitcheck-color-primary: var(--color-primary, #0082c9);
+  --arbeitszeitcheck-color-primary-hover: #006aa3;
+  --arbeitszeitcheck-color-primary-active: #005a8b;
+  --arbeitszeitcheck-color-primary-light: var(--color-primary-light, #e6f3fa);
+  --arbeitszeitcheck-color-primary-lighter: #f0f8fc;
+
+  /* Secondary Colors */
+  --arbeitszeitcheck-color-secondary: #f5f5f5;
+  --arbeitszeitcheck-color-secondary-hover: #e8e8e8;
+  --arbeitszeitcheck-color-secondary-active: #dcdcdc;
+
+  /* Accent Colors */
+  --arbeitszeitcheck-color-accent: #ff6b35;
+  --arbeitszeitcheck-color-accent-hover: #e55a2b;
+  --arbeitszeitcheck-color-accent-active: #cc4a24;
+  --arbeitszeitcheck-color-accent-light: #fff2ed;
+
+  /* Semantic Colors */
+  --arbeitszeitcheck-color-success: #46ba61;
+  --arbeitszeitcheck-color-success-hover: #3da352;
+  --arbeitszeitcheck-color-success-light: #e8f5e9;
+  --arbeitszeitcheck-color-success-dark: #2e7d32;
+
+  --arbeitszeitcheck-color-warning: #ffa726;
+  --arbeitszeitcheck-color-warning-hover: #ff9800;
+  --arbeitszeitcheck-color-warning-light: #fff3e0;
+  --arbeitszeitcheck-color-warning-dark: #f57c00;
+
+  --arbeitszeitcheck-color-error: #e74c3c;
+  --arbeitszeitcheck-color-error-hover: #c0392b;
+  --arbeitszeitcheck-color-error-light: #ffebee;
+  --arbeitszeitcheck-color-error-dark: #c62828;
+
+  --arbeitszeitcheck-color-info: #3498db;
+  --arbeitszeitcheck-color-info-hover: #2980b9;
+  --arbeitszeitcheck-color-info-light: #e3f2fd;
+  --arbeitszeitcheck-color-info-dark: #1976d2;
+
+  /* Neutral Colors */
+  --arbeitszeitcheck-color-white: #ffffff;
+  --arbeitszeitcheck-color-black: #000000;
+  --arbeitszeitcheck-color-gray-50: #fafafa;
+  --arbeitszeitcheck-color-gray-100: #f5f5f5;
+  --arbeitszeitcheck-color-gray-200: #eeeeee;
+  --arbeitszeitcheck-color-gray-300: #e0e0e0;
+  --arbeitszeitcheck-color-gray-400: #bdbdbd;
+  --arbeitszeitcheck-color-gray-500: #9e9e9e;
+  --arbeitszeitcheck-color-gray-600: #757575;
+  --arbeitszeitcheck-color-gray-700: #616161;
+  --arbeitszeitcheck-color-gray-800: #424242;
+  --arbeitszeitcheck-color-gray-900: #212121;
+
+  /* Background Colors */
+  /* Prefer Nextcloud theme variables to support all themes */
+  --arbeitszeitcheck-color-background: var(--color-background, var(--color-main-background, var(--arbeitszeitcheck-color-white)));
+  --arbeitszeitcheck-color-background-secondary: var(--color-background-hover, var(--color-background-dark, var(--arbeitszeitcheck-color-gray-50)));
+  --arbeitszeitcheck-color-background-tertiary: var(--color-background-dark, var(--arbeitszeitcheck-color-gray-100));
+  --arbeitszeitcheck-color-background-elevated: var(--color-main-background, var(--arbeitszeitcheck-color-white));
+  --arbeitszeitcheck-color-background-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text Colors (WCAG 2.1 AA: normal text ≥4.5:1 contrast on background) */
+  --arbeitszeitcheck-color-text: var(--color-main-text, var(--arbeitszeitcheck-color-gray-900));
+  --arbeitszeitcheck-color-text-secondary: var(--arbeitszeitcheck-color-gray-700);
+  --arbeitszeitcheck-color-text-tertiary: var(--arbeitszeitcheck-color-gray-600);
+  --arbeitszeitcheck-color-text-inverse: var(--arbeitszeitcheck-color-white);
+  --arbeitszeitcheck-color-text-muted: var(--arbeitszeitcheck-color-gray-500);
+
+  /* Border Colors */
+  --arbeitszeitcheck-color-border: var(--color-border, var(--arbeitszeitcheck-color-gray-200));
+  --arbeitszeitcheck-color-border-secondary: var(--color-border, var(--arbeitszeitcheck-color-gray-100));
+  --arbeitszeitcheck-color-border-focus: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-border-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-border-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-border-warning: var(--arbeitszeitcheck-color-warning);
+
+  /* Shadow Colors */
+  --arbeitszeitcheck-color-shadow-light: rgba(0, 0, 0, 0.1);
+  --arbeitszeitcheck-color-shadow-medium: rgba(0, 0, 0, 0.15);
+  --arbeitszeitcheck-color-shadow-heavy: rgba(0, 0, 0, 0.25);
+
+  /* Status Colors */
+  --arbeitszeitcheck-color-status-online: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-status-offline: var(--arbeitszeitcheck-color-gray-400);
+  --arbeitszeitcheck-color-status-busy: var(--arbeitszeitcheck-color-warning);
+  --arbeitszeitcheck-color-status-away: var(--arbeitszeitcheck-color-info);
+
+  /* Time Entry Colors */
+  --arbeitszeitcheck-color-time-entry-billable: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-time-entry-non-billable: var(--arbeitszeitcheck-color-gray-500);
+  --arbeitszeitcheck-color-time-entry-overtime: var(--arbeitszeitcheck-color-warning);
+  --arbeitszeitcheck-color-time-entry-compliant: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-time-entry-violation: var(--arbeitszeitcheck-color-error);
+
+  /* Menu Bar Colors */
+  --arbeitszeitcheck-color-menu-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-menu-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-menu-item-hover: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-menu-item-active: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-menu-item-active-text: var(--arbeitszeitcheck-color-white);
+  --arbeitszeitcheck-color-menu-section-header: var(--arbeitszeitcheck-color-text-secondary);
+  --arbeitszeitcheck-color-menu-user-avatar: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-menu-user-avatar-text: var(--arbeitszeitcheck-color-white);
+
+  /* Form Colors */
+  --arbeitszeitcheck-color-form-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-form-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-form-border-focus: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-form-border-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-form-border-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-form-label: var(--arbeitszeitcheck-color-text);
+  --arbeitszeitcheck-color-form-help: var(--arbeitszeitcheck-color-text-secondary);
+  --arbeitszeitcheck-color-form-required: var(--arbeitszeitcheck-color-error);
+
+  /* Table Colors */
+  --arbeitszeitcheck-color-table-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-table-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-table-header-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-table-row-hover: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-table-row-selected: var(--arbeitszeitcheck-color-primary-light);
+  --arbeitszeitcheck-color-table-stripe: var(--arbeitszeitcheck-color-background-secondary);
+
+  /* Modal Colors */
+  --arbeitszeitcheck-color-modal-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-modal-overlay: var(--arbeitszeitcheck-color-background-overlay);
+  --arbeitszeitcheck-color-modal-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-modal-header-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-modal-footer-background: var(--arbeitszeitcheck-color-background-secondary);
+
+  /* Notification Colors */
+  --arbeitszeitcheck-color-notification-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-notification-success-background: var(--arbeitszeitcheck-color-success-light);
+  --arbeitszeitcheck-color-notification-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-notification-error-background: var(--arbeitszeitcheck-color-error-light);
+  --arbeitszeitcheck-color-notification-warning: var(--arbeitszeitcheck-color-warning);
+  --arbeitszeitcheck-color-notification-warning-background: var(--arbeitszeitcheck-color-warning-light);
+  --arbeitszeitcheck-color-notification-info: var(--arbeitszeitcheck-color-info);
+  --arbeitszeitcheck-color-notification-info-background: var(--arbeitszeitcheck-color-info-light);
+
+  /* Button Colors */
+  --arbeitszeitcheck-color-button-primary: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-button-primary-hover: var(--arbeitszeitcheck-color-primary-hover);
+  --arbeitszeitcheck-color-button-primary-active: var(--arbeitszeitcheck-color-primary-active);
+  --arbeitszeitcheck-color-button-primary-text: var(--arbeitszeitcheck-color-white);
+  --arbeitszeitcheck-color-button-secondary: var(--arbeitszeitcheck-color-secondary);
+  --arbeitszeitcheck-color-button-secondary-hover: var(--arbeitszeitcheck-color-secondary-hover);
+  --arbeitszeitcheck-color-button-secondary-active: var(--arbeitszeitcheck-color-secondary-active);
+  --arbeitszeitcheck-color-button-secondary-text: var(--arbeitszeitcheck-color-text);
+  --arbeitszeitcheck-color-button-danger: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-button-danger-hover: var(--arbeitszeitcheck-color-error-hover);
+  --arbeitszeitcheck-color-button-danger-text: var(--arbeitszeitcheck-color-white);
+
+  /* Loading and Animation Colors */
+  --arbeitszeitcheck-color-loading-spinner: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-loading-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-progress-bar: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-progress-background: var(--arbeitszeitcheck-color-background-secondary);
+}
+
+/* Dark Theme Colors */
+html[data-theme="dark"],
+body[data-theme-dark],
+body[data-theme-dark-highcontrast] {
+  /* Primary Colors - Adjusted for dark theme */
+  --arbeitszeitcheck-color-primary: #4a9eff;
+  --arbeitszeitcheck-color-primary-hover: #66b3ff;
+  --arbeitszeitcheck-color-primary-active: #3385d6;
+  --arbeitszeitcheck-color-primary-light: #1a3a4a;
+  --arbeitszeitcheck-color-primary-lighter: #0f1f2a;
+
+  /* Secondary Colors */
+  --arbeitszeitcheck-color-secondary: #2a2a2a;
+  --arbeitszeitcheck-color-secondary-hover: #3a3a3a;
+  --arbeitszeitcheck-color-secondary-active: #4a4a4a;
+
+  /* Accent Colors */
+  --arbeitszeitcheck-color-accent: #ff8a65;
+  --arbeitszeitcheck-color-accent-hover: #ffab91;
+  --arbeitszeitcheck-color-accent-active: #ff7043;
+  --arbeitszeitcheck-color-accent-light: #3d2b1f;
+
+  /* Semantic Colors - Adjusted for dark theme */
+  --arbeitszeitcheck-color-success: #66bb6a;
+  --arbeitszeitcheck-color-success-hover: #81c784;
+  --arbeitszeitcheck-color-success-light: #1b3a1d;
+  --arbeitszeitcheck-color-success-dark: #4caf50;
+
+  --arbeitszeitcheck-color-warning: #ffb74d;
+  --arbeitszeitcheck-color-warning-hover: #ffcc80;
+  --arbeitszeitcheck-color-warning-light: #3d2f1a;
+  --arbeitszeitcheck-color-warning-dark: #ff9800;
+
+  --arbeitszeitcheck-color-error: #ef5350;
+  --arbeitszeitcheck-color-error-hover: #e57373;
+  --arbeitszeitcheck-color-error-light: #3d1a1a;
+  --arbeitszeitcheck-color-error-dark: #f44336;
+
+  --arbeitszeitcheck-color-info: #42a5f5;
+  --arbeitszeitcheck-color-info-hover: #64b5f6;
+  --arbeitszeitcheck-color-info-light: #1a2f3d;
+  --arbeitszeitcheck-color-info-dark: #2196f3;
+
+  /* Neutral Colors - Dark theme */
+  --arbeitszeitcheck-color-white: #000000;
+  --arbeitszeitcheck-color-black: #ffffff;
+  --arbeitszeitcheck-color-gray-50: #1a1a1a;
+  --arbeitszeitcheck-color-gray-100: #2a2a2a;
+  --arbeitszeitcheck-color-gray-200: #3a3a3a;
+  --arbeitszeitcheck-color-gray-300: #4a4a4a;
+  --arbeitszeitcheck-color-gray-400: #5a5a5a;
+  --arbeitszeitcheck-color-gray-500: #6a6a6a;
+  --arbeitszeitcheck-color-gray-600: #7a7a7a;
+  --arbeitszeitcheck-color-gray-700: #8a8a8a;
+  --arbeitszeitcheck-color-gray-800: #9a9a9a;
+  --arbeitszeitcheck-color-gray-900: #e0e0e0;
+
+  /* Background Colors - Dark theme */
+  --arbeitszeitcheck-color-background: #1a1a1a;
+  --arbeitszeitcheck-color-background-secondary: #2a2a2a;
+  --arbeitszeitcheck-color-background-tertiary: #3a3a3a;
+  --arbeitszeitcheck-color-background-elevated: #2a2a2a;
+  --arbeitszeitcheck-color-background-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Text Colors - Dark theme */
+  --arbeitszeitcheck-color-text: #e0e0e0;
+  --arbeitszeitcheck-color-text-secondary: #b0b0b0;
+  --arbeitszeitcheck-color-text-tertiary: #8a8a8a;
+  --arbeitszeitcheck-color-text-inverse: #1a1a1a;
+  --arbeitszeitcheck-color-text-muted: #6a6a6a;
+
+  /* Border Colors - Dark theme */
+  --arbeitszeitcheck-color-border: #3a3a3a;
+  --arbeitszeitcheck-color-border-secondary: #2a2a2a;
+  --arbeitszeitcheck-color-border-focus: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-border-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-border-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-border-warning: var(--arbeitszeitcheck-color-warning);
+
+  /* Shadow Colors - Dark theme */
+  --arbeitszeitcheck-color-shadow-light: rgba(0, 0, 0, 0.3);
+  --arbeitszeitcheck-color-shadow-medium: rgba(0, 0, 0, 0.4);
+  --arbeitszeitcheck-color-shadow-heavy: rgba(0, 0, 0, 0.6);
+
+  /* Menu Bar Colors - Dark theme */
+  --arbeitszeitcheck-color-menu-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-menu-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-menu-item-hover: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-menu-item-active: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-menu-item-active-text: var(--arbeitszeitcheck-color-text-inverse);
+  --arbeitszeitcheck-color-menu-section-header: var(--arbeitszeitcheck-color-text-secondary);
+  --arbeitszeitcheck-color-menu-user-avatar: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-menu-user-avatar-text: var(--arbeitszeitcheck-color-text-inverse);
+
+  /* Form Colors - Dark theme */
+  --arbeitszeitcheck-color-form-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-form-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-form-border-focus: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-form-border-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-form-border-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-form-label: var(--arbeitszeitcheck-color-text);
+  --arbeitszeitcheck-color-form-help: var(--arbeitszeitcheck-color-text-secondary);
+  --arbeitszeitcheck-color-form-required: var(--arbeitszeitcheck-color-error);
+
+  /* Table Colors - Dark theme */
+  --arbeitszeitcheck-color-table-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-table-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-table-header-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-table-row-hover: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-table-row-selected: var(--arbeitszeitcheck-color-primary-light);
+  --arbeitszeitcheck-color-table-stripe: var(--arbeitszeitcheck-color-background-secondary);
+
+  /* Modal Colors - Dark theme */
+  --arbeitszeitcheck-color-modal-background: var(--arbeitszeitcheck-color-background);
+  --arbeitszeitcheck-color-modal-overlay: var(--arbeitszeitcheck-color-background-overlay);
+  --arbeitszeitcheck-color-modal-border: var(--arbeitszeitcheck-color-border);
+  --arbeitszeitcheck-color-modal-header-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-modal-footer-background: var(--arbeitszeitcheck-color-background-secondary);
+
+  /* Notification Colors - Dark theme */
+  --arbeitszeitcheck-color-notification-success: var(--arbeitszeitcheck-color-success);
+  --arbeitszeitcheck-color-notification-success-background: var(--arbeitszeitcheck-color-success-light);
+  --arbeitszeitcheck-color-notification-error: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-notification-error-background: var(--arbeitszeitcheck-color-error-light);
+  --arbeitszeitcheck-color-notification-warning: var(--arbeitszeitcheck-color-warning);
+  --arbeitszeitcheck-color-notification-warning-background: var(--arbeitszeitcheck-color-warning-light);
+  --arbeitszeitcheck-color-notification-info: var(--arbeitszeitcheck-color-info);
+  --arbeitszeitcheck-color-notification-info-background: var(--arbeitszeitcheck-color-info-light);
+
+  /* Button Colors - Dark theme */
+  --arbeitszeitcheck-color-button-primary: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-button-primary-hover: var(--arbeitszeitcheck-color-primary-hover);
+  --arbeitszeitcheck-color-button-primary-active: var(--arbeitszeitcheck-color-primary-active);
+  --arbeitszeitcheck-color-button-primary-text: var(--arbeitszeitcheck-color-text-inverse);
+  --arbeitszeitcheck-color-button-secondary: var(--arbeitszeitcheck-color-secondary);
+  --arbeitszeitcheck-color-button-secondary-hover: var(--arbeitszeitcheck-color-secondary-hover);
+  --arbeitszeitcheck-color-button-secondary-active: var(--arbeitszeitcheck-color-secondary-active);
+  --arbeitszeitcheck-color-button-secondary-text: var(--arbeitszeitcheck-color-text);
+  --arbeitszeitcheck-color-button-danger: var(--arbeitszeitcheck-color-error);
+  --arbeitszeitcheck-color-button-danger-hover: var(--arbeitszeitcheck-color-error-hover);
+  --arbeitszeitcheck-color-button-danger-text: var(--arbeitszeitcheck-color-text-inverse);
+
+  /* Loading and Animation Colors - Dark theme */
+  --arbeitszeitcheck-color-loading-spinner: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-loading-background: var(--arbeitszeitcheck-color-background-secondary);
+  --arbeitszeitcheck-color-progress-bar: var(--arbeitszeitcheck-color-primary);
+  --arbeitszeitcheck-color-progress-background: var(--arbeitszeitcheck-color-background-secondary);
+}
+
+/* Accessibility: High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --arbeitszeitcheck-color-primary: #0066cc;
+    --arbeitszeitcheck-color-primary-hover: #004499;
+    --arbeitszeitcheck-color-error: #cc0000;
+    --arbeitszeitcheck-color-success: #006600;
+    --arbeitszeitcheck-color-warning: #cc6600;
+    --arbeitszeitcheck-color-border: #000000;
+    --arbeitszeitcheck-color-text: #000000;
+    --arbeitszeitcheck-color-background: #ffffff;
+  }
+
+  html[data-theme="dark"],
+  body[data-theme-dark],
+  body[data-theme-dark-highcontrast] {
+    --arbeitszeitcheck-color-primary: #66b3ff;
+    --arbeitszeitcheck-color-primary-hover: #99ccff;
+    --arbeitszeitcheck-color-error: #ff6666;
+    --arbeitszeitcheck-color-success: #66cc66;
+    --arbeitszeitcheck-color-warning: #ffcc66;
+    --arbeitszeitcheck-color-border: #ffffff;
+    --arbeitszeitcheck-color-text: #ffffff;
+    --arbeitszeitcheck-color-background: #000000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="unit">
+            <directory suffix="Test.php">tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage>
+        <include>
+            <directory suffix=".php">lib</directory>
+        </include>
+        <exclude>
+            <directory suffix=".php">lib/Migration</directory>
+            <directory suffix=".php">tests</directory>
+        </exclude>
+        <report>
+            <html outputDirectory="tests/coverage" lowUpperBound="35" highLowerBound="70"/>
+        </report>
+    </coverage>
+
+    <logging>
+        <junit outputFile="tests/results.xml"/>
+    </logging>
+</phpunit>

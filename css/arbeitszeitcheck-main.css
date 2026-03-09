@@ -1,0 +1,107 @@
+/**
+ * ArbeitszeitCheck — global app styles
+ * Loaded by manager, admin, compliance, settings, substitute pages.
+ * Theme-safe (CSS variables only). WCAG 2.1 AA friendly.
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* -------------------------------------------------------------------------
+   Stats grid & cards (manager dashboard, admin, etc.)
+   ------------------------------------------------------------------------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4, 1rem);
+  width: 100%;
+}
+
+.stat-card {
+  background: var(--color-background-dark, var(--color-main-background));
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-large, 8px);
+  padding: var(--space-4, 1rem) var(--space-5, 1.25rem);
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  min-height: var(--default-clickable-area, 44px);
+}
+
+.stat-card:hover {
+  background: var(--color-background-hover);
+}
+
+.stat-card .stat-number {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-main-text);
+  line-height: 1.2;
+}
+
+.stat-card .stat-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--color-text-lighter);
+  margin-top: var(--space-1, 0.25rem);
+  font-weight: 500;
+}
+
+/* -------------------------------------------------------------------------
+   Compliance sub-navigation tabs
+   ------------------------------------------------------------------------- */
+.compliance-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-4, 1rem);
+  padding-bottom: var(--space-3, 0.75rem);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.compliance-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--color-text-lighter);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base, 6px);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.compliance-tab:hover,
+.compliance-tab:focus {
+  color: var(--color-main-text);
+  background: var(--color-background-hover);
+  outline: 2px solid var(--arbeitszeitcheck-color-border-focus, var(--color-primary));
+  outline-offset: 2px;
+}
+
+.compliance-tab--active {
+  color: var(--color-primary);
+  font-weight: 600;
+  border-color: var(--color-border);
+  background: var(--color-background-hover);
+}
+
+.section-header--with-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+/* -------------------------------------------------------------------------
+   Manager/Admin content layout (page-specific, uses app-layout base)
+   ------------------------------------------------------------------------- */
+#content.app-arbeitszeitcheck #app-content.manager-dashboard,
+#content.app-arbeitszeitcheck #app-content.admin-teams {
+  min-height: 100%;
+}

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0082c9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0066a1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0f0f0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="clockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#e8e8e8;stop-opacity:0.95" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGradient)" stroke="#ffffff" stroke-width="4"/>
+  
+  <!-- Time tracking icon - clock with checkmark for compliance -->
+  <g transform="translate(32, 32)">
+    <!-- Main clock circle -->
+    <circle cx="32" cy="32" r="24" fill="url(#clockGradient)" stroke="#0082c9" stroke-width="2"/>
+    
+    <!-- Clock face inner circle -->
+    <circle cx="32" cy="32" r="20" fill="none" stroke="#0082c9" stroke-width="1.5" opacity="0.3"/>
+    
+    <!-- Hour markers -->
+    <line x1="32" y1="12" x2="32" y2="16" stroke="#0082c9" stroke-width="2" stroke-linecap="round"/>
+    <line x1="52" y1="32" x2="48" y2="32" stroke="#0082c9" stroke-width="2" stroke-linecap="round"/>
+    <line x1="32" y1="52" x2="32" y2="48" stroke="#0082c9" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="32" x2="16" y2="32" stroke="#0082c9" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Clock hands - showing 9:00 (work start time) -->
+    <!-- Hour hand -->
+    <line x1="32" y1="32" x2="32" y2="22" stroke="#0082c9" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Minute hand -->
+    <line x1="32" y1="32" x2="40" y2="32" stroke="#0082c9" stroke-width="2" stroke-linecap="round"/>
+    <!-- Center dot -->
+    <circle cx="32" cy="32" r="2.5" fill="#0082c9"/>
+    
+    <!-- Compliance checkmark shield overlay -->
+    <g transform="translate(40, 16)">
+      <!-- Shield shape -->
+      <path d="M8 4 C8 2, 10 0, 12 0 C14 0, 16 2, 16 4 L16 8 C16 10, 14 12, 12 12 C10 12, 8 10, 8 8 Z" 
+            fill="url(#iconGradient)" stroke="#4CAF50" stroke-width="1.5"/>
+      <!-- Checkmark -->
+      <path d="M6 6 L9 9 L14 4" fill="none" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    
+    <!-- Calendar/schedule element at bottom -->
+    <g transform="translate(8, 48)">
+      <!-- Calendar base -->
+      <rect x="0" y="0" width="48" height="16" rx="2" fill="url(#iconGradient)" stroke="#0082c9" stroke-width="1.5"/>
+      <!-- Calendar header -->
+      <rect x="0" y="0" width="48" height="4" rx="2" fill="#0082c9"/>
+      <!-- Calendar grid lines -->
+      <line x1="16" y1="4" x2="16" y2="16" stroke="#0082c9" stroke-width="1" opacity="0.3"/>
+      <line x1="32" y1="4" x2="32" y2="16" stroke="#0082c9" stroke-width="1" opacity="0.3"/>
+      <line x1="0" y1="10" x2="48" y2="10" stroke="#0082c9" stroke-width="1" opacity="0.3"/>
+      <!-- Calendar dots (days) -->
+      <circle cx="8" cy="13" r="1.5" fill="#0082c9" opacity="0.6"/>
+      <circle cx="24" cy="13" r="1.5" fill="#0082c9" opacity="0.6"/>
+      <circle cx="40" cy="13" r="1.5" fill="#0082c9" opacity="0.6"/>
+    </g>
+  </g>
+  
+  <!-- Small decorative elements -->
+  <circle cx="20" cy="20" r="2.5" fill="#ffffff" opacity="0.6"/>
+  <circle cx="108" cy="20" r="2.5" fill="#ffffff" opacity="0.6"/>
+  <circle cx="20" cy="108" r="2.5" fill="#ffffff" opacity="0.6"/>
+  <circle cx="108" cy="108" r="2.5" fill="#ffffff" opacity="0.6"/>
+</svg>

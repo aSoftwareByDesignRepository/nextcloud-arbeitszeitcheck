@@ -1,0 +1,608 @@
+/**
+ * Time Entries CSS for arbeitszeitcheck app
+ * Layout: app-layout.css (single source of truth)
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+#content.app-arbeitszeitcheck #app-content {
+    padding-bottom: 20px;
+}
+
+/* Section Styling */
+.section {
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    border-radius: var(--radius-2xl, 16px);
+    margin-bottom: var(--space-8, 2rem);
+    padding: var(--space-6, 1.5rem);
+    overflow: visible;
+    box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    position: relative;
+    height: auto;
+    visibility: visible;
+    opacity: 1;
+    display: block;
+}
+
+.page-header-section {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    margin-bottom: var(--space-8, 2rem);
+}
+
+.page-header-section .header-content {
+    margin-bottom: var(--space-6, 1.5rem);
+}
+
+/* Page Header - Use common styles, only override if needed */
+.arbeitszeitcheck-header {
+    background: linear-gradient(135deg,
+            var(--arbeitszeitcheck-color-primary-lighter, var(--color-primary-background, #f0f7ff)) 0%,
+            var(--arbeitszeitcheck-color-background-secondary, var(--color-background-hover, #f5f5f5)) 100%);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    padding: 2.5rem 2rem;
+    margin: 0 0 2rem 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-8, 2rem);
+    visibility: visible;
+    opacity: 1;
+    width: 100%;
+}
+
+.stat-card {
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: var(--radius-base, 12px);
+    padding: var(--space-6, 1.5rem);
+    text-align: center;
+    box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+    transition: all 0.2s ease;
+    visibility: visible;
+    opacity: 1;
+    box-sizing: border-box;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+    transform: translateY(-2px);
+    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+}
+
+.stat-card .stat-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    margin-bottom: var(--space-2, 0.5rem);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    visibility: visible;
+    opacity: 1;
+}
+
+.stat-card .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+    line-height: 1.2;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Filter Section */
+.filter-section {
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: var(--radius-xl, 12px);
+    padding: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-8, 2rem);
+    box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Table Styling */
+.table-responsive,
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    visibility: visible;
+    opacity: 1;
+}
+
+.table,
+.arbeitszeitcheck-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table thead,
+.arbeitszeitcheck-table thead,
+.table thead {
+    background: var(--arbeitszeitcheck-color-background-dark, var(--color-background-dark, var(--arbeitszeitcheck-color-background-tertiary)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table th,
+.arbeitszeitcheck-table th {
+    padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
+    border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table td,
+.arbeitszeitcheck-table td {
+    padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border, #ddd));
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table tbody tr:hover,
+.table--hover tbody tr:hover,
+.arbeitszeitcheck-table tbody tr:hover {
+    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+}
+
+.description-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    visibility: visible;
+    opacity: 1;
+}
+
+.description-more {
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+}
+
+.actions-cell {
+    display: flex;
+    gap: var(--space-2, 0.5rem);
+    align-items: center;
+    flex-wrap: wrap;
+    visibility: visible;
+    opacity: 1;
+}
+
+.actions-cell .btn {
+    min-width: auto;
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--space-12, 3rem) var(--space-6, 1.5rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+.empty-state__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    margin: 0 0 var(--space-4, 1rem) 0;
+    visibility: visible;
+    opacity: 1;
+}
+
+.empty-state__description {
+    font-size: 1rem;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+    line-height: 1.5;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4, 1rem);
+    margin-top: var(--space-6, 1.5rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+.pagination-info {
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    font-size: 0.9rem;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Form Enhancements */
+.form-section {
+    margin-bottom: var(--space-8, 2rem);
+    padding-bottom: var(--space-6, 1.5rem);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.form-section-title {
+    font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-semibold, 600);
+    color: var(--arbeitszeitcheck-color-text, var(--color-main-text, #000));
+    margin: 0 0 var(--space-2, 0.5rem) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+}
+
+.form-section-description {
+    font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    margin: 0 0 var(--space-4, 1rem) 0;
+    line-height: var(--arbeitszeitcheck-line-height-relaxed, 1.6);
+}
+
+.form-grid {
+    display: grid;
+    gap: var(--space-4, 1rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.form-grid:last-child {
+    margin-bottom: 0;
+}
+
+.form-grid .form-group {
+    margin-bottom: 0;
+}
+
+.form-grid--2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.form-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.form-label-icon {
+    display: inline-block;
+    margin-right: var(--space-1, 0.25rem);
+    font-size: 1.1em;
+    vertical-align: middle;
+}
+
+.card {
+    padding: var(--space-6, 1.5rem);
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: var(--radius-xl, 12px);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+.card--elevated {
+    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .section {
+        padding: var(--space-4, 1rem);
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-actions {
+        width: 100%;
+    }
+
+    .header-actions button {
+        flex: 1;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-4, 1rem);
+    }
+
+    .table-container {
+        border-radius: var(--radius-base, 8px);
+    }
+
+    .form-grid--2,
+    .form-grid--3 {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        padding: var(--space-4, 1rem);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+
+/* Time Input Group - Custom 24-hour format selectors */
+.time-input-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    background-color: var(--arbeitszeitcheck-color-form-background, var(--color-main-background, #fff));
+    border: 1px solid var(--arbeitszeitcheck-color-form-border, var(--color-border, #ddd));
+    border-radius: var(--radius-base, 8px);
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.time-input-group:focus-within {
+    border-color: var(--arbeitszeitcheck-color-form-border-focus, var(--color-primary-element, #0082c9));
+    box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-primary-light, rgba(0, 130, 201, 0.1));
+    outline: none;
+}
+
+.time-input-group .time-hour,
+.time-input-group .time-minute {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2, 0.5rem) var(--space-6, 1.5rem) var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    text-align: center;
+    font-family: var(--arbeitszeitcheck-font-family-mono, 'Courier New', 'Consolas', 'Monaco', monospace);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
+    color: var(--arbeitszeitcheck-color-text, var(--color-main-text, #000));
+    background-color: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right var(--space-2, 0.5rem) center;
+    background-repeat: no-repeat;
+    background-size: 1em 1em;
+    transition: background-color 0.15s ease-in-out;
+    height: auto;
+    line-height: 1.5;
+}
+
+.time-input-group .time-hour:hover,
+.time-input-group .time-minute:hover {
+    background-color: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, #f5f5f5));
+}
+
+.time-input-group .time-hour:focus,
+.time-input-group .time-minute:focus {
+    background-color: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, #f5f5f5));
+    outline: none;
+}
+
+.time-input-group .time-hour::-ms-expand,
+.time-input-group .time-minute::-ms-expand {
+    display: none;
+}
+
+.time-input-group .time-hour option,
+.time-input-group .time-minute option {
+    padding: var(--space-2, 0.5rem);
+    text-align: center;
+    font-family: var(--arbeitszeitcheck-font-family-mono, 'Courier New', 'Consolas', 'Monaco', monospace);
+    font-variant-numeric: tabular-nums;
+}
+
+.time-separator {
+    font-size: var(--arbeitszeitcheck-font-size-xl, 1.25rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
+    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    margin: 0;
+    line-height: 1;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.time-input-group input[type="hidden"] {
+    display: none;
+}
+
+/* Error state for time input group */
+.time-input-group.error,
+.time-input-group.form-input--error {
+    border-color: var(--arbeitszeitcheck-color-form-border-error, var(--color-error, #e9322d));
+}
+
+.time-input-group.error:focus-within,
+.time-input-group.form-input--error:focus-within {
+    border-color: var(--arbeitszeitcheck-color-form-border-error, var(--color-error, #e9322d));
+    box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-error-light, rgba(233, 50, 45, 0.1));
+}
+
+/* Responsive adjustments for time input group */
+@media (max-width: 768px) {
+    .time-input-group {
+        gap: var(--space-1, 0.25rem);
+        padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    }
+    
+    .time-input-group .time-hour,
+    .time-input-group .time-minute {
+        padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem) var(--space-2, 0.5rem) var(--space-2, 0.5rem);
+        font-size: 0.95rem;
+    }
+    
+    .time-separator {
+        font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+        margin: 0 var(--space-1, 0.25rem);
+    }
+}
+
+/* Break requirement indicator */
+.break-requirement-indicator {
+    margin-top: var(--space-2, 0.5rem);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    background: var(--arbeitszeitcheck-color-background-info, var(--color-background-dark, #f8f9fa));
+    border: 1px solid var(--arbeitszeitcheck-color-border-info, var(--color-border, #ddd));
+    border-radius: var(--radius-lg, 8px);
+    opacity: 0;
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+.break-requirement-indicator small {
+    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
+}
+
+/* Break entry styling - Specific to time entries page */
+.break-entry {
+    margin-bottom: var(--space-4, 1rem);
+    padding: var(--space-3, 0.75rem);
+    border-radius: var(--radius-lg, 8px);
+}
+
+.break-entry:last-child,
+.break-entry:last-of-type {
+    margin-bottom: 0;
+}
+
+/* Auto-generated break styling */
+.break-entry[data-auto-break] {
+    background: var(--arbeitszeitcheck-color-background-success-light, rgba(40, 167, 69, 0.05));
+    border: 1px solid var(--arbeitszeitcheck-color-success-light, rgba(40, 167, 69, 0.2));
+    border-radius: var(--radius-lg, 8px);
+    padding: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.break-entry[data-auto-break] .form-label {
+    color: var(--arbeitszeitcheck-color-success, var(--color-success, #28a745));
+}
+
+.auto-break-indicator {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.auto-break-note {
+    margin-top: var(--space-2, 0.5rem);
+    margin-bottom: 0;
+    padding-top: var(--space-2, 0.5rem);
+    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+}
+
+.auto-break-note small {
+    font-size: 0.85em;
+}
+
+/* Auto-break toggle */
+.auto-break-toggle {
+    margin-top: var(--space-4, 1rem);
+    margin-bottom: var(--space-4, 1rem);
+    padding: var(--space-4, 1rem);
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: var(--radius-lg, 8px);
+}
+
+.auto-break-toggle .form-help {
+    margin-top: var(--space-2, 0.5rem);
+    margin-bottom: 0;
+}
+
+.form-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    cursor: pointer;
+    user-select: none;
+}
+
+.form-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-radius: 24px;
+    transition: background-color 0.3s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-toggle input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--arbeitszeitcheck-color-success, var(--color-success, #28a745));
+}
+
+.form-toggle input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
+    color: var(--arbeitszeitcheck-color-text-primary, var(--color-text-maxcontrast, #333));
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

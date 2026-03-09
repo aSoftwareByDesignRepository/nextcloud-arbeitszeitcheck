@@ -1,0 +1,256 @@
+/**
+ * Timeline CSS for arbeitszeitcheck app
+ * Layout: app-layout.css (single source of truth)
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+#content.app-arbeitszeitcheck #app-content {
+	padding-bottom: 20px;
+}
+
+/* Section Styling */
+.section {
+	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+	border-radius: var(--radius-2xl, 16px);
+	margin-bottom: var(--space-8, 2rem);
+	padding: var(--space-6, 1.5rem);
+	overflow: visible;
+	box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
+	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+	position: relative;
+	height: auto;
+}
+
+.page-header-section {
+	padding: 0;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	margin-bottom: var(--space-8, 2rem);
+}
+
+.page-header-section .header-content {
+	margin-bottom: var(--space-6, 1.5rem);
+}
+
+/* Timeline Container */
+.timeline-container {
+	padding: var(--space-8, 2rem) 0;
+	min-height: 200px;
+}
+
+.timeline-loading {
+	text-align: center;
+	padding: var(--space-12, 3rem);
+	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary)));
+}
+
+.loading-spinner {
+	border: 3px solid var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+	border-top: 3px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
+	border-radius: 50%;
+	width: 40px;
+	height: 40px;
+	animation: spin 1s linear infinite;
+	margin: 0 auto var(--space-4, 1rem);
+}
+
+.timeline-error {
+	text-align: center;
+	padding: var(--space-12, 3rem);
+	color: var(--arbeitszeitcheck-color-error, var(--color-error));
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+/* Timeline Structure */
+.timeline {
+	padding: var(--space-4, 1rem) 0;
+	width: 100%;
+}
+
+.timeline-day {
+	margin-bottom: var(--space-10, 2.5rem);
+}
+
+.timeline-day-header {
+	margin-bottom: var(--space-4, 1rem);
+	padding-bottom: var(--space-2, 0.5rem);
+	border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+}
+
+.timeline-day-header h3 {
+	margin: 0;
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
+}
+
+.timeline-day-items {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4, 1rem);
+}
+
+/* Timeline Items */
+.timeline-item {
+	display: flex;
+	gap: var(--space-4, 1rem);
+	padding: var(--space-4, 1rem);
+	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+	border-radius: var(--radius-base, 4px);
+	transition: all 0.2s ease;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.timeline-item:hover {
+	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+	box-shadow: var(--shadow-md, 0 2px 8px rgba(0, 0, 0, 0.1));
+	transform: translateX(4px);
+}
+
+.timeline-item-icon {
+	font-size: 1.5rem;
+	line-height: 1;
+	flex-shrink: 0;
+	width: 2.5rem;
+	height: 2.5rem;
+	min-width: 2.5rem;
+	min-height: 2.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+	border-radius: var(--radius-base, 4px);
+}
+
+.timeline-item--time-entry .timeline-item-icon {
+	background: rgba(0, 130, 201, 0.1);
+}
+
+.timeline-item--absence .timeline-item-icon {
+	background: rgba(255, 165, 0, 0.1);
+}
+
+.timeline-item-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2, 0.5rem);
+	min-width: 0;
+}
+
+.timeline-item-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--space-4, 1rem);
+	flex-wrap: wrap;
+}
+
+.timeline-item-time,
+.timeline-item-date,
+.timeline-item-duration,
+.timeline-item-type {
+	font-weight: 500;
+	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
+}
+
+.timeline-item-time {
+	font-size: 1rem;
+}
+
+.timeline-item-duration {
+	color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
+	font-weight: 600;
+}
+
+.timeline-item-type {
+	text-transform: capitalize;
+}
+
+.timeline-item-status {
+	display: flex;
+	gap: var(--space-2, 0.5rem);
+	flex-wrap: wrap;
+}
+
+/* Badge Styles - Compatible with all Nextcloud themes */
+.badge {
+	display: inline-block;
+	padding: 0.25rem 0.75rem;
+	border-radius: 12px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	/* Use Nextcloud standard variables */
+	background-color: var(--color-background-hover, var(--color-background-dark, #f0f0f0));
+	color: var(--color-main-text, var(--color-text, #000));
+}
+
+.badge--success {
+	background-color: var(--color-success, #46ba61);
+	color: var(--color-success-text, var(--color-main-background, #ffffff));
+}
+
+.badge--primary {
+	background-color: var(--color-primary-element, var(--color-primary, #0082c9));
+	color: var(--color-primary-element-text, var(--color-primary-text, #ffffff));
+}
+
+.badge--warning {
+	background-color: var(--color-warning, #eca700);
+	color: var(--color-warning-text, var(--color-main-background, #ffffff));
+}
+
+.badge--error {
+	background-color: var(--color-error, #e9322d);
+	color: var(--color-error-text, var(--color-main-background, #ffffff));
+}
+
+.badge--secondary {
+	background-color: var(--color-background-hover, var(--color-background-dark, #f0f0f0));
+	color: var(--color-text-maxcontrast, var(--color-text, #666));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary)));
+}
+
+/* Empty and Error States */
+.timeline-empty,
+.timeline-error {
+	text-align: center;
+	padding: var(--space-12, 3rem);
+	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary)));
+}
+
+.timeline-error {
+	color: var(--arbeitszeitcheck-color-error, var(--color-error));
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.section {
+		padding: var(--space-4, 1rem);
+	}
+
+	.timeline-container {
+		padding: var(--space-4, 1rem) 0;
+	}
+
+	.timeline-item {
+		flex-direction: column;
+		gap: var(--space-2, 0.5rem);
+	}
+
+	.timeline-item-header {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

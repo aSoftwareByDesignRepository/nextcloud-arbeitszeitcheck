@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: 2024 Nextcloud GmbH and Nextcloud contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Ignore compiled and built files from translation extraction
+js/
+css/
+dist/
+build/
+
+# Ignore node modules and vendor dependencies
+node_modules/
+vendor/
+3rdparty/
+
+# Ignore test files
+tests/
+test/
+__tests__/
+*.test.js
+*.spec.js
+
+# Ignore documentation
+docs/
+*.md
+README*
+
+# Ignore config files
+*.config.js
+*.config.ts
+webpack.config.js
+vite.config.js
+jest.config.js
+babel.config.js
+.babelrc
+
+# Ignore build scripts
+build*.sh
+*.sh
+
+# Ignore temporary files
+*.tmp
+*.backup
+*.backup2
+*.temp
+webpack.temp.config.js
+
+# Ignore chunk files
+*.chunk.js
+
+# Ignore license files
+*.LICENSE.txt
+LICENSE
+COPYING
+
+# Ignore git files
+.git/
+.github/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore compiled CSS that's generated from source
+css/arbeitszeitcheck-main.css
+css/admin-settings.css
+css/compliance-dashboard.css
+css/compliance-reports.css
+css/compliance-violations.css
+css/settings.css
+
+# Only extract from source Vue and JS files in src/
+# Translation extraction should only scan:
+# - src/**/*.vue
+# - src/**/*.js
+# - lib/**/*.php
+# - templates/**/*.php

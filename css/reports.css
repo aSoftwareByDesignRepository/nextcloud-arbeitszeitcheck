@@ -1,0 +1,391 @@
+/**
+ * Reports – Clear, accessible, responsive layout
+ * Layout: app-layout.css (single source of truth for #app-content-wrapper)
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* ========== Sections ========== */
+.reports-section {
+	margin-bottom: var(--space-10, 2.5rem);
+}
+
+.reports-section__title {
+	margin: 0 0 var(--space-2, 0.5rem);
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: var(--color-main-text);
+	line-height: 1.3;
+}
+
+.reports-section__desc {
+	margin: 0 0 var(--space-6, 1.5rem);
+	font-size: 1rem;
+	color: var(--color-text-lighter);
+	line-height: 1.5;
+}
+
+.section {
+	background: var(--color-background-dark);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 10px);
+	padding: var(--space-6, 1.5rem);
+	box-shadow: 0 1px 3px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow));
+}
+
+.page-header-section {
+	padding: 0;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	margin-bottom: var(--space-6, 1.5rem);
+}
+
+.page-header-section .header-content {
+	margin-bottom: 0;
+}
+
+.page-header-section .header-text p {
+	margin: var(--space-2, 0.5rem) 0 0;
+	color: var(--color-text-lighter);
+	font-size: 1rem;
+}
+
+/* ========== Report type cards ========== */
+.report-selection-section {
+	padding: 0;
+}
+
+.report-types-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+	gap: var(--space-4, 1rem);
+	margin-top: var(--space-4, 1rem);
+}
+
+.report-type-card {
+	background: var(--color-main-background);
+	border: 2px solid var(--color-border);
+	border-radius: var(--border-radius-large, 10px);
+	padding: var(--space-5, 1.25rem);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	cursor: pointer;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	min-height: var(--default-clickable-area, 44px);
+	min-height: 11rem;
+	box-sizing: border-box;
+}
+
+.report-type-card:hover {
+	border-color: var(--color-primary-element);
+	box-shadow: 0 2px 8px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow));
+}
+
+.report-type-card:focus-within {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+.report-type-icon {
+	font-size: 2.5rem;
+	margin-bottom: var(--space-3, 0.75rem);
+	line-height: 1;
+}
+
+.report-type-card h4 {
+	margin: 0 0 var(--space-2, 0.5rem);
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: var(--color-main-text);
+}
+
+.report-type-card p {
+	margin: 0 0 var(--space-4, 1rem);
+	font-size: 0.9375rem;
+	color: var(--color-text-lighter);
+	line-height: 1.45;
+	flex: 1;
+}
+
+.btn-select-report {
+	width: 100%;
+	min-height: var(--default-clickable-area, 44px);
+	padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+	font-size: 1rem;
+	font-weight: 500;
+	color: var(--color-primary-element-text);
+	background: var(--color-primary-element);
+	border: 2px solid transparent;
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease;
+	margin-top: auto;
+	box-sizing: border-box;
+}
+
+.btn-select-report:hover {
+	background: var(--color-primary-element-hover);
+}
+
+.btn-select-report:focus-visible {
+	outline: 2px solid var(--color-main-text);
+	outline-offset: 2px;
+}
+
+/* ========== Parameters form ========== */
+.report-parameters-section {
+	border-top: 1px solid var(--color-border);
+	padding-top: var(--space-6, 1.5rem);
+	margin-top: var(--space-6, 1.5rem);
+}
+
+.report-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6, 1.5rem);
+	max-width: 28rem;
+}
+
+.report-form .form-group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2, 0.5rem);
+}
+
+.report-form .form-label {
+	font-weight: 500;
+	color: var(--color-main-text);
+	font-size: 1rem;
+}
+
+.report-form .form-required {
+	color: var(--color-error);
+}
+
+.report-form .form-input,
+.report-form .form-select {
+	min-height: var(--default-clickable-area, 44px);
+	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+	border: 2px solid var(--color-border);
+	border-radius: var(--border-radius);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font-size: 1rem;
+}
+
+.report-form .form-input:focus,
+.report-form .form-select:focus {
+	border-color: var(--color-primary-element);
+	outline: none;
+	box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.report-form .form-help {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--color-text-lighter);
+	line-height: 1.4;
+}
+
+/* ========== Actions ========== */
+.card-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-3, 0.75rem);
+	align-items: center;
+	margin-top: var(--space-2, 0.5rem);
+}
+
+.card-actions .btn {
+	min-height: var(--default-clickable-area, 44px);
+	padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+	font-size: 1rem;
+	font-weight: 500;
+	border-radius: var(--border-radius);
+	border: 2px solid transparent;
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease;
+	box-sizing: border-box;
+}
+
+.card-actions .btn:focus-visible {
+	outline: 2px solid var(--color-main-text);
+	outline-offset: 2px;
+}
+
+.card-actions .btn--primary {
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+}
+
+.card-actions .btn--primary:hover {
+	background: var(--color-primary-element-hover);
+}
+
+.card-actions .btn--secondary {
+	background: var(--color-background-dark);
+	color: var(--color-main-text);
+	border-color: var(--color-border);
+}
+
+.card-actions .btn--secondary:hover {
+	background: var(--color-background-hover);
+	border-color: var(--color-main-text);
+}
+
+/* ========== Preview ========== */
+.report-preview-section {
+	border-top: 1px solid var(--color-border);
+	padding-top: var(--space-6, 1.5rem);
+	margin-top: var(--space-6, 1.5rem);
+}
+
+.report-preview-content {
+	background: var(--color-main-background);
+	border: 2px solid var(--color-border);
+	border-radius: var(--border-radius-large, 10px);
+	padding: var(--space-6, 1.5rem);
+	min-height: 8rem;
+	margin-top: var(--space-4, 1rem);
+}
+
+.report-result {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4, 1rem);
+}
+
+.report-meta {
+	margin: 0;
+	font-size: 1rem;
+	color: var(--color-main-text);
+	line-height: 1.5;
+}
+
+.report-success {
+	margin: 0 0 var(--space-4, 1rem);
+	padding: var(--space-3, 0.75rem);
+	background: var(--color-success);
+	color: var(--color-success-text, var(--color-main-text));
+	border-radius: var(--border-radius);
+	font-weight: 500;
+}
+
+.report-error {
+	margin: 0;
+	padding: var(--space-3, 0.75rem);
+	background: var(--color-error);
+	color: var(--color-error-text, var(--color-primary-text));
+	border-radius: var(--border-radius);
+	font-weight: 500;
+}
+
+.report-loading {
+	margin: 0;
+	color: var(--color-text-lighter);
+}
+
+.report-subhead {
+	margin: var(--space-4, 1rem) 0 var(--space-2, 0.5rem);
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--color-main-text);
+}
+
+.report-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 1rem;
+}
+
+.report-table th,
+.report-table td {
+	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+	text-align: left;
+	border-bottom: 1px solid var(--color-border);
+}
+
+.report-table th {
+	font-weight: 600;
+	color: var(--color-main-text);
+	background: var(--color-background-dark);
+}
+
+.report-table td {
+	color: var(--color-main-text);
+}
+
+.report-summary {
+	margin: var(--space-2, 0.5rem) 0 0;
+	color: var(--color-text-lighter);
+	line-height: 1.5;
+}
+
+/* Screen reader only (live region) */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ========== Empty state ========== */
+.empty-state {
+	text-align: center;
+	padding: var(--space-8, 2rem);
+}
+
+.empty-state__title {
+	margin: 0 0 var(--space-3, 0.75rem);
+	font-size: 1.25rem;
+	color: var(--color-main-text);
+}
+
+.empty-state__description {
+	margin: 0;
+	color: var(--color-text-lighter);
+	line-height: 1.5;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+	.report-types-grid {
+		grid-template-columns: 1fr;
+		gap: var(--space-3, 0.75rem);
+	}
+
+	.report-type-card {
+		min-height: 10rem;
+		padding: var(--space-4, 1rem);
+	}
+
+	.card-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.card-actions .btn {
+		width: 100%;
+	}
+}
+
+@media (min-width: 769px) {
+	.report-types-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.report-types-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}

@@ -1,0 +1,43 @@
+{
+  "name": "arbeitszeitcheck",
+  "version": "1.1.1",
+  "description": "German labor law compliant time tracking system for Nextcloud",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint js/",
+    "lint:fix": "eslint js/ --fix",
+    "stylelint": "stylelint 'css/**/*.css'",
+    "stylelint:fix": "stylelint 'css/**/*.css' --fix",
+    "test": "echo \"No tests specified\" && exit 0",
+    "build": "echo \"No build step\" && exit 0",
+    "test:a11y": "echo \"No a11y tests yet\" && exit 0"
+  },
+  "keywords": [
+    "nextcloud",
+    "time-tracking",
+    "arbeitszeit",
+    "german-law",
+    "arbzg",
+    "gdpr"
+  ],
+  "author": "Alexander Mäule <info@software-by-design.de> (https://software-by-design.de)",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@nextcloud/eslint-config": "^8.3.0",
+    "@nextcloud/stylelint-config": "^3.0.1",
+    "eslint": "^8.57.1",
+    "stylelint": "^17.1.1"
+  },
+  "dependencies": {
+    "@nextcloud/axios": "^2.5.0",
+    "@nextcloud/l10n": "^3.1.0",
+    "date-fns": "^2.30.0"
+  },
+  "browserslist": [
+    "extends @nextcloud/browserslist-config"
+  ],
+  "engines": {
+    "node": "^20.0.0 || ^22.0.0",
+    "npm": "^10.0.0"
+  }
+}

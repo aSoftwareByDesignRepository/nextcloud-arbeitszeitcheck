@@ -1,0 +1,33 @@
+# Dependencies
+vendor/
+node_modules/
+
+# Test coverage and results
+tests/coverage/
+tests/results.xml
+.phpunit.result.cache
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+server.log
+
+# Nextcloud specific
+data/
+config/config.php
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build output
+build/

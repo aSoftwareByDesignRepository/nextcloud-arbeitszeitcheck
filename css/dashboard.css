@@ -1,0 +1,514 @@
+/**
+ * Dashboard CSS for arbeitszeitcheck app
+ * Layout: app-layout.css (single source of truth for #app-content, #app-content-wrapper)
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* Dashboard-specific: extra bottom padding for scroll */
+#content.app-arbeitszeitcheck #app-content {
+    padding-bottom: var(--space-12);
+}
+
+/* Section Styling - Clear, easy-to-identify blocks (WCAG 2.1 AA friendly) */
+.section {
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    border-radius: var(--radius-2xl);
+    margin-bottom: var(--space-12);
+    padding: var(--space-8);
+    overflow: visible;
+    box-shadow: var(--shadow-base);
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    position: relative;
+    height: auto;
+    visibility: visible;
+    opacity: 1;
+    display: block;
+}
+
+.section:last-child {
+    margin-bottom: 0;
+}
+
+/* Page header: one clear title + short description */
+.page-header-section {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    margin-bottom: var(--space-10);
+}
+
+.page-header-section .header-content {
+    margin-bottom: 0;
+}
+
+.page-header-section .header-text h2 {
+    font-size: var(--arbeitszeitcheck-font-size-3xl);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold);
+    margin: 0 0 var(--space-2) 0;
+    color: var(--arbeitszeitcheck-color-text);
+}
+
+.page-header-section .header-text p {
+    font-size: var(--arbeitszeitcheck-font-size-lg);
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    margin: 0;
+    line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+/* Section Header - Clear visual separation (easy to identify sections, WCAG heading hierarchy) */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-5);
+    border-bottom: 3px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    visibility: visible;
+    opacity: 1;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: var(--arbeitszeitcheck-font-size-2xl);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold);
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.section-header p {
+    margin: var(--space-2) 0 0 0;
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    line-height: 1.5;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Dashboard Grid - Clear spacing between cards (generous gaps for clarity) */
+.arbeitszeitcheck-dashboard__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: var(--space-10);
+    margin-bottom: 0;
+    visibility: visible;
+    opacity: 1;
+    width: 100%;
+}
+
+/* Cards - Clear boundaries, comfortable padding (simple UX, foolproof) */
+.card {
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    border-radius: var(--radius-xl);
+    padding: var(--space-8);
+    box-shadow: var(--shadow-base);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    visibility: visible;
+    opacity: 1;
+    box-sizing: border-box;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .card:hover {
+        transform: translateY(-2px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card {
+        transition: none;
+    }
+    .card:hover {
+        transform: none;
+    }
+}
+
+.card-header {
+    margin-bottom: var(--space-4, 1rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-2, 0.5rem) 0;
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.card-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 1rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Welcome message: step list — clear, simple, easy for anyone to follow */
+.welcome-steps {
+    margin: var(--space-6) 0;
+    padding-left: var(--space-8);
+    list-style: decimal;
+    font-size: var(--arbeitszeitcheck-font-size-lg);
+    line-height: 1.7;
+}
+
+.welcome-steps li {
+    margin-bottom: var(--space-4);
+    line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
+.welcome-steps li:last-child {
+    margin-bottom: 0;
+}
+
+/* Welcome alert card - visually distinct, welcoming */
+.card.alert--info {
+    border-width: 2px;
+    border-color: var(--arbeitszeitcheck-color-info);
+}
+
+/* ===== Current Status Card (Dashboard) ===== */
+.dashboard-status-card {
+    position: relative;
+    overflow: hidden;
+    --status-accent: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+}
+
+.dashboard-status-card--active {
+    --status-accent: var(--arbeitszeitcheck-color-success, var(--color-success, #46ba61));
+}
+
+.dashboard-status-card--break {
+    --status-accent: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+}
+
+.dashboard-status-card--clocked_out {
+    --status-accent: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+}
+
+.dashboard-status-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--status-accent), transparent);
+    opacity: 0.9;
+}
+
+.dashboard-status-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4, 1rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.dashboard-status-card__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    min-width: 0;
+}
+
+.dashboard-status-card__icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg, 8px);
+    background: color-mix(in srgb, var(--status-accent) 14%, transparent);
+    color: var(--status-accent);
+    font-size: 1.1rem;
+    flex: 0 0 auto;
+    border: 1px solid color-mix(in srgb, var(--status-accent) 28%, transparent);
+}
+
+.dashboard-status-card .badge {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-full, 9999px);
+    /* Ensure compatibility with all Nextcloud themes */
+    background-color: var(--color-primary-element, var(--color-primary, #0082c9));
+    color: var(--color-primary-element-text, var(--color-primary-text, #ffffff));
+}
+
+/* Session Timer */
+.dashboard-status-card__timer {
+    padding: var(--space-4, 1rem);
+    border-radius: var(--radius-lg, 8px);
+    background: color-mix(in srgb, var(--status-accent) 10%, var(--arbeitszeitcheck-color-background-elevated, #fff));
+    border: 1px solid color-mix(in srgb, var(--status-accent) 25%, var(--arbeitszeitcheck-color-border, #ddd));
+    margin: 0;
+}
+
+/* Session Timer */
+.session-timer {
+    margin: 1rem 0;
+    visibility: visible;
+    opacity: 1;
+}
+
+.timer-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    margin-bottom: var(--space-2, 0.5rem);
+    visibility: visible;
+    opacity: 1;
+}
+
+.timer-value {
+    font-family: 'Courier New', monospace;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.dashboard-status-card--active .timer-value {
+    color: var(--arbeitszeitcheck-color-success, var(--color-success, #46ba61));
+}
+
+.dashboard-status-card--break .timer-value {
+    color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+}
+
+/* Timer warnings for maximum working hours (ArbZG §3) */
+.timer-value.timer-warning {
+    color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+.timer-value.timer-error {
+    color: var(--arbeitszeitcheck-color-error, var(--color-error, #e9322d));
+    animation: pulse-error 1s ease-in-out infinite;
+}
+
+.session-timer.timer-warning {
+    border-color: var(--arbeitszeitcheck-color-warning, var(--color-warning, #ffa726));
+    background: color-mix(in srgb, var(--arbeitszeitcheck-color-warning, #ffa726) 15%, var(--arbeitszeitcheck-color-background-elevated, #fff));
+}
+
+.session-timer.timer-exceeded {
+    border-color: var(--arbeitszeitcheck-color-error, var(--color-error, #e9322d));
+    background: color-mix(in srgb, var(--arbeitszeitcheck-color-error, #e9322d) 15%, var(--arbeitszeitcheck-color-background-elevated, #fff));
+}
+
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes pulse-error {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.dashboard-status-card__meta {
+    margin-top: var(--space-2, 0.5rem);
+    font-size: 0.85rem;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, #666));
+}
+
+.dashboard-status-card .card-actions {
+    justify-content: flex-start;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+/* Touch targets: buttons at least 44px (WCAG 2.5.5) */
+.dashboard-status-card .card-actions .btn {
+    flex: 1 1 160px;
+    min-height: 44px;
+}
+
+/* Stat Items - clear label/value pairs, easy to scan */
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4) 0;
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border));
+    visibility: visible;
+    opacity: 1;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    visibility: visible;
+    opacity: 1;
+}
+
+.stat-value {
+    font-size: var(--arbeitszeitcheck-font-size-xl);
+    font-weight: 700;
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
+    visibility: visible;
+    opacity: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-value.positive {
+    color: var(--arbeitszeitcheck-color-success, var(--color-success, #2ecc71));
+}
+
+.stat-value.negative {
+    color: var(--arbeitszeitcheck-color-error, var(--color-error, #e74c3c));
+}
+
+/* Action Buttons - Use common button styles from components.css */
+.action-buttons {
+    display: flex;
+    gap: var(--space-3, 0.75rem);
+    flex-wrap: wrap;
+    margin-top: var(--space-4, 1rem);
+}
+
+/* Action buttons use common button styles from components.css */
+
+/* Recent Entries Section */
+.recent-entries-section {
+    margin-top: var(--space-8, 2rem);
+}
+
+/* Table Styling - Use common table styles */
+.table-responsive,
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    visibility: visible;
+    opacity: 1;
+}
+
+.table,
+.table--hover {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table thead {
+    background: var(--arbeitszeitcheck-color-background-dark, var(--color-background-dark, var(--arbeitszeitcheck-color-background-tertiary)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table th {
+    padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
+    border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table td {
+    padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border, #ddd));
+    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    visibility: visible;
+    opacity: 1;
+}
+
+.table tbody tr:hover,
+.table--hover tbody tr:hover {
+    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+}
+
+/* Empty State - Clear, welcoming, easy to understand (simple UX) */
+.empty-state {
+    text-align: center;
+    padding: var(--space-12) var(--space-6);
+}
+
+.empty-state p:first-child,
+.empty-state__title {
+    font-size: var(--arbeitszeitcheck-font-size-xl);
+    font-weight: var(--arbeitszeitcheck-font-weight-semibold);
+    color: var(--arbeitszeitcheck-color-text);
+}
+
+.empty-state-description {
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    margin: var(--space-3) 0 var(--space-6);
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    line-height: 1.6;
+    max-width: 40ch;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.empty-state .btn {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--arbeitszeitcheck-font-size-base);
+}
+
+/* Responsive - Clear layout on small screens (100% width, no overflow) */
+@media (max-width: 768px) {
+    .section {
+        padding: var(--space-5);
+        margin-bottom: var(--space-8);
+    }
+
+    .arbeitszeitcheck-dashboard__grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-6);
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-3);
+    }
+
+    .dashboard-status-card__header {
+        align-items: center;
+    }
+
+    .page-header-section .header-text h2 {
+        font-size: var(--arbeitszeitcheck-font-size-2xl);
+    }
+
+    /* Full-width action buttons on mobile; stack vertically for clarity */
+    .dashboard-status-card .card-actions {
+        flex-direction: column;
+    }
+
+    .dashboard-status-card .card-actions .btn {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+}

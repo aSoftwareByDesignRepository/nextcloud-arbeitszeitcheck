@@ -31,3 +31,6 @@ config/config.php
 
 # Build output
 build/
+
+# Local dev scripts (e.g. signing helper, not for public repo)
+scripts/

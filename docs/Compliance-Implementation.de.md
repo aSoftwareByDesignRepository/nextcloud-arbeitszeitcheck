@@ -1,8 +1,8 @@
 # Compliance-Implementierung: Echtzeit-Prüfung nach ArbZG
 
 > **Hinweis:** Dieses Dokument beschreibt die **technische Umsetzung** der ArbZG‑Compliance in ArbeitszeitCheck.  
-> Für eine juristische Einordnung und eine zusammengefasste Bewertung siehe `ArbZG-Compliance-Analyse.md`.  
-> Dieses Dokument ist **keine Rechtsberatung**.
+> Es ist eine rein technische Beschreibung und **keine Rechtsberatung** oder juristische Stellungnahme.  
+> Für eine rechtliche Bewertung von Arbeitszeitmodellen und Regelungen wenden Sie sich bitte an Ihre Rechtsabteilung oder einen Fachanwalt für Arbeitsrecht.
 
 ## Gesetzliche Grundlagen
 

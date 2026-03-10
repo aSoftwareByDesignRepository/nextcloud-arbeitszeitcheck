@@ -46,6 +46,8 @@ $total = $_['total'] ?? 0;
                                 <th scope="col"><?php p($l->t('Employee Name')); ?></th>
                                 <th scope="col"><?php p($l->t('Email Address')); ?></th>
                                 <th scope="col"><?php p($l->t('Work Schedule')); ?></th>
+                                <th scope="col"><?php p($l->t('Vacation days')); ?></th>
+                                <th scope="col"><?php p($l->t('Valid from / to')); ?></th>
                                 <th scope="col"><?php p($l->t('Status')); ?></th>
                                 <th scope="col"><?php p($l->t('Actions')); ?></th>
                             </tr>
@@ -53,12 +55,25 @@ $total = $_['total'] ?? 0;
                         <tbody id="users-tbody">
                             <?php if (empty($users)): ?>
                                 <tr>
-                                    <td colspan="5" class="text-center">
+                                    <td colspan="7" class="text-center">
                                         <?php p($l->t('No users found')); ?>
                                     </td>
                                 </tr>
                             <?php else: ?>
+                                <?php
+                                $formatDate = function ($iso) use ($l) {
+                                    if (empty($iso)) return '-';
+                                    $d = \DateTime::createFromFormat('Y-m-d', $iso);
+                                    return $d ? $d->format('d.m.Y') : $iso;
+                                };
+                                ?>
                                 <?php foreach (($users ?? []) as $user): ?>
+                                    <?php
+                                    $vacation = $user['vacationDaysPerYear'] ?? null;
+                                    $start = $user['workingTimeModelStartDate'] ?? null;
+                                    $end = $user['workingTimeModelEndDate'] ?? null;
+                                    $validity = $start ? ($formatDate($start) . ($end ? ' – ' . $formatDate($end) : ' – ' . $l->t('ongoing'))) : '-';
+                                    ?>
                                     <tr data-user-id="<?php p($user['userId']); ?>">
                                         <td><?php p($user['displayName']); ?></td>
                                         <td><?php p($user['email'] ?? '-'); ?></td>
@@ -69,6 +84,8 @@ $total = $_['total'] ?? 0;
                                                 <span class="text-muted"><?php p($l->t('Not assigned')); ?></span>
                                             <?php endif; ?>
                                         </td>
+                                        <td><?php p($vacation !== null ? (string)$vacation : '-'); ?></td>
+                                        <td><?php p($validity); ?></td>
                                         <td>
                                             <?php if ($user['enabled']): ?>
                                                 <span class="badge badge--success"><?php p($l->t('Enabled')); ?></span>
@@ -77,14 +94,25 @@ $total = $_['total'] ?? 0;
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <button type="button" 
-                                                    class="btn btn--sm btn--secondary" 
-                                                    data-action="edit-user" 
-                                                    data-user-id="<?php p($user['userId']); ?>"
-                                                    aria-label="<?php p($l->t('Edit this employee\'s work schedule')); ?>"
-                                                    title="<?php p($l->t('Click to change this employee\'s work schedule or other settings')); ?>">
-                                                <?php p($l->t('Edit')); ?>
-                                            </button>
+                                            <div class="user-actions" role="group" aria-label="<?php p($l->t('Actions for %s', [$user['displayName']])); ?>">
+                                                <button type="button" 
+                                                        class="btn btn--sm btn--tertiary" 
+                                                        data-action="history-user" 
+                                                        data-user-id="<?php p($user['userId']); ?>"
+                                                        data-user-name="<?php p($user['displayName']); ?>"
+                                                        aria-label="<?php p($l->t('View assignment history for %s', [$user['displayName']])); ?>"
+                                                        title="<?php p($l->t('View work schedule history')); ?>">
+                                                    <?php p($l->t('History')); ?>
+                                                </button>
+                                                <button type="button" 
+                                                        class="btn btn--sm btn--secondary" 
+                                                        data-action="edit-user" 
+                                                        data-user-id="<?php p($user['userId']); ?>"
+                                                        aria-label="<?php p($l->t('Edit this employee\'s work schedule')); ?>"
+                                                        title="<?php p($l->t('Click to change this employee\'s work schedule or other settings')); ?>">
+                                                    <?php p($l->t('Edit')); ?>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -117,6 +145,24 @@ $total = $_['total'] ?? 0;
     window.ArbeitszeitCheck.l10n.selectWorkScheduleHelp = <?php echo json_encode($l->t('Select a work schedule to assign to this employee'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.vacationDaysHelp = <?php echo json_encode($l->t('Number of vacation days per year (standard in Germany: 25 days)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.endDateHelp = <?php echo json_encode($l->t('Leave empty if the assignment has no end date'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.endDateOptional = <?php echo json_encode($l->t('End Date (Optional)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.userUpdated = <?php echo json_encode($l->t('User updated successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.error = <?php echo json_encode($l->t('An error occurred'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.currentAssignment = <?php echo json_encode($l->t('Current assignment'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.changeAssignment = <?php echo json_encode($l->t('Change assignment'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.assignmentHistory = <?php echo json_encode($l->t('Assignment history'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.noAssignmentHistory = <?php echo json_encode($l->t('No assignment history'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.active = <?php echo json_encode($l->t('Active'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.ended = <?php echo json_encode($l->t('Ended'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.vacationDays = <?php echo json_encode($l->t('vacation days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.loading = <?php echo json_encode($l->t('Loading'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.ongoing = <?php echo json_encode($l->t('ongoing'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.notAssigned = <?php echo json_encode($l->t('Not assigned'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.history = <?php echo json_encode($l->t('History'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.close = <?php echo json_encode($l->t('Close'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.workSchedule = <?php echo json_encode($l->t('Work schedule'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.vacationDaysCol = <?php echo json_encode($l->t('Vacation days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.validFrom = <?php echo json_encode($l->t('Valid from'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.validTo = <?php echo json_encode($l->t('Valid to'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.status = <?php echo json_encode($l->t('Status'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>

@@ -18,6 +18,22 @@ Die App läuft vollständig innerhalb Ihrer selbst gehosteten Nextcloud‑Instan
 - **Audit‑Logs**: Lückenlose Nachvollziehbarkeit von Änderungen an Zeiten, Abwesenheiten und Einstellungen
 - **DSGVO‑Support**: Exporte, Löschkonzepte (unter Beachtung der gesetzlichen Aufbewahrung), DPIA‑/Verarbeitungsverzeichnis‑Vorlagen
 
+> **Rechtlicher Hinweis (DE):**  
+> ArbeitszeitCheck unterstützt Arbeitgeber und Administratoren bei der technisch sauberen Umsetzung von ArbZG‑ und DSGVO‑Anforderungen (z. B. Höchstarbeitszeit, Pausen, Ruhezeiten, Aufzeichnungspflichten).  
+> Die App ersetzt **keine** individuelle Rechtsberatung. Arbeitgeber bleiben rechtlich dafür verantwortlich,
+> - wie Arbeitszeitmodelle, Betriebsvereinbarungen und Tarifverträge gestaltet sind,  
+> - wie Konfigurationen (Grenzwerte, Ausnahmen, Aufbewahrungsfristen) gewählt werden und  
+> - wie die erfassten Daten ausgewertet und für arbeitsrechtliche Entscheidungen verwendet werden.  
+> Prüfen Sie Konfiguration, Prozesse und Texte bei Bedarf mit Ihrer Rechtsabteilung oder einem Fachanwalt für Arbeitsrecht.
+
+> **Legal notice (EN):**  
+> ArbeitszeitCheck helps organizations implement technical controls for German working time law (ArbZG) and GDPR (e.g. maximum working hours, breaks, rest periods, record‑keeping).  
+> The app is **not** a substitute for legal advice. Employers remain legally responsible for:
+> - the design of working time models, collective agreements and internal policies,  
+> - the chosen configuration (limits, exceptions, retention periods), and  
+> - how recorded data is interpreted and used for HR / legal decisions.  
+> Always review your setup with your legal counsel if in doubt.
+
 ### Installation
 
 **Aus dem Nextcloud App Store (empfohlen)**
@@ -45,20 +61,17 @@ Unterstützte Umgebungen:
 
 ### Dokumentation
 
-Die wichtigsten Begleitdokumente liegen im Ordner `docs/`:
+Die wichtigsten öffentlich mitgelieferten Begleitdokumente liegen im Ordner `docs/`:
 
-- **Architektur & Rollen**
-  - `VIEWS_ANALYSIS.md` – Überblick über alle Seiten und Routen
-  - `ROLES_AND_PERMISSIONS.md` – Rollen‑ und Berechtigungsmodell (Single Source of Truth)
 - **Compliance**
-  - `ArbZG-Compliance-Analyse.md` – Abdeckung der ArbZG‑Paragraphen
   - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – technische Umsetzung der ArbZG‑Regeln
   - `GDPR-Compliance-Guide.en.md` – Betrieb der App im Einklang mit DSGVO/GDPR
 - **Implementierung**
   - `TRANSLATIONS.md` – Übersetzungskonzept und verwendete Keys
   - `UX-and-Accessibility.md` – UX‑/WCAG‑Leitlinien und Designentscheidungen
   - `Developer-Documentation.en.md` – Architekturüberblick und Hinweise für Beitragende
-  - `Store-Publishing.md` – Ablauf für Releases in den Nextcloud App Store
+
+Weitere, detailliertere Arbeits‑ und Compliance‑Dokumente (z. B. Rollen‑/Rechtematrix, ArbZG‑Analyse, Store‑Publishing‑How‑to) werden intern in einem separaten Dokumentations‑Repository gepflegt und bewusst nicht mit der App ausgeliefert.
 
 Die Endnutzer‑Oberfläche ist so gestaltet, dass sie ohne separates Handbuch verständlich ist; zusätzliche Handbücher oder rechtliche Vorlagen werden bewusst nicht mit ausgeliefert und können organisationsspezifisch ergänzt werden.
 

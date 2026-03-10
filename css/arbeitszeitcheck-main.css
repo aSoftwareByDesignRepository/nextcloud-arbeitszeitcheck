@@ -42,7 +42,7 @@
 .stat-card .stat-label {
   display: block;
   font-size: 0.875rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   margin-top: var(--space-1, 0.25rem);
   font-weight: 500;
 }
@@ -68,7 +68,7 @@
   font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
   font-weight: 500;
   text-decoration: none;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-base, 6px);

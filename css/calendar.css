@@ -17,7 +17,7 @@
 	margin-bottom: var(--space-8, 2rem);
 	padding: var(--space-6, 1.5rem);
 	overflow: visible;
-	box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
+	box-shadow: var(--arbeitszeitcheck-shadow-base);
 	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
 	position: relative;
 	height: auto;
@@ -59,7 +59,7 @@
 
 .btn-nav:hover {
 	background: var(--arbeitszeitcheck-color-primary, var(--color-primary));
-	color: var(--arbeitszeitcheck-color-primary-text, var(--color-primary-text, var(--arbeitszeitcheck-color-white)));
+	color: var(--arbeitszeitcheck-color-primary-text, var(--color-primary-text));
 	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 
@@ -165,7 +165,7 @@
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
 	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
 	transform: translateY(-2px);
-	box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+	box-shadow: var(--arbeitszeitcheck-shadow-md);
 }
 
 .calendar-day--empty {
@@ -413,7 +413,7 @@
 
 .view-toggle .btn.active {
 	background: var(--arbeitszeitcheck-color-primary, var(--color-primary));
-	color: var(--arbeitszeitcheck-color-primary-text, var(--color-primary-text, var(--arbeitszeitcheck-color-white)));
+	color: var(--arbeitszeitcheck-color-primary-text, var(--color-primary-text));
 	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 

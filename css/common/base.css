@@ -409,32 +409,32 @@ template {
   color: var(--arbeitszeitcheck-color-text);
 }
 
-/* Scrollbar Styles */
-::-webkit-scrollbar {
+/* Scrollbar Styles — scoped to app content to avoid affecting header/account menu popover */
+#content.app-arbeitszeitcheck ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+#content.app-arbeitszeitcheck ::-webkit-scrollbar-track {
   background: var(--arbeitszeitcheck-color-background-secondary);
 }
 
-::-webkit-scrollbar-thumb {
+#content.app-arbeitszeitcheck ::-webkit-scrollbar-thumb {
   background: var(--arbeitszeitcheck-color-gray-400);
   border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+#content.app-arbeitszeitcheck ::-webkit-scrollbar-thumb:hover {
   background: var(--arbeitszeitcheck-color-gray-500);
 }
 
-/* Firefox Scrollbar */
-* {
+/* Firefox Scrollbar — scoped to app content to avoid affecting header/account menu popover */
+#content.app-arbeitszeitcheck * {
   scrollbar-width: thin;
   scrollbar-color: var(--arbeitszeitcheck-color-gray-400) var(--arbeitszeitcheck-color-background-secondary);
 }
 
-/* Print Styles */
+/* Print Styles — black text on white for paper (standard; screen theme vars don't apply) */
 @media print {
   *,
   *::before,
@@ -595,7 +595,7 @@ button {
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 /* Link Base Styles */

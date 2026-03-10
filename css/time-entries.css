@@ -12,13 +12,13 @@
 
 /* Section Styling */
 .section {
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-    border-radius: var(--radius-2xl, 16px);
-    margin-bottom: var(--space-8, 2rem);
-    padding: var(--space-6, 1.5rem);
-    overflow: visible;
-    box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-elevated);
+	border-radius: var(--radius-2xl, 16px);
+	margin-bottom: var(--space-8, 2rem);
+	padding: var(--space-6, 1.5rem);
+	overflow: visible;
+	box-shadow: var(--arbeitszeitcheck-shadow-base);
+	border: 1px solid var(--arbeitszeitcheck-color-border);
     position: relative;
     height: auto;
     visibility: visible;
@@ -41,13 +41,13 @@
 /* Page Header - Use common styles, only override if needed */
 .arbeitszeitcheck-header {
     background: linear-gradient(135deg,
-            var(--arbeitszeitcheck-color-primary-lighter, var(--color-primary-background, #f0f7ff)) 0%,
-            var(--arbeitszeitcheck-color-background-secondary, var(--color-background-hover, #f5f5f5)) 100%);
-    border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+            var(--arbeitszeitcheck-color-primary-lighter) 0%,
+            var(--arbeitszeitcheck-color-background-secondary) 100%);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
     padding: 2.5rem 2rem;
     margin: 0 0 2rem 0;
     border-radius: 16px 16px 0 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 /* Stats Grid */
@@ -62,12 +62,12 @@
 }
 
 .stat-card {
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-elevated);
+    border: 1px solid var(--arbeitszeitcheck-color-border);
     border-radius: var(--radius-base, 12px);
     padding: var(--space-6, 1.5rem);
     text-align: center;
-    box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+    box-shadow: var(--arbeitszeitcheck-shadow-subtle);
     transition: all 0.2s ease;
     visibility: visible;
     opacity: 1;
@@ -75,15 +75,15 @@
 }
 
 .stat-card:hover {
-    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+    box-shadow: var(--arbeitszeitcheck-shadow-md);
     transform: translateY(-2px);
-    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+    background: var(--arbeitszeitcheck-color-background-hover);
 }
 
 .stat-card .stat-label {
     display: block;
     font-size: 0.85rem;
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
     margin-bottom: var(--space-2, 0.5rem);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -95,7 +95,7 @@
     display: block;
     font-size: 2rem;
     font-weight: 700;
-    color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+    color: var(--arbeitszeitcheck-color-primary);
     line-height: 1.2;
     visibility: visible;
     opacity: 1;
@@ -103,12 +103,12 @@
 
 /* Filter Section */
 .filter-section {
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-elevated);
+    border: 1px solid var(--arbeitszeitcheck-color-border);
     border-radius: var(--radius-xl, 12px);
     padding: var(--space-6, 1.5rem);
     margin-bottom: var(--space-8, 2rem);
-    box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+    box-shadow: var(--arbeitszeitcheck-shadow-subtle);
     visibility: visible;
     opacity: 1;
 }
@@ -127,7 +127,7 @@
 .arbeitszeitcheck-table {
     width: 100%;
     border-collapse: collapse;
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+    background: var(--arbeitszeitcheck-color-background-elevated);
     visibility: visible;
     opacity: 1;
 }
@@ -148,8 +148,8 @@
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
-    border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
+    border-bottom: 2px solid var(--arbeitszeitcheck-color-border);
     visibility: visible;
     opacity: 1;
 }
@@ -157,8 +157,8 @@
 .table td,
 .arbeitszeitcheck-table td {
     padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
-    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border, #ddd));
-    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary);
+    color: var(--arbeitszeitcheck-color-main-text);
     visibility: visible;
     opacity: 1;
 }
@@ -166,7 +166,7 @@
 .table tbody tr:hover,
 .table--hover tbody tr:hover,
 .arbeitszeitcheck-table tbody tr:hover {
-    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+    background: var(--arbeitszeitcheck-color-background-hover);
 }
 
 .description-cell {
@@ -179,7 +179,7 @@
 }
 
 .description-more {
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 .actions-cell {
@@ -208,7 +208,7 @@
 .empty-state__title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+    color: var(--arbeitszeitcheck-color-main-text);
     margin: 0 0 var(--space-4, 1rem) 0;
     visibility: visible;
     opacity: 1;
@@ -216,7 +216,7 @@
 
 .empty-state__description {
     font-size: 1rem;
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
     margin: 0 0 var(--space-6, 1.5rem) 0;
     line-height: 1.5;
     visibility: visible;
@@ -235,7 +235,7 @@
 }
 
 .pagination-info {
-    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
     font-size: 0.9rem;
     visibility: visible;
     opacity: 1;
@@ -245,7 +245,7 @@
 .form-section {
     margin-bottom: var(--space-8, 2rem);
     padding-bottom: var(--space-6, 1.5rem);
-    border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
 }
 
 .form-section:last-of-type {
@@ -257,7 +257,7 @@
 .form-section-title {
     font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
     font-weight: var(--arbeitszeitcheck-font-weight-semibold, 600);
-    color: var(--arbeitszeitcheck-color-text, var(--color-main-text, #000));
+    color: var(--arbeitszeitcheck-color-text);
     margin: 0 0 var(--space-2, 0.5rem) 0;
     display: flex;
     align-items: center;
@@ -266,7 +266,7 @@
 
 .form-section-description {
     font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
-    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    color: var(--arbeitszeitcheck-color-text-secondary);
     margin: 0 0 var(--space-4, 1rem) 0;
     line-height: var(--arbeitszeitcheck-line-height-relaxed, 1.6);
 }
@@ -302,14 +302,14 @@
 
 .card {
     padding: var(--space-6, 1.5rem);
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-elevated);
+    border: 1px solid var(--arbeitszeitcheck-color-border);
     border-radius: var(--radius-xl, 12px);
-    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
+    box-shadow: var(--arbeitszeitcheck-shadow-md);
 }
 
 .card--elevated {
-    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+    box-shadow: var(--arbeitszeitcheck-shadow-lg);
 }
 
 /* Responsive */
@@ -363,8 +363,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2, 0.5rem);
-    background-color: var(--arbeitszeitcheck-color-form-background, var(--color-main-background, #fff));
-    border: 1px solid var(--arbeitszeitcheck-color-form-border, var(--color-border, #ddd));
+    background-color: var(--arbeitszeitcheck-color-form-background);
+    border: 1px solid var(--arbeitszeitcheck-color-form-border);
     border-radius: var(--radius-base, 8px);
     padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
@@ -373,8 +373,8 @@
 }
 
 .time-input-group:focus-within {
-    border-color: var(--arbeitszeitcheck-color-form-border-focus, var(--color-primary-element, #0082c9));
-    box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-primary-light, rgba(0, 130, 201, 0.1));
+    border-color: var(--arbeitszeitcheck-color-form-border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--arbeitszeitcheck-color-primary) 10%, transparent);
     outline: none;
 }
 
@@ -388,7 +388,7 @@
     font-variant-numeric: tabular-nums;
     font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
     font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
-    color: var(--arbeitszeitcheck-color-text, var(--color-main-text, #000));
+    color: var(--arbeitszeitcheck-color-text);
     background-color: transparent;
     border: none;
     border-radius: var(--radius-sm, 4px);
@@ -407,12 +407,12 @@
 
 .time-input-group .time-hour:hover,
 .time-input-group .time-minute:hover {
-    background-color: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, #f5f5f5));
+    background-color: var(--arbeitszeitcheck-color-background-hover);
 }
 
 .time-input-group .time-hour:focus,
 .time-input-group .time-minute:focus {
-    background-color: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, #f5f5f5));
+    background-color: var(--arbeitszeitcheck-color-background-hover);
     outline: none;
 }
 
@@ -432,7 +432,7 @@
 .time-separator {
     font-size: var(--arbeitszeitcheck-font-size-xl, 1.25rem);
     font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
-    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    color: var(--arbeitszeitcheck-color-text-secondary);
     margin: 0;
     line-height: 1;
     user-select: none;
@@ -446,13 +446,13 @@
 /* Error state for time input group */
 .time-input-group.error,
 .time-input-group.form-input--error {
-    border-color: var(--arbeitszeitcheck-color-form-border-error, var(--color-error, #e9322d));
+    border-color: var(--arbeitszeitcheck-color-form-border-error);
 }
 
 .time-input-group.error:focus-within,
 .time-input-group.form-input--error:focus-within {
-    border-color: var(--arbeitszeitcheck-color-form-border-error, var(--color-error, #e9322d));
-    box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-error-light, rgba(233, 50, 45, 0.1));
+    border-color: var(--arbeitszeitcheck-color-form-border-error);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--arbeitszeitcheck-color-error) 10%, transparent);
 }
 
 /* Responsive adjustments for time input group */
@@ -478,15 +478,15 @@
 .break-requirement-indicator {
     margin-top: var(--space-2, 0.5rem);
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-    background: var(--arbeitszeitcheck-color-background-info, var(--color-background-dark, #f8f9fa));
-    border: 1px solid var(--arbeitszeitcheck-color-border-info, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-secondary);
+    border: 1px solid var(--arbeitszeitcheck-color-border);
     border-radius: var(--radius-lg, 8px);
     opacity: 0;
     animation: fadeIn 0.3s ease-in-out forwards;
 }
 
 .break-requirement-indicator small {
-    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    color: var(--arbeitszeitcheck-color-text-secondary);
     font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
 }
 
@@ -504,27 +504,27 @@
 
 /* Auto-generated break styling */
 .break-entry[data-auto-break] {
-    background: var(--arbeitszeitcheck-color-background-success-light, rgba(40, 167, 69, 0.05));
-    border: 1px solid var(--arbeitszeitcheck-color-success-light, rgba(40, 167, 69, 0.2));
+    background: color-mix(in srgb, var(--arbeitszeitcheck-color-success) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--arbeitszeitcheck-color-success) 20%, transparent);
     border-radius: var(--radius-lg, 8px);
     padding: var(--space-3, 0.75rem);
     margin-bottom: var(--space-4, 1rem);
 }
 
 .break-entry[data-auto-break] .form-label {
-    color: var(--arbeitszeitcheck-color-success, var(--color-success, #28a745));
+    color: var(--arbeitszeitcheck-color-success);
 }
 
 .auto-break-indicator {
     font-style: italic;
-    opacity: 0.8;
+    color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
 .auto-break-note {
     margin-top: var(--space-2, 0.5rem);
     margin-bottom: 0;
     padding-top: var(--space-2, 0.5rem);
-    color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast, #666));
+    color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
 .auto-break-note small {
@@ -536,8 +536,8 @@
     margin-top: var(--space-4, 1rem);
     margin-bottom: var(--space-4, 1rem);
     padding: var(--space-4, 1rem);
-    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
-    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-background-elevated);
+    border: 1px solid var(--arbeitszeitcheck-color-border);
     border-radius: var(--radius-lg, 8px);
 }
 
@@ -565,7 +565,7 @@
     position: relative;
     width: 44px;
     height: 24px;
-    background: var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+    background: var(--arbeitszeitcheck-color-border);
     border-radius: 24px;
     transition: background-color 0.3s ease;
 }
@@ -577,14 +577,14 @@
     left: 2px;
     width: 20px;
     height: 20px;
-    background: white;
+    background: var(--color-main-background);
     border-radius: 50%;
     transition: transform 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 .form-toggle input[type="checkbox"]:checked + .toggle-slider {
-    background: var(--arbeitszeitcheck-color-success, var(--color-success, #28a745));
+    background: var(--arbeitszeitcheck-color-success);
 }
 
 .form-toggle input[type="checkbox"]:checked + .toggle-slider::before {
@@ -593,7 +593,7 @@
 
 .toggle-label {
     font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
-    color: var(--arbeitszeitcheck-color-text-primary, var(--color-text-maxcontrast, #333));
+    color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 @keyframes fadeIn {

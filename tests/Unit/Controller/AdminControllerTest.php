@@ -14,6 +14,9 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 use OCA\ArbeitszeitCheck\Controller\AdminController;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
+use OCA\ArbeitszeitCheck\Db\TeamMapper;
+use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
+use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
@@ -27,6 +30,7 @@ use OCP\IRequest;
 use OCP\IL10N;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -73,9 +77,14 @@ class AdminControllerTest extends TestCase
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->appConfig = $this->createMock(IAppConfig::class);
 		$this->request = $this->createMock(IRequest::class);
+		$teamMapper = $this->createMock(TeamMapper::class);
+		$teamMemberMapper = $this->createMock(TeamMemberMapper::class);
+		$teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn(null);
 		$cspService = $this->createMock(CSPService::class);
 		$l10n = $this->createMock(IL10N::class);
-		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
 
 		$this->controller = new AdminController(
 			'arbeitszeitcheck',
@@ -87,6 +96,10 @@ class AdminControllerTest extends TestCase
 			$this->auditLogMapper,
 			$this->userManager,
 			$this->appConfig,
+			$teamMapper,
+			$teamMemberMapper,
+			$teamManagerMapper,
+			$userSession,
 			$cspService,
 			$l10n
 		);
@@ -656,6 +669,76 @@ class AdminControllerTest extends TestCase
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 		$this->assertStringContainsString('Cannot delete working time model', $data['error']);
+	}
+
+	/**
+	 * Test updateUserWorkingTimeModel ends assignment when workingTimeModelId is null (No Model Assigned)
+	 */
+	public function testUpdateUserWorkingTimeModelRemovesAssignmentWhenNull(): void
+	{
+		$userId = 'admin';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$currentAssignment = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel::class);
+		$currentAssignment->method('getId')->willReturn(1);
+		$endedAssignment = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel::class);
+		$endedAssignment->method('getId')->willReturn(1);
+		$endedAssignment->method('getSummary')->willReturn([]);
+
+		$this->request->method('getParams')
+			->willReturn([
+				'workingTimeModelId' => null,
+				'vacationDaysPerYear' => 25,
+				'startDate' => null,
+				'endDate' => null
+			]);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
+			->with($userId)
+			->willReturn($currentAssignment);
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('endCurrentAssignment')
+			->with($userId, $this->isInstanceOf(\DateTime::class))
+			->willReturn($endedAssignment);
+
+		$response = $this->controller->updateUserWorkingTimeModel($userId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('userWorkingTimeModel', $data);
+	}
+
+	/**
+	 * Test updateUserWorkingTimeModel succeeds when no assignment and null model (nothing to do)
+	 */
+	public function testUpdateUserWorkingTimeModelSucceedsWhenNoAssignmentAndNullModel(): void
+	{
+		$userId = 'admin';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->request->method('getParams')
+			->willReturn([
+				'workingTimeModelId' => null,
+				'vacationDaysPerYear' => 25,
+				'startDate' => null,
+				'endDate' => null
+			]);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
+			->with($userId)
+			->willReturn(null);
+		$this->userWorkingTimeModelMapper->expects($this->never())
+			->method('endCurrentAssignment');
+
+		$response = $this->controller->updateUserWorkingTimeModel($userId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertNull($data['userWorkingTimeModel']);
 	}
 
 	/**

@@ -78,13 +78,13 @@
             data: formData,
             onSuccess: function(data) {
                 if (data.success) {
-                    Messaging.showSuccess(data.message || 'Settings saved successfully');
+                    Messaging.showSuccess(data.message || (window.t ? window.t('arbeitszeitcheck', 'Settings saved successfully') : 'Settings saved successfully'));
                 } else {
-                    Messaging.showError(data.error || 'Failed to save settings');
+                    Messaging.showError(data.error || (window.t ? window.t('arbeitszeitcheck', 'Failed to save settings') : 'Failed to save settings'));
                 }
             },
             onError: function(_error) {
-                Messaging.showError('An error occurred while saving settings');
+                Messaging.showError(window.t ? window.t('arbeitszeitcheck', 'An error occurred while saving settings') : 'An error occurred while saving settings');
             }
         });
     }
@@ -125,7 +125,8 @@
         const max = parseFloat(field.getAttribute('max'));
 
         if (isNaN(value) || value < min || value > max) {
-            Validation.showFieldError(field, `Value must be between ${min} and ${max}`);
+            const msg = window.t ? window.t('arbeitszeitcheck', 'Value must be between {min} and {max}', {min: String(min), max: String(max)}) : 'Value must be between ' + min + ' and ' + max;
+            Validation.showFieldError(field, msg);
             return false;
         } else {
             Validation.clearFieldError(field);

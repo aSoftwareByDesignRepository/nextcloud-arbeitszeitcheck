@@ -132,6 +132,7 @@ return [
 		['name' => 'admin#getUsers', 'url' => '/api/admin/users', 'verb' => 'GET'],
 		['name' => 'admin#getUser', 'url' => '/api/admin/users/{userId}', 'verb' => 'GET'],
 		['name' => 'admin#updateUserWorkingTimeModel', 'url' => '/api/admin/users/{userId}/working-time-model', 'verb' => 'PUT'],
+		['name' => 'admin#getUserAssignmentHistory', 'url' => '/api/admin/users/{userId}/working-time-model/history', 'verb' => 'GET'],
 		['name' => 'admin#getWorkingTimeModels', 'url' => '/api/admin/working-time-models', 'verb' => 'GET'],
 		['name' => 'admin#getWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'GET'],
 		['name' => 'admin#createWorkingTimeModel', 'url' => '/api/admin/working-time-models', 'verb' => 'POST'],

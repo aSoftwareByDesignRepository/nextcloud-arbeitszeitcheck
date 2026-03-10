@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -56,6 +57,9 @@ class PageControllerTest extends TestCase
 		$groupManager = $this->createMock(IGroupManager::class);
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$config = $this->createMock(IConfig::class);
+		$permissionService = $this->createMock(PermissionService::class);
+		$permissionService->method('canAccessManagerDashboard')->willReturn(false);
+		$permissionService->method('isAdmin')->willReturn(false);
 		$cspService = $this->createMock(CSPService::class);
 		$cspService->method('applyPolicyWithNonce')->willReturnCallback(fn ($r) => $r);
 		$l10n = $this->createMock(IL10N::class);
@@ -73,6 +77,7 @@ class PageControllerTest extends TestCase
 			$groupManager,
 			$urlGenerator,
 			$config,
+			$permissionService,
 			$cspService,
 			$l10n
 		);

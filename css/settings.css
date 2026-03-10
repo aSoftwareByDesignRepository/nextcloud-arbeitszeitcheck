@@ -12,13 +12,13 @@
 
 /* Section Styling */
 .section {
-	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+	background: var(--arbeitszeitcheck-color-background-elevated);
 	border-radius: var(--radius-2xl, 16px);
 	margin-bottom: var(--space-8, 2rem);
 	padding: var(--space-6, 1.5rem);
 	overflow: visible;
-	box-shadow: var(--shadow-base, 0 2px 20px rgba(0, 0, 0, 0.04));
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	box-shadow: var(--arbeitszeitcheck-shadow-base);
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 	position: relative;
 	height: auto;
 	visibility: visible;
@@ -51,7 +51,7 @@
 	flex-direction: column;
 	gap: var(--space-6, 1.5rem);
 	padding-bottom: var(--space-6, 1.5rem);
-	border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
 }
 
 .settings-section:last-child {
@@ -65,7 +65,7 @@
 	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
 	margin: 0 0 var(--space-4, 1rem) 0;
 	padding-bottom: var(--space-2, 0.5rem);
-	border-bottom: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	border-bottom: 2px solid var(--arbeitszeitcheck-color-primary);
 }
 
 /* Setting Item (for read-only information) */
@@ -90,7 +90,7 @@
 	padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
 	border-radius: var(--radius-base, 4px);
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 }
 
 /* Form Styling */
@@ -119,7 +119,7 @@
 	min-height: 20px;
 	margin-top: 2px;
 	cursor: pointer;
-	accent-color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	accent-color: var(--arbeitszeitcheck-color-primary);
 }
 
 .form-checkbox label {
@@ -141,8 +141,8 @@
 /* Info Box */
 .info-box {
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
-	border-left: 4px solid var(--arbeitszeitcheck-color-info, var(--color-primary, #0082c9));
+	border: 1px solid var(--arbeitszeitcheck-color-border);
+	border-left: 4px solid var(--arbeitszeitcheck-color-info);
 	border-radius: var(--radius-base, 4px);
 	padding: var(--space-4, 1rem);
 	margin-bottom: var(--space-4, 1rem);
@@ -215,17 +215,17 @@
 
 .btn--primary,
 .button.primary {
-	background: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
-	color: var(--arbeitszeitcheck-color-primary-text, var(--color-primary-text, #fff));
-	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	background: var(--arbeitszeitcheck-color-primary);
+	color: var(--arbeitszeitcheck-color-primary-text);
+	border-color: var(--arbeitszeitcheck-color-primary);
 }
 
 .btn--primary:hover,
 .button.primary:hover {
-	background: var(--arbeitszeitcheck-color-primary-hover, var(--color-primary-element-dark, #006ba1));
-	border-color: var(--arbeitszeitcheck-color-primary-hover, var(--color-primary-element-dark, #006ba1));
+	background: var(--arbeitszeitcheck-color-primary-hover);
+	border-color: var(--arbeitszeitcheck-color-primary-hover);
 	transform: translateY(-1px);
-	box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+	box-shadow: var(--arbeitszeitcheck-shadow-md);
 }
 
 .btn--primary:active,
@@ -235,21 +235,21 @@
 
 .btn--secondary,
 .button.secondary {
-	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
-	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, #000));
-	border-color: var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	background: var(--arbeitszeitcheck-color-background-elevated);
+	color: var(--arbeitszeitcheck-color-main-text);
+	border-color: var(--arbeitszeitcheck-color-border);
 }
 
 .btn--secondary:hover,
 .button.secondary:hover {
-	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, #f5f5f5));
-	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
-	color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	background: var(--arbeitszeitcheck-color-background-hover);
+	border-color: var(--arbeitszeitcheck-color-primary);
+	color: var(--arbeitszeitcheck-color-primary);
 }
 
 .btn:disabled,
 .button:disabled {
-	opacity: 0.6;
+	opacity: 0.75;
 	cursor: not-allowed;
 	pointer-events: none;
 }
@@ -279,5 +279,14 @@
 	.form-help {
 		padding-left: 0;
 		margin-top: var(--space-2, 0.5rem);
+	}
+}
+
+/* Wider layouts: let settings use more horizontal space with two columns */
+@media (min-width: 1024px) {
+	.settings-container {
+		display: grid;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+		align-items: flex-start;
 	}
 }

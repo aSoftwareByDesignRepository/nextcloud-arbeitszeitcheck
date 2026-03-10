@@ -12,11 +12,11 @@
 
 /* Section Styling */
 .section {
-	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+	background: var(--arbeitszeitcheck-color-background-elevated);
 	border-radius: var(--radius-xl, 12px);
 	overflow: visible;
-	box-shadow: var(--shadow-base, 0 2px 12px rgba(0, 0, 0, 0.06));
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #e5e7eb));
+	box-shadow: var(--arbeitszeitcheck-shadow-base);
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 	position: relative;
 	height: auto;
 	padding: var(--space-6, 1.5rem);
@@ -45,13 +45,13 @@
 	display: block;
 	font-weight: 600;
 	margin-bottom: var(--space-2, 0.5rem);
-	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, #1a1a1a));
+	color: var(--arbeitszeitcheck-color-main-text);
 }
 
 .section--form .form-help {
 	margin-top: var(--space-2, 0.5rem);
 	font-size: 0.875rem;
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, #6b7280));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 .section--form .form-select,
@@ -60,7 +60,7 @@
 	min-height: 44px;
 	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
 	border-radius: var(--radius-base, 8px);
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #d1d5db));
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
@@ -74,7 +74,7 @@
 .section--form .form-actions {
 	margin-top: var(--space-8, 2rem);
 	padding-top: var(--space-6, 1.5rem);
-	border-top: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #e5e7eb));
+	border-top: 1px solid var(--arbeitszeitcheck-color-border);
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-4, 1rem);
@@ -106,13 +106,13 @@
 	margin: 0 0 var(--space-2, 0.5rem);
 	font-size: 1.5rem;
 	line-height: 1.3;
-	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, #1a1a1a));
+	color: var(--arbeitszeitcheck-color-main-text);
 }
 
 .page-header-section .header-text p {
 	margin: 0;
 	font-size: 0.9375rem;
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, #6b7280));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 	line-height: 1.5;
 }
 
@@ -133,28 +133,28 @@
 }
 
 .stat-card {
-	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	background: var(--arbeitszeitcheck-color-background-elevated);
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 	border-radius: var(--radius-base, 12px);
 	padding: var(--space-6, 1.5rem);
 	text-align: center;
 	transition: all 0.2s ease;
 	visibility: visible;
 	opacity: 1;
-	box-shadow: var(--shadow-base, 0 2px 8px rgba(0, 0, 0, 0.04));
+	box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 	box-sizing: border-box;
 }
 
 .stat-card:hover {
-	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
-	box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+	background: var(--arbeitszeitcheck-color-background-hover);
+	box-shadow: var(--arbeitszeitcheck-shadow-md);
 	transform: translateY(-2px);
 }
 
 .stat-card .stat-label {
 	display: block;
 	font-size: 0.85rem;
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 	margin-bottom: var(--space-2, 0.5rem);
 	font-weight: 500;
 	visibility: visible;
@@ -165,7 +165,7 @@
 	display: block;
 	font-size: 2rem;
 	font-weight: 700;
-	color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	color: var(--arbeitszeitcheck-color-primary);
 	line-height: 1.2;
 	visibility: visible;
 	opacity: 1;
@@ -185,7 +185,7 @@
 .arbeitszeitcheck-table {
 	width: 100%;
 	border-collapse: collapse;
-	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, var(--arbeitszeitcheck-color-background, #fff)));
+	background: var(--arbeitszeitcheck-color-background-elevated);
 	visibility: visible;
 	opacity: 1;
 }
@@ -205,8 +205,8 @@
 	font-size: 0.85rem;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary, #666)));
-	border-bottom: 2px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
+	border-bottom: 2px solid var(--arbeitszeitcheck-color-border);
 	visibility: visible;
 	opacity: 1;
 }
@@ -214,15 +214,15 @@
 .table td,
 .arbeitszeitcheck-table td {
 	padding: var(--space-3, 0.875rem) var(--space-4, 1rem);
-	border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--color-border, #ddd));
-	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text, #000)));
+	border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary);
+	color: var(--arbeitszeitcheck-color-main-text);
 	visibility: visible;
 	opacity: 1;
 }
 
 .table tbody tr:hover,
 .arbeitszeitcheck-table tbody tr:hover {
-	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
+	background: var(--arbeitszeitcheck-color-background-hover);
 }
 
 /* Absence Type Badge - Compatible with all Nextcloud themes */
@@ -235,30 +235,25 @@
 	text-transform: capitalize;
 	visibility: visible;
 	opacity: 1;
-	/* Use Nextcloud standard variables */
-	background-color: var(--color-background-hover, var(--color-background-dark, #f0f0f0));
-	color: var(--color-main-text, var(--color-text, #000));
+	background-color: var(--color-background-hover);
+	color: var(--color-main-text);
 }
 
+/* WCAG 2.1 AA: darkened backgrounds for contrast with white text */
 .absence-type-badge.type-vacation {
-	background-color: var(--color-success, #46ba61);
-	color: var(--color-success-text, var(--color-main-background, #ffffff));
-	/* Fallback for themes without success-text */
-	color: var(--color-success-text, var(--color-main-background, #ffffff));
+	background-color: color-mix(in srgb, var(--color-success) 80%, black);
+	color: var(--color-primary-text);
 }
 
-.absence-type-badge.type-sick {
-	background-color: var(--color-error, #e9322d);
-	color: var(--color-error-text, var(--color-main-background, #ffffff));
-	/* Fallback for themes without error-text */
-	color: var(--color-error-text, var(--color-main-background, #ffffff));
+.absence-type-badge.type-sick,
+.absence-type-badge.type-sick_leave {
+	background-color: color-mix(in srgb, var(--color-error) 80%, black);
+	color: var(--color-primary-text);
 }
 
 .absence-type-badge.type-other {
-	background-color: var(--color-primary-element, var(--color-primary, #0082c9));
-	color: var(--color-primary-element-text, var(--color-primary-text, #ffffff));
-	/* Fallback for themes without primary-element-text */
-	color: var(--color-primary-element-text, var(--color-primary-text, #ffffff));
+	background-color: var(--color-primary-element);
+	color: var(--color-primary-element-text);
 }
 
 /* Table Cell Styles */
@@ -272,7 +267,7 @@
 }
 
 .reason-more {
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 .actions-cell {
@@ -285,7 +280,7 @@
 
 .btn-icon {
 	background: transparent;
-	border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #ddd));
+	border: 1px solid var(--arbeitszeitcheck-color-border);
 	border-radius: var(--radius-base, 4px);
 	padding: var(--space-2, 0.5rem);
 	cursor: pointer;
@@ -304,7 +299,7 @@
 
 .btn-icon:hover {
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
-	border-color: var(--arbeitszeitcheck-color-primary, var(--color-primary, #0082c9));
+	border-color: var(--arbeitszeitcheck-color-primary);
 }
 
 .btn-icon.btn-edit:hover {
@@ -324,7 +319,7 @@
 
 /* WCAG 2.1 AA: focus visible for icon buttons */
 .btn-icon:focus-visible {
-	outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary-element, #0082c9));
+	outline: 2px solid var(--arbeitszeitcheck-color-primary);
 	outline-offset: 2px;
 }
 
@@ -346,7 +341,7 @@
 }
 
 .empty-content p {
-	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary, #666)));
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 	font-size: 1rem;
 	margin: 0;
 	visibility: visible;
@@ -393,10 +388,10 @@
 		display: block;
 		margin-bottom: var(--space-4, 1rem);
 		padding: var(--space-4, 1rem);
-		background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, #fff));
-		border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border, #e5e7eb));
+		background: var(--arbeitszeitcheck-color-background-elevated);
+		border: 1px solid var(--arbeitszeitcheck-color-border);
 		border-radius: var(--radius-base, 8px);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 	}
 
 	/* Empty state row: single full-width cell */
@@ -416,21 +411,21 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: var(--space-2, 0.5rem) 0;
-		border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary, #f3f4f6);
+		border-bottom: 1px solid var(--arbeitszeitcheck-color-border-secondary);
 		gap: var(--space-3, 0.75rem);
 	}
 
 	.absences-table tbody td:last-child {
 		border-bottom: none;
 		padding-top: var(--space-3, 0.75rem);
-		border-top: 1px solid var(--arbeitszeitcheck-color-border, #e5e7eb);
+		border-top: 1px solid var(--arbeitszeitcheck-color-border);
 	}
 
 	.absences-table tbody td::before {
 		content: attr(data-label);
 		font-weight: 600;
 		font-size: 0.8125rem;
-		color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, #6b7280));
+		color: var(--arbeitszeitcheck-color-text-maxcontrast);
 		flex-shrink: 0;
 	}
 

@@ -98,9 +98,9 @@ $error = $_['error'] ?? null;
                         <button id="btn-export"
                             class="btn btn--secondary"
                             type="button"
-                            aria-label="<?php p($l->t('Download your time entries as a file')); ?>"
-                            title="<?php p($l->t('Click to download all your time entries as a file. You can choose PDF, Excel, or CSV format.')); ?>">
-                            <?php p($l->t('Download')); ?>
+                            aria-label="<?php p($l->t('Download your time entries as a CSV file')); ?>"
+                            title="<?php p($l->t('Click to download all your time entries from the last 30 days as a CSV file that you can open in Excel or other spreadsheet programs.')); ?>">
+                            <?php p($l->t('Download CSV')); ?>
                         </button>
                     </div>
                 <?php endif; ?>
@@ -183,7 +183,7 @@ $error = $_['error'] ?? null;
                                             name="date"
                                             class="form-input datepicker-input"
                                             pattern="\d{2}\.\d{2}\.\d{4}"
-                                            placeholder="dd.mm.yyyy"
+                                            placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
                                             value="<?php p($entry ? $entry->getStartTime()->format('d.m.Y') : date('d.m.Y')); ?>"
                                             aria-labelledby="entry-date-label"
                                             aria-describedby="entry-date-help entry-date-error"
@@ -532,11 +532,11 @@ $error = $_['error'] ?? null;
                 <div class="form">
                     <div class="form-group">
                         <label for="filter-start-date" class="form-label"><?php p($l->t('Start Date')); ?></label>
-                        <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="dd.mm.yyyy" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                        <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
                     </div>
                     <div class="form-group">
                         <label for="filter-end-date" class="form-label"><?php p($l->t('End Date')); ?></label>
-                        <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="dd.mm.yyyy" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                        <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
                     </div>
                     <div class="form-group">
                         <label for="filter-status" class="form-label"><?php p($l->t('Status')); ?></label>

@@ -1352,7 +1352,14 @@
                 business_trip: 'Business Trip'
             };
             const labelKey = map[key] || 'Absence';
-            return (window.t && window.t('arbeitszeitcheck', labelKey)) || labelKey;
+            // Prefer server-provided translation map when available (timeline/index.php),
+            // fallback to global t() and then raw key.
+            const absenceTypes = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.absenceTypes) || {};
+            if (absenceTypes[key]) {
+                return absenceTypes[key];
+            }
+            const translated = (window.t && window.t('arbeitszeitcheck', labelKey)) || labelKey;
+            return translated;
         },
 
         /**

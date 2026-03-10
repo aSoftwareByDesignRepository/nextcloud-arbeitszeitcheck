@@ -49,9 +49,10 @@ function initializeDatepicker(input, options = {}) {
 		return null;
 	}
 
-	const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-		'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-	const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+	const t = (s) => (typeof window !== 'undefined' && window.t ? window.t('arbeitszeitcheck', s) : s);
+	const monthNames = [t('January'), t('February'), t('March'), t('April'), t('May'), t('June'),
+		t('July'), t('August'), t('September'), t('October'), t('November'), t('December')];
+	const dayNames = [t('Mon'), t('Tue'), t('Wed'), t('Thu'), t('Fri'), t('Sat'), t('Sun')];
 
 	let selectedDate = null;
 	if (element.value && /^\d{2}\.\d{2}\.\d{4}$/.test(element.value)) {
@@ -151,7 +152,7 @@ function initializeDatepicker(input, options = {}) {
 
 		const container = document.createElement('div');
 		container.className = 'arbeitszeitcheck-datepicker';
-		container.style.cssText = 'position:fixed;z-index:10000;background:var(--color-main-background);border:1px solid var(--color-border);border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:280px;';
+		container.style.cssText = 'position:fixed;z-index:10000;background:var(--color-main-background);border:1px solid var(--color-border);border-radius:8px;padding:12px;box-shadow:var(--arbeitszeitcheck-shadow-md, 0 4px 12px var(--color-border));min-width:280px;';
 
 		const header = document.createElement('div');
 		header.className = 'arbeitszeitcheck-datepicker-header';
@@ -161,7 +162,7 @@ function initializeDatepicker(input, options = {}) {
 		prevBtn.type = 'button';
 		prevBtn.innerHTML = '‹';
 		prevBtn.style.cssText = 'background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;color:var(--color-main-text);';
-		prevBtn.setAttribute('aria-label', 'Previous month');
+		prevBtn.setAttribute('aria-label', t('Previous month'));
 
 		const monthYear = document.createElement('div');
 		monthYear.className = 'arbeitszeitcheck-datepicker-monthyear';
@@ -260,7 +261,7 @@ function initializeDatepicker(input, options = {}) {
 	toggleBtn.type = 'button';
 	toggleBtn.innerHTML = '📅';
 	toggleBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;';
-	toggleBtn.setAttribute('aria-label', 'Open calendar');
+	toggleBtn.setAttribute('aria-label', t('Open calendar'));
 	toggleBtn.addEventListener('click', function (e) {
 		e.preventDefault();
 		e.stopPropagation();

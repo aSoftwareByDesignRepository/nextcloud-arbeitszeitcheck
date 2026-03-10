@@ -44,7 +44,9 @@
    min-height: 0 is critical for flex children to allow overflow/scroll. */
 
 #content.app-arbeitszeitcheck #app-content {
-  background: var(--arbeitszeitcheck-color-main-background, var(--color-main-background, var(--arbeitszeitcheck-color-background)));
+  /* Use Nextcloud theme variable directly — theme vars are on body [data-theme-X], not :root */
+  background: var(--color-main-background);
+  color: var(--color-main-text);
   flex: 1 1 0;
   min-height: 0; /* Allow flex child to shrink; enables overflow-y: auto */
   min-width: 0;
@@ -64,6 +66,7 @@
   margin: 0;
   padding: var(--space-6) var(--space-6) var(--space-16);
   display: flex;
+  color: var(--color-main-text);
   flex-direction: column;
   gap: 0;
   box-sizing: border-box;
@@ -175,6 +178,7 @@
   background-color: var(--arbeitszeitcheck-color-background-elevated);
   box-shadow: var(--shadow-sm);
   position: relative;
+  color: var(--color-main-text);
   /* Generous spacing: easy to scan, even for users with low vision */
 }
 
@@ -259,6 +263,7 @@
   border: 1px solid var(--arbeitszeitcheck-color-border);
   background-color: var(--arbeitszeitcheck-color-background-elevated);
   box-shadow: var(--shadow-sm);
+  color: var(--color-main-text);
 }
 
 #app-content-wrapper .card:last-child {

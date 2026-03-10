@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 
 use OCA\ArbeitszeitCheck\Controller\ComplianceController;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
@@ -65,6 +66,7 @@ class ComplianceControllerTest extends TestCase
 
 		$this->complianceService = $this->createMock(ComplianceService::class);
 		$this->violationMapper = $this->createMock(ComplianceViolationMapper::class);
+		$auditLogMapper = $this->createMock(AuditLogMapper::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->permissionService->method('canViewUserCompliance')->willReturn(true);
 		$this->permissionService->method('canResolveViolation')->willReturn(true);
@@ -81,6 +83,7 @@ class ComplianceControllerTest extends TestCase
 			$this->request,
 			$this->complianceService,
 			$this->violationMapper,
+			$auditLogMapper,
 			$this->permissionService,
 			$this->userSession,
 			$this->urlGenerator,
@@ -317,9 +320,10 @@ class ComplianceControllerTest extends TestCase
 		$violation = $this->createMock(ComplianceViolation::class);
 		$violation->method('getUserId')->willReturn($userId);
 		$violation->method('getResolved')->willReturn(false);
+		$violation->method('getSummary')->willReturn(['id' => $violationId, 'resolved' => false]);
 
 		$resolvedViolation = $this->createMock(ComplianceViolation::class);
-		$resolvedViolation->method('getSummary')->willReturn(['id' => $violationId]);
+		$resolvedViolation->method('getSummary')->willReturn(['id' => $violationId, 'resolved' => true]);
 
 		$this->violationMapper->method('find')->willReturn($violation);
 		$this->violationMapper->expects($this->once())

@@ -526,26 +526,7 @@ i {
   }
 }
 
-/* Accessibility: High Contrast Mode */
-@media (prefers-contrast: high) {
-  :root {
-    --arbeitszeitcheck-text-color-primary: #000000;
-    --arbeitszeitcheck-text-color-secondary: #000000;
-    --arbeitszeitcheck-text-color-tertiary: #000000;
-    --arbeitszeitcheck-text-color-muted: #000000;
-    --arbeitszeitcheck-text-color-inverse: #ffffff;
-  }
-
-  html[data-theme="dark"],
-  body[data-theme-dark],
-  body[data-theme-dark-highcontrast] {
-    --arbeitszeitcheck-text-color-primary: #ffffff;
-    --arbeitszeitcheck-text-color-secondary: #ffffff;
-    --arbeitszeitcheck-text-color-tertiary: #ffffff;
-    --arbeitszeitcheck-text-color-muted: #ffffff;
-    --arbeitszeitcheck-text-color-inverse: #000000;
-  }
-}
+/* High contrast: Nextcloud injects appropriate --color-* values automatically */
 
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {

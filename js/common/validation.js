@@ -5,6 +5,8 @@
  * @license AGPL-3.0-or-later
  */
 
+const t = (s, opts) => (typeof window !== 'undefined' && window.t ? window.t('arbeitszeitcheck', s, opts || {}) : s);
+
 const ArbeitszeitCheckValidation = {
   /**
    * Validate form field
@@ -12,36 +14,36 @@ const ArbeitszeitCheckValidation = {
   validateField(field, rules = {}) {
     const value = field.value.trim();
     const errors = [];
-    const fieldLabel = field.labels && field.labels[0] ? field.labels[0].textContent : 'This field';
+    const fieldLabel = field.labels && field.labels[0] ? field.labels[0].textContent : t('This field');
     const l10n = window.ArbeitszeitCheck?.l10n || {};
 
     // Required validation
     if (rules.required && !value) {
-      const message = l10n.fieldRequired || `${fieldLabel} is required. Please fill in this field.`;
+      const message = l10n.fieldRequired || t('{field} is required. Please fill in this field.', { field: fieldLabel });
       errors.push(message);
     }
 
     // Email validation
     if (rules.email && value && !this.isEmail(value)) {
-      const message = l10n.emailInvalid || `Please enter a valid email address. Example: name@example.com`;
+      const message = l10n.emailInvalid || t('Please enter a valid email address. Example: name@example.com');
       errors.push(message);
     }
 
     // Min length validation
     if (rules.minLength && value.length < rules.minLength) {
-      const message = l10n.minLength || `Please enter at least ${rules.minLength} characters. You entered ${value.length} characters.`;
+      const message = l10n.minLength || t('Please enter at least {min} characters. You entered {actual} characters.', { min: String(rules.minLength), actual: String(value.length) });
       errors.push(message);
     }
 
     // Max length validation
     if (rules.maxLength && value.length > rules.maxLength) {
-      const message = l10n.maxLength || `Please enter no more than ${rules.maxLength} characters. You entered ${value.length} characters.`;
+      const message = l10n.maxLength || t('Please enter no more than {max} characters. You entered {actual} characters.', { max: String(rules.maxLength), actual: String(value.length) });
       errors.push(message);
     }
 
     // Pattern validation
     if (rules.pattern && value && !rules.pattern.test(value)) {
-      const message = rules.patternMessage || l10n.invalidFormat || `The format is incorrect. ${rules.formatExample || 'Please check the format and try again.'}`;
+      const message = rules.patternMessage || l10n.invalidFormat || t('The format is incorrect. Please check the format and try again.');
       errors.push(message);
     }
 
@@ -49,15 +51,15 @@ const ArbeitszeitCheckValidation = {
     if (rules.number) {
       const num = parseFloat(value);
       if (isNaN(num)) {
-        const message = l10n.numberInvalid || `Please enter a valid number. Example: ${rules.example || '8'}`;
+        const message = l10n.numberInvalid || t('Please enter a valid number. Example: {example}', { example: String(rules.example || '8') });
         errors.push(message);
       } else {
         if (rules.min !== undefined && num < rules.min) {
-          const message = l10n.numberMin || `Please enter a number that is at least ${rules.min}. You entered ${num}.`;
+          const message = l10n.numberMin || t('Please enter a number that is at least {min}. You entered {actual}.', { min: String(rules.min), actual: String(num) });
           errors.push(message);
         }
         if (rules.max !== undefined && num > rules.max) {
-          const message = l10n.numberMax || `Please enter a number that is no more than ${rules.max}. You entered ${num}.`;
+          const message = l10n.numberMax || t('Please enter a number that is no more than {max}. You entered {actual}.', { max: String(rules.max), actual: String(num) });
           errors.push(message);
         }
       }
@@ -67,7 +69,7 @@ const ArbeitszeitCheckValidation = {
     if (rules.time && value) {
       const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timePattern.test(value)) {
-        const message = l10n.timeInvalid || `Please enter the time in this format: HH:MM (hours:minutes). Example: 09:00 for 9 in the morning, or 14:30 for 2:30 in the afternoon.`;
+        const message = l10n.timeInvalid || t('Please enter the time in this format: HH:MM (hours:minutes). Example: 09:00');
         errors.push(message);
       }
     }
@@ -76,7 +78,7 @@ const ArbeitszeitCheckValidation = {
     if (rules.date && value) {
       const date = new Date(value);
       if (isNaN(date.getTime())) {
-        const message = l10n.dateInvalid || `Please enter a valid date. Click the calendar icon to pick a date, or enter it in this format: YYYY-MM-DD. Example: 2024-01-15 for January 15, 2024.`;
+        const message = l10n.dateInvalid || t('Please enter a valid date. Click the calendar icon to pick a date, or enter it in format dd.mm.yyyy.');
         errors.push(message);
       }
     }
@@ -286,7 +288,7 @@ const ArbeitszeitCheckValidation = {
     if (!dateStr || !dateStr.trim()) {
       return {
         valid: false,
-        errors: [l10n.dateRequired || 'Date is required. Please enter a date in the format dd.mm.yyyy (e.g., 15.01.2024).'],
+        errors: [l10n.dateRequired || t('Date is required. Please enter a date in the format dd.mm.yyyy (e.g., 15.01.2024).')],
         date: null
       };
     }
@@ -315,7 +317,7 @@ const ArbeitszeitCheckValidation = {
       } else {
         return {
           valid: false,
-          errors: [l10n.dateInvalidFormat || 'Invalid date format. Please use dd.mm.yyyy (e.g., 15.01.2024).'],
+          errors: [l10n.dateInvalidFormat || t('Invalid date format. Please use dd.mm.yyyy (e.g., 15.01.2024).')],
           date: null
         };
       }
@@ -325,26 +327,26 @@ const ArbeitszeitCheckValidation = {
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
       return {
         valid: false,
-        errors: [l10n.dateInvalidFormat || 'Invalid date format. Please use dd.mm.yyyy (e.g., 15.01.2024).'],
+        errors: [l10n.dateInvalidFormat || t('Invalid date format. Please use dd.mm.yyyy (e.g., 15.01.2024).')],
         date: null
       };
     }
 
     // Validate year (reasonable range)
     if (year < 1900 || year > 2100) {
-      errors.push(l10n.dateYearInvalid || `Year must be between 1900 and 2100. You entered ${year}.`);
+      errors.push(l10n.dateYearInvalid || t('Year must be between 1900 and 2100. You entered {year}.', { year: String(year) }));
     }
 
     // Validate month
     if (month < 1 || month > 12) {
-      errors.push(l10n.dateMonthInvalid || `Month must be between 1 and 12. You entered ${month}.`);
+      errors.push(l10n.dateMonthInvalid || t('Month must be between 1 and 12. You entered {month}.', { month: String(month) }));
       return { valid: false, errors, date: null };
     }
 
     // Validate day using checkdate logic (handles leap years automatically)
     const daysInMonth = new Date(year, month, 0).getDate();
     if (day < 1 || day > daysInMonth) {
-      errors.push(l10n.dateDayInvalid || `Invalid day for ${month}/${year}. This month has ${daysInMonth} days.`);
+      errors.push(l10n.dateDayInvalid || t('Invalid day for {month}/{year}. This month has {days} days.', { month: String(month), year: String(year), days: String(daysInMonth) }));
       return { valid: false, errors, date: null };
     }
 
@@ -353,7 +355,7 @@ const ArbeitszeitCheckValidation = {
     
     // Verify date is valid (handles leap years, etc.)
     if (date.getFullYear() !== year || date.getMonth() !== (month - 1) || date.getDate() !== day) {
-      errors.push(l10n.dateInvalid || `Invalid date: ${day}.${month}.${year}. Please check and try again.`);
+      errors.push(l10n.dateInvalid || t('Invalid date: {date}. Please check and try again.', { date: day + '.' + month + '.' + year }));
       return { valid: false, errors, date: null };
     }
 
@@ -362,7 +364,7 @@ const ArbeitszeitCheckValidation = {
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
       if (date > today) {
-        errors.push(l10n.dateFutureNotAllowed || 'Future dates are not allowed. Please enter a date today or in the past.');
+        errors.push(l10n.dateFutureNotAllowed || t('Future dates are not allowed. Please enter a date today or in the past.'));
       }
     }
 
@@ -373,7 +375,7 @@ const ArbeitszeitCheckValidation = {
       minDate.setHours(0, 0, 0, 0);
       if (date < minDate) {
         const days = Math.floor(options.maxDaysPast / 365);
-        errors.push(l10n.dateTooOld || `Date is too far in the past. Maximum allowed: ${days} years ago.`);
+        errors.push(l10n.dateTooOld || t('Date is too far in the past. Maximum allowed: {years} years ago.', { years: String(days) }));
       }
     }
 
@@ -394,7 +396,7 @@ const ArbeitszeitCheckValidation = {
     if (!timeStr || !timeStr.trim()) {
       return {
         valid: false,
-        errors: [l10n.timeRequired || 'Time is required. Please enter a time in the format HH:MM (e.g., 09:00).'],
+        errors: [l10n.timeRequired || t('Time is required. Please enter a time in the format HH:MM (e.g., 09:00).')],
         hour: null,
         minute: null
       };
@@ -406,7 +408,7 @@ const ArbeitszeitCheckValidation = {
     if (!match) {
       return {
         valid: false,
-        errors: [l10n.timeInvalidFormat || 'Invalid time format. Please use HH:MM (24-hour format, e.g., 09:00 for 9 AM or 17:30 for 5:30 PM).'],
+          errors: [l10n.timeInvalidFormat || t('Invalid time format. Please use HH:MM (24-hour format, e.g., 09:00 or 17:30).')],
         hour: null,
         minute: null
       };
@@ -416,11 +418,11 @@ const ArbeitszeitCheckValidation = {
     const minute = parseInt(match[2], 10);
 
     if (hour < 0 || hour > 23) {
-      errors.push(l10n.timeHourInvalid || `Hour must be between 0 and 23. You entered ${hour}.`);
+      errors.push(l10n.timeHourInvalid || t('Hour must be between 0 and 23. You entered {hour}.', { hour: String(hour) }));
     }
 
     if (minute < 0 || minute > 59) {
-      errors.push(l10n.timeMinuteInvalid || `Minute must be between 0 and 59. You entered ${minute}.`);
+      errors.push(l10n.timeMinuteInvalid || t('Minute must be between 0 and 59. You entered {minute}.', { minute: String(minute) }));
     }
 
     if (errors.length > 0) {
@@ -572,7 +574,7 @@ const ArbeitszeitCheckValidation = {
     if (!breakStartTime || !breakEndTime) {
       return {
         valid: false,
-        errors: [l10n.breakBothRequired || 'Both break start and end times are required if you enter a break.'],
+        errors: [l10n.breakBothRequired || t('Both break start and end times are required if you enter a break.')],
         duration: 0
       };
     }
@@ -593,21 +595,20 @@ const ArbeitszeitCheckValidation = {
     }
 
     if (breakStart < workStart || breakEnd > workEnd) {
-      errors.push(l10n.breakOutsideWorkPeriod || 'Break must be completely within your work period. Please adjust the break times.');
+      errors.push(l10n.breakOutsideWorkPeriod || t('Break must be completely within your work period. Please adjust the break times.'));
     }
 
     // Validate break order
     if (breakEnd <= breakStart) {
-      errors.push(l10n.breakEndBeforeStart || 'Break end time must be after break start time.');
+      errors.push(l10n.breakEndBeforeStart || t('Break end time must be after break start time.'));
     }
 
     // Validate minimum duration (15 minutes - ArbZG §4)
     const breakDurationMs = breakEnd - breakStart;
     if (breakDurationMs < minBreakDurationMs) {
       errors.push(
-        l10n.breakTooShort || 
-        'Break must be at least 15 minutes long to count toward legal break requirements (ArbZG §4). ' +
-        `Your break is ${Math.round(breakDurationMs / 60000)} minutes.`
+        l10n.breakTooShort ||
+        t('Break must be at least 15 minutes long (ArbZG §4). Your break is {minutes} minutes.', { minutes: String(Math.round(breakDurationMs / 60000)) })
       );
     }
 
@@ -647,8 +648,8 @@ const ArbeitszeitCheckValidation = {
         // Check for overlap
         if ((b1Start < b2End && b1End > b2Start)) {
           errors.push(
-            l10n.breaksOverlap || 
-            `Break ${i + 1} and Break ${j + 1} overlap. Please adjust the break times so they don't overlap.`
+            l10n.breaksOverlap ||
+            t('Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap.', { a: String(i + 1), b: String(j + 1) })
           );
         }
       }

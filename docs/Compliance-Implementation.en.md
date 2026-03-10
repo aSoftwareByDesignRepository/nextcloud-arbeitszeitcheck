@@ -1,8 +1,8 @@
 # Compliance Implementation: Real-Time Checking According to ArbZG
 
 > **Note:** This document describes the **technical implementation** of ArbZG‑related compliance checks in ArbeitszeitCheck.  
-> For a legal‑level overview and consolidated assessment see `ArbZG-Compliance-Analyse.md`.  
-> This document is **not legal advice**.
+> It is a technical description only and **not legal advice** or a legal opinion.  
+> For a legal‑level assessment of working time models and policies, please consult qualified legal counsel.
 
 ## Legal Foundations
 

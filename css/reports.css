@@ -22,7 +22,7 @@
 .reports-section__desc {
 	margin: 0 0 var(--space-6, 1.5rem);
 	font-size: 1rem;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	line-height: 1.5;
 }
 
@@ -48,7 +48,7 @@
 
 .page-header-section .header-text p {
 	margin: var(--space-2, 0.5rem) 0 0;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	font-size: 1rem;
 }
 
@@ -106,7 +106,7 @@
 .report-type-card p {
 	margin: 0 0 var(--space-4, 1rem);
 	font-size: 0.9375rem;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	line-height: 1.45;
 	flex: 1;
 }
@@ -187,7 +187,7 @@
 .report-form .form-help {
 	margin: 0;
 	font-size: 0.875rem;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	line-height: 1.4;
 }
 
@@ -286,7 +286,7 @@
 
 .report-loading {
 	margin: 0;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 }
 
 .report-subhead {
@@ -321,7 +321,7 @@
 
 .report-summary {
 	margin: var(--space-2, 0.5rem) 0 0;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	line-height: 1.5;
 }
 
@@ -352,7 +352,7 @@
 
 .empty-state__description {
 	margin: 0;
-	color: var(--color-text-lighter);
+	color: var(--color-text-maxcontrast);
 	line-height: 1.5;
 }
 

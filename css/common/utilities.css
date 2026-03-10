@@ -382,9 +382,9 @@
 .text-info { color: var(--arbeitszeitcheck-color-info); }
 .text-muted { color: var(--arbeitszeitcheck-color-text-muted); }
 
-/* Background Color Utilities - Use arbeitszeitcheck color variables */
-.bg-white { background-color: var(--arbeitszeitcheck-color-white); }
-.bg-gray { background-color: var(--arbeitszeitcheck-color-gray-100); }
+/* Background Color Utilities - Use arbeitszeitcheck color variables (theme-aware) */
+.bg-white { background-color: var(--arbeitszeitcheck-color-background); }
+.bg-gray { background-color: var(--arbeitszeitcheck-color-background-secondary); }
 .bg-primary { background-color: var(--arbeitszeitcheck-color-primary); }
 .bg-success { background-color: var(--arbeitszeitcheck-color-success); }
 .bg-error { background-color: var(--arbeitszeitcheck-color-error); }

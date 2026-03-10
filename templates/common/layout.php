@@ -27,6 +27,7 @@ $pageKeywords = isset($pageKeywords) ? $pageKeywords : $l->t('time tracking, arb
 
 // Inherit theme from Nextcloud without app overrides; fallback to light
 $theme = 'light';
+$primary = '#0082c9'; // default Nextcloud blue
 try {
     $theming = \OCP\Server::get(\OCA\Theming\ThemingDefaults::class);
     $primary = $theming->getColorPrimary();
@@ -71,9 +72,9 @@ try {
     <!-- Security Headers (also set as HTTP headers via CSPService) -->
     <!-- Note: HTTP headers are preferred, but meta tags provide fallback -->
 
-    <!-- Theme Color -->
-    <meta name="theme-color" content="#0082c9">
-    <meta name="msapplication-TileColor" content="#0082c9">
+    <!-- Theme Color (from Nextcloud theming if available) -->
+    <meta name="theme-color" content="<?php p($primary ?? '#0082c9'); ?>">
+    <meta name="msapplication-TileColor" content="<?php p($primary ?? '#0082c9'); ?>">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <!-- Favicon (use app icon if dedicated favicon not present) -->

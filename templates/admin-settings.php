@@ -148,7 +148,7 @@ $settings = $_['settings'] ?? [];
                 <div class="form-group">
                     <label for="maxDailyHours" class="form-label">
                         <?php p($l->t('Maximum Hours Per Day')); ?>
-                        <span class="form-required" aria-label="required">*</span>
+                        <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
                            id="maxDailyHours" 
@@ -176,7 +176,7 @@ $settings = $_['settings'] ?? [];
                 <div class="form-group">
                     <label for="minRestPeriod" class="form-label">
                         <?php p($l->t('Minimum Rest Time Between Work Days')); ?>
-                        <span class="form-required" aria-label="required">*</span>
+                        <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
                            id="minRestPeriod" 
@@ -196,7 +196,7 @@ $settings = $_['settings'] ?? [];
                 <div class="form-group">
                     <label for="defaultWorkingHours" class="form-label">
                         <?php p($l->t('Standard Working Hours Per Day')); ?>
-                        <span class="form-required" aria-label="required">*</span>
+                        <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
                            id="defaultWorkingHours" 
@@ -216,7 +216,7 @@ $settings = $_['settings'] ?? [];
                 <div class="form-group">
                     <label for="germanState" class="form-label">
                         <?php p($l->t('Which German State?')); ?>
-                        <span class="form-required" aria-label="required">*</span>
+                        <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <select id="germanState" 
                             name="germanState" 
@@ -245,7 +245,7 @@ $settings = $_['settings'] ?? [];
                 <div class="form-group">
                     <label for="retentionPeriod" class="form-label">
                         <?php p($l->t('How Long to Keep Time Records')); ?>
-                        <span class="form-required" aria-label="required">*</span>
+                        <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
                            id="retentionPeriod" 

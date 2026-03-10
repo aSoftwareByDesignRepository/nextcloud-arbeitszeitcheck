@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCP\AppFramework\Controller;
@@ -37,6 +38,7 @@ class ComplianceController extends Controller
 
 	private ComplianceService $complianceService;
 	private ComplianceViolationMapper $violationMapper;
+	private AuditLogMapper $auditLogMapper;
 	private PermissionService $permissionService;
 	private IUserSession $userSession;
 	private IURLGenerator $urlGenerator;
@@ -47,6 +49,7 @@ class ComplianceController extends Controller
 		IRequest $request,
 		ComplianceService $complianceService,
 		ComplianceViolationMapper $violationMapper,
+		AuditLogMapper $auditLogMapper,
 		PermissionService $permissionService,
 		IUserSession $userSession,
 		IURLGenerator $urlGenerator,
@@ -56,6 +59,7 @@ class ComplianceController extends Controller
 		parent::__construct($appName, $request);
 		$this->complianceService = $complianceService;
 		$this->violationMapper = $violationMapper;
+		$this->auditLogMapper = $auditLogMapper;
 		$this->permissionService = $permissionService;
 		$this->userSession = $userSession;
 		$this->urlGenerator = $urlGenerator;
@@ -133,7 +137,7 @@ class ComplianceController extends Controller
 					'id' => $violation->getId(),
 					'type' => $violation->getViolationType(),
 					'severity' => $violation->getSeverity(),
-					'date' => $violation->getViolationDate() ? $violation->getViolationDate()->format('Y-m-d') : null,
+					'date' => $violation->getDate() ? $violation->getDate()->format('Y-m-d') : null,
 					'resolved' => $violation->getResolved(),
 					'description' => $violation->getDescription()
 				];
@@ -147,6 +151,7 @@ class ComplianceController extends Controller
 			]);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Compliance dashboard error: ' . $e->getMessage(), ['exception' => $e]);
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-dashboard', [
 				'complianceStatus' => [
 					'compliant' => false,
@@ -156,7 +161,7 @@ class ComplianceController extends Controller
 				],
 				'recentViolations' => [],
 				'urlGenerator' => $this->urlGenerator,
-				'error' => $e->getMessage(),
+				'error' => null,
 				'l' => $this->l10n,
 			]);
 			return $this->configureCSP($response);
@@ -173,7 +178,9 @@ class ComplianceController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files (including app-layout, responsive, navigation)
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
@@ -193,14 +200,9 @@ class ComplianceController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			// Get violations (last 30 days, first 50)
-			$endDate = new \DateTime();
-			$endDate->setTime(23, 59, 59);
-			$startDate = clone $endDate;
-			$startDate->modify('-30 days');
-			$startDate->setTime(0, 0, 0);
-
-			$violations = $this->violationMapper->findByDateRange($startDate, $endDate, $userId, null);
+			// Get all violations for the current user (initial view).
+			// The filters and date range in the UI are handled via the API (getViolations).
+			$violations = $this->violationMapper->findByUser($userId, null);
 			$violations = array_slice($violations, 0, 50);
 
 			$violationsData = [];
@@ -209,7 +211,7 @@ class ComplianceController extends Controller
 					'id' => $violation->getId(),
 					'type' => $violation->getViolationType(),
 					'severity' => $violation->getSeverity(),
-					'date' => $violation->getViolationDate() ? $violation->getViolationDate()->format('Y-m-d') : null,
+					'date' => $violation->getDate() ? $violation->getDate()->format('Y-m-d') : null,
 					'resolved' => $violation->getResolved(),
 					'description' => $violation->getDescription()
 				];
@@ -244,7 +246,9 @@ class ComplianceController extends Controller
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
-		// Add common CSS files (including app-layout, responsive, navigation)
+		// Add common CSS files (including colors, typography for consistent fonts)
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
 		Util::addStyle('arbeitszeitcheck', 'common/base');
 		Util::addStyle('arbeitszeitcheck', 'common/components');
 		Util::addStyle('arbeitszeitcheck', 'common/layout');
@@ -264,14 +268,8 @@ class ComplianceController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			// Get compliance summary for last 30 days
-			$endDate = new \DateTime();
-			$endDate->setTime(23, 59, 59);
-			$startDate = clone $endDate;
-			$startDate->modify('-30 days');
-			$startDate->setTime(0, 0, 0);
-
-			$violations = $this->violationMapper->findByDateRange($startDate, $endDate, $userId, null);
+			// Get compliance summary for all recorded violations
+			$violations = $this->violationMapper->findByUser($userId, null);
 
 			$reportData = [
 				'total_violations' => count($violations),
@@ -292,13 +290,18 @@ class ComplianceController extends Controller
 				$reportData['by_severity'][$severity] = ($reportData['by_severity'][$severity] ?? 0) + 1;
 			}
 
-			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', [
-				'reportData' => $reportData,
-				'startDate' => $startDate->format('Y-m-d'),
-				'endDate' => $endDate->format('Y-m-d'),
-				'urlGenerator' => $this->urlGenerator,
-				'l' => $this->l10n,
-			]);
+			$response = new TemplateResponse(
+				'arbeitszeitcheck',
+				'compliance-reports',
+				[
+					'reportData' => $reportData,
+					// No fixed date range; the page shows an all-time summary.
+					'startDate' => null,
+					'endDate' => null,
+					'urlGenerator' => $this->urlGenerator,
+					'l' => $this->l10n,
+				]
+			);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', [
@@ -523,11 +526,25 @@ class ComplianceController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			$oldValues = $violation->getSummary();
+
 			// Mark as resolved using mapper's resolveViolation method
 			// Note: resolvedBy field is int, but Nextcloud user IDs are strings
 			// We set it to a hash of the user ID for tracking purposes
 			$resolvedByHash = abs(crc32($userId)) % PHP_INT_MAX; // Convert string to positive int
 			$updatedViolation = $this->violationMapper->resolveViolation($id, $resolvedByHash);
+
+			$newValues = $updatedViolation->getSummary();
+			$newValues['resolved_by_user_id'] = $userId;
+			$this->auditLogMapper->logAction(
+				$violationOwnerId,
+				'compliance_violation_resolved',
+				'compliance_violation',
+				$id,
+				$oldValues,
+				$newValues,
+				$userId
+			);
 
 			return new JSONResponse([
 				'success' => true,

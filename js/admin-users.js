@@ -35,11 +35,10 @@
             Utils.on(refreshBtn, 'click', loadUsers);
         }
 
-        // Edit user buttons
         const editButtons = Utils.$$('[data-action="edit-user"]');
-        editButtons.forEach(btn => {
-            Utils.on(btn, 'click', handleEditUser);
-        });
+        editButtons.forEach(btn => { Utils.on(btn, 'click', handleEditUser); });
+        const historyButtons = Utils.$$('[data-action="history-user"]');
+        historyButtons.forEach(btn => { Utils.on(btn, 'click', handleHistoryUser); });
     }
 
     /**
@@ -63,7 +62,7 @@
         if (!tbody) return;
 
         // Show loading
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Loading…') : 'Loading…') + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Loading…') : 'Loading…') + '</td></tr>';
 
         const url = '/apps/arbeitszeitcheck/api/admin/users' + (search ? '?search=' + encodeURIComponent(search) : '');
         
@@ -73,11 +72,11 @@
                 if (data.success && data.users) {
                     renderUsers(data.users);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
                 }
             },
             onError: function(_error) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(window.t ? window.t('arbeitszeitcheck', 'Failed to load users. Please try again.') : 'Failed to load users. Please try again.');
                 }
@@ -93,11 +92,23 @@
         if (!tbody) return;
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'No users found') : 'No users found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'No users found') : 'No users found') + '</td></tr>';
             return;
         }
 
-        tbody.innerHTML = users.map(user => `
+        const formatDate = (iso) => {
+            if (!iso) return '-';
+            const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
+        };
+        const ongoingLabel = (window.t && window.t('arbeitszeitcheck', 'ongoing')) || window.ArbeitszeitCheck?.l10n?.ongoing || 'ongoing';
+
+        tbody.innerHTML = users.map(user => {
+            const vacation = user.vacationDaysPerYear != null ? String(user.vacationDaysPerYear) : '-';
+            const start = user.workingTimeModelStartDate || null;
+            const end = user.workingTimeModelEndDate || null;
+            const validity = start ? (formatDate(start) + (end ? ' – ' + formatDate(end) : ' – ' + ongoingLabel)) : '-';
+            return `
             <tr data-user-id="${Utils.escapeHtml(user.userId)}">
                 <td>${Utils.escapeHtml(user.displayName)}</td>
                 <td>${Utils.escapeHtml(user.email || '-')}</td>
@@ -106,6 +117,8 @@
                         ? Utils.escapeHtml(user.workingTimeModel.name) 
                         : `<span class="text-muted">${(window.t && window.t('arbeitszeitcheck', 'Not assigned')) || window.ArbeitszeitCheck?.l10n?.notAssigned || 'Not assigned'}</span>`}
                 </td>
+                <td>${Utils.escapeHtml(vacation)}</td>
+                <td>${Utils.escapeHtml(validity)}</td>
                 <td>
                     <span class="badge badge--${user.enabled ? 'success' : 'error'}">
                         ${user.enabled 
@@ -114,20 +127,40 @@
                     </span>
                 </td>
                 <td>
-                    <button type="button" class="button small" 
-                        data-action="edit-user" 
-                        data-user-id="${Utils.escapeHtml(user.userId)}">
-                        ${(window.t && window.t('arbeitszeitcheck', 'Edit')) || window.ArbeitszeitCheck?.l10n?.edit || 'Edit'}
-                    </button>
+                    <div class="user-actions" role="group" aria-label="${(window.t && window.t('arbeitszeitcheck', 'Actions')) || 'Actions'}">
+                        <button type="button" class="btn btn--sm btn--tertiary" 
+                            data-action="history-user" 
+                            data-user-id="${Utils.escapeHtml(user.userId)}"
+                            data-user-name="${Utils.escapeHtml(user.displayName || user.userId)}">
+                            ${(window.t && window.t('arbeitszeitcheck', 'History')) || window.ArbeitszeitCheck?.l10n?.history || 'History'}
+                        </button>
+                        <button type="button" class="btn btn--sm btn--secondary" 
+                            data-action="edit-user" 
+                            data-user-id="${Utils.escapeHtml(user.userId)}">
+                            ${(window.t && window.t('arbeitszeitcheck', 'Edit')) || window.ArbeitszeitCheck?.l10n?.edit || 'Edit'}
+                        </button>
+                    </div>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         // Rebind edit buttons
         const editButtons = Utils.$$('[data-action="edit-user"]');
         editButtons.forEach(btn => {
             Utils.on(btn, 'click', handleEditUser);
         });
+    }
+
+    /**
+     * Handle history user
+     */
+    function handleHistoryUser(e) {
+        const btn = e.currentTarget;
+        const userId = btn.dataset.userId;
+        const userName = btn.dataset.userName || userId;
+        if (!userId) return;
+        showHistoryModal(userId, userName);
     }
 
     /**
@@ -163,20 +196,95 @@
             Messaging.showError(errorMsg);
             return;
         }
+        const models = Array.isArray(user.availableWorkingTimeModels) ? user.availableWorkingTimeModels : [];
+        showEditUserModalWithModels(user, models);
+    }
 
-        // Load available working time models
-        Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models', {
+    /**
+     * Show history modal for a user
+     */
+    function showHistoryModal(userId, userName) {
+        const t = (s) => (window.t && window.t('arbeitszeitcheck', s)) || window.ArbeitszeitCheck?.l10n?.[s] || s;
+        const title = t('assignmentHistory') + ': ' + (userName || userId);
+        const closeLabel = t('close') || 'Close';
+        const loadingText = t('loading') + '…';
+
+        const content = `
+            <p class="history-modal__loading" id="history-modal-loading">${loadingText}</p>
+            <div id="history-modal-content" class="history-modal__content" style="display:none;"></div>
+        `;
+
+        const modal = Components.createModal({
+            id: 'history-modal',
+            title: title,
+            content: content,
+            size: 'md',
+            closable: true,
+            onClose: function() {
+                const el = document.getElementById('history-modal');
+                if (el && el.parentNode) el.parentNode.remove();
+            }
+        });
+
+        Components.openModal('history-modal');
+
+        const closeBtn = modal.querySelector('[data-action="close-modal"]');
+        if (!closeBtn && modal.querySelector('.modal-close')) {
+            modal.querySelector('.modal-close').setAttribute('aria-label', closeLabel);
+        }
+
+        Utils.ajax('/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/working-time-model/history', {
             method: 'GET',
-            onSuccess: function(response) {
-                if (response.success && Array.isArray(response.models)) {
-                    showEditUserModalWithModels(user, response.models);
+            onSuccess: function(data) {
+                const loadingEl = document.getElementById('history-modal-loading');
+                const contentEl = document.getElementById('history-modal-content');
+                if (!loadingEl || !contentEl) return;
+                loadingEl.style.display = 'none';
+                if (data.success && Array.isArray(data.history) && data.history.length > 0) {
+                    const formatDate = (iso) => {
+                        if (!iso) return '–';
+                        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                        return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
+                    };
+                    const workScheduleHdr = Utils.escapeHtml(t('workSchedule'));
+                    const vacationDaysHdr = Utils.escapeHtml(t('vacationDaysCol'));
+                    const validFromHdr = Utils.escapeHtml(t('validFrom'));
+                    const validToHdr = Utils.escapeHtml(t('validTo'));
+                    const statusHdr = Utils.escapeHtml(t('status'));
+                    const ongoingVal = Utils.escapeHtml(t('ongoing'));
+                    const activeVal = Utils.escapeHtml(t('active'));
+                    const endedVal = Utils.escapeHtml(t('ended'));
+                    const rows = data.history.map(item => {
+                        const model = Utils.escapeHtml(item.modelName);
+                        const vacation = String(item.vacationDaysPerYear);
+                        const from = formatDate(item.startDate);
+                        const to = formatDate(item.endDate) || ongoingVal;
+                        const status = item.isActive
+                            ? '<span class="badge badge--success">' + activeVal + '</span>'
+                            : '<span class="badge">' + endedVal + '</span>';
+                        return '<tr><td>' + model + '</td><td>' + vacation + '</td><td>' + from + '</td><td>' + to + '</td><td>' + status + '</td></tr>';
+                    }).join('');
+                    contentEl.innerHTML = '<div class="table-responsive" role="region" aria-label="' + Utils.escapeHtml(t('assignmentHistory')) + '">' +
+                        '<table class="table history-modal__table" role="table" aria-label="' + Utils.escapeHtml(t('assignmentHistory')) + '">' +
+                        '<thead><tr>' +
+                        '<th scope="col">' + workScheduleHdr + '</th>' +
+                        '<th scope="col">' + vacationDaysHdr + '</th>' +
+                        '<th scope="col">' + validFromHdr + '</th>' +
+                        '<th scope="col">' + validToHdr + '</th>' +
+                        '<th scope="col">' + statusHdr + '</th>' +
+                        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
                 } else {
-                    const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to load working time models')) || window.ArbeitszeitCheck?.l10n?.failedToLoadWorkingTimeModels || 'Failed to load working time models';
-                    Messaging.showError(errorMsg);
+                    contentEl.innerHTML = '<p class="history-modal__empty">' + Utils.escapeHtml(t('noAssignmentHistory')) + '</p>';
                 }
+                contentEl.style.display = 'block';
             },
-            onError: function(_error) {
-                Messaging.showError('Failed to load working time models');
+            onError: function() {
+                const loadingEl = document.getElementById('history-modal-loading');
+                const contentEl = document.getElementById('history-modal-content');
+                if (!loadingEl || !contentEl) return;
+                loadingEl.style.display = 'none';
+                contentEl.innerHTML = '<p class="history-modal__empty">' + t('error') + '</p>';
+                contentEl.style.display = 'block';
             }
         });
     }
@@ -185,16 +293,22 @@
      * Show edit user modal with working time models loaded
      */
     function showEditUserModalWithModels(user, models) {
-        const title = (window.ArbeitszeitCheck?.l10n?.editUser || 'Edit User') + ': ' + (user.displayName || user.userId);
-        const saveLabel = window.ArbeitszeitCheck?.l10n?.save || 'Save';
-        const cancelLabel = window.ArbeitszeitCheck?.l10n?.cancel || 'Cancel';
-        const modelLabel = window.ArbeitszeitCheck?.l10n?.workingTimeModel || 'Working Time Model';
-        const vacationDaysLabel = window.ArbeitszeitCheck?.l10n?.vacationDaysPerYear || 'Vacation Days Per Year';
-        const startDateLabel = window.ArbeitszeitCheck?.l10n?.startDate || 'Start Date';
-        const endDateLabel = window.ArbeitszeitCheck?.l10n?.endDate || (window.t && window.t('arbeitszeitcheck', 'End Date (Optional)')) || 'End Date (Optional)';
-        const noModelLabel = window.ArbeitszeitCheck?.l10n?.noModel || 'No Model Assigned';
+        const t = (s) => (window.t && window.t('arbeitszeitcheck', s)) || window.ArbeitszeitCheck?.l10n?.[s] || s;
+        const title = t('editUser') + ': ' + (user.displayName || user.userId);
+        const saveLabel = t('save');
+        const cancelLabel = t('cancel');
+        const modelLabel = t('workingTimeModel');
+        const vacationDaysLabel = t('vacationDaysPerYear');
+        const startDateLabel = t('startDate');
+        const endDateLabel = t('endDateOptional');
+        const noModelLabel = t('noModel');
 
-        // Build model options
+        const vacation = user.vacationDaysPerYear ?? user.userWorkingTimeModel?.vacationDaysPerYear ?? 25;
+        const startIso = user.workingTimeModelStartDate ?? user.userWorkingTimeModel?.startDate ?? null;
+        const endIso = user.workingTimeModelEndDate ?? user.userWorkingTimeModel?.endDate ?? null;
+        const startVal = (startIso && convertISOToEuropean(startIso)) || '';
+        const endVal = (endIso && convertISOToEuropean(endIso)) || '';
+
         let modelOptions = `<option value="">${noModelLabel}</option>`;
         models.forEach(model => {
             const selected = user.workingTimeModel && user.workingTimeModel.id === model.id ? 'selected' : '';
@@ -206,29 +320,24 @@
                 <input type="hidden" id="user-id" name="userId" value="${Utils.escapeHtml(user.userId)}">
                 <div class="form-group">
                     <label for="user-model" class="form-label">${modelLabel}</label>
-                    <select id="user-model" name="workingTimeModelId" class="form-select">
+                    <select id="user-model" name="workingTimeModelId" class="form-select" aria-describedby="user-model-help">
                         ${modelOptions}
                     </select>
-                    <p class="form-help">Select a work schedule to assign to this employee</p>
+                    <p id="user-model-help" class="form-help">${t('selectWorkScheduleHelp')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-vacation-days" class="form-label">${vacationDaysLabel}</label>
-                    <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" 
-                           min="0" max="365" value="${user.vacationDaysPerYear || 25}">
-                    <p class="form-help">${window.ArbeitszeitCheck?.l10n?.vacationDaysHelp || 'Number of vacation days per year (standard in Germany: 25 days)'}</p>
+                    <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" min="0" max="365" value="${vacation}" aria-describedby="user-vacation-help">
+                    <p id="user-vacation-help" class="form-help">${t('vacationDaysHelp')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-start-date" class="form-label">${startDateLabel}</label>
-                    <input type="text" id="user-start-date" name="startDate" class="form-input datepicker-input" 
-                           placeholder="dd.mm.yyyy" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10"
-                           value="${(user.workingTimeModelStartDate && convertISOToEuropean(user.workingTimeModelStartDate)) || ''}">
+                    <input type="text" id="user-start-date" name="startDate" class="form-input datepicker-input" placeholder="dd.mm.yyyy" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${startVal}" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="user-end-date" class="form-label">${endDateLabel}</label>
-                    <input type="text" id="user-end-date" name="endDate" class="form-input datepicker-input" 
-                           placeholder="dd.mm.yyyy" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10"
-                           value="${(user.workingTimeModelEndDate && convertISOToEuropean(user.workingTimeModelEndDate)) || ''}">
-                    <p class="form-help">Leave empty if the assignment has no end date</p>
+                    <input type="text" id="user-end-date" name="endDate" class="form-input datepicker-input" placeholder="dd.mm.yyyy" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${endVal}" autocomplete="off">
+                    <p class="form-help">${t('endDateHelp')}</p>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn--secondary" data-action="close-modal">${cancelLabel}</button>
@@ -244,16 +353,13 @@
             size: 'md',
             closable: true,
             onClose: function() {
-                const modalEl = document.getElementById('edit-user-modal');
-                if (modalEl && modalEl.parentNode) {
-                    modalEl.parentNode.remove();
-                }
+                const el = document.getElementById('edit-user-modal');
+                if (el && el.parentNode) el.parentNode.remove();
             }
         });
 
         Components.openModal('edit-user-modal');
 
-        // Init datepickers on dynamically added inputs
         const dp = window.ArbeitszeitCheckDatepicker;
         if (dp && dp.initializeDatepicker) {
             const startEl = document.getElementById('user-start-date');
@@ -262,7 +368,6 @@
             if (endEl) dp.initializeDatepicker(endEl, {});
         }
 
-        // Handle form submission
         const form = document.getElementById('edit-user-form');
         if (form) {
             form.addEventListener('submit', function(e) {
@@ -271,12 +376,9 @@
             });
         }
 
-        // Handle cancel button
         const cancelBtn = modal.querySelector('[data-action="close-modal"]');
         if (cancelBtn) {
-            cancelBtn.addEventListener('click', function() {
-                Components.closeModal(modal);
-            });
+            cancelBtn.addEventListener('click', function() { Components.closeModal(modal); });
         }
     }
 

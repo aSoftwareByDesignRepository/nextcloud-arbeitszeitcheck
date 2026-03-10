@@ -29,92 +29,92 @@
   box-sizing: border-box;
 }
 
-.btn:focus {
-  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary-element);
   outline-offset: 2px;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.75;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* Button Variants */
+/* Button Variants — Nextcloud theme variables for light/dark/high-contrast */
 .btn--primary {
-  background-color: var(--arbeitszeitcheck-color-button-primary);
-  border-color: var(--arbeitszeitcheck-color-button-primary);
-  color: var(--arbeitszeitcheck-color-button-primary-text);
+  background-color: var(--color-primary-element);
+  border-color: var(--color-primary-element);
+  color: var(--color-primary-element-text);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-primary-hover);
-  border-color: var(--arbeitszeitcheck-color-button-primary-hover);
+  background-color: var(--color-primary-element-hover);
+  border-color: var(--color-primary-element-hover);
 }
 
 .btn--primary:active:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-primary-active);
-  border-color: var(--arbeitszeitcheck-color-button-primary-active);
+  background-color: var(--color-primary-element);
+  border-color: var(--color-primary-element);
 }
 
 .btn--secondary {
-  background-color: var(--arbeitszeitcheck-color-button-secondary);
-  border-color: var(--arbeitszeitcheck-color-border);
-  color: var(--arbeitszeitcheck-color-button-secondary-text);
+  background-color: var(--color-background-dark);
+  border-color: var(--color-border);
+  color: var(--color-main-text);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-secondary-hover);
-  border-color: var(--arbeitszeitcheck-color-border);
+  background-color: var(--color-background-hover);
+  border-color: var(--color-border);
 }
 
 .btn--secondary:active:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-secondary-active);
-  border-color: var(--arbeitszeitcheck-color-border);
+  background-color: var(--color-background-hover);
+  border-color: var(--color-border);
 }
 
 .btn--tertiary {
   background-color: transparent;
   border-color: transparent;
-  color: var(--arbeitszeitcheck-color-primary);
+  color: var(--color-primary-element);
 }
 
 .btn--tertiary:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-primary-light);
+  background-color: var(--color-primary-element-light);
   border-color: transparent;
 }
 
 .btn--danger {
-  background-color: var(--arbeitszeitcheck-color-button-danger);
-  border-color: var(--arbeitszeitcheck-color-button-danger);
-  color: var(--arbeitszeitcheck-color-button-danger-text);
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: var(--color-primary-text);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-danger-hover);
-  border-color: var(--arbeitszeitcheck-color-button-danger-hover);
+  background-color: var(--color-error-hover);
+  border-color: var(--color-error-hover);
 }
 
 .btn--success {
-  background-color: var(--arbeitszeitcheck-color-success);
-  border-color: var(--arbeitszeitcheck-color-success);
-  color: var(--arbeitszeitcheck-color-text-inverse);
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-primary-text);
 }
 
 .btn--success:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-success-hover);
-  border-color: var(--arbeitszeitcheck-color-success-hover);
+  background-color: var(--color-success-hover);
+  border-color: var(--color-success-hover);
 }
 
 .btn--warning {
-  background-color: var(--arbeitszeitcheck-color-warning);
-  border-color: var(--arbeitszeitcheck-color-warning);
-  color: var(--arbeitszeitcheck-color-text-inverse);
+  background-color: var(--color-warning);
+  border-color: var(--color-warning);
+  color: var(--color-primary-text);
 }
 
 .btn--warning:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-warning-hover);
-  border-color: var(--arbeitszeitcheck-color-warning-hover);
+  background-color: var(--color-warning-hover);
+  border-color: var(--color-warning-hover);
 }
 
 /* Button Sizes */
@@ -202,40 +202,40 @@
 
 .button.primary,
 .btn-primary {
-  background-color: var(--arbeitszeitcheck-color-button-primary);
-  border-color: var(--arbeitszeitcheck-color-button-primary);
-  color: var(--arbeitszeitcheck-color-button-primary-text);
+  background-color: var(--color-primary-element);
+  border-color: var(--color-primary-element);
+  color: var(--color-primary-element-text);
 }
 
 .button.primary:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-primary-hover);
-  border-color: var(--arbeitszeitcheck-color-button-primary-hover);
+  background-color: var(--color-primary-element-hover);
+  border-color: var(--color-primary-element-hover);
 }
 
 .button.secondary,
 .btn-secondary {
-  background-color: var(--arbeitszeitcheck-color-button-secondary);
-  border-color: var(--arbeitszeitcheck-color-border);
-  color: var(--arbeitszeitcheck-color-button-secondary-text);
+  background-color: var(--color-background-dark);
+  border-color: var(--color-border);
+  color: var(--color-main-text);
 }
 
 .button.secondary:hover:not(:disabled),
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-secondary-hover);
+  background-color: var(--color-background-hover);
 }
 
 .button.error,
 .btn-danger {
-  background-color: var(--arbeitszeitcheck-color-button-danger);
-  border-color: var(--arbeitszeitcheck-color-button-danger);
-  color: var(--arbeitszeitcheck-color-button-danger-text);
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: var(--color-primary-text);
 }
 
 .button.error:hover:not(:disabled),
 .btn-danger:hover:not(:disabled) {
-  background-color: var(--arbeitszeitcheck-color-button-danger-hover);
-  border-color: var(--arbeitszeitcheck-color-button-danger-hover);
+  background-color: var(--color-error-hover);
+  border-color: var(--color-error-hover);
 }
 
 .button.small,
@@ -386,6 +386,18 @@
   box-shadow: 0 0 0 3px var(--arbeitszeitcheck-color-warning-light);
 }
 
+/* Placeholder — theme-aware (WCAG contrast in light/dark) */
+.form-input::placeholder,
+.form-group input::placeholder,
+.form-textarea::placeholder,
+.form-group textarea::placeholder {
+  color: var(--color-text-maxcontrast);
+}
+.form-select:invalid,
+.form-group select:invalid {
+  color: var(--color-text-maxcontrast);
+}
+
 /* Form Textarea */
 .form-textarea,
 .form-group textarea {
@@ -400,10 +412,10 @@
   width: 100%;
 }
 
-/* Form Select */
+/* Form Select — uses Nextcloud theme icon for arrow (light/dark compatible) */
 .form-select,
 .form-group select {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-image: var(--icon-triangle-s-dark, url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b6b6b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e"));
   background-position: right var(--space-2) center;
   background-repeat: no-repeat;
   background-size: 1.5em 1.5em;
@@ -411,8 +423,9 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  height: 48px;
-  line-height: 48px;
+  /* Match input height (44px) for consistent vertical rhythm */
+  height: 44px;
+  line-height: 44px;
   box-sizing: border-box;
   vertical-align: middle;
 }
@@ -422,8 +435,8 @@
   padding-right: 2.5rem;
   background-position: right 0.75rem center;
   background-size: 1.25em 1.25em;
-  height: 48px;
-  line-height: 48px;
+  height: 44px;
+  line-height: 44px;
   vertical-align: middle;
 }
 
@@ -1026,29 +1039,29 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   gap: var(--space-3);
 }
 
-/* Alert Variants */
+/* Alert Variants — WCAG 2.1 AA: main text on light backgrounds for 4.5:1 contrast */
 .alert--success {
   background-color: var(--arbeitszeitcheck-color-notification-success-background);
   border-color: var(--arbeitszeitcheck-color-notification-success);
-  color: var(--arbeitszeitcheck-color-success-dark);
+  color: var(--color-main-text);
 }
 
 .alert--error {
   background-color: var(--arbeitszeitcheck-color-notification-error-background);
   border-color: var(--arbeitszeitcheck-color-notification-error);
-  color: var(--arbeitszeitcheck-color-error-dark);
+  color: var(--color-main-text);
 }
 
 .alert--warning {
   background-color: var(--arbeitszeitcheck-color-notification-warning-background);
   border-color: var(--arbeitszeitcheck-color-notification-warning);
-  color: var(--arbeitszeitcheck-color-warning-dark);
+  color: var(--color-main-text);
 }
 
 .alert--info {
   background-color: var(--arbeitszeitcheck-color-notification-info-background);
   border-color: var(--arbeitszeitcheck-color-notification-info);
-  color: var(--arbeitszeitcheck-color-info-dark);
+  color: var(--color-main-text);
 }
 
 /* Alert Icon */
@@ -1090,7 +1103,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   cursor: pointer;
   padding: var(--space-1);
   border-radius: var(--radius-base);
-  opacity: 0.7;
+  opacity: 0.9;
   transition: opacity 0.15s ease-in-out;
 }
 
@@ -1229,7 +1242,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   cursor: pointer;
   padding: var(--space-1);
   border-radius: var(--radius-base);
-  opacity: 0.7;
+  opacity: 0.9;
   transition: opacity 0.15s ease-in-out;
   flex-shrink: 0;
 }
@@ -1380,23 +1393,27 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   color: var(--color-text-maxcontrast);
 }
 
+/* Badges — darkened backgrounds for WCAG 2.1 AA contrast with white text */
 .badge--success {
-  background-color: var(--color-success);
-  color: var(--color-success-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
 }
 
 .badge--warning {
-  background-color: var(--color-warning);
-  color: var(--color-warning-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
 }
 
 .badge--error {
-  background-color: var(--color-error);
-  color: var(--color-error-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
 }
 
-/* Avatar */
-.avatar {
+/* Avatar — scoped to app content to avoid overriding Nextcloud header (avatardiv, account-menu__avatar) */
+#content.app-arbeitszeitcheck .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1410,25 +1427,25 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   overflow: hidden;
 }
 
-.avatar--sm {
+#content.app-arbeitszeitcheck .avatar--sm {
   width: 2rem;
   height: 2rem;
   font-size: var(--arbeitszeitcheck-font-size-xs);
 }
 
-.avatar--lg {
+#content.app-arbeitszeitcheck .avatar--lg {
   width: 3rem;
   height: 3rem;
   font-size: var(--arbeitszeitcheck-font-size-base);
 }
 
-.avatar--xl {
+#content.app-arbeitszeitcheck .avatar--xl {
   width: 4rem;
   height: 4rem;
   font-size: var(--arbeitszeitcheck-font-size-lg);
 }
 
-.avatar img {
+#content.app-arbeitszeitcheck .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1466,7 +1483,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   left: 50%;
   transform: translateX(-50%);
   border: 4px solid transparent;
-  border-top-color: var(--arbeitszeitcheck-color-gray-900);
+  border-top-color: var(--arbeitszeitcheck-color-gray-900, var(--color-main-text));
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
@@ -1558,8 +1575,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 .breadcrumb li:not(:last-child)::after {
   content: '/';
   margin-left: var(--space-2);
-  color: var(--arbeitszeitcheck-color-text-tertiary);
-  opacity: 0.5;
+  color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
 .breadcrumb a {
@@ -1643,8 +1659,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   justify-content: center;
   margin: 0 auto var(--space-6) auto;
   font-size: 2rem;
-  color: var(--arbeitszeitcheck-color-primary);
-  opacity: 0.6;
+  color: var(--arbeitszeitcheck-color-primary-element);
 }
 
 .empty-state__title {
@@ -1729,7 +1744,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
   border-radius: var(--radius-base);
   padding: var(--space-4);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 .pending-approval-card__body {
@@ -1897,17 +1912,17 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 .team-compliance-stat--ok {
   border-left-width: 4px;
-  border-left-color: var(--color-success, #2fb344);
+  border-left-color: var(--color-success);
 }
 
 .team-compliance-stat--warning {
   border-left-width: 4px;
-  border-left-color: var(--color-warning, #eca700);
+  border-left-color: var(--color-warning);
 }
 
 .team-compliance-stat--error {
   border-left-width: 4px;
-  border-left-color: var(--color-error, #e9322d);
+  border-left-color: var(--color-error);
 }
 
 .team-compliance-stat--info {
@@ -1916,11 +1931,11 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 .team-compliance-stat--has-issues {
-  border-color: var(--color-warning, #eca700);
+  border-color: var(--color-warning);
 }
 
 .team-compliance-stat.team-compliance-stat--error.team-compliance-stat--has-issues {
-  border-color: var(--color-error, #e9322d);
+  border-color: var(--color-error);
 }
 
 .team-compliance-note {
@@ -1931,7 +1946,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 .team-compliance-note--success {
   color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-secondary)));
-  border-left: 3px solid var(--color-success, #2fb344);
+  border-left: 3px solid var(--color-success);
   padding-left: var(--space-2);
 }
 
@@ -2035,7 +2050,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
   border-radius: var(--radius-base);
   padding: var(--space-4);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 .substitution-request-card__body {

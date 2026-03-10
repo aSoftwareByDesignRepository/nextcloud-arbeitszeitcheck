@@ -29,7 +29,7 @@
 
 .admin-teams .section__desc {
   margin: 0;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   font-size: var(--default-font-size, 1rem);
   line-height: 1.6;
   max-width: 56em;
@@ -60,7 +60,7 @@
   background: var(--color-background-dark);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-large, 8px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 .admin-teams .config-card:focus-within {
@@ -77,7 +77,7 @@
 .admin-teams .form-help {
   margin: 0.75rem 0 0 0;
   font-size: 0.9375rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   line-height: 1.5;
 }
 
@@ -90,7 +90,7 @@
   background: var(--color-background-dark);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-large, 8px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--arbeitszeitcheck-shadow-subtle);
 }
 
 .admin-teams .org-tree .teams-tree__root {
@@ -101,7 +101,7 @@
 .admin-teams .teams-empty {
   margin: 0;
   padding: 1.25rem 1.5rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   line-height: 1.5;
 }
 
@@ -221,7 +221,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   font-size: var(--default-font-size);
   cursor: pointer;
   min-height: var(--default-clickable-area, 44px);
@@ -302,7 +302,7 @@
 .admin-teams .team-list__empty,
 .admin-teams .team-list__error {
   padding: 1rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   text-align: center;
 }
 

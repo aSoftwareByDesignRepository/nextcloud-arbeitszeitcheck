@@ -7,9 +7,9 @@
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>arbeitszeitcheck</id>
 	<name>ArbeitszeitCheck / TimeGuard</name>
-	<summary>Legally compliant time tracking system for German labor law (ArbZG) and GDPR</summary>
+	<summary>Legally compliant Nextcloud time tracking app for German labor law (ArbZG) and GDPR</summary>
 	<description>
-		ArbeitszeitCheck is a comprehensive, legally compliant time tracking system specifically designed for German organizations.
+		ArbeitszeitCheck is a comprehensive, legally compliant time tracking app for Nextcloud, specifically designed for German organizations.
 		It fully implements German labor law (Arbeitszeitgesetz - ArbZG) requirements including mandatory break times,
 		maximum working hours, rest periods, and Sunday/holiday work tracking.
 
@@ -54,7 +54,11 @@
 	</optional-dependencies>
 
 	<screenshots>
-		<screenshot>screenshots/dashboard.png</screenshot>
+		<screenshot>screenshots/arbeitszeitcheck-screenshot-01.png</screenshot>
+		<screenshot>screenshots/arbeitszeitcheck-screenshot-02.png</screenshot>
+		<screenshot>screenshots/arbeitszeitcheck-screenshot-03.png</screenshot>
+		<screenshot>screenshots/arbeitszeitcheck-screenshot-04.png</screenshot>
+		<screenshot>screenshots/arbeitszeitcheck-screenshot-05.png</screenshot>
 	</screenshots>
 
 	<navigations>
@@ -68,7 +72,10 @@
 
 	<keywords>
 		<keyword>time tracking</keyword>
+		<keyword>time tracking app</keyword>
 		<keyword>arbeitszeit</keyword>
+		<keyword>arbeitszeiterfassung</keyword>
+		<keyword>zeiterfassung</keyword>
 		<keyword>labor law</keyword>
 		<keyword>german law</keyword>
 		<keyword>arbzg</keyword>
@@ -77,8 +84,11 @@
 		<keyword>work hours</keyword>
 		<keyword>breaks</keyword>
 		<keyword>overtime</keyword>
+		<keyword>overtime tracking</keyword>
 		<keyword>vacation</keyword>
+		<keyword>urlaub</keyword>
 		<keyword>absence</keyword>
+		<keyword>abwesenheiten</keyword>
 		<keyword>audit</keyword>
 		<keyword>reporting</keyword>
 		<keyword>accessibility</keyword>

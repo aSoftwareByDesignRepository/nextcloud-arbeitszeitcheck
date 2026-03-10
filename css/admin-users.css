@@ -1,0 +1,58 @@
+/**
+ * Admin Users – Edit user modal, history modal, Manage Employees styles
+ * WCAG 2.1 AA compliant, responsive
+ *
+ * @copyright Copyright (c) 2024, Nextcloud GmbH
+ * @license AGPL-3.0-or-later
+ */
+
+/* ===== USER ACTIONS (History + Edit) ===== */
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+}
+
+/* ===== HISTORY MODAL ===== */
+
+.history-modal__loading,
+.history-modal__empty {
+  margin: 0;
+  padding: var(--space-4, 1rem);
+  color: var(--color-text-maxcontrast);
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+/* History table */
+.history-modal__content .table-responsive {
+  overflow-x: auto;
+}
+
+.history-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+  color: var(--color-main-text, var(--arbeitszeitcheck-color-text));
+}
+
+.history-modal__table th {
+  text-align: left;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  font-weight: 600;
+  color: var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text));
+  border-bottom: 2px solid var(--color-border, var(--arbeitszeitcheck-color-border));
+  white-space: nowrap;
+}
+
+.history-modal__table td {
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
+  vertical-align: middle;
+}
+
+.history-modal__table tbody tr:last-child td {
+  border-bottom: none;
+}
+

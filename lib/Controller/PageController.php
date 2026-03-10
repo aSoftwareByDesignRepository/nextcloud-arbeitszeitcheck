@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -47,6 +48,7 @@ class PageController extends Controller
 	private IGroupManager $groupManager;
 	private IURLGenerator $urlGenerator;
 	private IConfig $config;
+	private PermissionService $permissionService;
 	private IL10N $l10n;
 
 	/**
@@ -76,6 +78,7 @@ class PageController extends Controller
 		IGroupManager $groupManager,
 		IURLGenerator $urlGenerator,
 		IConfig $config,
+		PermissionService $permissionService,
 		CSPService $cspService,
 		IL10N $l10n
 	) {
@@ -90,6 +93,7 @@ class PageController extends Controller
 		$this->groupManager = $groupManager;
 		$this->urlGenerator = $urlGenerator;
 		$this->config = $config;
+		$this->permissionService = $permissionService;
 		$this->l10n = $l10n;
 		$this->setCspService($cspService);
 	}
@@ -358,22 +362,11 @@ class PageController extends Controller
 
 		try {
 			$userId = $this->getUserId();
-			$user = $this->userSession->getUser();
-			
-			// Check if user is admin or manager
-			$isAdmin = $user && $this->groupManager->isAdmin($user->getUID());
-			$isManager = false;
-			if ($user && !$isAdmin) {
-				// Check if user is in a manager group (you can customize this logic)
-				$userGroups = $this->groupManager->getUserGroups($user);
-				foreach ($userGroups as $group) {
-					if (stripos($group->getGID(), 'manager') !== false || stripos($group->getGID(), 'leiter') !== false) {
-						$isManager = true;
-						break;
-					}
-				}
-			}
-			
+			// Use PermissionService as single source of truth for roles and permissions
+			$canAccessReports = $this->permissionService->canAccessManagerDashboard($userId);
+			$isAdmin = $this->permissionService->isAdmin($userId);
+			$isManager = $canAccessReports && !$isAdmin;
+
 			// Get stats for sidebar
 			$timeEntryCount = $this->timeEntryMapper->countByUser($userId);
 			$absenceCount = $this->absenceMapper->countByUser($userId);

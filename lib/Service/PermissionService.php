@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Single source of truth for roles and permissions in ArbeitszeitCheck.
- * Used for access control and audit; see docs/ROLES_AND_PERMISSIONS.md.
+ * Used for access control and audit; see the internal roles/permissions documentation.
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later

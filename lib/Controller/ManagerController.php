@@ -677,6 +677,8 @@ class ManagerController extends Controller
 				], Http::STATUS_FORBIDDEN);
 			}
 
+			$oldValues = $entry->getSummary();
+
 			// Approve the correction - finalize the proposed changes
 			$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
 			$entry->setApprovedByUserId($managerId);
@@ -722,19 +724,18 @@ class ManagerController extends Controller
 				}
 			}
 
-			// Create audit log
+			// Create audit log (full before/after for payroll evidence)
 			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
+			$newValues = $updatedEntry->getSummary();
+			$newValues['approval_comment'] = $comment;
 			$auditLogMapper->logAction(
-				$entry->getUserId(), // userId - the employee who owns the entry
+				$entry->getUserId(),
 				'time_entry_correction_approved',
 				'time_entry',
-				$timeEntryId, // entityId
-				null, // oldValues
-				[
-					'comment' => $comment,
-					'approved_by' => $managerId
-				], // newValues
-				$managerId // performedBy - the manager who approved
+				$timeEntryId,
+				$oldValues,
+				$newValues,
+				$managerId
 			);
 
 			// Send notification to employee
@@ -797,6 +798,8 @@ class ManagerController extends Controller
 				], Http::STATUS_FORBIDDEN);
 			}
 
+			$oldValues = $entry->getSummary();
+
 			// Get original data from justification to restore
 			$justificationData = json_decode($entry->getJustification() ?? '{}', true);
 			$originalData = $justificationData['original'] ?? [];
@@ -842,19 +845,19 @@ class ManagerController extends Controller
 
 			$updatedEntry = $timeEntryMapper->update($entry);
 
-			// Create audit log
+			// Create audit log (full before/after for payroll evidence)
 			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
+			$newValues = $updatedEntry->getSummary();
+			$newValues['rejection_reason'] = $reason ?? '';
+			$newValues['rejected_by'] = $managerId;
 			$auditLogMapper->logAction(
-				$entry->getUserId(), // userId - the employee who owns the entry
+				$entry->getUserId(),
 				'time_entry_correction_rejected',
 				'time_entry',
-				$timeEntryId, // entityId
-				null, // oldValues
-				[
-					'reason' => $reason,
-					'rejected_by' => $managerId
-				], // newValues
-				$managerId // performedBy - the manager who rejected
+				$timeEntryId,
+				$oldValues,
+				$newValues,
+				$managerId
 			);
 
 			// Send notification to employee

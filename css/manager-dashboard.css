@@ -10,6 +10,7 @@
    ------------------------------------------------------------------------- */
 .manager-dashboard {
   background: var(--color-main-background);
+  color: var(--color-main-text);
 }
 
 .manager-dashboard__content {
@@ -36,7 +37,7 @@
 .manager-dashboard__subtitle {
   margin: 0;
   font-size: 1rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   line-height: 1.5;
 }
 
@@ -49,6 +50,7 @@
   border-radius: var(--border-radius-large, 8px);
   padding: 1.5rem;
   margin-bottom: 0;
+  color: var(--color-main-text);
 }
 
 .manager-dashboard .section-header {
@@ -65,7 +67,7 @@
 .manager-dashboard .section__desc {
   margin: 0;
   font-size: 0.9375rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   line-height: 1.5;
 }
 
@@ -98,7 +100,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   font-size: 1rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
   cursor: pointer;
   margin-bottom: -1px;
   min-height: var(--default-clickable-area, 44px);
@@ -131,7 +133,7 @@
 .pending-approvals-loading {
   margin: 0;
   padding: 1rem;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
 }
 
 .pending-approval-card {
@@ -183,7 +185,7 @@
 .manager-dashboard .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--color-text-lighter);
+  color: var(--color-text-maxcontrast);
 }
 
 /* -------------------------------------------------------------------------

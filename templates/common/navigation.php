@@ -33,7 +33,6 @@ $isManagerPage = strpos($currentPage, '/manager') !== false;
 $isSubstitutionRequests = strpos($currentPage, '/substitution-requests') !== false;
 $isCompliance = strpos($currentPage, '/compliance') !== false;
 $isAdmin = strpos($currentPage, '/admin') !== false;
-$isAdminTeams = strpos($currentPage, '/admin/teams') !== false;
 // Dashboard is active if URL contains /dashboard OR if it's the base app URL without any specific section
 $isDashboard = strpos($currentPage, '/dashboard') !== false || 
                (!$isTimeEntries && !$isAbsences && !$isReports && !$isCompliance && !$isCalendar && !$isTimeline && !$isSettings && 
@@ -159,6 +158,7 @@ if ($showManagerLink === null) {
                 <span><?php p($l->t('Timeline')); ?></span>
             </a>
         </li>
+        <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
         <li class="<?php p($isSettings ? 'active' : ''); ?>" <?php p($isSettings ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.settings')); ?>"
                title="<?php p($l->t('Settings: Change your personal preferences and working time settings')); ?>"
@@ -179,20 +179,12 @@ if ($showManagerLink === null) {
         }
         if ($showAdminNav): ?>
         <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
-        <li class="<?php p($isAdminTeams ? 'active' : ''); ?>" <?php p($isAdminTeams ? 'aria-current="page"' : ''); ?>>
-            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams')); ?>"
-               title="<?php p($l->t('Organization: Define teams, departments, and hierarchy')); ?>"
-               aria-label="<?php p($l->t('Go to organization to configure teams and structure')); ?>">
-                <i data-lucide="building-2" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Organization')); ?></span>
-            </a>
-        </li>
-        <li class="<?php p($isAdmin && !$isAdminTeams ? 'active' : ''); ?>" <?php p($isAdmin && !$isAdminTeams ? 'aria-current="page"' : ''); ?>>
+        <li class="<?php p($isAdmin ? 'active' : ''); ?>" <?php p($isAdmin ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard')); ?>"
-               title="<?php p($l->t('Admin Dashboard')); ?>"
-               aria-label="<?php p($l->t('Go to admin dashboard')); ?>">
-                <i data-lucide="settings" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Admin')); ?></span>
+               title="<?php p($l->t('Administration: Employees, work schedules, teams, and app settings')); ?>"
+               aria-label="<?php p($l->t('Go to administration')); ?>">
+                <i data-lucide="shield" class="lucide-icon" aria-hidden="true"></i>
+                <span><?php p($l->t('Administration')); ?></span>
             </a>
         </li>
         <?php endif; ?>
@@ -237,7 +229,8 @@ if ($showManagerLink === null) {
         users: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
         'user-check': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17,11 19,13 23,9"/></svg>',
         'shield-check': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
-        'building-2': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/></svg>'
+        'building-2': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/></svg>',
+        shield: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="lucide-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
     };
 
     document.addEventListener('DOMContentLoaded', function() {

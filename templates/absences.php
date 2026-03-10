@@ -110,11 +110,11 @@ $usersUrl = $_['usersUrl'] ?? '';
                 <div class="form form--inline">
                     <div class="form-group">
                         <label for="filter-start-date" class="form-label"><?php p($l->t('Start Date')); ?></label>
-                        <input type="text" id="filter-start-date" class="form-input datepicker-input" placeholder="dd.mm.yyyy" value="<?php p($filterStartDate); ?>" data-datepicker-min="">
+                        <input type="text" id="filter-start-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterStartDate); ?>" data-datepicker-min="">
                     </div>
                     <div class="form-group">
                         <label for="filter-end-date" class="form-label"><?php p($l->t('End Date')); ?></label>
-                        <input type="text" id="filter-end-date" class="form-input datepicker-input" placeholder="dd.mm.yyyy" value="<?php p($filterEndDate); ?>" data-datepicker-min="">
+                        <input type="text" id="filter-end-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterEndDate); ?>" data-datepicker-min="">
                     </div>
                     <div class="form-group">
                         <label for="filter-status" class="form-label"><?php p($l->t('Status')); ?></label>
@@ -196,7 +196,7 @@ $usersUrl = $_['usersUrl'] ?? '';
                                class="form-input datepicker-input"
                                data-datepicker-min="today"
                                value="<?php p($absence ? $absence->getStartDate()->format('d.m.Y') : ''); ?>"
-                               placeholder="dd.mm.yyyy"
+                               placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
                                pattern="\d{2}\.\d{2}\.\d{4}"
                                maxlength="10"
                                required>
@@ -213,7 +213,7 @@ $usersUrl = $_['usersUrl'] ?? '';
                                class="form-input datepicker-input"
                                data-datepicker-min="today"
                                value="<?php p($absence ? $absence->getEndDate()->format('d.m.Y') : ''); ?>"
-                               placeholder="dd.mm.yyyy"
+                               placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
                                pattern="\d{2}\.\d{2}\.\d{4}"
                                maxlength="10"
                                required>

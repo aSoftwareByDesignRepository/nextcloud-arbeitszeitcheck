@@ -90,10 +90,24 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
                             </thead>
                             <tbody>
                                 <?php foreach (($reportData['by_severity'] ?? []) as $severity => $count): ?>
+                                    <?php
+                                    $severityKey = $severity ?? '';
+                                    $severityLabel = match ($severityKey) {
+                                        'error' => $l->t('High'),
+                                        'warning' => $l->t('Medium'),
+                                        'info' => $l->t('Low'),
+                                        default => $severityKey,
+                                    };
+                                    $severityBadge = match ($severityKey) {
+                                        'error' => 'error',
+                                        'warning' => 'warning',
+                                        default => 'primary',
+                                    };
+                                    ?>
                                     <tr>
                                         <td>
-                                            <span class="badge badge--<?php p($severity === 'high' ? 'error' : ($severity === 'medium' ? 'warning' : 'primary')); ?>">
-                                                <?php p($severity); ?>
+                                            <span class="badge badge--<?php p($severityBadge); ?>">
+                                                <?php p($severityLabel); ?>
                                             </span>
                                         </td>
                                         <td><?php p($count); ?></td>

@@ -171,13 +171,11 @@ $canAccessReports = $isAdmin || $isManager;
                                 name="format" 
                                 class="form-select"
                                 aria-describedby="format-help">
-                            <option value="pdf"><?php p($l->t('PDF (for printing or viewing)')); ?></option>
                             <option value="csv"><?php p($l->t('CSV (for Excel or other programs)')); ?></option>
-                            <option value="xlsx"><?php p($l->t('Excel File (XLSX)')); ?></option>
                             <option value="json"><?php p($l->t('JSON (for computer programs)')); ?></option>
                         </select>
                         <p id="format-help" class="form-help">
-                            <?php p($l->t('Choose how you want to save the report. PDF is best for printing or viewing. Excel or CSV is best if you want to edit the data in a spreadsheet program.')); ?>
+                            <?php p($l->t('Choose how you want to save the report. CSV works well with spreadsheet programs. JSON is best if another system needs to process the data.')); ?>
                         </p>
                     </div>
                     

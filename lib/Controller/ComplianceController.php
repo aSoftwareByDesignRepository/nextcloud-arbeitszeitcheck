@@ -200,14 +200,9 @@ class ComplianceController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			// Get violations (last 30 days, first 50)
-			$endDate = new \DateTime();
-			$endDate->setTime(23, 59, 59);
-			$startDate = clone $endDate;
-			$startDate->modify('-30 days');
-			$startDate->setTime(0, 0, 0);
-
-			$violations = $this->violationMapper->findByDateRange($startDate, $endDate, $userId, null);
+			// Get all violations for the current user (initial view).
+			// The filters and date range in the UI are handled via the API (getViolations).
+			$violations = $this->violationMapper->findByUser($userId, null);
 			$violations = array_slice($violations, 0, 50);
 
 			$violationsData = [];
@@ -273,14 +268,8 @@ class ComplianceController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-			// Get compliance summary for last 30 days
-			$endDate = new \DateTime();
-			$endDate->setTime(23, 59, 59);
-			$startDate = clone $endDate;
-			$startDate->modify('-30 days');
-			$startDate->setTime(0, 0, 0);
-
-			$violations = $this->violationMapper->findByDateRange($startDate, $endDate, $userId, null);
+			// Get compliance summary for all recorded violations
+			$violations = $this->violationMapper->findByUser($userId, null);
 
 			$reportData = [
 				'total_violations' => count($violations),
@@ -301,13 +290,18 @@ class ComplianceController extends Controller
 				$reportData['by_severity'][$severity] = ($reportData['by_severity'][$severity] ?? 0) + 1;
 			}
 
-			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', [
-				'reportData' => $reportData,
-				'startDate' => $startDate->format('Y-m-d'),
-				'endDate' => $endDate->format('Y-m-d'),
-				'urlGenerator' => $this->urlGenerator,
-				'l' => $this->l10n,
-			]);
+			$response = new TemplateResponse(
+				'arbeitszeitcheck',
+				'compliance-reports',
+				[
+					'reportData' => $reportData,
+					// No fixed date range; the page shows an all-time summary.
+					'startDate' => null,
+					'endDate' => null,
+					'urlGenerator' => $this->urlGenerator,
+					'l' => $this->l10n,
+				]
+			);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', [

@@ -423,8 +423,9 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  height: 48px;
-  line-height: 48px;
+  /* Match input height (44px) for consistent vertical rhythm */
+  height: 44px;
+  line-height: 44px;
   box-sizing: border-box;
   vertical-align: middle;
 }
@@ -434,8 +435,8 @@
   padding-right: 2.5rem;
   background-position: right 0.75rem center;
   background-size: 1.25em 1.25em;
-  height: 48px;
-  line-height: 48px;
+  height: 44px;
+  line-height: 44px;
   vertical-align: middle;
 }
 
@@ -1394,18 +1395,21 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 /* Badges — darkened backgrounds for WCAG 2.1 AA contrast with white text */
 .badge--success {
-  background-color: color-mix(in srgb, var(--color-success) 80%, black);
-  color: var(--color-primary-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
 }
 
 .badge--warning {
-  background-color: color-mix(in srgb, var(--color-warning) 65%, black);
-  color: var(--color-primary-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
 }
 
 .badge--error {
-  background-color: color-mix(in srgb, var(--color-error) 80%, black);
-  color: var(--color-primary-text);
+  background-color: var(--color-background-dark);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
 }
 
 /* Avatar — scoped to app content to avoid overriding Nextcloud header (avatardiv, account-menu__avatar) */

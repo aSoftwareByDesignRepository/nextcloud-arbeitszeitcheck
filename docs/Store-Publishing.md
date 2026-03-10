@@ -106,3 +106,16 @@ To add screenshots:
 - [x] Screenshot (at least one in `screenshots/`)
 - [ ] App signing (obtain certificate, see above)
 - [ ] Real screenshots (replace placeholder before final submission)
+
+## Support, Contact & Monetization
+
+- **Contact information** is already provided in `appinfo/info.xml`:
+  - `author` with mail and homepage: `info@software-by-design.de`, `https://software-by-design.de`
+  - `<website>` and `<bugs>` both point to `https://software-by-design.de`
+- **Do NOT** add marketing text like  
+  `Kommerzieller Support und Weiterentwicklung verfügbar – …`  
+  into the app description, UI texts or translations. This can conflict with Nextcloud App Store and trademark guidelines.
+- If you want to offer **commercial support or custom development**:
+  - Describe it on your own website (linked via `homepage` / `website`).
+  - Optionally enable the official **Enterprise support / “Request quote”** option in the App Store UI.
+  - Optionally configure **donation links** (PayPal/Stripe) in the App Store / `info.xml` once the real URLs are available.

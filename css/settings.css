@@ -281,3 +281,12 @@
 		margin-top: var(--space-2, 0.5rem);
 	}
 }
+
+/* Wider layouts: let settings use more horizontal space with two columns */
+@media (min-width: 1024px) {
+	.settings-container {
+		display: grid;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+		align-items: flex-start;
+	}
+}

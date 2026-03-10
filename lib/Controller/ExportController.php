@@ -208,13 +208,13 @@ class ExportController extends Controller
 	/**
 	 * Export compliance reports
 	 *
-	 * @param string $format Format: csv, json, pdf
+	 * @param string $format Format: csv, json
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function compliance(string $format = 'pdf', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
+	public function compliance(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {
 			$user = $this->userSession->getUser();
@@ -265,8 +265,7 @@ class ExportController extends Controller
 			return match($format) {
 				'csv' => $this->exportAsCsv($data, $filename),
 				'json' => $this->exportAsJson($data, $filename),
-				'pdf' => $this->exportAsPdf($data, $filename, 'Compliance Report'),
-				default => $this->exportAsPdf($data, $filename, 'Compliance Report')
+				default => $this->exportAsCsv($data, $filename)
 			};
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ExportController::compliance: ' . $e->getMessage(), ["exception" => $e]);

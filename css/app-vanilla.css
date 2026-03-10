@@ -181,8 +181,9 @@
 
 .badge.status-completed,
 .badge--success { 
-    background-color: color-mix(in srgb, var(--color-success) 80%, black);
-    color: var(--color-primary-text);
+    background-color: var(--color-background-dark);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
 }
 
 .badge.status-active,
@@ -193,13 +194,15 @@
 
 .badge.status-break,
 .badge--warning { 
-    background-color: color-mix(in srgb, var(--color-warning) 65%, black);
-    color: var(--color-primary-text);
+    background-color: var(--color-background-dark);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
 }
 
 .badge--error {
-    background-color: color-mix(in srgb, var(--color-error) 80%, black);
-    color: var(--color-primary-text);
+    background-color: var(--color-background-dark);
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
 }
 
 .empty-state {

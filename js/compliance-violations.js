@@ -85,12 +85,29 @@
         const resolvedLabel = (window.t && window.t('arbeitszeitcheck', 'Resolved')) || 'Resolved';
         const unresolvedLabel = (window.t && window.t('arbeitszeitcheck', 'Unresolved')) || 'Unresolved';
 
+        const typeLabels = {
+            missing_break: (window.t && window.t('arbeitszeitcheck', 'Missing break')) || 'Missing break',
+            excessive_working_hours: (window.t && window.t('arbeitszeitcheck', 'Excessive working hours')) || 'Excessive working hours',
+            insufficient_rest_period: (window.t && window.t('arbeitszeitcheck', 'Insufficient rest period')) || 'Insufficient rest period',
+            daily_hours_limit_exceeded: (window.t && window.t('arbeitszeitcheck', 'Daily hours limit exceeded')) || 'Daily hours limit exceeded',
+            weekly_hours_limit_exceeded: (window.t && window.t('arbeitszeitcheck', 'Weekly hours limit exceeded')) || 'Weekly hours limit exceeded',
+            night_work: (window.t && window.t('arbeitszeitcheck', 'Night work')) || 'Night work',
+            sunday_work: (window.t && window.t('arbeitszeitcheck', 'Sunday work')) || 'Sunday work',
+            holiday_work: (window.t && window.t('arbeitszeitcheck', 'Holiday work')) || 'Holiday work',
+        };
+
+        const severityLabels = {
+            error: (window.t && window.t('arbeitszeitcheck', 'High')) || 'High',
+            warning: (window.t && window.t('arbeitszeitcheck', 'Medium')) || 'Medium',
+            info: (window.t && window.t('arbeitszeitcheck', 'Low')) || 'Low',
+        };
+
         tbody.innerHTML = violations.map(v => `
             <tr>
-                <td>${Utils.escapeHtml(v.type)}</td>
+                <td>${Utils.escapeHtml(typeLabels[v.type] || v.type)}</td>
                 <td>
-                    <span class="badge badge--${v.severity === 'high' ? 'error' : (v.severity === 'medium' ? 'warning' : 'primary')}">
-                        ${Utils.escapeHtml(v.severity)}
+                    <span class="badge badge--${v.severity === 'error' ? 'error' : (v.severity === 'warning' ? 'warning' : 'primary')}">
+                        ${Utils.escapeHtml(severityLabels[v.severity] || v.severity)}
                     </span>
                 </td>
                 <td>${v.date || '-'}</td>

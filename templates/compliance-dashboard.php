@@ -140,11 +140,37 @@ $hasData = $complianceStatus['has_data'] ?? true;
                             </thead>
                             <tbody>
                                 <?php foreach (($recentViolations ?? []) as $violation): ?>
+                                    <?php
+                                    $typeKey = $violation['type'] ?? '';
+                                    $typeLabel = match ($typeKey) {
+                                        'missing_break' => $l->t('Missing break'),
+                                        'excessive_working_hours' => $l->t('Excessive working hours'),
+                                        'insufficient_rest_period' => $l->t('Insufficient rest period'),
+                                        'daily_hours_limit_exceeded' => $l->t('Daily hours limit exceeded'),
+                                        'weekly_hours_limit_exceeded' => $l->t('Weekly hours limit exceeded'),
+                                        'night_work' => $l->t('Night work'),
+                                        'sunday_work' => $l->t('Sunday work'),
+                                        'holiday_work' => $l->t('Holiday work'),
+                                        default => $typeKey,
+                                    };
+                                    $severityKey = $violation['severity'] ?? '';
+                                    $severityLabel = match ($severityKey) {
+                                        'error' => $l->t('High'),
+                                        'warning' => $l->t('Medium'),
+                                        'info' => $l->t('Low'),
+                                        default => $severityKey,
+                                    };
+                                    $severityBadge = match ($severityKey) {
+                                        'error' => 'error',
+                                        'warning' => 'warning',
+                                        default => 'primary',
+                                    };
+                                    ?>
                                     <tr>
-                                        <td><?php p($violation['type']); ?></td>
+                                        <td><?php p($typeLabel); ?></td>
                                         <td>
-                                            <span class="badge badge--<?php p($violation['severity'] === 'high' ? 'error' : ($violation['severity'] === 'medium' ? 'warning' : 'primary')); ?>">
-                                                <?php p($violation['severity']); ?>
+                                            <span class="badge badge--<?php p($severityBadge); ?>">
+                                                <?php p($severityLabel); ?>
                                             </span>
                                         </td>
                                         <td><?php p($violation['date'] ?? '-'); ?></td>

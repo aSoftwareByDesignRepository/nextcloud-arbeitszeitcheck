@@ -98,9 +98,9 @@ $error = $_['error'] ?? null;
                         <button id="btn-export"
                             class="btn btn--secondary"
                             type="button"
-                            aria-label="<?php p($l->t('Download your time entries as a file')); ?>"
-                            title="<?php p($l->t('Click to download all your time entries as a file. You can choose PDF, Excel, or CSV format.')); ?>">
-                            <?php p($l->t('Download')); ?>
+                            aria-label="<?php p($l->t('Download your time entries as a CSV file')); ?>"
+                            title="<?php p($l->t('Click to download all your time entries from the last 30 days as a CSV file that you can open in Excel or other spreadsheet programs.')); ?>">
+                            <?php p($l->t('Download CSV')); ?>
                         </button>
                     </div>
                 <?php endif; ?>

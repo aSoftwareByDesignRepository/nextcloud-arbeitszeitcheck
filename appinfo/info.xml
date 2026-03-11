@@ -6,46 +6,71 @@
 -->
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>arbeitszeitcheck</id>
-	<name>ArbeitszeitCheck / TimeGuard</name>
-	<summary>Legally compliant Nextcloud time tracking app for German labor law (ArbZG) and GDPR</summary>
-	<description>
-		ArbeitszeitCheck is a comprehensive, legally compliant time tracking app for Nextcloud, specifically designed for German organizations.
-		It fully implements German labor law (Arbeitszeitgesetz - ArbZG) requirements including mandatory break times,
-		maximum working hours, rest periods, and Sunday/holiday work tracking.
+	<name>ArbeitszeitCheck</name>
+	<name lang="de">ArbeitszeitCheck</name>
+	<summary>Time tracking with ArbZG/GDPR compliance checks directly in your Nextcloud</summary>
+	<summary lang="de">Zeiterfassung mit ArbZG-/DSGVO-Compliance-Prüfungen direkt in Ihrer Nextcloud</summary>
+	<description><![CDATA[
+# ArbeitszeitCheck
 
-		Key features:
-		- German labor law compliance (ArbZG, ECJ C-55/18)
-		- GDPR compliant data processing and employee rights
-		- Real-time compliance monitoring and violation alerts
-		- Employee self-service portal with dashboard
-		- Manager approval workflows
-		- Vacation and absence management
-		- Project time tracking integration (optional)
-		- Comprehensive reporting and exports
-		- WCAG 2.1 AAA accessibility compliance
-		- Mobile-responsive design
-		- Audit logging and data retention management
+Time tracking focused on German working time law (ArbZG) and GDPR. Record work
+times, enforce breaks and rest periods, and monitor compliance – fully self‑hosted
+in your Nextcloud instance.
 
-		This system ensures organizations meet all legal requirements while providing employees with
-		full transparency and control over their working time data.
-	</description>
+## Features
 
-	<version>1.1.1</version>
-	<licence>agpl</licence>
+- **ArbZG-aware rules** – maximum hours, breaks, rest periods, Sundays/holidays
+- **Compliance monitoring** – automatic violation detection and reports
+- **Self‑service dashboards** – employee, team and manager views
+- **Absences & leave** – approval workflows and reporting
+- **Exports & audit log** – e.g. for DATEV and internal audits
+- 100% self‑hosted – no data leaves your server
+
+## Requirements
+
+- Nextcloud 32–36
+- PHP 8.1–8.4
+	]]></description>
+	<description lang="de"><![CDATA[
+# ArbeitszeitCheck
+
+Zeiterfassung und Compliance-App für das deutsche Arbeitszeitgesetz (ArbZG)
+und die DSGVO. Erfassen Sie Arbeitszeiten, setzen Sie Pausen- und Ruhezeiten
+technisch durch und überwachen Sie Verstöße – vollständig in Ihrer selbst
+gehosteten Nextcloud.
+
+## Funktionen
+
+- **ArbZG-orientierte Regeln** – Höchstarbeitszeit, Pausen, Ruhezeiten, Sonn-/Feiertage
+- **Compliance-Monitoring** – automatische Verstoßmeldungen und Berichte
+- **Self-Service-Dashboards** – für Mitarbeitende, Teams und Führungskräfte
+- **Urlaub & Abwesenheiten** – Genehmigungs-Workflows und Auswertungen
+- **Exporte & Audit-Log** – z. B. für DATEV und interne Prüfungen
+- Vollständig selbst gehostet – **keine Daten verlassen Ihren Server**
+
+## Voraussetzungen
+
+- Nextcloud 32–36
+- PHP 8.1–8.4
+	]]></description>
+
+	<version>1.1.2</version>
+	<licence>AGPL-3.0-or-later</licence>
 	<author mail="info@software-by-design.de" homepage="https://software-by-design.de">Alexander Mäule</author>
 
 	<namespace>ArbeitszeitCheck</namespace>
 
 	<category>organization</category>
-	<category>productivity</category>
+	<category>tools</category>
 
 	<website>https://software-by-design.de</website>
-	<bugs>https://software-by-design.de</bugs>
-	<repository>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git</repository>
+	<bugs>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck/issues</bugs>
+	<repository>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck</repository>
 
 	<dependencies>
 		<!-- Compatible with Nextcloud 32, 33, 34, 35, 36 (current and future releases) -->
 		<nextcloud min-version="32" max-version="36"/>
+		<php min-version="8.1" max-version="8.4"/>
 	</dependencies>
 
 	<optional-dependencies>
@@ -53,13 +78,21 @@
 		<app min-version="2.0.0">projectcheck</app>
 	</optional-dependencies>
 
-	<screenshots>
-		<screenshot>screenshots/arbeitszeitcheck-screenshot-01.png</screenshot>
-		<screenshot>screenshots/arbeitszeitcheck-screenshot-02.png</screenshot>
-		<screenshot>screenshots/arbeitszeitcheck-screenshot-03.png</screenshot>
-		<screenshot>screenshots/arbeitszeitcheck-screenshot-04.png</screenshot>
-		<screenshot>screenshots/arbeitszeitcheck-screenshot-05.png</screenshot>
-	</screenshots>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png
+	</screenshot>
 
 	<navigations>
 		<navigation>
@@ -92,21 +125,8 @@
 		<keyword>audit</keyword>
 		<keyword>reporting</keyword>
 		<keyword>accessibility</keyword>
+		<keyword>timeguard</keyword>
 	</keywords>
-
-	<release>
-		<databases>
-			<database>mysql</database>
-			<database>pgsql</database>
-			<database>sqlite</database>
-		</databases>
-		<php min-version="8.1" max-version="8.4"/>
-		<platforms>
-			<platform>linux</platform>
-			<platform>mac</platform>
-			<platform>windows</platform>
-		</platforms>
-	</release>
 
 	<settings>
 		<admin>OCA\ArbeitszeitCheck\Settings\AdminSettings</admin>

@@ -10,15 +10,13 @@ version = $(shell grep '^\s*<version>' appinfo/info.xml | sed 's/.*<version>\([0
 release:
 	@echo "Building $(app_name) v$(version)..."
 	@mkdir -p $(release_dir)
-	@tar -czf $(release_dir)/$(app_name).tar.gz \
-		--exclude='.git' \
-		--exclude='$(build_dir)' \
-		--exclude='.github' \
-		--exclude='node_modules' \
-		--exclude='tests' \
-		--exclude='.phpunit.result.cache' \
-		--transform 's,^,$(app_name)/,' \
-		.
+	@staging=$$(mktemp -d) && \
+		mkdir -p "$$staging/$(app_name)" && \
+		rsync -a --exclude='.git' --exclude='$(build_dir)' --exclude='.github' \
+			--exclude='node_modules' --exclude='tests' --exclude='.phpunit.result.cache' \
+			./ "$$staging/$(app_name)/" && \
+		tar -czf $(release_dir)/$(app_name).tar.gz -C "$$staging" $(app_name) && \
+		rm -rf "$$staging"
 	@echo "Created $(release_dir)/$(app_name).tar.gz"
 
 clean:

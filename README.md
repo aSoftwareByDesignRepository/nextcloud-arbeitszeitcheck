@@ -75,6 +75,17 @@ Weitere, detailliertere Arbeits‑ und Compliance‑Dokumente (z. B. Rollen‑
 
 Die Endnutzer‑Oberfläche ist so gestaltet, dass sie ohne separates Handbuch verständlich ist; zusätzliche Handbücher oder rechtliche Vorlagen werden bewusst nicht mit ausgeliefert und können organisationsspezifisch ergänzt werden.
 
+### Projekt & Support
+
+ArbeitszeitCheck wird von **Software by Design** entwickelt und gepflegt.  
+Weitere Informationen zu Projekten, Leistungen und Kontaktmöglichkeiten finden Sie auf der Website: https://software-by-design.de/  
+Für Anfragen per E-Mail erreichen Sie uns unter: info@software-by-design.de
+
+> **Maintainer & Support (EN):**  
+> ArbeitszeitCheck is developed and maintained by **Software by Design**.  
+> For more information about projects, services and how to get in touch, visit: https://software-by-design.de/  
+> You can also contact us via e-mail: info@software-by-design.de
+
 ### Nextcloud App Store Assets
 
 - **App‑Metadaten**: `appinfo/info.xml` (Name, Beschreibung, Version, Abhängigkeiten)  

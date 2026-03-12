@@ -22,9 +22,10 @@ use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
-use OCA\ArbeitszeitCheck\Db\HolidayMapper;
 use OCA\ArbeitszeitCheck\Db\Holiday;
+use OCA\ArbeitszeitCheck\Db\HolidayMapper;
 use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -664,9 +665,56 @@ class AdminController extends Controller
 			$start = new \DateTimeImmutable(sprintf('%04d-01-01', $year));
 			$end = new \DateTimeImmutable(sprintf('%04d-12-31', $year));
 
-			// Use HolidayCalendarService so that statutory holidays are
-			// automatically seeded for the requested state/year.
-			$dtoList = $this->holidayCalendarService->getHolidaysForRange($state, new \DateTime($start->format('Y-m-d')), new \DateTime($end->format('Y-m-d')));
+			// Use HolidayCalendarService as primary source (DB-backed, incl. any
+			// manually erfasste Firmen-/Custom-Feiertage).
+			$dtoList = $this->holidayCalendarService->getHolidaysForRange(
+				$state,
+				new \DateTime($start->format('Y-m-d')),
+				new \DateTime($end->format('Y-m-d'))
+			);
+
+			// Sicherheitsnetz: Stelle sicher, dass alle gesetzlichen
+			// Basis-Feiertage des Jahres immer sichtbar sind, selbst wenn es
+			// einmal zu Problemen beim Seeding oder manuellen Änderungen kam.
+			// Gesetzliche Feiertage werden hier NICHT aus der DB gelöscht,
+			// sondern bei Bedarf nur "virtuell" ergänzt.
+			$existingStatutoryByDate = [];
+			foreach ($dtoList as $item) {
+				if (
+					isset($item['scope'], $item['date'])
+					&& $item['scope'] === Holiday::SCOPE_STATUTORY
+					&& is_string($item['date'])
+				) {
+					$existingStatutoryByDate[$item['date']] = true;
+				}
+			}
+
+			try {
+				$baseHolidays = HolidayService::getGermanPublicHolidaysForYear($year);
+			} catch (\Throwable $e) {
+				$baseHolidays = [];
+			}
+
+			foreach ($baseHolidays as $dateStr => $name) {
+				if (isset($existingStatutoryByDate[$dateStr])) {
+					continue;
+				}
+				$dtoList[] = [
+					'id' => null,
+					'state' => $state,
+					'date' => $dateStr,
+					'name' => $this->l10n->t($name),
+					'kind' => Holiday::KIND_FULL,
+					'scope' => Holiday::SCOPE_STATUTORY,
+					'source' => Holiday::SOURCE_GENERATED,
+					'weight' => 1.0,
+				];
+			}
+
+			// Konsistente Sortierung nach Datum
+			usort($dtoList, static function (array $a, array $b): int {
+				return strcmp((string)($a['date'] ?? ''), (string)($b['date'] ?? ''));
+			});
 
 			return new JSONResponse([
 				'success' => true,

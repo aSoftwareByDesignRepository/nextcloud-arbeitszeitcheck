@@ -24,15 +24,27 @@
 }
 
 .page-header-section {
-	padding: 0;
+	padding: var(--space-3, 0.75rem) 0 var(--space-2, 0.5rem);
 	background: transparent;
 	border: none;
 	box-shadow: none;
-	margin-bottom: var(--space-8, 2rem);
+	margin-bottom: var(--space-5, 1.25rem);
 }
 
 .page-header-section .header-content {
-	margin-bottom: var(--space-6, 1.5rem);
+	margin-bottom: 0;
+	align-items: center;
+	gap: var(--space-4, 1rem);
+}
+
+.page-header-section .header-actions {
+	gap: var(--space-2, 0.5rem);
+}
+
+.page-header-section .view-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1, 0.25rem);
 }
 
 /* Calendar Navigation */
@@ -192,6 +204,18 @@
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
 }
 
+.calendar-day--holiday {
+	background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+	border-color: var(--color-warning);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-warning) 40%, transparent);
+}
+
+.calendar-day--company-holiday {
+	background: color-mix(in srgb, var(--color-info) 12%, transparent);
+	border-color: var(--color-info);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-info) 35%, transparent);
+}
+
 .calendar-day--has-entry {
 	border-left: 3px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
@@ -317,6 +341,16 @@
 	border: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 
+.legend-color--holiday {
+	background: var(--color-warning);
+	border: 1px solid color-mix(in srgb, var(--color-warning) 60%, var(--color-border) 40%);
+}
+
+.legend-color--company-holiday {
+	background: var(--color-info);
+	border: 1px solid color-mix(in srgb, var(--color-info) 60%, var(--color-border) 40%);
+}
+
 .legend-label {
 	font-size: 0.85rem;
 	color: var(--color-text-maxcontrast);
@@ -403,6 +437,16 @@
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, var(--arbeitszeitcheck-color-background-secondary)));
 	border-radius: var(--radius-base, 4px);
 	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)));
+}
+
+/* Focus styles for keyboard navigation (WCAG 2.1 AA) */
+.calendar-day:focus-visible,
+.calendar-week-day:focus-visible,
+.btn-nav:focus-visible,
+.btn-close:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
 /* View Toggle */

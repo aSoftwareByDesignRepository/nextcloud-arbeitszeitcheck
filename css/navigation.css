@@ -52,6 +52,12 @@
     z-index: 2;
 }
 
+/* Navigation spacing variables (override Nextcloud defaults safely) */
+#app-navigation {
+    --azc-nav-padding-inline: 1.25rem;
+    --azc-nav-gap-icon-text: 0.875rem;
+}
+
 /* Section divider (before Manager / responsibilities) - clear visual separation */
 .nav-section-divider {
     height: 2px;
@@ -76,16 +82,123 @@
     padding: 0;
 }
 
-/* Navigation links: clear, touch-friendly (WCAG 2.5.5: 44px min touch target) */
+/* Parent items with children (e.g. Verwaltung) */
+.nav-item-has-children {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-parent-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--azc-nav-gap-icon-text);
+    padding: 0.875rem var(--azc-nav-padding-inline);
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--color-main-text);
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-lg);
+    margin: 0.25rem 0; /* only vertical spacing; horizontal via padding */
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.3;
+    min-height: 48px;
+    position: relative;
+}
+
+/* Verwaltung-Header: wirklich volle Sidebar-Breite, ohne seitlichen Versatz */
+.nav-item-has-children .nav-parent-toggle {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0;
+    width: 100%;
+}
+
+/* Überschreibe mögliche Nextcloud-Standard-Paddings auf Listenelementen,
+   damit Verwaltung und andere Einträge wirklich bis zum Rand gehen. */
+#app-navigation .nav-menu > li {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.nav-parent-toggle:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-main-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .nav-parent-toggle:hover {
+        transform: translateX(2px);
+    }
+}
+
+.nav-parent-toggle:focus-visible {
+    outline: 3px solid var(--color-primary-element);
+    outline-offset: 2px;
+}
+
+.nav-item-has-children.is-open .nav-parent-toggle {
+    background-color: var(--color-primary-element-light);
+    color: var(--color-primary-element);
+    font-weight: 600;
+}
+
+.nav-parent-toggle .lucide-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    flex-shrink: 0;
+    stroke-width: 1.75;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
+.nav-parent-chevron {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-right: 2px solid var(--color-main-text);
+    border-bottom: 2px solid var(--color-main-text);
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.nav-item-has-children.is-open .nav-parent-chevron {
+    transform: rotate(-135deg);
+}
+
+.nav-submenu {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.5rem 0;
+    /* Sichtbare Einrückung der gesamten Unterliste unter „Verwaltung“ */
+    margin-left: 1.5rem;
+}
+
+.nav-submenu li a {
+    /* Submenu stark sichtbar eingerückt gegenüber Top-Level-Text:
+       Basis ist der Text-Start der Top-Level-Items (Padding + Icon + Gap)
+       plus zusätzliche ~3rem für eine sehr klare Hierarchie. */
+    padding-left: calc(var(--azc-nav-padding-inline) + 1.125rem + var(--azc-nav-gap-icon-text) + 3rem);
+    font-size: 0.95rem;
+}
+
+/* Navigation links: clear, touch-friendly (WCAG 2.5.5: 44px min touch target)
+   Use padding only for horizontal spacing; margins are purely vertical so that
+   Nextcloud core CSS cannot introduce inconsistent insets. */
 .nav-menu a {
     display: flex;
     align-items: center;
-    gap: 0.875rem;
-    padding: 0.875rem 1.25rem;
+    gap: var(--azc-nav-gap-icon-text);
+    padding: 0.875rem var(--azc-nav-padding-inline);
     text-decoration: none;
     color: var(--color-main-text);
     border-radius: var(--radius-lg);
-    margin: 0.25rem 0.75rem;
+    margin: 0.25rem 0; /* same as .nav-parent-toggle for perfectly aligned edges */
     transition: all 0.2s ease;
     font-weight: 500;
     font-size: 1rem;
@@ -138,7 +251,7 @@
 }
 
 /* Text alignment */
-.nav-menu span {
+.nav-menu span:not(.nav-parent-chevron) {
     flex: 1;
     white-space: nowrap;
     overflow: hidden;

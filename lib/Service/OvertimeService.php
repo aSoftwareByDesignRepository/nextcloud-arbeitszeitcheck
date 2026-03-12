@@ -26,17 +26,20 @@ class OvertimeService
 	private WorkingTimeModelMapper $workingTimeModelMapper;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private IL10N $l10n;
+	private HolidayCalendarService $holidayCalendarService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
 		WorkingTimeModelMapper $workingTimeModelMapper,
 		UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
-		IL10N $l10n
+		IL10N $l10n,
+		HolidayCalendarService $holidayCalendarService
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->workingTimeModelMapper = $workingTimeModelMapper;
 		$this->userWorkingTimeModelMapper = $userWorkingTimeModelMapper;
 		$this->l10n = $l10n;
+		$this->holidayCalendarService = $holidayCalendarService;
 	}
 
 	/**
@@ -78,8 +81,8 @@ class OvertimeService
 			}
 		}
 
-		// Calculate required hours based on working days
-		$requiredHours = $this->calculateRequiredHours($startDate, $endDate, $dailyHours, $weeklyHours);
+		// Calculate required hours based on working days (Mon–Fri minus holidays for this user)
+		$requiredHours = $this->calculateRequiredHours($userId, $startDate, $endDate, $dailyHours, $weeklyHours);
 
 		// Calculate overtime (positive = overtime, negative = undertime)
 		$overtimeHours = $totalHoursWorked - $requiredHours;
@@ -107,7 +110,7 @@ class OvertimeService
 			'cumulative_balance_after' => round($newBalance, 2),
 			'daily_hours' => $dailyHours,
 			'weekly_hours' => $weeklyHours,
-			'working_days' => $this->countWorkingDays($startDate, $endDate)
+			'working_days' => $this->countWorkingDays($userId, $startDate, $endDate)
 		];
 	}
 
@@ -185,15 +188,16 @@ class OvertimeService
 	/**
 	 * Calculate required hours for a date range based on working time model
 	 *
+	 * @param string $userId
 	 * @param \DateTime $startDate
 	 * @param \DateTime $endDate
 	 * @param float $dailyHours Daily hours requirement
 	 * @param float $weeklyHours Weekly hours requirement
 	 * @return float Required hours
 	 */
-	private function calculateRequiredHours(\DateTime $startDate, \DateTime $endDate, float $dailyHours, float $weeklyHours): float
+	private function calculateRequiredHours(string $userId, \DateTime $startDate, \DateTime $endDate, float $dailyHours, float $weeklyHours): float
 	{
-		$workingDays = $this->countWorkingDays($startDate, $endDate);
+		$workingDays = $this->countWorkingDays($userId, $startDate, $endDate);
 		
 		// For flexible/trust-based models, use weekly average
 		// For fixed models, use daily hours * working days
@@ -210,27 +214,16 @@ class OvertimeService
 	/**
 	 * Count working days in a date range (excluding weekends)
 	 *
+	 * @param string $userId
 	 * @param \DateTime $startDate
 	 * @param \DateTime $endDate
-	 * @return int Number of working days
+	 * @return float Number of working days (Mon–Fri minus holidays, can include half days)
 	 */
-	private function countWorkingDays(\DateTime $startDate, \DateTime $endDate): int
+	private function countWorkingDays(string $userId, \DateTime $startDate, \DateTime $endDate): float
 	{
-		$workingDays = 0;
-		$current = clone $startDate;
-		$current->setTime(0, 0, 0);
-		$end = clone $endDate;
-		$end->setTime(23, 59, 59);
-
-		while ($current <= $end) {
-			$dayOfWeek = (int)$current->format('w'); // 0 = Sunday, 6 = Saturday
-			if ($dayOfWeek !== 0 && $dayOfWeek !== 6) {
-				$workingDays++;
-			}
-			$current->modify('+1 day');
-		}
-
-		return $workingDays;
+		// Delegate to HolidayCalendarService so that statutory and company holidays
+		// (including half days) are treated consistently across the app.
+		return $this->holidayCalendarService->computeWorkingDaysForUser($userId, $startDate, $endDate);
 	}
 
 	/**

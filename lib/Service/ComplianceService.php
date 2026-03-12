@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IUserManager;
 
@@ -32,58 +33,8 @@ class ComplianceService
     private IUserManager $userManager;
     private IL10N $l10n;
     private ?NotificationService $notificationService;
-
-    // German public holidays by state (Bundesland)
-    private const GERMAN_PUBLIC_HOLIDAYS = [
-        'BW' => [ // Baden-Württemberg
-            '01-01', '01-06', '03-15', '05-01', '05-29', '06-08', '06-19', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'BY' => [ // Bayern
-            '01-01', '01-06', '04-07', '05-01', '05-29', '06-08', '06-19', '08-15', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'BE' => [ // Berlin
-            '01-01', '05-01', '05-08', '10-03', '12-25', '12-26'
-        ],
-        'BB' => [ // Brandenburg
-            '01-01', '03-08', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '12-25', '12-26'
-        ],
-        'HB' => [ // Bremen
-            '01-01', '05-01', '10-03', '12-25', '12-26'
-        ],
-        'HH' => [ // Hamburg
-            '01-01', '05-01', '10-03', '12-25', '12-26'
-        ],
-        'HE' => [ // Hessen
-            '01-01', '05-01', '06-08', '06-19', '10-03', '12-25', '12-26'
-        ],
-        'MV' => [ // Mecklenburg-Vorpommern
-            '01-01', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '10-31', '11-01', '12-25', '12-26'
-        ],
-        'NI' => [ // Niedersachsen
-            '01-01', '05-01', '06-08', '06-19', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'NW' => [ // Nordrhein-Westfalen
-            '01-01', '05-01', '05-29', '06-08', '06-19', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'RP' => [ // Rheinland-Pfalz
-            '01-01', '05-01', '05-29', '06-08', '06-19', '08-15', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'SL' => [ // Saarland
-            '01-01', '05-01', '05-29', '06-08', '06-19', '08-15', '10-03', '11-01', '12-25', '12-26'
-        ],
-        'SN' => [ // Sachsen
-            '01-01', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '10-31', '11-01', '12-25', '12-26'
-        ],
-        'ST' => [ // Sachsen-Anhalt
-            '01-01', '03-08', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '10-31', '11-01', '12-25', '12-26'
-        ],
-        'SH' => [ // Schleswig-Holstein
-            '01-01', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '12-25', '12-26'
-        ],
-        'TH' => [ // Thüringen
-            '01-01', '05-01', '05-08', '05-29', '06-08', '06-19', '10-03', '10-31', '11-01', '12-25', '12-26'
-        ]
-    ];
+    private HolidayCalendarService $holidayCalendarService;
+    private IConfig $config;
 
     public function __construct(
         TimeEntryMapper $timeEntryMapper,
@@ -92,7 +43,9 @@ class ComplianceService
         UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
         IUserManager $userManager,
         IL10N $l10n,
-        ?NotificationService $notificationService = null
+        ?NotificationService $notificationService = null,
+        HolidayCalendarService $holidayCalendarService,
+        IConfig $config
     ) {
         $this->timeEntryMapper = $timeEntryMapper;
         $this->violationMapper = $violationMapper;
@@ -101,6 +54,8 @@ class ComplianceService
         $this->userManager = $userManager;
         $this->l10n = $l10n;
         $this->notificationService = $notificationService;
+        $this->holidayCalendarService = $holidayCalendarService;
+        $this->config = $config;
     }
 
     /**
@@ -878,8 +833,16 @@ class ComplianceService
             );
         }
 
-        // Check if work was done on public holiday
-        $isHoliday = $this->isGermanPublicHoliday($startTime);
+        // Check if work was done on public holiday (state-aware, via HolidayCalendarService)
+        $isHoliday = false;
+        try {
+            $isHoliday = $this->holidayCalendarService->isHolidayForUser(
+                $timeEntry->getUserId(),
+                (clone $startTime)->setTime(0, 0, 0)
+            );
+        } catch (\Throwable) {
+            // If holiday lookup fails, we fall back to "not a holiday" to avoid false positives.
+        }
 
         if ($isHoliday) {
             $this->violationMapper->createViolation(
@@ -930,89 +893,21 @@ class ComplianceService
      * Check if a date is a German public holiday
      *
      * @param \DateTime $date
-     * @param string|null $state German state code (e.g., 'NW' for Nordrhein-Westfalen)
+     * @param string|null $state Optional German state code (e.g., 'NW' for Nordrhein-Westfalen)
      * @return bool
      */
     public function isGermanPublicHoliday(\DateTime $date, ?string $state = null): bool
     {
-        $year = (int)$date->format('Y');
-        $dateString = $date->format('m-d');
+        $checkDate = (clone $date)->setTime(0, 0, 0);
 
-        // Use default state if not specified (could be configurable per user/company)
-        $state = $state ?: 'NW'; // Default to Nordrhein-Westfalen
-
-        if (!isset(self::GERMAN_PUBLIC_HOLIDAYS[$state])) {
-            $state = 'NW'; // Fallback to NRW
+        if ($state !== null && $state !== '') {
+            return $this->holidayCalendarService->isHolidayForState($state, $checkDate);
         }
 
-        $holidays = self::GERMAN_PUBLIC_HOLIDAYS[$state];
+        // Legacy-style call without explicit state falls back to the app default state.
+        $defaultState = $this->config->getAppValue('arbeitszeitcheck', 'german_state', 'NW');
 
-        // Check fixed holidays
-        if (in_array($dateString, $holidays)) {
-            return true;
-        }
-
-        // Check variable holidays (Easter-based)
-        $variableHolidays = $this->calculateVariableHolidays($year);
-
-        foreach ($variableHolidays as $holiday) {
-            if ($holiday === $dateString) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Calculate variable German public holidays (Easter-based)
-     *
-     * @param int $year
-     * @return array
-     */
-    private function calculateVariableHolidays(int $year): array
-    {
-        // Calculate Easter date using Gauss algorithm (simplified)
-        $a = $year % 19;
-        $b = intdiv($year, 100);
-        $c = $year % 100;
-        $d = intdiv($b, 4);
-        $e = $b % 4;
-        $f = intdiv($b + 8, 25);
-        $g = intdiv($b - $f + 1, 3);
-        $h = (19 * $a + $b - $d - $g + 15) % 30;
-        $i = intdiv($c, 4);
-        $k = $c % 4;
-        $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
-        $m = intdiv($a + 11 * $h + 22 * $l, 451);
-        $month = intdiv($h + $l - 7 * $m + 114, 31);
-        $day = (($h + $l - 7 * $m + 114) % 31) + 1;
-
-        $easterDate = new \DateTime("$year-$month-$day");
-
-        // Calculate holidays based on Easter
-        $goodFriday = clone $easterDate;
-        $goodFriday->modify('-2 days');
-
-        $easterMonday = clone $easterDate;
-        $easterMonday->modify('+1 day');
-
-        $ascensionDay = clone $easterDate;
-        $ascensionDay->modify('+39 days');
-
-        $whitMonday = clone $easterDate;
-        $whitMonday->modify('+50 days');
-
-        $corpusChristi = clone $easterDate;
-        $corpusChristi->modify('+60 days');
-
-        return [
-            $goodFriday->format('m-d'),
-            $easterMonday->format('m-d'),
-            $ascensionDay->format('m-d'),
-            $whitMonday->format('m-d'),
-            $corpusChristi->format('m-d')
-        ];
+        return $this->holidayCalendarService->isHolidayForState($defaultState, $checkDate);
     }
 
     /**

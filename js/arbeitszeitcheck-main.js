@@ -1443,6 +1443,7 @@
             this.calendarData = {
                 timeEntries: [],
                 absences: [],
+                holidays: [],
                 currentDate: new Date(monthStr + '-01'),
                 currentView: this.config.currentView || 'month'
             };
@@ -1494,6 +1495,7 @@
             const apiUrl = (typeof window !== 'undefined' && window.ArbeitszeitCheck && window.ArbeitszeitCheck.apiUrl) || this.config.apiUrl || {};
             const timeEntriesPath = apiUrl.calendar || '/apps/arbeitszeitcheck/api/time-entries';
             const absencesPath = apiUrl.absences || '/apps/arbeitszeitcheck/api/absences';
+            const holidaysPath = apiUrl.holidays || '/apps/arbeitszeitcheck/api/holidays';
 
             const d = this.calendarData.currentDate;
             const year = d.getFullYear();
@@ -1528,13 +1530,16 @@
 
             const timeEntriesParams = { start_date: startDate, end_date: endDate, limit: '500' };
             const absencesParams = { limit: '500' };
+            const holidaysParams = { start: startDate, end: endDate };
 
             Promise.all([
                 this.fetchTimelineData(timeEntriesPath, timeEntriesParams),
-                this.fetchTimelineData(absencesPath, absencesParams)
-            ]).then(([timeEntries, absences]) => {
+                this.fetchTimelineData(absencesPath, absencesParams),
+                this.fetchTimelineData(holidaysPath, holidaysParams)
+            ]).then(([timeEntries, absences, holidaysResponse]) => {
                 this.calendarData.timeEntries = Array.isArray(timeEntries) ? timeEntries : [];
                 this.calendarData.absences = Array.isArray(absences) ? absences : [];
+                this.calendarData.holidays = Array.isArray(holidaysResponse && holidaysResponse.holidays) ? holidaysResponse.holidays : [];
                 this.renderCalendar();
             }).catch((error) => {
                 const container = document.getElementById('calendar-month-view');
@@ -1617,6 +1622,13 @@
                 if (dayData.isToday) classes.push('calendar-day--today');
                 if (dayData.isWeekend) classes.push('calendar-day--weekend');
 
+                // Mark public holidays and company holidays
+                const holidays = Array.isArray(this.calendarData.holidays) ? this.calendarData.holidays : [];
+                const isHoliday = holidays.some(h => h.date === dateKey && h.scope === 'statutory');
+                const isCompanyHoliday = holidays.some(h => h.date === dateKey && h.scope !== 'statutory');
+                if (isHoliday) classes.push('calendar-day--holiday');
+                if (isCompanyHoliday) classes.push('calendar-day--company-holiday');
+
                 // Build day content with more useful information
                 let dayContent = `<div class="calendar-day-number">${day}</div>`;
                 
@@ -1659,7 +1671,13 @@
                     dayContent += `<div class="calendar-day-entry-count" title="${dayData.entries.length} ${this.config.l10n?.timeEntries || 'entries'}">${dayData.entries.length}×</div>`;
                 }
                 const dayAriaLabel = this.getDayCellAriaLabel(dateKey, dayData);
-                html += `<div class="${classes.join(' ')}" data-date="${dateKey}" role="button" tabindex="0" aria-label="${escapeHtml(dayAriaLabel)}">${dayContent}</div>`;
+                const holidayLabels = holidays
+                    .filter(h => h.date === dateKey)
+                    .map(h => h.name)
+                    .join(', ');
+                const ariaLabel = holidayLabels ? `${dayAriaLabel} – ${holidayLabels}` : dayAriaLabel;
+
+                html += `<div class="${classes.join(' ')}" data-date="${dateKey}" role="button" tabindex="0" aria-label="${escapeHtml(ariaLabel)}">${dayContent}</div>`;
             }
 
             html += '</div></div>';
@@ -1969,6 +1987,11 @@
             
             if (!panel || !label || !content) return;
 
+            // Remember the element that opened the panel so we can restore focus on close
+            if (typeof document !== 'undefined' && document.activeElement) {
+                this.calendarData.lastActiveDayElement = document.activeElement;
+            }
+
             const date = new Date(dateKey);
             const dayData = this.getDayData(dateKey);
 
@@ -1980,9 +2003,26 @@
             label.textContent = `${weekdayName}, ${day}.${month}.${year}`;
 
             let html = '';
-            
-            if (dayData.entries.length === 0 && dayData.absences.length === 0) {
-                html = `<p>${this.config.l10n?.noEntries || 'No entries for this day'}</p>`;
+
+            // Holiday info
+            const holidays = Array.isArray(this.calendarData.holidays) ? this.calendarData.holidays : [];
+            const holidayNames = holidays
+                .filter(h => h.date === dateKey)
+                .map(h => h.name)
+                .filter(Boolean);
+            if (holidayNames.length > 0) {
+                const label = this.config.l10n?.holiday || (window.t ? window.t('arbeitszeitcheck', 'Holiday') : 'Holiday');
+                const namesText = holidayNames.join(', ');
+                html += `
+                    <div class="day-details-section">
+                        <h4>${escapeHtml(label)}</h4>
+                        <p>${escapeHtml(namesText)}</p>
+                    </div>
+                `;
+            }
+
+            if (dayData.entries.length === 0 && dayData.absences.length === 0 && holidayNames.length === 0) {
+                html += `<p>${this.config.l10n?.noEntries || 'No entries for this day'}</p>`;
             } else {
                 if (dayData.entries.length > 0) {
                     const timeEntriesLabel = this.config.l10n?.timeEntries || 'Time Entries';
@@ -2041,6 +2081,10 @@
             const panel = document.getElementById('day-details-panel');
             if (panel) {
                 panel.style.display = 'none';
+            }
+            // Restore focus to the last active day tile to keep keyboard users oriented
+            if (this.calendarData && this.calendarData.lastActiveDayElement && typeof this.calendarData.lastActiveDayElement.focus === 'function') {
+                this.calendarData.lastActiveDayElement.focus();
             }
         },
 

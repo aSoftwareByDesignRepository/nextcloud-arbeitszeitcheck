@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\Absence;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\IConfig;
 use OCP\IL10N;
 use OCP\Mail\IMailer;
@@ -27,12 +28,14 @@ class AbsenceIcalMailService
 {
 	private const CONFIG_SEND_ICAL = 'send_ical_approved_absences';
 	private const CONFIG_SEND_ICAL_TO_SUBSTITUTE = 'send_ical_to_substitute';
+	private const CONFIG_SEND_ICAL_TO_MANAGERS = 'send_ical_to_managers';
 
 	public function __construct(
 		private IMailer $mailer,
 		private IConfig $config,
 		private IL10N $l10n,
 		private IUserManager $userManager,
+		private TeamResolverService $teamResolver,
 		private ?LoggerInterface $logger = null,
 	) {
 	}
@@ -67,6 +70,26 @@ class AbsenceIcalMailService
 				$substitute = $this->userManager->get($substituteId);
 				if ($substitute !== null && $substitute->isEnabled()) {
 					$this->sendOneIcalEmail($absence, $substitute->getEMailAddress(), $substitute->getDisplayName(), $icalBody, true);
+				}
+			}
+		}
+
+		// Optionally send to managers / team leads of the employee
+		if ($this->config->getAppValue($appName, self::CONFIG_SEND_ICAL_TO_MANAGERS, '0') === '1') {
+			$managerIds = $this->teamResolver->getManagerIdsForEmployee($absence->getUserId());
+			if (!empty($managerIds)) {
+				foreach ($managerIds as $managerId) {
+					$manager = $this->userManager->get($managerId);
+					if ($manager === null || !$manager->isEnabled()) {
+						continue;
+					}
+					$this->sendOneIcalEmail(
+						$absence,
+						$manager->getEMailAddress(),
+						$manager->getDisplayName(),
+						$icalBody,
+						true
+					);
 				}
 			}
 		}

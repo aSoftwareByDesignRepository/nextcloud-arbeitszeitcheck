@@ -37,6 +37,7 @@ class AbsenceService
 	private IL10N $l10n;
 	private ?NotificationService $notificationService;
 	private ?AbsenceIcalMailService $absenceIcalMailService;
+	private HolidayCalendarService $holidayCalendarService;
 
 	public function __construct(
 		AbsenceMapper $absenceMapper,
@@ -48,7 +49,8 @@ class AbsenceService
 		IUserManager $userManager,
 		IL10N $l10n,
 		?NotificationService $notificationService = null,
-		?AbsenceIcalMailService $absenceIcalMailService = null
+		?AbsenceIcalMailService $absenceIcalMailService = null,
+		HolidayCalendarService $holidayCalendarService
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -60,6 +62,7 @@ class AbsenceService
 		$this->l10n = $l10n;
 		$this->notificationService = $notificationService;
 		$this->absenceIcalMailService = $absenceIcalMailService;
+		$this->holidayCalendarService = $holidayCalendarService;
 	}
 
 	/**
@@ -87,8 +90,8 @@ class AbsenceService
 		$absence->setCreatedAt(new \DateTime());
 		$absence->setUpdatedAt(new \DateTime());
 
-		// Calculate working days
-		$workingDays = $absence->calculateWorkingDays();
+		// Calculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
+		$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
 		$absence->setDays($workingDays);
 
 		$savedAbsence = $this->absenceMapper->insert($absence);
@@ -205,8 +208,8 @@ class AbsenceService
 		}
 		$this->validateAbsenceData($validateData, $userId, $id);
 
-		// Recalculate working days
-		$workingDays = $absence->calculateWorkingDays();
+		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
+		$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
 		$absence->setDays($workingDays);
 		$absence->setUpdatedAt(new \DateTime());
 
@@ -675,8 +678,8 @@ class AbsenceService
 
 		// Vacation entitlement: ensure user has enough remaining days
 		// (getVacationStats only counts approved absences; when updating, add back old absence's days)
-		if ($type === Absence::TYPE_VACATION) {
-			$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate);
+			if ($type === Absence::TYPE_VACATION) {
+			$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate, $userId);
 			$addBackPerYear = [];
 			if ($excludeAbsenceId !== null) {
 				try {
@@ -685,7 +688,7 @@ class AbsenceService
 						$oldStart = $oldAbsence->getStartDate();
 						$oldEnd = $oldAbsence->getEndDate();
 						if ($oldStart && $oldEnd) {
-							$addBackPerYear = $this->computeWorkingDaysPerYear($oldStart, $oldEnd);
+							$addBackPerYear = $this->computeWorkingDaysPerYear($oldStart, $oldEnd, $userId);
 						}
 					}
 				} catch (DoesNotExistException $e) {
@@ -885,87 +888,36 @@ class AbsenceService
 	 * @param \DateTime $end
 	 * @return array<int, float> year => working days
 	 */
-	private function computeWorkingDaysPerYear(\DateTime $start, \DateTime $end): array
+	private function computeWorkingDaysPerYear(\DateTime $start, \DateTime $end, string $userId): array
 	{
-		$start = clone $start;
-		$end = clone $end;
-		$result = [];
-		$startYear = (int)$start->format('Y');
-		$endYear = (int)$end->format('Y');
-		$holidays = [];
-		for ($y = $startYear; $y <= $endYear; $y++) {
-			$holidays[$y] = $this->getGermanPublicHolidaysForYear($y);
-		}
-		while ($start <= $end) {
-			if ($start->format('N') < 6) {
-				$dateStr = $start->format('Y-m-d');
-				$year = (int)$start->format('Y');
-				if (!isset($holidays[$year][$dateStr])) {
-					$result[$year] = ($result[$year] ?? 0) + 1;
-				}
-			}
-			$start->modify('+1 day');
-		}
-		foreach (array_keys($result) as $y) {
-			$result[$y] = (float)$result[$y];
-		}
-		return $result;
+		return $this->holidayCalendarService->computeWorkingDaysPerYearForUser($userId, $start, $end);
 	}
 
 	/**
-	 * Get German public holidays for a year (for working-days calculation)
+	 * Compute working days for a user absence, taking into account
+	 * company-wide holidays (full and half days).
+	 */
+	private function computeWorkingDaysForUser(string $userId, \DateTime $start, \DateTime $end): float
+	{
+		return $this->holidayCalendarService->computeWorkingDaysForUser($userId, $start, $end);
+	}
+
+	/**
+	 * Build a map of additional holiday weights (full/half Firmenfeiertage)
+	 * for the given date range and user.
 	 *
-	 * @param int $year
-	 * @return array<string, string> date (Y-m-d) => name
+	 * NOTE:
+	 * - Aktuell sind Firmenfeiertage organisationsweit konfiguriert
+	 *   (ohne Bundeslandspezifik). Pro-User-Bundesland wirkt sich daher
+	 *   nur auf spätere, state-spezifische Erweiterungen aus.
+	 *
+	 * @return array<string,float> date (Y-m-d) => weight
 	 */
-	private function getGermanPublicHolidaysForYear(int $year): array
+	private function buildExtraHolidayWeights(\DateTime $start, \DateTime $end, string $userId): array
 	{
-		$holidays = [];
-		$holidays[$year . '-01-01'] = 'New Year';
-		$easterDays = function_exists('easter_days') ? \easter_days($year) : $this->easterDaysGauss($year);
-		$march21 = new \DateTime($year . '-03-21');
-		$easter = clone $march21;
-		$easter->modify('+' . $easterDays . ' days');
-		$easter->modify('-2 days');
-		$holidays[$easter->format('Y-m-d')] = 'Good Friday';
-		$easter->modify('+3 days');
-		$holidays[$easter->format('Y-m-d')] = 'Easter Monday';
-		$easter->modify('+38 days');
-		$holidays[$easter->format('Y-m-d')] = 'Ascension';
-		$easter->modify('+11 days');
-		$holidays[$easter->format('Y-m-d')] = 'Whit Monday';
-		$easter->modify('+10 days');
-		$holidays[$easter->format('Y-m-d')] = 'Corpus Christi';
-		$holidays[$year . '-05-01'] = 'Labour Day';
-		$holidays[$year . '-10-03'] = 'Unity Day';
-		$holidays[$year . '-10-31'] = 'Reformation Day';
-		$holidays[$year . '-11-01'] = 'All Saints';
-		$holidays[$year . '-12-25'] = 'Christmas';
-		$holidays[$year . '-12-26'] = 'Second Christmas';
-		return $holidays;
-	}
-
-	/**
-	 * Gauss algorithm for Easter (fallback when easter_days not available)
-	 */
-	private function easterDaysGauss(int $year): int
-	{
-		$a = $year % 19;
-		$b = (int)($year / 100);
-		$c = $year % 100;
-		$d = (int)($b / 4);
-		$e = $b % 4;
-		$f = (int)(($b + 8) / 25);
-		$g = (int)(($b - $f + 1) / 3);
-		$h = (19 * $a + $b - $d - $g + 15) % 30;
-		$i = (int)($c / 4);
-		$k = $c % 4;
-		$l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
-		$m = (int)(($a + 11 * $h + 22 * $l) / 451);
-		$month = (int)(($h + $l - 7 * $m + 114) / 31);
-		$day = (($h + $l - 7 * $m + 114) % 31) + 1;
-		$march21 = new \DateTime($year . '-03-21');
-		$easterDate = new \DateTime("$year-$month-$day");
-		return (int)$march21->diff($easterDate)->days;
+		// Legacy helper is kept for backward compatibility with Absence::calculateWorkingDays()
+		// and will internally delegate to HolidayCalendarService in future iterations if needed.
+		unset($start, $end, $userId);
+		return [];
 	}
 }

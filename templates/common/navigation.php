@@ -33,6 +33,14 @@ $isManagerPage = strpos($currentPage, '/manager') !== false;
 $isSubstitutionRequests = strpos($currentPage, '/substitution-requests') !== false;
 $isCompliance = strpos($currentPage, '/compliance') !== false;
 $isAdmin = strpos($currentPage, '/admin') !== false;
+// Finer-grained admin section flags for clear highlighting of sub-items
+$isAdminDashboard = strpos($currentPage, '/admin/dashboard') !== false || ($isAdmin && strpos($currentPage, '/admin/') === false);
+$isAdminUsers = strpos($currentPage, '/admin/users') !== false;
+$isAdminWorkingTimeModels = strpos($currentPage, '/admin/working-time-models') !== false;
+$isAdminHolidays = strpos($currentPage, '/admin/holidays') !== false;
+$isAdminTeams = strpos($currentPage, '/admin/teams') !== false;
+$isAdminAuditLog = strpos($currentPage, '/admin/audit-log') !== false;
+$isAdminSettingsPage = strpos($currentPage, '/admin/settings') !== false;
 // Dashboard is active if URL contains /dashboard OR if it's the base app URL without any specific section
 $isDashboard = strpos($currentPage, '/dashboard') !== false || 
                (!$isTimeEntries && !$isAbsences && !$isReports && !$isCompliance && !$isCalendar && !$isTimeline && !$isSettings && 
@@ -67,6 +75,23 @@ if ($showManagerLink === null) {
 	} catch (\Throwable $e) {
 		$showManagerLink = false;
 	}
+}
+
+// Show Reports link only when the user can access manager features (manager dashboard) or is an admin.
+// This keeps the Reports area strictly limited to managers and administrators.
+$showReportsLink = false;
+try {
+	$user = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
+	if ($user !== null) {
+		$permissionService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$groupManager = \OCP\Server::get(\OCP\IGroupManager::class);
+		$uid = $user->getUID();
+		$isNcAdmin = $groupManager->isAdmin($uid);
+		$canAccessManagerDashboard = $permissionService->canAccessManagerDashboard($uid);
+		$showReportsLink = $isNcAdmin || $canAccessManagerDashboard;
+	}
+} catch (\Throwable $e) {
+	$showReportsLink = false;
 }
 ?>
 
@@ -126,14 +151,16 @@ if ($showManagerLink === null) {
                 <span><?php p($l->t('Absences')); ?></span>
             </a>
         </li>
+        <?php if ($showReportsLink): ?>
         <li class="<?php p($isReports ? 'active' : ''); ?>" <?php p($isReports ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.reports')); ?>"
-               title="<?php p($l->t('Reports: Create and download reports about your working time')); ?>"
-               aria-label="<?php p($l->t('Go to reports to create and download working time reports')); ?>">
+               title="<?php p($l->t('Berichte für Team- und Organisationsauswertungen (nur für Manager und Admins sichtbar)')); ?>"
+               aria-label="<?php p($l->t('Zu den Berichten wechseln, um Auswertungen für Team oder Organisation zu erstellen (nur für Manager/Admins)')); ?>">
                 <i data-lucide="file-text" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Reports')); ?></span>
+                <span><?php p($l->t('Berichte (Manager/Admin)')); ?></span>
             </a>
         </li>
+        <?php endif; ?>
         <li class="<?php p($isCompliance ? 'active' : ''); ?>" <?php p($isCompliance ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard')); ?>"
                title="<?php p($l->t('Compliance: Check if your working time follows German labor law')); ?>"
@@ -161,10 +188,10 @@ if ($showManagerLink === null) {
         <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
         <li class="<?php p($isSettings ? 'active' : ''); ?>" <?php p($isSettings ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.settings')); ?>"
-               title="<?php p($l->t('Settings: Change your personal preferences and working time settings')); ?>"
-               aria-label="<?php p($l->t('Go to settings to change your preferences')); ?>">
+               title="<?php p($l->t('Meine Einstellungen: Persönliche Ansichten und Benachrichtigungen anpassen')); ?>"
+               aria-label="<?php p($l->t('Zu „Meine Einstellungen“ wechseln, um persönliche Optionen zu ändern')); ?>">
                 <i data-lucide="settings" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Settings')); ?></span>
+                <span><?php p($l->t('Meine Einstellungen')); ?></span>
             </a>
         </li>
         <?php 
@@ -179,13 +206,65 @@ if ($showManagerLink === null) {
         }
         if ($showAdminNav): ?>
         <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
-        <li class="<?php p($isAdmin ? 'active' : ''); ?>" <?php p($isAdmin ? 'aria-current="page"' : ''); ?>>
-            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard')); ?>"
-               title="<?php p($l->t('Administration: Employees, work schedules, teams, and app settings')); ?>"
-               aria-label="<?php p($l->t('Go to administration')); ?>">
+        <li class="nav-item-has-children <?php p($isAdmin ? 'is-open' : ''); ?>">
+            <button class="nav-parent-toggle"
+                    type="button"
+                    aria-expanded="<?php p($isAdmin ? 'true' : 'false'); ?>"
+                    aria-controls="admin-subnav">
                 <i data-lucide="shield" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Administration')); ?></span>
-            </a>
+                <span><?php p($l->t('Verwaltung')); ?></span>
+            </button>
+            <ul id="admin-subnav" class="nav-submenu" <?php p($isAdmin ? '' : 'hidden'); ?>>
+                <li class="<?php p($isAdminDashboard ? 'active' : ''); ?>" <?php p($isAdminDashboard ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard')); ?>"
+                       title="<?php p($l->t('Übersicht mit Kennzahlen und aktuellen Problemen')); ?>"
+                       aria-label="<?php p($l->t('Verwaltungs-Übersicht öffnen')); ?>">
+                        <span><?php p($l->t('Übersicht')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminUsers ? 'active' : ''); ?>" <?php p($isAdminUsers ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.users')); ?>"
+                       title="<?php p($l->t('Mitarbeitende & Arbeitszeitmodelle verwalten')); ?>"
+                       aria-label="<?php p($l->t('Mitarbeitende verwalten')); ?>">
+                        <span><?php p($l->t('Mitarbeitende')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminWorkingTimeModels ? 'active' : ''); ?>" <?php p($isAdminWorkingTimeModels ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.workingTimeModels')); ?>"
+                       title="<?php p($l->t('Arbeitszeitmodelle konfigurieren')); ?>"
+                       aria-label="<?php p($l->t('Arbeitszeitmodelle verwalten')); ?>">
+                        <span><?php p($l->t('Arbeitszeitmodelle')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminHolidays ? 'active' : ''); ?>" <?php p($isAdminHolidays ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.holidays')); ?>"
+                       title="<?php p($l->t('Feiertagskalender pro Bundesland und Standardkalender verwalten')); ?>"
+                       aria-label="<?php p($l->t('Feiertage & Kalender verwalten')); ?>">
+                        <span><?php p($l->t('Feiertage & Kalender')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminTeams ? 'active' : ''); ?>" <?php p($isAdminTeams ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams')); ?>"
+                       title="<?php p($l->t('Teams, Standorte und Zuständigkeiten verwalten')); ?>"
+                       aria-label="<?php p($l->t('Teams verwalten')); ?>">
+                        <span><?php p($l->t('Teams & Standorte')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminAuditLog ? 'active' : ''); ?>" <?php p($isAdminAuditLog ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.auditLog')); ?>"
+                       title="<?php p($l->t('Aktivitäten- und Änderungsprotokoll einsehen')); ?>"
+                       aria-label="<?php p($l->t('Protokolle einsehen')); ?>">
+                        <span><?php p($l->t('Protokoll')); ?></span>
+                    </a>
+                </li>
+                <li class="<?php p($isAdminSettingsPage ? 'active' : ''); ?>" <?php p($isAdminSettingsPage ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.settings')); ?>"
+                       title="<?php p($l->t('Globale Regeln, Benachrichtigungen und Compliance-Einstellungen verwalten')); ?>"
+                       aria-label="<?php p($l->t('Globale Verwaltungseinstellungen öffnen')); ?>">
+                        <span><?php p($l->t('Globale Einstellungen')); ?></span>
+                    </a>
+                </li>
+            </ul>
         </li>
         <?php endif; ?>
         <?php if ($showManagerLink): ?>

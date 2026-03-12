@@ -17,7 +17,13 @@ use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
+use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Service\OvertimeService;
+use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -28,6 +34,8 @@ use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
 use OCP\IUserManager;
+use OCP\IURLGenerator;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\Util;
 
@@ -44,9 +52,17 @@ class ManagerController extends Controller
 	private AbsenceMapper $absenceMapper;
 	private TeamResolverService $teamResolver;
 	private PermissionService $permissionService;
+	private TeamMapper $teamMapper;
 	private IUserSession $userSession;
 	private IUserManager $userManager;
 	private IL10N $l10n;
+	private TeamManagerMapper $teamManagerMapper;
+	private OvertimeService $overtimeService;
+	private AuditLogMapper $auditLogMapper;
+	private NotificationService $notificationService;
+	private TimeEntryMapper $timeEntryMapper;
+	private IURLGenerator $urlGenerator;
+	private IConfig $config;
 
 	public function __construct(
 		string $appName,
@@ -57,10 +73,18 @@ class ManagerController extends Controller
 		AbsenceMapper $absenceMapper,
 		TeamResolverService $teamResolver,
 		PermissionService $permissionService,
+		TeamMapper $teamMapper,
 		IUserSession $userSession,
 		IUserManager $userManager,
 		CSPService $cspService,
-		IL10N $l10n
+		IL10N $l10n,
+		TeamManagerMapper $teamManagerMapper,
+		OvertimeService $overtimeService,
+		AuditLogMapper $auditLogMapper,
+		NotificationService $notificationService,
+		TimeEntryMapper $timeEntryMapper,
+		IURLGenerator $urlGenerator,
+		IConfig $config
 	) {
 		parent::__construct($appName, $request);
 		$this->absenceService = $absenceService;
@@ -69,10 +93,77 @@ class ManagerController extends Controller
 		$this->absenceMapper = $absenceMapper;
 		$this->teamResolver = $teamResolver;
 		$this->permissionService = $permissionService;
+		$this->teamMapper = $teamMapper;
 		$this->userSession = $userSession;
 		$this->userManager = $userManager;
 		$this->l10n = $l10n;
+		$this->teamManagerMapper = $teamManagerMapper;
+		$this->overtimeService = $overtimeService;
+		$this->auditLogMapper = $auditLogMapper;
+		$this->notificationService = $notificationService;
+		$this->timeEntryMapper = $timeEntryMapper;
+		$this->urlGenerator = $urlGenerator;
+		$this->config = $config;
 		$this->setCspService($cspService);
+	}
+
+	/**
+	 * Get list of app-owned teams the current user manages (for reporting / dashboards).
+	 *
+	 * When app teams are disabled, or the user does not manage any teams, an empty list is returned.
+	 * This endpoint is intentionally read-only and returns only minimal metadata (id, name, path).
+	 */
+	#[NoAdminRequired]
+	public function getManagedTeams(): JSONResponse
+	{
+		try {
+			$managerId = $this->getUserId();
+
+			// If app teams are not enabled, there is no concept of multiple named teams for managers.
+			if (!$this->teamResolver->useAppTeams()) {
+				return new JSONResponse([
+					'success' => true,
+					'teams' => [],
+				]);
+			}
+
+			// Collect all team IDs where this user is manager.
+			$managedTeamIds = $this->teamManagerMapper->getTeamIdsForManager($managerId);
+
+			if (empty($managedTeamIds)) {
+				return new JSONResponse([
+					'success' => true,
+					'teams' => [],
+				]);
+			}
+
+			// Build lightweight team DTOs, including hierarchical path for clarity in the UI.
+			$teams = [];
+			foreach ($managedTeamIds as $teamId) {
+				try {
+					$team = $this->teamMapper->find($teamId);
+				} catch (\Throwable $e) {
+					continue;
+				}
+
+				$teams[] = [
+					'id' => $team->getId(),
+					'name' => $team->getName(),
+					'parentId' => $team->getParentId(),
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'teams' => $teams,
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ManagerController::getManagedTeams: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
 	}
 
 	/**
@@ -147,7 +238,7 @@ class ManagerController extends Controller
 
 			// Redirect non-managers (no team, not admin) to dashboard
 			if (!$this->permissionService->canAccessManagerDashboard($managerId)) {
-				$urlGenerator = \OCP\Server::get(\OCP\IURLGenerator::class);
+				$urlGenerator = $this->urlGenerator;
 				$redirect = $urlGenerator->linkToRoute('arbeitszeitcheck.page.index');
 				return new \OCP\AppFramework\Http\RedirectResponse($redirect);
 			}
@@ -251,12 +342,11 @@ class ManagerController extends Controller
 				// Get today's hours
 				$todayHours = $this->timeTrackingService->getTodayHours($userId);
 
-				// Get week's hours using OvertimeService
+				// Get week's hours using injected OvertimeService
 				$weekEnd = clone $weekStart;
 				$weekEnd->modify('+6 days');
 				$weekEnd->setTime(23, 59, 59);
-				$overtimeService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeService::class);
-				$weekOvertime = $overtimeService->calculateOvertime($userId, $weekStart, $weekEnd);
+				$weekOvertime = $this->overtimeService->calculateOvertime($userId, $weekStart, $weekEnd);
 				$weekHours = $weekOvertime['total_hours_worked'];
 
 				// Get current status
@@ -271,9 +361,8 @@ class ManagerController extends Controller
 				$complianceStatus = $this->complianceService->getComplianceStatus($userId);
 				$complianceStatusText = $complianceStatus['compliant'] ? 'good' : 'warning';
 
-				// Calculate overtime using OvertimeService
-				$overtimeService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeService::class);
-				$dailyOvertime = $overtimeService->getDailyOvertime($userId);
+				// Calculate overtime using injected OvertimeService
+				$dailyOvertime = $this->overtimeService->getDailyOvertime($userId);
 				$overtimeHours = $dailyOvertime['overtime_hours'];
 
 				$teamMembers[] = [
@@ -355,8 +444,7 @@ class ManagerController extends Controller
 
 			// Get pending time entry corrections if requested
 			if ($type === null || $type === 'time_entry') {
-				$timeEntryMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
-				$pendingTimeEntries = $timeEntryMapper->findPendingApprovalForUsers($teamUserIds, $limit, $offset);
+				$pendingTimeEntries = $this->timeEntryMapper->findPendingApprovalForUsers($teamUserIds, $limit, $offset);
 
 				foreach ($pendingTimeEntries as $entry) {
 					try {
@@ -523,12 +611,10 @@ class ManagerController extends Controller
 				'totalOvertime' => 0,
 				'members' => []
 			];
-
-			$overtimeService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeService::class);
 			
 			foreach ($teamUserIds as $userId) {
 				$hours = $this->timeTrackingService->getTodayHours($userId);
-				$dailyOvertime = $overtimeService->getDailyOvertime($userId);
+				$dailyOvertime = $this->overtimeService->getDailyOvertime($userId);
 				$overtime = $dailyOvertime['overtime_hours'];
 
 				$summary['totalHours'] += $hours;
@@ -657,8 +743,7 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
-			$timeEntryMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
-			$entry = $timeEntryMapper->find($timeEntryId);
+			$entry = $this->timeEntryMapper->find($timeEntryId);
 
 			// Verify entry is pending approval
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
@@ -696,17 +781,16 @@ class ManagerController extends Controller
 				}
 			}
 
-			$updatedEntry = $timeEntryMapper->update($entry);
+			$updatedEntry = $this->timeEntryMapper->update($entry);
 
 			// Real-time compliance check when approving a time entry
 			// Based on industry best practices: immediate compliance checking upon approval
 			if ($updatedEntry->getStatus() === \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED && $updatedEntry->getEndTime() !== null) {
 				try {
-					$config = \OCP\Server::get(\OCP\IConfig::class);
-					$realTimeComplianceEnabled = $config->getAppValue('arbeitszeitcheck', 'realtime_compliance_check', '1') === '1';
+					$realTimeComplianceEnabled = $this->config->getAppValue('arbeitszeitcheck', 'realtime_compliance_check', '1') === '1';
 					
 					if ($realTimeComplianceEnabled && $this->complianceService) {
-						$strictMode = $config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+						$strictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
 						$this->complianceService->checkComplianceForCompletedEntry($updatedEntry, $strictMode);
 						
 						\OCP\Log\logger('arbeitszeitcheck')->info('Real-time compliance check performed on approved entry', [
@@ -725,10 +809,9 @@ class ManagerController extends Controller
 			}
 
 			// Create audit log (full before/after for payroll evidence)
-			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
 			$newValues = $updatedEntry->getSummary();
 			$newValues['approval_comment'] = $comment;
-			$auditLogMapper->logAction(
+			$this->auditLogMapper->logAction(
 				$entry->getUserId(),
 				'time_entry_correction_approved',
 				'time_entry',
@@ -739,8 +822,7 @@ class ManagerController extends Controller
 			);
 
 			// Send notification to employee
-			$notificationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\NotificationService::class);
-			$notificationService->notifyTimeEntryCorrectionApproved(
+			$this->notificationService->notifyTimeEntryCorrectionApproved(
 				$entry->getUserId(),
 				$updatedEntry->getSummary()
 			);
@@ -778,8 +860,7 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
-			$timeEntryMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
-			$entry = $timeEntryMapper->find($timeEntryId);
+			$entry = $this->timeEntryMapper->find($timeEntryId);
 
 			// Verify entry is pending approval
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
@@ -843,14 +924,13 @@ class ManagerController extends Controller
 				$entry->setJustification(json_encode($justificationData));
 			}
 
-			$updatedEntry = $timeEntryMapper->update($entry);
+			$updatedEntry = $this->timeEntryMapper->update($entry);
 
 			// Create audit log (full before/after for payroll evidence)
-			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
 			$newValues = $updatedEntry->getSummary();
 			$newValues['rejection_reason'] = $reason ?? '';
 			$newValues['rejected_by'] = $managerId;
-			$auditLogMapper->logAction(
+			$this->auditLogMapper->logAction(
 				$entry->getUserId(),
 				'time_entry_correction_rejected',
 				'time_entry',
@@ -861,8 +941,7 @@ class ManagerController extends Controller
 			);
 
 			// Send notification to employee
-			$notificationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\NotificationService::class);
-			$notificationService->notifyTimeEntryCorrectionRejected(
+			$this->notificationService->notifyTimeEntryCorrectionRejected(
 				$entry->getUserId(),
 				$updatedEntry->getSummary(),
 				$reason
@@ -907,12 +986,11 @@ class ManagerController extends Controller
 				]);
 			}
 
-			$timeEntryMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
 			$corrections = [];
 
 			foreach ($teamUserIds as $userId) {
 				// Get pending approval entries for this user
-				$pendingEntries = $timeEntryMapper->findByUserAndStatus(
+				$pendingEntries = $this->timeEntryMapper->findByUserAndStatus(
 					$userId,
 					\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL
 				);

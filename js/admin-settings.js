@@ -60,6 +60,7 @@
         formData.enableViolationNotifications = formData.enableViolationNotifications === 'on' || formData.enableViolationNotifications === true;
         formData.sendIcalApprovedAbsences = formData.sendIcalApprovedAbsences === 'on' || formData.sendIcalApprovedAbsences === true;
         formData.sendIcalToSubstitute = formData.sendIcalToSubstitute === 'on' || formData.sendIcalToSubstitute === true;
+        formData.sendIcalToManagers = formData.sendIcalToManagers === 'on' || formData.sendIcalToManagers === true;
 
         // Convert numbers
         formData.maxDailyHours = parseFloat(formData.maxDailyHours);
@@ -94,22 +95,26 @@
      */
     function validateForm(data) {
         if (data.maxDailyHours < 1 || data.maxDailyHours > 24) {
-            Messaging.showError('Maximum daily hours must be between 1 and 24');
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Maximum daily hours must be between 1 and 24')) || 'Maximum daily hours must be between 1 and 24';
+            Messaging.showError(msg);
             return false;
         }
 
         if (data.minRestPeriod < 1 || data.minRestPeriod > 24) {
-            Messaging.showError('Minimum rest period must be between 1 and 24 hours');
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Minimum rest period must be between 1 and 24 hours')) || 'Minimum rest period must be between 1 and 24 hours';
+            Messaging.showError(msg);
             return false;
         }
 
         if (data.defaultWorkingHours < 1 || data.defaultWorkingHours > 24) {
-            Messaging.showError('Default working hours must be between 1 and 24');
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Default working hours must be between 1 and 24')) || 'Default working hours must be between 1 and 24';
+            Messaging.showError(msg);
             return false;
         }
 
         if (data.retentionPeriod < 1 || data.retentionPeriod > 10) {
-            Messaging.showError('Retention period must be between 1 and 10 years');
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Retention period must be between 1 and 10 years')) || 'Retention period must be between 1 and 10 years';
+            Messaging.showError(msg);
             return false;
         }
 

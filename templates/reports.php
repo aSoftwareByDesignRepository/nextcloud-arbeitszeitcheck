@@ -34,6 +34,10 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 $isAdmin = $_['isAdmin'] ?? false;
 $isManager = $_['isManager'] ?? false;
 $canAccessReports = $isAdmin || $isManager;
+
+// Whether app-owned teams are enabled (controls whether manager-specific team selection makes sense)
+$config = \OCP\Server::get(\OCP\IConfig::class);
+$useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') === '1';
 ?>
 
 <?php include __DIR__ . '/common/navigation.php'; ?>
@@ -60,8 +64,8 @@ $canAccessReports = $isAdmin || $isManager;
             </div>
         </header>
 
-        <!-- Step 1: Report Type Selection -->
-        <section id="report-type-section" class="reports-section section" aria-labelledby="report-type-heading" aria-label="<?php p($l->t('Select report type')); ?>">
+        <!-- Step 1: Scope & Report Type Selection -->
+        <section id="report-type-section" class="reports-section section" aria-labelledby="report-scope-heading" aria-label="<?php p($l->t('Select what you want to see')); ?>">
             <?php if (!$canAccessReports): ?>
                 <div class="empty-state">
                     <h3 class="empty-state__title" id="report-type-heading"><?php p($l->t('Reports are only available for administrators and managers')); ?></h3>
@@ -70,10 +74,131 @@ $canAccessReports = $isAdmin || $isManager;
                     </p>
                 </div>
             <?php else: ?>
-            <div class="report-selection-section">
-                <h3 id="report-type-heading" class="reports-section__title"><?php p($l->t('Select Report Type')); ?></h3>
-                <p class="reports-section__desc"><?php p($l->t('Choose the kind of report you need. Then set the date range below.')); ?></p>
-                <div class="report-types-grid">
+
+            <!-- Scope selection: who should be included -->
+            <div class="report-scope-section">
+                <h3 id="report-scope-heading" class="reports-section__title"><?php p($l->t('Who should be included in the report?')); ?></h3>
+                <p class="reports-section__desc">
+                    <?php
+                    if ($isAdmin) {
+                        p($l->t('Choose whether you want a report for the whole organization or for a specific team.'));
+                    } else {
+                        p($l->t('Choose whether you want a report for everyone you manage.'));
+                    }
+                    ?>
+                </p>
+
+                <form id="report-scope-form" class="report-scope-form" aria-label="<?php p($l->t('Select report scope')); ?>">
+                    <fieldset class="form-fieldset" aria-labelledby="scope-legend">
+                        <legend id="scope-legend" class="form-legend"><?php p($l->t('Report scope')); ?></legend>
+
+                        <?php if ($isAdmin): ?>
+                            <div class="form-group">
+                                <div class="form-radio">
+                                    <input type="radio"
+                                           id="scope-organization"
+                                           name="report_scope"
+                                           value="organization"
+                                           checked
+                                           aria-describedby="scope-organization-help">
+                                    <label for="scope-organization" class="form-label">
+                                        <?php p($l->t('Whole organization')); ?>
+                                    </label>
+                                </div>
+                                <p id="scope-organization-help" class="form-help">
+                                    <?php p($l->t('Includes all active employees in your Nextcloud instance.')); ?>
+                                </p>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="form-radio">
+                                    <input type="radio"
+                                           id="scope-admin-team"
+                                           name="report_scope"
+                                           value="admin_team"
+                                           aria-describedby="scope-admin-team-help">
+                                    <label for="scope-admin-team" class="form-label">
+                                        <?php p($l->t('Specific team')); ?>
+                                    </label>
+                                </div>
+                                <p id="scope-admin-team-help" class="form-help">
+                                    <?php p($l->t('Limit the report to one department or team that you configure in the administration area.')); ?>
+                                </p>
+
+                                <label for="admin-team-select" class="form-label visually-hidden">
+                                    <?php p($l->t('Select team')); ?>
+                                </label>
+                                <select id="admin-team-select"
+                                        name="admin_team_id"
+                                        class="form-select"
+                                        aria-describedby="admin-team-select-help"
+                                        disabled>
+                                    <option value=""><?php p($l->t('Select a team')); ?></option>
+                                </select>
+                                <p id="admin-team-select-help" class="form-help">
+                                    <?php p($l->t('Only available if you have configured app-owned teams.')); ?>
+                                </p>
+                            </div>
+                        <?php else: ?>
+                            <div class="form-group">
+                                <div class="form-radio">
+                                    <input type="radio"
+                                           id="scope-my-team"
+                                           name="report_scope"
+                                           value="manager_team"
+                                           checked
+                                           aria-describedby="scope-my-team-help">
+                                    <label for="scope-my-team" class="form-label">
+                                        <?php p($l->t('Everyone I manage')); ?>
+                                    </label>
+                                </div>
+                                <p id="scope-my-team-help" class="form-help">
+                                    <?php p($l->t('Includes all people you are responsible for as a manager.')); ?>
+                                </p>
+                            </div>
+
+                            <?php if ($useAppTeams): ?>
+                            <div class="form-group">
+                                <div class="form-radio">
+                                    <input type="radio"
+                                           id="scope-manager-single-team"
+                                           name="report_scope"
+                                           value="manager_single_team"
+                                           aria-describedby="scope-manager-single-team-help"
+                                           disabled>
+                                    <label for="scope-manager-single-team" class="form-label">
+                                        <?php p($l->t('Specific managed team')); ?>
+                                    </label>
+                                </div>
+                                <p id="scope-manager-single-team-help" class="form-help">
+                                    <?php p($l->t('If you manage more than one team, you can choose one here.')); ?>
+                                </p>
+
+                                <label for="manager-team-select" class="form-label visually-hidden">
+                                    <?php p($l->t('Select managed team')); ?>
+                                </label>
+                                <select id="manager-team-select"
+                                        name="manager_team_id"
+                                        class="form-select"
+                                        aria-describedby="manager-team-select-help"
+                                        disabled>
+                                    <option value=""><?php p($l->t('Select a team you manage')); ?></option>
+                                </select>
+                                <p id="manager-team-select-help" class="form-help">
+                                    <?php p($l->t('This list is filled automatically if app-owned teams are enabled.')); ?>
+                                </p>
+                            </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </fieldset>
+                </form>
+            </div>
+
+            <div class="report-selection-section" aria-labelledby="report-type-heading">
+                <h3 id="report-type-heading" class="reports-section__title"><?php p($l->t('What kind of report do you need?')); ?></h3>
+                <p class="reports-section__desc"><?php p($l->t('First choose the scope above, then pick the type of report.')); ?></p>
+
+                <div class="report-types-grid" role="list">
                     <div class="report-type-card" data-report-type="daily">
                         <div class="report-type-icon">📊</div>
                         <h4><?php p($l->t('Daily Report')); ?></h4>
@@ -120,12 +245,16 @@ $canAccessReports = $isAdmin || $isManager;
 
             <!-- Step 2: Report Parameters -->
             <div id="report-parameters" class="reports-section report-parameters-section" style="display: none;" aria-labelledby="report-parameters-heading">
-                <h3 id="report-parameters-heading" class="reports-section__title"><?php p($l->t('Set date range')); ?></h3>
-                <p class="reports-section__desc"><?php p($l->t('Pick the start and end date for your report.')); ?></p>
+                <h3 id="report-parameters-heading" class="reports-section__title"><?php p($l->t('Set time period and format')); ?></h3>
+                <p class="reports-section__desc">
+                    <?php p($l->t('Pick the time period for your report. For daily or weekly reports, we will adjust the dates automatically.')); ?>
+                </p>
                 <form id="report-form" class="report-form" aria-label="<?php p($l->t('Report parameters')); ?>">
                     <input type="hidden" id="report-type" name="report_type" value="">
+                    <input type="hidden" id="report-scope" name="report_scope" value="">
+                    <input type="hidden" id="report-team-users" name="report_team_users" value="">
                     
-                    <div class="form-group">
+                    <div class="form-group" id="start-date-group">
                         <label for="start-date" class="form-label">
                             <?php p($l->t('Start Date')); ?>
                             <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
@@ -144,7 +273,7 @@ $canAccessReports = $isAdmin || $isManager;
                         </p>
                     </div>
                     
-                    <div class="form-group">
+                    <div class="form-group" id="end-date-group">
                         <label for="end-date" class="form-label">
                             <?php p($l->t('End Date')); ?>
                             <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
@@ -223,6 +352,8 @@ $canAccessReports = $isAdmin || $isManager;
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.page = 'reports';
     window.ArbeitszeitCheck.canAccessReports = <?php echo json_encode($canAccessReports, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.isAdmin = <?php echo json_encode($isAdmin, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.isManager = <?php echo json_encode($isManager, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     
     window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
     window.ArbeitszeitCheck.l10n.error = <?php echo json_encode($l->t('An error occurred'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -238,6 +369,8 @@ $canAccessReports = $isAdmin || $isManager;
     window.ArbeitszeitCheck.l10n.users = <?php echo json_encode($l->t('Users'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.name = <?php echo json_encode($l->t('Name'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.dailyBreakdown = <?php echo json_encode($l->t('Daily breakdown'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.scopeRequired = <?php echo json_encode($l->t('Please choose who should be included in the report.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.teamRequired = <?php echo json_encode($l->t('Please select a team.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     
     window.ArbeitszeitCheck.apiUrl = {
         daily: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.report.daily'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
@@ -245,7 +378,8 @@ $canAccessReports = $isAdmin || $isManager;
         monthly: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.report.monthly'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         overtime: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.report.overtime'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         absence: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.report.absence'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        compliance: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.getReport'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        compliance: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.getReport'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        team: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.report.team'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };
     // Export endpoints that trigger real file downloads
     window.ArbeitszeitCheck.exportUrl = {
@@ -262,12 +396,176 @@ $canAccessReports = $isAdmin || $isManager;
         const reportParameters = document.getElementById('report-parameters');
         const reportForm = document.getElementById('report-form');
         const reportTypeInput = document.getElementById('report-type');
+        const reportScopeInput = document.getElementById('report-scope');
+        const reportTeamUsersInput = document.getElementById('report-team-users');
         const startDateInput = document.getElementById('start-date');
         const endDateInput = document.getElementById('end-date');
         const formatSelect = document.getElementById('format');
         const previewBtn = document.getElementById('btn-preview-report');
         const generateBtn = document.getElementById('btn-generate-report');
+        const scopeForm = document.getElementById('report-scope-form');
+        const startDateGroup = document.getElementById('start-date-group');
+        const endDateGroup = document.getElementById('end-date-group');
+
+        // Helper: get request token safely
         
+        function getRequestToken() {
+            return (typeof OC !== 'undefined' && OC.requestToken)
+                ? OC.requestToken
+                : (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) || '';
+        }
+
+        // Helper: announce status to screen reader
+        function announceToScreenReader(message) {
+            var live = document.getElementById('report-preview-live');
+            if (live) {
+                live.textContent = '';
+                live.setAttribute('aria-live', 'polite');
+                setTimeout(function() { live.textContent = message; }, 100);
+            }
+        }
+
+        // Helper: escape HTML
+        function esc(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Scope handling: keep a clean, explicit state
+        var scopeState = {
+            scope: '',
+            adminTeamId: '',
+            managerTeamId: '',
+            teamUserIds: []
+        };
+
+        function updateScopeFromForm() {
+            if (!scopeForm) return;
+            var formData = new FormData(scopeForm);
+            var scope = formData.get('report_scope') || '';
+            scopeState.scope = scope;
+
+            if (window.ArbeitszeitCheck.isAdmin) {
+                scopeState.adminTeamId = (formData.get('admin_team_id') || '').trim();
+            } else if (window.ArbeitszeitCheck.isManager) {
+                scopeState.managerTeamId = (formData.get('manager_team_id') || '').trim();
+            }
+
+            if (reportScopeInput) {
+                reportScopeInput.value = scope || '';
+            }
+        }
+
+        // Load admin teams for selection (only once)
+        function loadAdminTeamsIfNeeded() {
+            if (!window.ArbeitszeitCheck.isAdmin) return;
+            var select = document.getElementById('admin-team-select');
+            if (!select || select.dataset.loaded === 'true') return;
+
+            var url = OC.generateUrl('/apps/arbeitszeitcheck/api/admin/teams');
+            fetch(url, { method: 'GET', headers: { requesttoken: getRequestToken() } })
+                .then(function (res) { return res.ok ? res.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.success || !Array.isArray(data.teams)) {
+                        return;
+                    }
+                    // Mark that we tried loading; even if empty we avoid repeated fetches
+                    select.dataset.loaded = 'true';
+                    data.teams.forEach(function (team) {
+                        var opt = document.createElement('option');
+                        opt.value = String(team.id);
+                        opt.textContent = team.name || ('#' + team.id);
+                        select.appendChild(opt);
+                    });
+                })
+                .catch(function () {
+                    // Fail silently – scope selection still works with organization-wide reports
+                });
+        }
+
+        // Load manager-managed teams when app-owned teams are enabled
+        function loadManagerTeamsIfNeeded() {
+            if (!window.ArbeitszeitCheck.isManager) return;
+            var select = document.getElementById('manager-team-select');
+            var scopeRadio = document.getElementById('scope-manager-single-team');
+            if (!select || select.dataset.loaded === 'true') return;
+
+            var url = OC.generateUrl('/apps/arbeitszeitcheck/api/manager/teams');
+            fetch(url, { method: 'GET', headers: { requesttoken: getRequestToken() } })
+                .then(function (res) { return res.ok ? res.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.success || !Array.isArray(data.teams)) {
+                        return;
+                    }
+                    select.dataset.loaded = 'true';
+                    if (data.teams.length === 0) {
+                        // No app-owned teams: keep radio disabled, scope "everyone I manage" still works
+                        return;
+                    }
+                    // Enable the single-team scope option only when at least one team is available
+                    if (scopeRadio) {
+                        scopeRadio.disabled = false;
+                    }
+                    data.teams.forEach(function (team) {
+                        var opt = document.createElement('option');
+                        opt.value = String(team.id);
+                        opt.textContent = team.name || ('#' + team.id);
+                        select.appendChild(opt);
+                    });
+                })
+                .catch(function () {
+                    // Fail silently – manager can still use aggregated team scope
+                });
+        }
+
+        // React to changes in scope radios and team selects
+        if (scopeForm) {
+            scopeForm.addEventListener('change', function (e) {
+                var target = e.target;
+                if (!target) return;
+
+                // Enable/disable team selects based on active scope
+                var scopeOrg = document.getElementById('scope-organization');
+                var scopeAdminTeam = document.getElementById('scope-admin-team');
+                var scopeManagerTeam = document.getElementById('scope-my-team');
+                var scopeManagerSingleTeam = document.getElementById('scope-manager-single-team');
+                var adminTeamSelect = document.getElementById('admin-team-select');
+                var managerTeamSelect = document.getElementById('manager-team-select');
+
+                // Admin: toggle team select
+                if (scopeAdminTeam && adminTeamSelect) {
+                    var adminTeamActive = scopeAdminTeam.checked;
+                    adminTeamSelect.disabled = !adminTeamActive;
+                    if (adminTeamActive) {
+                        loadAdminTeamsIfNeeded();
+                    }
+                }
+
+                // Manager: toggle team select
+                if (scopeManagerSingleTeam && managerTeamSelect) {
+                    var managerSingleActive = scopeManagerSingleTeam.checked;
+                    managerTeamSelect.disabled = !managerSingleActive;
+                    if (managerSingleActive) {
+                        loadManagerTeamsIfNeeded();
+                    }
+                }
+
+                updateScopeFromForm();
+            });
+
+            // Initialize scope state once
+            updateScopeFromForm();
+            if (window.ArbeitszeitCheck.isAdmin) {
+                loadAdminTeamsIfNeeded();
+            } else if (window.ArbeitszeitCheck.isManager) {
+                loadManagerTeamsIfNeeded();
+            }
+        }
+
         // Handle report card clicks
         reportCards.forEach(card => {
             card.addEventListener('click', function(e) {
@@ -290,6 +588,12 @@ $canAccessReports = $isAdmin || $isManager;
                 if (reportType && reportTypeInput) {
                     reportTypeInput.value = reportType;
                     
+                    // Ensure scope is up to date before showing parameters
+                    updateScopeFromForm();
+
+                    // For daily and weekly reports we only really need one anchor date; we keep both fields visible
+                    // for consistency but will adjust the API parameters later.
+
                     // Show parameters section
                     if (reportParameters) {
                         reportParameters.style.display = 'block';
@@ -312,11 +616,6 @@ $canAccessReports = $isAdmin || $isManager;
             });
         });
         
-        // Request token for API calls (avoids CSRF issues; endpoints also have NoCSRFRequired)
-        function getRequestToken() {
-            return (typeof OC !== 'undefined' && OC.requestToken) ? OC.requestToken
-                : (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) || '';
-        }
         // Build report URL with correct params per type (API expects specific param names)
         function buildReportUrl(apiUrl, reportType, startDate, endDate) {
             const url = new URL(apiUrl, window.location.origin);
@@ -332,18 +631,6 @@ $canAccessReports = $isAdmin || $isManager;
             }
             return url.toString();
         }
-        function announceToScreenReader(message) {
-            var live = document.getElementById('report-preview-live');
-            if (live) {
-                live.textContent = '';
-                live.setAttribute('aria-live', 'polite');
-                setTimeout(function() { live.textContent = message; }, 100);
-            }
-        }
-        function esc(s) {
-            if (s == null) return '';
-            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
         // Format period for display (API returns object { start, end } or string)
         function formatPeriod(period) {
             if (period == null) return '';
@@ -356,7 +643,7 @@ $canAccessReports = $isAdmin || $isManager;
             }
             return '';
         }
-        // Render report data as HTML (never show raw JSON). Handles daily, weekly, monthly, overtime, absence, compliance.
+        // Render report data as HTML (never show raw JSON). Handles daily, weekly, monthly, overtime, absence, team, compliance.
         function renderReportHtml(report) {
             if (!report) return '';
             var L = window.ArbeitszeitCheck.l10n || {};
@@ -376,7 +663,14 @@ $canAccessReports = $isAdmin || $isManager;
                 });
                 html += '</tbody></table>';
             }
-            if (report.users && report.users.length) {
+            if (report.members && report.members.length) {
+                // Team report (aggregated members)
+                html += '<h4 class="report-subhead">' + (L.users || 'Users') + '</h4><table class="report-table"><thead><tr><th>' + (L.name || 'Name') + '</th><th>' + (L.hours || 'Hours') + '</th><th>' + (L.overtime || 'Overtime') + '</th></tr></thead><tbody>';
+                report.members.forEach(function(m) {
+                    html += '<tr><td>' + esc(m.display_name || m.user_id || '-') + '</td><td>' + esc(m.total_hours != null ? m.total_hours : '-') + '</td><td>' + esc(m.overtime_hours != null ? m.overtime_hours : '-') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            } else if (report.users && report.users.length) {
                 html += '<h4 class="report-subhead">' + (L.users || 'Users') + '</h4><table class="report-table"><thead><tr><th>' + (L.name || 'Name') + '</th><th>' + (L.hours || 'Hours') + '</th><th>' + (L.overtime || 'Overtime') + '</th></tr></thead><tbody>';
                 report.users.forEach(function(u) {
                     html += '<tr><td>' + esc(u.display_name || u.user_id || '-') + '</td><td>' + esc(u.total_hours != null ? u.total_hours : (u.total_hours_worked != null ? u.total_hours_worked : '-')) + '</td><td>' + esc(u.overtime_hours != null ? u.overtime_hours : '-') + '</td></tr>';
@@ -395,6 +689,85 @@ $canAccessReports = $isAdmin || $isManager;
             html += '</div>';
             return html;
         }
+        // Build params for team report (organization, admin team, manager team) – returns { apiUrl, isTeam, extraParams }
+        function resolveScopeAndApi(reportType, startDate, endDate) {
+            var A = window.ArbeitszeitCheck || {};
+            var apiMap = A.apiUrl || {};
+            var scope = reportScopeInput ? reportScopeInput.value : '';
+
+            // Default: per-user reports (viewer or target user)
+            if (!scope || scope === '') {
+                return {
+                    apiUrl: apiMap[reportType] || null,
+                    isTeam: false,
+                    queryParams: {}
+                };
+            }
+
+            // Admin scopes
+            if (A.isAdmin) {
+                if (scope === 'organization') {
+                    // organization-wide: use existing per-period API with userId=null
+                    return {
+                        apiUrl: apiMap[reportType] || null,
+                        isTeam: false,
+                        queryParams: { userId: '' }
+                    };
+                }
+
+                if (scope === 'admin_team') {
+                    var teamUsers = (reportTeamUsersInput && reportTeamUsersInput.value) ? reportTeamUsersInput.value : '';
+                    return {
+                        apiUrl: apiMap.team || null,
+                        isTeam: true,
+                        queryParams: {
+                            userIds: teamUsers,
+                            startDate: startDate,
+                            endDate: endDate
+                        }
+                    };
+                }
+            }
+
+            // Manager scopes
+            if (A.isManager) {
+                if (scope === 'manager_team') {
+                    // "Everyone I manage": reporting service already expects team userIds; we use team API endpoint,
+                    // and let the backend resolve the exact team membership for this manager.
+                    return {
+                        apiUrl: apiMap.team || null,
+                        isTeam: true,
+                        queryParams: {
+                            // empty userIds signals "use my full team"; backend still checks permissions
+                            userIds: '',
+                            startDate: startDate,
+                            endDate: endDate
+                        }
+                    };
+                }
+
+                if (scope === 'manager_single_team') {
+                    var managerTeamUsers = (reportTeamUsersInput && reportTeamUsersInput.value) ? reportTeamUsersInput.value : '';
+                    return {
+                        apiUrl: apiMap.team || null,
+                        isTeam: true,
+                        queryParams: {
+                            userIds: managerTeamUsers,
+                            startDate: startDate,
+                            endDate: endDate
+                        }
+                    };
+                }
+            }
+
+            // Fallback: per-user API
+            return {
+                apiUrl: apiMap[reportType] || null,
+                isTeam: false,
+                queryParams: {}
+            };
+        }
+
         // Shared: fetch report and show in preview (or show error in preview). Both Preview and Generate use this.
         function fetchAndShowReport() {
             var reportType = reportTypeInput ? reportTypeInput.value : '';
@@ -406,22 +779,70 @@ $canAccessReports = $isAdmin || $isManager;
             var previewContent = document.getElementById('report-preview-content');
             if (!previewSection || !previewContent) return;
             if (!reportType || !startDate || !endDate) {
-                announceToScreenReader((window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.error) || 'An error occurred');
-                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.error ? window.ArbeitszeitCheck.l10n.error : 'Please fill in report type, start date and end date.') + '</p>';
+                var errMsg = (window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.error) || 'Please fill in report type, start date and end date.';
+                announceToScreenReader(errMsg);
+                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(errMsg) + '</p>';
                 previewSection.style.display = 'block';
                 previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 var h = document.getElementById('report-preview-heading');
                 if (h) h.focus();
                 return;
             }
-            var apiUrl = window.ArbeitszeitCheck && window.ArbeitszeitCheck.apiUrl ? window.ArbeitszeitCheck.apiUrl[reportType] : null;
-            if (!apiUrl) {
-                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.error ? window.ArbeitszeitCheck.l10n.error : 'Invalid report type.') + '</p>';
+
+            // Validate scope before building URL
+            updateScopeFromForm();
+            if (!reportScopeInput || !reportScopeInput.value) {
+                var scopeMsg = (window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.scopeRequired) || 'Please choose who should be included in the report.';
+                announceToScreenReader(scopeMsg);
+                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(scopeMsg) + '</p>';
                 previewSection.style.display = 'block';
                 previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 return;
             }
-            var url = buildReportUrl(apiUrl, reportType, startDate, endDate);
+
+            var scopeResolution = resolveScopeAndApi(reportType, startDate, endDate);
+            if (!scopeResolution.apiUrl) {
+                var typeMsg = (window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.error) || 'Invalid report type.';
+                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(typeMsg) + '</p>';
+                previewSection.style.display = 'block';
+                previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            // If a team-specific scope is selected, ensure a team or user set is present
+            if ((reportScopeInput.value === 'admin_team' || reportScopeInput.value === 'manager_single_team') &&
+                (!reportTeamUsersInput || !reportTeamUsersInput.value)) {
+                var teamMsg = (window.ArbeitszeitCheck.l10n && window.ArbeitszeitCheck.l10n.teamRequired) || 'Please select a team.';
+                announceToScreenReader(teamMsg);
+                previewContent.innerHTML = '<p class="report-error" role="alert">' + esc(teamMsg) + '</p>';
+                previewSection.style.display = 'block';
+                previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            var url;
+            if (scopeResolution.isTeam) {
+                // Team reports: use team endpoint and its own query params
+                var urlObj = new URL(scopeResolution.apiUrl, window.location.origin);
+                Object.keys(scopeResolution.queryParams || {}).forEach(function (key) {
+                    var val = scopeResolution.queryParams[key];
+                    if (val != null && val !== '') {
+                        urlObj.searchParams.set(key, val);
+                    }
+                });
+                url = urlObj.toString();
+            } else {
+                // Per-user and organization-wide reports: use classic per-type endpoints
+                url = buildReportUrl(scopeResolution.apiUrl, reportType, startDate, endDate);
+                // If we explicitly want organization-wide and the API supports userId, include it
+                if (scopeResolution.queryParams && typeof scopeResolution.queryParams.userId !== 'undefined') {
+                    var u = new URL(url);
+                    if (scopeResolution.queryParams.userId !== '') {
+                        u.searchParams.set('userId', scopeResolution.queryParams.userId);
+                    }
+                    url = u.toString();
+                }
+            }
             var requestToken = getRequestToken();
             var originalPreviewText = previewBtn ? previewBtn.textContent : '';
             var originalGenerateText = generateBtn ? generateBtn.textContent : '';
@@ -472,7 +893,9 @@ $canAccessReports = $isAdmin || $isManager;
                 return;
             }
             var format = formatSelect ? formatSelect.value : 'csv';
-            // Map report types to export endpoints
+            // Map report types to export endpoints (team/org exports reuse the same endpoints,
+            // which are currently per-user and organization-safe – team/org downloads can
+            // be added later via dedicated export endpoints if needed).
             var exportKey = 'timeEntries';
             if (reportType === 'absence') {
                 exportKey = 'absences';

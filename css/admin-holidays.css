@@ -1,0 +1,59 @@
+/* Admin Holidays: vereinheitlichte Typografie
+ *
+ * Ziel: Wenige, klar unterscheidbare Schriftgrößen auf der Seite
+ * "Feiertage & Kalender", ohne die globale Typografie der App zu verändern.
+ */
+
+.admin-holidays-page .section-header h2 {
+	font-size: var(--arbeitszeitcheck-font-size-2xl);
+	line-height: 1.3;
+	margin-bottom: var(--space-2);
+}
+
+.admin-holidays-page .section-header p {
+	font-size: var(--arbeitszeitcheck-font-size-base);
+	line-height: 1.6;
+	max-width: 52rem;
+	margin-top: 0;
+	margin-bottom: var(--space-2);
+}
+
+.admin-holidays-page .section-header .form-help {
+	max-width: 52rem;
+	margin-top: 0;
+}
+
+.admin-holidays-page .form-label {
+	font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+.admin-holidays-page .form-help {
+	font-size: var(--arbeitszeitcheck-font-size-sm);
+	line-height: 1.5;
+}
+
+.admin-holidays-page .table th,
+.admin-holidays-page .table td {
+	font-size: var(--arbeitszeitcheck-font-size-sm);
+}
+
+.admin-holidays-page .admin-holidays-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-4);
+	align-items: flex-end;
+	margin-bottom: var(--space-4);
+}
+
+.admin-holidays-page .form-group--inline {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+@media (min-width: 768px) {
+	.admin-holidays-page .form-group--inline {
+		min-width: 10rem;
+	}
+}
+

@@ -23,9 +23,11 @@
   display: flex;
   flex-direction: column;
   margin: 0 !important;
-  margin-top: 50px !important; /* Clear Nextcloud header (--header-height) */
+  margin-top: 50px !important;
+  /* Clear Nextcloud header (--header-height) */
   padding: 0 !important;
-  overflow: hidden; /* Contain flex children; scrolling happens in #app-content */
+  overflow: hidden;
+  /* Contain flex children; scrolling happens in #app-content */
 }
 
 /* ===== APP WRAPPER: FILL #content, ENABLE SCROLL IN CHILDREN ===== */
@@ -48,7 +50,8 @@
   background: var(--color-main-background);
   color: var(--color-main-text);
   flex: 1 1 0;
-  min-height: 0; /* Allow flex child to shrink; enables overflow-y: auto */
+  min-height: 0;
+  /* Allow flex child to shrink; enables overflow-y: auto */
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -170,8 +173,8 @@
 
 /* ===== SECTIONS (clear, easy-to-identify blocks — simple UX, WCAG 2.1 AA) ===== */
 
-#app-content-wrapper > .section {
-  margin-bottom: var(--space-12);
+#app-content-wrapper>.section {
+  margin-bottom: 0px;
   padding: var(--space-8) var(--space-8);
   border-radius: var(--radius-2xl);
   border: 1px solid var(--arbeitszeitcheck-color-border);
@@ -182,13 +185,13 @@
   /* Generous spacing: easy to scan, even for users with low vision */
 }
 
-#app-content-wrapper > .section:focus-within {
+#app-content-wrapper>.section:focus-within {
   outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
   outline-offset: 2px;
 }
 
 /* Section left accent: quick visual scanning (border + bar, not only color — WCAG 1.4.11) */
-#app-content-wrapper > .section:not(.page-header-section)::before {
+#app-content-wrapper>.section:not(.page-header-section)::before {
   content: '';
   position: absolute;
   left: 0;
@@ -210,19 +213,19 @@
   letter-spacing: var(--arbeitszeitcheck-letter-spacing-tight);
 }
 
-#app-content-wrapper > .section:last-child {
+#app-content-wrapper>.section:last-child {
   margin-bottom: 0;
 }
 
 /* Page header is a section but without card look */
-#app-content-wrapper > .section.page-header-section {
+#app-content-wrapper>.section.page-header-section {
   border: none;
   box-shadow: none;
   background: transparent;
   padding: var(--space-4) 0;
 }
 
-#app-content-wrapper > .section.page-header-section::before {
+#app-content-wrapper>.section.page-header-section::before {
   display: none;
 }
 
@@ -321,13 +324,13 @@
     padding: var(--space-5) var(--space-4) var(--space-12);
   }
 
-  #app-content-wrapper > .section {
+  #app-content-wrapper>.section {
     padding: var(--space-6) var(--space-5);
     margin-bottom: var(--space-10);
     border-radius: var(--radius-xl);
   }
 
-  #app-content-wrapper > .section::before {
+  #app-content-wrapper>.section::before {
     top: var(--space-4);
     bottom: var(--space-4);
     width: 4px;
@@ -389,7 +392,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #app-content-wrapper > .section::before {
+  #app-content-wrapper>.section::before {
     transition: none;
   }
 }
@@ -490,7 +493,7 @@
   margin-top: 0;
 }
 
-.settings-section .section-title + .form,
-.settings-section .section-title + .info-box {
+.settings-section .section-title+.form,
+.settings-section .section-title+.info-box {
   margin-top: var(--space-2);
 }

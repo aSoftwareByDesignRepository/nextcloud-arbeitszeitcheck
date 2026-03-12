@@ -23,52 +23,65 @@ $models = $_['models'] ?? [];
     <div id="app-content-wrapper">
         <div class="section">
             <div class="section-header">
-                <h2><?php p($l->t('Working Time Models')); ?></h2>
-                <p><?php p($l->t('Set up different work schedules and assign them to employees')); ?></p>
+                <h2><?php p($l->t('Arbeitszeitmodelle')); ?></h2>
+                <p><?php p($l->t('Legen Sie verschiedene Arbeitszeitmodelle an (z. B. Vollzeit, Teilzeit) und weisen Sie diese Mitarbeitenden zu.')); ?></p>
             </div>
 
             <div class="section-content mb-3">
                 <button type="button" 
                         id="create-model" 
                         class="btn btn--primary"
-                        aria-label="<?php p($l->t('Create a new working time model')); ?>"
-                        title="<?php p($l->t('Click to create a new work schedule. For example, you could create a model for full-time employees (8 hours per day) or part-time employees (4 hours per day).')); ?>">
-                    <?php p($l->t('Create New Work Schedule')); ?>
+                        aria-label="<?php p($l->t('Neues Arbeitszeitmodell anlegen')); ?>"
+                        title="<?php p($l->t('Neues Arbeitszeitmodell anlegen, z. B. für Vollzeit (8 Stunden/Tag) oder Teilzeit (4 Stunden/Tag).')); ?>">
+                    <?php p($l->t('Neues Arbeitszeitmodell')); ?>
                 </button>
             </div>
 
             <!-- Models Table -->
-            <div class="table-container" role="region" aria-label="<?php p($l->t('Working time models')); ?>">
-                <table class="table table--hover" id="models-table" role="table" aria-label="<?php p($l->t('Working time models')); ?>">
+            <div class="table-container" role="region" aria-label="<?php p($l->t('Arbeitszeitmodelle')); ?>">
+                <table class="table table--hover" id="models-table" role="table" aria-label="<?php p($l->t('Arbeitszeitmodelle')); ?>">
                 <thead>
                     <tr>
                         <th scope="col"><?php p($l->t('Name')); ?></th>
-                        <th scope="col"><?php p($l->t('Type')); ?></th>
-                        <th scope="col"><?php p($l->t('Weekly Hours')); ?></th>
-                        <th scope="col"><?php p($l->t('Daily Hours')); ?></th>
-                        <th scope="col"><?php p($l->t('Default')); ?></th>
-                        <th scope="col"><?php p($l->t('Actions')); ?></th>
+                        <th scope="col"><?php p($l->t('Typ')); ?></th>
+                        <th scope="col"><?php p($l->t('Wochenstunden')); ?></th>
+                        <th scope="col"><?php p($l->t('Tagesstunden')); ?></th>
+                        <th scope="col"><?php p($l->t('Standard')); ?></th>
+                        <th scope="col"><?php p($l->t('Aktionen')); ?></th>
                     </tr>
                 </thead>
                 <tbody id="models-tbody">
                     <?php if (empty($models)): ?>
                         <tr>
                             <td colspan="6" class="text-center">
-                                <?php p($l->t('No working time models found')); ?>
+                                <?php p($l->t('Keine Arbeitszeitmodelle vorhanden')); ?>
                             </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach (($models ?? []) as $model): ?>
                             <tr data-model-id="<?php p($model['id']); ?>">
                                 <td><?php p($model['name']); ?></td>
-                                <td><?php p($model['type']); ?></td>
+                                <td>
+                                    <?php
+                                    $typeKey = $model['type'] ?? '';
+                                    $typeLabel = match ($typeKey) {
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_FULL_TIME => $l->t('Vollzeit'),
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_PART_TIME => $l->t('Teilzeit'),
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_FLEXIBLE => $l->t('Flexibel'),
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_TRUST_BASED => $l->t('Vertrauensarbeitszeit'),
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK => $l->t('Schichtarbeit'),
+                                        default => $typeKey,
+                                    };
+                                    p($typeLabel);
+                                    ?>
+                                </td>
                                 <td><?php p($model['weeklyHours']); ?>h</td>
                                 <td><?php p($model['dailyHours']); ?>h</td>
                                 <td>
                                     <?php if ($model['isDefault']): ?>
-                                        <span class="badge badge--success"><?php p($l->t('Yes')); ?></span>
+                                        <span class="badge badge--success"><?php p($l->t('Ja')); ?></span>
                                     <?php else: ?>
-                                        <span class="badge"><?php p($l->t('No')); ?></span>
+                                        <span class="badge"><?php p($l->t('Nein')); ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>

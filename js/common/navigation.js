@@ -60,6 +60,22 @@
                 });
             });
 
+            // Admin submenu toggle (Verwaltung)
+            const adminToggle = this.menuNav.querySelector('.nav-parent-toggle');
+            const adminSubmenu = this.menuNav.querySelector('#admin-subnav');
+            if (adminToggle && adminSubmenu) {
+                adminToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isExpanded = adminToggle.getAttribute('aria-expanded') === 'true';
+                    adminToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+                    if (isExpanded) {
+                        adminSubmenu.setAttribute('hidden', '');
+                    } else {
+                        adminSubmenu.removeAttribute('hidden');
+                    }
+                });
+            }
+
             // Close menu on Escape key
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && this.isMobileMenuOpen) {
@@ -112,7 +128,7 @@
          * Setup keyboard navigation
          */
         setupKeyboardNavigation() {
-            const navLinks = this.menuNav.querySelectorAll('a');
+            const navLinks = this.menuNav.querySelectorAll('a, .nav-parent-toggle');
             
             navLinks.forEach((link, index) => {
                 link.addEventListener('keydown', (e) => {

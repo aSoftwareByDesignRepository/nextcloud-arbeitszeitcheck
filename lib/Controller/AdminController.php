@@ -16,11 +16,14 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\Team;
 use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Db\HolidayMapper;
+use OCA\ArbeitszeitCheck\Db\Holiday;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -33,6 +36,7 @@ use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\IURLGenerator;
 use OCP\IL10N;
 use OCP\Util;
 
@@ -51,10 +55,13 @@ class AdminController extends Controller
 	private IUserManager $userManager;
 	private IAppConfig $appConfig;
 	private IL10N $l10n;
+	private UserSettingsMapper $userSettingsMapper;
 	private TeamMapper $teamMapper;
 	private TeamMemberMapper $teamMemberMapper;
 	private TeamManagerMapper $teamManagerMapper;
 	private IUserSession $userSession;
+	private IURLGenerator $urlGenerator;
+	private HolidayMapper $holidayMapper;
 
 	public function __construct(
 		string $appName,
@@ -66,12 +73,15 @@ class AdminController extends Controller
 		AuditLogMapper $auditLogMapper,
 		IUserManager $userManager,
 		IAppConfig $appConfig,
+		UserSettingsMapper $userSettingsMapper,
 		TeamMapper $teamMapper,
 		TeamMemberMapper $teamMemberMapper,
 		TeamManagerMapper $teamManagerMapper,
 		IUserSession $userSession,
 		CSPService $cspService,
-		IL10N $l10n
+		IL10N $l10n,
+		IURLGenerator $urlGenerator,
+		HolidayMapper $holidayMapper
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -81,11 +91,14 @@ class AdminController extends Controller
 		$this->auditLogMapper = $auditLogMapper;
 		$this->userManager = $userManager;
 		$this->appConfig = $appConfig;
+		$this->userSettingsMapper = $userSettingsMapper;
 		$this->teamMapper = $teamMapper;
 		$this->teamMemberMapper = $teamMemberMapper;
 		$this->teamManagerMapper = $teamManagerMapper;
 		$this->userSession = $userSession;
 		$this->l10n = $l10n;
+		$this->urlGenerator = $urlGenerator;
+		$this->holidayMapper = $holidayMapper;
 		$this->setCspService($cspService);
 	}
 
@@ -348,6 +361,7 @@ class AdminController extends Controller
 			'requireSubstituteTypes' => $requireSubstituteTypes,
 			'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 			'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
+			'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
 			'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', '10'),
 			'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', '11'),
 			'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
@@ -360,6 +374,492 @@ class AdminController extends Controller
 			'l' => $this->l10n,
 		]);
 		return $this->configureCSP($response, 'admin');
+	}
+
+	/**
+	 * Admin holidays / calendars page (admin-only by default)
+	 *
+	 * Dedicated UI to explain and manage holiday calendars per state.
+	 */
+	#[NoCSRFRequired]
+	public function holidays(): TemplateResponse
+	{
+		// One-time legacy migration: import old company_holidays JSON into at_holidays
+		$this->migrateLegacyCompanyHolidaysIfNeeded();
+
+		Util::addTranslations('arbeitszeitcheck');
+
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
+		Util::addStyle('arbeitszeitcheck', 'common/base');
+		Util::addStyle('arbeitszeitcheck', 'common/components');
+		Util::addStyle('arbeitszeitcheck', 'common/layout');
+		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
+		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		Util::addStyle('arbeitszeitcheck', 'admin-holidays');
+
+		Util::addScript('arbeitszeitcheck', 'common/utils');
+		Util::addScript('arbeitszeitcheck', 'common/datepicker');
+		Util::addScript('arbeitszeitcheck', 'common/components');
+		Util::addScript('arbeitszeitcheck', 'common/messaging');
+		Util::addScript('arbeitszeitcheck', 'admin-holidays');
+
+		$defaultState = $this->appConfig->getAppValueString('german_state', 'NW');
+
+		$urlGenerator = $this->urlGenerator;
+
+		$response = new TemplateResponse('arbeitszeitcheck', 'admin-holidays', [
+			'defaultState' => $defaultState,
+			'urlGenerator' => $urlGenerator,
+			'l' => $this->l10n,
+		]);
+
+		return $this->configureCSP($response, 'admin');
+	}
+
+	/**
+	 * Get additional company holidays configuration (legacy, app-wide list).
+	 *
+	 * New code should use getStateHolidays() which is backed by at_holidays.
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function getCompanyHolidays(): JSONResponse
+	{
+		try {
+			$json = $this->appConfig->getAppValueString('company_holidays', '[]');
+			$items = json_decode($json, true);
+			if (!is_array($items)) {
+				$items = [];
+			}
+
+			// Normalize items
+			$holidays = [];
+			foreach ($items as $item) {
+				if (!is_array($item)) {
+					continue;
+				}
+				$date = isset($item['date']) ? (string)$item['date'] : '';
+				$name = isset($item['name']) ? (string)$item['name'] : '';
+				if ($date === '' || $name === '') {
+					continue;
+				}
+				$holidays[] = [
+					'date' => $date,
+					'name' => $name,
+					'scope' => isset($item['scope']) ? (string)$item['scope'] : '',
+					'kind' => isset($item['kind']) && $item['kind'] === 'half' ? 'half' : 'full',
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'holidays' => $holidays,
+			]);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Create or update a single company holiday entry (identified by date).
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function saveCompanyHoliday(): JSONResponse
+	{
+		try {
+			$params = $this->request->getParams();
+			$date = isset($params['date']) ? trim((string)$params['date']) : '';
+			$name = isset($params['name']) ? trim((string)$params['name']) : '';
+			$scope = isset($params['scope']) ? trim((string)$params['scope']) : '';
+			$kind = isset($params['kind']) && (string)$params['kind'] === 'half' ? 'half' : 'full';
+
+			if ($date === '' || $name === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Date and name are required for a holiday'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			// Basic date validation (ISO yyyy-mm-dd)
+			try {
+				$d = new \DateTime($date);
+				// Normalize format
+				$date = $d->format('Y-m-d');
+			} catch (\Throwable $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date format. Expected yyyy-mm-dd.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			// Load existing entries
+			$json = $this->appConfig->getAppValueString('company_holidays', '[]');
+			$items = json_decode($json, true);
+			if (!is_array($items)) {
+				$items = [];
+			}
+
+			// Upsert by date
+			$found = false;
+			foreach ($items as &$item) {
+				if (isset($item['date']) && (string)$item['date'] === $date) {
+					$item['name'] = $name;
+					$item['scope'] = $scope;
+					$item['kind'] = $kind;
+					$found = true;
+					break;
+				}
+			}
+			unset($item);
+
+			if (!$found) {
+				$items[] = [
+					'date' => $date,
+					'name' => $name,
+					'scope' => $scope,
+					'kind' => $kind,
+				];
+			}
+
+			$this->appConfig->setAppValueString('company_holidays', json_encode($items));
+
+			return new JSONResponse([
+				'success' => true,
+			]);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Delete a company holiday identified by date.
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function deleteCompanyHoliday(): JSONResponse
+	{
+		try {
+			$date = isset($this->request->getParams()['date']) ? trim((string)$this->request->getParams()['date']) : '';
+			if ($date === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Date is required to delete a holiday'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$json = $this->appConfig->getAppValueString('company_holidays', '[]');
+			$items = json_decode($json, true);
+			if (!is_array($items)) {
+				$items = [];
+			}
+
+			$newItems = [];
+			foreach ($items as $item) {
+				if (!is_array($item) || !isset($item['date']) || (string)$item['date'] !== $date) {
+					$newItems[] = $item;
+				}
+			}
+
+			$this->appConfig->setAppValueString('company_holidays', json_encode($newItems));
+
+			return new JSONResponse([
+				'success' => true,
+			]);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Get holidays for a given state and year (backed by at_holidays).
+	 *
+	 * @param string $state
+	 * @param int $year
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function getStateHolidays(string $state, int $year): JSONResponse
+	{
+		try {
+			$this->migrateLegacyCompanyHolidaysIfNeeded();
+
+			$state = strtoupper(trim($state));
+			if ($state === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('State is required'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($year < 1970 || $year > 2100) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid year'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$start = new \DateTime(sprintf('%04d-01-01', $year));
+			$end = new \DateTime(sprintf('%04d-12-31', $year));
+			$holidays = $this->holidayMapper->findByStateAndYear($state, $year);
+
+			$data = [];
+			foreach ($holidays as $holiday) {
+				$date = $holiday->getDate();
+				$data[] = [
+					'id' => $holiday->getId(),
+					'state' => $holiday->getState(),
+					'date' => $date ? $date->format('Y-m-d') : null,
+					'name' => $holiday->getName(),
+					'kind' => $holiday->getKind(),
+					'scope' => $holiday->getScope(),
+					'source' => $holiday->getSource(),
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'state' => $state,
+				'year' => $year,
+				'holidays' => $data,
+				'period' => [
+					'start' => $start->format('Y-m-d'),
+					'end' => $end->format('Y-m-d'),
+				],
+			]);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Create or update a state holiday (backed by at_holidays).
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function saveStateHoliday(): JSONResponse
+	{
+		try {
+			$this->migrateLegacyCompanyHolidaysIfNeeded();
+
+			$params = $this->request->getParams();
+			$id = isset($params['id']) ? (int)$params['id'] : 0;
+			$state = isset($params['state']) ? strtoupper(trim((string)$params['state'])) : '';
+			$date = isset($params['date']) ? trim((string)$params['date']) : '';
+			$name = isset($params['name']) ? trim((string)$params['name']) : '';
+			$kind = isset($params['kind']) && (string)$params['kind'] === Holiday::KIND_HALF ? Holiday::KIND_HALF : Holiday::KIND_FULL;
+			$scope = isset($params['scope']) ? trim((string)$params['scope']) : Holiday::SCOPE_COMPANY;
+
+			if ($state === '' || $date === '' || $name === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('State, date, and name are required for a holiday'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			try {
+				$dateObj = new \DateTime($date);
+				$dateObj->setTime(0, 0, 0);
+			} catch (\Throwable $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date format. Expected yyyy-mm-dd.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			if (!in_array($scope, [Holiday::SCOPE_STATUTORY, Holiday::SCOPE_COMPANY, Holiday::SCOPE_CUSTOM], true)) {
+				$scope = Holiday::SCOPE_COMPANY;
+			}
+
+			$holiday = new Holiday();
+			if ($id > 0) {
+				$holiday->setId($id);
+			}
+			if ($holiday->getCreatedAt() === null) {
+				$holiday->setCreatedAt(new \DateTime());
+			}
+
+			$holiday->setState($state);
+			$holiday->setDate($dateObj);
+			$holiday->setName($name);
+			$holiday->setKind($kind);
+			$holiday->setScope($scope);
+			$holiday->setSource(Holiday::SOURCE_MANUAL);
+			$holiday->setUpdatedAt(new \DateTime());
+
+			if (!$holiday->isValid()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Holiday definition is invalid'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			if ($id > 0) {
+				$holiday = $this->holidayMapper->update($holiday);
+			} else {
+				$holiday = $this->holidayMapper->insert($holiday);
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'holiday' => [
+					'id' => $holiday->getId(),
+					'state' => $holiday->getState(),
+					'date' => $holiday->getDate() ? $holiday->getDate()->format('Y-m-d') : null,
+					'name' => $holiday->getName(),
+					'kind' => $holiday->getKind(),
+					'scope' => $holiday->getScope(),
+					'source' => $holiday->getSource(),
+				],
+			]);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Delete a state holiday by ID (backed by at_holidays).
+	 *
+	 * @param int $id
+	 * @return JSONResponse
+	 */
+	#[NoCSRFRequired]
+	public function deleteStateHoliday(int $id): JSONResponse
+	{
+		try {
+			if ($id <= 0) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid holiday ID'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$this->holidayMapper->deleteById($id);
+
+			return new JSONResponse([
+				'success' => true,
+			]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Holiday not found'),
+			], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * One-time migration of legacy app config "company_holidays" into at_holidays.
+	 * After successful migration a flag "company_holidays_migrated" is set so this
+	 * method becomes a cheap no-op.
+	 */
+	private function migrateLegacyCompanyHolidaysIfNeeded(): void
+	{
+		try {
+			$alreadyMigrated = $this->appConfig->getAppValueString('company_holidays_migrated', '0') === '1';
+			if ($alreadyMigrated) {
+				return;
+			}
+
+			$json = $this->appConfig->getAppValueString('company_holidays', '[]');
+			$items = json_decode($json, true);
+			if (!is_array($items) || $items === []) {
+				$this->appConfig->setAppValueString('company_holidays_migrated', '1');
+				return;
+			}
+
+			$states = [
+				'BW', 'BY', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV',
+				'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH',
+			];
+
+			$now = new \DateTime();
+
+			foreach ($items as $item) {
+				if (!is_array($item)) {
+					continue;
+				}
+				$dateStr = isset($item['date']) ? (string)$item['date'] : '';
+				$name = isset($item['name']) ? trim((string)$item['name']) : '';
+				if ($dateStr === '' || $name === '') {
+					continue;
+				}
+				$kind = (isset($item['kind']) && (string)$item['kind'] === 'half') ? Holiday::KIND_HALF : Holiday::KIND_FULL;
+
+				try {
+					$date = new \DateTime($dateStr);
+					$date->setTime(0, 0, 0);
+				} catch (\Throwable) {
+					continue;
+				}
+
+				foreach ($states as $state) {
+					$existing = $this->holidayMapper->findByStateAndRange($state, $date, $date);
+					$duplicate = false;
+					foreach ($existing as $existingHoliday) {
+						if ($existingHoliday->getScope() === Holiday::SCOPE_COMPANY
+							&& $existingHoliday->getName() === $name) {
+							$duplicate = true;
+							break;
+						}
+					}
+					if ($duplicate) {
+						continue;
+					}
+
+					$holiday = new Holiday();
+					$holiday->setState($state);
+					$holiday->setDate(clone $date);
+					$holiday->setName($name);
+					$holiday->setKind($kind);
+					$holiday->setScope(Holiday::SCOPE_COMPANY);
+					$holiday->setSource(Holiday::SOURCE_MANUAL);
+					$holiday->setCreatedAt(clone $now);
+					$holiday->setUpdatedAt(clone $now);
+
+					if (!$holiday->isValid()) {
+						continue;
+					}
+
+					try {
+						$this->holidayMapper->insert($holiday);
+					} catch (\Throwable) {
+						// ignore individual insert errors, continue with others
+					}
+				}
+			}
+
+			$this->appConfig->setAppValueString('company_holidays_migrated', '1');
+		} catch (\Throwable) {
+			// Never break admin UI because of a failed migration; it can be retried later.
+		}
 	}
 
 	/**
@@ -501,6 +1001,7 @@ class AdminController extends Controller
 				'requireSubstituteTypes' => $requireSubstituteTypes,
 				'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 				'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
+				'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
 				'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', '10'),
 				'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', '11'),
 				'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
@@ -541,6 +1042,7 @@ class AdminController extends Controller
 				'requireSubstituteTypes' => 'require_substitute_types',
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
+				'sendIcalToManagers' => 'send_ical_to_managers',
 				'maxDailyHours' => 'max_daily_hours',
 				'minRestPeriod' => 'min_rest_period',
 				'germanState' => 'german_state',
@@ -787,6 +1289,11 @@ class AdminController extends Controller
 			// Get all available working time models
 			$allModels = $this->workingTimeModelMapper->findAll();
 
+			// Resolve Bundesland / holiday calendar for this user:
+			// per-user setting (german_state) falls back to global default.
+			$defaultState = $this->appConfig->getAppValueString('german_state', 'NW');
+			$userGermanState = $this->userSettingsMapper->getStringSetting($userId, 'german_state', $defaultState);
+
 			$startDate = $currentModel ? $currentModel->getStartDate() : null;
 			$endDate = $currentModel ? $currentModel->getEndDate() : null;
 
@@ -807,6 +1314,7 @@ class AdminController extends Controller
 					'vacationDaysPerYear' => $currentModel ? $currentModel->getVacationDaysPerYear() : null,
 					'workingTimeModelStartDate' => $startDate ? $startDate->format('Y-m-d') : null,
 					'workingTimeModelEndDate' => $endDate ? $endDate->format('Y-m-d') : null,
+					'germanState' => $userGermanState,
 					'userWorkingTimeModel' => $currentModel ? $currentModel->getSummary() : null,
 					'availableWorkingTimeModels' => array_map(function ($model) {
 						return [
@@ -845,6 +1353,7 @@ class AdminController extends Controller
 			$vacationDaysPerYear = isset($params['vacationDaysPerYear']) ? (int)$params['vacationDaysPerYear'] : null;
 			$startDate = $params['startDate'] ?? null;
 			$endDate = $params['endDate'] ?? null;
+			$germanState = isset($params['germanState']) ? (string)$params['germanState'] : null;
 
 			if ($vacationDaysPerYear !== null && ($vacationDaysPerYear < 0 || $vacationDaysPerYear > 366)) {
 				return new JSONResponse([
@@ -876,6 +1385,17 @@ class AdminController extends Controller
 					return new JSONResponse([
 						'success' => false,
 						'error' => $this->l10n->t('Validation failed. Please check your input.')
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+
+			// Validate germanState if provided (optional; empty string means "use global default")
+			if ($germanState !== null && $germanState !== '') {
+				$validStates = ['NW', 'BY', 'BW', 'HE', 'NI', 'RP', 'SL', 'BE', 'BB', 'HB', 'HH', 'MV', 'SN', 'ST', 'SH', 'TH'];
+				if (!in_array($germanState, $validStates, true)) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid German state code')
 					], Http::STATUS_BAD_REQUEST);
 				}
 			}
@@ -982,6 +1502,16 @@ class AdminController extends Controller
 					'success' => false,
 					'error' => $this->l10n->t('Working time model ID is required')
 				], Http::STATUS_BAD_REQUEST);
+			}
+
+			// Persist per-user Bundesland / holiday calendar selection.
+			// Empty string clears the user-specific setting and falls back to global default.
+			if ($germanState !== null) {
+				if ($germanState === '') {
+					$this->userSettingsMapper->deleteSetting($userId, 'german_state');
+				} else {
+					$this->userSettingsMapper->setSetting($userId, 'german_state', $germanState);
+				}
 			}
 
 			return new JSONResponse([

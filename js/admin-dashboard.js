@@ -68,7 +68,8 @@
             },
             onError: function(_error) {
                 if (Messaging && Messaging.showError) {
-                    Messaging.showError('Failed to refresh statistics. Please try again.');
+                    const msg = (window.t && window.t('arbeitszeitcheck', 'An error occurred')) || 'An error occurred';
+                    Messaging.showError(msg);
                 }
             }
         });

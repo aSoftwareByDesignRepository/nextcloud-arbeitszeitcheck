@@ -110,16 +110,28 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
             <!-- Calendar Legend -->
             <div class="calendar-legend" aria-labelledby="calendar-legend-heading">
                 <h4 id="calendar-legend-heading"><?php p($l->t('Legend')); ?></h4>
-                <div class="legend-items">
-                    <div class="legend-item">
+                <div class="legend-items" role="list">
+                    <div class="legend-item" role="listitem">
                         <span class="legend-color legend-color--entry" aria-hidden="true"></span>
                         <span class="legend-label"><?php p($l->t('Day with time entries')); ?></span>
                     </div>
-                    <div class="legend-item">
+                    <div class="legend-item" role="listitem">
                         <span class="legend-color legend-color--absence" aria-hidden="true"></span>
                         <span class="legend-label"><?php p($l->t('Day with absence')); ?></span>
                     </div>
-                    <div class="legend-item">
+                    <div class="legend-item" role="listitem">
+                        <span class="legend-color legend-color--holiday" aria-hidden="true"></span>
+                        <span class="legend-label">
+                            <?php p($l->t('Public holiday (statutory)')); ?>
+                        </span>
+                    </div>
+                    <div class="legend-item" role="listitem">
+                        <span class="legend-color legend-color--company-holiday" aria-hidden="true"></span>
+                        <span class="legend-label">
+                            <?php p($l->t('Company holiday')); ?>
+                        </span>
+                    </div>
+                    <div class="legend-item" role="listitem">
                         <span class="legend-color legend-color--today" aria-hidden="true"></span>
                         <span class="legend-label"><?php p($l->t('Today')); ?></span>
                     </div>
@@ -176,6 +188,7 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
     
     window.ArbeitszeitCheck.apiUrl = {
         calendar: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        absences: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        absences: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        holidays: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.holiday.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };
 </script>

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Db;
 
 use OCP\AppFramework\Db\Entity;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 
 /**
  * Absence entity
@@ -123,116 +124,23 @@ class Absence extends Entity
 	}
 
 	/**
-	 * Calculate the number of working days for this absence
-	 * Excludes weekends and German public holidays
+	 * Calculate the number of working days for this absence.
+	 *
+	 * NOTE:
+	 * - For newly created/updated absences the precise value (inkl. Firmenfeiertage
+	 *   und halber Feiertage) wird im Service gesetzt und als Feld `days`
+	 *   gespeichert.
+	 * - Diese Methode dient vor allem als Fallback, falls `days` (noch) nicht
+	 *   gesetzt ist (Altbestände).
 	 *
 	 * @return float
 	 */
 	public function calculateWorkingDays(): float
 	{
-		$start = clone $this->startDate;
-		$end = clone $this->endDate;
-		$workingDays = 0;
-
-		$startYear = (int)$start->format('Y');
-		$endYear = (int)$end->format('Y');
-		$germanHolidays = $this->getGermanPublicHolidays($startYear);
-		if ($endYear !== $startYear) {
-			$germanHolidays = array_merge($germanHolidays, $this->getGermanPublicHolidays($endYear));
+		if ($this->days !== null) {
+			return (float)$this->days;
 		}
-
-		while ($start <= $end) {
-			// Skip weekends (1=Mon .. 5=Fri, 6=Sat, 7=Sun)
-			if ($start->format('N') < 6) {
-				$dateString = $start->format('Y-m-d');
-				if (!isset($germanHolidays[$dateString])) {
-					$workingDays++;
-				}
-			}
-			$start->modify('+1 day');
-		}
-
-		return (float)$workingDays;
-	}
-
-	/**
-	 * Get German public holidays for a given year.
-	 * Uses PHP easter_days() for movable feasts (Easter-based).
-	 *
-	 * @param int $year
-	 * @return array<string, string> date string (Y-m-d) => name
-	 */
-	private function getGermanPublicHolidays(int $year): array
-	{
-		$holidays = [];
-
-		// New Year's Day
-		$holidays[$year . '-01-01'] = 'New Year\'s Day';
-
-		// Easter-based: PHP easter_days($year) = days after March 21 (use \ for global)
-		$easterDays = function_exists('easter_days') ? \easter_days($year) : $this->easterDaysGauss($year);
-		$march21 = new \DateTime($year . '-03-21');
-		$easter = clone $march21;
-		$easter->modify('+' . $easterDays . ' days');
-
-		$easter->modify('-2 days');
-		$holidays[$easter->format('Y-m-d')] = 'Good Friday';
-		$easter->modify('+3 days'); // Easter Monday
-		$holidays[$easter->format('Y-m-d')] = 'Easter Monday';
-		$easter->modify('+38 days'); // Ascension (39 days after Easter Sunday)
-		$holidays[$easter->format('Y-m-d')] = 'Ascension Day';
-		$easter->modify('+11 days'); // Whit Monday
-		$holidays[$easter->format('Y-m-d')] = 'Whit Monday';
-		$easter->modify('+10 days'); // Corpus Christi (Thursday after Trinity)
-		$holidays[$easter->format('Y-m-d')] = 'Corpus Christi';
-
-		// Labour Day
-		$holidays[$year . '-05-01'] = 'Labour Day';
-
-		// German Unity Day
-		$holidays[$year . '-10-03'] = 'German Unity Day';
-
-		// Reformation Day
-		$holidays[$year . '-10-31'] = 'Reformation Day';
-
-		// All Saints' Day
-		$holidays[$year . '-11-01'] = 'All Saints\' Day';
-
-		// Christmas
-		$holidays[$year . '-12-25'] = 'Christmas Day';
-		$holidays[$year . '-12-26'] = 'Second Christmas Day';
-
-		return $holidays;
-	}
-
-	/**
-	 * Gauss algorithm: days after March 21 for Easter (fallback when easter_days extension not loaded)
-	 *
-	 * @param int $year
-	 * @return int
-	 */
-	private function easterDaysGauss(int $year): int
-	{
-		$a = $year % 19;
-		$b = (int)($year / 100);
-		$c = $year % 100;
-		$d = (int)($b / 4);
-		$e = $b % 4;
-		$f = (int)(($b + 8) / 25);
-		$g = (int)(($b - $f + 1) / 3);
-		$h = (19 * $a + $b - $d - $g + 15) % 30;
-		$i = (int)($c / 4);
-		$k = $c % 4;
-		$l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
-		$m = (int)(($a + 11 * $h + 22 * $l) / 451);
-		$month = (int)(($h + $l - 7 * $m + 114) / 31);
-		$day = (($h + $l - 7 * $m + 114) % 31) + 1;
-
-		$march21 = new \DateTime($year . '-03-21');
-		$easterDate = new \DateTime("$year-$month-$day");
-		$diff = $march21->diff($easterDate);
-
-		return (int)$diff->days;
+		return HolidayService::computeWorkingDays($this->startDate, $this->endDate);
 	}
 
 	/**

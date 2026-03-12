@@ -26,9 +26,10 @@ class LoadSidebarScripts implements IEventListener
 	 */
 	public function handle(Event $event): void
 	{
-		// Load scripts and styles when the sidebar is loaded
-		// Note: Cannot use Util::addScript for ES modules in NC32
-		// Script must be loaded in template with type="module"
+		// Load app-wide styles whenever the ArbeitszeitCheck sidebar is present.
+		// This ensures consistent navigation styling across all views, including
+		// user dashboard, manager and admin pages.
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
 	}
 }

@@ -29,6 +29,7 @@ class ReportingService
 	private OvertimeService $overtimeService;
 	private IUserManager $userManager;
 	private IL10N $l10n;
+	private HolidayCalendarService $holidayCalendarService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -36,7 +37,8 @@ class ReportingService
 		ComplianceViolationMapper $violationMapper,
 		OvertimeService $overtimeService,
 		IUserManager $userManager,
-		IL10N $l10n
+		IL10N $l10n,
+		HolidayCalendarService $holidayCalendarService
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->absenceMapper = $absenceMapper;
@@ -44,6 +46,7 @@ class ReportingService
 		$this->overtimeService = $overtimeService;
 		$this->userManager = $userManager;
 		$this->l10n = $l10n;
+		$this->holidayCalendarService = $holidayCalendarService;
 	}
 
 	/**
@@ -276,6 +279,10 @@ class ReportingService
 			'total_overtime' => 0.0,
 			'violations_count' => 0,
 			'working_days' => $this->countWorkingDays($start, $end),
+			'holiday_summary' => [
+				'holiday_days' => 0,
+				'holiday_work_hours' => 0.0,
+			],
 			'users' => []
 		];
 
@@ -293,6 +300,8 @@ class ReportingService
 					}
 				}
 
+				$holidaySummary = $this->calculateHolidaySummaryForUser($userId, $start, $end, $entries);
+
 				$report['total_users'] = 1;
 				$report['active_users'] = !empty($entries) ? 1 : 0;
 				$report['total_hours'] = $overtimeData['total_hours_worked'];
@@ -300,6 +309,7 @@ class ReportingService
 				$report['total_overtime'] = $overtimeData['overtime_hours'];
 				$report['violations_count'] = count($violations);
 				$report['average_hours_per_user'] = $overtimeData['total_hours_worked'];
+				$report['holiday_summary'] = $holidaySummary;
 			}
 		} else {
 			$userIds = [];
@@ -316,6 +326,9 @@ class ReportingService
 			$totalOvertime = 0.0;
 			$totalViolations = 0;
 
+			$totalHolidayDays = 0;
+			$totalHolidayWorkHours = 0.0;
+
 			foreach ($userIds as $uid) {
 				$overtimeData = $this->overtimeService->calculateOvertime($uid, $start, $end);
 				$entries = $this->timeEntryMapper->findByUserAndDateRange($uid, $start, $end);
@@ -326,6 +339,9 @@ class ReportingService
 					$totalHours += $overtimeData['total_hours_worked'];
 					$totalOvertime += $overtimeData['overtime_hours'];
 					$totalViolations += count($violations);
+					$holidaySummary = $this->calculateHolidaySummaryForUser($uid, $start, $end, $entries);
+					$totalHolidayDays += $holidaySummary['holiday_days'];
+					$totalHolidayWorkHours += $holidaySummary['holiday_work_hours'];
 
 					foreach ($entries as $entry) {
 						if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED) {
@@ -349,6 +365,10 @@ class ReportingService
 			$report['total_overtime'] = round($totalOvertime, 2);
 			$report['violations_count'] = $totalViolations;
 			$report['average_hours_per_user'] = $activeCount > 0 ? round($totalHours / $activeCount, 2) : 0.0;
+			$report['holiday_summary'] = [
+				'holiday_days' => $totalHolidayDays,
+				'holiday_work_hours' => round($totalHolidayWorkHours, 2),
+			];
 		}
 
 		return $report;
@@ -671,6 +691,53 @@ class ReportingService
 		}
 
 		return $workingDays;
+	}
+
+	/**
+	 * Calculate holiday days and hours worked on holidays for a given user and period.
+	 *
+	 * @param string $userId
+	 * @param \DateTime $start
+	 * @param \DateTime $end
+	 * @param TimeEntry[] $entries
+	 * @return array{holiday_days:int,holiday_work_hours:float}
+	 */
+	private function calculateHolidaySummaryForUser(string $userId, \DateTime $start, \DateTime $end, array $entries): array
+	{
+		$holidayDays = 0;
+		$holidayWorkHours = 0.0;
+
+		$cursor = (clone $start)->setTime(0, 0, 0);
+		$endDay = (clone $end)->setTime(0, 0, 0);
+
+		while ($cursor <= $endDay) {
+			if ($this->holidayCalendarService->isHolidayForUser($userId, $cursor)) {
+				$holidayDays++;
+			}
+			$cursor->modify('+1 day');
+		}
+
+		foreach ($entries as $entry) {
+			if ($entry->getStatus() !== TimeEntry::STATUS_COMPLETED || $entry->getEndTime() === null) {
+				continue;
+			}
+			$startTime = $entry->getStartTime();
+			if ($startTime === null) {
+				continue;
+			}
+			$entryDate = (clone $startTime)->setTime(0, 0, 0);
+			if ($this->holidayCalendarService->isHolidayForUser($userId, $entryDate)) {
+				$hours = $entry->getWorkingDurationHours();
+				if ($hours !== null) {
+					$holidayWorkHours += $hours;
+				}
+			}
+		}
+
+		return [
+			'holiday_days' => $holidayDays,
+			'holiday_work_hours' => $holidayWorkHours,
+		];
 	}
 
 	/**

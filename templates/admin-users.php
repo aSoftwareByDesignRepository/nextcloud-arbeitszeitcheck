@@ -130,6 +130,35 @@ $total = $_['total'] ?? 0;
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
 
+<?php
+// Prepare holiday / Bundesland states for use in the edit-user modal
+$holidayStates = [
+    'BW' => 'Baden‑Württemberg',
+    'BY' => 'Bayern',
+    'BE' => 'Berlin',
+    'BB' => 'Brandenburg',
+    'HB' => 'Bremen',
+    'HH' => 'Hamburg',
+    'HE' => 'Hessen',
+    'MV' => 'Mecklenburg‑Vorpommern',
+    'NI' => 'Niedersachsen',
+    'NW' => 'Nordrhein‑Westfalen',
+    'RP' => 'Rheinland‑Pfalz',
+    'SL' => 'Saarland',
+    'SN' => 'Sachsen',
+    'ST' => 'Sachsen‑Anhalt',
+    'SH' => 'Schleswig‑Holstein',
+    'TH' => 'Thüringen',
+];
+$holidayStatesForJs = [];
+foreach ($holidayStates as $code => $name) {
+    $holidayStatesForJs[] = [
+        'code' => $code,
+        'label' => $l->t($name),
+    ];
+}
+?>
+
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
@@ -165,4 +194,8 @@ $total = $_['total'] ?? 0;
     window.ArbeitszeitCheck.l10n.validFrom = <?php echo json_encode($l->t('Valid from'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.validTo = <?php echo json_encode($l->t('Valid to'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.status = <?php echo json_encode($l->t('Status'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.germanStateLabel = <?php echo json_encode($l->t('Bundesland für Feiertage / Kalender'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.germanStateHelp = <?php echo json_encode($l->t('Wählen Sie das Bundesland, dessen Feiertagskalender für diese Person gelten soll. Ohne Auswahl wird das globale Standard-Bundesland verwendet.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.germanStateDefault = <?php echo json_encode($l->t('Globales Standard-Bundesland verwenden'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.states = <?php echo json_encode($holidayStatesForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>

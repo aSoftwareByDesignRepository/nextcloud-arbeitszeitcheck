@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Listener\UserDeletedListener;
 use OCA\ArbeitszeitCheck\Notification\Notifier;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
@@ -97,6 +98,18 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\HolidayMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\HolidayMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
 		$context->registerService(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper(
 				$c->query(IDBConnection::class)
@@ -160,6 +173,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(\OCP\IUserManager::class),
+				$c->query(TeamResolverService::class),
 				$c->query(\Psr\Log\LoggerInterface::class)
 			);
 		});
@@ -175,7 +189,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(NotificationService::class),
-				$c->query(AbsenceIcalMailService::class)
+				$c->query(AbsenceIcalMailService::class),
+				$c->query(HolidayCalendarService::class)
 			);
 		});
 
@@ -187,7 +202,19 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
-				$c->query(NotificationService::class)
+				$c->query(NotificationService::class),
+				$c->query(HolidayCalendarService::class),
+				$c->query(\OCP\IConfig::class)
+			);
+		});
+
+		$context->registerService(HolidayCalendarService::class, function($c) {
+			return new HolidayCalendarService(
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\ICacheFactory::class),
+				$c->query(\Psr\Log\LoggerInterface::class)
 			);
 		});
 
@@ -205,7 +232,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
-				$c->query(\OCP\IL10N::class)
+				$c->query(\OCP\IL10N::class),
+				$c->query(HolidayCalendarService::class)
 			);
 		});
 
@@ -224,7 +252,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper::class),
 				$c->query(OvertimeService::class),
 				$c->query(\OCP\IUserManager::class),
-				$c->query(\OCP\IL10N::class)
+				$c->query(\OCP\IL10N::class),
+				$c->query(HolidayCalendarService::class)
 			);
 		});
 

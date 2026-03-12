@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCP\AppFramework\Controller;
 use OCP\IConfig;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -48,6 +49,7 @@ class TimeEntryController extends Controller
 	private IConfig $config;
 	private TimeTrackingService $timeTrackingService;
 	private TeamResolverService $teamResolver;
+	private NotificationService $notificationService;
 
 	public function __construct(
 		string $appName,
@@ -62,7 +64,8 @@ class TimeEntryController extends Controller
 		CSPService $cspService,
 		ComplianceService $complianceService,
 		TimeTrackingService $timeTrackingService,
-		TeamResolverService $teamResolver
+		TeamResolverService $teamResolver,
+		NotificationService $notificationService
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -76,6 +79,7 @@ class TimeEntryController extends Controller
 		$this->complianceService = $complianceService;
 		$this->timeTrackingService = $timeTrackingService;
 		$this->teamResolver = $teamResolver;
+		$this->notificationService = $notificationService;
 	}
 
 	/**
@@ -1283,8 +1287,7 @@ class TimeEntryController extends Controller
 			$updatedEntry = $this->timeEntryMapper->update($entry);
 
 			// Create audit log
-			$auditLogMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
-			$auditLogMapper->logAction(
+			$this->auditLogMapper->logAction(
 				$userId,
 				'time_entry_correction_requested',
 				'time_entry',
@@ -1299,8 +1302,7 @@ class TimeEntryController extends Controller
 
 			// Send notification to manager (if manager exists)
 			try {
-				$notificationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\NotificationService::class);
-				$notificationService->notifyTimeEntryCorrectionRequested(
+				$this->notificationService->notifyTimeEntryCorrectionRequested(
 					$userId,
 					$updatedEntry->getSummary(),
 					$justification
@@ -1312,7 +1314,7 @@ class TimeEntryController extends Controller
 
 			// Auto-approve when employee has no manager (no colleagues in team/groups)
 			if (!$this->employeeHasManager($userId)) {
-				$updatedEntry = $this->autoApproveTimeEntryCorrection($updatedEntry, $auditLogMapper);
+				$updatedEntry = $this->autoApproveTimeEntryCorrection($updatedEntry, $this->auditLogMapper);
 				return new JSONResponse([
 					'success' => true,
 					'entry' => $updatedEntry->getSummary(),
@@ -1399,8 +1401,7 @@ class TimeEntryController extends Controller
 		);
 
 		try {
-			$notificationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\NotificationService::class);
-			$notificationService->notifyTimeEntryCorrectionApproved(
+			$this->notificationService->notifyTimeEntryCorrectionApproved(
 				$entry->getUserId(),
 				$updatedEntry->getSummary()
 			);

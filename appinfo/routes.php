@@ -79,6 +79,7 @@ return [
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
 		['name' => 'manager#getTeamCompliance', 'url' => '/api/manager/team-compliance', 'verb' => 'GET'],
 		['name' => 'manager#getTeamHoursSummary', 'url' => '/api/manager/team-hours', 'verb' => 'GET'],
+		['name' => 'manager#getManagedTeams', 'url' => '/api/manager/teams', 'verb' => 'GET'],
 		['name' => 'manager#approveAbsence', 'url' => '/api/manager/absences/{absenceId}/approve', 'verb' => 'POST'],
 		['name' => 'manager#rejectAbsence', 'url' => '/api/manager/absences/{absenceId}/reject', 'verb' => 'POST'],
 		['name' => 'manager#getTeamAbsenceCalendar', 'url' => '/api/manager/absence-calendar', 'verb' => 'GET'],
@@ -105,6 +106,9 @@ return [
 		['name' => 'compliance#getReport', 'url' => '/api/compliance/report', 'verb' => 'GET'],
 		['name' => 'compliance#runCheck', 'url' => '/api/compliance/run-check', 'verb' => 'POST'],
 
+		// Holiday routes
+		['name' => 'holiday#index', 'url' => '/api/holidays', 'verb' => 'GET'],
+
 		// Report routes
 		['name' => 'report#daily', 'url' => '/api/reports/daily', 'verb' => 'GET'],
 		['name' => 'report#weekly', 'url' => '/api/reports/weekly', 'verb' => 'GET'],
@@ -121,10 +125,19 @@ return [
 		['name' => 'admin#dashboard', 'url' => '/admin', 'verb' => 'GET'],
 		['name' => 'admin#users', 'url' => '/admin/users', 'verb' => 'GET'],
 		['name' => 'admin#settings', 'url' => '/admin/settings', 'verb' => 'GET'],
+		['name' => 'admin#holidays', 'url' => '/admin/holidays', 'verb' => 'GET'],
 		['name' => 'admin#workingTimeModels', 'url' => '/admin/working-time-models', 'verb' => 'GET'],
 		['name' => 'admin#auditLog', 'url' => '/admin/audit-log', 'verb' => 'GET'],
 		['name' => 'admin#getAdminSettings', 'url' => '/api/admin/settings', 'verb' => 'GET'],
 		['name' => 'admin#updateAdminSettings', 'url' => '/api/admin/settings', 'verb' => 'POST'],
+		// Legacy company_holidays JSON (kept for backward compatibility; new code should use state-holidays endpoints)
+		['name' => 'admin#getCompanyHolidays', 'url' => '/api/admin/holidays', 'verb' => 'GET'],
+		['name' => 'admin#saveCompanyHoliday', 'url' => '/api/admin/holidays', 'verb' => 'POST'],
+		['name' => 'admin#deleteCompanyHoliday', 'url' => '/api/admin/holidays', 'verb' => 'DELETE'],
+		// New state-based holidays API (backed by at_holidays via HolidayMapper)
+		['name' => 'admin#getStateHolidays', 'url' => '/api/admin/state-holidays', 'verb' => 'GET'],
+		['name' => 'admin#saveStateHoliday', 'url' => '/api/admin/state-holidays', 'verb' => 'POST'],
+		['name' => 'admin#deleteStateHoliday', 'url' => '/api/admin/state-holidays/{id}', 'verb' => 'DELETE'],
 		['name' => 'admin#getStatistics', 'url' => '/api/admin/statistics', 'verb' => 'GET'],
 		['name' => 'admin#getAuditLogs', 'url' => '/api/admin/audit-logs', 'verb' => 'GET'],
 		['name' => 'admin#getAuditLogStats', 'url' => '/api/admin/audit-logs/stats', 'verb' => 'GET'],

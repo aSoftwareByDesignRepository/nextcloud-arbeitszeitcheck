@@ -185,4 +185,53 @@ class TeamResolverService
 		$teamIds = $this->getTeamMemberIds($approverUserId);
 		return in_array($employeeUserId, $teamIds, true);
 	}
+
+	/**
+	 * Get manager (Vorgesetzte) user IDs for a given employee.
+	 * Only available when app-owned teams are enabled. For legacy group-based
+	 * setups this returns an empty list, because groups do not model explicit managers.
+	 *
+	 * @param string $employeeUserId
+	 * @return list<string>
+	 */
+	public function getManagerIdsForEmployee(string $employeeUserId): array
+	{
+		if (!$this->useAppTeams()) {
+			return [];
+		}
+
+		try {
+			$memberships = $this->teamMemberMapper->findByUserId($employeeUserId);
+			if (empty($memberships)) {
+				return [];
+			}
+
+			$teamIds = [];
+			foreach ($memberships as $membership) {
+				$teamIds[] = $membership->getTeamId();
+			}
+			if (empty($teamIds)) {
+				return [];
+			}
+
+			$managerIds = [];
+			foreach ($teamIds as $teamId) {
+				$managers = $this->teamManagerMapper->findByTeamId($teamId);
+				foreach ($managers as $manager) {
+					$uid = $manager->getUserId();
+					if ($uid !== $employeeUserId && !in_array($uid, $managerIds, true)) {
+						$managerIds[] = $uid;
+					}
+				}
+			}
+
+			return $managerIds;
+		} catch (\Throwable $e) {
+			$msg = $e->getMessage();
+			if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_team')) {
+				return [];
+			}
+			throw $e;
+		}
+	}
 }

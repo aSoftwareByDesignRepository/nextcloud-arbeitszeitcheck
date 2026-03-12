@@ -20,6 +20,7 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -356,7 +357,7 @@ class PageController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function reports(): TemplateResponse
+	public function reports(): TemplateResponse|RedirectResponse
 	{
 		Util::addTranslations('arbeitszeitcheck');
 
@@ -366,6 +367,14 @@ class PageController extends Controller
 			$canAccessReports = $this->permissionService->canAccessManagerDashboard($userId);
 			$isAdmin = $this->permissionService->isAdmin($userId);
 			$isManager = $canAccessReports && !$isAdmin;
+
+			// Hard security gate: only admins and users with manager capabilities may access the reports area.
+			// Everyone else is redirected back to the main dashboard so that the Reports page truly only exists
+			// for managers and administrators.
+			if (!$isAdmin && !$canAccessReports) {
+				$redirectUrl = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index');
+				return new RedirectResponse($redirectUrl);
+			}
 
 			// Get stats for sidebar
 			$timeEntryCount = $this->timeEntryMapper->countByUser($userId);

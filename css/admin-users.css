@@ -56,3 +56,63 @@
   border-bottom: none;
 }
 
+/* ===== EDIT USER MODAL – FORM USABILITY & THEME-SAFE SELECT ===== */
+
+/* Ensure the edit-user form is clearly structured and readable on all screens */
+#edit-user-modal .form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+#edit-user-modal .form-group {
+  margin-bottom: 0;
+}
+
+#edit-user-modal .form-label {
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+#edit-user-modal .form-help {
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+/* Strong, theme-independent colors for the work schedule dropdown */
+#edit-user-modal .form-select {
+  background-color: var(--color-main-background);
+  color: var(--color-main-text);
+  border-color: var(--color-border);
+}
+
+#edit-user-modal .form-select option {
+  background-color: var(--color-main-background);
+  color: var(--color-main-text);
+}
+
+/* In dark / high-contrast themes, rely on core Nextcloud variables */
+html[data-theme="dark"] #edit-user-modal .form-select,
+html[data-theme="dark"] #edit-user-modal .form-select option,
+body[data-theme-dark] #edit-user-modal .form-select,
+body[data-theme-dark] #edit-user-modal .form-select option,
+body[data-theme-dark-highcontrast] #edit-user-modal .form-select,
+body[data-theme-dark-highcontrast] #edit-user-modal .form-select option {
+  background-color: var(--color-main-background);
+  color: var(--color-main-text);
+}
+
+/* Make actions easy to hit and visually clear */
+#edit-user-modal .form-actions {
+  margin-top: var(--space-4, 1rem);
+  gap: var(--space-3, 0.75rem);
+}
+
+@media (max-width: 768px) {
+  #edit-user-modal .form-actions {
+    flex-direction: column;
+  }
+
+  #edit-user-modal .form-actions .btn {
+    width: 100%;
+  }
+}
+

@@ -23,21 +23,21 @@ $settings = $_['settings'] ?? [];
     <div id="app-content-wrapper">
         <div class="section">
             <div class="section-header">
-                <h2><?php p($l->t('Admin Settings')); ?></h2>
-                <p><?php p($l->t('Set up how time tracking works for everyone in your organization')); ?></p>
+                <h2><?php p($l->t('Einstellungen für ArbeitszeitCheck')); ?></h2>
+                <p><?php p($l->t('Hier legen Sie fest, wie die Zeiterfassung und die Prüfungen für alle Beschäftigten funktionieren.')); ?></p>
             </div>
 
             <?php if (isset($_['error']) && !empty($_['error'])): ?>
                 <div class="alert alert--error" role="alert" aria-live="polite">
                     <span class="alert-icon" aria-hidden="true">⚠️</span>
                     <div class="alert-content">
-                        <strong class="alert-title"><?php p($l->t('Something went wrong')); ?></strong>
+                        <strong class="alert-title"><?php p($l->t('Es ist ein Fehler aufgetreten')); ?></strong>
                         <p class="alert-message">
                             <?php 
                             // Make error message more helpful
                             $error = $_['error'];
                             if (strpos($error, 'Exception') !== false || strpos($error, 'Error') !== false || strpos($error, 'SQL') !== false) {
-                                p($l->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'));
+                                p($l->t('Bitte versuchen Sie es erneut. Wenn das Problem bleibt, wenden Sie sich an Ihre Administratorin oder Ihren Administrator.'));
                             } else {
                                 p($error);
                             }
@@ -53,11 +53,11 @@ $settings = $_['settings'] ?? [];
                         <input type="checkbox" id="autoComplianceCheck" name="autoComplianceCheck" 
                             <?php echo ($settings['autoComplianceCheck'] ?? true) ? 'checked' : ''; ?>>
                         <label for="autoComplianceCheck" class="form-label">
-                            <?php p($l->t('Check working time rules automatically')); ?>
+                            <?php p($l->t('Arbeitszeitregeln automatisch prüfen')); ?>
                         </label>
                     </div>
                     <p class="form-help">
-                        <?php p($l->t('The system will automatically check if working hours follow German labor law. For example, it will warn if someone works more than 8 hours per day without a break.')); ?>
+                        <?php p($l->t('Die App prüft automatisch, ob Arbeitszeiten das Arbeitszeitgesetz einhalten (z. B. Warnung bei mehr als 8 Stunden ohne Pause).')); ?>
                     </p>
                 </div>
 
@@ -66,11 +66,11 @@ $settings = $_['settings'] ?? [];
                         <input type="checkbox" id="requireBreakJustification" name="requireBreakJustification"
                             <?php echo ($settings['requireBreakJustification'] ?? true) ? 'checked' : ''; ?>>
                         <label for="requireBreakJustification" class="form-label">
-                            <?php p($l->t('Require a reason when taking breaks')); ?>
+                            <?php p($l->t('Grund für Pausen verlangen')); ?>
                         </label>
                     </div>
                     <p class="form-help">
-                        <?php p($l->t('When employees take breaks, they must write a short reason. This helps ensure breaks are used correctly and comply with labor law.')); ?>
+                        <?php p($l->t('Bei Pausen muss ein kurzer Grund eingetragen werden. Das hilft, Pausen korrekt und nachvollziehbar zu dokumentieren.')); ?>
                     </p>
                 </div>
 
@@ -79,18 +79,18 @@ $settings = $_['settings'] ?? [];
                         <input type="checkbox" id="enableViolationNotifications" name="enableViolationNotifications"
                             <?php echo ($settings['enableViolationNotifications'] ?? true) ? 'checked' : ''; ?>>
                         <label for="enableViolationNotifications" class="form-label">
-                            <?php p($l->t('Send alerts when working time rules are broken')); ?>
+                            <?php p($l->t('Hinweise bei Verstößen gegen Arbeitszeitregeln senden')); ?>
                         </label>
                     </div>
                     <p class="form-help">
-                        <?php p($l->t('When someone works too many hours or doesn\'t take required breaks, the system will send a notification to managers and the employee.')); ?>
+                        <?php p($l->t('Bei Überschreitung von Grenzwerten (z. B. zu viele Stunden, fehlende Pausen) werden Hinweise an Beschäftigte und ggf. Vorgesetzte gesendet.')); ?>
                     </p>
                 </div>
 
                 <fieldset class="form-fieldset" aria-labelledby="send-ical-legend">
-                    <legend id="send-ical-legend" class="form-legend"><?php p($l->t('Absences: Send iCal by email after approval')); ?></legend>
+                    <legend id="send-ical-legend" class="form-legend"><?php p($l->t('Abwesenheiten: iCal per E‑Mail versenden')); ?></legend>
                     <p class="form-help form-help--block">
-                        <?php p($l->t('When an absence is approved, the employee can receive an email with an iCalendar (.ics) attachment so they can add the absence to their calendar.')); ?>
+                        <?php p($l->t('Bei genehmigten Abwesenheiten kann automatisch eine E‑Mail mit einem iCalendar‑Anhang (.ics) verschickt werden.')); ?>
                     </p>
                     <div class="form-group">
                         <div class="form-checkbox">
@@ -98,7 +98,7 @@ $settings = $_['settings'] ?? [];
                                 <?php echo ($settings['sendIcalApprovedAbsences'] ?? true) ? 'checked' : ''; ?>
                                 aria-describedby="send-ical-legend">
                             <label for="sendIcalApprovedAbsences" class="form-label">
-                                <?php p($l->t('Send iCal email to employee when absence is approved')); ?>
+                                <?php p($l->t('iCal an die Person mit genehmigter Abwesenheit senden')); ?>
                             </label>
                         </div>
                     </div>
@@ -108,28 +108,38 @@ $settings = $_['settings'] ?? [];
                                 <?php echo ($settings['sendIcalToSubstitute'] ?? false) ? 'checked' : ''; ?>
                                 aria-describedby="send-ical-legend">
                             <label for="sendIcalToSubstitute" class="form-label">
-                                <?php p($l->t('Also send iCal to the substitute (if one was selected)')); ?>
+                                <?php p($l->t('Zusätzlich iCal an Vertretung senden (falls ausgewählt)')); ?>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="sendIcalToManagers" name="sendIcalToManagers" value="1"
+                                <?php echo ($settings['sendIcalToManagers'] ?? false) ? 'checked' : ''; ?>
+                                aria-describedby="send-ical-legend">
+                            <label for="sendIcalToManagers" class="form-label">
+                                <?php p($l->t('Zusätzlich iCal an Vorgesetzte senden (Team-Manager:innen)')); ?>
                             </label>
                         </div>
                     </div>
                 </fieldset>
 
                 <fieldset class="form-fieldset" aria-labelledby="require-substitute-legend">
-                    <legend id="require-substitute-legend" class="form-legend"><?php p($l->t('Absences: Require substitute')); ?></legend>
+                    <legend id="require-substitute-legend" class="form-legend"><?php p($l->t('Abwesenheiten: Vertretung erforderlich')); ?></legend>
                     <p class="form-help form-help--block">
-                        <?php p($l->t('For the selected absence types, employees must specify who will cover for them. This helps ensure work is assigned during time off.')); ?>
+                        <?php p($l->t('Für die ausgewählten Abwesenheitsarten muss eine Vertretung angegeben werden. So ist klar, wer während der Abwesenheit zuständig ist.')); ?>
                     </p>
                     <?php
                     $requireTypes = $settings['requireSubstituteTypes'] ?? [];
                     $absenceTypes = [
-                        'vacation' => $l->t('Vacation'),
-                        'sick_leave' => $l->t('Sick Leave'),
-                        'personal_leave' => $l->t('Personal Leave'),
-                        'parental_leave' => $l->t('Parental Leave'),
-                        'special_leave' => $l->t('Special Leave'),
-                        'unpaid_leave' => $l->t('Unpaid Leave'),
-                        'home_office' => $l->t('Home Office'),
-                        'business_trip' => $l->t('Business Trip'),
+                        'vacation' => $l->t('Urlaub'),
+                        'sick_leave' => $l->t('Krankschreibung'),
+                        'personal_leave' => $l->t('Persönliche Gründe'),
+                        'parental_leave' => $l->t('Elternzeit'),
+                        'special_leave' => $l->t('Sonderurlaub'),
+                        'unpaid_leave' => $l->t('Unbezahlter Urlaub'),
+                        'home_office' => $l->t('Homeoffice'),
+                        'business_trip' => $l->t('Dienstreise'),
                     ];
                     foreach ($absenceTypes as $typeKey => $typeLabel):
                         $checked = in_array($typeKey, $requireTypes, true);
@@ -147,7 +157,7 @@ $settings = $_['settings'] ?? [];
 
                 <div class="form-group">
                     <label for="maxDailyHours" class="form-label">
-                        <?php p($l->t('Maximum Hours Per Day')); ?>
+                        <?php p($l->t('Maximale Arbeitsstunden pro Tag')); ?>
                         <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
@@ -162,7 +172,7 @@ $settings = $_['settings'] ?? [];
                            aria-describedby="maxDailyHours-help <?php echo isset($_['errors']['maxDailyHours']) ? 'maxDailyHours-error' : ''; ?>"
                            aria-invalid="<?php echo isset($_['errors']['maxDailyHours']) ? 'true' : 'false'; ?>">
                     <p id="maxDailyHours-help" class="form-help">
-                        <?php p($l->t('The most hours someone can work in one day. German law allows up to 8 hours normally, or 10 hours in special cases. Example: Enter 10 to allow up to 10 hours per day.')); ?>
+                        <?php p($l->t('Obergrenze der täglichen Arbeitszeit in Stunden. Nach ArbZG in der Regel 8 Stunden, in Ausnahmen bis 10 Stunden.')); ?>
                     </p>
                     <?php if (isset($_['errors']['maxDailyHours'])): ?>
                         <?php 
@@ -175,7 +185,7 @@ $settings = $_['settings'] ?? [];
 
                 <div class="form-group">
                     <label for="minRestPeriod" class="form-label">
-                        <?php p($l->t('Minimum Rest Time Between Work Days')); ?>
+                        <?php p($l->t('Mindest-Ruhezeit zwischen zwei Arbeitstagen')); ?>
                         <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
@@ -189,13 +199,13 @@ $settings = $_['settings'] ?? [];
                            required
                            aria-describedby="minRestPeriod-help">
                     <p id="minRestPeriod-help" class="form-help">
-                        <?php p($l->t('How many hours of rest someone must have between the end of one work day and the start of the next. German law requires at least 11 hours. Example: If someone finishes work at 6 PM, they cannot start again before 5 AM the next day.')); ?>
+                        <?php p($l->t('Anzahl Stunden Ruhezeit zwischen Arbeitsende und nächstem Arbeitsbeginn (ArbZG verlangt mindestens 11 Stunden).')); ?>
                     </p>
                 </div>
 
                 <div class="form-group">
                     <label for="defaultWorkingHours" class="form-label">
-                        <?php p($l->t('Standard Working Hours Per Day')); ?>
+                        <?php p($l->t('Standard-Arbeitszeit pro Tag')); ?>
                         <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
@@ -209,13 +219,13 @@ $settings = $_['settings'] ?? [];
                            required
                            aria-describedby="defaultWorkingHours-help">
                     <p id="defaultWorkingHours-help" class="form-help">
-                        <?php p($l->t('The normal number of hours people work each day. This is used for new employees until you set their individual working hours. Example: Enter 8 for a standard 8-hour workday.')); ?>
+                        <?php p($l->t('Übliche tägliche Arbeitszeit in Stunden. Wird für neue Mitarbeitende als Voreinstellung verwendet, bis individuelle Modelle gesetzt sind.')); ?>
                     </p>
                 </div>
 
                 <div class="form-group">
                     <label for="germanState" class="form-label">
-                        <?php p($l->t('Which German State?')); ?>
+                        <?php p($l->t('Standard-Bundesland für Feiertage')); ?>
                         <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <select id="germanState" 
@@ -224,27 +234,42 @@ $settings = $_['settings'] ?? [];
                             required
                             aria-describedby="germanState-help">
                         <?php
-                        $states = ['NW' => 'North Rhine-Westphalia', 'BY' => 'Bavaria', 'BW' => 'Baden-Württemberg', 
-                                   'HE' => 'Hesse', 'NI' => 'Lower Saxony', 'RP' => 'Rhineland-Palatinate', 
-                                   'SL' => 'Saarland', 'BE' => 'Berlin', 'BB' => 'Brandenburg', 
-                                   'HB' => 'Bremen', 'HH' => 'Hamburg', 'MV' => 'Mecklenburg-Western Pomerania', 
-                                   'SN' => 'Saxony', 'ST' => 'Saxony-Anhalt', 'SH' => 'Schleswig-Holstein', 
-                                   'TH' => 'Thuringia'];
+                        $states = [
+                            'BW' => 'Baden‑Württemberg',
+                            'BY' => 'Bayern',
+                            'BE' => 'Berlin',
+                            'BB' => 'Brandenburg',
+                            'HB' => 'Bremen',
+                            'HH' => 'Hamburg',
+                            'HE' => 'Hessen',
+                            'MV' => 'Mecklenburg‑Vorpommern',
+                            'NI' => 'Niedersachsen',
+                            'NW' => 'Nordrhein‑Westfalen',
+                            'RP' => 'Rheinland‑Pfalz',
+                            'SL' => 'Saarland',
+                            'SN' => 'Sachsen',
+                            'ST' => 'Sachsen‑Anhalt',
+                            'SH' => 'Schleswig‑Holstein',
+                            'TH' => 'Thüringen',
+                        ];
                         $currentState = $settings['germanState'] ?? 'NW';
                         foreach ($states as $code => $name) {
-                            $selected = ($currentState === $code) ? 'selected' : '';
-                            echo "<option value=\"{$code}\" {$selected}>" . p($l->t($name)) . "</option>";
+                            $selected = ($currentState === $code) ? ' selected' : '';
+                            $label = $l->t($name);
+                            echo '<option value="' . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . '"' . $selected . '>' .
+                                htmlspecialchars($label, ENT_QUOTES, 'UTF-8') .
+                                '</option>';
                         }
                         ?>
                     </select>
                     <p id="germanState-help" class="form-help">
-                        <?php p($l->t('Select the German state where your organization is located. This ensures the system follows the correct labor laws for that state.')); ?>
+                        <?php p($l->t('Wird für gesetzliche Feiertage und arbeitszeitrechtliche Prüfungen verwendet, wenn für Mitarbeitende/Teams nichts Spezielleres hinterlegt ist.')); ?>
                     </p>
                 </div>
 
                 <div class="form-group">
                     <label for="retentionPeriod" class="form-label">
-                        <?php p($l->t('How Long to Keep Time Records')); ?>
+                        <?php p($l->t('Aufbewahrungsdauer für Zeitnachweise (in Jahren)')); ?>
                         <span class="form-required" aria-label="<?php p($l->t('required')); ?>">*</span>
                     </label>
                     <input type="number" 
@@ -257,22 +282,22 @@ $settings = $_['settings'] ?? [];
                            required
                            aria-describedby="retentionPeriod-help">
                     <p id="retentionPeriod-help" class="form-help">
-                        <?php p($l->t('How many years to keep time tracking records before they are automatically deleted. German law typically requires keeping records for 2 years. Example: Enter 2 to keep records for 2 years.')); ?>
+                        <?php p($l->t('Anzahl der Jahre, für die Arbeitszeitdaten gespeichert werden, bevor sie automatisch gelöscht werden (typisch: mindestens 2 Jahre).')); ?>
                     </p>
                 </div>
 
                 <div class="card-actions">
                     <button type="submit" 
                             class="btn btn--primary"
-                            aria-label="<?php p($l->t('Save all admin settings')); ?>"
-                            title="<?php p($l->t('Click to save all settings. Changes will apply to all users.')); ?>">
-                        <?php p($l->t('Save Settings')); ?>
+                            aria-label="<?php p($l->t('Alle Einstellungen speichern')); ?>"
+                            title="<?php p($l->t('Änderungen speichern und für alle Benutzerinnen und Benutzer übernehmen')); ?>">
+                        <?php p($l->t('Einstellungen speichern')); ?>
                     </button>
                     <a href="<?php p(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.page.index')); ?>"
                        class="btn btn--secondary"
-                       aria-label="<?php p($l->t('Cancel and go back to dashboard')); ?>"
-                       title="<?php p($l->t('Click to cancel and go back without saving changes')); ?>">
-                        <?php p($l->t('Cancel')); ?>
+                       aria-label="<?php p($l->t('Abbrechen und zurück zur Übersicht')); ?>"
+                       title="<?php p($l->t('Zurück, ohne Änderungen zu speichern')); ?>">
+                        <?php p($l->t('Abbrechen')); ?>
                     </a>
                 </div>
             </form>

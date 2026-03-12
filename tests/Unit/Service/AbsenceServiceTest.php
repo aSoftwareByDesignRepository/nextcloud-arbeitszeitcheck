@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -51,6 +52,9 @@ class AbsenceServiceTest extends TestCase
 	/** @var NotificationService|\PHPUnit\Framework\MockObject\MockObject */
 	private $notificationService;
 
+	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	private $holidayCalendarService;
+
 	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	private $config;
 
@@ -77,6 +81,7 @@ class AbsenceServiceTest extends TestCase
 		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
+		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
 
 		$this->l10n->method('t')
 			->willReturnCallback(function ($text) {
@@ -92,7 +97,9 @@ class AbsenceServiceTest extends TestCase
 			$this->config,
 			$this->userManager,
 			$this->l10n,
-			$this->notificationService
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService
 		);
 	}
 

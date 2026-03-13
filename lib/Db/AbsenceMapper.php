@@ -211,6 +211,24 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
+	 * Find all absences where the given user is configured as substitute.
+	 * Used for cleanup and notifications when a substitute account is deleted.
+	 *
+	 * @param string $substituteUserId
+	 * @return Absence[]
+	 */
+	public function findBySubstituteUser(string $substituteUserId): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('substitute_user_id', $qb->createNamedParameter($substituteUserId)))
+			->orderBy('start_date', 'ASC');
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Find active absences (currently ongoing)
 	 *
 	 * @param string|null $userId Optional user filter

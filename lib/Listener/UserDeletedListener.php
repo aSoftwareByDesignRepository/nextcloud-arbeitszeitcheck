@@ -17,6 +17,7 @@ namespace OCA\ArbeitszeitCheck\Listener;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\User\Events\UserDeletedEvent;
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
@@ -25,6 +26,8 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
+use OCA\ArbeitszeitCheck\Service\NotificationService;
+use OCP\IL10N;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -43,6 +46,8 @@ class UserDeletedListener implements IEventListener
 		private readonly UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
+		private readonly NotificationService $notificationService,
+		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger,
 	) {
 	}
@@ -88,10 +93,62 @@ class UserDeletedListener implements IEventListener
 
 	private function clearSubstituteFromAbsences(string $userId): void
 	{
-		$count = $this->absenceMapper->clearSubstituteForUser($userId);
-		if ($count > 0) {
-			$this->logger->info('Cleared substitute from absences', ['app' => 'arbeitszeitcheck', 'userId' => $userId, 'count' => $count]);
+		$affected = $this->absenceMapper->findBySubstituteUser($userId);
+		if (empty($affected)) {
+			return;
 		}
+
+		$notifiedCount = 0;
+		foreach ($affected as $absence) {
+			// Remember original status to decide how to transition.
+			$status = $absence->getStatus();
+
+			// If the absence was still waiting for this substitute's approval,
+			// fall back to a normal pending state so the request is not stuck.
+			if ($status === Absence::STATUS_SUBSTITUTE_PENDING) {
+				$absence->setStatus(Absence::STATUS_PENDING);
+			}
+
+			$absence->setSubstituteUserId(null);
+			$absence->setUpdatedAt(new \DateTime());
+			$this->absenceMapper->update($absence);
+
+			// Notify the employee that their chosen substitute no longer exists
+			// so they can pick a new one if needed.
+			try {
+				$employeeUserId = $absence->getUserId();
+				$startDate = $absence->getStartDate();
+				$endDate = $absence->getEndDate();
+
+				$this->notificationService->notifySubstituteDeclined(
+					$employeeUserId,
+					$userId,
+					[
+						'id' => $absence->getId(),
+						'type' => $absence->getType(),
+						'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+						'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
+						'days' => $absence->getDays(),
+					],
+					$this->l10n->t('Your selected substitute account was removed. Please edit this absence and choose a new substitute if required.')
+				);
+				$notifiedCount++;
+			} catch (\Throwable $e) {
+				$this->logger->warning('Failed to notify employee about removed substitute', [
+					'app' => 'arbeitszeitcheck',
+					'userId' => $userId,
+					'absenceId' => $absence->getId(),
+					'exception' => $e,
+				]);
+			}
+		}
+
+		$this->logger->info('Cleared substitute from absences for deleted user', [
+			'app' => 'arbeitszeitcheck',
+			'userId' => $userId,
+			'count' => \count($affected),
+			'notified' => $notifiedCount,
+		]);
 	}
 
 	private function deleteComplianceViolations(string $userId): void

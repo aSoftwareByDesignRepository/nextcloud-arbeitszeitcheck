@@ -117,6 +117,11 @@ class AbsenceIcalMailService
 		if ($this->config->getAppValue($appName, self::CONFIG_SEND_ICAL, '1') !== '1') {
 			return;
 		}
+		// Respect the dedicated admin toggle for substitutes to avoid sending
+		// coverage iCals when this feature is disabled.
+		if ($this->config->getAppValue($appName, self::CONFIG_SEND_ICAL_TO_SUBSTITUTE, '0') !== '1') {
+			return;
+		}
 
 		$substituteId = $absence->getSubstituteUserId();
 		if ($substituteId === null || $substituteId === '') {

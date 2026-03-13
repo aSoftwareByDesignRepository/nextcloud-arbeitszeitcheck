@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
@@ -357,13 +358,60 @@ class AbsenceController extends Controller
 
 			$absences = $this->absenceService->getAbsencesByUser($userId, $filters, $limit, $offset);
 
-			// Safely map absences to summaries, handling any potential null DateTime issues
+			// Also include absences where the current user is configured as substitute,
+			// so upcoming coverages appear in calendar and timeline views.
+			$coverageAbsences = $this->absenceMapper->findBySubstituteUser($userId);
+			$coverageAbsences = array_filter($coverageAbsences, function (Absence $a) use ($status, $type): bool {
+				// Only show absences that the user is actually covering or will cover:
+				// - pending: substitute has already approved, waiting for manager
+				// - approved: fully approved absence
+				if (!in_array($a->getStatus(), [Absence::STATUS_PENDING, Absence::STATUS_APPROVED], true)) {
+					return false;
+				}
+				if ($type !== null && $type !== '' && $a->getType() !== $type) {
+					return false;
+				}
+				if ($status !== null && $status !== '') {
+					if ($status === 'pending') {
+						// "pending" means awaiting any approval – for substitute role we
+						// restrict this to the manager-pending state.
+						return $a->getStatus() === Absence::STATUS_PENDING;
+					}
+					return $a->getStatus() === $status;
+				}
+				return true;
+			});
+
+			// Safely map absences to summaries, handling any potential null DateTime issues.
+			// Track IDs so we don't accidentally duplicate entries if business rules change.
 			$absenceSummaries = [];
+			$seenIds = [];
+
 			foreach ($absences as $absence) {
 				try {
-					$absenceSummaries[] = $absence->getSummary();
+					$summary = $absence->getSummary();
+					$absenceSummaries[] = $summary;
+					if (isset($summary['id'])) {
+						$seenIds[(int)$summary['id']] = true;
+					}
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary for absence ' . $absence->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
+					continue;
+				}
+			}
+
+			// Add substitute-role absences with a small "role" flag for frontend context.
+			foreach ($coverageAbsences as $absence) {
+				$id = $absence->getId();
+				if ($id !== null && isset($seenIds[(int)$id])) {
+					continue;
+				}
+				try {
+					$summary = $absence->getSummary();
+					$summary['role'] = 'substitute';
+					$absenceSummaries[] = $summary;
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary for substitute absence ' . $absence->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
 					continue;
 				}
 			}

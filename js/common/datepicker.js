@@ -36,10 +36,17 @@ function convertISOToEuropean(dateString) {
 	return dateString;
 }
 
+function parseDDMMYYYYToDate(val) {
+	if (!val || !/^\d{2}\.\d{2}\.\d{4}$/.test(val)) return null;
+	var p = val.split('.');
+	return new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+}
+
 /**
  * Initialize datepicker on input (dd.mm.yyyy format, calendar popup)
  * @param {HTMLElement|string} input - Input element or selector
- * @param {Object} options - { maxDate, minDate }
+ * @param {Object} options - { maxDate, minDate, getInitialMonth: () => Date|null }
+ *   getInitialMonth: when opening, if provided and returns a Date, the calendar shows that month
  * @returns {Object} Datepicker instance
  */
 function initializeDatepicker(input, options = {}) {
@@ -54,12 +61,8 @@ function initializeDatepicker(input, options = {}) {
 		t('July'), t('August'), t('September'), t('October'), t('November'), t('December')];
 	const dayNames = [t('Mon'), t('Tue'), t('Wed'), t('Thu'), t('Fri'), t('Sat'), t('Sun')];
 
-	let selectedDate = null;
-	if (element.value && /^\d{2}\.\d{2}\.\d{4}$/.test(element.value)) {
-		const p = element.value.split('.');
-		selectedDate = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
-	}
-	let currentDate = selectedDate || new Date();
+	let selectedDate = parseDDMMYYYYToDate(element.value);
+	let currentDate = selectedDate ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1) : new Date();
 	currentDate.setHours(0, 0, 0, 0);
 
 	let calendarOpen = false;
@@ -151,6 +154,22 @@ function initializeDatepicker(input, options = {}) {
 
 	function openCalendar() {
 		if (calendarOpen) return;
+
+		/* Re-read input value in case it was updated externally */
+		selectedDate = parseDDMMYYYYToDate(element.value);
+		if (selectedDate) {
+			currentDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+		} else if (typeof options.getInitialMonth === 'function') {
+			var ref = options.getInitialMonth();
+			if (ref && ref instanceof Date && !isNaN(ref.getTime())) {
+				currentDate = new Date(ref.getFullYear(), ref.getMonth(), 1);
+			} else {
+				currentDate = new Date();
+			}
+		} else {
+			currentDate = new Date();
+		}
+		currentDate.setHours(0, 0, 0, 0);
 
 		const container = document.createElement('div');
 		container.className = 'arbeitszeitcheck-datepicker';
@@ -304,6 +323,14 @@ function initializeDatepicker(input, options = {}) {
 				var maxDate = maxVal === 'today' ? new Date() : parseDateFromAttr(maxVal);
 				if (minDate) opts.minDate = minDate;
 				if (maxDate) opts.maxDate = maxDate;
+				var syncId = el.getAttribute('data-datepicker-sync-month-with');
+				if (syncId) {
+					opts.getInitialMonth = function () {
+						var other = document.getElementById(syncId);
+						if (!other || !other.value) return null;
+						return parseDDMMYYYYToDate(other.value);
+					};
+				}
 				initializeDatepicker(el, opts);
 			});
 		}

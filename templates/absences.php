@@ -154,11 +154,9 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
             <section class="section section--form" aria-labelledby="form-title" aria-describedby="form-desc">
                 <h3 id="form-title" class="section__title visually-hidden"><?php p($l->t('Absence request details')); ?></h3>
                 <p id="form-desc" class="section__desc visually-hidden"><?php p($l->t('Fill in the type, dates, and optional reason and substitute.')); ?></p>
-                <?php if ($error): ?>
-                    <div class="alert alert--error" role="alert" aria-live="polite" id="absence-form-error">
-                        <p><?php p($error); ?></p>
-                    </div>
-                <?php endif; ?>
+                <div class="alert alert--error" role="alert" aria-live="polite" id="absence-form-error"<?php echo $error ? '' : ' style="display: none;"'; ?>>
+                    <p id="absence-form-error-text"><?php echo $error ? htmlspecialchars($error, ENT_QUOTES, 'UTF-8') : ''; ?></p>
+                </div>
                 
                 <form id="absence-form" class="form" method="POST" action="<?php 
                     if ($mode === 'create') {
@@ -209,7 +207,8 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                                id="absence-start-date"
                                name="start_date"
                                class="form-input datepicker-input"
-                               data-datepicker-min="today"
+                               data-datepicker-min="<?php echo (new DateTime())->modify('-7 days')->format('d.m.Y'); ?>"
+                               data-datepicker-sync-month-with="absence-end-date"
                                value="<?php p($absence ? $absence->getStartDate()->format('d.m.Y') : ''); ?>"
                                placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
                                pattern="\d{2}\.\d{2}\.\d{4}"
@@ -226,7 +225,8 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                                id="absence-end-date"
                                name="end_date"
                                class="form-input datepicker-input"
-                               data-datepicker-min="today"
+                               data-datepicker-min="<?php echo (new DateTime())->modify('-7 days')->format('d.m.Y'); ?>"
+                               data-datepicker-sync-month-with="absence-start-date"
                                value="<?php p($absence ? $absence->getEndDate()->format('d.m.Y') : ''); ?>"
                                placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
                                pattern="\d{2}\.\d{2}\.\d{4}"
@@ -756,20 +756,37 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
         
         if (startDateInput) {
             startDateInput.addEventListener('change', function() {
-                if (endDateInput.value) {
+                if (!endDateInput.value && startDateInput.value && /^\d{2}\.\d{2}\.\d{4}$/.test(startDateInput.value)) {
+                    endDateInput.value = startDateInput.value;
+                    endDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                } else if (endDateInput.value) {
                     validateDates();
                 }
             });
         }
-        
+
         if (endDateInput) {
-            endDateInput.addEventListener('change', validateDates);
+            endDateInput.addEventListener('change', function() {
+                if (!startDateInput.value && endDateInput.value && /^\d{2}\.\d{2}\.\d{4}$/.test(endDateInput.value)) {
+                    startDateInput.value = endDateInput.value;
+                    startDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                validateDates();
+            });
         }
         
+        function hideFormError() {
+            var errEl = document.getElementById('absence-form-error');
+            if (errEl) { errEl.style.display = 'none'; }
+        }
+        if (typeSelect) typeSelect.addEventListener('change', hideFormError);
+        if (startDateInput) startDateInput.addEventListener('input', hideFormError);
+        if (endDateInput) endDateInput.addEventListener('input', hideFormError);
+
         if (form) {
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                
+                hideFormError();
                 if (!validateDates()) {
                     return;
                 }
@@ -843,27 +860,36 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                             let errMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to submit absence request')) || 'Failed to submit absence request';
                             try {
                                 const j = JSON.parse(text);
-                                if (j && j.error) errMsg = j.error;
+                                if (j && typeof j.error === 'string' && j.error) errMsg = j.error;
                             } catch (e) { /* ignore */ }
+                            var errEl = document.getElementById('absence-form-error');
+                            var errText = document.getElementById('absence-form-error-text');
+                            if (errEl && errText) {
+                                errText.textContent = errMsg;
+                                errEl.style.display = 'block';
+                                errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
                             if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {
-                                window.OC.Notification.showTemporary(errMsg, { type: 'error' });
+                                window.OC.Notification.showTemporary(errMsg, { type: 'error', timeout: 8000 });
                             } else {
-                                // Fallback so users are not left without any visible error message
-                                try {
-                                    alert(errMsg);
-                                } catch (e) {}
+                                try { alert(errMsg); } catch (e) {}
                             }
                         });
                     })
                     .catch(function(err) {
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalText; }
                         const errMsg = (err && err.message) || (window.t && window.t('arbeitszeitcheck', 'Failed to submit absence request')) || 'Failed to submit absence request';
+                        var errEl = document.getElementById('absence-form-error');
+                        var errText = document.getElementById('absence-form-error-text');
+                        if (errEl && errText) {
+                            errText.textContent = errMsg;
+                            errEl.style.display = 'block';
+                            errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                         if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {
-                            window.OC.Notification.showTemporary(errMsg, { type: 'error' });
+                            window.OC.Notification.showTemporary(errMsg, { type: 'error', timeout: 8000 });
                         } else {
-                            try {
-                                alert(errMsg);
-                            } catch (e) {}
+                            try { alert(errMsg); } catch (e) {}
                         }
                     });
             });

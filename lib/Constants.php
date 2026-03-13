@@ -42,6 +42,11 @@ final class Constants
 	public const MAX_ABSENCE_DAYS = 365;
 
 	/**
+	 * Sick leave: maximum days in the past for start date (German law allows up to 3 days backdating; 7 is a safe buffer).
+	 */
+	public const SICK_LEAVE_MAX_PAST_DAYS = 7;
+
+	/**
 	 * Maximum date range in days for exports (audit, users, etc.).
 	 */
 	public const MAX_EXPORT_DATE_RANGE_DAYS = 365;

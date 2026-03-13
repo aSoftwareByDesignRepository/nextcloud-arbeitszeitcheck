@@ -609,6 +609,10 @@ class AbsenceController extends Controller
 				'success' => true,
 				'absence' => $absence->getSummary()
 			], Http::STATUS_CREATED);
+		} catch (\Exception $e) {
+			$msg = trim((string)$e->getMessage());
+			$error = $msg !== '' ? $msg : $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			return new JSONResponse(['success' => false, 'error' => $error], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -681,6 +685,10 @@ class AbsenceController extends Controller
 				'success' => true,
 				'absence' => $absence->getSummary()
 			]);
+		} catch (\Exception $e) {
+			$msg = trim((string)$e->getMessage());
+			$error = $msg !== '' ? $msg : $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			return new JSONResponse(['success' => false, 'error' => $error], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			return new JSONResponse([
 				'success' => false,

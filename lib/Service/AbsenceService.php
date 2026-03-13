@@ -788,27 +788,50 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Start date cannot be after end date'));
 		}
 
-		// Validate dates are not in the past (with small tolerance for same-day requests)
+		// Extract type early (needed for past-date and overlap logic)
+		$type = isset($data['type']) && !is_array($data['type']) ? (string)$data['type'] : (is_array($data['type'] ?? null) && !empty($data['type']) ? (string)reset($data['type']) : '');
+
+		// Validate dates: past start allowed only for sick leave (up to SICK_LEAVE_MAX_PAST_DAYS)
 		$today = new \DateTime();
 		$today->setTime(0, 0, 0);
-
 		if ($startDate < $today) {
-			throw new \Exception($this->l10n->t('Start date cannot be in the past'));
+			if ($type === Absence::TYPE_SICK_LEAVE) {
+				$cutoff = (clone $today)->modify('-' . Constants::SICK_LEAVE_MAX_PAST_DAYS . ' days');
+				if ($startDate < $cutoff) {
+					throw new \Exception($this->l10n->t('Sick leave start date cannot be more than %s days in the past.', [(string)Constants::SICK_LEAVE_MAX_PAST_DAYS]));
+				}
+			} else {
+				throw new \Exception($this->l10n->t('Start date cannot be in the past'));
+			}
 		}
 
 		// Check for overlapping absences (exclude current absence when updating)
 		$overlapping = $this->absenceMapper->findOverlapping($userId, $startDate, $endDate, $excludeAbsenceId);
 		if (!empty($overlapping)) {
-			throw new \Exception($this->l10n->t('Absence overlaps with existing absence'));
+			$first = $overlapping[0];
+			$overlapType = $first->getType();
+			$overlapStart = $first->getStartDate() ? $first->getStartDate()->format('d.m.Y') : '?';
+			$overlapEnd = $first->getEndDate() ? $first->getEndDate()->format('d.m.Y') : '?';
+			$typeLabels = [
+				'vacation' => $this->l10n->t('Vacation'),
+				'sick_leave' => $this->l10n->t('Sick Leave'),
+				'personal_leave' => $this->l10n->t('Personal Leave'),
+				'parental_leave' => $this->l10n->t('Parental Leave'),
+				'special_leave' => $this->l10n->t('Special Leave'),
+				'unpaid_leave' => $this->l10n->t('Unpaid Leave'),
+				'home_office' => $this->l10n->t('Home Office'),
+				'business_trip' => $this->l10n->t('Business Trip'),
+			];
+			$overlapTypeLabel = $typeLabels[$overlapType] ?? $this->l10n->t('Absence');
+			$baseMsg = $this->l10n->t('This period overlaps with an existing %1$s (%2$s – %3$s).', [$overlapTypeLabel, $overlapStart, $overlapEnd]);
+			if ($type === Absence::TYPE_SICK_LEAVE && $overlapType === Absence::TYPE_VACATION) {
+				$hint = $this->l10n->t('If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.');
+				throw new \Exception($baseMsg . ' ' . $hint);
+			}
+			throw new \Exception($baseMsg);
 		}
 
-		// Ensure type is a string and whitelist allowed values
-		$type = $data['type'];
-		if (is_array($type)) {
-			$type = !empty($type) ? (string)reset($type) : '';
-		} else {
-			$type = (string)$type;
-		}
+		// Validate type
 		if (empty($type)) {
 			throw new \Exception($this->l10n->t('Absence type is required'));
 		}

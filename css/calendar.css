@@ -224,6 +224,11 @@
 	border-left: 3px solid var(--arbeitszeitcheck-color-warning, var(--color-warning));
 }
 
+/* Coverage day: user is substituting (not absent) – primary color */
+.calendar-day--has-coverage {
+	border-left-color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
+}
+
 .calendar-day-number {
 	font-weight: 600;
 	font-size: 1rem;
@@ -313,30 +318,34 @@
 	line-height: 1.2;
 }
 
-/* Calendar Legend */
+/* Calendar Legend – WCAG 2.1 AA, clear grouping */
 .calendar-legend {
-	padding: 1.5rem;
-	border-top: 1px solid var(--color-border);
-	margin-top: 1rem;
+	padding: var(--space-6, 1.5rem);
+	border-top: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+	margin-top: var(--space-6, 1.5rem);
+	background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background, transparent));
+	border-radius: var(--radius-base, 4px);
 }
 
 .calendar-legend h4 {
-	margin: 0 0 1rem 0;
+	margin: 0 0 var(--space-4, 1rem) 0;
 	font-size: 1rem;
 	font-weight: 600;
-	color: var(--color-main-text);
+	color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text));
+	line-height: 1.4;
 }
 
 .legend-items {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 1.5rem;
+	gap: var(--space-4, 1rem) var(--space-6, 1.5rem);
 }
 
 .legend-item {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--space-3, 0.75rem);
+	min-height: 2.75rem;
 }
 
 .legend-color {
@@ -354,6 +363,11 @@
 .legend-color--absence {
 	background: transparent;
 	border-left: 4px solid var(--arbeitszeitcheck-color-warning, var(--color-warning));
+}
+
+.legend-color--coverage {
+	background: transparent;
+	border-left: 4px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 
 .legend-color--today {
@@ -493,7 +507,7 @@
 	}
 
 	.calendar-day {
-		min-height: 72px; /* Touch target ~44px + content */
+		min-height: 72px; /* Touch target ~44px + content, WCAG 2.5.5 */
 		padding: var(--space-2, 0.5rem);
 	}
 
@@ -507,6 +521,25 @@
 
 	.day-details-panel {
 		width: 100%;
+		max-width: 100%;
+	}
+
+	.calendar-legend {
+		padding: var(--space-4, 1rem);
+	}
+
+	.legend-items {
+		flex-direction: column;
+		gap: var(--space-2, 0.5rem);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.calendar-day,
+	.calendar-week-day,
+	.btn-nav,
+	.btn-close {
+		transition: none;
 	}
 }
 

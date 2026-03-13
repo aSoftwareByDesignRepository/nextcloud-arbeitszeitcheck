@@ -65,7 +65,7 @@ return [
 
 		// API routes for absences (specific routes must come before parameterized routes)
 		['name' => 'absence#stats', 'url' => '/api/absences/stats', 'verb' => 'GET'],
-		['name' => 'absence#users', 'url' => '/api/users', 'verb' => 'GET'],
+		['name' => 'absence#users', 'url' => '/api/colleagues', 'verb' => 'GET'],
 		['name' => 'absence#index', 'url' => '/api/absences', 'verb' => 'GET'],
 		['name' => 'absence#apiStore', 'url' => '/api/absences', 'verb' => 'POST'],
 		['name' => 'absence#apiShow', 'url' => '/api/absences/{id}', 'verb' => 'GET'],
@@ -162,6 +162,7 @@ return [
 		['name' => 'admin#createTeam', 'url' => '/api/admin/teams', 'verb' => 'POST'],
 		['name' => 'admin#updateTeam', 'url' => '/api/admin/teams/{id}', 'verb' => 'PUT'],
 		['name' => 'admin#deleteTeam', 'url' => '/api/admin/teams/{id}', 'verb' => 'DELETE'],
+		['name' => 'admin#getTeamDeleteImpact', 'url' => '/api/admin/teams/{id}/delete-impact', 'verb' => 'GET'],
 		['name' => 'admin#getTeamMembers', 'url' => '/api/admin/teams/{id}/members', 'verb' => 'GET'],
 		['name' => 'admin#addTeamMember', 'url' => '/api/admin/teams/{id}/members', 'verb' => 'POST'],
 		['name' => 'admin#removeTeamMember', 'url' => '/api/admin/teams/{id}/members/{userId}', 'verb' => 'DELETE'],

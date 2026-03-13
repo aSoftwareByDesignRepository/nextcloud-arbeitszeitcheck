@@ -38,6 +38,7 @@ class AbsenceService
 	private IL10N $l10n;
 	private ?NotificationService $notificationService;
 	private ?AbsenceIcalMailService $absenceIcalMailService;
+	private ?AbsenceNotificationMailService $absenceNotificationMailService;
 	private HolidayCalendarService $holidayCalendarService;
 
 	public function __construct(
@@ -51,7 +52,8 @@ class AbsenceService
 		IL10N $l10n,
 		?NotificationService $notificationService = null,
 		?AbsenceIcalMailService $absenceIcalMailService = null,
-		HolidayCalendarService $holidayCalendarService
+		HolidayCalendarService $holidayCalendarService,
+		?AbsenceNotificationMailService $absenceNotificationMailService = null
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -64,6 +66,7 @@ class AbsenceService
 		$this->notificationService = $notificationService;
 		$this->absenceIcalMailService = $absenceIcalMailService;
 		$this->holidayCalendarService = $holidayCalendarService;
+		$this->absenceNotificationMailService = $absenceNotificationMailService;
 	}
 
 	/**
@@ -128,6 +131,11 @@ class AbsenceService
 			);
 		}
 
+		// Send email to substitute if admin enabled it
+		if ($substituteUserId && $this->absenceNotificationMailService) {
+			$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($savedAbsence);
+		}
+
 		return $savedAbsence;
 	}
 
@@ -172,8 +180,8 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 
-		// Check if absence can be updated (pending or substitute_pending can be modified by owner)
-		if (!in_array($absence->getStatus(), [Absence::STATUS_PENDING, Absence::STATUS_SUBSTITUTE_PENDING], true)) {
+		// Check if absence can be updated (pending, substitute_pending, or substitute_declined can be modified by owner)
+		if (!in_array($absence->getStatus(), [Absence::STATUS_PENDING, Absence::STATUS_SUBSTITUTE_PENDING, Absence::STATUS_SUBSTITUTE_DECLINED], true)) {
 			throw new \Exception($this->l10n->t('Only pending absences can be updated'));
 		}
 
@@ -214,7 +222,35 @@ class AbsenceService
 		$absence->setDays($workingDays);
 		$absence->setUpdatedAt(new \DateTime());
 
+		// When resubmitting after substitute_declined: clear decline comment, set status, notify new substitute
+		$wasDeclined = $absence->getStatus() === Absence::STATUS_SUBSTITUTE_DECLINED;
+		$newSubstituteId = $absence->getSubstituteUserId();
+
+		if ($wasDeclined) {
+			$absence->setApproverComment(null);
+			$absence->setStatus($newSubstituteId ? Absence::STATUS_SUBSTITUTE_PENDING : Absence::STATUS_PENDING);
+		}
+
 		$updatedAbsence = $this->absenceMapper->update($absence);
+
+		if ($wasDeclined && $newSubstituteId && $this->notificationService) {
+			$startDate = $updatedAbsence->getStartDate();
+			$endDate = $updatedAbsence->getEndDate();
+			$this->notificationService->notifySubstitutionRequest(
+				$newSubstituteId,
+				$updatedAbsence->getUserId(),
+				[
+					'id' => $updatedAbsence->getId(),
+					'type' => $updatedAbsence->getType(),
+					'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+					'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
+					'days' => $updatedAbsence->getDays(),
+				]
+			);
+		}
+		if ($wasDeclined && $newSubstituteId && $this->absenceNotificationMailService) {
+			$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($updatedAbsence);
+		}
 
 		// Log the action
 		$this->auditLogMapper->logAction(
@@ -243,8 +279,8 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 
-		// Check if absence can be deleted (pending or substitute_pending can be deleted by owner)
-		if (!in_array($absence->getStatus(), [Absence::STATUS_PENDING, Absence::STATUS_SUBSTITUTE_PENDING], true)) {
+		// Check if absence can be deleted (pending, substitute_pending, or substitute_declined can be deleted by owner)
+		if (!in_array($absence->getStatus(), [Absence::STATUS_PENDING, Absence::STATUS_SUBSTITUTE_PENDING, Absence::STATUS_SUBSTITUTE_DECLINED], true)) {
 			throw new \Exception($this->l10n->t('Only pending absences can be deleted'));
 		}
 
@@ -562,7 +598,12 @@ class AbsenceService
 			$substituteUserId
 		);
 
-		// Notify employee that substitute approved
+		// When employee has no manager: auto-approve immediately. Skip "awaiting manager" notifications.
+		if (!$this->employeeHasManager($absence->getUserId())) {
+			return $this->autoApproveForNoManager($updatedAbsence);
+		}
+
+		// Employee has manager: notify about substitute approval and that manager approval is pending
 		if ($this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();
 			$endDate = $updatedAbsence->getEndDate();
@@ -579,14 +620,14 @@ class AbsenceService
 			);
 		}
 
-		// Send iCal to substitute so they can add coverage period to their calendar
-		if ($this->absenceIcalMailService) {
-			$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
+		if ($this->absenceNotificationMailService) {
+			$this->absenceNotificationMailService->sendSubstituteApprovedToEmployee($updatedAbsence);
+			$this->absenceNotificationMailService->sendSubstituteApprovedToManagers($updatedAbsence);
 		}
 
-		// Auto-approve when employee has no manager (no colleagues in team/groups)
-		if (!$this->employeeHasManager($absence->getUserId())) {
-			return $this->autoApproveForNoManager($updatedAbsence);
+		// iCal to substitute when they approve (coverage reminder)
+		if ($this->absenceIcalMailService) {
+			$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
 		}
 
 		return $updatedAbsence;

@@ -361,6 +361,25 @@
     }
 
     function confirmDeleteTeam(id, name) {
+        // Load a small impact summary so the confirmation dialog can explain
+        // clearly what will happen (members, managers, sub-teams).
+        Utils.ajax(baseUrl + '/api/admin/teams/' + id + '/delete-impact', {
+            method: 'GET',
+            onSuccess: function(data) {
+                if (!data || !data.success || !data.impact) {
+                    showSimpleDeleteConfirm(id, name);
+                    return;
+                }
+                showImpactDeleteModal(id, name, data.impact);
+            },
+            onError: function() {
+                // Fallback to a simple confirmation when impact cannot be loaded.
+                showSimpleDeleteConfirm(id, name);
+            }
+        });
+    }
+
+    function showSimpleDeleteConfirm(id, name) {
         var message = t('Are you sure you want to delete the unit "%s"? Members and managers will be unassigned.', 'Are you sure you want to delete this unit?').replace('%s', name);
         confirmDestructiveCompat(
             message,
@@ -373,6 +392,83 @@
             },
             function() { deleteTeam(id); }
         );
+    }
+
+    function showImpactDeleteModal(id, name, impact) {
+        const title = t('Delete unit', 'Delete unit');
+        const memberCount = impact.memberCount || 0;
+        const managerCount = impact.managerCount || 0;
+        const childCount = impact.childTeamCount || 0;
+
+        const heading = t('Delete "%s"?', 'Delete unit').replace('%s', name);
+        const intro = t('Deleting this unit will unassign all members and managers from it. Sub-teams must be handled separately.', 'Deleting this unit will unassign all members and managers.');
+
+        const impactList = [
+            t('Members in this unit: %s', 'Members in this unit:').replace('%s', String(memberCount)),
+            t('Managers in this unit: %s', 'Managers in this unit:').replace('%s', String(managerCount)),
+            t('Direct sub-units: %s', 'Direct sub-units:').replace('%s', String(childCount))
+        ];
+
+        const content = `
+            <div class="modal-section">
+                <h2 id="team-delete-title" class="modal-title">${heading}</h2>
+                <p id="team-delete-intro" class="modal-text">${intro}</p>
+                <ul class="modal-list">
+                    <li>${impactList[0]}</li>
+                    <li>${impactList[1]}</li>
+                    <li>${impactList[2]}</li>
+                </ul>
+                <p class="modal-text">
+                    ${t('This action cannot be undone.', 'This action cannot be undone.')}
+                </p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn--secondary" data-action="close-modal">${t('Cancel', 'Cancel')}</button>
+                <button type="button" class="btn btn--primary btn--danger" data-action="confirm-delete-team">
+                    ${t('Delete', 'Delete')}
+                </button>
+            </div>
+        `;
+
+        const modal = Components.createModal({
+            id: 'modal-delete-team',
+            title: title,
+            content: content,
+            size: 'md',
+            closable: true,
+            ariaLabelledBy: 'team-delete-title',
+            ariaDescribedBy: 'team-delete-intro',
+            onClose: function() {
+                const el = document.getElementById('modal-delete-team');
+                if (el && el.parentNode) {
+                    el.parentNode.remove();
+                }
+            }
+        });
+
+        document.body.appendChild(modal);
+        Components.openModal('modal-delete-team');
+
+        const modalEl = document.getElementById('modal-delete-team');
+        if (!modalEl) {
+            return;
+        }
+
+        const cancelBtn = modalEl.querySelector('[data-action="close-modal"]');
+        const confirmBtn = modalEl.querySelector('[data-action="confirm-delete-team"]');
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() {
+                Components.closeModal(modalEl);
+            });
+        }
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function() {
+                Components.closeModal(modalEl);
+                deleteTeam(id);
+            });
+            confirmBtn.focus();
+        }
     }
 
     function deleteTeam(id) {

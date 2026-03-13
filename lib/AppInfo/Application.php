@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
+use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
@@ -182,6 +183,18 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(AbsenceNotificationMailService::class, function($c) {
+			return new AbsenceNotificationMailService(
+				$c->query(\OCP\Mail\IMailer::class),
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IL10N::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\IURLGenerator::class),
+				$c->query(TeamResolverService::class),
+				$c->query(\Psr\Log\LoggerInterface::class)
+			);
+		});
+
 		$context->registerService(AbsenceService::class, function($c) {
 			return new AbsenceService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
@@ -194,7 +207,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IL10N::class),
 				$c->query(NotificationService::class),
 				$c->query(AbsenceIcalMailService::class),
-				$c->query(HolidayCalendarService::class)
+				$c->query(HolidayCalendarService::class),
+				$c->query(AbsenceNotificationMailService::class)
 			);
 		});
 

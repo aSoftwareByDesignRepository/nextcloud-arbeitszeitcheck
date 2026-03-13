@@ -82,14 +82,15 @@ class TeamMapper extends QBMapper
 	{
 		$ids = [$teamId];
 		$toProcess = [$teamId];
+		$tableName = $this->getTableName();
 		while (!empty($toProcess)) {
 			$parentIds = $toProcess;
 			$toProcess = [];
-			$qb = $this->db->getQueryBuilder();
-			$qb->select('id')
-				->from($this->getTableName())
-				->where($qb->expr()->in('parent_id', $qb->createParameter('parents')));
 			foreach (array_chunk($parentIds, \OCA\ArbeitszeitCheck\Constants::BATCH_CHUNK_SIZE) as $chunk) {
+				$qb = $this->db->getQueryBuilder();
+				$qb->select('id')
+					->from($tableName)
+					->where($qb->expr()->in('parent_id', $qb->createParameter('parents')));
 				$qb->setParameter('parents', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
 				$result = $qb->executeQuery();
 				while ($row = $result->fetch()) {

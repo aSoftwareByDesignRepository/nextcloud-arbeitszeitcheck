@@ -40,6 +40,7 @@ $currentUserId = $_['currentUserId'] ?? '';
 $usersUrl = $_['usersUrl'] ?? '';
 $substituteDisplayName = $_['substituteDisplayName'] ?? null;
 $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
+$colleagues = $_['colleagues'] ?? [];
 ?>
 
 <?php include __DIR__ . '/common/navigation.php'; ?>
@@ -158,13 +159,15 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                     <p id="absence-form-error-text"><?php echo $error ? htmlspecialchars($error, ENT_QUOTES, 'UTF-8') : ''; ?></p>
                 </div>
                 
-                <form id="absence-form" class="form" method="POST" action="<?php 
+                <form id="absence-form" class="form absence-request-form" method="POST" action="<?php 
                     if ($mode === 'create') {
                         p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.store'));
                     } else {
                         p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.updatePost', ['id' => $absence->getId()]));
                     }
                 ?>">
+                    <section class="absence-form-section absence-form-section--main" aria-labelledby="absence-form-section-main-title">
+                        <h3 id="absence-form-section-main-title" class="absence-form-section__title absence-form-section__title--main"><?php p($l->t('Request details')); ?></h3>
                     <div class="form-group">
                         <label for="absence-type" class="form-label">
                             <?php p($l->t('Type')); ?> <span class="form-required">*</span>
@@ -253,33 +256,28 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                         <p class="form-help"><?php p($l->t('You can provide additional information about your absence request')); ?></p>
                     </div>
 
-                    <?php if (($_['hasColleagues'] ?? true)): ?>
-                    <div class="form-group form-group--substitute" id="absence-substitute-group">
+                    <!-- Vertretung: always shown so every user sees the field; list filled via API -->
+                    <div class="form-group form-group--substitute absence-form-section absence-form-section--substitute" id="absence-substitute-group">
+                        <h3 class="absence-form-section__title" id="absence-substitute-section-title"><?php p($l->t('Substitute (Vertretung)')); ?></h3>
                         <label for="absence-substitute" class="form-label" id="absence-substitute-label">
-                            <?php p($l->t('Substitute')); ?>
+                            <?php p($l->t('Who will cover for you?')); ?>
                         </label>
                         <select id="absence-substitute"
                                 name="substitute_user_id"
                                 class="form-select"
-                                aria-describedby="absence-substitute-help"
-                                aria-required="false">
+                                aria-describedby="absence-substitute-help absence-substitute-status"
+                                aria-required="false"
+                                aria-busy="false">
                             <option value=""><?php p($l->t('None')); ?></option>
-                            <!-- Options filled by JavaScript from /api/users -->
+                            <!-- Options filled by JavaScript from /api/colleagues -->
                         </select>
                         <p id="absence-substitute-help" class="form-help"><?php p($l->t('Choose a colleague from your team who will cover your tasks during your absence. Only team members appear in this list.')); ?></p>
+                        <p id="absence-substitute-status" class="form-help form-help--status" aria-live="polite" role="status"></p>
                         <p id="absence-substitute-empty" class="form-help form-help--info" style="display: none;" role="status"><?php p($l->t('No team members found. Add yourself to a team or group to select a substitute.')); ?></p>
+                        <p id="absence-substitute-error" class="form-help form-help--error" style="display: none;" role="alert"><?php p($l->t('Could not load team members. Please try again.')); ?></p>
                         <p id="absence-substitute-required-msg" class="form-help form-help--error" style="display: none;" role="alert"><?php p($l->t('A substitute is required for this absence type. Please select who will cover for you.')); ?></p>
                     </div>
-                    <?php else: ?>
-                    <p class="form-help form-help--info" role="status"><?php
-                        $hasRequired = !empty($requireSubstituteTypes);
-                        if ($hasRequired) {
-                            p($l->t('Some absence types require a substitute. Add yourself to a team to select one.'));
-                        } else {
-                            p($l->t('No team members in your team. You cannot select a substitute. Add yourself to a team to enable this option.'));
-                        }
-                    ?></p>
-                    <?php endif; ?>
+                    </section>
 
                     <div class="form-actions">
                         <button type="submit" class="btn btn--primary">
@@ -361,7 +359,17 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                     </p>
                 </div>
 
-                <?php if ($canCancel): ?>
+                <?php
+                $canEditAfterDecline = $absence->getStatus() === 'substitute_declined';
+                ?>
+                <?php if ($canEditAfterDecline): ?>
+                    <div class="absence-detail-actions absence-detail-actions--top" role="group" aria-label="<?php p($l->t('Actions after substitute declined')); ?>">
+                        <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.edit', ['id' => $absence->getId()])); ?>" class="btn btn--primary" aria-label="<?php p($l->t('Edit to select a different substitute')); ?>">
+                            <?php p($l->t('Edit and select different substitute')); ?>
+                        </a>
+                        <p class="absence-detail-hint"><?php p($l->t('You can edit to select a different substitute or delete this request from the overview.')); ?></p>
+                    </div>
+                <?php elseif ($canCancel): ?>
                     <div class="absence-detail-actions absence-detail-actions--top">
                         <form method="POST"
                               action="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.cancel', ['id' => $absence->getId()])); ?>">
@@ -445,10 +453,10 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                             <dd class="absence-detail-value"><?php p($substituteDisplayName ?? $absence->getSubstituteUserId() ?? $l->t('None')); ?></dd>
                         </div>
                         <div class="absence-detail-row">
-                            <dt class="absence-detail-label"><?php p($l->t('Approval comment')); ?></dt>
+                            <dt class="absence-detail-label"><?php p($absence->getStatus() === 'substitute_declined' ? $l->t('Reason for declining') : $l->t('Approval comment')); ?></dt>
                             <dd class="absence-detail-value"><?php
                                 $comment = $absence->getApproverComment();
-                                p($comment ? $l->t($comment) : $l->t('No approval comment available'));
+                                p($comment ?: $l->t('No approval comment available'));
                             ?></dd>
                         </div>
                     </dl>
@@ -530,7 +538,7 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                         <tbody>
                             <?php if (!empty($absences)): ?>
                                 <?php foreach (($absences ?? []) as $absence): ?>
-                                    <tr data-absence-id="<?php p($absence->getId()); ?>">
+                                    <tr data-absence-id="<?php p($absence->getId()); ?>" data-status="<?php p($absence->getStatus()); ?>">
                                         <td data-label="<?php p($l->t('Type')); ?>">
                                             <span class="absence-type-badge type-<?php p($absence->getType()); ?>">
                                                 <?php 
@@ -593,7 +601,7 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                                             </span>
                                         </td>
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
-                                            <?php if (in_array($absence->getStatus(), ['pending', 'substitute_pending'], true)): ?>
+                                            <?php if (in_array($absence->getStatus(), ['pending', 'substitute_pending', 'substitute_declined'], true)): ?>
                                                 <button type="button" class="btn-icon btn-icon--edit" 
                                                         data-absence-id="<?php p($absence->getId()); ?>"
                                                         aria-label="<?php p($l->t('Edit this absence request')); ?>"
@@ -651,6 +659,7 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
     window.ArbeitszeitCheck.mode = <?php echo json_encode($mode, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.currentUserId = <?php echo json_encode($currentUserId ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.usersUrl = <?php echo json_encode($usersUrl ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.colleagues = <?php echo json_encode($colleagues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.selectedSubstituteId = <?php echo json_encode(($absence && $absence->getSubstituteUserId()) ? $absence->getSubstituteUserId() : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.requireSubstituteTypes = <?php echo json_encode($requireSubstituteTypes ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.absences = <?php echo json_encode(array_map(function($a) {
@@ -689,37 +698,75 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
         const currentUserId = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.currentUserId) || '';
         const usersUrl = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.usersUrl) || '';
         const selectedSubstituteId = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.selectedSubstituteId) || '';
-        if (substituteSelect && usersUrl) {
-            var requestToken = (typeof OC !== 'undefined' && OC.requestToken) ? OC.requestToken : (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) || '';
-            fetch(usersUrl, {
-                headers: { 'requesttoken': requestToken },
-                credentials: 'same-origin'
-            })
-                .then(function(r) {
-                    if (!r.ok) return null;
-                    return r.json();
+        if (substituteSelect) {
+            var substituteGroup = document.getElementById('absence-substitute-group');
+            var emptyHint = document.getElementById('absence-substitute-empty');
+            var errorHint = document.getElementById('absence-substitute-error');
+            var statusEl = document.getElementById('absence-substitute-status');
+            var loadingText = (window.t && window.t('arbeitszeitcheck', 'Loading team members…')) || 'Loading team members…';
+            var errorText = (window.t && window.t('arbeitszeitcheck', 'Could not load team members. Please try again.')) || 'Could not load team members. Please try again.';
+            var colleagues = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.colleagues) || [];
+
+            function setSubstituteState(loading, error, empty) {
+                if (substituteSelect) {
+                    substituteSelect.setAttribute('aria-busy', loading ? 'true' : 'false');
+                    substituteSelect.disabled = loading;
+                }
+                if (statusEl) {
+                    statusEl.textContent = loading ? loadingText : '';
+                    statusEl.style.display = loading ? 'block' : 'none';
+                }
+                if (errorHint) {
+                    errorHint.textContent = errorText;
+                    errorHint.style.display = error ? 'block' : 'none';
+                }
+                if (emptyHint) emptyHint.style.display = (empty && !error) ? 'block' : 'none';
+            }
+
+            function fillSubstituteOptions(users) {
+                var opts = substituteSelect.querySelectorAll('option:not([value=""])');
+                opts.forEach(function(o) { o.remove(); });
+                var count = 0;
+                (users || []).forEach(function(u) {
+                    if (u.userId === currentUserId) return;
+                    var opt = document.createElement('option');
+                    opt.value = u.userId;
+                    opt.textContent = u.displayName || u.display_name || u.userId;
+                    if (u.userId === selectedSubstituteId) opt.selected = true;
+                    substituteSelect.appendChild(opt);
+                    count++;
+                });
+                if (emptyHint) emptyHint.style.display = count === 0 ? 'block' : 'none';
+            }
+
+            if (Array.isArray(colleagues) && colleagues.length > 0) {
+                setSubstituteState(false, false, false);
+                fillSubstituteOptions(colleagues);
+            } else if (usersUrl) {
+                setSubstituteState(true, false, false);
+                var requestToken = (typeof OC !== 'undefined' && OC.requestToken) ? OC.requestToken : (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) || '';
+                fetch(usersUrl, {
+                    headers: { 'requesttoken': requestToken },
+                    credentials: 'same-origin'
                 })
-                .then(function(data) {
-                    var opts = substituteSelect.querySelectorAll('option[value!=""]');
-                    opts.forEach(function(o) { o.remove(); });
-                    var emptyHint = document.getElementById('absence-substitute-empty');
-                    if (!data || !Array.isArray(data.users)) {
-                        if (emptyHint) emptyHint.style.display = 'block';
-                        return;
-                    }
-                    var count = 0;
-                    data.users.forEach(function(u) {
-                        if (u.userId === currentUserId) return;
-                        var opt = document.createElement('option');
-                        opt.value = u.userId;
-                        opt.textContent = u.displayName || u.display_name || u.userId;
-                        if (u.userId === selectedSubstituteId) opt.selected = true;
-                        substituteSelect.appendChild(opt);
-                        count++;
+                    .then(function(r) {
+                        if (!r.ok) {
+                            setSubstituteState(false, false, true);
+                            return null;
+                        }
+                        return r.json().catch(function() { return null; });
+                    })
+                    .then(function(data) {
+                        setSubstituteState(false, false, false);
+                        var users = (data && Array.isArray(data.users)) ? data.users : [];
+                        fillSubstituteOptions(users);
+                    })
+                    .catch(function() {
+                        setSubstituteState(false, false, true);
                     });
-                    if (emptyHint) emptyHint.style.display = count === 0 ? 'block' : 'none';
-                })
-                .catch(function() {});
+            } else {
+                setSubstituteState(false, false, true);
+            }
         }
 
         function updateSubstituteRequiredState() {

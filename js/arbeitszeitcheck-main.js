@@ -1617,6 +1617,17 @@
         },
 
         /**
+         * Return display label for absence (own absences: type label; substitute: "Covering for X")
+         */
+        getAbsenceDisplayLabel: function(absence) {
+            if (absence && absence.role === 'substitute' && absence.ownerDisplayName) {
+                const tmpl = (this.config.l10n && this.config.l10n.coveringFor) || 'Covering for %1$s';
+                return String(tmpl).replace('%1$s', absence.ownerDisplayName);
+            }
+            return this.getAbsenceTypeLabel(absence ? (absence.type || 'absence') : 'absence');
+        },
+
+        /**
          * Render an absence item for timeline
          */
         renderAbsenceItem: function(absence) {
@@ -1624,7 +1635,8 @@
             const endDate = absence.end_date || absence.endDate;
             const type = absence.type || 'unknown';
             const status = absence.status || 'pending';
-            const translatedType = this.getAbsenceTypeLabel(type);
+            const translatedType = this.getAbsenceDisplayLabel(absence);
+            const isCoverage = absence && absence.role === 'substitute';
 
             const start = startDate ? new Date(startDate) : null;
             const end = endDate ? new Date(endDate) : null;
@@ -1674,8 +1686,8 @@
             const badgeClass = status === 'approved' ? 'success' : status === 'rejected' || status === 'substitute_declined' ? 'error' : 'warning';
 
             return `
-                <div class="timeline-item timeline-item--absence">
-                    <div class="timeline-item-icon">📅</div>
+                <div class="timeline-item timeline-item--absence${isCoverage ? ' timeline-item--coverage' : ''}">
+                    <div class="timeline-item-icon">${isCoverage ? '👤' : '📅'}</div>
                     <div class="timeline-item-content">
                         <div class="timeline-item-header">
                             <span class="timeline-item-type">${escapeHtml(translatedType)}</span>
@@ -1931,7 +1943,13 @@
                 
                 const classes = ['calendar-day'];
                 if (dayData.hasTimeEntry) classes.push('calendar-day--has-entry');
-                if (dayData.hasAbsence) classes.push('calendar-day--has-absence');
+                if (dayData.hasAbsence) {
+                    classes.push('calendar-day--has-absence');
+                    const firstAbsence = dayData.absences[0];
+                    if (firstAbsence && firstAbsence.role === 'substitute') {
+                        classes.push('calendar-day--has-coverage');
+                    }
+                }
                 if (dayData.isToday) classes.push('calendar-day--today');
                 if (dayData.isWeekend) classes.push('calendar-day--weekend');
 
@@ -1962,18 +1980,20 @@
                     const absence = dayData.absences[0];
                     const type = absence.type || 'absence';
                     const status = absence.status || 'pending';
-                    
-                    // Use emoji or text indicator for absence type
+                    const isCoverage = absence.role === 'substitute';
+
+                    // Use emoji or text indicator: 👤 for coverage (substitute), else absence type
                     let absenceIndicator = '';
-                    if (type === 'vacation' || type === 'holiday') {
+                    if (isCoverage) {
+                        absenceIndicator = '👤';
+                    } else if (type === 'vacation' || type === 'holiday') {
                         absenceIndicator = '🏖️';
                     } else if (type === 'sick' || type === 'sick_leave') {
                         absenceIndicator = '🏥';
                     } else {
                         absenceIndicator = '📅';
                     }
-                    
-                    // Add status indicator
+
                     if (status === 'pending' || status === 'substitute_pending') {
                         absenceIndicator += ' ⏳';
                     } else if (status === 'approved') {
@@ -1981,9 +2001,9 @@
                     } else if (status === 'rejected' || status === 'substitute_declined') {
                         absenceIndicator += ' ✗';
                     }
-                    
-                    const typeLabel = this.getAbsenceTypeLabel(type);
-                    dayContent += `<div class="calendar-day-absence" title="${escapeHtml(typeLabel)}">${absenceIndicator}</div>`;
+
+                    const displayLabel = this.getAbsenceDisplayLabel(absence);
+                    dayContent += `<div class="calendar-day-absence" title="${escapeHtml(displayLabel)}">${absenceIndicator}</div>`;
                 }
                 
                 // Show entry count if multiple entries
@@ -2061,7 +2081,7 @@
                     totalHours += dayData.hours;
                     workingDays++;
                 }
-                if (dayData.hasAbsence) {
+                if (dayData.hasOwnAbsence) {
                     absenceDays++;
                 }
             }
@@ -2182,9 +2202,12 @@
                 }
             });
 
+            const hasOwnAbsence = dayAbsences.some(a => !a.role || a.role !== 'substitute');
+
             return {
                 hasTimeEntry: dayEntries.length > 0,
                 hasAbsence: dayAbsences.length > 0,
+                hasOwnAbsence,
                 hours: totalHours,
                 entries: dayEntries,
                 absences: dayAbsences,
@@ -2207,8 +2230,8 @@
             if (dayData.isToday) label += ', ' + (this.config.l10n?.today || 'Today');
             if (dayData.hours > 0) label += ', ' + dayData.hours.toFixed(1) + ' ' + (this.config.l10n?.hours || 'hours');
             if (dayData.hasAbsence && dayData.absences.length > 0) {
-                const typeLabel = this.getAbsenceTypeLabel(dayData.absences[0].type || 'absence');
-                label += ', ' + typeLabel;
+                const displayLabel = this.getAbsenceDisplayLabel(dayData.absences[0]);
+                label += ', ' + displayLabel;
             }
             label += '. ' + (this.config.l10n?.clickForDetails || 'Click for details');
             return label;
@@ -2395,8 +2418,8 @@
                     const absencesLabel = this.config.l10n?.absences || 'Absences';
                     html += `<div class="day-details-section"><h4>${absencesLabel}</h4><ul>`;
                     dayData.absences.forEach(absence => {
-                        const translatedType = this.getAbsenceTypeLabel(absence.type || 'absence');
-                        html += `<li>${escapeHtml(translatedType)}</li>`;
+                        const displayLabel = this.getAbsenceDisplayLabel(absence);
+                        html += `<li>${escapeHtml(displayLabel)}</li>`;
                     });
                     html += '</ul></div>';
                 }
@@ -2450,4 +2473,4 @@
     // Expose to global scope for debugging
     window.ArbeitszeitCheckApp = ArbeitszeitCheck;
 
-})(window, OC);
+})(window, (typeof window !== 'undefined' && window.OC) ? window.OC : {});

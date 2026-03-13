@@ -114,6 +114,43 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * Colleague list for substitute dropdown (same data as users() API).
+	 * Built on page load so the form works even if the API request fails.
+	 *
+	 * @return list<array{userId: string, displayName: string, display_name: string}>
+	 */
+	private function getColleaguesForSubstitute(string $userId): array
+	{
+		$colleagueIds = $this->teamResolver->getColleagueIds($userId);
+		\OCP\Log\logger('arbeitszeitcheck')->debug(
+			'[Vertretung] getColleaguesForSubstitute userId=' . $userId . ' colleagueIds=' . count($colleagueIds) . ' ' . json_encode($colleagueIds),
+			['app' => 'arbeitszeitcheck']
+		);
+		$list = [];
+		foreach ($colleagueIds as $uid) {
+			$user = $this->userManager->get($uid);
+			if ($user !== null && $user->isEnabled()) {
+				$displayName = $user->getDisplayName();
+				$list[] = [
+					'userId' => $user->getUID(),
+					'displayName' => $displayName ?? $user->getUID(),
+					'display_name' => $displayName ?? $user->getUID(),
+				];
+			} else {
+				\OCP\Log\logger('arbeitszeitcheck')->debug(
+					'[Vertretung] getColleaguesForSubstitute uid=' . $uid . ' skipped (user=null or disabled)',
+					['app' => 'arbeitszeitcheck']
+				);
+			}
+		}
+		\OCP\Log\logger('arbeitszeitcheck')->debug(
+			'[Vertretung] getColleaguesForSubstitute returning ' . count($list) . ' colleagues',
+			['app' => 'arbeitszeitcheck']
+		);
+		return $list;
+	}
+
+	/**
 	 * Get current user ID
 	 *
 	 * @return string
@@ -400,7 +437,7 @@ class AbsenceController extends Controller
 				}
 			}
 
-			// Add substitute-role absences with a small "role" flag for frontend context.
+			// Add substitute-role absences with a small "role" flag and owner display name for frontend.
 			foreach ($coverageAbsences as $absence) {
 				$id = $absence->getId();
 				if ($id !== null && isset($seenIds[(int)$id])) {
@@ -409,6 +446,8 @@ class AbsenceController extends Controller
 				try {
 					$summary = $absence->getSummary();
 					$summary['role'] = 'substitute';
+					$owner = $this->userManager->get($absence->getUserId());
+					$summary['ownerDisplayName'] = $owner !== null ? $owner->getDisplayName() : $absence->getUserId();
 					$absenceSummaries[] = $summary;
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary for substitute absence ' . $absence->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
@@ -438,9 +477,14 @@ class AbsenceController extends Controller
 	public function create(): TemplateResponse
 	{
 		$userId = $this->getUserId();
-		$colleagueIds = $this->teamResolver->getColleagueIds($userId);
-		$hasColleagues = count($colleagueIds) > 0;
+		$colleagues = $this->getColleaguesForSubstitute($userId);
+		$hasColleagues = count($colleagues) > 0;
 		$requireSubstituteTypes = $this->getRequireSubstituteTypes();
+
+		\OCP\Log\logger('arbeitszeitcheck')->info(
+			'[Vertretung] create() userId=' . $userId . ' colleagues=' . count($colleagues) . ' hasColleagues=' . ($hasColleagues ? '1' : '0'),
+			['app' => 'arbeitszeitcheck']
+		);
 
 		$response = new TemplateResponse(
 			$this->appName,
@@ -454,6 +498,7 @@ class AbsenceController extends Controller
 				'requireSubstituteTypes' => $requireSubstituteTypes,
 				'stats' => [],
 				'currentUserId' => $userId,
+				'colleagues' => $colleagues,
 				'usersUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.users'),
 				'l' => $this->l10n,
 			]
@@ -491,8 +536,8 @@ class AbsenceController extends Controller
 			}
 
 			$userId = $this->getUserId();
-			$colleagueIds = $this->teamResolver->getColleagueIds($userId);
-			$hasColleagues = count($colleagueIds) > 0;
+			$colleagues = $this->getColleaguesForSubstitute($userId);
+			$hasColleagues = count($colleagues) > 0;
 			$requireSubstituteTypes = $this->getRequireSubstituteTypes();
 
 			$response = new TemplateResponse(
@@ -507,6 +552,7 @@ class AbsenceController extends Controller
 					'requireSubstituteTypes' => $requireSubstituteTypes,
 					'stats' => [],
 					'currentUserId' => $userId,
+					'colleagues' => $colleagues,
 					'usersUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.users'),
 					'l' => $this->l10n,
 				]
@@ -569,8 +615,8 @@ class AbsenceController extends Controller
 				return $this->configureCSP($response);
 			}
 
-			$colleagueIds = $this->teamResolver->getColleagueIds($userId);
-			$hasColleagues = count($colleagueIds) > 0;
+			$colleagues = $this->getColleaguesForSubstitute($userId);
+			$hasColleagues = count($colleagues) > 0;
 
 			$substituteDisplayName = null;
 			$subId = $absence->getSubstituteUserId();
@@ -595,6 +641,7 @@ class AbsenceController extends Controller
 					'computedWorkingDays' => [],
 					'absences' => [],
 					'hasColleagues' => $hasColleagues,
+					'colleagues' => $colleagues,
 					'substituteDisplayName' => $substituteDisplayName,
 					'stats' => [],
 					'currentUserId' => $userId,
@@ -769,8 +816,55 @@ class AbsenceController extends Controller
 	public function delete(int $id): JSONResponse
 	{
 		try {
+			if ($id <= 0) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid absence ID')
+				], Http::STATUS_BAD_REQUEST);
+			}
+
 			$userId = $this->getUserId();
-			$this->absenceService->deleteAbsence($id, $userId);
+
+			// First, distinguish between "not found" and "forbidden" using the mapper
+			try {
+				$absence = $this->absenceMapper->find($id);
+			} catch (DoesNotExistException $e) {
+				// Idempotent behaviour: deleting a non-existing absence returns 404,
+				// so API clients can distinguish this from success.
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Absence not found')
+				], Http::STATUS_NOT_FOUND);
+			}
+
+			if ($absence->getUserId() !== $userId) {
+				// Do not leak whether the ID belongs to another user; just deny access.
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied')
+				], Http::STATUS_FORBIDDEN);
+			}
+
+			// Delegate business rules (pending/substitute_pending only, etc.) to the service.
+			try {
+				$this->absenceService->deleteAbsence($id, $userId);
+			} catch (\Exception $e) {
+				$message = trim($e->getMessage());
+				// Map known state-related messages to 409 Conflict to signal that the
+				// resource exists but is not deletable in its current state.
+				if ($message === $this->l10n->t('Only pending absences can be deleted')) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $message
+					], Http::STATUS_CONFLICT);
+				}
+
+				// Fallback: bad request with the service's message.
+				return new JSONResponse([
+					'success' => false,
+					'error' => $message !== '' ? $message : $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+				], Http::STATUS_BAD_REQUEST);
+			}
 
 			return new JSONResponse([
 				'success' => true
@@ -883,23 +977,33 @@ class AbsenceController extends Controller
 			foreach ($colleagueIds as $uid) {
 				$user = $this->userManager->get($uid);
 				if ($user !== null && $user->isEnabled()) {
+					$displayName = $user->getDisplayName();
 					$usersData[] = [
 						'userId' => $user->getUID(),
-						'displayName' => $user->getDisplayName(),
-						'display_name' => $user->getDisplayName()
+						'displayName' => $displayName ?? $user->getUID(),
+						'display_name' => $displayName ?? $user->getUID(),
 					];
 				}
 			}
 
 			return new JSONResponse([
 				'success' => true,
-				'users' => $usersData
+				'users' => $usersData,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Failed to load colleague list for substitute selection: ' . $e->getMessage(),
+				[
+					'app' => 'arbeitszeitcheck',
+					'exception' => $e,
+					'userId' => $this->userSession->getUser()?->getUID() ?? 'unknown',
+				]
+			);
+			// Return empty list so the UI stays usable; user sees "None" and empty-state message
 			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_INTERNAL_SERVER_ERROR);
+				'success' => true,
+				'users' => [],
+			]);
 		}
 	}
 

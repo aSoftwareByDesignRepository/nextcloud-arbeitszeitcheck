@@ -127,7 +127,7 @@ class TeamResolverService
 	/**
 	 * Get colleague user IDs (users in same team/group) for substitute selection.
 	 * Used when an employee selects who will cover for them during absence (Vertretung).
-	 * If use_app_teams: members of all teams where user is a member (excluding self).
+	 * If use_app_teams: members of all teams where user is a member or a manager (excluding self).
 	 * Else: same Nextcloud group members (excluding self).
 	 *
 	 * @param string $userId Current user ID (the employee creating the absence)
@@ -135,34 +135,69 @@ class TeamResolverService
 	 */
 	public function getColleagueIds(string $userId): array
 	{
-		if ($this->useAppTeams()) {
+		$useApp = $this->useAppTeams();
+		\OCP\Log\logger('arbeitszeitcheck')->debug(
+			'[Vertretung] getColleagueIds userId=' . $userId . ' useAppTeams=' . ($useApp ? '1' : '0'),
+			['app' => 'arbeitszeitcheck']
+		);
+		if ($useApp) {
 			try {
-				return $this->getColleagueIdsFromAppTeams($userId);
+				$ids = $this->getColleagueIdsFromAppTeams($userId);
+				\OCP\Log\logger('arbeitszeitcheck')->debug(
+					'[Vertretung] getColleagueIdsFromAppTeams returned ' . count($ids) . ' ids',
+					['app' => 'arbeitszeitcheck', 'ids' => $ids]
+				);
+				return $ids;
 			} catch (\Throwable $e) {
-				$msg = $e->getMessage();
-				if (str_contains($msg, "doesn't exist") || str_contains($msg, 'at_team')) {
-					return [];
-				}
-				throw $e;
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'[Vertretung] getColleagueIdsFromAppTeams exception: ' . $e->getMessage(),
+					['app' => 'arbeitszeitcheck', 'exception' => $e]
+				);
+				return [];
 			}
 		}
-		return $this->getTeamMemberIdsFromGroups($userId);
+		try {
+			$ids = $this->getTeamMemberIdsFromGroups($userId);
+			\OCP\Log\logger('arbeitszeitcheck')->debug(
+				'[Vertretung] getTeamMemberIdsFromGroups returned ' . count($ids) . ' ids',
+				['app' => 'arbeitszeitcheck', 'ids' => $ids]
+			);
+			return $ids;
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'[Vertretung] getTeamMemberIdsFromGroups exception: ' . $e->getMessage(),
+				['app' => 'arbeitszeitcheck', 'exception' => $e]
+			);
+			return [];
+		}
 	}
 
 	/**
-	 * Colleagues from app-owned teams: all members of teams where user is a member.
+	 * Colleagues from app-owned teams: all members of teams where user is a member or a manager.
+	 * This ensures users who are only managers (not members) still see team members as substitute options.
 	 *
 	 * @return list<string>
 	 */
 	private function getColleagueIdsFromAppTeams(string $userId): array
 	{
-		$memberships = $this->teamMemberMapper->findByUserId($userId);
-		if (empty($memberships)) {
-			return [];
-		}
 		$teamIds = [];
-		foreach ($memberships as $m) {
-			$teamIds[] = $m->getTeamId();
+		$memberTeams = $this->teamMemberMapper->findByUserId($userId);
+		foreach ($memberTeams as $m) {
+			$teamIds[$m->getTeamId()] = true;
+		}
+		$managerTeamIds = $this->teamManagerMapper->getTeamIdsForManager($userId);
+		foreach ($managerTeamIds as $tid) {
+			foreach ($this->teamMapper->getIdsWithDescendants($tid) as $id) {
+				$teamIds[$id] = true;
+			}
+		}
+		$teamIds = array_keys($teamIds);
+		\OCP\Log\logger('arbeitszeitcheck')->debug(
+			'[Vertretung] getColleagueIdsFromAppTeams teamIds=' . json_encode($teamIds) . ' (memberCount=' . count($memberTeams) . ', managerTeamCount=' . count($managerTeamIds) . ')',
+			['app' => 'arbeitszeitcheck']
+		);
+		if (empty($teamIds)) {
+			return [];
 		}
 		$memberIds = $this->teamMemberMapper->getMemberUserIdsByTeamIds($teamIds);
 		$result = [];

@@ -22,7 +22,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
 <?php include __DIR__ . '/common/navigation.php'; ?>
 
 <div id="app-content">
-    <div id="app-content-wrapper">
+    <div id="app-content-wrapper" role="main" aria-label="<?php p($l->t('Settings')); ?>">
         <div class="section">
             <div class="section-header">
                 <h2><?php p($l->t('Settings for ArbeitszeitCheck')); ?></h2>
@@ -142,6 +142,43 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                                 aria-describedby="send-ical-legend">
                             <label for="sendIcalToManagers" class="form-label">
                                 <?php p($l->t('Also send iCal to managers (team managers)')); ?>
+                            </label>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-fieldset" aria-labelledby="email-notifications-legend">
+                    <legend id="email-notifications-legend" class="form-legend"><?php p($l->t('Absences: Email notifications for substitution workflow')); ?></legend>
+                    <p class="form-help form-help--block">
+                        <?php p($l->t('When a substitute is selected, emails can be sent at each step of the approval process.')); ?>
+                    </p>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="sendEmailSubstitutionRequest" name="sendEmailSubstitutionRequest" value="1"
+                                <?php echo ($settings['sendEmailSubstitutionRequest'] ?? true) ? 'checked' : ''; ?>
+                                aria-describedby="email-notifications-legend">
+                            <label for="sendEmailSubstitutionRequest" class="form-label">
+                                <?php p($l->t('Email substitute when a substitution request is created')); ?>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="sendEmailSubstituteApprovedToEmployee" name="sendEmailSubstituteApprovedToEmployee" value="1"
+                                <?php echo ($settings['sendEmailSubstituteApprovedToEmployee'] ?? true) ? 'checked' : ''; ?>
+                                aria-describedby="email-notifications-legend">
+                            <label for="sendEmailSubstituteApprovedToEmployee" class="form-label">
+                                <?php p($l->t('Email employee when substitute approves')); ?>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="sendEmailSubstituteApprovedToManager" name="sendEmailSubstituteApprovedToManager" value="1"
+                                <?php echo ($settings['sendEmailSubstituteApprovedToManager'] ?? true) ? 'checked' : ''; ?>
+                                aria-describedby="email-notifications-legend">
+                            <label for="sendEmailSubstituteApprovedToManager" class="form-label">
+                                <?php p($l->t('Email managers when substitute approves (requires app teams)')); ?>
                             </label>
                         </div>
                     </div>

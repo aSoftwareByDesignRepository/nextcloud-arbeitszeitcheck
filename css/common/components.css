@@ -2042,9 +2042,9 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 /* ===== SUBSTITUTION REQUESTS (Vertretungs-Freigabe) ===== */
 .substitution-requests-page .substitution-requests__header {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8, 2rem);
   padding: var(--space-6);
-  background: var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background));
+  background: var(--arbeitszeitcheck-color-background-elevated);
   border-radius: var(--radius-xl);
   border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
 }
@@ -2054,40 +2054,52 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 .substitution-requests__title {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 1.2;
-  margin: 0 0 var(--space-2);
+  line-height: 1.3;
+  margin: 0 0 var(--space-3);
+  color: var(--arbeitszeitcheck-color-main-text);
 }
 
 .substitution-requests__desc {
   margin: 0;
-  color: var(--arbeitszeitcheck-color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 .substitution-requests-content {
-  margin-top: var(--space-4);
+  margin-top: var(--space-5);
+  min-height: 80px;
 }
 
 .substitution-requests-loading {
   margin: 0;
-  padding: var(--space-4);
-  color: var(--arbeitszeitcheck-color-text-secondary);
+  padding: var(--space-6);
+  font-size: 0.9375rem;
+  color: var(--arbeitszeitcheck-color-text-maxcontrast);
+  text-align: center;
 }
 
 .substitution-requests-items {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .substitution-request-card {
-  background: var(--arbeitszeitcheck-color-background-card, var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background)));
+  background: var(--arbeitszeitcheck-color-background-elevated);
   border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  border-radius: var(--radius-xl, 12px);
+  padding: var(--space-6, 1.5rem);
   box-shadow: var(--arbeitszeitcheck-shadow-subtle);
-  transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .substitution-request-card { transition: none; }
 }
 
 .substitution-request-card:focus-within {
@@ -2096,48 +2108,67 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 .substitution-request-card__body {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  justify-content: space-between;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
 }
 
 .substitution-request-card__title {
   margin: 0;
-  font-size: var(--arbeitszeitcheck-font-size-base);
-  flex: 1 1 100%;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--arbeitszeitcheck-color-main-text);
 }
 
 .substitution-request-card__meta {
   margin: 0;
-  font-size: var(--arbeitszeitcheck-font-size-sm);
-  color: var(--arbeitszeitcheck-color-text-secondary);
-  flex: 1 1 100%;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
+/* WCAG 2.1 AA 2.5.5: min 44x44px touch targets */
 .substitution-request-card__actions {
   display: flex;
-  gap: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-3);
   flex: 1 1 100%;
   margin-top: var(--space-2);
 }
 
+.substitution-request-card__actions .btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: var(--space-2) var(--space-4);
+}
+
 .substitution-requests-empty {
-  padding: var(--space-8) var(--space-4);
+  padding: var(--space-10, 2.5rem) var(--space-6);
   text-align: center;
-  color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
 .substitution-requests-empty p {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--arbeitszeitcheck-color-main-text);
 }
 
+.substitution-requests-empty p:last-child { margin-bottom: 0; }
+
 .substitution-requests-empty__hint {
-  font-size: var(--arbeitszeitcheck-font-size-sm);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
 @media (min-width: 640px) {
-  .substitution-request-card__title { flex: 1 1 auto; }
+  .substitution-request-card__body {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .substitution-request-card__title { flex: 1 1 auto; min-width: 0; }
   .substitution-request-card__meta { flex: 0 0 auto; }
   .substitution-request-card__actions { flex: 0 0 auto; margin-top: 0; }
   .substitution-requests__title { font-size: 2rem; }

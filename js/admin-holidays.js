@@ -333,14 +333,89 @@
                 deleteBtn.setAttribute('aria-label', ariaLabel);
             }
             Utils.on(deleteBtn, 'click', function() {
+                const name = item.name || '';
+                const title = window.t ? window.t('arbeitszeitcheck', 'Remove holiday') : 'Remove holiday';
+
+                const baseMessage = window.t
+                    ? window.t('arbeitszeitcheck', 'Do you really want to remove the holiday "{name}" on {date}?')
+                        .replace('{name}', name)
+                        .replace('{date}', displayDate || '')
+                    : ('Do you really want to remove the holiday "' + name + '" on ' + (displayDate || '') + '?');
+
+                let extra = '';
                 if (item.scope === 'statutory') {
-                    const infoMsg = (window.t && window.t('arbeitszeitcheck', 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.')) || 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.';
-                    const confirmMsg = (window.t && window.t('arbeitszeitcheck', 'Remove this holiday?')) || 'Remove this holiday?';
-                    if (!window.confirm(infoMsg + '\n\n' + confirmMsg)) {
+                    extra = window.t
+                        ? window.t('arbeitszeitcheck', 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.')
+                        : 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.';
+                }
+
+                const body = extra ? (extra + '<br><br>' + baseMessage) : baseMessage;
+
+                if (window.ArbeitszeitCheckComponents && window.ArbeitszeitCheckComponents.createModal) {
+                    const Components = window.ArbeitszeitCheckComponents;
+                    const content = `
+                        <div class="modal-section">
+                            <h2 id="holiday-delete-title" class="modal-title">${title}</h2>
+                            <p id="holiday-delete-body" class="modal-text">${body}</p>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn--secondary" data-action="close-modal">
+                                ${(window.t && window.t('arbeitszeitcheck', 'Cancel')) || 'Cancel'}
+                            </button>
+                            <button type="button" class="btn btn--primary btn--danger" data-action="confirm-delete-holiday">
+                                ${(window.t && window.t('arbeitszeitcheck', 'Remove')) || 'Remove'}
+                            </button>
+                        </div>
+                    `;
+
+                    const modal = Components.createModal({
+                        id: 'delete-holiday-modal',
+                        title: title,
+                        content: content,
+                        size: 'md',
+                        closable: true,
+                        ariaLabelledBy: 'holiday-delete-title',
+                        ariaDescribedBy: 'holiday-delete-body',
+                        onClose: function() {
+                            const el = document.getElementById('delete-holiday-modal');
+                            if (el && el.parentNode) {
+                                el.parentNode.remove();
+                            }
+                        }
+                    });
+
+                    document.body.appendChild(modal);
+                    Components.openModal('delete-holiday-modal');
+
+                    const modalEl = document.getElementById('delete-holiday-modal');
+                    if (!modalEl) {
                         return;
                     }
+
+                    const cancelBtn = modalEl.querySelector('[data-action="close-modal"]');
+                    const confirmBtn = modalEl.querySelector('[data-action="confirm-delete-holiday"]');
+
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', function() {
+                            Components.closeModal(modalEl);
+                        });
+                    }
+
+                    if (confirmBtn) {
+                        confirmBtn.addEventListener('click', function() {
+                            Components.closeModal(modalEl);
+                            deleteHoliday(item.id, row);
+                        });
+                        confirmBtn.focus();
+                    }
+                } else {
+                    // Fallback to native confirm if modal components are not available
+                    const confirmMsg = body.replace(/<br\s*\/?>/gi, '\n\n');
+                    if (!window.confirm(confirmMsg)) {
+                        return;
+                    }
+                    deleteHoliday(item.id, row);
                 }
-                deleteHoliday(item.id, row);
             });
             actionsCell.appendChild(deleteBtn);
         }

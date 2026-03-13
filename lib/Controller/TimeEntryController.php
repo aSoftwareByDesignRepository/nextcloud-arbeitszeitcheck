@@ -1470,6 +1470,8 @@ class TimeEntryController extends Controller
 				];
 			}
 
+			// Delete the entry itself
+			$entryId = $entry->getId();
 			$this->timeEntryMapper->delete($entry);
 
 			// Log the action

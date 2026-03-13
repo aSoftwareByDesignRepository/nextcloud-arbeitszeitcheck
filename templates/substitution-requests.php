@@ -44,7 +44,7 @@ $apiDeclineUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.substitute.decline
             <h2 id="requests-heading" class="visually-hidden"><?php p($l->t('Pending substitution requests')); ?></h2>
 
             <div id="substitution-requests-content" class="substitution-requests-content" role="region" aria-live="polite">
-                <p id="substitution-requests-loading" class="substitution-requests-loading" aria-hidden="false"><?php p($l->t('Loading…')); ?></p>
+                <p id="substitution-requests-loading" class="substitution-requests-loading" role="status" aria-live="polite" aria-hidden="false"><?php p($l->t('Loading…')); ?></p>
                 <div id="substitution-requests-items" class="substitution-requests-items" aria-hidden="true"></div>
                 <div id="substitution-requests-empty" class="substitution-requests-empty visually-hidden" role="status">
                     <p><?php p($l->t('No substitution requests.')); ?></p>

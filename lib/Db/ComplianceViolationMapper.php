@@ -134,6 +134,25 @@ class ComplianceViolationMapper extends QBMapper
 	}
 
 	/**
+	 * Delete all violations that are linked to a given time entry.
+	 *
+	 * This is used when a manual time entry is deleted so that we do not keep
+	 * orphaned compliance records pointing to a non-existent entry. The user
+	 * still has an audit trail for the deletion itself via the audit log.
+	 *
+	 * @param int $timeEntryId
+	 * @return int Number of deleted rows
+	 */
+	public function deleteByTimeEntryId(int $timeEntryId): int
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('time_entry_id', $qb->createNamedParameter($timeEntryId, IQueryBuilder::PARAM_INT)));
+
+		return $qb->executeStatement();
+	}
+
+	/**
 	 * Find violations by type
 	 *
 	 * @param string $violationType

@@ -83,6 +83,21 @@ class SubstituteController extends Controller
 		return $user ? $user->getDisplayName() : $userId;
 	}
 
+	private function getTypeLabel(string $type): string
+	{
+		$map = [
+			'vacation' => $this->l10n->t('Vacation'),
+			'sick_leave' => $this->l10n->t('Sick Leave'),
+			'personal_leave' => $this->l10n->t('Personal Leave'),
+			'parental_leave' => $this->l10n->t('Parental Leave'),
+			'special_leave' => $this->l10n->t('Special Leave'),
+			'unpaid_leave' => $this->l10n->t('Unpaid Leave'),
+			'home_office' => $this->l10n->t('Home Office'),
+			'business_trip' => $this->l10n->t('Business Trip'),
+		];
+		return $map[$type] ?? $type;
+	}
+
 	/**
 	 * Page to view and respond to substitution requests
 	 */
@@ -152,6 +167,7 @@ class SubstituteController extends Controller
 			foreach ($requests as $absence) {
 				$summary = $absence->getSummary();
 				$summary['displayName'] = $this->getDisplayName($absence->getUserId());
+				$summary['typeLabel'] = $this->getTypeLabel($absence->getType());
 				$items[] = $summary;
 			}
 

@@ -63,6 +63,9 @@
         formData.sendIcalApprovedAbsences = isChecked(formData.sendIcalApprovedAbsences);
         formData.sendIcalToSubstitute = isChecked(formData.sendIcalToSubstitute);
         formData.sendIcalToManagers = isChecked(formData.sendIcalToManagers);
+        formData.sendEmailSubstitutionRequest = isChecked(formData.sendEmailSubstitutionRequest);
+        formData.sendEmailSubstituteApprovedToEmployee = isChecked(formData.sendEmailSubstituteApprovedToEmployee);
+        formData.sendEmailSubstituteApprovedToManager = isChecked(formData.sendEmailSubstituteApprovedToManager);
         formData.statutoryAutoReseed = isChecked(formData.statutoryAutoReseed);
 
         // Convert numbers (use defaults on invalid/empty)

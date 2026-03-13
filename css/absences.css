@@ -42,8 +42,59 @@
 	margin-bottom: 0;
 }
 
+/* Form sections: clear hierarchy and spacing (WCAG 2.1 AA, simple UX) */
+.absence-request-form .absence-form-section {
+	margin-bottom: var(--space-8, 2rem);
+}
+.absence-request-form .absence-form-section:last-of-type {
+	margin-bottom: 0;
+}
+.absence-form-section__title {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--arbeitszeitcheck-color-main-text);
+	margin: 0 0 var(--space-4, 1rem);
+	line-height: 1.4;
+}
+.absence-form-section__title--main {
+	margin-bottom: var(--space-5, 1.25rem);
+	padding-bottom: var(--space-2, 0.5rem);
+	border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
+}
+.absence-form-section--substitute {
+	margin-top: var(--space-6, 1.5rem);
+	padding-top: var(--space-6, 1.5rem);
+	border-top: 1px solid var(--arbeitszeitcheck-color-border);
+	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, rgba(0, 0, 0, 0.03)));
+	border-radius: var(--radius-base, 8px);
+	padding: var(--space-6, 1.5rem);
+	margin-left: calc(-1 * var(--space-6, 1.5rem));
+	margin-right: calc(-1 * var(--space-6, 1.5rem));
+	margin-bottom: 0;
+}
+.absence-form-section--substitute .absence-form-section__title {
+	margin-top: 0;
+	margin-bottom: var(--space-3, 0.75rem);
+}
+.form-help--status {
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
+	font-style: italic;
+}
+.section--form .form-select[aria-busy="true"],
+.section--form .form-select:disabled {
+	opacity: 0.8;
+	cursor: wait;
+}
 .section--form .form-group--substitute {
-	margin-top: var(--space-4, 1rem);
+	margin-top: 0;
+}
+
+@media (max-width: 768px) {
+	.absence-form-section--substitute {
+		margin-left: 0;
+		margin-right: 0;
+		padding: var(--space-5, 1.25rem);
+	}
 }
 
 .section--form .form-label {
@@ -283,6 +334,15 @@
 	background: var(--arbeitszeitcheck-color-background-hover);
 }
 
+/* Subtle highlight for rows that need action (e.g. substitute declined) */
+.absences-table tbody tr[data-status="substitute_declined"] {
+	background: var(--arbeitszeitcheck-color-background-hover, rgba(0, 0, 0, 0.02));
+}
+
+.absences-table tbody tr[data-status="substitute_declined"]:hover {
+	background: var(--arbeitszeitcheck-color-background-hover);
+}
+
 /* Absence Type Badge - Compatible with all Nextcloud themes */
 .absence-type-badge {
 	display: inline-block;
@@ -476,6 +536,14 @@
 	color: var(--arbeitszeitcheck-color-main-text);
 	word-break: break-word;
 	min-width: 0; /* crucial: allow grid item to shrink */
+}
+
+.absence-detail-hint {
+	margin: var(--space-3, 0.75rem) 0 0;
+	font-size: 0.9375rem;
+	line-height: 1.5;
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
+	max-width: 36em;
 }
 
 .absence-detail-actions {

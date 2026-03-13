@@ -407,6 +407,9 @@ class AdminController extends Controller
 			'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 			'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
 			'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
+			'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
+			'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
+			'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
 			'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', '10'),
 			'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', '11'),
 			'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
@@ -1182,6 +1185,9 @@ class AdminController extends Controller
 				'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 				'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
 				'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
+				'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
+				'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
+				'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
 				'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', '10'),
 				'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', '11'),
 				'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
@@ -1223,6 +1229,9 @@ class AdminController extends Controller
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
 				'sendIcalToManagers' => 'send_ical_to_managers',
+				'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
+				'sendEmailSubstituteApprovedToEmployee' => 'send_email_substitute_approved_to_employee',
+				'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
 				'maxDailyHours' => 'max_daily_hours',
 				'minRestPeriod' => 'min_rest_period',
 				'germanState' => 'german_state',
@@ -1239,7 +1248,12 @@ class AdminController extends Controller
 					$value = $params[$paramKey];
 
 					// Validate and convert value based on type
-					if ($paramKey === 'autoComplianceCheck' || $paramKey === 'realtimeComplianceCheck' || $paramKey === 'complianceStrictMode' || $paramKey === 'enableViolationNotifications' || $paramKey === 'sendIcalApprovedAbsences' || $paramKey === 'sendIcalToSubstitute' || $paramKey === 'statutoryAutoReseed') {
+					if (in_array($paramKey, [
+						'autoComplianceCheck', 'realtimeComplianceCheck', 'complianceStrictMode', 'enableViolationNotifications',
+						'sendIcalApprovedAbsences', 'sendIcalToSubstitute', 'sendIcalToManagers',
+						'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee', 'sendEmailSubstituteApprovedToManager',
+						'statutoryAutoReseed'
+					], true)) {
 						$value = ($value === true || $value === 'true' || $value === '1') ? '1' : '0';
 					} elseif ($paramKey === 'maxDailyHours' || $paramKey === 'minRestPeriod' || $paramKey === 'defaultWorkingHours') {
 						$value = (string)max(0, (float)$value);
@@ -2471,6 +2485,47 @@ class AdminController extends Controller
 			}
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::getTeams: ' . $msg, ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $msg], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Get a summary of what will be affected if a team is deleted.
+	 *
+	 * Returns counts of members, managers, and direct sub-teams. This is used
+	 * by the admin UI to present a clear, WCAG-compliant confirmation dialog
+	 * before performing the destructive action.
+	 */
+	#[NoCSRFRequired]
+	public function getTeamDeleteImpact(int $id): JSONResponse
+	{
+		try {
+			$team = $this->teamMapper->find($id);
+
+			$members = $this->teamMemberMapper->findByTeamId($id);
+			$managers = $this->teamManagerMapper->findByTeamId($id);
+			$children = $this->teamMapper->findByParentId($id);
+
+			return new JSONResponse([
+				'success' => true,
+				'impact' => [
+					'teamId' => $team->getId(),
+					'teamName' => $team->getName(),
+					'memberCount' => count($members),
+					'managerCount' => count($managers),
+					'childTeamCount' => count($children),
+				],
+			]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Team not found'),
+			], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::getTeamDeleteImpact: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 

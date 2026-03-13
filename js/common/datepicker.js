@@ -42,6 +42,17 @@ function parseDDMMYYYYToDate(val) {
 	return new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
 }
 
+function parseMinDateFromElement(el) {
+	var minVal = el && el.getAttribute && el.getAttribute('data-datepicker-min');
+	if (!minVal || minVal === 'today') return minVal === 'today' ? new Date() : null;
+	if (/^\d{2}\.\d{2}\.\d{4}$/.test(minVal)) {
+		var p = minVal.split('.');
+		return new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+	}
+	if (/^\d{4}-\d{2}-\d{2}$/.test(minVal)) return new Date(minVal);
+	return null;
+}
+
 /**
  * Initialize datepicker on input (dd.mm.yyyy format, calendar popup)
  * @param {HTMLElement|string} input - Input element or selector
@@ -122,7 +133,12 @@ function initializeDatepicker(input, options = {}) {
 				dayCell.style.color = 'var(--color-primary-element-text)';
 			}
 
-			const disabled = (options.minDate && date < options.minDate) || (options.maxDate && date > options.maxDate);
+			var minDate = options.minDate;
+			if (element.getAttribute && (!minDate || options.useDynamicMin)) {
+				var dyn = parseMinDateFromElement(element);
+				if (dyn) minDate = dyn;
+			}
+			const disabled = (minDate && date < minDate) || (options.maxDate && date > options.maxDate);
 			if (disabled) {
 				dayCell.style.opacity = '0.3';
 				dayCell.style.cursor = 'not-allowed';
@@ -331,6 +347,7 @@ function initializeDatepicker(input, options = {}) {
 						return parseDDMMYYYYToDate(other.value);
 					};
 				}
+				if (el.getAttribute('data-datepicker-min-sick')) opts.useDynamicMin = true;
 				initializeDatepicker(el, opts);
 			});
 		}

@@ -1312,6 +1312,8 @@
 		"Sick leave start date cannot be more than %s days in the past.": "Das Startdatum der Krankschreibung darf höchstens %s Tage in der Vergangenheit liegen.",
 		"This period overlaps with an existing %1$s (%2$s – %3$s).": "Dieser Zeitraum überschneidet sich mit einer bestehenden %1$s (%2$s – %3$s).",
 		"If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.": "Falls Sie im Urlaub erkrankt sind: Bitte verkürzen oder stornieren Sie zuerst den Urlaub und reichen Sie danach eine separate Krankschreibung ein.",
+		"Date is required and cannot be empty": "Datum ist erforderlich und darf nicht leer sein",
+		"Vacation must include at least one working day. The selected period contains only weekends or public holidays.": "Urlaub muss mindestens einen Arbeitstag umfassen. Der gewählte Zeitraum enthält nur Wochenenden oder Feiertage.",
 		"Submitting...": "Wird übermittelt...",
 		"Create Entry": "Eintrag erstellen",
 		"Update Entry": "Eintrag aktualisieren",

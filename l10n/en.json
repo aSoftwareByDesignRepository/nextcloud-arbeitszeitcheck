@@ -1292,6 +1292,8 @@
 		"Sick leave start date cannot be more than %s days in the past.": "Sick leave start date cannot be more than %s days in the past.",
 		"This period overlaps with an existing %1$s (%2$s – %3$s).": "This period overlaps with an existing %1$s (%2$s – %3$s).",
 		"If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.": "If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.",
+		"Date is required and cannot be empty": "Date is required and cannot be empty",
+		"Vacation must include at least one working day. The selected period contains only weekends or public holidays.": "Vacation must include at least one working day. The selected period contains only weekends or public holidays.",
 		"Submitting...": "Submitting...",
 		"Create Entry": "Create Entry",
 		"Update Entry": "Update Entry",

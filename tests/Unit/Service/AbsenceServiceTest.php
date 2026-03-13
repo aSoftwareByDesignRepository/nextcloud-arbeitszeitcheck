@@ -153,6 +153,89 @@ class AbsenceServiceTest extends TestCase
 	}
 
 	/**
+	 * Test creating absence with empty/whitespace date string – parseDate rejects
+	 */
+	public function testCreateAbsenceEmptyDateString(): void
+	{
+		$userId = 'testuser';
+		$data = [
+			'type' => Absence::TYPE_VACATION,
+			'start_date' => '   ',
+			'end_date' => (new \DateTime())->modify('+7 days')->format('Y-m-d'),
+			'reason' => 'Test'
+		];
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('Date is required and cannot be empty');
+
+		$this->service->createAbsence($data, $userId);
+	}
+
+	/**
+	 * Test vacation with 0 working days (e.g. weekend-only) – must be rejected
+	 */
+	public function testCreateAbsenceVacationZeroWorkingDays(): void
+	{
+		$userId = 'testuser';
+		$futureSat = (new \DateTime())->modify('next Saturday');
+		$futureSun = (clone $futureSat)->modify('+1 day');
+		$data = [
+			'type' => Absence::TYPE_VACATION,
+			'start_date' => $futureSat->format('Y-m-d'),
+			'end_date' => $futureSun->format('Y-m-d'),
+			'reason' => 'Weekend only'
+		];
+
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$year = (int)$futureSat->format('Y');
+		$this->holidayCalendarService->method('computeWorkingDaysPerYearForUser')
+			->willReturn([$year => 0.0]);
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('Vacation must include at least one working day');
+
+		$this->service->createAbsence($data, $userId);
+	}
+
+	/**
+	 * Test vacation when computeWorkingDaysPerYear returns empty – fallback to HolidayService
+	 */
+	public function testCreateAbsenceVacationFallbackWhenEmpty(): void
+	{
+		$userId = 'testuser';
+		$futureStart = (new \DateTime())->modify('+14 days');
+		$futureEnd = (clone $futureStart)->modify('+2 days');
+		$data = [
+			'type' => Absence::TYPE_VACATION,
+			'start_date' => $futureStart->format('Y-m-d'),
+			'end_date' => $futureEnd->format('Y-m-d'),
+			'reason' => 'Fallback test'
+		];
+
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->absenceMapper->method('getVacationDaysUsed')->willReturn(0.0);
+		$this->absenceMapper->method('getSickLeaveDays')->willReturn(0.0);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userSettingsMapper->method('getIntegerSetting')->willReturn(25);
+		$this->holidayCalendarService->method('computeWorkingDaysPerYearForUser')->willReturn([]);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(2.0);
+
+		$absence = new Absence();
+		$absence->setId(125);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(clone $futureStart);
+		$absence->setEndDate(clone $futureEnd);
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setDays(2.0);
+		$this->absenceMapper->expects($this->once())->method('insert')->willReturn($absence);
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+
+		$result = $this->service->createAbsence($data, $userId);
+		$this->assertSame($absence, $result);
+	}
+
+	/**
 	 * Test creating absence with invalid date range (start after end)
 	 */
 	public function testCreateAbsenceInvalidDateRange(): void
@@ -455,7 +538,15 @@ class AbsenceServiceTest extends TestCase
 			->method('findOverlapping')
 			->willReturn([]);
 
-		$this->holidayCalendarService->method('computeWorkingDaysPerYearForUser')->willReturn([]);
+		$newStart = (clone $start)->modify('+1 day');
+		$newEnd = (clone $end)->modify('+1 day');
+		$year = (int)$newStart->format('Y');
+		$this->holidayCalendarService->method('computeWorkingDaysPerYearForUser')
+			->willReturn([$year => 5.0]);
+		$this->absenceMapper->method('getVacationDaysUsed')->willReturn(10.0);
+		$this->absenceMapper->method('getSickLeaveDays')->willReturn(0.0);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userSettingsMapper->method('getIntegerSetting')->willReturn(25);
 
 		$this->absenceMapper->expects($this->once())
 			->method('update')
@@ -468,11 +559,9 @@ class AbsenceServiceTest extends TestCase
 			->method('logAction')
 			->with($userId, 'absence_updated', 'absence', $absenceId, $this->isType('array'), $this->isType('array'));
 
-		$newStart = (clone $start)->modify('+1 day');
-		$newEnd = (clone $end)->modify('+1 day');
 		$updateData = [
 			'start_date' => $newStart->format('Y-m-d'),
-			'end_date' => $newEnd->format('Y-m-d')
+			'end_date' => $newEnd->format('Y-m-d'),
 		];
 
 		$result = $this->service->updateAbsence($absenceId, $updateData, $userId);

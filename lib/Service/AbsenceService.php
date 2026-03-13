@@ -854,6 +854,18 @@ class AbsenceService
 		// (getVacationStats only counts approved absences; when updating, add back old absence's days)
 			if ($type === Absence::TYPE_VACATION) {
 			$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate, $userId);
+			// Fallback if HolidayCalendarService returns empty (e.g. config/state resolution failure)
+			if ($requestedWorkingDaysPerYear === []) {
+				$requestedWorkingDaysPerYear = HolidayService::computeWorkingDaysPerYear(
+					clone $startDate,
+					clone $endDate,
+					[]
+				);
+			}
+			$totalRequested = array_sum($requestedWorkingDaysPerYear);
+			if ($totalRequested < 0.01) {
+				throw new \Exception($this->l10n->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.'));
+			}
 			$addBackPerYear = [];
 			if ($excludeAbsenceId !== null) {
 				try {
@@ -1033,6 +1045,11 @@ class AbsenceService
 	 */
 	private function parseDate(string $dateString): \DateTime
 	{
+		$dateString = trim($dateString);
+		if ($dateString === '') {
+			throw new \Exception($this->l10n->t('Date is required and cannot be empty'));
+		}
+
 		// Try German format first (dd.mm.yyyy)
 		if (preg_match('/^(\d{2})\.(\d{2})\.(\d{4})$/', $dateString, $matches)) {
 			$day = (int)$matches[1];

@@ -688,6 +688,31 @@
                 }
             }
 
+            // Create/Edit form: update min date for start/end based on absence type
+            const absenceTypeSel = document.getElementById('absence-type');
+            const absenceStartInput = document.getElementById('absence-start-date');
+            const absenceEndInput = document.getElementById('absence-end-date');
+            if (absenceTypeSel && absenceStartInput && absenceEndInput) {
+                const applyMinDateForType = function() {
+                    const type = absenceTypeSel.value;
+                    const isSickLeave = type === 'sick_leave';
+                    const minVal = isSickLeave && absenceStartInput.getAttribute('data-datepicker-min-sick')
+                        ? absenceStartInput.getAttribute('data-datepicker-min-sick')
+                        : (function() {
+                            const d = new Date();
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            return dd + '.' + mm + '.' + d.getFullYear();
+                        })();
+                    absenceStartInput.setAttribute('data-datepicker-min', minVal);
+                    absenceEndInput.setAttribute('data-datepicker-min', absenceEndInput.getAttribute('data-datepicker-min-sick') && isSickLeave
+                        ? absenceEndInput.getAttribute('data-datepicker-min-sick')
+                        : minVal);
+                };
+                absenceTypeSel.addEventListener('change', applyMinDateForType);
+                applyMinDateForType();
+            }
+
             // Filter button - toggle filter section (only when both exist)
             const filterBtn = document.getElementById('btn-filter');
             const filterSection = document.getElementById('filter-section');

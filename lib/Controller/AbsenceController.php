@@ -89,6 +89,18 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * Get a safe user-facing error message from an exception.
+	 * Business logic exceptions (\Exception) contain user-safe messages; other Throwables use generic text.
+	 */
+	private function getSafeErrorMessage(\Throwable $e): string
+	{
+		if ($e instanceof \Exception && $e->getMessage() !== '') {
+			return $e->getMessage();
+		}
+		return $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+	}
+
+	/**
 	 * Whether the request expects a JSON response (AJAX/API).
 	 *
 	 * @return bool
@@ -223,13 +235,14 @@ class AbsenceController extends Controller
 				'absence' => $absence->getSummary()
 			]);
 		} catch (\Throwable $e) {
+			$msg = $this->getSafeErrorMessage($e);
 			if (!$this->wantsJson()) {
-				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?error=' . rawurlencode($this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'));
+				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?error=' . rawurlencode($msg);
 				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 			}
 			return new JSONResponse([
 				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+				'error' => $msg
 			], Http::STATUS_BAD_REQUEST);
 		}
 	}
@@ -265,7 +278,7 @@ class AbsenceController extends Controller
 		} catch (\Throwable $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+				'error' => $this->getSafeErrorMessage($e)
 			], Http::STATUS_BAD_REQUEST);
 		}
 	}
@@ -294,7 +307,7 @@ class AbsenceController extends Controller
 			return new RedirectResponse($url . '?shortened=1', Http::STATUS_SEE_OTHER);
 		} catch (\Throwable $e) {
 			$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.show', ['id' => $id]);
-			return new RedirectResponse($url . '?shorten_error=' . rawurlencode($this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')), Http::STATUS_SEE_OTHER);
+			return new RedirectResponse($url . '?shorten_error=' . rawurlencode($this->getSafeErrorMessage($e)), Http::STATUS_SEE_OTHER);
 		}
 	}
 

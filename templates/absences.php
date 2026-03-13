@@ -199,6 +199,10 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                         <p class="form-help"><?php p($l->t('Select the type of absence you want to request')); ?></p>
                     </div>
 
+                    <?php
+                    $todayFormatted = (new DateTime())->format('d.m.Y');
+                    $sickMinDate = (new DateTime())->modify('-7 days')->format('d.m.Y');
+                    ?>
                     <div class="form-group">
                         <label for="absence-start-date" class="form-label">
                             <?php p($l->t('Start Date')); ?> <span class="form-required">*</span>
@@ -207,7 +211,8 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                                id="absence-start-date"
                                name="start_date"
                                class="form-input datepicker-input"
-                               data-datepicker-min="<?php echo (new DateTime())->modify('-7 days')->format('d.m.Y'); ?>"
+                               data-datepicker-min="<?php echo $todayFormatted; ?>"
+                               data-datepicker-min-sick="<?php echo $sickMinDate; ?>"
                                data-datepicker-sync-month-with="absence-end-date"
                                value="<?php p($absence ? $absence->getStartDate()->format('d.m.Y') : ''); ?>"
                                placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
@@ -225,7 +230,8 @@ $requireSubstituteTypes = $_['requireSubstituteTypes'] ?? [];
                                id="absence-end-date"
                                name="end_date"
                                class="form-input datepicker-input"
-                               data-datepicker-min="<?php echo (new DateTime())->modify('-7 days')->format('d.m.Y'); ?>"
+                               data-datepicker-min="<?php echo $todayFormatted; ?>"
+                               data-datepicker-min-sick="<?php echo $sickMinDate; ?>"
                                data-datepicker-sync-month-with="absence-start-date"
                                value="<?php p($absence ? $absence->getEndDate()->format('d.m.Y') : ''); ?>"
                                placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"

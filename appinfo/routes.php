@@ -51,6 +51,7 @@ return [
 		['name' => 'time_entry#apiUpdatePost', 'url' => '/api/time-entries/{id}', 'verb' => 'POST'],
 		['name' => 'time_entry#apiDelete', 'url' => '/api/time-entries/{id}', 'verb' => 'DELETE'],
 		['name' => 'time_entry#requestCorrection', 'url' => '/api/time-entries/{id}/request-correction', 'verb' => 'POST'],
+		['name' => 'time_entry#checkOverlap', 'url' => '/api/time-entries/check-overlap', 'verb' => 'GET'],
 
 		// Absence management routes
 		['name' => 'absence#index_api', 'url' => '/api/absences-legacy', 'verb' => 'GET'],
@@ -108,6 +109,7 @@ return [
 		['name' => 'compliance#getStatus', 'url' => '/api/compliance/status', 'verb' => 'GET'],
 		['name' => 'compliance#getReport', 'url' => '/api/compliance/report', 'verb' => 'GET'],
 		['name' => 'compliance#runCheck', 'url' => '/api/compliance/run-check', 'verb' => 'POST'],
+		['name' => 'compliance#checkRestPeriod', 'url' => '/api/compliance/check-rest-period', 'verb' => 'GET'],
 
 		// Holiday routes
 		['name' => 'holiday#index', 'url' => '/api/holidays', 'verb' => 'GET'],
@@ -146,6 +148,7 @@ return [
 		['name' => 'admin#getAuditLogStats', 'url' => '/api/admin/audit-logs/stats', 'verb' => 'GET'],
 		['name' => 'admin#exportAuditLogs', 'url' => '/api/admin/audit-logs/export', 'verb' => 'GET'],
 		['name' => 'admin#getUsers', 'url' => '/api/admin/users', 'verb' => 'GET'],
+		['name' => 'admin#exportUsers', 'url' => '/api/admin/users/export', 'verb' => 'GET'],
 		['name' => 'admin#getUser', 'url' => '/api/admin/users/{userId}', 'verb' => 'GET'],
 		['name' => 'admin#updateUserWorkingTimeModel', 'url' => '/api/admin/users/{userId}/working-time-model', 'verb' => 'PUT'],
 		['name' => 'admin#getUserAssignmentHistory', 'url' => '/api/admin/users/{userId}/working-time-model/history', 'verb' => 'GET'],
@@ -154,7 +157,6 @@ return [
 		['name' => 'admin#createWorkingTimeModel', 'url' => '/api/admin/working-time-models', 'verb' => 'POST'],
 		['name' => 'admin#updateWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'PUT'],
 		['name' => 'admin#deleteWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'DELETE'],
-		['name' => 'admin#exportUsers', 'url' => '/api/admin/users/export', 'verb' => 'GET'],
 
 		// Admin teams (app-owned teams/departments)
 		['name' => 'admin#teams', 'url' => '/admin/teams', 'verb' => 'GET'],

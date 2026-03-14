@@ -92,13 +92,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Heading Styles */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+/* Heading Styles - scoped to app content to avoid affecting Nextcloud core */
+#app-content-wrapper h1,
+#app-content-wrapper h2,
+#app-content-wrapper h3,
+#app-content-wrapper h4,
+#app-content-wrapper h5,
+#app-content-wrapper h6 {
   font-family: var(--arbeitszeitcheck-font-family-sans);
   font-weight: var(--arbeitszeitcheck-heading-font-weight);
   line-height: var(--arbeitszeitcheck-heading-line-height);
@@ -107,45 +107,45 @@ h6 {
   margin: 0 0 1rem 0;
 }
 
-h1 {
+#app-content-wrapper h1 {
   font-size: var(--arbeitszeitcheck-font-size-4xl);
   margin-bottom: 1.5rem;
 }
 
-h2 {
+#app-content-wrapper h2 {
   font-size: var(--arbeitszeitcheck-font-size-3xl);
   margin-bottom: 1.25rem;
 }
 
-h3 {
+#app-content-wrapper h3 {
   font-size: var(--arbeitszeitcheck-font-size-2xl);
   margin-bottom: 1rem;
 }
 
-h4 {
+#app-content-wrapper h4 {
   font-size: var(--arbeitszeitcheck-font-size-xl);
   margin-bottom: 0.75rem;
 }
 
-h5 {
+#app-content-wrapper h5 {
   font-size: var(--arbeitszeitcheck-font-size-lg);
   margin-bottom: 0.5rem;
 }
 
-h6 {
+#app-content-wrapper h6 {
   font-size: var(--arbeitszeitcheck-font-size-base);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: var(--arbeitszeitcheck-letter-spacing-wide);
 }
 
-/* Paragraph Styles */
-p {
+/* Paragraph Styles - scoped to app content */
+#app-content-wrapper p {
   margin: 0 0 1rem 0;
   line-height: var(--arbeitszeitcheck-line-height-relaxed);
 }
 
-p:last-child {
+#app-content-wrapper p:last-child {
   margin-bottom: 0;
 }
 

@@ -18,7 +18,9 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    /* Subtract header; dvh accounts for dynamic viewport changes (iOS Safari address bar) */
+    height: calc(100vh - var(--header-height, 50px));
+    height: calc(100dvh - var(--header-height, 50px));
 }
 
 /* Subtle background pattern - theme compatible */
@@ -397,7 +399,7 @@
     position: fixed;
     top: var(--space-4);
     left: var(--space-4);
-    z-index: 2001;
+    z-index: 1021;
     transition: background-color 0.2s ease, transform 0.2s ease;
     padding: 0;
     box-shadow: var(--shadow-md);
@@ -478,7 +480,7 @@
         width: 280px;
         max-width: 85vw;
         height: 100vh;
-        z-index: 2000;
+        z-index: 1020;
         transform: translateX(-100%);
         transition: transform 0.3s ease-in-out;
         box-shadow: var(--shadow-xl);

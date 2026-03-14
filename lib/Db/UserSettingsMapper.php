@@ -169,11 +169,14 @@ class UserSettingsMapper extends QBMapper
 	public function getIntegerSetting(string $userId, string $settingKey, int $default = 0): int
 	{
 		$setting = $this->getSetting($userId, $settingKey);
-		if (!$setting || $setting->getSettingValue() === null) {
+		if (!$setting) {
 			return $default;
 		}
-
-		return (int)$setting->getSettingValue() ?: $default;
+		$val = $setting->getSettingValue();
+		if ($val === null || $val === '') {
+			return $default;
+		}
+		return (int)$val;
 	}
 
 	/**
@@ -187,11 +190,14 @@ class UserSettingsMapper extends QBMapper
 	public function getFloatSetting(string $userId, string $settingKey, float $default = 0.0): float
 	{
 		$setting = $this->getSetting($userId, $settingKey);
-		if (!$setting || $setting->getSettingValue() === null) {
+		if (!$setting) {
 			return $default;
 		}
-
-		return (float)$setting->getSettingValue() ?: $default;
+		$val = $setting->getSettingValue();
+		if ($val === null || $val === '') {
+			return $default;
+		}
+		return (float)$val;
 	}
 
 	/**
@@ -205,10 +211,13 @@ class UserSettingsMapper extends QBMapper
 	public function getStringSetting(string $userId, string $settingKey, string $default = ''): string
 	{
 		$setting = $this->getSetting($userId, $settingKey);
-		if (!$setting || $setting->getSettingValue() === null) {
+		if (!$setting) {
 			return $default;
 		}
-
-		return $setting->getSettingValue() ?: $default;
+		$val = $setting->getSettingValue();
+		if ($val === null) {
+			return $default;
+		}
+		return (string)$val;
 	}
 }

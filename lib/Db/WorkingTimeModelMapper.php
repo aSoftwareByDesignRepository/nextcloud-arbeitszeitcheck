@@ -123,7 +123,7 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')
 			->from($this->getTableName())
-			->where($qb->expr()->like('name', $qb->createNamedParameter('%' . $query . '%')))
+			->where($qb->expr()->like('name', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($query) . '%')))
 			->orderBy('name', 'ASC');
 
 		return $this->findEntities($qb);

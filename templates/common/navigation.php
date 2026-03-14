@@ -121,10 +121,10 @@ $showAdminNav = !empty($_['showAdminNav']);
         <?php if ($showReportsLink): ?>
         <li class="<?php p($isReports ? 'active' : ''); ?>" <?php p($isReports ? 'aria-current="page"' : ''); ?>>
             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.reports')); ?>"
-               title="<?php p($l->t('Berichte für Team- und Organisationsauswertungen (nur für Manager und Admins sichtbar)')); ?>"
-               aria-label="<?php p($l->t('Zu den Berichten wechseln, um Auswertungen für Team oder Organisation zu erstellen (nur für Manager/Admins)')); ?>">
+               title="<?php p($l->t('Reports for team and organisation summaries (visible to managers and admins only)')); ?>"
+               aria-label="<?php p($l->t('Go to reports to create summaries for team or organisation (managers/admins only)')); ?>">
                 <i data-lucide="file-text" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Berichte (Manager/Admin)')); ?></span>
+                <span><?php p($l->t('Reports (Manager/Admin)')); ?></span>
             </a>
         </li>
         <?php endif; ?>
@@ -169,14 +169,14 @@ $showAdminNav = !empty($_['showAdminNav']);
                     aria-expanded="<?php p($isAdmin ? 'true' : 'false'); ?>"
                     aria-controls="admin-subnav">
                 <i data-lucide="shield" class="lucide-icon" aria-hidden="true"></i>
-                <span><?php p($l->t('Verwaltung')); ?></span>
+                <span><?php p($l->t('Administration')); ?></span>
             </button>
             <ul id="admin-subnav" class="nav-submenu" <?php p($isAdmin ? '' : 'hidden'); ?>>
                 <li class="<?php p($isAdminDashboard ? 'active' : ''); ?>" <?php p($isAdminDashboard ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard')); ?>"
-                       title="<?php p($l->t('Übersicht mit Kennzahlen und aktuellen Problemen')); ?>"
-                       aria-label="<?php p($l->t('Verwaltungs-Übersicht öffnen')); ?>">
-                        <span><?php p($l->t('Übersicht')); ?></span>
+                       title="<?php p($l->t('Overview with metrics and current issues')); ?>"
+                       aria-label="<?php p($l->t('Open administration overview')); ?>">
+                        <span><?php p($l->t('Overview')); ?></span>
                     </a>
                 </li>
                 <li class="<?php p($isAdminUsers ? 'active' : ''); ?>" <?php p($isAdminUsers ? 'aria-current="page"' : ''); ?>>
@@ -188,23 +188,23 @@ $showAdminNav = !empty($_['showAdminNav']);
                 </li>
                 <li class="<?php p($isAdminWorkingTimeModels ? 'active' : ''); ?>" <?php p($isAdminWorkingTimeModels ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.workingTimeModels')); ?>"
-                       title="<?php p($l->t('Arbeitszeitmodelle konfigurieren')); ?>"
-                       aria-label="<?php p($l->t('Arbeitszeitmodelle verwalten')); ?>">
-                        <span><?php p($l->t('Arbeitszeitmodelle')); ?></span>
+                       title="<?php p($l->t('Configure working time models')); ?>"
+                       aria-label="<?php p($l->t('Manage working time models')); ?>">
+                        <span><?php p($l->t('Working time models')); ?></span>
                     </a>
                 </li>
                 <li class="<?php p($isAdminHolidays ? 'active' : ''); ?>" <?php p($isAdminHolidays ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.holidays')); ?>"
-                       title="<?php p($l->t('Feiertagskalender pro Bundesland und Standardkalender verwalten')); ?>"
-                       aria-label="<?php p($l->t('Feiertage & Kalender verwalten')); ?>">
-                        <span><?php p($l->t('Feiertage & Kalender')); ?></span>
+                       title="<?php p($l->t('Manage holiday calendar per state and default calendar')); ?>"
+                       aria-label="<?php p($l->t('Manage holidays and calendar')); ?>">
+                        <span><?php p($l->t('Holidays & calendar')); ?></span>
                     </a>
                 </li>
                 <li class="<?php p($isAdminTeams ? 'active' : ''); ?>" <?php p($isAdminTeams ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams')); ?>"
-                       title="<?php p($l->t('Teams, Standorte und Zuständigkeiten verwalten')); ?>"
-                       aria-label="<?php p($l->t('Teams verwalten')); ?>">
-                        <span><?php p($l->t('Teams & Standorte')); ?></span>
+                       title="<?php p($l->t('Manage teams, locations and responsibilities')); ?>"
+                       aria-label="<?php p($l->t('Manage teams')); ?>">
+                        <span><?php p($l->t('Teams & locations')); ?></span>
                     </a>
                 </li>
                 <li class="<?php p($isAdminAuditLog ? 'active' : ''); ?>" <?php p($isAdminAuditLog ? 'aria-current="page"' : ''); ?>>
@@ -216,9 +216,9 @@ $showAdminNav = !empty($_['showAdminNav']);
                 </li>
                 <li class="<?php p($isAdminSettingsPage ? 'active' : ''); ?>" <?php p($isAdminSettingsPage ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.settings')); ?>"
-                       title="<?php p($l->t('Globale Regeln, Benachrichtigungen und Compliance-Einstellungen verwalten')); ?>"
-                       aria-label="<?php p($l->t('Globale Verwaltungseinstellungen öffnen')); ?>">
-                        <span><?php p($l->t('Globale Einstellungen')); ?></span>
+                       title="<?php p($l->t('Manage global rules, notifications and compliance settings')); ?>"
+                       aria-label="<?php p($l->t('Open global administration settings')); ?>">
+                        <span><?php p($l->t('Global settings')); ?></span>
                     </a>
                 </li>
             </ul>

@@ -359,13 +359,13 @@
 
 /* WCAG 2.1 AA: darkened backgrounds for contrast with white text */
 .absence-type-badge.type-vacation {
-	background-color: color-mix(in srgb, var(--color-success) 80%, black);
+	background-color: color-mix(in srgb, var(--color-success) 70%, var(--color-main-background));
 	color: var(--color-primary-text);
 }
 
 .absence-type-badge.type-sick,
 .absence-type-badge.type-sick_leave {
-	background-color: color-mix(in srgb, var(--color-error) 80%, black);
+	background-color: color-mix(in srgb, var(--color-error) 70%, var(--color-main-background));
 	color: var(--color-primary-text);
 }
 
@@ -377,15 +377,37 @@
 /* Table Cell Styles */
 .reason-cell {
 	max-width: 200px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	visibility: visible;
 	opacity: 1;
 }
 
-.reason-more {
+/* Truncated reason with expand toggle */
+.reason-truncated {
+	display: inline;
+}
+
+.reason-truncated__short {
+	word-break: break-word;
+}
+
+.reason-truncated__full {
+	word-break: break-word;
+}
+
+.reason-truncated__toggle {
+	display: inline;
+	padding: 0 var(--space-1);
+	min-height: unset;
+	min-width: unset;
+	font-size: var(--arbeitszeitcheck-font-size-sm);
+	vertical-align: baseline;
+}
+
+/* Required fields note */
+.form-required-note {
+	font-size: var(--arbeitszeitcheck-font-size-sm);
 	color: var(--arbeitszeitcheck-color-text-maxcontrast);
+	margin-bottom: var(--space-4);
 }
 
 .actions-cell {

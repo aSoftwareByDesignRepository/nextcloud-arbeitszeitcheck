@@ -23,8 +23,9 @@
   display: flex;
   flex-direction: column;
   margin: 0 !important;
-  margin-top: 50px !important;
-  /* Clear Nextcloud header (--header-height) */
+  /* Use the Nextcloud header-height variable (set on body by NC core).
+     Fall back to 50px which is the conventional height on NC 25-32. */
+  margin-top: var(--header-height, 50px) !important;
   padding: 0 !important;
   overflow: hidden;
   /* Contain flex children; scrolling happens in #app-content */

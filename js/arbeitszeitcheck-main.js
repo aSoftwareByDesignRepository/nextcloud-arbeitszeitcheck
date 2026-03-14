@@ -130,6 +130,39 @@
                             return;
                         }
 
+                        // Page Visibility API: when the tab is backgrounded and
+                        // then brought back into focus, re-sync from the backend so
+                        // that throttled setInterval ticks don't accumulate drift.
+                        // Remove any previously registered handler to avoid duplicates
+                        // on re-init (e.g. SPA-style page transitions).
+                        if (this._visibilityHandler) {
+                            document.removeEventListener('visibilitychange', this._visibilityHandler);
+                        }
+                        this._visibilityHandler = () => {
+                            if (document.visibilityState === 'visible' && isClockedIn && !isOnBreak) {
+                                // Force an immediate status sync to correct any drift
+                                this.getStatus()
+                                    .then(response => {
+                                        if (response && response.success && response.status) {
+                                            const newStatus = response.status.status || 'clocked_out';
+                                            isClockedIn = (newStatus === 'active' || newStatus === 'break');
+                                            isOnBreak   = (newStatus === 'break');
+                                            if (response.status.current_session_duration !== null
+                                                    && response.status.current_session_duration !== undefined) {
+                                                baseWorkingSeconds = Math.floor(response.status.current_session_duration);
+                                            }
+                                            lastUpdateTime = new Date().getTime();
+                                        }
+                                    })
+                                    .catch(() => {
+                                        // Non-fatal: reset lastUpdateTime so elapsed calculation
+                                        // starts fresh from the moment the tab becomes visible.
+                                        lastUpdateTime = new Date().getTime();
+                                    });
+                            }
+                        };
+                        document.addEventListener('visibilitychange', this._visibilityHandler);
+
                         // Update timer every second
                         this.timers.session = setInterval(() => {
                             const now = new Date().getTime();
@@ -1010,10 +1043,12 @@
         },
 
         /**
-         * Set loading state on buttons and forms
+         * Set loading state on buttons and forms (includes clock-in/out/break for double-submit guard)
          */
         setLoadingState: function(loading) {
-            const buttons = document.querySelectorAll('button[data-api-action]');
+            const buttons = document.querySelectorAll(
+                'button[data-api-action], #btn-clock-in, #btn-start-break, #btn-end-break, .btn-clock-out'
+            );
             buttons.forEach(button => {
                 if (loading) {
                     button.disabled = true;
@@ -1180,13 +1215,18 @@
         },
 
         /**
-         * Initialize timeline page
+         * Initialize timeline page (with max retry to avoid infinite loop)
          */
-        initTimeline: function() {
+        initTimeline: function(retryCount = 0) {
+            const maxRetries = 20;
             const container = document.getElementById('timeline-container');
             if (!container) {
+                if (retryCount >= maxRetries) {
+                    console.warn('arbeitszeitcheck: timeline-container not found after ' + maxRetries + ' retries');
+                    return;
+                }
                 setTimeout(() => {
-                    this.initTimeline();
+                    this.initTimeline(retryCount + 1);
                 }, 100);
                 return;
             }
@@ -2453,6 +2493,12 @@
                 }
             });
             this.timers = {};
+
+            // Remove Page Visibility API listener if registered
+            if (this._visibilityHandler) {
+                document.removeEventListener('visibilitychange', this._visibilityHandler);
+                this._visibilityHandler = null;
+            }
         }
     };
 

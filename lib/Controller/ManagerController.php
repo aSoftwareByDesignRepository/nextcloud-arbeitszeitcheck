@@ -645,11 +645,41 @@ class ManagerController extends Controller
 				'totalOvertime' => 0,
 				'members' => []
 			];
-			
+
+			$period = $period ?? 'today';
+			if (!in_array($period, ['today', 'week', 'month'], true)) {
+				$period = 'today';
+			}
+
+			$today = new \DateTime();
+			$today->setTime(0, 0, 0);
+
+			if ($period === 'today') {
+				$start = clone $today;
+				$end = clone $today;
+				$end->modify('+1 day');
+			} elseif ($period === 'week') {
+				$dayOfWeek = (int)$today->format('w');
+				$start = clone $today;
+				$start->modify('-' . $dayOfWeek . ' days');
+				$start->setTime(0, 0, 0);
+				$end = clone $start;
+				$end->modify('+7 days');
+			} else {
+				$start = new \DateTime($today->format('Y-m-01'));
+				$end = clone $start;
+				$end->modify('first day of next month');
+			}
+
 			foreach ($teamUserIds as $userId) {
-				$hours = $this->timeTrackingService->getTodayHours($userId);
-				$dailyOvertime = $this->overtimeService->getDailyOvertime($userId);
-				$overtime = $dailyOvertime['overtime_hours'];
+				if ($period === 'today') {
+					$hours = $this->timeTrackingService->getTodayHours($userId);
+					$overtimeData = $this->overtimeService->getDailyOvertime($userId);
+				} else {
+					$hours = $this->timeEntryMapper->getTotalHoursByUserAndDateRange($userId, $start, $end);
+					$overtimeData = $this->overtimeService->calculateOvertime($userId, $start, $end, false);
+				}
+				$overtime = $overtimeData['overtime_hours'];
 
 				$summary['totalHours'] += $hours;
 				$summary['totalOvertime'] += $overtime;

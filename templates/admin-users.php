@@ -31,6 +31,7 @@ $total = $_['total'] ?? 0;
             <!-- Search and Filters -->
             <div class="section-content">
                 <div class="flex flex--between flex--gap mb-3">
+                    <label for="user-search" class="visually-hidden"><?php p($l->t('Search users')); ?></label>
                     <input type="text" id="user-search" class="form-input" 
                         placeholder="<?php p($l->t('Search users...')); ?>">
                     <button type="button" id="refresh-users" class="btn btn--secondary">

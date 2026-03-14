@@ -50,8 +50,8 @@
     margin-bottom: 15px;
 }
 
-.status-badge.active { background-color: color-mix(in srgb, var(--color-success) 80%, black); color: var(--color-primary-text); }
-.status-badge.break { background-color: color-mix(in srgb, var(--color-warning) 65%, black); color: var(--color-primary-text); }
+.status-badge.active { background-color: color-mix(in srgb, var(--color-success) 70%, var(--color-main-background)); color: var(--color-primary-text); }
+.status-badge.break { background-color: color-mix(in srgb, var(--color-warning) 60%, var(--color-main-background)); color: var(--color-primary-text); }
 .status-badge.clocked_out { background-color: var(--color-background-darker); color: var(--color-text-maxcontrast); }
 
 .session-timer {

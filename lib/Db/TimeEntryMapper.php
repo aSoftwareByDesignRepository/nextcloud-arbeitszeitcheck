@@ -367,6 +367,31 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Whether the user has any time entries on the given date
+	 *
+	 * @param string $userId
+	 * @param \DateTime $date
+	 * @return bool
+	 */
+	public function hasEntriesOnDate(string $userId, \DateTime $date): bool
+	{
+		$startOfDay = clone $date;
+		$startOfDay->setTime(0, 0, 0);
+		$endOfDay = clone $date;
+		$endOfDay->modify('+1 day');
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('1'))
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startOfDay->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($endOfDay->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->setMaxResults(1);
+
+		return $qb->executeQuery()->fetchOne() !== false;
+	}
+
+	/**
 	 * Count distinct users with time entries on a specific date
 	 *
 	 * @param \DateTime $date

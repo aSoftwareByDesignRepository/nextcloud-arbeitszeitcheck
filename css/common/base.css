@@ -138,28 +138,25 @@
   margin: 0;
 }
 
-/* CSS Reset - Modern Normalize (scoped where necessary by Nextcloud core)
- * Do NOT override global html/body here to avoid impacting other apps.
- */
-*,
-*::before,
-*::after {
+/* CSS Reset - Scoped to app content to avoid bleeding into Nextcloud core UI */
+#app-content-wrapper *,
+#app-content-wrapper *::before,
+#app-content-wrapper *::after {
   box-sizing: border-box;
 }
 
-/* Typography Reset */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+#app-content-wrapper h1,
+#app-content-wrapper h2,
+#app-content-wrapper h3,
+#app-content-wrapper h4,
+#app-content-wrapper h5,
+#app-content-wrapper h6 {
   margin: 0;
   font-size: inherit;
   font-weight: inherit;
 }
 
-p {
+#app-content-wrapper p {
   margin: 0;
 }
 
@@ -203,52 +200,52 @@ p {
   background-color: transparent;
 }
 
-/* Form Element Reset */
-button,
-input,
-optgroup,
-select,
-textarea {
+/* Form Element Reset - scoped to app content */
+#app-content-wrapper button,
+#app-content-wrapper input,
+#app-content-wrapper optgroup,
+#app-content-wrapper select,
+#app-content-wrapper textarea {
   font-family: inherit;
   font-size: 100%;
   line-height: 1.15;
   margin: 0;
 }
 
-button,
-input {
+#app-content-wrapper button,
+#app-content-wrapper input {
   overflow: visible;
 }
 
-button,
-select {
+#app-content-wrapper button,
+#app-content-wrapper select {
   text-transform: none;
 }
 
-button,
-[type="button"],
-[type="reset"],
-[type="submit"] {
+#app-content-wrapper button,
+#app-content-wrapper [type="button"],
+#app-content-wrapper [type="reset"],
+#app-content-wrapper [type="submit"] {
   -webkit-appearance: button;
   appearance: button;
 }
 
-button::-moz-focus-inner,
-[type="button"]::-moz-focus-inner,
-[type="reset"]::-moz-focus-inner,
-[type="submit"]::-moz-focus-inner {
+#app-content-wrapper button::-moz-focus-inner,
+#app-content-wrapper [type="button"]::-moz-focus-inner,
+#app-content-wrapper [type="reset"]::-moz-focus-inner,
+#app-content-wrapper [type="submit"]::-moz-focus-inner {
   border-style: none;
   padding: 0;
 }
 
-button:-moz-focusring,
-[type="button"]:-moz-focusring,
-[type="reset"]:-moz-focusring,
-[type="submit"]:-moz-focusring {
+#app-content-wrapper button:-moz-focusring,
+#app-content-wrapper [type="button"]:-moz-focusring,
+#app-content-wrapper [type="reset"]:-moz-focusring,
+#app-content-wrapper [type="submit"]:-moz-focusring {
   outline: 1px dotted ButtonText;
 }
 
-fieldset {
+#app-content-wrapper fieldset {
   padding: 0.35em 0.75em 0.625em;
   margin: 0;
   border: 0;

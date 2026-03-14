@@ -568,14 +568,9 @@ class ComplianceController extends Controller
 
 			$oldValues = $violation->getSummary();
 
-			// Mark as resolved using mapper's resolveViolation method
-			// Note: resolvedBy field is int, but Nextcloud user IDs are strings
-			// We set it to a hash of the user ID for tracking purposes
-			$resolvedByHash = abs(crc32($userId)) % PHP_INT_MAX; // Convert string to positive int
-			$updatedViolation = $this->violationMapper->resolveViolation($id, $resolvedByHash);
+			$updatedViolation = $this->violationMapper->resolveViolation($id, $userId);
 
 			$newValues = $updatedViolation->getSummary();
-			$newValues['resolved_by_user_id'] = $userId;
 			$this->auditLogMapper->logAction(
 				$violationOwnerId,
 				'compliance_violation_resolved',
@@ -681,6 +676,57 @@ class ComplianceController extends Controller
 				'success' => false,
 				'error' => $errorMessage
 			], Http::STATUS_BAD_REQUEST);
+		}
+	}
+
+	/**
+	 * Check whether the minimum rest period (ArbZG §5) is met for a given start time.
+	 *
+	 * Used by the frontend validation layer to give real-time feedback before the user
+	 * saves a new time entry. The authenticated user's ID is always used — the optional
+	 * `userId` query parameter from legacy JS callers is intentionally ignored to prevent
+	 * checking another user's rest period.
+	 *
+	 * @param string $startTime ISO-8601 start time of the new entry
+	 * @param int|null $excludeEntryId Entry ID to exclude from the check (when editing)
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function checkRestPeriod(string $startTime, ?int $excludeEntryId = null): JSONResponse
+	{
+		try {
+			$userId = $this->getUserId();
+
+			$startDt = \DateTime::createFromFormat(\DateTime::ATOM, $startTime)
+				?: \DateTime::createFromFormat('Y-m-d\TH:i:s.u\Z', $startTime)
+				?: \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $startTime)
+				?: \DateTime::createFromFormat('Y-m-d\TH:i:sP', $startTime)
+				?: new \DateTime($startTime);
+
+			if ($startDt === false) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid start time format. Use ISO-8601 (e.g. 2024-01-15T09:00:00Z).')
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$result = $this->complianceService->checkRestPeriodForStartTime($userId, $startDt, $excludeEntryId);
+
+			return new JSONResponse([
+				'success' => true,
+				'valid' => $result['valid'],
+				'message' => $result['message'] ?? null,
+				'earliestStartTime' => isset($result['earliestStartTime'])
+					? $result['earliestStartTime']->format(\DateTime::ATOM)
+					: null,
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('checkRestPeriod error: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 

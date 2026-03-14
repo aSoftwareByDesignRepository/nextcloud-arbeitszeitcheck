@@ -86,7 +86,7 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
         <!-- Welcome Message for First-Time Users -->
         <?php if (($_['isFirstTimeUser'] ?? false) === true): ?>
             <div class="section">
-                <div class="card alert alert--info" role="dialog" aria-labelledby="welcome-title">
+                <div class="card alert alert--info" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
                     <div class="card-header">
                         <h3 id="welcome-title" class="card-title">
                             <span class="alert-icon" aria-hidden="true">👋</span>

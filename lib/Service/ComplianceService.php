@@ -296,34 +296,8 @@ class ComplianceService
         $duration = $timeEntry->getDurationHours();
         $breakDuration = $timeEntry->getBreakDurationHours();
 
-        if ($duration >= 6 && $breakDuration < 0.5) { // 30 minutes break required
-            $violation = $this->violationMapper->createViolation(
-                $timeEntry->getUserId(),
-                ComplianceViolation::TYPE_MISSING_BREAK,
-                $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
-                $timeEntry->getEndTime() ?: new \DateTime(),
-                $timeEntry->getId(),
-                ComplianceViolation::SEVERITY_ERROR
-            );
-            
-            $violations[] = [
-                'id' => $violation->getId(),
-                'type' => ComplianceViolation::TYPE_MISSING_BREAK,
-                'severity' => ComplianceViolation::SEVERITY_ERROR,
-                'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work')
-            ];
-            
-            // Send notification
-            if ($this->notificationService) {
-                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
-                    'id' => $violation->getId(),
-                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
-                    'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
-                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
-                    'severity' => ComplianceViolation::SEVERITY_ERROR
-                ]);
-            }
-        } elseif ($duration >= 9 && $breakDuration < 0.75) { // 45 minutes break required
+        // ArbZG §4: Check 9h (45 min break) first — otherwise duration >= 6 would catch it
+        if ($duration >= 9 && $breakDuration < 0.75) { // 45 minutes break required
             $violation = $this->violationMapper->createViolation(
                 $timeEntry->getUserId(),
                 ComplianceViolation::TYPE_MISSING_BREAK,
@@ -346,6 +320,33 @@ class ComplianceService
                     'id' => $violation->getId(),
                     'type' => ComplianceViolation::TYPE_MISSING_BREAK,
                     'message' => $this->l10n->t('Mandatory 45-minute break missing after 9 hours of work'),
+                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                    'severity' => ComplianceViolation::SEVERITY_ERROR
+                ]);
+            }
+        } elseif ($duration >= 6 && $breakDuration < 0.5) { // 30 minutes break required
+            $violation = $this->violationMapper->createViolation(
+                $timeEntry->getUserId(),
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
+                $timeEntry->getEndTime() ?: new \DateTime(),
+                $timeEntry->getId(),
+                ComplianceViolation::SEVERITY_ERROR
+            );
+
+            $violations[] = [
+                'id' => $violation->getId(),
+                'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                'severity' => ComplianceViolation::SEVERITY_ERROR,
+                'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work')
+            ];
+
+            // Send notification
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                    'id' => $violation->getId(),
+                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                    'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
                     'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
                     'severity' => ComplianceViolation::SEVERITY_ERROR
                 ]);
@@ -540,7 +541,8 @@ class ComplianceService
             'message' => $this->l10n->t(
                 'Minimum %1$d-hour rest period required between shifts (ArbZG §5). Your last shift ended on %2$s at %3$s. This entry cannot start before %4$s (%5$.1f hours required).',
                 [(int)$minRest, $lastEndDateFormatted, $lastEndTime->format('H:i'), $earliestStartDateFormatted, abs($hoursStillNeeded)]
-            )
+            ),
+            'earliestStartTime' => $earliestStartTime,
         ];
     }
 
@@ -695,27 +697,8 @@ class ComplianceService
         $duration = $timeEntry->getDurationHours();
         $breakDuration = $timeEntry->getBreakDurationHours();
 
-        if ($duration >= 6 && $breakDuration < 0.5) { // 30 minutes break required
-            $violation = $this->violationMapper->createViolation(
-                $timeEntry->getUserId(),
-                ComplianceViolation::TYPE_MISSING_BREAK,
-                $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
-                $timeEntry->getEndTime() ?: new \DateTime(),
-                $timeEntry->getId(),
-                ComplianceViolation::SEVERITY_ERROR
-            );
-            
-            // Send notification
-            if ($this->notificationService) {
-                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
-                    'id' => $violation->getId(),
-                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
-                    'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
-                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
-                    'severity' => ComplianceViolation::SEVERITY_ERROR
-                ]);
-            }
-        } elseif ($duration >= 9 && $breakDuration < 0.75) { // 45 minutes break required
+        // ArbZG §4: Check 9h (45 min break) first — otherwise duration >= 6 would catch it
+        if ($duration >= 9 && $breakDuration < 0.75) { // 45 minutes break required
             $violation = $this->violationMapper->createViolation(
                 $timeEntry->getUserId(),
                 ComplianceViolation::TYPE_MISSING_BREAK,
@@ -731,6 +714,26 @@ class ComplianceService
                     'id' => $violation->getId(),
                     'type' => ComplianceViolation::TYPE_MISSING_BREAK,
                     'message' => $this->l10n->t('Mandatory 45-minute break missing after 9 hours of work'),
+                    'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                    'severity' => ComplianceViolation::SEVERITY_ERROR
+                ]);
+            }
+        } elseif ($duration >= 6 && $breakDuration < 0.5) { // 30 minutes break required
+            $violation = $this->violationMapper->createViolation(
+                $timeEntry->getUserId(),
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
+                $timeEntry->getEndTime() ?: new \DateTime(),
+                $timeEntry->getId(),
+                ComplianceViolation::SEVERITY_ERROR
+            );
+
+            // Send notification
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                    'id' => $violation->getId(),
+                    'type' => ComplianceViolation::TYPE_MISSING_BREAK,
+                    'message' => $this->l10n->t('Mandatory 30-minute break missing after 6 hours of work'),
                     'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
                     'severity' => ComplianceViolation::SEVERITY_ERROR
                 ]);

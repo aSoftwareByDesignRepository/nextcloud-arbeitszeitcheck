@@ -34,8 +34,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setResolved(bool $resolved)
  * @method \DateTime|null getResolvedAt()
  * @method void setResolvedAt(\DateTime|null $resolvedAt)
- * @method int|null getResolvedBy()
- * @method void setResolvedBy(int|null $resolvedBy)
+ * @method string|null getResolvedBy()
+ * @method void setResolvedBy(string|null $resolvedBy)
  * @method \DateTime getCreatedAt()
  * @method void setCreatedAt(\DateTime $createdAt)
  */
@@ -78,7 +78,7 @@ class ComplianceViolation extends Entity
 	/** @var \DateTime|null */
 	protected $resolvedAt;
 
-	/** @var int|null */
+	/** @var string|null */
 	protected $resolvedBy;
 
 	/** @var \DateTime */
@@ -97,7 +97,7 @@ class ComplianceViolation extends Entity
 		$this->addType('severity', 'string');
 		$this->addType('resolved', 'boolean');
 		$this->addType('resolvedAt', 'datetime');
-		$this->addType('resolvedBy', 'integer');
+		$this->addType('resolvedBy', 'string');
 		$this->addType('createdAt', 'datetime');
 	}
 
@@ -191,9 +191,9 @@ class ComplianceViolation extends Entity
 	/**
 	 * Mark violation as resolved
 	 *
-	 * @param int $resolvedBy User ID who resolved it
+	 * @param string $resolvedBy Nextcloud user ID who resolved it
 	 */
-	public function markAsResolved(int $resolvedBy): void
+	public function markAsResolved(string $resolvedBy): void
 	{
 		$this->setResolved(true);
 		$this->setResolvedAt(new \DateTime());

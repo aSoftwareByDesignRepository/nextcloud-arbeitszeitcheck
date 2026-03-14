@@ -345,11 +345,11 @@ class ComplianceViolationMapper extends QBMapper
 	 * Mark violation as resolved
 	 *
 	 * @param int $id
-	 * @param int $resolvedBy
+	 * @param string $resolvedBy Nextcloud user ID of the resolver
 	 * @return ComplianceViolation
 	 * @throws \Exception
 	 */
-	public function resolveViolation(int $id, int $resolvedBy): ComplianceViolation
+	public function resolveViolation(int $id, string $resolvedBy): ComplianceViolation
 	{
 		$violation = $this->find($id);
 		$violation->markAsResolved($resolvedBy);

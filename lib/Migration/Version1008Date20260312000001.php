@@ -32,22 +32,54 @@ class Version1008Date20260312000001 extends SimpleMigrationStep
 
 	public function preSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void
 	{
-		$prefix = $this->config->getSystemValueString('dbtableprefix', 'oc_');
-		$table = $prefix . 'at_holidays';
-
-		// Remove duplicate rows: keep the one with the smallest id per (state, date, scope)
-		// MySQL/MariaDB: DELETE with self-join
-		$sql = "DELETE h1 FROM `{$table}` h1 " .
-			"INNER JOIN `{$table}` h2 " .
-			"ON h1.state = h2.state AND h1.date = h2.date AND h1.scope = h2.scope AND h1.id > h2.id";
+		// Remove duplicate rows keeping only the one with the smallest id per
+		// (state, date, scope) before the unique index is added.
+		// Uses the Doctrine DBAL QueryBuilder to stay fully portable across
+		// MySQL/MariaDB, PostgreSQL, and SQLite.
 		try {
-			$this->db->executeStatement($sql);
+			$qb = $this->db->getQueryBuilder();
+
+			// Fetch all rows, ordered so duplicates within a group are predictable
+			$qb->select('id', 'state', 'date', 'scope')
+				->from('at_holidays')
+				->orderBy('state', 'ASC')
+				->addOrderBy('date', 'ASC')
+				->addOrderBy('scope', 'ASC')
+				->addOrderBy('id', 'ASC');
+
+			$rows = $qb->executeQuery()->fetchAllAssociative();
 		} catch (\Throwable $e) {
-			// Table might not exist yet (fresh install); ignore
-			if (str_contains((string)$e->getMessage(), "doesn't exist")) {
+			$msg = (string)$e->getMessage();
+			// Table does not exist on a fresh install — nothing to deduplicate
+			if (str_contains($msg, "doesn't exist")
+				|| str_contains($msg, 'does not exist')
+				|| str_contains($msg, 'no such table')
+				|| str_contains($msg, 'undefined table')
+			) {
 				return;
 			}
 			throw $e;
+		}
+
+		// Identify the IDs to delete in PHP — keeps the row with the smallest id
+		// per group and marks all others as duplicates.
+		$seen    = [];
+		$toDelete = [];
+		foreach ($rows as $row) {
+			$key = $row['state'] . '|' . $row['date'] . '|' . $row['scope'];
+			if (isset($seen[$key])) {
+				$toDelete[] = (int)$row['id'];
+			} else {
+				$seen[$key] = true;
+			}
+		}
+
+		// Delete in batches of 100 to avoid excessively long IN-clauses
+		foreach (array_chunk($toDelete, 100) as $batch) {
+			$delQb = $this->db->getQueryBuilder();
+			$delQb->delete('at_holidays')
+				->where($delQb->expr()->in('id', $delQb->createNamedParameter($batch, \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT_ARRAY)));
+			$delQb->executeStatement();
 		}
 	}
 

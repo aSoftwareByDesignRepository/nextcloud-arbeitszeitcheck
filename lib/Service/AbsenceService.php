@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
+use OCP\IDBConnection;
 use OCP\IL10N;
 use OCA\ArbeitszeitCheck\Constants;
 use OCP\IUserManager;
@@ -34,6 +35,7 @@ class AbsenceService
 	private TeamResolverService $teamResolver;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private IConfig $config;
+	private IDBConnection $db;
 	private IUserManager $userManager;
 	private IL10N $l10n;
 	private ?NotificationService $notificationService;
@@ -48,6 +50,7 @@ class AbsenceService
 		TeamResolverService $teamResolver,
 		UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		IConfig $config,
+		IDBConnection $db,
 		IUserManager $userManager,
 		IL10N $l10n,
 		?NotificationService $notificationService = null,
@@ -61,6 +64,7 @@ class AbsenceService
 		$this->teamResolver = $teamResolver;
 		$this->userWorkingTimeModelMapper = $userWorkingTimeModelMapper;
 		$this->config = $config;
+		$this->db = $db;
 		$this->userManager = $userManager;
 		$this->l10n = $l10n;
 		$this->notificationService = $notificationService;
@@ -98,42 +102,74 @@ class AbsenceService
 		$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
 		$absence->setDays($workingDays);
 
-		$savedAbsence = $this->absenceMapper->insert($absence);
+		// All DB writes are atomic: if the audit log insertion fails, the absence
+		// insertion is rolled back and the user sees an error rather than having an
+		// absence in the DB with no audit trail.
+		$savedAbsence = null;
+		$autoApproved = false;
 
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_created',
-			'absence',
-			$savedAbsence->getId(),
-			null,
-			$savedAbsence->getSummary()
-		);
+		$this->db->beginTransaction();
+		try {
+			$savedAbsence = $this->absenceMapper->insert($absence);
 
-		// Auto-approve when employee has no manager (no colleagues in team/groups)
-		if ($savedAbsence->getStatus() === Absence::STATUS_PENDING && !$this->employeeHasManager($userId)) {
-			return $this->autoApproveForNoManager($savedAbsence);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'absence_created',
+				'absence',
+				$savedAbsence->getId(),
+				null,
+				$savedAbsence->getSummary()
+			);
+
+			// Auto-approve when employee has no manager (no colleagues in team/groups)
+			if ($savedAbsence->getStatus() === Absence::STATUS_PENDING && !$this->employeeHasManager($userId)) {
+				$savedAbsence = $this->doAutoApproveDbWork($savedAbsence);
+				$autoApproved = true;
+			}
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
 		}
 
-		// Notify substitute when they need to approve (Vertretungs-Freigabe)
-		if ($substituteUserId && $this->notificationService) {
-			$startDate = $savedAbsence->getStartDate();
-			$endDate = $savedAbsence->getEndDate();
-			$this->notificationService->notifySubstitutionRequest(
-				$substituteUserId,
-				$userId,
-				[
+		// Side effects (notifications / emails) always happen after the DB commit so
+		// that a) no DB lock is held while sending mail, and b) notifications are only
+		// dispatched when the data is actually persisted.
+		if ($autoApproved) {
+			if ($this->notificationService) {
+				$startDate = $savedAbsence->getStartDate();
+				$endDate = $savedAbsence->getEndDate();
+				$this->notificationService->notifyAbsenceApproved($savedAbsence->getUserId(), [
 					'id' => $savedAbsence->getId(),
 					'type' => $savedAbsence->getType(),
 					'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
 					'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
 					'days' => $savedAbsence->getDays()
-				]
-			);
-		}
-
-		// Send email to substitute if admin enabled it
-		if ($substituteUserId && $this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($savedAbsence);
+				]);
+			}
+			if ($this->absenceIcalMailService) {
+				$this->absenceIcalMailService->sendIcalForApprovedAbsence($savedAbsence);
+			}
+		} elseif ($substituteUserId) {
+			if ($this->notificationService) {
+				$startDate = $savedAbsence->getStartDate();
+				$endDate = $savedAbsence->getEndDate();
+				$this->notificationService->notifySubstitutionRequest(
+					$substituteUserId,
+					$userId,
+					[
+						'id' => $savedAbsence->getId(),
+						'type' => $savedAbsence->getType(),
+						'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+						'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
+						'days' => $savedAbsence->getDays()
+					]
+				);
+			}
+			if ($this->absenceNotificationMailService) {
+				$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($savedAbsence);
+			}
 		}
 
 		return $savedAbsence;
@@ -231,8 +267,28 @@ class AbsenceService
 			$absence->setStatus($newSubstituteId ? Absence::STATUS_SUBSTITUTE_PENDING : Absence::STATUS_PENDING);
 		}
 
-		$updatedAbsence = $this->absenceMapper->update($absence);
+		$updatedAbsence = null;
 
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
+
+			$this->auditLogMapper->logAction(
+				$userId,
+				'absence_updated',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary()
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+
+		// Side effects after commit
 		if ($wasDeclined && $newSubstituteId && $this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();
 			$endDate = $updatedAbsence->getEndDate();
@@ -251,16 +307,6 @@ class AbsenceService
 		if ($wasDeclined && $newSubstituteId && $this->absenceNotificationMailService) {
 			$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($updatedAbsence);
 		}
-
-		// Log the action
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_updated',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary()
-		);
 
 		return $updatedAbsence;
 	}
@@ -284,17 +330,24 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Only pending absences can be deleted'));
 		}
 
-		$this->absenceMapper->delete($absence);
+		$this->db->beginTransaction();
+		try {
+			$this->absenceMapper->delete($absence);
 
-		// Log the action
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_deleted',
-			'absence',
-			$id,
-			$absence->getSummary(),
-			null
-		);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'absence_deleted',
+				'absence',
+				$id,
+				$absence->getSummary(),
+				null
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 	}
 
 	/**
@@ -343,19 +396,26 @@ class AbsenceService
 		$absence->setStatus(Absence::STATUS_CANCELLED);
 		$absence->setUpdatedAt(new \DateTime());
 
-		$updatedAbsence = $this->absenceMapper->update($absence);
+		$updatedAbsence = null;
 
-		// Log the action for audit/compliance
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_cancelled',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary()
-		);
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
 
-		// Optional: notify managers or substitutes in the future; for now we keep it simple
+			$this->auditLogMapper->logAction(
+				$userId,
+				'absence_cancelled',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary()
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 
 		return $updatedAbsence;
 	}
@@ -421,16 +481,26 @@ class AbsenceService
 		$absence->setDays($workingDays);
 		$absence->setUpdatedAt(new \DateTime());
 
-		$updatedAbsence = $this->absenceMapper->update($absence);
+		$updatedAbsence = null;
 
-		$this->auditLogMapper->logAction(
-			$userId,
-			'absence_shortened',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary()
-		);
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
+
+			$this->auditLogMapper->logAction(
+				$userId,
+				'absence_shortened',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary()
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 
 		return $updatedAbsence;
 	}
@@ -465,20 +535,29 @@ class AbsenceService
 		$absence->setApprovedAt(new \DateTime());
 		$absence->setUpdatedAt(new \DateTime());
 
-		$updatedAbsence = $this->absenceMapper->update($absence);
+		$updatedAbsence = null;
 
-		// Log the action
-		$this->auditLogMapper->logAction(
-			$approverId,
-			'absence_approved',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary(),
-			$approverId
-		);
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
 
-		// Send notification to the employee
+			$this->auditLogMapper->logAction(
+				$approverId,
+				'absence_approved',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary(),
+				$approverId
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+
+		// Side effects after commit
 		if ($this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();
 			$endDate = $updatedAbsence->getEndDate();
@@ -491,7 +570,6 @@ class AbsenceService
 			]);
 		}
 
-		// Send iCal email to employee (and optionally substitute) if enabled in admin settings
 		if ($this->absenceIcalMailService) {
 			$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
 		}
@@ -529,20 +607,29 @@ class AbsenceService
 		$absence->setApprovedAt(new \DateTime());
 		$absence->setUpdatedAt(new \DateTime());
 
-		$updatedAbsence = $this->absenceMapper->update($absence);
+		$updatedAbsence = null;
 
-		// Log the action
-		$this->auditLogMapper->logAction(
-			$approverId,
-			'absence_rejected',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary(),
-			$approverId
-		);
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
 
-		// Send notification to the employee
+			$this->auditLogMapper->logAction(
+				$approverId,
+				'absence_rejected',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary(),
+				$approverId
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+
+		// Side effect after commit
 		if ($this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();
 			$endDate = $updatedAbsence->getEndDate();
@@ -586,48 +673,78 @@ class AbsenceService
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_PENDING);
 		$absence->setUpdatedAt(new \DateTime());
-		$updatedAbsence = $this->absenceMapper->update($absence);
 
-		$this->auditLogMapper->logAction(
-			$substituteUserId,
-			'absence_substitute_approved',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary(),
-			$substituteUserId
-		);
+		$updatedAbsence = null;
+		$wasAutoApproved = false;
 
-		// When employee has no manager: auto-approve immediately. Skip "awaiting manager" notifications.
-		if (!$this->employeeHasManager($absence->getUserId())) {
-			return $this->autoApproveForNoManager($updatedAbsence);
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
+
+			$this->auditLogMapper->logAction(
+				$substituteUserId,
+				'absence_substitute_approved',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary(),
+				$substituteUserId
+			);
+
+			// When employee has no manager: auto-approve immediately (DB work only; notifications after commit)
+			if (!$this->employeeHasManager($absence->getUserId())) {
+				$updatedAbsence = $this->doAutoApproveDbWork($updatedAbsence);
+				$wasAutoApproved = true;
+			}
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
 		}
 
-		// Employee has manager: notify about substitute approval and that manager approval is pending
-		if ($this->notificationService) {
-			$startDate = $updatedAbsence->getStartDate();
-			$endDate = $updatedAbsence->getEndDate();
-			$this->notificationService->notifySubstituteApproved(
-				$updatedAbsence->getUserId(),
-				$substituteUserId,
-				[
+		// Side effects after commit
+		if ($wasAutoApproved) {
+			if ($this->notificationService) {
+				$startDate = $updatedAbsence->getStartDate();
+				$endDate = $updatedAbsence->getEndDate();
+				$this->notificationService->notifyAbsenceApproved($updatedAbsence->getUserId(), [
 					'id' => $updatedAbsence->getId(),
 					'type' => $updatedAbsence->getType(),
 					'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
 					'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
 					'days' => $updatedAbsence->getDays()
-				]
-			);
-		}
+				]);
+			}
+			if ($this->absenceIcalMailService) {
+				$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
+			}
+		} else {
+			// Employee has manager: notify about substitute approval and that manager approval is pending
+			if ($this->notificationService) {
+				$startDate = $updatedAbsence->getStartDate();
+				$endDate = $updatedAbsence->getEndDate();
+				$this->notificationService->notifySubstituteApproved(
+					$updatedAbsence->getUserId(),
+					$substituteUserId,
+					[
+						'id' => $updatedAbsence->getId(),
+						'type' => $updatedAbsence->getType(),
+						'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+						'end_date' => $endDate ? $endDate->format('Y-m-d') : null,
+						'days' => $updatedAbsence->getDays()
+					]
+				);
+			}
 
-		if ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendSubstituteApprovedToEmployee($updatedAbsence);
-			$this->absenceNotificationMailService->sendSubstituteApprovedToManagers($updatedAbsence);
-		}
+			if ($this->absenceNotificationMailService) {
+				$this->absenceNotificationMailService->sendSubstituteApprovedToEmployee($updatedAbsence);
+				$this->absenceNotificationMailService->sendSubstituteApprovedToManagers($updatedAbsence);
+			}
 
-		// iCal to substitute when they approve (coverage reminder)
-		if ($this->absenceIcalMailService) {
-			$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
+			if ($this->absenceIcalMailService) {
+				$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
+			}
 		}
 
 		return $updatedAbsence;
@@ -663,19 +780,30 @@ class AbsenceService
 		$absence->setStatus(Absence::STATUS_SUBSTITUTE_DECLINED);
 		$absence->setApproverComment($comment);
 		$absence->setUpdatedAt(new \DateTime());
-		$updatedAbsence = $this->absenceMapper->update($absence);
 
-		$this->auditLogMapper->logAction(
-			$substituteUserId,
-			'absence_substitute_declined',
-			'absence',
-			$updatedAbsence->getId(),
-			$oldData,
-			$updatedAbsence->getSummary(),
-			$substituteUserId
-		);
+		$updatedAbsence = null;
 
-		// Notify employee that substitute declined
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->absenceMapper->update($absence);
+
+			$this->auditLogMapper->logAction(
+				$substituteUserId,
+				'absence_substitute_declined',
+				'absence',
+				$updatedAbsence->getId(),
+				$oldData,
+				$updatedAbsence->getSummary(),
+				$substituteUserId
+			);
+
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+
+		// Side effect after commit
 		if ($this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();
 			$endDate = $updatedAbsence->getEndDate();
@@ -1024,20 +1152,29 @@ class AbsenceService
 	}
 
 	/**
-	 * Whether the employee has at least one manager (colleague in same team/group who could approve).
+	 * Whether the employee has at least one manager who could approve.
+	 * Uses getManagerIdsForEmployee when app-owned teams are enabled.
+	 * Falls back to getColleagueIds for group-based mode (legacy setups).
 	 * Used to auto-approve absences when no one would see them in the manager dashboard.
 	 */
 	private function employeeHasManager(string $employeeUserId): bool
 	{
+		$managerIds = $this->teamResolver->getManagerIdsForEmployee($employeeUserId);
+		if (!empty($managerIds)) {
+			return true;
+		}
+		// Group-based mode: no explicit managers, fall back to colleagues for legacy
 		$colleagueIds = $this->teamResolver->getColleagueIds($employeeUserId);
 		return !empty($colleagueIds);
 	}
 
 	/**
-	 * Auto-approve an absence when the employee has no manager (no colleagues).
-	 * Ensures absences are not stuck in PENDING forever for solo users or users alone in their team.
+	 * Perform only the DB writes needed to auto-approve an absence (no notifications/emails).
+	 *
+	 * Call this inside an open transaction so the status update and the audit log are
+	 * committed atomically. Send notifications after the caller commits.
 	 */
-	private function autoApproveForNoManager(Absence $absence): Absence
+	private function doAutoApproveDbWork(Absence $absence): Absence
 	{
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_APPROVED);
@@ -1057,6 +1194,30 @@ class AbsenceService
 			$updatedAbsence->getSummary(),
 			'system'
 		);
+
+		return $updatedAbsence;
+	}
+
+	/**
+	 * Auto-approve an absence when the employee has no manager (no colleagues).
+	 * Ensures absences are not stuck in PENDING forever for solo users or users alone in their team.
+	 *
+	 * This method wraps `doAutoApproveDbWork` in its own transaction and then sends
+	 * notifications. Prefer calling `doAutoApproveDbWork` directly inside a caller-owned
+	 * transaction (e.g. createAbsence, approveBySubstitute) to keep everything atomic.
+	 */
+	private function autoApproveForNoManager(Absence $absence): Absence
+	{
+		$updatedAbsence = null;
+
+		$this->db->beginTransaction();
+		try {
+			$updatedAbsence = $this->doAutoApproveDbWork($absence);
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 
 		if ($this->notificationService) {
 			$startDate = $updatedAbsence->getStartDate();

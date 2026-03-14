@@ -98,6 +98,7 @@ $currentUrl = $_SERVER['REQUEST_URI'];
                 <button type="button"
                     id="quick-clock-btn"
                     class="header__action-btn header__action-btn--primary"
+                    aria-label="<?php p($l->t('Clock In/Out')); ?>"
                     title="<?php p($l->t('Clock In/Out')); ?>">
                     <span class="header__action-icon">▶️</span>
                     <span class="header__action-text"><?php p($l->t('Clock In')); ?></span>
@@ -106,6 +107,7 @@ $currentUrl = $_SERVER['REQUEST_URI'];
                 <button type="button"
                     id="quick-entry-btn"
                     class="header__action-btn"
+                    aria-label="<?php p($l->t('Add Time Entry')); ?>"
                     title="<?php p($l->t('Add Time Entry')); ?>">
                     <span class="header__action-icon">➕</span>
                     <span class="header__action-text"><?php p($l->t('Add Entry')); ?></span>
@@ -118,6 +120,7 @@ $currentUrl = $_SERVER['REQUEST_URI'];
                     class="header__user-btn"
                     aria-expanded="false"
                     aria-haspopup="true"
+                    aria-label="<?php p($l->t('User menu')); ?>"
                     title="<?php p($l->t('User menu')); ?>">
                     <span class="header__user-avatar">
                         <?php if ($user): ?>
@@ -256,14 +259,18 @@ $currentUrl = $_SERVER['REQUEST_URI'];
         <div class="header__mobile-actions">
             <button type="button"
                 id="mobile-quick-clock-btn"
-                class="header__mobile-action-btn header__mobile-action-btn--primary">
+                class="header__mobile-action-btn header__mobile-action-btn--primary"
+                aria-label="<?php p($l->t('Clock In/Out')); ?>"
+                title="<?php p($l->t('Clock In/Out')); ?>">
                 <span class="header__mobile-action-icon">▶️</span>
                 <span class="header__mobile-action-text"><?php p($l->t('Clock In')); ?></span>
             </button>
 
             <button type="button"
                 id="mobile-quick-entry-btn"
-                class="header__mobile-action-btn">
+                class="header__mobile-action-btn"
+                aria-label="<?php p($l->t('Add Time Entry')); ?>"
+                title="<?php p($l->t('Add Time Entry')); ?>">
                 <span class="header__mobile-action-icon">➕</span>
                 <span class="header__mobile-action-text"><?php p($l->t('Add Entry')); ?></span>
             </button>

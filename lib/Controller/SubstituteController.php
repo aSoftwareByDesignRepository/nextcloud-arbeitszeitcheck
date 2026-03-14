@@ -179,7 +179,7 @@ class SubstituteController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('SubstituteController::getPending: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -208,7 +208,7 @@ class SubstituteController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('SubstituteController::approve: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -242,7 +242,7 @@ class SubstituteController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('SubstituteController::decline: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}

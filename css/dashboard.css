@@ -272,14 +272,15 @@
 }
 
 .timer-value {
-    font-family: 'Courier New', monospace;
-    font-size: 2.25rem;
+    /* System monospace stack: ui-monospace → Menlo (Mac) → Consolas (Win) → fallback */
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 2.5rem;
     font-weight: 700;
     color: var(--arbeitszeitcheck-color-primary);
     display: block;
     visibility: visible;
     opacity: 1;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
 }

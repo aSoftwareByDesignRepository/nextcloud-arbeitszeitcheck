@@ -2180,6 +2180,80 @@ class TimeEntryController extends Controller
 	 * @return void
 	 * @throws \Exception If strict mode is enabled and critical violations are found
 	 */
+	/**
+	 * Check whether a proposed time window overlaps with existing entries.
+	 *
+	 * Used by the frontend for real-time overlap warnings before the user saves.
+	 * Always checks against the authenticated user's own entries regardless of the
+	 * optional `userId` query parameter that legacy JS callers may send.
+	 *
+	 * @param string $startTime ISO-8601 start time
+	 * @param string $endTime ISO-8601 end time
+	 * @param int|null $excludeEntryId Entry ID to exclude (for edit flows)
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function checkOverlap(string $startTime, string $endTime, ?int $excludeEntryId = null): JSONResponse
+	{
+		try {
+			$userId = $this->getUserId();
+
+			$parse = static function (string $ts): ?\DateTime {
+				return \DateTime::createFromFormat(\DateTime::ATOM, $ts)
+					?: \DateTime::createFromFormat('Y-m-d\TH:i:s.u\Z', $ts)
+					?: \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $ts)
+					?: \DateTime::createFromFormat('Y-m-d\TH:i:sP', $ts)
+					?: (new \DateTime($ts) ?: null);
+			};
+
+			$startDt = $parse($startTime);
+			$endDt = $parse($endTime);
+
+			if ($startDt === null || $startDt === false) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid start time format.')
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($endDt === null || $endDt === false) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid end time format.')
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($startDt >= $endDt) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Start time must be before end time.')
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$overlapping = $this->timeEntryMapper->findOverlapping($userId, $startDt, $endDt, $excludeEntryId);
+
+			$entries = [];
+			foreach ($overlapping as $entry) {
+				$entries[] = [
+					'id' => $entry->getId(),
+					'startTime' => $entry->getStartTime() ? $entry->getStartTime()->format(\DateTime::ATOM) : null,
+					'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format(\DateTime::ATOM) : null,
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'hasOverlap' => !empty($overlapping),
+				'entries' => $entries,
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('checkOverlap error: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
 	private function performRealTimeComplianceCheck(TimeEntry $timeEntry): void
 	{
 		// Check if real-time compliance checking is enabled

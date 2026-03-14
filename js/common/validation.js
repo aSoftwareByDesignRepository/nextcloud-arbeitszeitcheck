@@ -359,8 +359,10 @@ const ArbeitszeitCheckValidation = {
       return { valid: false, errors, date: null };
     }
 
-    // Check if date is in future (if option set)
-    if (options.noFuture !== false) {
+    // Check if date is in future — only when caller explicitly opts in via noFuture: true.
+    // Absence end dates and future-scheduled entries legitimately need future dates, so the
+    // default must be permissive. Callers that want to block future dates pass noFuture: true.
+    if (options.noFuture === true) {
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
       if (date > today) {
@@ -374,8 +376,12 @@ const ArbeitszeitCheckValidation = {
       minDate.setDate(minDate.getDate() - options.maxDaysPast);
       minDate.setHours(0, 0, 0, 0);
       if (date < minDate) {
-        const days = Math.floor(options.maxDaysPast / 365);
-        errors.push(l10n.dateTooOld || t('Date is too far in the past. Maximum allowed: {years} years ago.', { years: String(days) }));
+        // Show days if less than 2 years, otherwise show years
+        const totalDays = options.maxDaysPast;
+        const displayText = totalDays < 730
+          ? t('Date is too far in the past. Maximum allowed: {days} days ago.', { days: String(totalDays) })
+          : t('Date is too far in the past. Maximum allowed: {years} years ago.', { years: String(Math.round(totalDays / 365)) });
+        errors.push(l10n.dateTooOld || displayText);
       }
     }
 

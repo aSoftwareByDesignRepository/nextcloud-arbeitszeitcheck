@@ -45,7 +45,7 @@ $error = $_['error'] ?? null;
 <?php include __DIR__ . '/common/navigation.php'; ?>
 
 <div id="app-content">
-    <div id="app-content-wrapper">
+    <div id="app-content-wrapper" role="main" aria-label="<?php p($l->t('Time Entries')); ?>">
         <!-- Breadcrumb Navigation -->
         <div class="breadcrumb-container">
             <nav class="breadcrumb" aria-label="<?php p($l->t('Breadcrumb')); ?>">
@@ -136,7 +136,7 @@ $error = $_['error'] ?? null;
                 <div class="card card--elevated">
                     <form id="time-entry-form" 
                           class="form" 
-                          method="GET" 
+                          method="POST" 
                           action="#"
                           novalidate
                           role="form"

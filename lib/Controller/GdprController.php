@@ -230,11 +230,10 @@ class GdprController extends Controller
 			return new DataDownloadResponse($json, $filename, 'application/json; charset=utf-8');
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in GdprController::export: ' . $e->getMessage(), ["exception" => $e]);
-			// Return error as JSON file
-			$errorData = ['error' => $e->getMessage()];
-			$errorJson = json_encode($errorData, JSON_PRETTY_PRINT);
-			$filename = 'arbeitszeitcheck-gdpr-export-error-' . date('Y-m-d') . '.json';
-			return new DataDownloadResponse($errorJson, $filename, 'application/json; charset=utf-8');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -324,10 +323,11 @@ class GdprController extends Controller
 				'note' => $this->l10n->t('Some data must be retained per configured retention period. Audit logs and compliance violations are retained for legal compliance purposes.')
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in GdprController::delete: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage()
-			], Http::STATUS_BAD_REQUEST);
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 }

@@ -42,17 +42,17 @@ body {
   /* Semantic — from Nextcloud */
   --arbeitszeitcheck-color-success: var(--color-success);
   --arbeitszeitcheck-color-success-hover: var(--color-success);
-  --arbeitszeitcheck-color-success-light: var(--color-primary-light);
+  --arbeitszeitcheck-color-success-light: color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent);
   --arbeitszeitcheck-color-success-dark: var(--color-success);
 
   --arbeitszeitcheck-color-warning: var(--color-warning);
   --arbeitszeitcheck-color-warning-hover: var(--color-warning);
-  --arbeitszeitcheck-color-warning-light: var(--color-primary-light);
+  --arbeitszeitcheck-color-warning-light: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
   --arbeitszeitcheck-color-warning-dark: var(--color-warning);
 
   --arbeitszeitcheck-color-error: var(--color-error);
   --arbeitszeitcheck-color-error-hover: var(--color-error);
-  --arbeitszeitcheck-color-error-light: var(--color-primary-light);
+  --arbeitszeitcheck-color-error-light: color-mix(in srgb, var(--color-error, #ef4444) 15%, transparent);
   --arbeitszeitcheck-color-error-dark: var(--color-error);
 
   --arbeitszeitcheck-color-info: var(--color-primary);
@@ -177,6 +177,11 @@ body {
   --shadow-md: var(--arbeitszeitcheck-shadow-md);
   --shadow-lg: var(--arbeitszeitcheck-shadow-lg);
   --shadow-xl: var(--arbeitszeitcheck-shadow-xl);
+
+  /* Light shadow for cards, buttons; composed from main-text for dark-mode awareness */
+  --arbeitszeitcheck-color-shadow-light: color-mix(in srgb, var(--color-main-text) 10%, transparent);
+  /* Heavy shadow used by modals; composed from main-text for dark-mode awareness */
+  --arbeitszeitcheck-color-shadow-heavy: color-mix(in srgb, var(--color-main-text) 22%, transparent);
 }
 
 /* Reduced Motion Support */

@@ -1408,10 +1408,10 @@ class AdminController extends Controller
 					}
 				}
 
-				// Get user statistics
+				// Get user statistics (per-user: does this user have entries today?)
 				$today = new \DateTime();
 				$today->setTime(0, 0, 0);
-				$hasTimeEntriesToday = $this->timeEntryMapper->countDistinctUsersByDate($today) > 0;
+				$hasTimeEntriesToday = $this->timeEntryMapper->hasEntriesOnDate($userId, $today);
 
 				$usersData[] = [
 					'userId' => $userId,

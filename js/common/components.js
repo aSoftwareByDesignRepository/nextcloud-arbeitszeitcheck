@@ -182,8 +182,8 @@ const ArbeitszeitCheckComponents = {
     
     modal.innerHTML = `
       <div class="modal-header">
-        <h2 class="modal-title">${title}</h2>
-        ${closable ? `<button type="button" class="modal-close" aria-label="${closeLabel}">&times;</button>` : ''}
+        <h2 class="modal-title">${this._escapeHtml(title)}</h2>
+        ${closable ? `<button type="button" class="modal-close" aria-label="${this._escapeHtml(closeLabel)}">&times;</button>` : ''}
       </div>
       <div class="modal-body">
         ${content}
@@ -294,6 +294,137 @@ const ArbeitszeitCheckComponents = {
       info: 'ℹ'
     };
     return icons[type] || icons.info;
+  },
+
+  // ===== CONFIRM DIALOG =====
+
+  /**
+   * Show an accessible confirmation dialog and return a Promise that resolves
+   * to true (confirmed) or false (cancelled/dismissed).
+   *
+   * Replaces native window.confirm() which has no styling control and limited
+   * accessibility support (WCAG 4.1.2, 2.1.1).
+   *
+   * @param {Object} options
+   * @param {string} options.title       - Dialog heading
+   * @param {string} options.message     - Dialog body text (plain text, not HTML)
+   * @param {string} [options.confirmLabel] - Confirm button label (default: "Confirm")
+   * @param {string} [options.cancelLabel]  - Cancel button label (default: "Cancel")
+   * @param {string} [options.variant]      - "danger" | "warning" | "info" (default: "info")
+   * @returns {Promise<boolean>}
+   */
+  showConfirmDialog(options = {}) {
+    const {
+      title = '',
+      message = '',
+      confirmLabel = (window.t ? window.t('arbeitszeitcheck', 'Confirm') : 'Confirm'),
+      cancelLabel  = (window.t ? window.t('arbeitszeitcheck', 'Cancel') : 'Cancel'),
+      variant = 'info'
+    } = options;
+
+    return new Promise((resolve) => {
+      const dialogId = `confirm-dialog-${Date.now()}`;
+
+      // Build dialog element
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.setAttribute('role', 'none');
+
+      const dialog = document.createElement('div');
+      dialog.className = 'modal modal--sm confirm-dialog';
+      dialog.id = dialogId;
+      dialog.setAttribute('role', 'alertdialog');
+      dialog.setAttribute('aria-modal', 'true');
+      dialog.setAttribute('aria-labelledby', `${dialogId}-title`);
+      dialog.setAttribute('aria-describedby', `${dialogId}-message`);
+
+      const variantIconMap = { danger: '⚠️', warning: '⚠️', info: 'ℹ️' };
+      const icon = variantIconMap[variant] || variantIconMap.info;
+
+      dialog.innerHTML = `
+        <div class="modal-header">
+          <span class="confirm-dialog__icon" aria-hidden="true">${icon}</span>
+          <h2 class="modal-title" id="${dialogId}-title">${this._escapeHtml(title)}</h2>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-dialog__message" id="${dialogId}-message">${this._escapeHtml(message)}</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn--secondary confirm-dialog__cancel">${this._escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn btn--${variant === 'danger' ? 'danger' : 'primary'} confirm-dialog__confirm">${this._escapeHtml(confirmLabel)}</button>
+        </div>
+      `;
+
+      backdrop.appendChild(dialog);
+      document.body.appendChild(backdrop);
+      backdrop.style.display = 'flex';
+
+      // Lock scroll
+      document.body.style.overflow = 'hidden';
+
+      // Store element that had focus before the dialog opened
+      const previouslyFocused = document.activeElement;
+
+      // Focus the cancel button by default (safer: default action is "do nothing")
+      setTimeout(() => {
+        const cancelBtn = dialog.querySelector('.confirm-dialog__cancel');
+        if (cancelBtn) cancelBtn.focus();
+      }, 50);
+
+      const cleanup = (result) => {
+        backdrop.remove();
+        document.body.style.overflow = '';
+        if (previouslyFocused && previouslyFocused.focus) {
+          previouslyFocused.focus();
+        }
+        resolve(result);
+      };
+
+      dialog.querySelector('.confirm-dialog__confirm').addEventListener('click', () => cleanup(true));
+      dialog.querySelector('.confirm-dialog__cancel').addEventListener('click', () => cleanup(false));
+
+      // Escape key cancels
+      const keyHandler = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', keyHandler);
+          cleanup(false);
+        }
+      };
+      document.addEventListener('keydown', keyHandler);
+
+      // Backdrop click cancels
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          document.removeEventListener('keydown', keyHandler);
+          cleanup(false);
+        }
+      });
+
+      // Trap focus inside dialog
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const focusable = Array.from(
+          dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        ).filter((el) => !el.disabled);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      });
+    });
+  },
+
+  /**
+   * Escape HTML special characters to prevent XSS when inserting into innerHTML.
+   */
+  _escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
   },
 
   // ===== UTILITY FUNCTIONS =====

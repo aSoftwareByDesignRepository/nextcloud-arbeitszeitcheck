@@ -138,3 +138,45 @@ $teamMembers = $_['teamMembers'] ?? [];
     </div>
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
+
+<script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+    window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+    window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
+    Object.assign(window.ArbeitszeitCheck.l10n, {
+        "No pending absence requests.": <?php echo json_encode($l->t('No pending absence requests.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "No pending time entry corrections.": <?php echo json_encode($l->t('No pending time entry corrections.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Error loading pending approvals.": <?php echo json_encode($l->t('Error loading pending approvals.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Error loading pending time entry corrections.": <?php echo json_encode($l->t('Error loading pending time entry corrections.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "days": <?php echo json_encode($l->t('days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Approve": <?php echo json_encode($l->t('Approve'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Reject": <?php echo json_encode($l->t('Reject'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Absence approved.": <?php echo json_encode($l->t('Absence approved.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to approve.": <?php echo json_encode($l->t('Failed to approve.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to approve absence.": <?php echo json_encode($l->t('Failed to approve absence.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Optional reason for rejection (leave empty for none):": <?php echo json_encode($l->t('Optional reason for rejection (leave empty for none):'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Reason for rejection (optional)": <?php echo json_encode($l->t('Reason for rejection (optional)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Enter reason for rejection...": <?php echo json_encode($l->t('Enter reason for rejection...'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Cancel": <?php echo json_encode($l->t('Cancel'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Confirm rejection": <?php echo json_encode($l->t('Confirm rejection'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Reject Request": <?php echo json_encode($l->t('Reject Request'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Absence rejected.": <?php echo json_encode($l->t('Absence rejected.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to reject.": <?php echo json_encode($l->t('Failed to reject.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to reject absence.": <?php echo json_encode($l->t('Failed to reject absence.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Time entry correction": <?php echo json_encode($l->t('Time entry correction'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Original:": <?php echo json_encode($l->t('Original:'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Proposed:": <?php echo json_encode($l->t('Proposed:'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Time entry correction approved successfully": <?php echo json_encode($l->t('Time entry correction approved successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to approve time entry correction.": <?php echo json_encode($l->t('Failed to approve time entry correction.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Time entry correction rejected": <?php echo json_encode($l->t('Time entry correction rejected'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Failed to reject time entry correction.": <?php echo json_encode($l->t('Failed to reject time entry correction.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Unable to load compliance data.": <?php echo json_encode($l->t('Unable to load compliance data.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Error loading team compliance.": <?php echo json_encode($l->t('Error loading team compliance.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Compliant": <?php echo json_encode($l->t('Compliant'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Warnings": <?php echo json_encode($l->t('Warnings'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Critical Violations": <?php echo json_encode($l->t('Critical Violations'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Total Violations": <?php echo json_encode($l->t('Total Violations'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Some team members have compliance issues. Check the Compliance section for details.": <?php echo json_encode($l->t('Some team members have compliance issues. Check the Compliance section for details.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "All team members are compliant.": <?php echo json_encode($l->t('All team members are compliant.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "No team members.": <?php echo json_encode($l->t('No team members.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+    });
+</script>

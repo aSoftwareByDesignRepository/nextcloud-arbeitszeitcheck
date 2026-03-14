@@ -1043,6 +1043,27 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   justify-content: space-between;
 }
 
+/* ===== CONFIRM DIALOG ===== */
+
+.confirm-dialog .modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.confirm-dialog__icon {
+  font-size: var(--arbeitszeitcheck-font-size-2xl);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.confirm-dialog__message {
+  margin: 0;
+  color: var(--color-main-text);
+  font-size: var(--arbeitszeitcheck-font-size-base);
+  line-height: var(--arbeitszeitcheck-line-height-relaxed);
+}
+
 /* ===== ALERT COMPONENTS ===== */
 
 /* Alert Base */

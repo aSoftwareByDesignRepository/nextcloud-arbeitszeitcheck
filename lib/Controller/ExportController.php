@@ -66,7 +66,10 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function timeEntries(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
+	/**
+	 * @return DataDownloadResponse|JSONResponse
+	 */
+	public function timeEntries(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse|JSONResponse
 	{
 		try {
 			$user = $this->userSession->getUser();
@@ -133,10 +136,15 @@ class ExportController extends Controller
 
 			$filename = 'time-entries-' . date('Y-m-d') . '.' . $format;
 
+			if ($format === 'pdf') {
+				return new JSONResponse([
+					'error' => $this->l10n->t('PDF export is not available. Please use CSV.')
+				], Http::STATUS_UNPROCESSABLE_ENTITY);
+			}
+
 			return match($format) {
 				'csv' => $this->exportAsCsv($data, $filename),
 				'json' => $this->exportAsJson($data, $filename),
-				'pdf' => $this->exportAsPdf($data, $filename, 'Time Entries Export'),
 				'datev' => $this->exportAsDatev($userId, $start, $end),
 				default => $this->exportAsCsv($data, $filename)
 			};
@@ -157,7 +165,10 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function absences(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse
+	/**
+	 * @return DataDownloadResponse|JSONResponse
+	 */
+	public function absences(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse|JSONResponse
 	{
 		try {
 			$user = $this->userSession->getUser();
@@ -220,10 +231,15 @@ class ExportController extends Controller
 
 			$filename = 'absences-' . date('Y-m-d') . '.' . $format;
 
+			if ($format === 'pdf') {
+				return new JSONResponse([
+					'error' => $this->l10n->t('PDF export is not available. Please use CSV.')
+				], Http::STATUS_UNPROCESSABLE_ENTITY);
+			}
+
 			return match($format) {
 				'csv' => $this->exportAsCsv($data, $filename),
 				'json' => $this->exportAsJson($data, $filename),
-				'pdf' => $this->exportAsPdf($data, $filename, 'Absences Export'),
 				default => $this->exportAsCsv($data, $filename)
 			};
 		} catch (\Throwable $e) {

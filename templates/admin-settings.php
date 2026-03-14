@@ -50,6 +50,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
             <?php endif; ?>
 
             <form id="admin-settings-form" class="form admin-settings-form" method="post" action="#" novalidate>
+                <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
                 <section class="admin-settings-section" aria-labelledby="section-compliance-heading">
                     <h3 id="section-compliance-heading" class="admin-settings-section__title"><?php p($l->t('Compliance & working time rules')); ?></h3>
                 <div class="form-group">

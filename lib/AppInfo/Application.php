@@ -38,7 +38,6 @@ use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IDBConnection;
-use OCP\Notification\IManager as INotificationManager;
 use OCP\Security\CSP\AddContentSecurityPolicyEvent;
 use OCP\User\Events\UserDeletedEvent;
 
@@ -203,6 +202,7 @@ class Application extends App implements IBootstrap {
 				$c->query(TeamResolverService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
 				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IDBConnection::class),
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(NotificationService::class),
@@ -304,10 +304,6 @@ class Application extends App implements IBootstrap {
 	 * @inheritDoc
 	 */
 	public function boot(IBootContext $context): void {
-		$context->injectFn(function (INotificationManager $notificationManager) {
-			$notificationManager->registerNotifierService(Notifier::class);
-		});
-
 		// Load CSS and JS files ONLY on arbeitszeitcheck routes to avoid leaking into other apps
 		// Use a safer approach that doesn't fail if IRequest is not available (e.g., during migrations)
 		try {

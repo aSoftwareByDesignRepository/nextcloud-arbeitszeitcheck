@@ -31,8 +31,13 @@
     width: 280px;
     min-width: 280px;
     flex-shrink: 0;
-    height: calc(100vh - 50px); /* Below header */
-    max-height: calc(100vh - 50px);
+    /* Use the Nextcloud CSS variable for header height when available;
+       fall back to the conventional 50px. dvh is used where supported so
+       that the iOS Safari address-bar resize does not cause layout jumps. */
+    height: calc(var(--header-height, 50px) * -1 + 100vh);
+    height: calc(100dvh - var(--header-height, 50px));
+    max-height: calc(var(--header-height, 50px) * -1 + 100vh);
+    max-height: calc(100dvh - var(--header-height, 50px));
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
@@ -78,6 +83,7 @@
     width: 280px;
     max-width: 85vw;
     height: 100vh;
+    height: 100dvh;
     z-index: 2000;
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;

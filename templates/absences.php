@@ -155,6 +155,10 @@ $colleagues = $_['colleagues'] ?? [];
             <section class="section section--form" aria-labelledby="form-title" aria-describedby="form-desc">
                 <h3 id="form-title" class="section__title visually-hidden"><?php p($l->t('Absence request details')); ?></h3>
                 <p id="form-desc" class="section__desc visually-hidden"><?php p($l->t('Fill in the type, dates, and optional reason and substitute.')); ?></p>
+                <p class="form-required-note" aria-hidden="false">
+                    <span class="form-required" aria-hidden="true">*</span>
+                    <?php p($l->t('Required field')); ?>
+                </p>
                 <div class="alert alert--error" role="alert" aria-live="polite" id="absence-form-error"<?php echo $error ? '' : ' style="display: none;"'; ?>>
                     <p id="absence-form-error-text"><?php echo $error ? htmlspecialchars($error, ENT_QUOTES, 'UTF-8') : ''; ?></p>
                 </div>
@@ -372,11 +376,15 @@ $colleagues = $_['colleagues'] ?? [];
                 <?php elseif ($canCancel): ?>
                     <div class="absence-detail-actions absence-detail-actions--top">
                         <form method="POST"
-                              action="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.cancel', ['id' => $absence->getId()])); ?>">
+                              action="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.cancel', ['id' => $absence->getId()])); ?>"
+                              class="js-confirm-form">
                             <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
                             <button type="submit"
-                                    class="btn btn--secondary btn--danger"
-                                    onclick="return confirm('<?php echo addslashes($l->t('Do you really want to cancel this absence? This cannot be undone.')); ?>');"
+                                    class="btn btn--secondary btn--danger js-confirm-submit"
+                                    data-confirm-title="<?php p($l->t('Cancel absence')); ?>"
+                                    data-confirm-message="<?php p($l->t('Do you really want to cancel this absence? This cannot be undone.')); ?>"
+                                    data-confirm-variant="danger"
+                                    data-confirm-label="<?php p($l->t('Yes, cancel absence')); ?>"
                                     aria-label="<?php p($l->t('Cancel this absence request')); ?>">
                                 <?php p($l->t('Cancel absence')); ?>
                             </button>
@@ -569,10 +577,20 @@ $colleagues = $_['colleagues'] ?? [];
                                         <td class="reason-cell" data-label="<?php p($l->t('Reason')); ?>">
                                             <?php 
                                             $reason = $absence->getReason();
-                                            p($reason ? substr($reason, 0, 50) : '-'); 
-                                            ?>
-                                            <?php if ($reason && strlen($reason) > 50): ?>
-                                                <span class="reason-more">...</span>
+                                            if (!$reason): ?>
+                                                <span class="text-muted">-</span>
+                                            <?php elseif (strlen($reason) <= 60): ?>
+                                                <?php p($reason); ?>
+                                            <?php else: ?>
+                                                <span class="reason-truncated" aria-expanded="false">
+                                                    <span class="reason-truncated__short"><?php p(substr($reason, 0, 60)); ?>&hellip;</span>
+                                                    <span class="reason-truncated__full" hidden><?php p($reason); ?></span>
+                                                    <button type="button"
+                                                            class="btn btn--tertiary btn--sm reason-truncated__toggle"
+                                                            aria-label="<?php p($l->t('Show full reason')); ?>">
+                                                        <?php p($l->t('more')); ?>
+                                                    </button>
+                                                </span>
                                             <?php endif; ?>
                                         </td>
                                         <td data-label="<?php p($l->t('Status')); ?>">
@@ -949,4 +967,55 @@ $colleagues = $_['colleagues'] ?? [];
         }
     });
     <?php endif; ?>
+
+    // ===== REASON EXPAND/COLLAPSE =====
+    document.querySelectorAll('.reason-truncated__toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const container = btn.closest('.reason-truncated');
+            if (!container) return;
+            const short = container.querySelector('.reason-truncated__short');
+            const full  = container.querySelector('.reason-truncated__full');
+            const expanded = container.getAttribute('aria-expanded') === 'true';
+            container.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+            if (short) short.hidden = !expanded;
+            if (full)  full.hidden  =  expanded;
+            btn.textContent = expanded
+                ? (window.t ? window.t('arbeitszeitcheck', 'more') : 'more')
+                : (window.t ? window.t('arbeitszeitcheck', 'less') : 'less');
+            btn.setAttribute('aria-label', expanded
+                ? (window.t ? window.t('arbeitszeitcheck', 'Show full reason') : 'Show full reason')
+                : (window.t ? window.t('arbeitszeitcheck', 'Show less') : 'Show less'));
+        });
+    });
+
+    // ===== ACCESSIBLE CONFIRM DIALOGS =====
+    // Replace native confirm() on any .js-confirm-submit button.
+    // Uses ArbeitszeitCheckComponents.showConfirmDialog which returns a Promise.
+    document.querySelectorAll('.js-confirm-submit').forEach(function(btn) {
+        btn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const form = btn.closest('form');
+            if (!form) return;
+
+            const comp = window.ArbeitszeitCheckComponents;
+            if (!comp || typeof comp.showConfirmDialog !== 'function') {
+                // Fallback: native confirm — should never happen since components.js is always loaded
+                if (window.confirm(btn.dataset.confirmMessage || '')) {
+                    form.submit();
+                }
+                return;
+            }
+
+            const confirmed = await comp.showConfirmDialog({
+                title:        btn.dataset.confirmTitle   || '',
+                message:      btn.dataset.confirmMessage || '',
+                variant:      btn.dataset.confirmVariant || 'info',
+                confirmLabel: btn.dataset.confirmLabel   || undefined,
+            });
+
+            if (confirmed) {
+                form.submit();
+            }
+        });
+    });
 </script>

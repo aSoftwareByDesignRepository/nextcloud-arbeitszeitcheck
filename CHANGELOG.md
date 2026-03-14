@@ -5,18 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.1.3 – 2025-03-12
+## 1.1.3 – 2025-03-14
 
 ### Fixed
 
-- Admin holidays and settings: use English source strings for translation keys (correct l10n behaviour)
-- UserDeletedListener: inject TeamMemberMapper and TeamManagerMapper instead of OC
-- XSS: sanitise team names in admin-teams.js (aria-label, data-team-name)
+- **ArbZG compliance**: Corrected break check logic (9h/45min branch now reachable; check ≥9h before ≥6h)
+- **Manager logic**: `employeeHasManager()` now uses `getManagerIdsForEmployee()` instead of `getColleagueIds()`
+- **Reporting**: `getTeamHoursSummary()` respects period parameter (week/month)
+- **Admin users**: `hasTimeEntriesToday` is now per-user, not system-wide
+- **UserSettingsMapper**: Fixed falsy zero/empty-string handling in getIntegerSetting, getFloatSetting, getStringSetting
+- **Routing**: Moved exportUsers route above getUser to fix route shadowing
+- **Version1009 migration**: Replaced MySQL backtick SQL with portable QueryBuilder; use OCP\DB\Types
+- **Duplicate notifier**: Removed double registration from Application.php boot()
+- **API security**: Generic error messages instead of raw exception output (SubstituteController, GdprController)
+- **PDF export**: Returns HTTP 422 with clear message instead of silent CSV fallback
+- **LIKE injection**: WorkingTimeModelMapper::searchByName() uses escapeLikeParameter()
+- **XSS**: Modal titles escaped in components.js; compliance-violations.js innerHTML escaped
+- **Admin-settings form**: Added CSRF requesttoken
+- **AbsenceService DI**: Fixed constructor argument order (IDBConnection)
+- Admin holidays and settings: English source strings for l10n keys
+- UserDeletedListener: inject TeamMemberMapper and TeamManagerMapper
+- XSS: sanitise team names in admin-teams.js
 
 ### Changed
 
-- Added Constants.php for magic numbers (limits, timeouts)
-- Replaced raw exception messages with user-facing messages
+- **CSS**: Shadow-light variable, scoped resets, dark-mode color-mix fixes, semantic color variables, navigation height/z-index
+- **Clock buttons**: Double-submit guard (disabled during API calls)
+- **initTimeline()**: Max retry count (20) to prevent infinite loop
+- **Accessibility**: aria-label on header buttons, label for admin user search, aria-modal on welcome dialog, English l10n keys in navigation
+- **Docs**: Removed internal docs; added docs/README; corrected repo URLs
+- **Manager dashboard**: Injected l10n from PHP so JS translations work
+- Constants.php for magic numbers; user-facing error messages
+
+### Added
+
+- **Version1010 migration**: Compound indices on at_entries, at_violations, at_holidays, at_absences
 
 ## 1.1.2 – 2025-03-07
 

@@ -1,12 +1,34 @@
-## 1.1.3 – 2025-03-12
+## 1.1.3 – 2025-03-14
 ### Behoben
-- Admin-Feiertage und -Einstellungen: englische Quellstrings für Übersetzungsschlüssel (korrektes l10n-Verhalten)
-- UserDeletedListener: TeamMemberMapper und TeamManagerMapper per Injection statt OC
-- XSS: Team-Namen in admin-teams.js bereinigt (aria-label, data-team-name)
+- **ArbZG-Compliance**: Pausenprüfung korrigiert (9h/45min-Zweig erreichbar; Prüfung ≥9h vor ≥6h)
+- **Manager-Logik**: `employeeHasManager()` nutzt nun `getManagerIdsForEmployee()` statt `getColleagueIds()`
+- **Berichte**: `getTeamHoursSummary()` berücksichtigt Periodenparameter (Woche/Monat)
+- **Admin-Benutzer**: `hasTimeEntriesToday` pro Benutzer statt systemweit
+- **UserSettingsMapper**: Falsy-Null/Leerstring-Behandlung in getIntegerSetting, getFloatSetting, getStringSetting
+- **Routing**: exportUsers-Route vor getUser verschoben (Shadowing behoben)
+- **Version1009-Migration**: MySQL-Backticks durch portablen QueryBuilder ersetzt; OCP\DB\Types
+- **Doppelte Notifier-Registrierung**: Aus Application.php boot() entfernt
+- **API-Sicherheit**: Generische Fehlermeldungen statt roher Exceptions (SubstituteController, GdprController)
+- **PDF-Export**: HTTP 422 mit klarer Meldung statt stillem CSV-Fallback
+- **LIKE-Injection**: WorkingTimeModelMapper::searchByName() verwendet escapeLikeParameter()
+- **XSS**: Modal-Titel in components.js escaped; compliance-violations.js innerHTML escaped
+- **Admin-Einstellungen**: CSRF-requesttoken ergänzt
+- **AbsenceService DI**: Konstruktorargument-Reihenfolge (IDBConnection) korrigiert
+- Admin-Feiertage und -Einstellungen: englische Quellstrings für l10n
+- UserDeletedListener: TeamMemberMapper und TeamManagerMapper per Injection
+- XSS: Team-Namen in admin-teams.js bereinigt
 
 ### Geändert
-- Constants.php für Magic Numbers ergänzt (z. B. Limits, Timeouts)
-- Rohe Exception-Meldungen durch benutzerfreundliche Meldungen ersetzt
+- **CSS**: Shadow-Light-Variable, scopierte Resets, Dark-Mode color-mix, semantische Farben, Navigationshöhe/z-index
+- **Uhr-Buttons**: Doppel-Submit-Guard (deaktiviert während API-Aufrufen)
+- **initTimeline()**: Max-Retry (20) gegen Endlosschleife
+- **Barrierefreiheit**: aria-label auf Header-Buttons, Label für Admin-Suche, aria-modal im Willkommens-Dialog, englische l10n-Keys in Navigation
+- **Dokumentation**: Interne Docs entfernt; docs/README ergänzt; Repo-URLs korrigiert
+- **Manager-Dashboard**: l10n von PHP an JS übergeben für Übersetzungen
+- Constants.php; benutzerfreundliche Fehlermeldungen
+
+### Hinzugefügt
+- **Version1010-Migration**: Zusammengesetzte Indizes auf at_entries, at_violations, at_holidays, at_absences
 
 ## 1.1.2 – 2025-03-07
 ### Geändert

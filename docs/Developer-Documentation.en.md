@@ -79,7 +79,7 @@ apps/arbeitszeitcheck/
 
 ### Prerequisites
 
-- Nextcloud 27+ installed and running
+- Nextcloud 32+ installed and running
 - PHP 8.1+ with required extensions
 - Node.js 18+ and npm
 - Composer
@@ -90,7 +90,7 @@ apps/arbeitszeitcheck/
 1. **Clone repository:**
    ```bash
    cd /path/to/nextcloud/apps/
-   git clone https://github.com/nextcloud/arbeitszeitcheck.git
+   git clone https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git arbeitszeitcheck
    cd arbeitszeitcheck
    ```
 
@@ -99,17 +99,12 @@ apps/arbeitszeitcheck/
    composer install
    ```
 
-3. **Install Node.js dependencies:**
+3. **Install Node.js dependencies** (for linting and dev tooling; the app uses vanilla JS, no build step required):
    ```bash
    npm install
    ```
 
-4. **Build frontend:**
-   ```bash
-   npm run build
-   ```
-
-5. **Enable app:**
+4. **Enable app:**
    ```bash
    php occ app:enable arbeitszeitcheck
    ```

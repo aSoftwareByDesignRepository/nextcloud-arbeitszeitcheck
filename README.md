@@ -66,9 +66,7 @@ Die wichtigsten öffentlich mitgelieferten Begleitdokumente liegen im Ordner `do
 - **Compliance**
   - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – technische Umsetzung der ArbZG‑Regeln
   - `GDPR-Compliance-Guide.en.md` – Betrieb der App im Einklang mit DSGVO/GDPR
-- **Implementierung**
-  - `TRANSLATIONS.md` – Übersetzungskonzept und verwendete Keys
-  - `UX-and-Accessibility.md` – UX‑/WCAG‑Leitlinien und Designentscheidungen
+- **Entwicklung**
   - `Developer-Documentation.en.md` – Architekturüberblick und Hinweise für Beitragende
 
 Weitere, detailliertere Arbeits‑ und Compliance‑Dokumente (z. B. Rollen‑/Rechtematrix, ArbZG‑Analyse, Store‑Publishing‑How‑to) werden intern in einem separaten Dokumentations‑Repository gepflegt und bewusst nicht mit der App ausgeliefert.

@@ -158,14 +158,14 @@ $currentYear = date('Y');
                     </div>
 
                     <div class="footer__bottom-links">
-                        <a href="https://github.com/nextcloud/arbeitszeitcheck"
+                        <a href="https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck"
                             class="footer__bottom-link"
                             target="_blank"
                             rel="noopener noreferrer">
                             <?php p($l->t('Source Code')); ?>
                         </a>
                         <span class="footer__bottom-separator">•</span>
-                        <a href="https://github.com/nextcloud/arbeitszeitcheck/blob/main/docs/Developer-Documentation.en.md"
+                        <a href="https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck/blob/main/docs/Developer-Documentation.en.md"
                             class="footer__bottom-link"
                             target="_blank"
                             rel="noopener noreferrer">

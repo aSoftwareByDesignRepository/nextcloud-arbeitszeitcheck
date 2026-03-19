@@ -26,7 +26,7 @@ $currentYear = (int)date('Y');
     <div id="app-content-wrapper">
             <div class="section admin-holidays-section">
                 <header class="section-header admin-holidays-section__header">
-                    <h2><?php p($l->t('Holidays & Calendar')); ?></h2>
+                    <h2><?php p($l->t('Holidays and calendar')); ?></h2>
                     <p class="section-intro">
                         <?php p($l->t('Manage statutory and additional holidays per federal state. These calendars are used for vacation, working time calculations, and compliance checks.')); ?>
                     </p>

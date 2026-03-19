@@ -25,6 +25,7 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
 use OCP\IL10N;
+use OCP\IConfig;
 
 /**
  * ExportController
@@ -37,6 +38,7 @@ class ExportController extends Controller
 	private DatevExportService $datevExportService;
 	private IUserSession $userSession;
 	private IL10N $l10n;
+	private IConfig $config;
 
 	public function __construct(
 		string $appName,
@@ -46,7 +48,8 @@ class ExportController extends Controller
 		ComplianceViolationMapper $violationMapper,
 		DatevExportService $datevExportService,
 		IUserSession $userSession,
-		IL10N $l10n
+		IL10N $l10n,
+		IConfig $config
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -55,6 +58,7 @@ class ExportController extends Controller
 		$this->datevExportService = $datevExportService;
 		$this->userSession = $userSession;
 		$this->l10n = $l10n;
+		$this->config = $config;
 	}
 
 	/**
@@ -105,7 +109,10 @@ class ExportController extends Controller
 			// Get time entries from database
 			$entries = $this->timeEntryMapper->findByUserAndDateRange($userId, $start, $end);
 
-			// Convert to array format
+			// Decide whether to virtually split entries that span midnight in CSV/JSON export
+			$enableMidnightSplit = $this->config->getAppValue('arbeitszeitcheck', 'export_midnight_split_enabled', '1') === '1';
+
+			// Convert to array format (optionally with midnight split for entries spanning two calendar days)
 			$data = [];
 			foreach ($entries as $entry) {
 				try {
@@ -113,16 +120,212 @@ class ExportController extends Controller
 					if (!$startTime) {
 						continue; // Skip entries with no start time
 					}
+
+					$endTime = $entry->getEndTime();
+
+					// If the optional midnight split is disabled, always export as a single, unsplit row
+					if (!$enableMidnightSplit || $endTime === null) {
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime ? $endTime->format('H:i:s') : '',
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					// If entry has no end time or does not cross midnight, export as a single row (current behaviour)
+					if ($startTime->format('Y-m-d') === $endTime->format('Y-m-d')) {
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime ? $endTime->format('H:i:s') : '',
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					// Entry spans midnight: split into two virtual segments (before/after 00:00)
+					$startTs = $startTime->getTimestamp();
+					$endTs = $endTime->getTimestamp();
+
+					if ($endTs <= $startTs) {
+						// Defensive: if end before start (should not happen for completed entries), fall back to single row
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime->format('H:i:s'),
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					// Midnight boundary (00:00 of the day after startTime)
+					$midnight = clone $startTime;
+					$midnight->setTime(0, 0, 0);
+					if ($midnight->getTimestamp() <= $startTs) {
+						$midnight->modify('+1 day');
+					}
+					$midnightTs = $midnight->getTimestamp();
+
+					// If, ausnahmsweise, der Endzeitpunkt nicht hinter dieser Mitternacht liegt, behalten wir die Eintragslogik unverändert
+					if ($endTs <= $midnightTs) {
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime->format('H:i:s'),
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					$totalDurationSeconds = $endTs - $startTs;
+					if ($totalDurationSeconds <= 0) {
+						// Fallback – sollte durch obige Checks eigentlich nicht vorkommen
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime->format('H:i:s'),
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					// Dauer vor und nach Mitternacht
+					$durationBeforeMidnightSeconds = max(0, $midnightTs - $startTs);
+					$durationAfterMidnightSeconds = max(0, $endTs - $midnightTs);
+
+					// Falls es wider Erwarten nur einen winzigen Überlauf gibt, behalten wir zur Sicherheit das Original bei
+					if ($durationBeforeMidnightSeconds === 0 || $durationAfterMidnightSeconds === 0) {
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime->format('H:i:s'),
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $entry->getDurationHours(),
+							'break_duration_hours' => $entry->getBreakDurationHours(),
+							'working_hours' => $entry->getWorkingDurationHours(),
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					$durationBeforeMidnight = $durationBeforeMidnightSeconds / 3600.0;
+					$durationAfterMidnight = $durationAfterMidnightSeconds / 3600.0;
+
+					$totalDurationHours = $entry->getDurationHours();
+					$totalWorkingHours = $entry->getWorkingDurationHours();
+					$totalBreakHours = $entry->getBreakDurationHours();
+
+					// Wenn keine Dauer berechnet werden kann, behalten wir das bisherige Verhalten bei
+					if ($totalDurationHours === null || $totalDurationHours <= 0) {
+						$data[] = [
+							'id' => $entry->getId(),
+							'date' => $startTime->format('Y-m-d'),
+							'start_time' => $startTime->format('H:i:s'),
+							'end_time' => $endTime->format('H:i:s'),
+							'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
+							'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
+							'duration_hours' => $totalDurationHours,
+							'break_duration_hours' => $totalBreakHours,
+							'working_hours' => $totalWorkingHours,
+							'description' => $entry->getDescription() ?? '',
+							'status' => $entry->getStatus(),
+							'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+							'project_id' => $entry->getProjectCheckProjectId() ?? ''
+						];
+						continue;
+					}
+
+					// Proportionale Zuordnung von Arbeits- und Pausenzeit auf die beiden Kalendertage
+					$ratioBefore = $durationBeforeMidnight / $totalDurationHours;
+					$ratioAfter = $durationAfterMidnight / $totalDurationHours;
+
+					$workingBefore = $totalWorkingHours !== null ? $totalWorkingHours * $ratioBefore : null;
+					$workingAfter = $totalWorkingHours !== null ? $totalWorkingHours * $ratioAfter : null;
+
+					$breakBefore = $totalBreakHours !== null ? $totalBreakHours * $ratioBefore : null;
+					$breakAfter = $totalBreakHours !== null ? $totalBreakHours * $ratioAfter : null;
+
+					// Segment 1: Von Start bis kurz vor Mitternacht (23:59:59)
 					$data[] = [
 						'id' => $entry->getId(),
 						'date' => $startTime->format('Y-m-d'),
 						'start_time' => $startTime->format('H:i:s'),
-						'end_time' => ($endTime = $entry->getEndTime()) ? $endTime->format('H:i:s') : '',
-						'break_start' => ($breakStart = $entry->getBreakStartTime()) ? $breakStart->format('H:i:s') : '',
-						'break_end' => ($breakEnd = $entry->getBreakEndTime()) ? $breakEnd->format('H:i:s') : '',
-						'duration_hours' => $entry->getDurationHours(),
-						'break_duration_hours' => $entry->getBreakDurationHours(),
-						'working_hours' => $entry->getWorkingDurationHours(),
+						'end_time' => '23:59:59',
+						// Einzelne Break-Start/-End-Zeiten lassen sich nicht eindeutig segmentieren, daher leer
+						'break_start' => '',
+						'break_end' => '',
+						'duration_hours' => $durationBeforeMidnight,
+						'break_duration_hours' => $breakBefore,
+						'working_hours' => $workingBefore,
+						'description' => $entry->getDescription() ?? '',
+						'status' => $entry->getStatus(),
+						'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
+						'project_id' => $entry->getProjectCheckProjectId() ?? ''
+					];
+
+					// Segment 2: Von Mitternacht bis Endzeit
+					$data[] = [
+						'id' => $entry->getId(),
+						'date' => $midnight->format('Y-m-d'),
+						'start_time' => '00:00:00',
+						'end_time' => $endTime->format('H:i:s'),
+						'break_start' => '',
+						'break_end' => '',
+						'duration_hours' => $durationAfterMidnight,
+						'break_duration_hours' => $breakAfter,
+						'working_hours' => $workingAfter,
 						'description' => $entry->getDescription() ?? '',
 						'status' => $entry->getStatus(),
 						'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',

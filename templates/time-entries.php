@@ -169,7 +169,7 @@ $error = $_['error'] ?? null;
 
                         <!-- Date and Time Section -->
                         <div class="form-section" role="group" aria-labelledby="date-time-section-title">
-                            <h3 id="date-time-section-title" class="form-section-title"><?php p($l->t('Date & Time')); ?></h3>
+                            <h3 id="date-time-section-title" class="form-section-title"><?php p($l->t('Date and time')); ?></h3>
                             <div class="form-grid form-grid--2">
                                 <div class="form-group">
                                     <label for="entry-date" id="entry-date-label" class="form-label">

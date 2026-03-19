@@ -60,6 +60,7 @@
         formData.realtimeComplianceCheck = isChecked(formData.realtimeComplianceCheck);
         formData.complianceStrictMode = isChecked(formData.complianceStrictMode);
         formData.enableViolationNotifications = isChecked(formData.enableViolationNotifications);
+        formData.exportMidnightSplitEnabled = isChecked(formData.exportMidnightSplitEnabled);
         formData.sendIcalApprovedAbsences = isChecked(formData.sendIcalApprovedAbsences);
         formData.sendIcalToSubstitute = isChecked(formData.sendIcalToSubstitute);
         formData.sendIcalToManagers = isChecked(formData.sendIcalToManagers);

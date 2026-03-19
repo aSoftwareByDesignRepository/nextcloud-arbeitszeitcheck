@@ -26,6 +26,7 @@
 - **Dokumentation**: Interne Docs entfernt; docs/README ergänzt; Repo-URLs korrigiert
 - **Manager-Dashboard**: l10n von PHP an JS übergeben für Übersetzungen
 - Constants.php; benutzerfreundliche Fehlermeldungen
+- **Zeiteintrags-Export**: Optional (per Admin-Einstellung) können Einträge, die über Mitternacht laufen, im CSV/JSON-Export rein darstellungsbezogen in zwei Kalendertage segmentiert werden (vor/nach 00:00). Die zugrundeliegende Arbeitszeit- und ArbZG-Compliance-Berechnung bleibt unverändert auf Basis des originalen, unsplitteten Zeiteintrags.
 
 ### Hinzugefügt
 - **Version1010-Migration**: Zusammengesetzte Indizes auf at_entries, at_violations, at_holidays, at_absences

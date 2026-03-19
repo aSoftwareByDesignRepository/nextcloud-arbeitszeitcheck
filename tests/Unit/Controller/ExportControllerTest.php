@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Service\DatevExportService;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IConfig;
 use OCP\IUser;
 use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +50,9 @@ class ExportControllerTest extends TestCase
 	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	private $request;
 
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $config;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -59,6 +63,12 @@ class ExportControllerTest extends TestCase
 		$this->datevExportService = $this->createMock(DatevExportService::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->request = $this->createMock(IRequest::class);
+		$this->config = $this->createMock(IConfig::class);
+
+		// Default: midnight split enabled to preserve current behaviour
+		$this->config->method('getAppValue')
+			->with('arbeitszeitcheck', 'export_midnight_split_enabled', '1')
+			->willReturn('1');
 
 		$this->controller = new ExportController(
 			'arbeitszeitcheck',
@@ -67,7 +77,8 @@ class ExportControllerTest extends TestCase
 			$this->absenceMapper,
 			$this->violationMapper,
 			$this->datevExportService,
-			$this->userSession
+			$this->userSession,
+			$this->config
 		);
 	}
 
@@ -468,6 +479,151 @@ class ExportControllerTest extends TestCase
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 		$content = $response->render();
 		$this->assertStringContainsString('No data available', $content);
+	}
+
+	/**
+	 * Test timeEntries export splits entries spanning midnight into two rows
+	 */
+	public function testTimeEntriesExportSplitsMidnightSpanningEntry(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$entry->method('getId')->willReturn(1);
+		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 22:00:00'));
+		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-16 06:00:00'));
+		$entry->method('getBreakStartTime')->willReturn(null);
+		$entry->method('getBreakEndTime')->willReturn(null);
+		// 8 Stunden Gesamtarbeitszeit ohne Pausen
+		$entry->method('getDurationHours')->willReturn(8.0);
+		$entry->method('getBreakDurationHours')->willReturn(0.0);
+		$entry->method('getWorkingDurationHours')->willReturn(8.0);
+		$entry->method('getDescription')->willReturn('Night shift');
+		$entry->method('getStatus')->willReturn('completed');
+		$entry->method('getIsManualEntry')->willReturn(false);
+		$entry->method('getProjectCheckProjectId')->willReturn(null);
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		// Ensure midnight split is enabled for this test
+		$this->config->method('getAppValue')
+			->with('arbeitszeitcheck', 'export_midnight_split_enabled', '1')
+			->willReturn('1');
+
+		$response = $this->controller->timeEntries('csv', '2024-01-15', '2024-01-16');
+
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = $response->render();
+
+		// Erste Zeile ist Header, danach sollten zwei Datenzeilen existieren
+		$lines = array_values(array_filter(explode("\n", trim($content))));
+		$this->assertGreaterThanOrEqual(3, count($lines));
+
+		$header = str_getcsv($lines[0]);
+		$row1 = str_getcsv($lines[1]);
+		$row2 = str_getcsv($lines[2]);
+
+		// Hilfsfunktion: Hole Spaltenindex
+		$getIndex = static function (array $head, string $name): int {
+			$idx = array_search($name, $head, true);
+			return $idx === false ? -1 : $idx;
+		};
+
+		$dateIdx = $getIndex($header, 'date');
+		$startIdx = $getIndex($header, 'start_time');
+		$endIdx = $getIndex($header, 'end_time');
+		$durationIdx = $getIndex($header, 'duration_hours');
+		$workingIdx = $getIndex($header, 'working_hours');
+
+		$this->assertNotSame(-1, $dateIdx);
+		$this->assertNotSame(-1, $startIdx);
+		$this->assertNotSame(-1, $endIdx);
+		$this->assertNotSame(-1, $durationIdx);
+		$this->assertNotSame(-1, $workingIdx);
+
+		// Erste Datenzeile: 15.01., 22:00:00–23:59:59
+		$this->assertSame('2024-01-15', $row1[$dateIdx]);
+		$this->assertSame('22:00:00', $row1[$startIdx]);
+		$this->assertSame('23:59:59', $row1[$endIdx]);
+
+		// Zweite Datenzeile: 16.01., 00:00:00–06:00:00
+		$this->assertSame('2024-01-16', $row2[$dateIdx]);
+		$this->assertSame('00:00:00', $row2[$startIdx]);
+		$this->assertSame('06:00:00', $row2[$endIdx]);
+
+		// Die Summe der gesplitteten Arbeitsstunden sollte (näherungsweise) der Originaldauer entsprechen
+		$totalDuration = (float)$row1[$durationIdx] + (float)$row2[$durationIdx];
+		$totalWorking = (float)$row1[$workingIdx] + (float)$row2[$workingIdx];
+
+		$this->assertEquals(8.0, $totalDuration, '', 0.01);
+		$this->assertEquals(8.0, $totalWorking, '', 0.01);
+	}
+
+	/**
+	 * Test timeEntries export does NOT split midnight-spanning entries when setting is disabled
+	 */
+	public function testTimeEntriesExportDoesNotSplitWhenMidnightSplitDisabled(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$entry->method('getId')->willReturn(1);
+		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 22:00:00'));
+		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-16 06:00:00'));
+		$entry->method('getBreakStartTime')->willReturn(null);
+		$entry->method('getBreakEndTime')->willReturn(null);
+		$entry->method('getDurationHours')->willReturn(8.0);
+		$entry->method('getBreakDurationHours')->willReturn(0.0);
+		$entry->method('getWorkingDurationHours')->willReturn(8.0);
+		$entry->method('getDescription')->willReturn('Night shift');
+		$entry->method('getStatus')->willReturn('completed');
+		$entry->method('getIsManualEntry')->willReturn(false);
+		$entry->method('getProjectCheckProjectId')->willReturn(null);
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		// Explicitly disable midnight split
+		$this->config->method('getAppValue')
+			->with('arbeitszeitcheck', 'export_midnight_split_enabled', '1')
+			->willReturn('0');
+
+		$response = $this->controller->timeEntries('csv', '2024-01-15', '2024-01-16');
+
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = $response->render();
+
+		$lines = array_values(array_filter(explode("\n", trim($content))));
+		$this->assertCount(2, $lines); // 1 header + 1 data line
+
+		$header = str_getcsv($lines[0]);
+		$row = str_getcsv($lines[1]);
+
+		$getIndex = static function (array $head, string $name): int {
+			$idx = array_search($name, $head, true);
+			return $idx === false ? -1 : $idx;
+		};
+
+		$dateIdx = $getIndex($header, 'date');
+		$startIdx = $getIndex($header, 'start_time');
+		$endIdx = $getIndex($header, 'end_time');
+
+		$this->assertNotSame(-1, $dateIdx);
+		$this->assertNotSame(-1, $startIdx);
+		$this->assertNotSame(-1, $endIdx);
+
+		$this->assertSame('2024-01-15', $row[$dateIdx]);
+		$this->assertSame('22:00:00', $row[$startIdx]);
+		$this->assertSame('06:00:00', $row[$endIdx]);
 	}
 
 	/**

@@ -52,7 +52,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
             <form id="admin-settings-form" class="form admin-settings-form" method="post" action="#" novalidate>
                 <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
                 <section class="admin-settings-section" aria-labelledby="section-compliance-heading">
-                    <h3 id="section-compliance-heading" class="admin-settings-section__title"><?php p($l->t('Compliance & working time rules')); ?></h3>
+                    <h3 id="section-compliance-heading" class="admin-settings-section__title"><?php p($l->t('Compliance and working time rules')); ?></h3>
                 <div class="form-group">
                     <div class="form-checkbox">
                         <input type="checkbox" id="autoComplianceCheck" name="autoComplianceCheck"
@@ -109,8 +109,27 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                 </div>
                 </section>
 
+                <section class="admin-settings-section" aria-labelledby="section-export-heading">
+                    <h3 id="section-export-heading" class="admin-settings-section__title"><?php p($l->t('Exports and reporting')); ?></h3>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox"
+                                   id="exportMidnightSplitEnabled"
+                                   name="exportMidnightSplitEnabled"
+                                   <?php echo ($settings['exportMidnightSplitEnabled'] ?? true) ? 'checked' : ''; ?>
+                                   aria-describedby="exportMidnightSplitEnabled-help">
+                            <label for="exportMidnightSplitEnabled" class="form-label">
+                                <?php p($l->t('Split overnight entries at midnight in CSV/JSON export')); ?>
+                            </label>
+                        </div>
+                        <p id="exportMidnightSplitEnabled-help" class="form-help">
+                            <?php p($l->t('When enabled, entries that run across midnight (for example 22:00–06:00) are shown as two lines in the export (before and after 00:00). This is only a visual/export split – all internal working time and ArbZG compliance checks continue to use the original, unsplit entry.')); ?>
+                        </p>
+                    </div>
+                </section>
+
                 <section class="admin-settings-section" aria-labelledby="section-absences-heading">
-                    <h3 id="section-absences-heading" class="admin-settings-section__title"><?php p($l->t('Absences & notifications')); ?></h3>
+                    <h3 id="section-absences-heading" class="admin-settings-section__title"><?php p($l->t('Absences and notifications')); ?></h3>
                 <fieldset class="form-fieldset" aria-labelledby="send-ical-legend">
                     <legend id="send-ical-legend" class="form-legend"><?php p($l->t('Absences: Send iCal via email')); ?></legend>
                     <p class="form-help form-help--block">
@@ -218,7 +237,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                 </section>
 
                 <section class="admin-settings-section" aria-labelledby="section-hours-heading">
-                    <h3 id="section-hours-heading" class="admin-settings-section__title"><?php p($l->t('Daily hours & rest periods')); ?></h3>
+                    <h3 id="section-hours-heading" class="admin-settings-section__title"><?php p($l->t('Daily hours and rest periods')); ?></h3>
                 <div class="form-group">
                     <label for="maxDailyHours" class="form-label">
                         <?php p($l->t('Maximum working hours per day (in hours)')); ?>
@@ -289,7 +308,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                 </section>
 
                 <section class="admin-settings-section" aria-labelledby="section-regional-heading">
-                    <h3 id="section-regional-heading" class="admin-settings-section__title"><?php p($l->t('Region & holidays')); ?></h3>
+                    <h3 id="section-regional-heading" class="admin-settings-section__title"><?php p($l->t('Region and holidays')); ?></h3>
                 <div class="form-group">
                     <label for="germanState" class="form-label">
                         <?php p($l->t('Default federal state for holidays')); ?>

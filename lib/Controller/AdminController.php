@@ -403,6 +403,7 @@ class AdminController extends Controller
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
 			'enableViolationNotifications' => $this->appConfig->getAppValueString('enable_violation_notifications', '1') === '1',
+			'exportMidnightSplitEnabled' => $this->appConfig->getAppValueString('export_midnight_split_enabled', '1') === '1',
 			'requireSubstituteTypes' => $requireSubstituteTypes,
 			'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 			'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
@@ -1181,6 +1182,7 @@ class AdminController extends Controller
 			$settings = [
 				'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 				'enableViolationNotifications' => $this->appConfig->getAppValueString('enable_violation_notifications', '1') === '1',
+				'exportMidnightSplitEnabled' => $this->appConfig->getAppValueString('export_midnight_split_enabled', '1') === '1',
 				'requireSubstituteTypes' => $requireSubstituteTypes,
 				'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 				'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
@@ -1225,6 +1227,7 @@ class AdminController extends Controller
 				'realtimeComplianceCheck' => 'realtime_compliance_check',
 				'complianceStrictMode' => 'compliance_strict_mode',
 				'enableViolationNotifications' => 'enable_violation_notifications',
+				'exportMidnightSplitEnabled' => 'export_midnight_split_enabled',
 				'requireSubstituteTypes' => 'require_substitute_types',
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
@@ -1250,6 +1253,7 @@ class AdminController extends Controller
 					// Validate and convert value based on type
 					if (in_array($paramKey, [
 						'autoComplianceCheck', 'realtimeComplianceCheck', 'complianceStrictMode', 'enableViolationNotifications',
+						'exportMidnightSplitEnabled',
 						'sendIcalApprovedAbsences', 'sendIcalToSubstitute', 'sendIcalToManagers',
 						'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee', 'sendEmailSubstituteApprovedToManager',
 						'statutoryAutoReseed'

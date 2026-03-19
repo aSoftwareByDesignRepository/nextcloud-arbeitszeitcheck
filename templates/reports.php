@@ -322,7 +322,7 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
                                 class="btn btn--primary"
                                 aria-label="<?php p($l->t('Generate and download the report')); ?>"
                                 title="<?php p($l->t('Click to create the report and download it to your computer')); ?>">
-                            <?php p($l->t('Generate & Download')); ?>
+                            <?php p($l->t('Generate and download')); ?>
                         </button>
                         <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.index')); ?>"
                            class="btn btn--secondary"

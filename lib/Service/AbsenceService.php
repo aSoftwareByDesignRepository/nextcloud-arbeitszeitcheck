@@ -53,8 +53,8 @@ class AbsenceService
 		IDBConnection $db,
 		IUserManager $userManager,
 		IL10N $l10n,
-		?NotificationService $notificationService = null,
-		?AbsenceIcalMailService $absenceIcalMailService = null,
+		?NotificationService $notificationService,
+		?AbsenceIcalMailService $absenceIcalMailService,
 		HolidayCalendarService $holidayCalendarService,
 		?AbsenceNotificationMailService $absenceNotificationMailService = null
 	) {

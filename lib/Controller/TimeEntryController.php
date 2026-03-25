@@ -1624,6 +1624,15 @@ class TimeEntryController extends Controller
 	}
 
 	/**
+	 * Legacy API (CamelCase alias): Nextcloud routes may call `indexApi()` when the route is defined as `index_api`.
+	 */
+	#[NoAdminRequired]
+	public function indexApi(?string $start_date = null, ?string $end_date = null, ?string $status = null, ?int $limit = Constants::DEFAULT_LIST_LIMIT, ?int $offset = 0): JSONResponse
+	{
+		return $this->index_api($start_date, $end_date, $status, $limit, $offset);
+	}
+
+	/**
 	 * API: Get time entries (alias for index)
 	 *
 	 * REST API endpoint for retrieving time entries. Delegates to the index() method.

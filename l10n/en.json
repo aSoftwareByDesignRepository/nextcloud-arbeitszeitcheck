@@ -1261,7 +1261,8 @@
 		"Access denied. You can only view reports for teams you manage.": "Access denied. You can only view reports for teams you manage.",
 		"Start date must be before or equal to end date.": "Start date must be before or equal to end date.",
 		"Start date must be before or equal to end date": "Start date must be before or equal to end date",
-		"Export for team or organization scope is not yet available. Use Preview to view the report.": "The download will contain one row per team member matching this preview.",
+	"Export for team or organization scope is not yet available. Use Preview to view the report.": "The download will contain one row per team member matching this preview.",
+	"Export for organization scope is not yet available. Use Preview to view the report.": "Export for organization scope is not yet available. Use Preview to view the report.",
 		"Start date and end date are required for custom period": "Start date and end date are required for custom period",
 		"Invalid date: %s": "Invalid date: %s",
 		"Invalid date format. Expected yyyy-mm-dd or dd.mm.yyyy: %s": "Invalid date format. Expected yyyy-mm-dd or dd.mm.yyyy: %s",
@@ -1707,6 +1708,6 @@
 		"Business trip": "Business trip",
 		"Federal state for holidays / calendar": "Federal state for holidays / calendar",
 		"Select the federal state whose holiday calendar applies to this person. If not set, the global default state is used.": "Select the federal state whose holiday calendar applies to this person. If not set, the global default state is used.",
-		"Use global default state": "Use global default state",
+		"Use global default state": "Use global default state"
 	}
 }

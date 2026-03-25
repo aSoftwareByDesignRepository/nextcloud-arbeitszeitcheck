@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.4 – 2026-03-25
+
+### Fixed
+- **Routing/compatibility**: Added `indexApi()` compatibility aliases for legacy endpoints to prevent 500 errors in the Nextcloud log.
+- **PHP fatal errors**: Fixed constructor signature issues in `AbsenceService` and `ComplianceService` that could crash the app when loading services or saving settings.
+- **Reports security hardening**: Hardened report preview endpoints with `start <= end` validation and a maximum date-range limit to reduce DoS risk from untrusted parameters.
+- **Admin “whole organization” scope**: Correctly handle admin organization scope (`userId=""` = all enabled users) and enforce access checks so preview/download data stays consistent.
+- **Reports rendering**: Improved Preview rendering for **absence** and **compliance** reports to match the actual report data structure.
+
+### Changed
+- **Reports UI semantics**: Team scope is limited to the team overview/export semantics that the backend actually returns (prevents misleading previews/downloads).
+- **Organization download guidance**: Added explicit UI messaging for organization scope download limitations until organization-wide export endpoints are implemented.
+
 ## 1.1.3 – 2025-03-14
 
 ### Fixed

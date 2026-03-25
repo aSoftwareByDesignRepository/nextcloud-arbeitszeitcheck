@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
+use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
@@ -100,8 +101,17 @@ class ReportController extends Controller
 	{
 		try {
 			$currentUserId = $this->getUserId();
-			$reportUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			// Special case: admin organization scope (userId="") -> generate report for all enabled users.
+			// We must not run per-user permission checks in this mode.
+			$reportUserId = null;
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+			} else {
+				$reportUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			}
 
 			$reportDate = $date ? new \DateTime($date) : new \DateTime();
 			$report = $this->reportingService->generateDailyReport($reportDate, $reportUserId);
@@ -146,8 +156,16 @@ class ReportController extends Controller
 			$weekStartDate->setTime(0, 0, 0);
 
 			$currentUserId = $this->getUserId();
-			$reportUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			// Special case: admin organization scope (userId="") -> report for all enabled users.
+			$reportUserId = null;
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+			} else {
+				$reportUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			}
 
 			$report = $this->reportingService->generateWeeklyReport($weekStartDate, $reportUserId);
 
@@ -189,8 +207,16 @@ class ReportController extends Controller
 			}
 
 			$currentUserId = $this->getUserId();
-			$reportUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			// Special case: admin organization scope (userId="") -> report for all enabled users.
+			$reportUserId = null;
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+			} else {
+				$reportUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			}
 
 			$report = $this->reportingService->generateMonthlyReport($monthDate, $reportUserId);
 
@@ -230,10 +256,25 @@ class ReportController extends Controller
 			$end = $endDate ? new \DateTime($endDate) : new \DateTime();
 			$start->setTime(0, 0, 0);
 			$end->setTime(23, 59, 59);
+			if ($start > $end) {
+				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			}
+			$days = (int)$end->diff($start)->format('%a');
+			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
+				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+			}
 
 			$currentUserId = $this->getUserId();
-			$reportUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			// Special case: admin organization scope (userId="") -> report for all enabled users.
+			$reportUserId = null;
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+			} else {
+				$reportUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			}
 
 			$report = $this->reportingService->generateOvertimeReport($start, $end, $reportUserId);
 
@@ -270,13 +311,28 @@ class ReportController extends Controller
 	{
 		try {
 			$currentUserId = $this->getUserId();
-			$reportUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			// Special case: admin organization scope (userId="") -> report for all enabled users.
+			$reportUserId = null;
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+			} else {
+				$reportUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
+			}
 
 			$start = $startDate ? new \DateTime($startDate) : (new \DateTime())->modify('-1 year');
 			$end = $endDate ? new \DateTime($endDate) : new \DateTime();
 			$start->setTime(0, 0, 0);
 			$end->setTime(23, 59, 59);
+			if ($start > $end) {
+				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			}
+			$days = (int)$end->diff($start)->format('%a');
+			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
+				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+			}
 
 			$report = $this->reportingService->generateAbsenceReport($start, $end, $reportUserId);
 
@@ -325,6 +381,13 @@ class ReportController extends Controller
 			$end = $endDate ? new \DateTime($endDate) : new \DateTime();
 			$start->setTime(0, 0, 0);
 			$end->setTime(23, 59, 59);
+			if ($start > $end) {
+				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			}
+			$days = (int)$end->diff($start)->format('%a');
+			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
+				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+			}
 
 			$currentUserId = $this->getUserId();
 			$teamUserIds = [];

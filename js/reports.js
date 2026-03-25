@@ -169,6 +169,27 @@
 
 		// React to changes in scope radios and team selects
 		// Use both 'change' and 'input' so scope updates reliably (e.g. keyboard, click, assistive tech)
+		const teamScopes = ['admin_team', 'manager_team', 'manager_single_team'];
+		function applyReportTypeRestrictionsForScope(scope) {
+			const teamScope = teamScopes.includes(scope);
+			reportCards.forEach((card) => {
+				const reportType = card.getAttribute('data-report-type') || '';
+				const btn = card.querySelector('.btn-select-report');
+				if (!btn) return;
+
+				// Backend team endpoint is an aggregated "team overview".
+				// To keep preview/download semantics consistent, we restrict team scope to "overtime".
+				const allowed = !teamScope || reportType === 'overtime';
+				btn.disabled = !allowed;
+				btn.setAttribute('aria-disabled', String(!allowed));
+			});
+
+			// Keep the selected report type consistent with the restrictions.
+			if (teamScope && reportTypeInput) {
+				reportTypeInput.value = 'overtime';
+			}
+		}
+
 		function handleScopeChange() {
 				// Enable/disable team selects based on active scope
 				const scopeAdminTeam = document.getElementById('scope-admin-team');
@@ -195,6 +216,7 @@
 				}
 
 				updateScopeFromForm();
+				applyReportTypeRestrictionsForScope(reportScopeInput ? reportScopeInput.value : '');
 		}
 
 		if (scopeForm) {
@@ -203,6 +225,7 @@
 
 			// Initialize scope state once
 			updateScopeFromForm();
+			applyReportTypeRestrictionsForScope(reportScopeInput ? reportScopeInput.value : '');
 			if (A.isAdmin) {
 				loadAdminTeamsIfNeeded();
 			} else if (A.isManager) {
@@ -246,7 +269,7 @@
 
 					// Set default dates (last 30 days) in dd.mm.yyyy format
 					const today = new Date();
-					const thirtyDaysAgo = new Date();
+					const thirtyDaysAgo = new Date(today);
 					thirtyDaysAgo.setDate(today.getDate() - 30);
 					const toDDMMYYYY = (d) => {
 						const day = String(d.getDate()).padStart(2, '0');
@@ -254,8 +277,32 @@
 						const year = d.getFullYear();
 						return `${day}.${month}.${year}`;
 					};
-					if (startDateInput) startDateInput.value = toDDMMYYYY(thirtyDaysAgo);
-					if (endDateInput) endDateInput.value = toDDMMYYYY(today);
+
+					// Defaults per report type so preview and export ranges match user expectations.
+					let defaultStart = thirtyDaysAgo;
+					let defaultEnd = today;
+
+					if (reportType === 'daily') {
+						defaultStart = today;
+						defaultEnd = today;
+					} else if (reportType === 'weekly') {
+						// Backend aligns week start by subtracting JS weekday (w=0 is Sunday).
+						const jsDay = today.getDay(); // 0=Sun, 6=Sat
+						defaultStart = new Date(today);
+						defaultStart.setDate(today.getDate() - jsDay);
+						defaultEnd = new Date(defaultStart);
+						defaultEnd.setDate(defaultStart.getDate() + 6);
+					} else if (reportType === 'monthly') {
+						defaultStart = new Date(today.getFullYear(), today.getMonth(), 1);
+						defaultEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0); // last day
+					} else {
+						// overtime, absence, compliance: keep last-30-days default
+						defaultStart = thirtyDaysAgo;
+						defaultEnd = today;
+					}
+
+					if (startDateInput) startDateInput.value = toDDMMYYYY(defaultStart);
+					if (endDateInput) endDateInput.value = toDDMMYYYY(defaultEnd);
 				}
 			});
 		});
@@ -309,7 +356,86 @@
 				});
 				html += '</tbody></table>';
 			}
-			if (report.members && report.members.length) {
+			const isAbsenceReport = report.type === 'absence' || report.absences_by_type || report.absences_by_status;
+			const isComplianceReport = report.violations_by_type || report.violations_by_severity;
+
+			if (isAbsenceReport) {
+				html += `<p class="report-meta"><strong>${L.absences || 'Absences'}:</strong> ${esc(report.total_absences != null ? report.total_absences : '')}</p>`;
+				html += `<p class="report-meta"><strong>${L.totalDays || 'Total days'}:</strong> ${esc(report.total_days != null ? report.total_days : '')}</p>`;
+
+				if (report.absences_by_type && typeof report.absences_by_type === 'object') {
+					const rows = Object.entries(report.absences_by_type)
+						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+					html += `<h4 class="report-subhead">${esc(L.absencesByType || 'Absences by type')}</h4>`;
+					html += `<table class="report-table"><thead><tr><th>${esc(L.type || 'Type')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
+					rows.forEach(([k, v]) => {
+						html += `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+					});
+					html += '</tbody></table>';
+				}
+
+				if (report.absences_by_status && typeof report.absences_by_status === 'object') {
+					const rows = Object.entries(report.absences_by_status)
+						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+					html += `<h4 class="report-subhead">${esc(L.absencesByStatus || 'Absences by status')}</h4>`;
+					html += `<table class="report-table"><thead><tr><th>${esc(L.status || 'Status')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
+					rows.forEach(([k, v]) => {
+						html += `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+					});
+					html += '</tbody></table>';
+				}
+
+				// Flatten per-user absences for a simple, predictable preview.
+				if (report.users && report.users.length) {
+					const allAbsences = [];
+					report.users.forEach((u) => {
+						(u.absences || []).forEach((a) => {
+							allAbsences.push({
+								user_name: u.display_name || u.user_id || '-',
+								type: a.type || '-',
+								start: a.start_date || '',
+								end: a.end_date || '',
+								days: a.days != null ? a.days : '',
+								status: a.status || '-',
+							});
+						});
+					});
+
+					if (allAbsences.length) {
+						html += `<h4 class="report-subhead">${esc(L.details || 'Details')}</h4>`;
+						html += `<table class="report-table"><thead><tr><th>${esc(L.name || 'Name')}</th><th>${esc(L.type || 'Type')}</th><th>${esc(L.startDate || 'Start')}</th><th>${esc(L.endDate || 'End')}</th><th>${esc(L.days || 'Days')}</th><th>${esc(L.status || 'Status')}</th></tr></thead><tbody>`;
+						allAbsences.forEach((a) => {
+							html += `<tr><td>${esc(a.user_name)}</td><td>${esc(a.type)}</td><td>${esc(a.start)}</td><td>${esc(a.end)}</td><td>${esc(a.days)}</td><td>${esc(a.status)}</td></tr>`;
+						});
+						html += '</tbody></table>';
+					}
+				}
+			} else if (isComplianceReport) {
+				// Compliance report: show totals and grouped breakdowns.
+				if (report.violations_by_type && typeof report.violations_by_type === 'object') {
+					const rows = Object.entries(report.violations_by_type)
+						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+						.slice(0, 10);
+					html += `<h4 class="report-subhead">${esc(L.violationTypes || 'Violation types')}</h4>`;
+					html += `<table class="report-table"><thead><tr><th>${esc(L.type || 'Type')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
+					rows.forEach(([k, v]) => {
+						html += `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+					});
+					html += '</tbody></table>';
+				}
+
+				if (report.violations_by_severity && typeof report.violations_by_severity === 'object') {
+					const rows = Object.entries(report.violations_by_severity)
+						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+						.slice(0, 10);
+					html += `<h4 class="report-subhead">${esc(L.severities || 'Severities')}</h4>`;
+					html += `<table class="report-table"><thead><tr><th>${esc(L.severity || 'Severity')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
+					rows.forEach(([k, v]) => {
+						html += `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+					});
+					html += '</tbody></table>';
+				}
+			} else if (report.members && report.members.length) {
 				// Team report (aggregated members)
 				html += `<h4 class="report-subhead">${L.users || 'Users'}</h4><table class="report-table"><thead><tr><th>${L.name || 'Name'}</th><th>${L.hours || 'Hours'}</th><th>${L.overtime || 'Overtime'}</th></tr></thead><tbody>`;
 				report.members.forEach((m) => {
@@ -519,9 +645,8 @@
 				// If we explicitly want organization-wide and the API supports userId, include it
 				if (scopeResolution.queryParams && typeof scopeResolution.queryParams.userId !== 'undefined') {
 					const u = new URL(url);
-					if (scopeResolution.queryParams.userId !== '') {
-						u.searchParams.set('userId', scopeResolution.queryParams.userId);
-					}
+					// Important: organization scope uses an empty string to mean "all users".
+					u.searchParams.set('userId', String(scopeResolution.queryParams.userId));
 					url = u.toString();
 				}
 			}
@@ -569,6 +694,7 @@
 						const reportType = reportTypeInput ? reportTypeInput.value : '';
 						const scope = reportScopeInput ? reportScopeInput.value : '';
 						const isTeamScope = teamScopes.includes(scope) || reportType === 'team';
+						const isOrganizationScope = scope === 'organization';
 						let html = `<p class="report-success">${esc(
 							(A.l10n && A.l10n.reportReady) || 'Report generated successfully.',
 						)}</p>`;
@@ -576,6 +702,11 @@
 							html += `<p class="report-info" role="status">${esc(
 								(A.l10n && A.l10n.exportScopeNotice) ||
 								'The download will contain one row per team member matching this preview.',
+							)}</p>`;
+						} else if (isOrganizationScope) {
+							html += `<p class="report-info" role="status">${esc(
+								(A.l10n && A.l10n.exportOrganizationScopeNotice) ||
+								'Export for organization scope is not yet available. Use Preview to view the report.',
 							)}</p>`;
 						}
 						html += renderReportHtml(data.report);
@@ -634,6 +765,16 @@
 			const format = formatSelect ? formatSelect.value : 'csv';
 			const scope = reportScopeInput ? reportScopeInput.value : '';
 			const teamScopes = ['admin_team', 'manager_team', 'manager_single_team'];
+
+			// Organization-wide download is not implemented (export endpoints are per-user today).
+			// To avoid silently downloading the wrong data, block the download and instruct the user.
+			if (scope === 'organization') {
+				const msg =
+					(A.l10n && A.l10n.exportOrganizationScopeNotice) ||
+					'Export for organization scope is not yet available. Use Preview to view the report.';
+				announceToScreenReader(msg);
+				return;
+			}
 
 			// Team and manager scopes: export aggregated team report via team API
 			if (teamScopes.includes(scope)) {

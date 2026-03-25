@@ -374,6 +374,7 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
     window.ArbeitszeitCheck.l10n.teamRequired = <?php echo json_encode($l->t('Please select a team.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.dateRangeInvalid = <?php echo json_encode($l->t('Start date must be before or equal to end date.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.exportScopeNotice = <?php echo json_encode($l->t('Export for team or organization scope is not yet available. Use Preview to view the report.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.exportOrganizationScopeNotice = <?php echo json_encode($l->t('Export for organization scope is not yet available. Use Preview to view the report.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.reportParamsRequired = <?php echo json_encode($l->t('Please fill in report type, start date and end date.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.invalidReportType = <?php echo json_encode($l->t('Invalid report type.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.errorTryAgain = <?php echo json_encode($l->t('An error occurred. Please try again.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

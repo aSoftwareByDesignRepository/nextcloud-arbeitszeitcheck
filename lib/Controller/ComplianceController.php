@@ -642,13 +642,29 @@ class ComplianceController extends Controller
 	 *
 	 * @param string|null $startDate Start date (Y-m-d format)
 	 * @param string|null $endDate End date (Y-m-d format)
+	 * @param string|null $userId When set to an empty string (`userId=`) and the caller is an admin,
+	 *                            the report is generated for all enabled users. Otherwise, generates for that user.
 	 * @return JSONResponse
 	 */
 	#[NoAdminRequired]
-	public function getReport(?string $startDate = null, ?string $endDate = null): JSONResponse
+	public function getReport(?string $startDate = null, ?string $endDate = null, ?string $userId = null): JSONResponse
 	{
 		try {
-			$userId = $this->getUserId();
+			$currentUserId = $this->getUserId();
+			$targetUserId = null;
+
+			// Special case: organization scope for admins is expressed as an empty string (`userId=`).
+			// We treat `userId=""` as "all users" and require admin privileges.
+			if ($userId === '') {
+				if (!$this->permissionService->isAdmin($currentUserId)) {
+					throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+				}
+				$targetUserId = null;
+			} else {
+				// Default: current user (or an explicitly provided userId if a legacy caller passes it).
+				$targetUserId = $userId ?? $currentUserId;
+				$this->ensureCanAccessUserCompliance($currentUserId, $targetUserId);
+			}
 
 			// Parse and validate date params (Y-m-d format)
 			$startDt = $this->parseDateParam($startDate, 'start_date');
@@ -662,8 +678,18 @@ class ComplianceController extends Controller
 				$start->modify('-30 days');
 			}
 			$start->setTime(0, 0, 0);
+			if ($start > $end) {
+				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			}
+			$days = (int)$end->diff($start)->format('%a');
+			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
+				throw new \Exception($this->l10n->t(
+					'Export date range must not exceed %d days. Please narrow the range.',
+					[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
+				));
+			}
 
-			$report = $this->complianceService->generateComplianceReport($start, $end, $userId);
+			$report = $this->complianceService->generateComplianceReport($start, $end, $targetUserId);
 
 			return new JSONResponse([
 				'success' => true,

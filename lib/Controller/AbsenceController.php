@@ -368,6 +368,15 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * Legacy API (CamelCase alias): Nextcloud routes may call `indexApi()` when the route is defined as `index_api`.
+	 */
+	#[NoAdminRequired]
+	public function indexApi(?string $status = null, ?string $type = null, ?int $limit = Constants::DEFAULT_LIST_LIMIT, ?int $offset = 0): JSONResponse
+	{
+		return $this->index_api($status, $type, $limit, $offset);
+	}
+
+	/**
 	 * Get absences endpoint
 	 *
 	 *

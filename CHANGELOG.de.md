@@ -1,3 +1,16 @@
+## 1.1.4 – 2026-03-25
+
+### Behoben
+- **Routing/Kompatibilität**: `indexApi()`-Kompatibilitätsaliases für Legacy-Endpunkte ergänzt, um 500-Fehler in den Nextcloud-Logs zu verhindern.
+- **PHP-Fatals**: Konstruktor-Signaturprobleme in `AbsenceService` und `ComplianceService` behoben (konnte die App beim Laden von Services oder beim Speichern von Einstellungen zum Absturz bringen).
+- **Reports-Sicherheit**: Vorschau-Endpunkte gehärtet (`start <= end` Validierung + maximale Zeitraumbegrenzung) um DoS-Risiken durch untrusted Parameter zu reduzieren.
+- **Admin-“Gesamte Organisation”**: Admin-Organisation-Scope korrekt verarbeitet (`userId=""` = alle aktivierten Nutzer) inklusive passender Zugriffsprüfung, damit Preview/Download konsistent bleiben.
+- **Reports-Rendering**: Preview-Darstellung für **Abwesenheiten** und **Compliance** verbessert, sodass sie zur tatsächlichen Ergebnisstruktur passt.
+
+### Geändert
+- **Reports-UI-Semantik**: Team-Scope auf Team-Overview-/Export-Semantik eingeschränkt (verhindert irreführende Preview/Downloads).
+- **Organisation-Download Hinweis**: UI-Hinweis ergänzt, dass Organisation-Download erst vollständig unterstützt ist, sobald dedizierte Organization-Export-Endpunkte verfügbar sind.
+
 ## 1.1.3 – 2025-03-14
 ### Behoben
 - **ArbZG-Compliance**: Pausenprüfung korrigiert (9h/45min-Zweig erreichbar; Prüfung ≥9h vor ≥6h)

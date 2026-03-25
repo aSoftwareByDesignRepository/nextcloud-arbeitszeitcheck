@@ -43,7 +43,7 @@ class ComplianceService
         UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
         IUserManager $userManager,
         IL10N $l10n,
-        ?NotificationService $notificationService = null,
+        ?NotificationService $notificationService,
         HolidayCalendarService $holidayCalendarService,
         IConfig $config
     ) {

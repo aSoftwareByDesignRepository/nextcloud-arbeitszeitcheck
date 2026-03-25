@@ -117,6 +117,17 @@ class SettingsController extends Controller
 	}
 
 	/**
+	 * Legacy API (CamelCase alias): Nextcloud routes may call `indexApi()` when the route is defined as `index_api`.
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	public function indexApi(): JSONResponse
+	{
+		return $this->index_api();
+	}
+
+	/**
 	 * Personal settings page
 	 */
 	#[NoAdminRequired]

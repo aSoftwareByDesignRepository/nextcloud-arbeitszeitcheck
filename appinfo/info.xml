@@ -78,6 +78,10 @@ gehosteten Nextcloud.
 		<app min-version="2.0.0">projectcheck</app>
 	</optional-dependencies>
 
+	<commands>
+		<command>OCA\ArbeitszeitCheck\Command\GenerateTestDataCommand</command>
+	</commands>
+
 	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
 		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
 	</screenshot>

@@ -191,7 +191,24 @@ const ArbeitszeitCheckUtils = {
       }
     }
 
-    return fetch(typeof OC !== 'undefined' ? OC.generateUrl(url) : url, config)
+    const resolvedUrl = (() => {
+      if (typeof url !== 'string') {
+        return url;
+      }
+
+      // Keep fully-qualified and already-generated Nextcloud paths unchanged.
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//') || url.startsWith('/index.php/')) {
+        return url;
+      }
+
+      if (typeof OC !== 'undefined' && typeof OC.generateUrl === 'function') {
+        return OC.generateUrl(url);
+      }
+
+      return url;
+    })();
+
+    return fetch(resolvedUrl, config)
       .then(async response => {
         const data = await response.json().catch(() => null);
         if (!response.ok) {
@@ -212,6 +229,9 @@ const ArbeitszeitCheckUtils = {
       .catch(error => {
         if (onError) {
           onError(error);
+          // Most call sites rely on callbacks and do not attach .catch().
+          // Avoid unhandled promise rejections once the error callback ran.
+          return null;
         }
         throw error;
       });

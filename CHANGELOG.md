@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Docker (dev)**: Example `nextcloud` image in `docker-compose.yml` set to `nextcloud:33` to match Nextcloud 33.x in local stacks.
+- **Compatibility (dev)**: Local development stacks aligned with Nextcloud 33.x (example: official `nextcloud` Docker image).
 - **Reports layout**: Reverted an overly aggressive “full width” parameter form rule that could interfere with scrolling/layout on the reports page.
 
 ## 1.1.5 - 2026-03-26

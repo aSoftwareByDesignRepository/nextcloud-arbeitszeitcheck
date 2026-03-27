@@ -34,9 +34,12 @@ config/config.php
 # Build output
 build/
 
-# Release tarballs / signatures (checksums in release/ are committed)
+# Release tarballs / signatures (docs + CHECKSUMS-*.txt may be committed)
 release/*.tar.gz
 release/*.tar.gz.asc
+release/SIGNATURE-*.txt
+release/APPSTORE-SIGNATURE*.txt
+release/*.b64
 
 # Local dev scripts (e.g. signing helper, not for public repo)
 scripts/

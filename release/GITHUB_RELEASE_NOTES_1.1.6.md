@@ -10,7 +10,7 @@
 - **Absence type badges**: Theme-safe contrast for vacation / sick / home office / other.
 
 ### Changed
-- **Docker (dev)**: Example `nextcloud` image set to `nextcloud:33` for local stacks.
+- **Compatibility (dev)**: Local stacks aligned with Nextcloud 33.x (e.g. official `nextcloud` Docker image).
 - **Reports layout**: Reverted an overly aggressive full-width parameter form rule.
 
 ---

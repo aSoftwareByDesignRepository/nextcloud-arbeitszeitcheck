@@ -584,9 +584,9 @@ Run:
 npm run e2e
 ```
 
-### Docker-first commands (this repo)
+### Docker-based development (optional)
 
-This repository runs Nextcloud in Docker. For day-to-day development, prefer `docker compose exec`.
+If you use a Docker Compose stack for Nextcloud (service name often `nextcloud`), run tests inside the container from the app directory under `custom_apps`:
 
 Run PHP tests inside the Nextcloud container:
 ```bash

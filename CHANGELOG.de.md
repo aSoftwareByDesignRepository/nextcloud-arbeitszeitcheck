@@ -13,7 +13,7 @@
 
 ### Geändert
 
-- **Docker (Dev)**: Beispiel-Image `nextcloud:33` für lokale Stacks mit Nextcloud 33.x.
+- **Kompatibilität (Dev)**: Lokale Entwicklungsumgebungen an Nextcloud 33.x ausgerichtet (z. B. offizielles `nextcloud`-Docker-Image).
 - **Berichte-Layout**: Zu aggressive Vollbreiten-Regel für das Parameterformular zurückgenommen (verbessert Scroll/Layout).
 
 ## 1.1.4 – 2026-03-25

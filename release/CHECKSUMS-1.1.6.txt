@@ -1,9 +1,10 @@
 # ArbeitszeitCheck 1.1.6 — archive integrity
 # File: arbeitszeitcheck-1.1.6.tar.gz
-# Generated: 2026-03-27 (rebuild tarball before trusting checksums if sources change)
+# Excludes: node_modules, test-results, nested .git, scripts/, release/arbeitszeitcheck-*.tar.gz
+# Regenerate after rebuilding the tarball.
 
 SHA256:
-c658145272ea51334495f0d1275b7b6ad03c4af5f2e011a91cdc059f1a371ad6  arbeitszeitcheck-1.1.6.tar.gz
+408a2564a8b821da58ce240050b8f358be15c416351d6352819c6b1621115066  arbeitszeitcheck-1.1.6.tar.gz
 
 SHA512:
-5ad3b314418eaa24ea71f725f06fb82c464156350b5648c5324e7001a539255a3a63da4c081783ce555eeb976df29cbc136fca63844960a6775c6793aea5eda3  arbeitszeitcheck-1.1.6.tar.gz
+746fa6f542f436eb26a2b782adc6f09c434d80b33ee4e6160ddfc1ed4d9b01b21676d6211c2f3e2252d3f06c5614efd2e6adfc7473f770dc46ddecb0f8290efb  arbeitszeitcheck-1.1.6.tar.gz

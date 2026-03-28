@@ -64,8 +64,8 @@ gehosteten Nextcloud.
 	<category>tools</category>
 
 	<website>https://software-by-design.de</website>
-	<bugs>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck/issues</bugs>
-	<repository>https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck</repository>
+	<bugs>https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues</bugs>
+	<repository>https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck.git</repository>
 
 	<dependencies>
 		<!-- Compatible with Nextcloud 32, 33, 34, 35, 36 (current and future releases) -->
@@ -82,20 +82,20 @@ gehosteten Nextcloud.
 		<command>OCA\ArbeitszeitCheck\Command\GenerateTestDataCommand</command>
 	</commands>
 
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
 	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png
 	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png
 	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png
 	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/ArbeitszeitCheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png
 	</screenshot>
 
 	<navigations>

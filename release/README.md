@@ -4,7 +4,7 @@ This directory holds **release documentation** and optional **checksum list file
 
 ## Full workflow (Nextcloud App Store)
 
-See **[APPSTORE-RELEASE.md](./APPSTORE-RELEASE.md)** — build tarball, SHA-256/512, OpenSSL signature, what to paste in the store, **GitHub Release on the public app repo** (`aSoftwareByDesignRepository/ArbeitszeitCheck`, not the monorepo), and a **gitignore checklist** (what must not be committed).
+See **[APPSTORE-RELEASE.md](./APPSTORE-RELEASE.md)** — build tarball, SHA-256/512, OpenSSL signature, what to paste in the store, **GitHub Release on the public app repo** (`aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck`, not the private monorepo — see `ready2publish/REPOSITORY-LAYOUT.md`), and a **gitignore checklist** (what must not be committed).
 
 ## Files in this folder
 

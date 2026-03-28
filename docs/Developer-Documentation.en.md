@@ -90,7 +90,7 @@ apps/arbeitszeitcheck/
 1. **Clone repository:**
    ```bash
    cd /path/to/nextcloud/apps/
-   git clone https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git arbeitszeitcheck
+   git clone https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck.git arbeitszeitcheck
    cd arbeitszeitcheck
    ```
 

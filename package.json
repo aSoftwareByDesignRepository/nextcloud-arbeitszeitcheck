@@ -1,6 +1,6 @@
 {
   "name": "arbeitszeitcheck",
-  "version": "1.1.1",
+  "version": "1.1.7",
   "description": "German labor law compliant time tracking system for Nextcloud",
   "type": "module",
   "scripts": {
@@ -8,9 +8,12 @@
     "lint:fix": "eslint js/ --fix",
     "stylelint": "stylelint 'css/**/*.css'",
     "stylelint:fix": "stylelint 'css/**/*.css' --fix",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "build": "echo \"No build step\" && exit 0",
-    "test:a11y": "echo \"No a11y tests yet\" && exit 0"
+    "test:a11y": "echo \"Out of scope\" && exit 0"
   },
   "keywords": [
     "nextcloud",
@@ -25,7 +28,10 @@
   "devDependencies": {
     "@nextcloud/eslint-config": "^8.3.0",
     "@nextcloud/stylelint-config": "^3.0.1",
+    "@playwright/test": "^1.55.0",
     "eslint": "^8.57.1",
+    "jsdom": "^26.0.0",
+    "vitest": "^3.2.4",
     "stylelint": "^17.1.1"
   },
   "dependencies": {

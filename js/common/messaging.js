@@ -23,7 +23,9 @@ const ArbeitszeitCheckMessaging = {
     } else {
       try {
         alert(message);
-      } catch (e) {}
+      } catch (e) {
+        // ignore: alert may be blocked in some contexts
+      }
     }
   },
 
@@ -43,7 +45,9 @@ const ArbeitszeitCheckMessaging = {
     } else {
       try {
         alert(message);
-      } catch (e) {}
+      } catch (e) {
+        // ignore: alert may be blocked in some contexts
+      }
     }
   },
 
@@ -63,7 +67,9 @@ const ArbeitszeitCheckMessaging = {
     } else {
       try {
         alert(message);
-      } catch (e) {}
+      } catch (e) {
+        // ignore: alert may be blocked in some contexts
+      }
     }
   },
 
@@ -83,7 +89,9 @@ const ArbeitszeitCheckMessaging = {
     } else {
       try {
         alert(message);
-      } catch (e) {}
+      } catch (e) {
+        // ignore: alert may be blocked in some contexts
+      }
     }
   },
 
@@ -103,7 +111,9 @@ const ArbeitszeitCheckMessaging = {
     } else {
       try {
         alert(message);
-      } catch (e) {}
+      } catch (e) {
+        // ignore: alert may be blocked in some contexts
+      }
     }
   }
 };

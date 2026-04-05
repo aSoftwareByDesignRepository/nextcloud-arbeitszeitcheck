@@ -99,10 +99,13 @@ $error = $_['error'] ?? null;
                             class="btn btn--secondary"
                             type="button"
                             aria-label="<?php p($l->t('Download your time entries as a CSV file')); ?>"
-                            title="<?php p($l->t('Click to download all your time entries from the last 30 days as a CSV file that you can open in Excel or other spreadsheet programs.')); ?>">
+                            title="<?php p($l->t('Downloads the last 30 days as CSV (long layout): each row shows start and end times; overnight shifts appear as two rows when your administrator enables midnight split. Use Reports for date range and optional wide layout.')); ?>">
                             <?php p($l->t('Download CSV')); ?>
                         </button>
                     </div>
+                    <p class="form-help header-actions-help" id="time-entries-export-hint">
+                        <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
+                    </p>
                 <?php endif; ?>
             </div>
 

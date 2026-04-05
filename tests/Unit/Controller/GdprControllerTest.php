@@ -12,10 +12,15 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 
 use OCA\ArbeitszeitCheck\Controller\GdprController;
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Db\AuditLog;
+use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\UserSetting;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataDownloadResponse;
@@ -73,6 +78,9 @@ class GdprControllerTest extends TestCase
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n->method('t')->willReturnCallback(static function (string $text, array $parameters = []): string {
+			return $text;
+		});
 		$this->request = $this->createMock(IRequest::class);
 		$this->config = $this->createMock(IConfig::class);
 		$this->config->method('getAppValue')->willReturn('2');
@@ -104,51 +112,67 @@ class GdprControllerTest extends TestCase
 			->method('getUser')
 			->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getSummary')->willReturn(['id' => 1]);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
 
-		$absence = $this->createMock(\OCA\ArbeitszeitCheck\Db\Absence::class);
-		$absence->method('getId')->willReturn(1);
-		$absence->method('getType')->willReturn('vacation');
-		$absence->method('getStartDate')->willReturn(new \DateTime('2024-06-01'));
-		$absence->method('getEndDate')->willReturn(new \DateTime('2024-06-05'));
-		$absence->method('getDays')->willReturn(5);
-		$absence->method('getReason')->willReturn(null);
-		$absence->method('getStatus')->willReturn('approved');
-		$absence->method('getApproverComment')->willReturn(null);
-		$absence->method('getApprovedAt')->willReturn(null);
-		$absence->method('getCreatedAt')->willReturn(new \DateTime());
-		$absence->method('getUpdatedAt')->willReturn(new \DateTime());
+		$absence = new Absence();
+		$absence->setId(1);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-05'));
+		$absence->setDays(5);
+		$absence->setReason(null);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setApproverComment(null);
+		$absence->setApprovedAt(null);
+		$absence->setCreatedAt(new \DateTime());
+		$absence->setUpdatedAt(new \DateTime());
 
-		$setting = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserSetting::class);
-		$setting->method('getSettingKey')->willReturn('vacation_days_per_year');
-		$setting->method('getSettingValue')->willReturn('25');
-		$setting->method('getCreatedAt')->willReturn(new \DateTime());
-		$setting->method('getUpdatedAt')->willReturn(new \DateTime());
+		$setting = new UserSetting();
+		$setting->setId(1);
+		$setting->setUserId($userId);
+		$setting->setSettingKey('vacation_days_per_year');
+		$setting->setSettingValue('25');
+		$setting->setCreatedAt(new \DateTime());
+		$setting->setUpdatedAt(new \DateTime());
 
-		$violation = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolation::class);
-		$violation->method('getId')->willReturn(1);
-		$violation->method('getViolationType')->willReturn('missing_break');
-		$violation->method('getDescription')->willReturn('Missing break');
-		$violation->method('getDate')->willReturn(new \DateTime('2024-01-15'));
-		$violation->method('getTimeEntryId')->willReturn(1);
-		$violation->method('getSeverity')->willReturn('warning');
-		$violation->method('getResolved')->willReturn(false);
-		$violation->method('getResolvedAt')->willReturn(null);
-		$violation->method('getCreatedAt')->willReturn(new \DateTime());
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId($userId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-15'));
+		$violation->setTimeEntryId(1);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setResolved(false);
+		$violation->setResolvedAt(null);
+		$violation->setCreatedAt(new \DateTime());
 
-		$auditLog = $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLog::class);
-		$auditLog->method('getId')->willReturn(1);
-		$auditLog->method('getAction')->willReturn('time_entry_created');
-		$auditLog->method('getEntityType')->willReturn('time_entry');
-		$auditLog->method('getEntityId')->willReturn(1);
-		$auditLog->method('getOldValues')->willReturn(null);
-		$auditLog->method('getNewValues')->willReturn('{"id":1}');
-		$auditLog->method('getIpAddress')->willReturn('127.0.0.1');
-		$auditLog->method('getUserAgent')->willReturn('Test');
-		$auditLog->method('getPerformedBy')->willReturn($userId);
-		$auditLog->method('getCreatedAt')->willReturn(new \DateTime());
-		$auditLog->method('getUserId')->willReturn($userId);
+		$auditLog = new AuditLog();
+		$auditLog->setId(1);
+		$auditLog->setUserId($userId);
+		$auditLog->setAction('time_entry_created');
+		$auditLog->setEntityType('time_entry');
+		$auditLog->setEntityId(1);
+		$auditLog->setOldValues(null);
+		$auditLog->setNewValues('{"id":1}');
+		$auditLog->setIpAddress('127.0.0.1');
+		$auditLog->setUserAgent('Test');
+		$auditLog->setPerformedBy($userId);
+		$auditLog->setCreatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUser')
@@ -178,8 +202,10 @@ class GdprControllerTest extends TestCase
 		$response = $this->controller->export();
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('arbeitszeitcheck-gdpr-export-', $response->getFilename());
-		$this->assertStringContainsString('.json', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('arbeitszeitcheck-gdpr-export-', $contentDisposition);
+		$this->assertStringContainsString('.json', $contentDisposition);
 	}
 
 	/**
@@ -220,16 +246,24 @@ class GdprControllerTest extends TestCase
 		$this->userSession->method('getUser')->willReturn($user);
 
 		// Create old entry (beyond 2 years)
-		$oldEntry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$oldEntry = new TimeEntry();
+		$oldEntry->setId(1);
+		$oldEntry->setUserId($userId);
 		$oldDate = new \DateTime();
 		$oldDate->modify('-3 years');
-		$oldEntry->method('getStartTime')->willReturn($oldDate);
+		$oldEntry->setStartTime($oldDate);
+		$oldEntry->setCreatedAt(clone $oldDate);
+		$oldEntry->setUpdatedAt(clone $oldDate);
 
 		// Create recent entry (within 2 years)
-		$recentEntry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$recentEntry = new TimeEntry();
+		$recentEntry->setId(2);
+		$recentEntry->setUserId($userId);
 		$recentDate = new \DateTime();
 		$recentDate->modify('-1 year');
-		$recentEntry->method('getStartTime')->willReturn($recentDate);
+		$recentEntry->setStartTime($recentDate);
+		$recentEntry->setCreatedAt(clone $recentDate);
+		$recentEntry->setUpdatedAt(clone $recentDate);
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUser')
@@ -240,8 +274,13 @@ class GdprControllerTest extends TestCase
 			->method('delete')
 			->with($oldEntry);
 
-		$setting = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserSetting::class);
-		$setting->method('getSettingKey')->willReturn('vacation_days_per_year');
+		$setting = new UserSetting();
+		$setting->setId(1);
+		$setting->setUserId($userId);
+		$setting->setSettingKey('vacation_days_per_year');
+		$setting->setSettingValue('25');
+		$setting->setCreatedAt(new \DateTime());
+		$setting->setUpdatedAt(new \DateTime());
 
 		$this->userSettingsMapper->method('getUserSettings')
 			->willReturn([$setting]);
@@ -253,8 +292,12 @@ class GdprControllerTest extends TestCase
 		$this->auditLogMapper->expects($this->once())
 			->method('logAction');
 
-		$this->l10n->method('n')
-			->willReturn('Data deletion request processed. 1 time entry deleted. 1 entries retained due to legal 2-year retention requirement.');
+		$this->l10n->method('n')->willReturnCallback(static function (string $singular, string $plural, int $count, array $params = []): string {
+			if ($singular === 'year' && $plural === 'years') {
+				return $count === 1 ? 'year' : 'years';
+			}
+			return 'Data deletion request processed. 1 time entry deleted. 1 entries retained due to legal 2-year retention requirement.';
+		});
 
 		$response = $this->controller->delete();
 		$data = $response->getData();
@@ -304,7 +347,7 @@ class GdprControllerTest extends TestCase
 
 		$response = $this->controller->delete();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 		$this->assertStringContainsString('not authenticated', $data['error']);
@@ -319,10 +362,13 @@ class GdprControllerTest extends TestCase
 			->method('getUser')
 			->willReturn(null);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('User not authenticated');
-
-		$this->controller->export();
+		$response = $this->controller->export();
+		$this->assertInstanceOf(JSONResponse::class, $response);
+		/** @var JSONResponse $response */
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('not authenticated', $data['error']);
 	}
 
 	/**
@@ -342,10 +388,10 @@ class GdprControllerTest extends TestCase
 
 		$response = $this->controller->delete();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('Database error', $data['error']);
+		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
 	}
 
 	/**

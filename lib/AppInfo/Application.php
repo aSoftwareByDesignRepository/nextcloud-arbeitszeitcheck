@@ -24,6 +24,9 @@ use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
+use OCA\ArbeitszeitCheck\Service\AbsenceCalendarSyncService;
+use OCA\ArbeitszeitCheck\Service\HolidayNcCalendarSyncService;
+use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
@@ -114,6 +117,63 @@ class Application extends App implements IBootstrap {
 		$context->registerService(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper(
 				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(AbsenceCalendarSyncService::class, function($c) {
+			$calDav = null;
+			try {
+				$calDav = $c->query(\OCA\DAV\CalDAV\CalDavBackend::class);
+			} catch (\Throwable $e) {
+				// DAV app not available in some contexts (e.g. unit tests without full stack)
+			}
+			return new AbsenceCalendarSyncService(
+				$c->query(\OCP\Calendar\IManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper::class),
+				$c->query(\OCP\L10N\IFactory::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\AppFramework\Utility\ITimeFactory::class),
+				$c->query(\OCP\IURLGenerator::class),
+				$c->query(\OCP\IConfig::class),
+				$calDav
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(HolidayNcCalendarSyncService::class, function($c) {
+			$calDav = null;
+			try {
+				$calDav = $c->query(\OCA\DAV\CalDAV\CalDavBackend::class);
+			} catch (\Throwable $e) {
+			}
+			return new HolidayNcCalendarSyncService(
+				$c->query(\OCP\Calendar\IManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper::class),
+				$c->query(HolidayCalendarService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\L10N\IFactory::class),
+				$c->query(\OCP\AppFramework\Utility\ITimeFactory::class),
+				$c->query(\OCP\IURLGenerator::class),
+				$c->query(\OCP\IConfig::class),
+				$calDav
 			);
 		});
 
@@ -208,7 +268,10 @@ class Application extends App implements IBootstrap {
 				$c->query(NotificationService::class),
 				$c->query(AbsenceIcalMailService::class),
 				$c->query(HolidayCalendarService::class),
-				$c->query(AbsenceNotificationMailService::class)
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
+				$c->query(VacationAllocationService::class),
+				$c->query(AbsenceNotificationMailService::class),
+				$c->query(AbsenceCalendarSyncService::class)
 			);
 		});
 
@@ -234,6 +297,17 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\ICacheFactory::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(\Psr\Log\LoggerInterface::class)
+			);
+		});
+
+		$context->registerService(VacationAllocationService::class, function($c) {
+			return new VacationAllocationService(
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
+				$c->query(HolidayCalendarService::class)
 			);
 		});
 
@@ -263,6 +337,10 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCP\IL10N::class)
 			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer::class, function() {
+			return new \OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer();
 		});
 
 		$context->registerService(ReportingService::class, function($c) {

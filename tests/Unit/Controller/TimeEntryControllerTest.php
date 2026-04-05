@@ -15,9 +15,18 @@ use OCA\ArbeitszeitCheck\Controller\TimeEntryController;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
+use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Service\ComplianceService;
+use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\Service\TeamResolverService;
+use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IConfig;
 use OCP\IRequest;
+use OCP\IURLGenerator;
+use OCP\IL10N;
 use OCP\IUser;
 use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
@@ -39,6 +48,36 @@ class TimeEntryControllerTest extends TestCase
 	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	private $request;
 
+	/** @var OvertimeService|\PHPUnit\Framework\MockObject\MockObject */
+	private $overtimeService;
+
+	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
+	private $urlGenerator;
+
+	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
+	private $l10n;
+
+	/** @var AuditLogMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $auditLogMapper;
+
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $config;
+
+	/** @var CSPService|\PHPUnit\Framework\MockObject\MockObject */
+	private $cspService;
+
+	/** @var ComplianceService|\PHPUnit\Framework\MockObject\MockObject */
+	private $complianceService;
+
+	/** @var TimeTrackingService|\PHPUnit\Framework\MockObject\MockObject */
+	private $timeTrackingService;
+
+	/** @var TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamResolver;
+
+	/** @var NotificationService|\PHPUnit\Framework\MockObject\MockObject */
+	private $notificationService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -46,12 +85,44 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper = $this->createMock(TimeEntryMapper::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->request = $this->createMock(IRequest::class);
+		$this->overtimeService = $this->createMock(OvertimeService::class);
+		$this->urlGenerator = $this->createMock(IURLGenerator::class);
+		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $p ? (string)vsprintf($s, $p) : $s);
+		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
+		$this->auditLogMapper->method('logAction')->willReturn(new \OCA\ArbeitszeitCheck\Db\AuditLog());
+		$this->config = $this->createMock(IConfig::class);
+		$this->cspService = $this->createMock(CSPService::class);
+		$this->cspService->method('applyPolicyWithNonce')->willReturnCallback(static fn ($r) => $r);
+		$this->complianceService = $this->createMock(ComplianceService::class);
+		$this->complianceService->method('checkRestPeriodForStartTime')->willReturn([
+			'valid' => true,
+			'message' => '',
+		]);
+		$this->timeTrackingService = $this->createMock(TimeTrackingService::class);
+		$this->timeTrackingService->method('calculateAndSetAutomaticBreak');
+		$this->timeTrackingService->method('adjustEndTimeForDailyMaximum');
+		$this->teamResolver = $this->createMock(TeamResolverService::class);
+		$this->teamResolver->method('getColleagueIds')->willReturn([]);
+		$this->notificationService = $this->createMock(NotificationService::class);
+
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
 
 		$this->controller = new TimeEntryController(
 			'arbeitszeitcheck',
 			$this->request,
 			$this->timeEntryMapper,
-			$this->userSession
+			$this->userSession,
+			$this->overtimeService,
+			$this->urlGenerator,
+			$this->l10n,
+			$this->auditLogMapper,
+			$this->config,
+			$this->cspService,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->teamResolver,
+			$this->notificationService
 		);
 	}
 
@@ -68,9 +139,15 @@ class TimeEntryControllerTest extends TestCase
 			->method('getUser')
 			->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getSummary')->willReturn(['id' => 1]);
-		$entry->method('getStatus')->willReturn('completed');
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('count')
@@ -100,17 +177,27 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$completedEntry = $this->createMock(TimeEntry::class);
-		$completedEntry->method('getSummary')->willReturn(['id' => 1]);
-		$completedEntry->method('getStatus')->willReturn('completed');
+		$completedEntry = new TimeEntry();
+		$completedEntry->setId(1);
+		$completedEntry->setUserId($userId);
+		$completedEntry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$completedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$completedEntry->setIsManualEntry(false);
+		$completedEntry->setCreatedAt(new \DateTime());
+		$completedEntry->setUpdatedAt(new \DateTime());
 
-		$activeEntry = $this->createMock(TimeEntry::class);
-		$activeEntry->method('getSummary')->willReturn(['id' => 2]);
-		$activeEntry->method('getStatus')->willReturn('active');
+		$activeEntry = new TimeEntry();
+		$activeEntry->setId(2);
+		$activeEntry->setUserId($userId);
+		$activeEntry->setStartTime(new \DateTime('2024-01-16 09:00:00'));
+		$activeEntry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$activeEntry->setIsManualEntry(false);
+		$activeEntry->setCreatedAt(new \DateTime());
+		$activeEntry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('count')->willReturn(1);
-		$this->timeEntryMapper->method('findByUserAndDateRange')
-			->willReturn([$completedEntry, $activeEntry]);
+		$this->timeEntryMapper->method('findByUser')
+			->willReturn([$completedEntry]);
 
 		$response = $this->controller->index(null, null, 'completed');
 		$data = $response->getData();
@@ -132,9 +219,14 @@ class TimeEntryControllerTest extends TestCase
 
 		$entries = [];
 		for ($i = 1; $i <= 10; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getSummary')->willReturn(['id' => $i]);
-			$entry->method('getStatus')->willReturn('completed');
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
@@ -161,9 +253,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getSummary')->willReturn(['id' => $entryId]);
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('find')
@@ -190,8 +288,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($otherUserId);
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($otherUserId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -282,28 +387,46 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getIsManualEntry')->willReturn(true);
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('setStartTime')->willReturnSelf();
-		$entry->method('setEndTime')->willReturnSelf();
-		$entry->method('setDescription')->willReturnSelf();
-		$entry->method('setUpdatedAt')->willReturnSelf();
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setIsManualEntry(true);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setJustification('Initial manual entry justification');
+		$entryStart = (new \DateTime())->modify('-1 day')->setTime(9, 0, 0);
+		$entryEnd = (clone $entryStart)->modify('+8 hours');
+		$entry->setStartTime($entryStart);
+		$entry->setEndTime($entryEnd);
+		$entry->setDescription('Original description');
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
-		$updatedEntry = $this->createMock(TimeEntry::class);
-		$updatedEntry->method('getSummary')->willReturn(['id' => $entryId]);
+		$updatedEntry = new TimeEntry();
+		$updatedEntry->setId($entryId);
+		$updatedEntry->setUserId($userId);
+		$updatedEntry->setIsManualEntry(true);
+		$updatedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$updatedEntry->setJustification('Initial manual entry justification');
+		$updatedStart = (new \DateTime())->modify('-1 day')->setTime(9, 0, 0);
+		$updatedEnd = (clone $updatedStart)->modify('+7 hours 30 minutes');
+		$updatedEntry->setStartTime($updatedStart);
+		$updatedEntry->setEndTime($updatedEnd);
+		$updatedEntry->setDescription('Updated description');
+		$updatedEntry->setCreatedAt(new \DateTime());
+		$updatedEntry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->request->method('getParams')->willReturn([
+			'justification' => 'Fix manual entry',
+		]);
 		$this->timeEntryMapper->expects($this->once())
 			->method('update')
 			->willReturn($updatedEntry);
 
-		$response = $this->controller->update($entryId, '2024-01-16', 7.5, 'Updated description');
+		$response = $this->controller->update($entryId, $updatedStart->format('Y-m-d'), 7.5, 'Updated description');
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
+		$this->assertTrue($data['success'], 'Unexpected response: ' . json_encode($data));
 		$this->assertArrayHasKey('entry', $data);
 	}
 
@@ -320,8 +443,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($otherUserId);
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($otherUserId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(true);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -344,10 +474,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getStatus')->willReturn('completed');
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setIsManualEntry(false);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -356,7 +491,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Cannot edit automatic', $data['error']);
+		$this->assertStringContainsString('Only entries from the last 2 weeks', $data['error']);
 	}
 
 	/**
@@ -370,38 +505,45 @@ class TimeEntryControllerTest extends TestCase
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
+		$this->teamResolver->method('getColleagueIds')->willReturn(['manager1']);
+		$this->request->expects($this->once())->method('getParams')->willReturn([
+			'justification' => 'Wrong time recorded',
+			'newDate' => '2024-01-16',
+			'newHours' => 7.5,
+			'newDescription' => 'Corrected description',
+		]);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Original');
-		$entry->method('setJustification')->willReturnSelf();
-		$entry->method('setStatus')->willReturnSelf();
-		$entry->method('setStartTime')->willReturnSelf();
-		$entry->method('setEndTime')->willReturnSelf();
-		$entry->method('setDescription')->willReturnSelf();
-		$entry->method('setUpdatedAt')->willReturnSelf();
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setDescription('Original');
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
-		$updatedEntry = $this->createMock(TimeEntry::class);
-		$updatedEntry->method('getSummary')->willReturn(['id' => $entryId]);
+		$updatedEntry = new TimeEntry();
+		$updatedEntry->setId($entryId);
+		$updatedEntry->setUserId($userId);
+		$updatedEntry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$updatedEntry->setStartTime(new \DateTime('2024-01-16 09:00:00'));
+		$updatedEntry->setEndTime(new \DateTime('2024-01-16 16:30:00'));
+		$updatedEntry->setDescription('Corrected description');
+		$updatedEntry->setJustification('Wrong time recorded');
+		$updatedEntry->setIsManualEntry(false);
+		$updatedEntry->setCreatedAt(new \DateTime());
+		$updatedEntry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
-		$this->timeEntryMapper->expects($this->once())
-			->method('update')
+		$this->timeEntryMapper->method('update')
 			->willReturn($updatedEntry);
 
-		$response = $this->controller->requestCorrection(
-			$entryId,
-			'Wrong time recorded',
-			'2024-01-16',
-			7.5,
-			'Corrected description'
-		);
+		$response = $this->controller->requestCorrection($entryId);
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
+		$this->assertTrue($data['success'], 'Unexpected response: ' . json_encode($data));
 		$this->assertArrayHasKey('message', $data);
 	}
 
@@ -417,9 +559,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getStatus')->willReturn('pending_approval');
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -443,9 +591,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getStatus')->willReturn('completed');
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -469,9 +623,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getIsManualEntry')->willReturn(true);
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setIsManualEntry(true);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 		$this->timeEntryMapper->expects($this->once())
@@ -496,9 +656,15 @@ class TimeEntryControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getUserId')->willReturn($userId);
-		$entry->method('getIsManualEntry')->willReturn(false);
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($userId);
+		$entry->setIsManualEntry(false);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
@@ -510,38 +676,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertStringContainsString('Cannot delete automatic', $data['error']);
 	}
 
-	/**
-	 * Test stats returns statistics
-	 */
-	public function testStatsReturnsStatistics(): void
-	{
-		$userId = 'testuser';
-		$user = $this->createMock(IUser::class);
-		$user->method('getUID')->willReturn($userId);
-
-		$this->userSession->method('getUser')->willReturn($user);
-
-		$this->timeEntryMapper->expects($this->once())
-			->method('getTotalHoursByUserAndDateRange')
-			->willReturn(160.0);
-
-		$this->timeEntryMapper->expects($this->once())
-			->method('getTotalBreakHoursByUserAndDateRange')
-			->willReturn(20.0);
-
-		$this->timeEntryMapper->expects($this->once())
-			->method('countByUser')
-			->willReturn(20);
-
-		$response = $this->controller->stats('2024-01-01', '2024-01-31');
-		$data = $response->getData();
-
-		$this->assertTrue($data['success']);
-		$this->assertArrayHasKey('stats', $data);
-		$this->assertEquals(160.0, $data['stats']['total_hours']);
-		$this->assertEquals(20.0, $data['stats']['total_break_hours']);
-		$this->assertEquals(20, $data['stats']['total_entries']);
-	}
+	// NOTE: A legacy `stats()` endpoint existed previously but is no longer part of `TimeEntryController`.
 
 	/**
 	 * Test getOvertime returns overtime data
@@ -610,7 +745,7 @@ class TimeEntryControllerTest extends TestCase
 		$response = $this->controller->apiStore();
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
+		$this->assertTrue($data['success'], 'Unexpected response: ' . json_encode($data));
 	}
 
 	/**
@@ -632,6 +767,6 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Date and hours are required', $data['error']);
+		$this->assertStringContainsString('Either (date and hours) or (startTime and endTime) are required', $data['error']);
 	}
 }

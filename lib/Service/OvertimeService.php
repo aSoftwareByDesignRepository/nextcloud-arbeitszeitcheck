@@ -100,6 +100,9 @@ class OvertimeService
 		// Calculate new balance
 		$newBalance = $cumulativeBalance + $overtimeHours;
 
+		// Contract norm spread over a Mon–Fri week (matches required_hours = workingDays × weeklyHours ÷ 5).
+		$impliedDailyHours = $weeklyHours > 0 ? round($weeklyHours / 5, 2) : 0.0;
+
 		return [
 			'period_start' => $startDate->format('Y-m-d'),
 			'period_end' => $endDate->format('Y-m-d'),
@@ -108,8 +111,11 @@ class OvertimeService
 			'overtime_hours' => round($overtimeHours, 2),
 			'cumulative_balance_before' => round($cumulativeBalance, 2),
 			'cumulative_balance_after' => round($newBalance, 2),
+			'cumulative_balance' => round($newBalance, 2),
 			'daily_hours' => $dailyHours,
 			'weekly_hours' => $weeklyHours,
+			'implied_daily_hours' => $impliedDailyHours,
+			'required_hours_basis' => 'weekly_contract',
 			'working_days' => $this->countWorkingDays($userId, $startDate, $endDate)
 		];
 	}
@@ -186,29 +192,20 @@ class OvertimeService
 	}
 
 	/**
-	 * Calculate required hours for a date range based on working time model
+	 * Calculate required hours for a date range based on working time model.
 	 *
-	 * @param string $userId
-	 * @param \DateTime $startDate
-	 * @param \DateTime $endDate
-	 * @param float $dailyHours Daily hours requirement
-	 * @param float $weeklyHours Weekly hours requirement
-	 * @return float Required hours
+	 * Uses the weekly contract hours only: required = workingDays × (weeklyHours ÷ 5).
+	 * The model's dailyHours field is kept for display and defaults; it does not
+	 * change this calculation so tariff weeks (e.g. 38.7 h) stay consistent.
+	 *
+	 * @param float $dailyHours Stored norm per day (informational; not multiplied here)
 	 */
 	private function calculateRequiredHours(string $userId, \DateTime $startDate, \DateTime $endDate, float $dailyHours, float $weeklyHours): float
 	{
 		$workingDays = $this->countWorkingDays($userId, $startDate, $endDate);
-		
-		// For flexible/trust-based models, use weekly average
-		// For fixed models, use daily hours * working days
-		// This is a simplified calculation - can be enhanced based on model type
-		
-		$weeks = $workingDays / 5; // Approximate weeks
-		$requiredByWeekly = $weeks * $weeklyHours;
-		$requiredByDaily = $workingDays * $dailyHours;
-		
-		// Use the more appropriate calculation (weekly average is usually more accurate)
-		return $requiredByWeekly;
+		$weeks = $workingDays / 5.0;
+
+		return $weeks * $weeklyHours;
 	}
 
 	/**

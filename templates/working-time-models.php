@@ -137,6 +137,8 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.trustBased = <?php echo json_encode($l->t('Trust-Based'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.shiftWork = <?php echo json_encode($l->t('Shift Work'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelNameHelp = <?php echo json_encode($l->t('Enter a name for this work schedule (e.g., "Full-Time", "Part-Time")'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.weeklyHoursHelp = <?php echo json_encode($l->t('Decimal hours are allowed (e.g. 38.7 h/week under a collective agreement). Overtime targets use this weekly total spread across your working days.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.dailyHoursHelp = <?php echo json_encode($l->t('Usual hours per workday (e.g. 7.74 if 38.7 h/week over five days). Overtime compares worked time to the weekly contract hours × (working days ÷ 5).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelCreated = <?php echo json_encode($l->t('Model created successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelUpdated = <?php echo json_encode($l->t('Model updated successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>

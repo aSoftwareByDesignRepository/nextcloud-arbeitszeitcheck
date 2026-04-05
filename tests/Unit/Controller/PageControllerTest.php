@@ -20,6 +20,7 @@ use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -91,8 +92,8 @@ class PageControllerTest extends TestCase
 		$response = $this->controller->index();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('index', $response->getRenderAs());
+		$this->assertEquals('arbeitszeitcheck', $response->getApp());
+		$this->assertEquals('dashboard', $response->getTemplateName());
 	}
 
 	/**
@@ -103,8 +104,8 @@ class PageControllerTest extends TestCase
 		$response = $this->controller->dashboard();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('index', $response->getRenderAs());
+		$this->assertEquals('arbeitszeitcheck', $response->getApp());
+		$this->assertEquals('dashboard', $response->getTemplateName());
 	}
 
 	/**
@@ -114,9 +115,8 @@ class PageControllerTest extends TestCase
 	{
 		$response = $this->controller->reports();
 
-		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('index', $response->getRenderAs());
+		// In test setup the user is neither manager nor admin -> reports access is gated and redirects to dashboard.
+		$this->assertInstanceOf(RedirectResponse::class, $response);
 	}
 
 	/**
@@ -127,8 +127,8 @@ class PageControllerTest extends TestCase
 		$response = $this->controller->calendar();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('index', $response->getRenderAs());
+		$this->assertEquals('arbeitszeitcheck', $response->getApp());
+		$this->assertEquals('calendar', $response->getTemplateName());
 	}
 
 	/**
@@ -139,7 +139,7 @@ class PageControllerTest extends TestCase
 		$response = $this->controller->timeline();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('index', $response->getRenderAs());
+		$this->assertEquals('arbeitszeitcheck', $response->getApp());
+		$this->assertEquals('timeline', $response->getTemplateName());
 	}
 }

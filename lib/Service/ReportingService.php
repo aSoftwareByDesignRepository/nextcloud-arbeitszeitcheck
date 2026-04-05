@@ -251,17 +251,26 @@ class ReportingService
 	/**
 	 * Generate monthly summary report
 	 *
-	 * @param \DateTime $month Month to report (any day in the month)
+	 * @param \DateTime $month Month to report (any day in the month); used when no period override is given
 	 * @param string|null $userId User ID (null for all users)
+	 * @param \DateTime|null $periodStartOverride If set with $periodEndOverride, use this inclusive date range instead of the full calendar month
+	 * @param \DateTime|null $periodEndOverride
 	 * @return array Report data
 	 */
-	public function generateMonthlyReport(\DateTime $month, ?string $userId = null): array
+	public function generateMonthlyReport(\DateTime $month, ?string $userId = null, ?\DateTime $periodStartOverride = null, ?\DateTime $periodEndOverride = null): array
 	{
-		$start = new \DateTime($month->format('Y-m-01'));
-		$start->setTime(0, 0, 0);
-		$end = clone $start;
-		$end->modify('last day of this month');
-		$end->setTime(23, 59, 59);
+		if ($periodStartOverride !== null && $periodEndOverride !== null) {
+			$start = clone $periodStartOverride;
+			$start->setTime(0, 0, 0);
+			$end = clone $periodEndOverride;
+			$end->setTime(23, 59, 59);
+		} else {
+			$start = new \DateTime($month->format('Y-m-01'));
+			$start->setTime(0, 0, 0);
+			$end = clone $start;
+			$end->modify('last day of this month');
+			$end->setTime(23, 59, 59);
+		}
 
 		$report = [
 			'type' => 'monthly',
@@ -289,7 +298,7 @@ class ReportingService
 		if ($userId) {
 			$user = $this->userManager->get($userId);
 			if ($user) {
-				$overtimeData = $this->overtimeService->calculateMonthlyOvertime($userId);
+				$overtimeData = $this->overtimeService->calculateOvertime($userId, $start, $end);
 				$entries = $this->timeEntryMapper->findByUserAndDateRange($userId, $start, $end);
 				$violations = $this->violationMapper->findByDateRange($start, $end, $userId);
 

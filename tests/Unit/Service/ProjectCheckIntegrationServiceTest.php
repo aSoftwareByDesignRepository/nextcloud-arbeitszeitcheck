@@ -13,11 +13,12 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCP\App\IAppManager;
+use OCP\DB\IResult;
 use OCP\DB\QueryBuilder\IQueryBuilder;
-use OCP\DB\QueryBuilder\IResult;
 use OCP\IDBConnection;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class ProjectCheckIntegrationServiceTest
@@ -36,6 +37,9 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var LoggerInterface|\PHPUnit\Framework\MockObject\MockObject */
+	private $logger;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -43,6 +47,7 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 		$this->appManager = $this->createMock(IAppManager::class);
 		$this->db = $this->createMock(IDBConnection::class);
 		$this->l10n = $this->createMock(IL10N::class);
+		$this->logger = $this->createMock(LoggerInterface::class);
 
 		$this->l10n->method('t')
 			->willReturnCallback(function ($text) {
@@ -52,7 +57,8 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 		$this->service = new ProjectCheckIntegrationService(
 			$this->appManager,
 			$this->db,
-			$this->l10n
+			$this->l10n,
+			$this->logger
 		);
 	}
 
@@ -150,15 +156,19 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 			->method('orderBy')
 			->willReturnSelf();
 
-		$queryBuilder->expects($this->exactly(3))
-			->method('createNamedParameter')
+		$queryBuilder->method('createNamedParameter')
 			->willReturnCallback(function ($value) {
 				return ':' . $value;
 			});
 
-		$queryBuilder->expects($this->once())
-			->method('expr')
-			->willReturn($this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class));
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$composite = $this->createMock(\OCP\DB\QueryBuilder\ICompositeExpression::class);
+		$expr->method('eq')->willReturn('expr');
+		$expr->method('andX')->willReturn($composite);
+		$expr->method('orX')->willReturn($composite);
+		$expr->method('isNull')->willReturn('expr');
+
+		$queryBuilder->method('expr')->willReturn($expr);
 
 		$queryBuilder->expects($this->once())
 			->method('executeQuery')
@@ -275,9 +285,10 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 			->with($projectId)
 			->willReturn(':project1');
 
-		$queryBuilder->expects($this->once())
-			->method('expr')
-			->willReturn($this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class));
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$expr->method('eq')->willReturn('expr');
+		$queryBuilder->method('expr')
+			->willReturn($expr);
 
 		$queryBuilder->expects($this->once())
 			->method('executeQuery')
@@ -472,58 +483,46 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 			->with('projectcheck')
 			->willReturn(true);
 
-		$queryBuilder = $this->createMock(IQueryBuilder::class);
-		$result = $this->createMock(IResult::class);
+		$mainQb = $this->createMock(IQueryBuilder::class);
+		$existingQb = $this->createMock(IQueryBuilder::class);
+		$insertQb = $this->createMock(IQueryBuilder::class);
+
+		$mainResult = $this->createMock(IResult::class);
+		$existingResult = $this->createMock(IResult::class);
 
 		$this->db->expects($this->exactly(3))
 			->method('getQueryBuilder')
-			->willReturn($queryBuilder);
+			->willReturnOnConsecutiveCalls($mainQb, $existingQb, $insertQb);
 
-		// First query: Get ArbeitszeitCheck entries
-		$queryBuilder->expects($this->exactly(2))
-			->method('select')
-			->willReturnSelf();
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$expr->method('eq')->willReturn('expr');
+		$expr->method('isNotNull')->willReturn('expr');
+		$expr->method('gte')->willReturn('expr');
 
-		$queryBuilder->expects($this->exactly(2))
-			->method('from')
-			->willReturnOnConsecutiveCalls('at_entries', 'projectcheck_time_entries');
+		foreach ([$mainQb, $existingQb] as $qb) {
+			$qb->method('select')->willReturnSelf();
+			$qb->method('from')->willReturnSelf();
+			$qb->method('where')->willReturnSelf();
+			$qb->method('andWhere')->willReturnSelf();
+			$qb->method('createNamedParameter')->willReturn(':param');
+			$qb->method('expr')->willReturn($expr);
+		}
 
-		$queryBuilder->expects($this->exactly(3))
-			->method('where')
-			->willReturnSelf();
+		$mainQb->method('executeQuery')->willReturn($mainResult);
+		$existingQb->method('executeQuery')->willReturn($existingResult);
 
-		$queryBuilder->expects($this->exactly(2))
-			->method('andWhere')
-			->willReturnSelf();
-
-		$queryBuilder->expects($this->exactly(6))
-			->method('createNamedParameter')
-			->willReturnCallback(function ($value) {
-				return ':' . (is_string($value) ? $value : 'param');
-			});
-
-		$queryBuilder->expects($this->exactly(2))
-			->method('expr')
-			->willReturn($this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class));
-
-		$queryBuilder->expects($this->exactly(2))
-			->method('executeQuery')
-			->willReturn($result);
-
-		$queryBuilder->expects($this->once())
+		$insertQb->expects($this->once())
 			->method('insert')
 			->with('projectcheck_time_entries')
 			->willReturnSelf();
-
-		$queryBuilder->expects($this->once())
+		$insertQb->expects($this->once())
 			->method('values')
 			->willReturnSelf();
-
-		$queryBuilder->expects($this->once())
+		$insertQb->method('createNamedParameter')->willReturn(':param');
+		$insertQb->expects($this->once())
 			->method('executeStatement');
 
-		// Mock result: One entry to sync
-		$result->expects($this->exactly(2))
+		$mainResult->expects($this->exactly(2))
 			->method('fetch')
 			->willReturnOnConsecutiveCalls(
 				[
@@ -537,11 +536,13 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 					'created_at' => '2024-01-15 10:00:00',
 					'status' => 'completed'
 				],
-				false // No existing entry in ProjectCheck
+				false
 			);
+		$mainResult->expects($this->once())->method('closeCursor');
 
-		$result->expects($this->once())
-			->method('closeCursor');
+		$existingResult->expects($this->once())
+			->method('fetch')
+			->willReturn(false);
 
 		$syncResult = $this->service->syncTimeEntriesToProjectCheck($userId);
 
@@ -635,69 +636,49 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 	{
 		$projectId = 'project1';
 
-		$this->appManager->expects($this->exactly(2))
+		$this->appManager->expects($this->once())
 			->method('isEnabledForUser')
 			->with('projectcheck')
 			->willReturn(true);
 
-		$queryBuilder = $this->createMock(IQueryBuilder::class);
-		$result = $this->createMock(IResult::class);
+		$atQb = $this->createMock(IQueryBuilder::class);
+		$pcQb = $this->createMock(IQueryBuilder::class);
+		$atResult = $this->createMock(IResult::class);
+		$pcResult = $this->createMock(IResult::class);
 
 		$this->db->expects($this->exactly(2))
 			->method('getQueryBuilder')
-			->willReturn($queryBuilder);
+			->willReturnOnConsecutiveCalls($atQb, $pcQb);
 
-		// Mock ArbeitszeitCheck stats query
-		$queryBuilder->expects($this->exactly(2))
-			->method('select')
-			->willReturnSelf();
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$expr->method('eq')->willReturn('expr');
 
-		$queryBuilder->expects($this->exactly(2))
-			->method('from')
-			->willReturnOnConsecutiveCalls('at_entries', 'projectcheck_time_entries');
+		foreach ([$atQb, $pcQb] as $qb) {
+			$qb->method('select')->willReturnSelf();
+			$qb->method('from')->willReturnSelf();
+			$qb->method('where')->willReturnSelf();
+			$qb->method('andWhere')->willReturnSelf();
+			$qb->method('createNamedParameter')->willReturn(':param');
+			$qb->method('createFunction')->willReturn('FUNC');
+			$qb->method('expr')->willReturn($expr);
+		}
 
-		$queryBuilder->expects($this->exactly(2))
-			->method('where')
-			->willReturnSelf();
+		$atQb->method('executeQuery')->willReturn($atResult);
+		$pcQb->method('executeQuery')->willReturn($pcResult);
 
-		$queryBuilder->expects($this->exactly(2))
-			->method('andWhere')
-			->willReturnSelf();
+		$atResult->method('fetch')->willReturn([
+			'total_hours' => 40.0,
+			'total_cost' => 2000.0,
+			'entries_count' => 5
+		]);
+		$pcResult->method('fetch')->willReturn([
+			'total_hours' => 20.0,
+			'total_cost' => 1000.0,
+			'entries_count' => 3
+		]);
 
-		$queryBuilder->expects($this->exactly(3))
-			->method('createNamedParameter')
-			->willReturn(':param');
-
-		$queryBuilder->expects($this->exactly(2))
-			->method('createFunction')
-			->willReturn('SUM(hours)');
-
-		$queryBuilder->expects($this->exactly(2))
-			->method('expr')
-			->willReturn($this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class));
-
-		$queryBuilder->expects($this->exactly(2))
-			->method('executeQuery')
-			->willReturn($result);
-
-		// Mock results
-		$result->expects($this->exactly(2))
-			->method('fetch')
-			->willReturnOnConsecutiveCalls(
-				[
-					'total_hours' => 40.0,
-					'total_cost' => 2000.0,
-					'entries_count' => 5
-				],
-				[
-					'total_hours' => 20.0,
-					'total_cost' => 1000.0,
-					'entries_count' => 3
-				]
-			);
-
-		$result->expects($this->exactly(2))
-			->method('closeCursor');
+		$atResult->expects($this->once())->method('closeCursor');
+		$pcResult->expects($this->once())->method('closeCursor');
 
 		$stats = $this->service->getProjectTimeStats($projectId);
 

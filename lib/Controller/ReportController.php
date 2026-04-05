@@ -13,17 +13,21 @@ namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
+use OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\DataDownloadResponse;
+use OCP\IConfig;
 use OCP\IRequest;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\IL10N;
 
@@ -37,6 +41,10 @@ class ReportController extends Controller
 	private TeamResolverService $teamResolver;
 	private TeamMemberMapper $teamMemberMapper;
 	private TeamManagerMapper $teamManagerMapper;
+	private TimeEntryMapper $timeEntryMapper;
+	private TimeEntryExportTransformer $timeEntryExportTransformer;
+	private IConfig $config;
+	private IUserManager $userManager;
 	private IUserSession $userSession;
 	private IL10N $l10n;
 
@@ -48,6 +56,10 @@ class ReportController extends Controller
 		TeamResolverService $teamResolver,
 		TeamMemberMapper $teamMemberMapper,
 		TeamManagerMapper $teamManagerMapper,
+		TimeEntryMapper $timeEntryMapper,
+		TimeEntryExportTransformer $timeEntryExportTransformer,
+		IConfig $config,
+		IUserManager $userManager,
 		IUserSession $userSession,
 		IL10N $l10n
 	) {
@@ -57,6 +69,10 @@ class ReportController extends Controller
 		$this->teamResolver = $teamResolver;
 		$this->teamMemberMapper = $teamMemberMapper;
 		$this->teamManagerMapper = $teamManagerMapper;
+		$this->timeEntryMapper = $timeEntryMapper;
+		$this->timeEntryExportTransformer = $timeEntryExportTransformer;
+		$this->config = $config;
+		$this->userManager = $userManager;
 		$this->userSession = $userSession;
 		$this->l10n = $l10n;
 	}
@@ -197,7 +213,7 @@ class ReportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function monthly(?string $month = null, ?string $userId = null): JSONResponse
+	public function monthly(?string $month = null, ?string $userId = null, ?string $startDate = null, ?string $endDate = null): JSONResponse
 	{
 		try {
 			if ($month) {
@@ -218,7 +234,24 @@ class ReportController extends Controller
 				$this->ensureCanAccessUserReport($currentUserId, $reportUserId);
 			}
 
-			$report = $this->reportingService->generateMonthlyReport($monthDate, $reportUserId);
+			$periodStart = null;
+			$periodEnd = null;
+			if ($startDate !== null && $startDate !== '' && $endDate !== null && $endDate !== '') {
+				$periodStart = new \DateTime($startDate);
+				$periodEnd = new \DateTime($endDate);
+				if ($periodStart > $periodEnd) {
+					throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+				}
+				$days = (int)$periodEnd->diff($periodStart)->format('%a');
+				if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
+					throw new \Exception($this->l10n->t(
+						'Export date range must not exceed %d days. Please narrow the range.',
+						[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
+					));
+				}
+			}
+
+			$report = $this->reportingService->generateMonthlyReport($monthDate, $reportUserId, $periodStart, $periodEnd);
 
 			return new JSONResponse([
 				'success' => true,
@@ -393,7 +426,7 @@ class ReportController extends Controller
 			$teamUserIds = [];
 
 			if ($userIds && trim($userIds) !== '') {
-				$teamUserIds = array_filter(array_map('trim', explode(',', $userIds)));
+				$teamUserIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $userIds)))));
 			} elseif ($teamId !== null && $teamId !== '') {
 				$tid = (int) $teamId;
 				if ($tid <= 0) {
@@ -408,6 +441,7 @@ class ReportController extends Controller
 				$teamUserIds = $this->teamResolver->getTeamMemberIds($currentUserId);
 			}
 
+			$teamUserIds = array_values(array_unique($teamUserIds));
 			if (empty($teamUserIds)) {
 				return new JSONResponse([
 					'success' => false,
@@ -428,6 +462,89 @@ class ReportController extends Controller
 			$download = (string)$this->request->getParam('download', '0') === '1';
 			if ($download) {
 				$format = (string)$this->request->getParam('format', 'csv');
+				$variantParam = (string)$this->request->getParam('variant', 'summary');
+				$variant = in_array($variantParam, ['summary', 'time_entries'], true) ? $variantParam : 'summary';
+				$layoutParam = (string)$this->request->getParam('layout', 'long');
+				$layout = in_array($layoutParam, ['long', 'wide'], true) ? $layoutParam : 'long';
+
+				if ($variant === 'time_entries') {
+					$enableMidnightSplit = $this->config->getAppValue('arbeitszeitcheck', 'export_midnight_split_enabled', '1') === '1';
+					$longRows = [];
+					foreach ($teamUserIds as $uid) {
+						$entries = $this->timeEntryMapper->findByUserAndDateRange($uid, $start, $end);
+						$displayName = $this->getUserDisplayName($uid);
+						foreach ($this->timeEntryExportTransformer->entriesToExportRows($entries, $enableMidnightSplit) as $row) {
+							$row['user_id'] = $uid;
+							$row['display_name'] = $displayName;
+							$longRows[] = $row;
+						}
+					}
+					usort($longRows, static function (array $a, array $b): int {
+						return [
+							(string)($a['user_id'] ?? ''),
+							(string)($a['date'] ?? ''),
+							(string)($a['start_time'] ?? ''),
+							(int)($a['id'] ?? 0),
+						] <=> [
+							(string)($b['user_id'] ?? ''),
+							(string)($b['date'] ?? ''),
+							(string)($b['start_time'] ?? ''),
+							(int)($b['id'] ?? 0),
+						];
+					});
+
+					$l10n = $this->l10n;
+					$weekdayFormatter = static function (string $dateStr) use ($l10n): string {
+						$keys = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+						$n = (int)(new \DateTime($dateStr))->format('N');
+						return $l10n->t($keys[$n - 1]);
+					};
+
+					if ($layout === 'wide') {
+						$exportRows = $this->timeEntryExportTransformer->longExportRowsToWideDaily($longRows, $weekdayFormatter);
+					} else {
+						$exportRows = array_map(static function (array $row): array {
+							return [
+								'user_id' => $row['user_id'] ?? '',
+								'display_name' => $row['display_name'] ?? '',
+								'id' => $row['id'] ?? '',
+								'date' => $row['date'] ?? '',
+								'start_time' => $row['start_time'] ?? '',
+								'end_time' => $row['end_time'] ?? '',
+								'break_start' => $row['break_start'] ?? '',
+								'break_end' => $row['break_end'] ?? '',
+								'duration_hours' => $row['duration_hours'] ?? '',
+								'break_duration_hours' => $row['break_duration_hours'] ?? '',
+								'working_hours' => $row['working_hours'] ?? '',
+								'description' => $row['description'] ?? '',
+								'status' => $row['status'] ?? '',
+								'is_manual_entry' => $row['is_manual_entry'] ?? '',
+								'project_id' => $row['project_id'] ?? '',
+							];
+						}, $longRows);
+					}
+
+					$filenameBase = 'team-time-entries-' . date('Y-m-d');
+					if ($format === 'json') {
+						$json = json_encode($exportRows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+						if ($json === false) {
+							throw new \Exception($this->l10n->t('Failed to encode report as JSON'));
+						}
+						return new DataDownloadResponse(
+							$json,
+							$filenameBase . '.json',
+							'application/json; charset=utf-8'
+						);
+					}
+
+					$csv = $this->encodeTabularDataToCsv($exportRows);
+					return new DataDownloadResponse(
+						$csv,
+						$filenameBase . '.csv',
+						'text/csv; charset=utf-8'
+					);
+				}
+
 				$filenameBase = 'team-report-' . date('Y-m-d');
 
 				if ($format === 'json') {
@@ -511,6 +628,47 @@ class ReportController extends Controller
 	 * @param array $report
 	 * @return string
 	 */
+	private function getUserDisplayName(string $userId): string
+	{
+		$user = $this->userManager->get($userId);
+		return $user ? $user->getDisplayName() : $userId;
+	}
+
+	/**
+	 * @param list<array<string, mixed>> $rows
+	 */
+	private function encodeTabularDataToCsv(array $rows): string
+	{
+		if ($rows === []) {
+			return "No data available\n";
+		}
+		$fp = fopen('php://temp', 'r+');
+		if ($fp === false) {
+			throw new \RuntimeException('Failed to open temporary stream for CSV export');
+		}
+		fputcsv($fp, array_keys($rows[0]));
+		foreach ($rows as $row) {
+			$line = [];
+			foreach (array_keys($rows[0]) as $k) {
+				$v = $row[$k] ?? '';
+				if ($v === null) {
+					$v = '';
+				} elseif (is_float($v) || is_int($v)) {
+					$v = (string)$v;
+				} elseif (!is_string($v)) {
+					$v = (string)$v;
+				}
+				$line[] = $v;
+			}
+			fputcsv($fp, $line);
+		}
+		rewind($fp);
+		$csv = stream_get_contents($fp);
+		fclose($fp);
+
+		return $csv === false ? '' : $csv;
+	}
+
 	private function buildTeamReportCsv(array $report): string
 	{
 		$headers = [

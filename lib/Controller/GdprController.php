@@ -22,6 +22,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Response;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -70,12 +71,15 @@ class GdprController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function export(): DataDownloadResponse
+	public function export(): Response
 	{
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('User not authenticated'),
+				], Http::STATUS_UNAUTHORIZED);
 			}
 
 			$userId = $user->getUID();
@@ -248,7 +252,10 @@ class GdprController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('User not authenticated'),
+				], Http::STATUS_UNAUTHORIZED);
 			}
 
 			$userId = $user->getUID();

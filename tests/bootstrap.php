@@ -47,3 +47,12 @@ if ($base === null) {
 }
 
 require_once $base;
+
+// Some environments (notably containerized Nextcloud images) don't ship the core test classes.
+// Load our minimal shim so unit tests can still execute.
+if (!class_exists(\Test\TestCase::class)) {
+	$shim = __DIR__ . '/shim/TestCase.php';
+	if (is_file($shim)) {
+		require_once $shim;
+	}
+}

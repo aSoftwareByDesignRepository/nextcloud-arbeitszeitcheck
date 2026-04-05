@@ -38,6 +38,14 @@
     margin-bottom: var(--space-6, 1.5rem);
 }
 
+.page-header-section .header-actions-help {
+	margin: var(--space-3, 0.75rem) 0 0;
+	max-width: 42rem;
+	font-size: 0.875rem;
+	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast));
+	line-height: 1.45;
+}
+
 /* Page Header - Use common styles, only override if needed */
 .arbeitszeitcheck-header {
     background: linear-gradient(135deg,

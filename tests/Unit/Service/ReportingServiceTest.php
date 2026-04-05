@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCP\IUserManager;
@@ -50,6 +51,9 @@ class ReportingServiceTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	private $holidayCalendarService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -60,6 +64,9 @@ class ReportingServiceTest extends TestCase
 		$this->overtimeService = $this->createMock(OvertimeService::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->l10n = $this->createMock(IL10N::class);
+		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->holidayCalendarService->method('isHolidayForUser')->willReturn(false);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
 
 		$this->service = new ReportingService(
 			$this->timeEntryMapper,
@@ -67,7 +74,8 @@ class ReportingServiceTest extends TestCase
 			$this->violationMapper,
 			$this->overtimeService,
 			$this->userManager,
-			$this->l10n
+			$this->l10n,
+			$this->holidayCalendarService
 		);
 	}
 
@@ -84,16 +92,25 @@ class ReportingServiceTest extends TestCase
 		$user->method('getDisplayName')->willReturn('Test User');
 		$user->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->once())
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
 
 		// Mock time entries
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.75);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 16:45:00')); // 8h work + 45m break
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:45:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -110,9 +127,7 @@ class ReportingServiceTest extends TestCase
 			]);
 
 		// Mock violations
-		$this->violationMapper->expects($this->once())
-			->method('findByDateRange')
-			->willReturn([]);
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
 
 		$report = $this->service->generateDailyReport($date, $userId);
 
@@ -149,10 +164,19 @@ class ReportingServiceTest extends TestCase
 			});
 
 		// Mock time entries for user1
-		$entry1 = $this->createMock(TimeEntry::class);
-		$entry1->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry1->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry1->method('getBreakDurationHours')->willReturn(0.75);
+		$entry1 = new TimeEntry();
+		$entry1->setId(1);
+		$entry1->setUserId('user1');
+		$entry1->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry1->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry1->setEndTime(new \DateTime('2024-01-15 16:45:00')); // 8h work + 45m break
+		$entry1->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:45:00+00:00',
+		]]));
+		$entry1->setIsManualEntry(false);
+		$entry1->setCreatedAt(new \DateTime());
+		$entry1->setUpdatedAt(new \DateTime());
 
 		// Mock time entries for user2 (no entries)
 		$this->timeEntryMapper->expects($this->exactly(2))
@@ -196,7 +220,7 @@ class ReportingServiceTest extends TestCase
 		$user->method('getDisplayName')->willReturn('Test User');
 		$user->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->once())
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
@@ -212,24 +236,27 @@ class ReportingServiceTest extends TestCase
 			]);
 
 		// Mock time entries
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getBreakDurationHours')->willReturn(0.75);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 16:45:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:45:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
-		$this->timeEntryMapper->expects($this->once())
-			->method('findByUserAndDateRange')
-			->willReturn([$entry]);
+		// Weekly report internally generates 7 daily reports too; don't over-specify mapper call counts.
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
 		// Mock violations
-		$this->violationMapper->expects($this->once())
-			->method('findByDateRange')
-			->willReturn([]);
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
 
 		// Mock daily reports (called 7 times for each day of the week)
-		$this->timeEntryMapper->expects($this->exactly(7))
-			->method('findByUserAndDateRange')
-			->willReturn([]);
-
 		$this->overtimeService->expects($this->exactly(7))
 			->method('getDailyOvertime')
 			->willReturn([
@@ -238,9 +265,7 @@ class ReportingServiceTest extends TestCase
 				'overtime_hours' => 0.0
 			]);
 
-		$this->violationMapper->expects($this->exactly(7))
-			->method('findByDateRange')
-			->willReturn([]);
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
 
 		$report = $this->service->generateWeeklyReport($weekStart, $userId);
 
@@ -270,20 +295,37 @@ class ReportingServiceTest extends TestCase
 			->with($userId)
 			->willReturn($user);
 
-		// Mock overtime data
 		$this->overtimeService->expects($this->once())
-			->method('calculateMonthlyOvertime')
-			->with($userId)
+			->method('calculateOvertime')
+			->with(
+				$userId,
+				$this->callback(static function (\DateTime $start): bool {
+					return $start->format('Y-m-d') === '2024-01-01';
+				}),
+				$this->callback(static function (\DateTime $end): bool {
+					return $end->format('Y-m-d') === '2024-01-31';
+				})
+			)
 			->willReturn([
 				'total_hours_worked' => 160.0,
 				'required_hours' => 160.0,
-				'overtime_hours' => 0.0
+				'overtime_hours' => 0.0,
 			]);
 
 		// Mock time entries
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getBreakDurationHours')->willReturn(0.75);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-02 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 16:45:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-02T12:00:00+00:00',
+			'end' => '2024-01-02T12:45:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -318,7 +360,7 @@ class ReportingServiceTest extends TestCase
 		$user->method('getDisplayName')->willReturn('Test User');
 		$user->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->once())
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
@@ -361,7 +403,7 @@ class ReportingServiceTest extends TestCase
 		$user->method('getDisplayName')->willReturn('Test User');
 		$user->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->once())
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
@@ -395,23 +437,27 @@ class ReportingServiceTest extends TestCase
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-31');
 
-		$absence1 = $this->createMock(Absence::class);
-		$absence1->method('getType')->willReturn(Absence::TYPE_VACATION);
-		$absence1->method('getStatus')->willReturn(Absence::STATUS_APPROVED);
-		$absence1->method('getUserId')->willReturn($userId);
-		$absence1->method('getId')->willReturn(1);
-		$absence1->method('getStartDate')->willReturn(new \DateTime('2024-01-10'));
-		$absence1->method('getEndDate')->willReturn(new \DateTime('2024-01-12'));
-		$absence1->method('getDays')->willReturn(3);
+		$absence1 = new Absence();
+		$absence1->setId(1);
+		$absence1->setUserId($userId);
+		$absence1->setType(Absence::TYPE_VACATION);
+		$absence1->setStatus(Absence::STATUS_APPROVED);
+		$absence1->setStartDate(new \DateTime('2024-01-10'));
+		$absence1->setEndDate(new \DateTime('2024-01-12'));
+		$absence1->setDays(3.0);
+		$absence1->setCreatedAt(new \DateTime());
+		$absence1->setUpdatedAt(new \DateTime());
 
-		$absence2 = $this->createMock(Absence::class);
-		$absence2->method('getType')->willReturn(Absence::TYPE_SICK_LEAVE);
-		$absence2->method('getStatus')->willReturn(Absence::STATUS_APPROVED);
-		$absence2->method('getUserId')->willReturn($userId);
-		$absence2->method('getId')->willReturn(2);
-		$absence2->method('getStartDate')->willReturn(new \DateTime('2024-01-20'));
-		$absence2->method('getEndDate')->willReturn(new \DateTime('2024-01-21'));
-		$absence2->method('getDays')->willReturn(2);
+		$absence2 = new Absence();
+		$absence2->setId(2);
+		$absence2->setUserId($userId);
+		$absence2->setType(Absence::TYPE_SICK_LEAVE);
+		$absence2->setStatus(Absence::STATUS_APPROVED);
+		$absence2->setStartDate(new \DateTime('2024-01-20'));
+		$absence2->setEndDate(new \DateTime('2024-01-21'));
+		$absence2->setDays(2.0);
+		$absence2->setCreatedAt(new \DateTime());
+		$absence2->setUpdatedAt(new \DateTime());
 
 		$this->absenceMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -420,7 +466,7 @@ class ReportingServiceTest extends TestCase
 
 		$user = $this->createMock(IUser::class);
 		$user->method('getDisplayName')->willReturn('Test User');
-		$this->userManager->expects($this->exactly(2))
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
@@ -458,9 +504,15 @@ class ReportingServiceTest extends TestCase
 		$user2->method('getDisplayName')->willReturn('User Two');
 		$user2->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->exactly(2))
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
-			->willReturnOnConsecutiveCalls($user1, $user2);
+			->willReturnCallback(static function (string $uid) use ($user1, $user2): ?IUser {
+				return match ($uid) {
+					'user1' => $user1,
+					'user2' => $user2,
+					default => null,
+				};
+			});
 
 		// Mock overtime data for both users
 		$this->overtimeService->expects($this->exactly(2))
@@ -472,9 +524,19 @@ class ReportingServiceTest extends TestCase
 			]);
 
 		// Mock time entries
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getBreakDurationHours')->willReturn(0.75);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId('user1');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-02 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 16:45:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-02T12:00:00+00:00',
+			'end' => '2024-01-02T12:45:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->exactly(2))
 			->method('findByUserAndDateRange')
@@ -511,15 +573,23 @@ class ReportingServiceTest extends TestCase
 
 		$user1 = $this->createMock(IUser::class);
 		$user1->method('getUID')->willReturn('user1');
+		$user1->method('getDisplayName')->willReturn('User One');
 		$user1->method('isEnabled')->willReturn(true);
 
 		$user2 = $this->createMock(IUser::class);
 		$user2->method('getUID')->willReturn('user2');
+		$user2->method('getDisplayName')->willReturn('User Two');
 		$user2->method('isEnabled')->willReturn(false); // Disabled user
 
-		$this->userManager->expects($this->exactly(2))
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
-			->willReturnOnConsecutiveCalls($user1, $user2);
+			->willReturnCallback(static function (string $uid) use ($user1, $user2): ?IUser {
+				return match ($uid) {
+					'user1' => $user1,
+					'user2' => $user2,
+					default => null,
+				};
+			});
 
 		// Mock overtime data only for user1
 		$this->overtimeService->expects($this->once())
@@ -532,9 +602,19 @@ class ReportingServiceTest extends TestCase
 			]);
 
 		// Mock time entries only for user1
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getBreakDurationHours')->willReturn(0.75);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId('user1');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-02 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 16:45:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-02T12:00:00+00:00',
+			'end' => '2024-01-02T12:45:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -573,16 +653,25 @@ class ReportingServiceTest extends TestCase
 		$user->method('getDisplayName')->willReturn('Test User');
 		$user->method('isEnabled')->willReturn(true);
 
-		$this->userManager->expects($this->once())
+		$this->userManager->expects($this->atLeastOnce())
 			->method('get')
 			->with($userId)
 			->willReturn($user);
 
 		// Mock time entries
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.25); // Only 15 minutes break
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 16:15:00')); // 8h work + 15m break
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:15:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')

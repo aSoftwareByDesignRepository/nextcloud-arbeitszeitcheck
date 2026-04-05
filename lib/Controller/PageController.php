@@ -195,6 +195,9 @@ class PageController extends Controller
 
 			$navFlags = $this->getNavigationFlags($userId);
 
+			$currentYear = (int)date('Y');
+			$vacationStats = $this->absenceService->getVacationStats($userId, $currentYear);
+
 			$params = [
 				'status' => $status,
 				'overtime' => $overtimeData,
@@ -203,6 +206,13 @@ class PageController extends Controller
 				'stats' => [
 					'total_time_entries' => $timeEntryCount,
 					'total_absences' => $absenceCount,
+					'vacation_days_remaining' => (float)($vacationStats['remaining'] ?? 0),
+					'vacation_days_used_this_year' => (float)($vacationStats['used'] ?? 0),
+					'vacation_carryover_days' => (float)($vacationStats['carryover_days'] ?? 0),
+					'vacation_carryover_usable' => (float)($vacationStats['carryover_usable'] ?? 0),
+					'vacation_carryover_expires_on' => $vacationStats['carryover_expires_on'] ?? null,
+					'vacation_annual_entitlement' => (float)($vacationStats['entitlement'] ?? 0),
+					'vacation_year' => $currentYear,
 				],
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
@@ -221,7 +231,17 @@ class PageController extends Controller
 				'overtime' => [],
 				'recentEntries' => [],
 				'isFirstTimeUser' => true,
-				'stats' => ['total_time_entries' => 0, 'total_absences' => 0],
+				'stats' => [
+					'total_time_entries' => 0,
+					'total_absences' => 0,
+					'vacation_days_remaining' => 0,
+					'vacation_days_used_this_year' => 0,
+					'vacation_carryover_days' => 0,
+					'vacation_carryover_usable' => 0,
+					'vacation_carryover_expires_on' => null,
+					'vacation_annual_entitlement' => 0,
+					'vacation_year' => (int)date('Y'),
+				],
 				'error' => $errorMessage,
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
@@ -352,6 +372,10 @@ class PageController extends Controller
 		$vacationStats = $this->absenceService->getVacationStats($userId, $currentYear);
 		$vacationDaysRemaining = (float)($vacationStats['remaining'] ?? 0);
 		$vacationDaysUsedThisYear = (float)($vacationStats['used'] ?? 0);
+		$vacationCarryoverDays = (float)($vacationStats['carryover_days'] ?? 0);
+		$vacationCarryoverUsable = (float)($vacationStats['carryover_usable'] ?? 0);
+		$vacationCarryoverExpiresOn = $vacationStats['carryover_expires_on'] ?? null;
+		$vacationAnnualEntitlement = (float)($vacationStats['entitlement'] ?? 0);
 
 		// Current filter values for the form (European format for date inputs)
 		$filterStartDate = $filterStartDt ? $filterStartDt->format('d.m.Y') : '';
@@ -395,6 +419,10 @@ class PageController extends Controller
 				'total_absences' => $absenceCount,
 				'vacation_days_remaining' => $vacationDaysRemaining,
 				'vacation_days_used_this_year' => $vacationDaysUsedThisYear,
+				'vacation_carryover_days' => $vacationCarryoverDays,
+				'vacation_carryover_usable' => $vacationCarryoverUsable,
+				'vacation_carryover_expires_on' => $vacationCarryoverExpiresOn,
+				'vacation_annual_entitlement' => $vacationAnnualEntitlement,
 				'vacation_year' => $currentYear,
 				'pending_requests' => $pendingCount,
 			],
@@ -419,7 +447,7 @@ class PageController extends Controller
 				'filterEndDate' => '',
 				'filterStatus' => '',
 				'error' => $errorMessage,
-				'stats' => ['total_time_entries' => 0, 'total_absences' => 0, 'vacation_days_remaining' => 0, 'vacation_days_used_this_year' => 0, 'vacation_year' => (int)date('Y'), 'pending_requests' => 0],
+				'stats' => ['total_time_entries' => 0, 'total_absences' => 0, 'vacation_days_remaining' => 0, 'vacation_days_used_this_year' => 0, 'vacation_carryover_days' => 0, 'vacation_carryover_usable' => 0, 'vacation_carryover_expires_on' => null, 'vacation_annual_entitlement' => 0, 'vacation_year' => (int)date('Y'), 'pending_requests' => 0],
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 				'showSubstitutionLink' => false,

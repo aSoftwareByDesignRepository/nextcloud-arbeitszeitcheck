@@ -16,6 +16,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
@@ -42,6 +43,9 @@ class AbsenceService
 	private ?AbsenceIcalMailService $absenceIcalMailService;
 	private ?AbsenceNotificationMailService $absenceNotificationMailService;
 	private HolidayCalendarService $holidayCalendarService;
+	private VacationYearBalanceMapper $vacationYearBalanceMapper;
+	private VacationAllocationService $vacationAllocationService;
+	private ?AbsenceCalendarSyncService $absenceCalendarSyncService;
 
 	public function __construct(
 		AbsenceMapper $absenceMapper,
@@ -56,7 +60,10 @@ class AbsenceService
 		?NotificationService $notificationService,
 		?AbsenceIcalMailService $absenceIcalMailService,
 		HolidayCalendarService $holidayCalendarService,
-		?AbsenceNotificationMailService $absenceNotificationMailService = null
+		VacationYearBalanceMapper $vacationYearBalanceMapper,
+		VacationAllocationService $vacationAllocationService,
+		?AbsenceNotificationMailService $absenceNotificationMailService = null,
+		?AbsenceCalendarSyncService $absenceCalendarSyncService = null
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -70,7 +77,10 @@ class AbsenceService
 		$this->notificationService = $notificationService;
 		$this->absenceIcalMailService = $absenceIcalMailService;
 		$this->holidayCalendarService = $holidayCalendarService;
+		$this->vacationYearBalanceMapper = $vacationYearBalanceMapper;
 		$this->absenceNotificationMailService = $absenceNotificationMailService;
+		$this->absenceCalendarSyncService = $absenceCalendarSyncService;
+		$this->vacationAllocationService = $vacationAllocationService;
 	}
 
 	/**
@@ -151,6 +161,7 @@ class AbsenceService
 			if ($this->absenceIcalMailService) {
 				$this->absenceIcalMailService->sendIcalForApprovedAbsence($savedAbsence);
 			}
+			$this->afterAbsenceApprovedCalendar($savedAbsence);
 		} elseif ($substituteUserId) {
 			if ($this->notificationService) {
 				$startDate = $savedAbsence->getStartDate();
@@ -417,6 +428,10 @@ class AbsenceService
 			throw $e;
 		}
 
+		if ($status === Absence::STATUS_APPROVED) {
+			$this->removeAbsenceCalendarSafe($id);
+		}
+
 		return $updatedAbsence;
 	}
 
@@ -502,6 +517,8 @@ class AbsenceService
 			throw $e;
 		}
 
+		$this->afterAbsenceApprovedCalendar($updatedAbsence);
+
 		return $updatedAbsence;
 	}
 
@@ -539,6 +556,14 @@ class AbsenceService
 
 		$this->db->beginTransaction();
 		try {
+			if ($absence->getType() === Absence::TYPE_VACATION) {
+				$sd = $absence->getStartDate();
+				$ed = $absence->getEndDate();
+				if ($sd && $ed) {
+					$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null);
+				}
+			}
+
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -573,6 +598,8 @@ class AbsenceService
 		if ($this->absenceIcalMailService) {
 			$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
 		}
+
+		$this->afterAbsenceApprovedCalendar($updatedAbsence);
 
 		return $updatedAbsence;
 	}
@@ -719,6 +746,7 @@ class AbsenceService
 			if ($this->absenceIcalMailService) {
 				$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
 			}
+			$this->afterAbsenceApprovedCalendar($updatedAbsence);
 		} else {
 			// Employee has manager: notify about substitute approval and that manager approval is pending
 			if ($this->notificationService) {
@@ -879,26 +907,7 @@ class AbsenceService
 	 */
 	public function getVacationStats(string $userId, int $year): array
 	{
-		try {
-			// 1. Sum days for absences entirely within the year
-			$usedDays = $this->absenceMapper->getVacationDaysUsed($userId, $year);
-
-			// 2. Add per-year portion for absences spanning the year boundary
-			$spanning = $this->absenceMapper->findVacationApprovedSpanningYearBoundary($userId, $year);
-			foreach ($spanning as $absence) {
-				$start = $absence->getStartDate();
-				$end = $absence->getEndDate();
-				if (!$start || !$end) {
-					continue;
-				}
-				$perYear = $this->holidayCalendarService->computeWorkingDaysPerYearForUser($userId, $start, $end);
-				$usedDays += (float)($perYear[$year] ?? 0);
-			}
-		} catch (\Throwable $e) {
-			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting vacation days used: ' . $e->getMessage(), ['exception' => $e]);
-			$usedDays = 0.0;
-		}
-
+		$sickDays = 0.0;
 		try {
 			$sickDays = $this->absenceMapper->getSickLeaveDays($userId, $year);
 		} catch (\Throwable $e) {
@@ -906,32 +915,92 @@ class AbsenceService
 			$sickDays = 0.0;
 		}
 
-		// Get total vacation entitlement from the assigned working time model (single source of truth),
-		$totalEntitlement = Constants::DEFAULT_VACATION_DAYS_PER_YEAR;
 		try {
-			$currentModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($currentModel !== null && $currentModel->getVacationDaysPerYear() !== null) {
-				$totalEntitlement = $currentModel->getVacationDaysPerYear();
-			} else {
-				// Legacy / fallback: read from user settings if present
-				$totalEntitlement = $this->userSettingsMapper->getIntegerSetting(
-					$userId,
-					'vacation_days_per_year',
-					Constants::DEFAULT_VACATION_DAYS_PER_YEAR
-				);
-			}
-		} catch (\Throwable $e) {
-			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting vacation entitlement: ' . $e->getMessage(), ['exception' => $e]);
-			$totalEntitlement = Constants::DEFAULT_VACATION_DAYS_PER_YEAR;
-		}
+			$today = new \DateTime('today');
+			$alloc = $this->vacationAllocationService->computeYearAllocation($userId, $year, null, null, null, $today);
+			$totalEntitlement = (float)$alloc['entitlement'];
+			$carryoverOpening = (float)$alloc['carryover_opening'];
+			$totalAvailable = $totalEntitlement + $carryoverOpening;
+			$usedDays = (float)$alloc['used_total_working_days'];
+			$remaining = (float)$alloc['total_remaining_for_new_requests'];
 
-		return [
-			'year' => $year,
-			'entitlement' => $totalEntitlement,
-			'used' => $usedDays,
-			'remaining' => max(0, $totalEntitlement - $usedDays),
-			'sick_days' => $sickDays
-		];
+			return [
+				'year' => $year,
+				'entitlement' => (int)round($totalEntitlement),
+				'carryover_days' => round($carryoverOpening, 2),
+				'carryover_usable' => round((float)$alloc['carryover_usable_for_new_requests'], 2),
+				'carryover_expires_on' => $alloc['carryover_expires_on'],
+				'total_available' => round($totalAvailable, 2),
+				'used' => round($usedDays, 2),
+				'remaining' => round($remaining, 2),
+				'sick_days' => $sickDays,
+			];
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error getting vacation stats: ' . $e->getMessage(), ['exception' => $e]);
+			return [
+				'year' => $year,
+				'entitlement' => Constants::DEFAULT_VACATION_DAYS_PER_YEAR,
+				'carryover_days' => 0.0,
+				'carryover_usable' => 0.0,
+				'carryover_expires_on' => null,
+				'total_available' => (float)Constants::DEFAULT_VACATION_DAYS_PER_YEAR,
+				'used' => 0.0,
+				'remaining' => (float)Constants::DEFAULT_VACATION_DAYS_PER_YEAR,
+				'sick_days' => $sickDays,
+			];
+		}
+	}
+
+	/**
+	 * Enforce FIFO carryover + annual pools for vacation (create/update/approve).
+	 *
+	 * @throws \Exception
+	 */
+	private function assertVacationAllocationForRequest(string $userId, \DateTime $startDate, \DateTime $endDate, ?int $excludeAbsenceId = null): void
+	{
+		$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate, $userId);
+		if ($requestedWorkingDaysPerYear === []) {
+			$requestedWorkingDaysPerYear = HolidayService::computeWorkingDaysPerYear(
+				clone $startDate,
+				clone $endDate,
+				[]
+			);
+		}
+		$today = new \DateTime('today');
+		foreach ($requestedWorkingDaysPerYear as $y => $requestedDays) {
+			if ($requestedDays <= 0) {
+				continue;
+			}
+			$year = (int)$y;
+			$alloc = $this->vacationAllocationService->computeYearAllocation(
+				$userId,
+				$year,
+				$excludeAbsenceId,
+				$startDate,
+				$endDate,
+				$today
+			);
+			if ($alloc['allocation_valid']) {
+				continue;
+			}
+			$before = $this->vacationAllocationService->computeYearAllocation(
+				$userId,
+				$year,
+				$excludeAbsenceId,
+				null,
+				null,
+				$today
+			);
+			$msg = $this->l10n->t(
+				'Not enough vacation days remaining. You have %1$s days left for %2$s but requested %3$s days.',
+				[
+					(string)round($before['total_remaining_for_new_requests'], 1),
+					(string)$year,
+					(string)round($requestedDays, 1),
+				]
+			);
+			throw new \Exception($msg);
+		}
 	}
 
 	/**
@@ -1019,11 +1088,9 @@ class AbsenceService
 		}
 		$this->validateAbsenceTypeRules($type, $startDate, $endDate);
 
-		// Vacation entitlement: ensure user has enough remaining days
-		// (getVacationStats only counts approved absences; when updating, add back old absence's days)
-			if ($type === Absence::TYPE_VACATION) {
+		// Vacation entitlement: FIFO carryover + annual (see VacationAllocationService)
+		if ($type === Absence::TYPE_VACATION) {
 			$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate, $userId);
-			// Fallback if HolidayCalendarService returns empty (e.g. config/state resolution failure)
 			if ($requestedWorkingDaysPerYear === []) {
 				$requestedWorkingDaysPerYear = HolidayService::computeWorkingDaysPerYear(
 					clone $startDate,
@@ -1035,37 +1102,7 @@ class AbsenceService
 			if ($totalRequested < 0.01) {
 				throw new \Exception($this->l10n->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.'));
 			}
-			$addBackPerYear = [];
-			if ($excludeAbsenceId !== null) {
-				try {
-					$oldAbsence = $this->absenceMapper->find($excludeAbsenceId);
-					if ($oldAbsence->getUserId() === $userId && $oldAbsence->getType() === Absence::TYPE_VACATION) {
-						$oldStart = $oldAbsence->getStartDate();
-						$oldEnd = $oldAbsence->getEndDate();
-						if ($oldStart && $oldEnd) {
-							$addBackPerYear = $this->computeWorkingDaysPerYear($oldStart, $oldEnd, $userId);
-						}
-					}
-				} catch (DoesNotExistException $e) {
-					// Absence no longer exists, no days to add back
-				}
-			}
-			foreach ($requestedWorkingDaysPerYear as $year => $requestedDays) {
-				if ($requestedDays <= 0) {
-					continue;
-				}
-				$stats = $this->getVacationStats($userId, (int)$year);
-				$remaining = (float)($stats['remaining'] ?? 0);
-				$addBack = isset($addBackPerYear[$year]) ? (float)$addBackPerYear[$year] : 0.0;
-				$effectiveRemaining = $remaining + $addBack;
-				if ($effectiveRemaining < $requestedDays) {
-					$msg = $this->l10n->t(
-						'Not enough vacation days remaining. You have %1$s days left for %2$s but requested %3$s days.',
-						[(string)round($effectiveRemaining, 1), (string)$year, (string)round($requestedDays, 1)]
-					);
-					throw new \Exception($msg);
-				}
-			}
+			$this->assertVacationAllocationForRequest($userId, $startDate, $endDate, $excludeAbsenceId);
 		}
 
 		// Require substitute for configured types (admin setting)
@@ -1176,6 +1213,14 @@ class AbsenceService
 	 */
 	private function doAutoApproveDbWork(Absence $absence): Absence
 	{
+		if ($absence->getType() === Absence::TYPE_VACATION) {
+			$sd = $absence->getStartDate();
+			$ed = $absence->getEndDate();
+			if ($sd && $ed) {
+				$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null);
+			}
+		}
+
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_APPROVED);
 		$absence->setApproverComment($this->l10n->t('Auto-approved: no manager assigned in your team.'));
@@ -1334,5 +1379,35 @@ class AbsenceService
 		// and will internally delegate to HolidayCalendarService in future iterations if needed.
 		unset($start, $end, $userId);
 		return [];
+	}
+
+	private function afterAbsenceApprovedCalendar(Absence $absence): void
+	{
+		if ($this->absenceCalendarSyncService === null) {
+			return;
+		}
+		try {
+			$this->absenceCalendarSyncService->syncApprovedAbsence($absence);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Calendar sync after approval failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+		}
+	}
+
+	private function removeAbsenceCalendarSafe(int $absenceId): void
+	{
+		if ($this->absenceCalendarSyncService === null) {
+			return;
+		}
+		try {
+			$this->absenceCalendarSyncService->removeAbsenceCalendar($absenceId);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Calendar removal failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+		}
 	}
 }

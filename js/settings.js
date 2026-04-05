@@ -14,15 +14,44 @@
      */
     const SettingsPage = {
         /**
+         * Merge API URLs from hidden #azc-settings-config (required when inline boot script is absent).
+         */
+        applyConfigFromDom: function() {
+            const el = document.getElementById('azc-settings-config');
+            if (!el || !el.dataset) {
+                return;
+            }
+            window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+            window.ArbeitszeitCheck.apiUrl = window.ArbeitszeitCheck.apiUrl || {};
+            if (el.dataset.updateUrl && !window.ArbeitszeitCheck.apiUrl.updateSettings) {
+                window.ArbeitszeitCheck.apiUrl.updateSettings = el.dataset.updateUrl;
+            }
+            if (el.dataset.settingsLegacyUrl) {
+                window.ArbeitszeitCheck._settingsLegacyUrl = el.dataset.settingsLegacyUrl;
+            }
+        },
+
+        getLegacySettingsUrl: function() {
+            if (window.ArbeitszeitCheck && window.ArbeitszeitCheck._settingsLegacyUrl) {
+                return window.ArbeitszeitCheck._settingsLegacyUrl;
+            }
+            return OC.generateUrl('/apps/arbeitszeitcheck/api/settings-legacy');
+        },
+
+        /**
          * Initialize the settings page
          */
         init: function() {
+            this.applyConfigFromDom();
             this.loadCurrentSettings().then(() => {
                 if (document.getElementById('working-time-settings-form')) {
                     this.setupWorkingTimeForm();
                 }
                 if (document.getElementById('notification-settings-form')) {
                     this.setupNotificationForm();
+                }
+                if (document.getElementById('calendar-sync-settings-form')) {
+                    this.setupCalendarSyncForm();
                 }
                 this.loadWorkingTimeModelInfo();
             });
@@ -32,7 +61,7 @@
          * Load current settings from API
          */
         loadCurrentSettings: function() {
-            return fetch(OC.generateUrl('/apps/arbeitszeitcheck/api/settings-legacy'), {
+            return fetch(this.getLegacySettingsUrl(), {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -62,6 +91,14 @@
                     const breakReminders = document.getElementById('break-reminders');
                     if (breakReminders) {
                         breakReminders.checked = result.settings.break_reminders_enabled === '1' || result.settings.break_reminders_enabled === true;
+                    }
+
+                    const hol = document.getElementById('nc-calendar-sync-holidays');
+                    if (hol) {
+                        const hk = 'nc_calendar_sync_holidays';
+                        const v = result.settings[hk];
+                        // Default on when unset (matches server default for new users)
+                        hol.checked = v === undefined || v === null || v === '1' || v === true;
                     }
                 }
             })
@@ -94,6 +131,18 @@
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 this.saveNotificationSettings(form);
+            });
+        },
+
+        setupCalendarSyncForm: function() {
+            const form = document.getElementById('calendar-sync-settings-form');
+            if (!form) return;
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const data = {
+                    nc_calendar_sync_holidays: form.querySelector('#nc-calendar-sync-holidays').checked
+                };
+                this.submitSettings(data, 'calendar-sync-settings-form');
             });
         },
 

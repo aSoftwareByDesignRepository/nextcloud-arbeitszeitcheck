@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\Absence;
+use OCA\ArbeitszeitCheck\Service\AbsencePrivacyPolicy;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -40,9 +41,6 @@ class AbsenceIcalMailService
 	) {
 	}
 
-	/** Absence types for which we do NOT send iCal (privacy-sensitive / critical). */
-	private const SKIP_ICAL_TYPES = [Absence::TYPE_SICK_LEAVE];
-
 	/**
 	 * Send iCal email to the absence owner and optionally to the substitute.
 	 * Only sends for non-critical absences (no sick leave). Respects admin settings.
@@ -50,7 +48,7 @@ class AbsenceIcalMailService
 	 */
 	public function sendIcalForApprovedAbsence(Absence $absence): void
 	{
-		if (in_array($absence->getType(), self::SKIP_ICAL_TYPES, true)) {
+		if (in_array($absence->getType(), AbsencePrivacyPolicy::SENSITIVE_TYPES_NO_ICAL, true)) {
 			return;
 		}
 
@@ -109,7 +107,7 @@ class AbsenceIcalMailService
 	 */
 	public function sendIcalToSubstituteOnSubstitutionApproval(Absence $absence): void
 	{
-		if (in_array($absence->getType(), self::SKIP_ICAL_TYPES, true)) {
+		if (in_array($absence->getType(), AbsencePrivacyPolicy::SENSITIVE_TYPES_NO_ICAL, true)) {
 			return;
 		}
 

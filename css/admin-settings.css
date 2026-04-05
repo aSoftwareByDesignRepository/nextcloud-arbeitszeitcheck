@@ -160,6 +160,31 @@
   font-weight: 500;
 }
 
+/* Nextcloud Calendar sync — two clear columns on wide screens */
+.admin-nc-calendar__grid {
+  display: grid;
+  gap: var(--space-6, 1.5rem);
+  margin-top: var(--space-4, 1rem);
+}
+
+@media (min-width: 640px) {
+  .admin-nc-calendar__grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.form-fieldset--nc-calendar .form-help.form-help--block {
+  max-width: 65ch;
+}
+
+.admin-nc-calendar__option .form-help {
+  margin-top: var(--space-2, 0.5rem);
+  margin-left: 0;
+  padding-left: 0;
+  max-width: 55ch;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
   .admin-settings-section {

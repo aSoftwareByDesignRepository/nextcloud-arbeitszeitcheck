@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Db\Team;
 use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
@@ -70,6 +71,7 @@ class AdminController extends Controller
 	private IURLGenerator $urlGenerator;
 	private HolidayMapper $holidayMapper;
 	private HolidayCalendarService $holidayCalendarService;
+	private VacationYearBalanceMapper $vacationYearBalanceMapper;
 
 	public function __construct(
 		string $appName,
@@ -90,7 +92,8 @@ class AdminController extends Controller
 		IL10N $l10n,
 		IURLGenerator $urlGenerator,
 		HolidayMapper $holidayMapper,
-		HolidayCalendarService $holidayCalendarService
+		HolidayCalendarService $holidayCalendarService,
+		VacationYearBalanceMapper $vacationYearBalanceMapper
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -109,6 +112,7 @@ class AdminController extends Controller
 		$this->urlGenerator = $urlGenerator;
 		$this->holidayMapper = $holidayMapper;
 		$this->holidayCalendarService = $holidayCalendarService;
+		$this->vacationYearBalanceMapper = $vacationYearBalanceMapper;
 		$this->setCspService($cspService);
 	}
 
@@ -406,6 +410,8 @@ class AdminController extends Controller
 			'exportMidnightSplitEnabled' => $this->appConfig->getAppValueString('export_midnight_split_enabled', '1') === '1',
 			'requireSubstituteTypes' => $requireSubstituteTypes,
 			'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
+			'calendarSyncAbsencesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_CALENDAR_SYNC_ABSENCES_ENABLED, '1') === '1',
+			'calendarSyncHolidaysEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_CALENDAR_SYNC_HOLIDAYS_ENABLED, '1') === '1',
 			'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
 			'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
 			'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
@@ -416,7 +422,9 @@ class AdminController extends Controller
 			'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
 			'statutoryAutoReseed' => $this->appConfig->getAppValueString('statutory_auto_reseed', '1') === '1',
 			'retentionPeriod' => (int)$this->appConfig->getAppValueString('retention_period', '2'),
-			'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8')
+			'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8'),
+			'vacationCarryoverExpiryMonth' => max(1, min(12, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3'))),
+			'vacationCarryoverExpiryDay' => max(1, min(31, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31'))),
 		];
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-settings', [
@@ -1185,6 +1193,8 @@ class AdminController extends Controller
 				'exportMidnightSplitEnabled' => $this->appConfig->getAppValueString('export_midnight_split_enabled', '1') === '1',
 				'requireSubstituteTypes' => $requireSubstituteTypes,
 				'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
+				'calendarSyncAbsencesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_CALENDAR_SYNC_ABSENCES_ENABLED, '1') === '1',
+				'calendarSyncHolidaysEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_CALENDAR_SYNC_HOLIDAYS_ENABLED, '1') === '1',
 				'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
 				'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',
 				'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
@@ -1195,7 +1205,9 @@ class AdminController extends Controller
 				'germanState' => $this->appConfig->getAppValueString('german_state', 'NW'),
 				'statutoryAutoReseed' => $this->appConfig->getAppValueString('statutory_auto_reseed', '1') === '1',
 				'retentionPeriod' => (int)$this->appConfig->getAppValueString('retention_period', '2'),
-				'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8')
+				'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8'),
+				'vacationCarryoverExpiryMonth' => max(1, min(12, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3'))),
+				'vacationCarryoverExpiryDay' => max(1, min(31, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31'))),
 			];
 
 			return new JSONResponse([
@@ -1230,6 +1242,8 @@ class AdminController extends Controller
 				'exportMidnightSplitEnabled' => 'export_midnight_split_enabled',
 				'requireSubstituteTypes' => 'require_substitute_types',
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
+				'calendarSyncAbsencesEnabled' => Constants::CONFIG_CALENDAR_SYNC_ABSENCES_ENABLED,
+				'calendarSyncHolidaysEnabled' => Constants::CONFIG_CALENDAR_SYNC_HOLIDAYS_ENABLED,
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
 				'sendIcalToManagers' => 'send_ical_to_managers',
 				'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
@@ -1240,7 +1254,9 @@ class AdminController extends Controller
 				'germanState' => 'german_state',
 				'statutoryAutoReseed' => 'statutory_auto_reseed',
 				'retentionPeriod' => 'retention_period',
-				'defaultWorkingHours' => 'default_working_hours'
+				'defaultWorkingHours' => 'default_working_hours',
+				'vacationCarryoverExpiryMonth' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
+				'vacationCarryoverExpiryDay' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
 			];
 
 			$updatedSettings = [];
@@ -1254,7 +1270,7 @@ class AdminController extends Controller
 					if (in_array($paramKey, [
 						'autoComplianceCheck', 'realtimeComplianceCheck', 'complianceStrictMode', 'enableViolationNotifications',
 						'exportMidnightSplitEnabled',
-						'sendIcalApprovedAbsences', 'sendIcalToSubstitute', 'sendIcalToManagers',
+						'sendIcalApprovedAbsences', 'calendarSyncAbsencesEnabled', 'calendarSyncHolidaysEnabled', 'sendIcalToSubstitute', 'sendIcalToManagers',
 						'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee', 'sendEmailSubstituteApprovedToManager',
 						'statutoryAutoReseed'
 					], true)) {
@@ -1285,6 +1301,12 @@ class AdminController extends Controller
 							], Http::STATUS_BAD_REQUEST);
 						}
 						$value = (string)$value;
+					} elseif ($paramKey === 'vacationCarryoverExpiryMonth') {
+						$m = max(1, min(12, (int)$value));
+						$value = (string)$m;
+					} elseif ($paramKey === 'vacationCarryoverExpiryDay') {
+						$d = max(1, min(31, (int)$value));
+						$value = (string)$d;
 					} elseif ($paramKey === 'requireSubstituteTypes') {
 						$validTypes = ['vacation', 'sick_leave', 'personal_leave', 'parental_leave', 'special_leave', 'unpaid_leave', 'home_office', 'business_trip'];
 						$arr = is_array($value) ? $value : (is_string($value) ? json_decode($value, true) : []);
@@ -1396,6 +1418,7 @@ class AdminController extends Controller
 			$users = $this->userManager->search($search ?? '', $limit, $offset);
 
 			$usersData = [];
+			$currentYear = (int)date('Y');
 			foreach ($users as $user) {
 				$userId = $user->getUID();
 
@@ -1432,7 +1455,9 @@ class AdminController extends Controller
 					'vacationDaysPerYear' => $currentModel ? $currentModel->getVacationDaysPerYear() : null,
 					'workingTimeModelStartDate' => $currentModel && ($startDate = $currentModel->getStartDate()) ? $startDate->format('Y-m-d') : null,
 					'workingTimeModelEndDate' => $currentModel && ($endDate = $currentModel->getEndDate()) ? $endDate->format('Y-m-d') : null,
-					'hasTimeEntriesToday' => $hasTimeEntriesToday
+					'hasTimeEntriesToday' => $hasTimeEntriesToday,
+					'vacationCarryoverDays' => $this->vacationYearBalanceMapper->getCarryoverDays($userId, $currentYear),
+					'vacationCarryoverYear' => $currentYear,
 				];
 			}
 
@@ -1495,6 +1520,7 @@ class AdminController extends Controller
 
 			$startDate = $currentModel ? $currentModel->getStartDate() : null;
 			$endDate = $currentModel ? $currentModel->getEndDate() : null;
+			$currentYear = (int)date('Y');
 
 			return new JSONResponse([
 				'success' => true,
@@ -1503,6 +1529,8 @@ class AdminController extends Controller
 					'displayName' => $user->getDisplayName(),
 					'email' => $user->getEMailAddress(),
 					'enabled' => $user->isEnabled(),
+					'vacationCarryoverDays' => $this->vacationYearBalanceMapper->getCarryoverDays($userId, $currentYear),
+					'vacationCarryoverYear' => $currentYear,
 					'workingTimeModel' => $workingTimeModel ? [
 						'id' => $workingTimeModel->getId(),
 						'name' => $workingTimeModel->getName(),
@@ -1711,6 +1739,25 @@ class AdminController extends Controller
 				} else {
 					$this->userSettingsMapper->setSetting($userId, 'german_state', $germanState);
 				}
+			}
+
+			// Vacation carryover (Resturlaub) for a calendar year — admin-only via this API.
+			if (array_key_exists('vacationCarryoverDays', $params) && $params['vacationCarryoverDays'] !== '' && $params['vacationCarryoverDays'] !== null) {
+				$carryoverYear = isset($params['vacationCarryoverYear']) ? (int)$params['vacationCarryoverYear'] : (int)date('Y');
+				if ($carryoverYear < 2000 || $carryoverYear > 2100) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid year for vacation carryover')
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$carryoverVal = (float)$params['vacationCarryoverDays'];
+				if ($carryoverVal < 0 || $carryoverVal > 366) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Vacation carryover must be between 0 and 366 days')
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$this->vacationYearBalanceMapper->upsert($userId, $carryoverYear, $carryoverVal);
 			}
 
 			return new JSONResponse([

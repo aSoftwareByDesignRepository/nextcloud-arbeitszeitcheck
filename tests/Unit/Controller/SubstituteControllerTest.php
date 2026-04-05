@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
@@ -66,6 +67,7 @@ class SubstituteControllerTest extends TestCase
 		$cspService->method('applyPolicyWithNonce')->willReturnCallback(static fn ($response, $context) => $response);
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+		$permissionService = $this->createMock(PermissionService::class);
 
 		$this->controller = new SubstituteController(
 			'arbeitszeitcheck',
@@ -76,7 +78,8 @@ class SubstituteControllerTest extends TestCase
 			$this->userManager,
 			$urlGenerator,
 			$cspService,
-			$l10n
+			$l10n,
+			$permissionService
 		);
 	}
 

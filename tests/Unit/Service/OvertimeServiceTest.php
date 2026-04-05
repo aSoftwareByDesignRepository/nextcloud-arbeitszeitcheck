@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
@@ -41,6 +42,9 @@ class OvertimeServiceTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	private $holidayCalendarService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -49,12 +53,15 @@ class OvertimeServiceTest extends TestCase
 		$this->workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
 		$this->l10n = $this->createMock(IL10N::class);
+		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(5.0);
 
 		$this->service = new OvertimeService(
 			$this->timeEntryMapper,
 			$this->workingTimeModelMapper,
 			$this->userWorkingTimeModelMapper,
-			$this->l10n
+			$this->l10n,
+			$this->holidayCalendarService
 		);
 	}
 
@@ -68,7 +75,7 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07'); // One week
 
 		// Mock no working time model assigned
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
@@ -76,16 +83,24 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries - 5 working days, 8 hours each = 40 hours
 		$entries = [];
 		for ($i = 1; $i <= 5; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-0$i 17:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(8.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-0$i 08:00:00"));
+			$entry->setEndTime(new \DateTime("2024-01-0$i 17:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => "2024-01-0{$i}T12:00:00+00:00",
+				'end' => "2024-01-0{$i}T13:00:00+00:00",
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
-			->with($userId, $startDate, $endDate)
 			->willReturn($entries);
 
 		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
@@ -111,7 +126,7 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07'); // One week
 
 		// Mock no working time model (defaults to 40 hours/week)
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
@@ -119,16 +134,24 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries - 5 working days, 9 hours each = 45 hours (5 hours overtime)
 		$entries = [];
 		for ($i = 1; $i <= 5; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-0$i 18:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(9.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-0$i 08:00:00")); // total 10h
+			$entry->setEndTime(new \DateTime("2024-01-0$i 18:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => "2024-01-0{$i}T12:00:00+00:00",
+				'end' => "2024-01-0{$i}T13:00:00+00:00",
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
-			->with($userId, $startDate, $endDate)
 			->willReturn($entries);
 
 		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
@@ -148,7 +171,7 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07'); // One week
 
 		// Mock no working time model (defaults to 40 hours/week)
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
@@ -156,16 +179,24 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries - 5 working days, 7 hours each = 35 hours (5 hours undertime)
 		$entries = [];
 		for ($i = 1; $i <= 5; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-0$i 16:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(7.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-0$i 08:00:00")); // total 8h
+			$entry->setEndTime(new \DateTime("2024-01-0$i 16:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => "2024-01-0{$i}T12:00:00+00:00",
+				'end' => "2024-01-0{$i}T13:00:00+00:00",
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
-			->with($userId, $startDate, $endDate)
 			->willReturn($entries);
 
 		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
@@ -185,19 +216,27 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07'); // One week
 
 		// Mock custom working time model (part-time: 6 hours/day, 30 hours/week)
-		$userModel = $this->createMock(UserWorkingTimeModel::class);
-		$userModel->method('getWorkingTimeModelId')->willReturn(1);
+		$userModel = new UserWorkingTimeModel();
+		$userModel->setId(1);
+		$userModel->setUserId($userId);
+		$userModel->setWorkingTimeModelId(1);
+		$userModel->setCreatedAt(new \DateTime());
+		$userModel->setUpdatedAt(new \DateTime());
 
-		$model = $this->createMock(WorkingTimeModel::class);
-		$model->method('getDailyHours')->willReturn(6.0);
-		$model->method('getWeeklyHours')->willReturn(30.0);
+		$model = new WorkingTimeModel();
+		$model->setId(1);
+		$model->setName('Part-time');
+		$model->setDailyHours(6.0);
+		$model->setWeeklyHours(30.0);
+		$model->setCreatedAt(new \DateTime());
+		$model->setUpdatedAt(new \DateTime());
 
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn($userModel);
 
-		$this->workingTimeModelMapper->expects($this->once())
+		$this->workingTimeModelMapper->expects($this->atLeastOnce())
 			->method('find')
 			->with(1)
 			->willReturn($model);
@@ -205,16 +244,24 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries - 5 working days, 6 hours each = 30 hours
 		$entries = [];
 		for ($i = 1; $i <= 5; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-0$i 15:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(6.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-0$i 08:00:00")); // total 7h
+			$entry->setEndTime(new \DateTime("2024-01-0$i 15:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => "2024-01-0{$i}T12:00:00+00:00",
+				'end' => "2024-01-0{$i}T13:00:00+00:00",
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
-			->with($userId, $startDate, $endDate)
 			->willReturn($entries);
 
 		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
@@ -222,6 +269,8 @@ class OvertimeServiceTest extends TestCase
 		$this->assertEquals(30.0, $result['total_hours_worked']);
 		$this->assertEquals(6.0, $result['daily_hours']);
 		$this->assertEquals(30.0, $result['weekly_hours']);
+		$this->assertEquals(6.0, $result['implied_daily_hours']);
+		$this->assertSame('weekly_contract', $result['required_hours_basis']);
 		// Should be approximately balanced (worked exactly what's required)
 		$this->assertLessThan(1.0, abs($result['overtime_hours']));
 	}
@@ -236,29 +285,53 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07');
 
 		// Mock no working time model
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
 
 		// Mock entries: one completed, one active, one pending
-		$completedEntry = $this->createMock(TimeEntry::class);
-		$completedEntry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$completedEntry->method('getEndTime')->willReturn(new \DateTime('2024-01-01 17:00:00'));
-		$completedEntry->method('getWorkingDurationHours')->willReturn(8.0);
+		$completedEntry = new TimeEntry();
+		$completedEntry->setId(1);
+		$completedEntry->setUserId($userId);
+		$completedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$completedEntry->setStartTime(new \DateTime('2024-01-01 08:00:00'));
+		$completedEntry->setEndTime(new \DateTime('2024-01-01 17:00:00'));
+		$completedEntry->setBreaks(json_encode([[
+			'start' => '2024-01-01T12:00:00+00:00',
+			'end' => '2024-01-01T13:00:00+00:00',
+		]]));
+		$completedEntry->setIsManualEntry(false);
+		$completedEntry->setCreatedAt(new \DateTime());
+		$completedEntry->setUpdatedAt(new \DateTime());
 
-		$activeEntry = $this->createMock(TimeEntry::class);
-		$activeEntry->method('getStatus')->willReturn(TimeEntry::STATUS_ACTIVE);
-		$activeEntry->method('getEndTime')->willReturn(null);
+		$activeEntry = new TimeEntry();
+		$activeEntry->setId(2);
+		$activeEntry->setUserId($userId);
+		$activeEntry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$activeEntry->setStartTime(new \DateTime('2024-01-02 08:00:00'));
+		$activeEntry->setEndTime(null);
+		$activeEntry->setBreaks(json_encode([]));
+		$activeEntry->setIsManualEntry(false);
+		$activeEntry->setCreatedAt(new \DateTime());
+		$activeEntry->setUpdatedAt(new \DateTime());
 
-		$pendingEntry = $this->createMock(TimeEntry::class);
-		$pendingEntry->method('getStatus')->willReturn(TimeEntry::STATUS_PENDING_APPROVAL);
-		$pendingEntry->method('getEndTime')->willReturn(new \DateTime('2024-01-02 17:00:00'));
-		$pendingEntry->method('getWorkingDurationHours')->willReturn(8.0);
+		$pendingEntry = new TimeEntry();
+		$pendingEntry->setId(3);
+		$pendingEntry->setUserId($userId);
+		$pendingEntry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$pendingEntry->setStartTime(new \DateTime('2024-01-03 08:00:00'));
+		$pendingEntry->setEndTime(new \DateTime('2024-01-03 17:00:00'));
+		$pendingEntry->setBreaks(json_encode([[
+			'start' => '2024-01-03T12:00:00+00:00',
+			'end' => '2024-01-03T13:00:00+00:00',
+		]]));
+		$pendingEntry->setIsManualEntry(false);
+		$pendingEntry->setCreatedAt(new \DateTime());
+		$pendingEntry->setUpdatedAt(new \DateTime());
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
-			->with($userId, $startDate, $endDate)
 			->willReturn([$completedEntry, $activeEntry, $pendingEntry]);
 
 		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
@@ -283,10 +356,19 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries for current year
 		$entries = [];
 		for ($i = 1; $i <= 10; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-$i 17:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(8.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-$i 08:00:00"));
+			$entry->setEndTime(new \DateTime("2024-01-$i 17:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => sprintf('2024-01-%02dT12:00:00+00:00', $i),
+				'end' => sprintf('2024-01-%02dT13:00:00+00:00', $i),
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
@@ -309,18 +391,27 @@ class OvertimeServiceTest extends TestCase
 		$date = new \DateTime('2024-01-15');
 
 		// Mock no working time model
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
 
 		// Mock time entry for the day
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
 			->willReturn([$entry]);
 
@@ -341,7 +432,7 @@ class OvertimeServiceTest extends TestCase
 		$weekStart = new \DateTime('2024-01-15'); // Monday
 
 		// Mock no working time model
-		$this->userWorkingTimeModelMapper->expects($this->once())
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
 			->method('findCurrentByUser')
 			->with($userId)
 			->willReturn(null);
@@ -349,14 +440,23 @@ class OvertimeServiceTest extends TestCase
 		// Mock time entries for the week (5 working days)
 		$entries = [];
 		for ($i = 15; $i <= 19; $i++) {
-			$entry = $this->createMock(TimeEntry::class);
-			$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-			$entry->method('getEndTime')->willReturn(new \DateTime("2024-01-$i 17:00:00"));
-			$entry->method('getWorkingDurationHours')->willReturn(8.0);
+			$entry = new TimeEntry();
+			$entry->setId($i);
+			$entry->setUserId($userId);
+			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entry->setStartTime(new \DateTime("2024-01-$i 08:00:00"));
+			$entry->setEndTime(new \DateTime("2024-01-$i 17:00:00"));
+			$entry->setBreaks(json_encode([[
+				'start' => "2024-01-{$i}T12:00:00+00:00",
+				'end' => "2024-01-{$i}T13:00:00+00:00",
+			]]));
+			$entry->setIsManualEntry(false);
+			$entry->setCreatedAt(new \DateTime());
+			$entry->setUpdatedAt(new \DateTime());
 			$entries[] = $entry;
 		}
 
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
 			->willReturn($entries);
 

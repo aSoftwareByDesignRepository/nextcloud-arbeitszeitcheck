@@ -19,7 +19,10 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IL10N;
+use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
@@ -47,6 +50,15 @@ class SettingsControllerTest extends TestCase
 	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	private $request;
 
+	/** @var CSPService|\PHPUnit\Framework\MockObject\MockObject */
+	private $cspService;
+
+	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
+	private $urlGenerator;
+
+	/** @var PermissionService|\PHPUnit\Framework\MockObject\MockObject */
+	private $permissionService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -56,6 +68,10 @@ class SettingsControllerTest extends TestCase
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->request = $this->createMock(IRequest::class);
+		$this->cspService = $this->createMock(CSPService::class);
+		$this->cspService->method('applyPolicyWithNonce')->willReturnCallback(static fn ($response) => $response);
+		$this->urlGenerator = $this->createMock(IURLGenerator::class);
+		$this->permissionService = $this->createMock(PermissionService::class);
 
 		$this->l10n->method('t')
 			->willReturnCallback(function ($text) {
@@ -68,7 +84,11 @@ class SettingsControllerTest extends TestCase
 			$this->userSession,
 			$this->userSettingsMapper,
 			$this->auditLogMapper,
-			$this->l10n
+			$this->l10n,
+			$this->cspService,
+			$this->urlGenerator,
+			$this->permissionService,
+			null
 		);
 	}
 
@@ -98,20 +118,25 @@ class SettingsControllerTest extends TestCase
 		$this->request->expects($this->once())
 			->method('getParams')
 			->willReturn([
-				'vacation_days_per_year' => '25',
 				'notifications_enabled' => '1'
 			]);
 
 		// Mock old settings
-		$oldSetting = $this->createMock(UserSetting::class);
-		$oldSetting->method('getSettingValue')->willReturn('20');
+		$oldSetting = new UserSetting();
+		$oldSetting->setId(1);
+		$oldSetting->setUserId($userId);
+		$oldSetting->setSettingKey('notifications_enabled');
+		$oldSetting->setSettingValue('0');
+		$oldSetting->setCreatedAt(new \DateTime());
+		$oldSetting->setUpdatedAt(new \DateTime());
 
-		$this->userSettingsMapper->expects($this->exactly(2))
+		$this->userSettingsMapper->expects($this->once())
 			->method('getSetting')
 			->willReturn($oldSetting);
 
-		$this->userSettingsMapper->expects($this->exactly(2))
+		$this->userSettingsMapper->expects($this->once())
 			->method('setSetting')
+			->with($userId, 'notifications_enabled', '1')
 			->willReturn($oldSetting);
 
 		$this->auditLogMapper->expects($this->once())
@@ -131,12 +156,13 @@ class SettingsControllerTest extends TestCase
 		$data = $response->getData();
 		$this->assertTrue($data['success']);
 		$this->assertArrayHasKey('settings', $data);
+		$this->assertSame('1', $data['settings']['notifications_enabled']);
 	}
 
 	/**
 	 * Test update settings validates vacation days
 	 */
-	public function testUpdateSettingsValidatesVacationDays(): void
+	public function testUpdateSettingsIgnoresVacationDaysParam(): void
 	{
 		$userId = 'testuser';
 		$user = $this->createMock(IUser::class);
@@ -149,25 +175,12 @@ class SettingsControllerTest extends TestCase
 				'vacation_days_per_year' => '-5' // Negative value should be clamped to 0
 			]);
 
-		$oldSetting = $this->createMock(UserSetting::class);
-		$oldSetting->method('getSettingValue')->willReturn('20');
-
-		$this->userSettingsMapper->method('getSetting')->willReturn($oldSetting);
-
-		// Verify that value is clamped to 0 (max(0, -5) = 0)
-		$this->userSettingsMapper->expects($this->once())
-			->method('setSetting')
-			->with($userId, 'vacation_days_per_year', '0')
-			->willReturn($oldSetting);
-
-		$this->auditLogMapper->expects($this->once())
-			->method('logAction');
-
 		$response = $this->controller->update();
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
-		$this->assertEquals('0', $data['settings']['vacation_days_per_year']);
+		$this->assertFalse($data['success']);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertStringContainsString('No valid settings provided', $data['error']);
 	}
 
 	/**
@@ -188,8 +201,13 @@ class SettingsControllerTest extends TestCase
 				'auto_break_calculation' => '1' // String '1'
 			]);
 
-		$oldSetting = $this->createMock(UserSetting::class);
-		$oldSetting->method('getSettingValue')->willReturn('0');
+		$oldSetting = new UserSetting();
+		$oldSetting->setId(1);
+		$oldSetting->setUserId($userId);
+		$oldSetting->setSettingKey('notifications_enabled');
+		$oldSetting->setSettingValue('0');
+		$oldSetting->setCreatedAt(new \DateTime());
+		$oldSetting->setUpdatedAt(new \DateTime());
 
 		$this->userSettingsMapper->method('getSetting')->willReturn($oldSetting);
 
@@ -266,8 +284,13 @@ class SettingsControllerTest extends TestCase
 			->method('getUser')
 			->willReturn($user);
 
-		$setting = $this->createMock(UserSetting::class);
-		$setting->method('getSettingValue')->willReturn('0');
+		$setting = new UserSetting();
+		$setting->setId(1);
+		$setting->setUserId($userId);
+		$setting->setSettingKey('onboarding_completed');
+		$setting->setSettingValue('0');
+		$setting->setCreatedAt(new \DateTime());
+		$setting->setUpdatedAt(new \DateTime());
 
 		$this->userSettingsMapper->expects($this->once())
 			->method('getSetting')
@@ -293,8 +316,13 @@ class SettingsControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$setting = $this->createMock(UserSetting::class);
-		$setting->method('getSettingValue')->willReturn('1');
+		$setting = new UserSetting();
+		$setting->setId(1);
+		$setting->setUserId($userId);
+		$setting->setSettingKey('onboarding_completed');
+		$setting->setSettingValue('1');
+		$setting->setCreatedAt(new \DateTime());
+		$setting->setUpdatedAt(new \DateTime());
 
 		$this->userSettingsMapper->method('getSetting')
 			->willReturn($setting);
@@ -341,12 +369,14 @@ class SettingsControllerTest extends TestCase
 			->method('getUser')
 			->willReturn($user);
 
-		$setting = $this->createMock(UserSetting::class);
+		$this->request->expects($this->once())
+			->method('getParam')
+			->with('completed', true)
+			->willReturn(true);
 
 		$this->userSettingsMapper->expects($this->once())
 			->method('setSetting')
-			->with($userId, 'onboarding_completed', '1')
-			->willReturn($setting);
+			->with($userId, 'onboarding_completed', '1');
 
 		$this->auditLogMapper->expects($this->once())
 			->method('logAction')
@@ -379,7 +409,7 @@ class SettingsControllerTest extends TestCase
 		$response = $this->controller->setOnboardingCompleted();
 
 		$this->assertInstanceOf(JSONResponse::class, $response);
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 	}

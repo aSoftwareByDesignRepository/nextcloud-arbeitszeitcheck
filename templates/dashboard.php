@@ -34,6 +34,7 @@ $status = $_['status'] ?? [];
 $overtime = $_['overtime'] ?? [];
 $recentEntries = $_['recentEntries'] ?? [];
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
+$dashStats = $_['stats'] ?? [];
 
 // Current session duration calculation for display
 $currentSessionDuration = $status['current_session_duration'] ?? 0;
@@ -278,6 +279,43 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                         <div class="stat-item">
                             <span class="stat-label"><?php p($l->t('This Week:')); ?></span>
                             <span class="stat-value"><?php p(round($overtime['total_hours_worked'] ?? 0, 2)); ?> <?php p($l->t('hours')); ?></span>
+                        </div>
+                        <?php if (isset($overtime['implied_daily_hours'])): ?>
+                        <div class="stat-item">
+                            <span class="stat-label"><?php p($l->t('Contract daily norm (weekly hours ÷ 5)')); ?></span>
+                            <span class="stat-value"><?php p(round((float)($overtime['implied_daily_hours'] ?? 0), 2)); ?> <?php p($l->t('hours')); ?></span>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Vacation summary -->
+                <div class="card dashboard-vacation-card" role="region" aria-labelledby="dashboard-vacation-heading">
+                    <div class="card-header">
+                        <h3 id="dashboard-vacation-heading" class="card-title"><?php p($l->t('Vacation')); ?> <?php p((string)($dashStats['vacation_year'] ?? date('Y'))); ?></h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="dashboard-vacation-card__row">
+                            <span class="dashboard-vacation-card__label"><?php p($l->t('Remaining vacation days')); ?></span>
+                            <span class="dashboard-vacation-card__value" aria-describedby="dashboard-vacation-heading"><?php p((string)round((float)($dashStats['vacation_days_remaining'] ?? 0), 1)); ?></span>
+                        </div>
+                        <?php
+                        $vcExp = $dashStats['vacation_carryover_expires_on'] ?? null;
+                        $vcUsable = (float)($dashStats['vacation_carryover_usable'] ?? 0);
+                        if ($vcExp && ($dashStats['vacation_carryover_days'] ?? 0) > 0) {
+                            try {
+                                $vcExpFmt = (new \DateTimeImmutable((string)$vcExp))->format('d.m.Y');
+                            } catch (\Throwable $e) {
+                                $vcExpFmt = (string)$vcExp;
+                            }
+                            ?>
+                        <p class="form-help dashboard-vacation-card__hint" id="dashboard-vacation-carryover-hint">
+                            <?php p($l->t('Carryover from last year: use by %1$s (%2$s days still usable for new requests).', [$vcExpFmt, (string)round($vcUsable, 1)])); ?>
+                        </p>
+                        <?php } ?>
+                        <div class="dashboard-vacation-card__actions">
+                            <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.absences')); ?>"
+                               class="btn btn--secondary"><?php p($l->t('Open absences')); ?></a>
                         </div>
                     </div>
                 </div>

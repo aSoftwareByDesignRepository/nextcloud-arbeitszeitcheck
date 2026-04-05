@@ -299,6 +299,8 @@
         const cancelLabel = t('cancel');
         const modelLabel = t('workingTimeModel');
         const vacationDaysLabel = t('vacationDaysPerYear');
+        const carryoverLabel = t('vacationCarryoverLabel');
+        const carryoverYearLabel = t('vacationCarryoverYearLabel');
         const startDateLabel = t('startDate');
         const endDateLabel = t('endDateOptional');
         const noModelLabel = t('noModel');
@@ -308,6 +310,8 @@
 
         const DEFAULT_VACATION_DAYS = 25; // German standard; must match Constants::DEFAULT_VACATION_DAYS_PER_YEAR
         const vacation = user.vacationDaysPerYear ?? user.userWorkingTimeModel?.vacationDaysPerYear ?? DEFAULT_VACATION_DAYS;
+        const carryover = user.vacationCarryoverDays != null ? String(user.vacationCarryoverDays) : '0';
+        const carryYear = user.vacationCarryoverYear != null ? String(user.vacationCarryoverYear) : String(new Date().getFullYear());
         const startIso = user.workingTimeModelStartDate ?? user.userWorkingTimeModel?.startDate ?? null;
         const endIso = user.workingTimeModelEndDate ?? user.userWorkingTimeModel?.endDate ?? null;
         const startVal = (startIso && convertISOToEuropean(startIso)) || '';
@@ -348,6 +352,16 @@
                     <label for="user-vacation-days" class="form-label">${vacationDaysLabel}</label>
                     <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" min="0" max="365" value="${vacation}" aria-describedby="user-vacation-help">
                     <p id="user-vacation-help" class="form-help">${t('vacationDaysHelp')}</p>
+                </div>
+                <div class="form-group">
+                    <label for="user-vacation-carryover" class="form-label">${carryoverLabel}</label>
+                    <input type="number" id="user-vacation-carryover" name="vacationCarryoverDays" class="form-input" min="0" max="366" step="0.1" value="${carryover}" aria-describedby="user-carryover-help">
+                    <p id="user-carryover-help" class="form-help">${t('vacationCarryoverHelp')}</p>
+                </div>
+                <div class="form-group">
+                    <label for="user-vacation-carryover-year" class="form-label">${carryoverYearLabel}</label>
+                    <input type="number" id="user-vacation-carryover-year" name="vacationCarryoverYear" class="form-input" min="2000" max="2100" step="1" value="${carryYear}" aria-describedby="user-carryover-year-help">
+                    <p id="user-carryover-year-help" class="form-help">${t('vacationCarryoverYearHelp')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-start-date" class="form-label">${startDateLabel}</label>
@@ -417,6 +431,10 @@
         const data = {
             workingTimeModelId: formData.get('workingTimeModelId') ? parseInt(formData.get('workingTimeModelId')) : null,
             vacationDaysPerYear: formData.get('vacationDaysPerYear') ? parseInt(formData.get('vacationDaysPerYear')) : null,
+            vacationCarryoverDays: formData.get('vacationCarryoverDays') !== null && formData.get('vacationCarryoverDays') !== ''
+                ? parseFloat(String(formData.get('vacationCarryoverDays')))
+                : undefined,
+            vacationCarryoverYear: formData.get('vacationCarryoverYear') ? parseInt(String(formData.get('vacationCarryoverYear')), 10) : undefined,
             startDate: toISO(formData.get('startDate') || '') || null,
             endDate: toISO(formData.get('endDate') || '') || null,
             germanState: (formData.get('germanState') || '').toString()

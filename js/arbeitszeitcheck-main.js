@@ -1673,7 +1673,7 @@
         renderAbsenceItem: function(absence) {
             const startDate = absence.start_date || absence.startDate;
             const endDate = absence.end_date || absence.endDate;
-            const type = absence.type || 'unknown';
+            const _type = absence.type || 'unknown';
             const status = absence.status || 'pending';
             const translatedType = this.getAbsenceDisplayLabel(absence);
             const isCoverage = absence && absence.role === 'substitute';

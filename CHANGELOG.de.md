@@ -1,3 +1,42 @@
+## 1.1.7 – 2026-04-05
+
+### Hinzugefügt
+
+- **Resturlaub / Urlaubsübertrag**: Pro Nutzer und Kalenderjahr Eröffnungsbestand `carryover_days` in `at_vacation_year_balance`; globale Admin-Einstellung für Ablauf des Vorjahresurlaubs (Monat/Tag, Standard 31.03.). `VacationAllocationService` wendet FIFO auf genehmigten Urlaub an (nach `start_date`, dann `id`) und teilt Arbeitstage vor/nach Ablauf, sodass Resturlaub zuerst verbraucht wird, solange er gültig ist.
+- **Validierung & Freigaben**: Urlaubsanträge werden bei Manager-Freigabe (und bei Auto-Approve) erneut geprüft, damit parallele Anträge nach Genehmigung das Kontingent nicht überziehen.
+- **API & UI**: `AbsenceController::stats` liefert Anspruch, Übertrag, Summen und ablaufbezogene Felder; Dashboard und Abwesenheiten zeigen eine klare Urlaubsübersicht; Admin-Einstellungen enthalten Ablauffelder.
+- **DSGVO**: `UserDeletedListener` löscht Urlaubs-Jahresbestände bei Kontolöschung.
+- **Migration / Massenpflege**: `occ arbeitszeitcheck:import-vacation-balance` importiert CSV `user_id,year,carryover_days` mit `--dry-run`.
+
+### Tests
+
+- Unit-Tests für `VacationAllocationService`; erweiterte Tests für `AbsenceService` und zugehörige Controller.
+
+## 1.1.6 – 2026-03-27
+
+### Hinzugefügt
+
+- **Entwicklung**: CLI `occ arbeitszeitcheck:generate-test-data` für deterministische Demo-Daten (Zeiteinträge, Abwesenheiten, optional Verstöße, Demo-App-Team) zum Testen von UI, Berichten und Workflows.
+- **Exporte**: `TimeEntryExportTransformer` bündelt Feldzuordnung und CSV-Aufbereitung für Zeiteintrags-Exporte; `ExportController` delegiert daran für eine einheitliche, testbare Pipeline.
+
+### Behoben
+
+- **Berichte-UI**: Berichtstyp-Karten werden bei teambezogenem Scope nicht mehr fälschlich deaktiviert.
+- **Berichte (Tests)**: CSV-Download-Test nutzt `DataDownloadResponse::render()` für den Dateiinhalt.
+- **Team-Berichte**: Nutzer-IDs werden vor Berechtigungsprüfung und Aggregation dedupliziert (keine Doppelzählung bei Mehrfach-Teams).
+- **Abwesenheits-Badges**: Besser lesbare, theme-sichere Kontraste für Urlaub / Krank / Homeoffice / Sonstiges.
+
+### Geändert
+
+- **Kompatibilität (Dev)**: Lokale Entwicklungsumgebungen an Nextcloud 33.x ausgerichtet (z. B. offizielles `nextcloud`-Docker-Image).
+- **Berichte-Layout**: Zu aggressive Vollbreiten-Regel für das Parameterformular zurückgenommen (verbessert Scroll/Layout).
+- **Berichte-UI**: Anpassungen an Templates, JavaScript und Styles auf der Berichtsseite; Admin-Einstellungen mit zugehörigem Hook.
+- **Reporting**: Anpassungen in `ReportController` und `ReportingService` passend zum Export-Refactoring.
+
+### Tests
+
+- Unit-Tests für `TimeEntryExportTransformer`; erweiterte `ReportController`-Tests; `ExportController`-Tests an neue Verdrahtung angepasst.
+
 ## 1.1.4 – 2026-03-25
 
 ### Behoben

@@ -135,7 +135,7 @@
             const name = Utils.escapeHtml ? Utils.escapeHtml(node.name) : String(node.name || '').replace(/[&<>"']/g, function(c) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             });
-            const displayName = node.name || '';
+            const _displayName = node.name || '';
             const editLabel = (t('Edit unit', 'Edit') + ' ' + name).trim();
             const deleteLabel = (t('Delete unit', 'Delete unit') + ' ' + name).trim();
             const hasChildren = node.children && node.children.length > 0;

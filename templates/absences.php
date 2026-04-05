@@ -504,10 +504,40 @@ $colleagues = $_['colleagues'] ?? [];
                     <?php p($l->t('Vacation balance') . ' ' . (string)($stats['vacation_year'] ?? date('Y'))); ?>
                 </h3>
                 <p id="stats-desc" class="stats-section-desc visually-hidden">
-                    <?php p($l->t('Remaining vacation days for this year. Only approved vacation (not sick leave or other absences) is deducted.')); ?>
+                    <?php p($l->t('Remaining vacation days for this year (annual entitlement plus carryover minus approved vacation). Sick leave and other absences are not deducted.')); ?>
                 </p>
+                <?php
+                $carryoverExpiresOn = $stats['vacation_carryover_expires_on'] ?? null;
+                $carryoverExpiresFmt = '';
+                if ($carryoverExpiresOn) {
+                    try {
+                        $carryoverExpiresFmt = (new \DateTimeImmutable((string)$carryoverExpiresOn))->format('d.m.Y');
+                    } catch (\Throwable $e) {
+                        $carryoverExpiresFmt = (string)$carryoverExpiresOn;
+                    }
+                }
+                ?>
                 <?php if (!empty($stats)): ?>
-                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc">
+                    <p class="stats-section__intro" id="stats-intro">
+                        <?php p($l->t('These numbers only count approved vacation. Carryover days must be used for vacation days on or before the expiry date; after that, new requests use your regular annual entitlement first.')); ?>
+                        <?php if ($carryoverExpiresFmt !== '' && (float)($stats['vacation_carryover_days'] ?? 0) > 0.0001) { ?>
+                            <?php p(' ' . $l->t('Carryover expiry this year: %s.', [$carryoverExpiresFmt])); ?>
+                        <?php } ?>
+                    </p>
+                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc stats-intro">
+                        <div class="stat-card stat-card--carryover">
+                            <span class="stat-label" id="stat-carryover-label"><?php p($l->t('Carryover (opening balance)')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-carryover-label"><?php p((string)round($stats['vacation_carryover_days'] ?? 0, 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($l->t('vacation days')); ?></span>
+                            <?php if ((float)($stats['vacation_carryover_days'] ?? 0) > 0.0001) { ?>
+                            <span class="stat-card__meta" id="stat-carryover-usable"><?php p($l->t('Still usable for new requests: %s days', [(string)round((float)($stats['vacation_carryover_usable'] ?? 0), 1)])); ?></span>
+                            <?php } ?>
+                        </div>
+                        <div class="stat-card stat-card--entitlement">
+                            <span class="stat-label" id="stat-entitlement-label"><?php p($l->t('Annual entitlement')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-entitlement-label"><?php p((string)round($stats['vacation_annual_entitlement'] ?? 0, 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($l->t('vacation days')); ?></span>
+                        </div>
                         <div class="stat-card stat-card--remaining">
                             <span class="stat-label" id="stat-remaining-label"><?php p($l->t('Remaining')); ?></span>
                             <span class="stat-value" aria-labelledby="stat-remaining-label"><?php p((string)round($stats['vacation_days_remaining'] ?? 0, 1)); ?></span>

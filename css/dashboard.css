@@ -477,6 +477,41 @@
 }
 
 /* Responsive - Clear layout on small screens (100% width, no overflow) */
+/* Vacation summary card */
+.dashboard-vacation-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.dashboard-vacation-card__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.dashboard-vacation-card__label {
+    font-size: var(--arbeitszeitcheck-font-size-base);
+    color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.dashboard-vacation-card__value {
+    font-size: var(--arbeitszeitcheck-font-size-2xl);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold);
+    color: var(--arbeitszeitcheck-color-text);
+}
+
+.dashboard-vacation-card__hint {
+    margin: 0;
+    max-width: 42rem;
+}
+
+.dashboard-vacation-card__actions {
+    margin-top: var(--space-2);
+}
+
 @media (max-width: 768px) {
     .section {
         padding: var(--space-5);

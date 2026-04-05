@@ -18,11 +18,11 @@ use OCP\Util;
 Util::addScript('arbeitszeitcheck', 'common/navigation');
 Util::addScript('arbeitszeitcheck', 'common/navigation-icons');
 
-// URL generator and translation must be passed in from the controller
+// URL generator and translation should be passed from the controller; fall back for embedded settings
 /** @var \OCP\IURLGenerator $urlGenerator */
 /** @var \OCP\IL10N $l */
-$urlGenerator = $_['urlGenerator'];
-$l = $_['l'];
+$urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
+$l = $_['l'] ?? Util::getL10N('arbeitszeitcheck');
 
 // Get current page to highlight active navigation item
 $currentPage = $_SERVER['REQUEST_URI'] ?? '';
@@ -64,6 +64,7 @@ $showAdminNav = !empty($_['showAdminNav']);
 
 <!-- App layout wrapper: flex container for sidebar + content (desktop), stacked (mobile) -->
 <div id="arbeitszeitcheck-app" class="arbeitszeitcheck-app">
+    <a href="#app-content" class="skip-link"><?php p($l->t('Skip to main content')); ?></a>
     <!-- Mobile hamburger menu button -->
     <button class="nav-mobile-toggle"
         id="nav-mobile-toggle"

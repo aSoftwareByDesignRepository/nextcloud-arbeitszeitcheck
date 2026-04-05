@@ -1038,7 +1038,12 @@ class AbsenceController extends Controller
 				'vacationStats' => [
 					'used' => $stats['used'],
 					'total' => $stats['entitlement'],
-					'remaining' => $stats['remaining']
+					'entitlement' => $stats['entitlement'],
+					'total_available' => $stats['total_available'] ?? null,
+					'carryover_days' => $stats['carryover_days'] ?? 0,
+					'carryover_usable' => $stats['carryover_usable'] ?? 0,
+					'carryover_expires_on' => $stats['carryover_expires_on'] ?? null,
+					'remaining' => $stats['remaining'],
 				],
 				'sickLeaveStats' => [
 					'days' => $stats['sick_days']

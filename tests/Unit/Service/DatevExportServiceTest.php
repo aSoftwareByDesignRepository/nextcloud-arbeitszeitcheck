@@ -81,19 +81,32 @@ class DatevExportServiceTest extends TestCase
 			->willReturn('12345678');
 
 		// Mock time entries
-		$entry1 = $this->createMock(TimeEntry::class);
-		$entry1->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry1->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry1->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$entry1->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry1->method('getDescription')->willReturn('Regular work');
+		$entry1 = new TimeEntry();
+		$entry1->setId(1);
+		$entry1->setUserId($userId);
+		$entry1->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry1->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry1->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry1->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry1->setDescription('Regular work');
+		$entry1->setIsManualEntry(false);
+		$entry1->setCreatedAt(new \DateTime());
+		$entry1->setUpdatedAt(new \DateTime());
 
-		$entry2 = $this->createMock(TimeEntry::class);
-		$entry2->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry2->method('getEndTime')->willReturn(new \DateTime('2024-01-16 18:00:00'));
-		$entry2->method('getStartTime')->willReturn(new \DateTime('2024-01-16 09:00:00'));
-		$entry2->method('getWorkingDurationHours')->willReturn(9.0);
-		$entry2->method('getDescription')->willReturn(null);
+		$entry2 = new TimeEntry();
+		$entry2->setId(2);
+		$entry2->setUserId($userId);
+		$entry2->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry2->setStartTime(new \DateTime('2024-01-16 09:00:00'));
+		$entry2->setEndTime(new \DateTime('2024-01-16 18:00:00'));
+		$entry2->setBreaks(json_encode([]));
+		$entry2->setDescription(null);
+		$entry2->setIsManualEntry(false);
+		$entry2->setCreatedAt(new \DateTime());
+		$entry2->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -118,10 +131,13 @@ class DatevExportServiceTest extends TestCase
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-31');
 
-		$this->config->expects($this->once())
-			->method('getAppValue')
-			->with('arbeitszeitcheck', 'datev_beraternummer', '')
-			->willReturn(''); // Empty Beraternummer
+		$this->config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', 'datev_beraternummer', '', ''], // Empty Beraternummer
+			['arbeitszeitcheck', 'datev_mandantennummer', '', '12345'],
+			['arbeitszeitcheck', 'datev_lohnart_normal', '1000', '1000'],
+			['arbeitszeitcheck', 'datev_lohnart_ueberstunden', '2000', '2000'],
+		]);
+		$this->config->method('getUserValue')->willReturn('12345678');
 
 		$this->expectException(\Exception::class);
 		$this->expectExceptionMessage('DATEV configuration incomplete');
@@ -138,12 +154,13 @@ class DatevExportServiceTest extends TestCase
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-31');
 
-		$this->config->expects($this->exactly(2))
-			->method('getAppValue')
-			->willReturnMap([
-				['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
-				['arbeitszeitcheck', 'datev_mandantennummer', '', ''] // Empty Mandantennummer
-			]);
+		$this->config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
+			['arbeitszeitcheck', 'datev_mandantennummer', '', ''], // Empty Mandantennummer
+			['arbeitszeitcheck', 'datev_lohnart_normal', '1000', '1000'],
+			['arbeitszeitcheck', 'datev_lohnart_ueberstunden', '2000', '2000'],
+		]);
+		$this->config->method('getUserValue')->willReturn('12345678');
 
 		$this->expectException(\Exception::class);
 		$this->expectExceptionMessage('DATEV configuration incomplete');
@@ -203,16 +220,31 @@ class DatevExportServiceTest extends TestCase
 			->willReturn('12345678');
 
 		// Mock entries: one completed, one active (should be skipped)
-		$completedEntry = $this->createMock(TimeEntry::class);
-		$completedEntry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$completedEntry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$completedEntry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$completedEntry->method('getWorkingDurationHours')->willReturn(8.0);
-		$completedEntry->method('getDescription')->willReturn('Completed');
+		$completedEntry = new TimeEntry();
+		$completedEntry->setId(1);
+		$completedEntry->setUserId($userId);
+		$completedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$completedEntry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$completedEntry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$completedEntry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$completedEntry->setDescription('Completed');
+		$completedEntry->setIsManualEntry(false);
+		$completedEntry->setCreatedAt(new \DateTime());
+		$completedEntry->setUpdatedAt(new \DateTime());
 
-		$activeEntry = $this->createMock(TimeEntry::class);
-		$activeEntry->method('getStatus')->willReturn(TimeEntry::STATUS_ACTIVE);
-		$activeEntry->method('getEndTime')->willReturn(null);
+		$activeEntry = new TimeEntry();
+		$activeEntry->setId(2);
+		$activeEntry->setUserId($userId);
+		$activeEntry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$activeEntry->setStartTime(new \DateTime('2024-01-16 08:00:00'));
+		$activeEntry->setEndTime(null);
+		$activeEntry->setBreaks(json_encode([]));
+		$activeEntry->setIsManualEntry(false);
+		$activeEntry->setCreatedAt(new \DateTime());
+		$activeEntry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -248,10 +280,16 @@ class DatevExportServiceTest extends TestCase
 			->willReturn('12345678');
 
 		// Mock entry with zero hours
-		$zeroHourEntry = $this->createMock(TimeEntry::class);
-		$zeroHourEntry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$zeroHourEntry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$zeroHourEntry->method('getWorkingDurationHours')->willReturn(0.0);
+		$zeroHourEntry = new TimeEntry();
+		$zeroHourEntry->setId(1);
+		$zeroHourEntry->setUserId($userId);
+		$zeroHourEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$zeroHourEntry->setStartTime(new \DateTime('2024-01-15 17:00:00'));
+		$zeroHourEntry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$zeroHourEntry->setBreaks(json_encode([]));
+		$zeroHourEntry->setIsManualEntry(false);
+		$zeroHourEntry->setCreatedAt(new \DateTime());
+		$zeroHourEntry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -288,12 +326,20 @@ class DatevExportServiceTest extends TestCase
 			->willReturn('12345678');
 
 		// Mock entry with very long description (should be truncated to 20 chars)
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('This is a very long description that should be truncated');
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry->setDescription('This is a very long description that should be truncated');
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -315,12 +361,14 @@ class DatevExportServiceTest extends TestCase
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-31');
 
-		$this->config->expects($this->exactly(2))
-			->method('getAppValue')
-			->willReturnMap([
-				['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
-				['arbeitszeitcheck', 'datev_mandantennummer', '', '12345']
-			]);
+		$this->config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default): string {
+			return match ($key) {
+				'datev_beraternummer' => '1234567',
+				'datev_mandantennummer' => '12345',
+				'datev_lohnart_normal' => '1000',
+				default => $default,
+			};
+		});
 
 		// Mock user values
 		$this->config->expects($this->exactly(2))
@@ -331,29 +379,39 @@ class DatevExportServiceTest extends TestCase
 			]);
 
 		// Mock time entries for both users
-		$entry1 = $this->createMock(TimeEntry::class);
-		$entry1->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry1->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry1->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$entry1->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry1->method('getDescription')->willReturn('User 1 work');
+		$entry1 = new TimeEntry();
+		$entry1->setId(1);
+		$entry1->setUserId('user1');
+		$entry1->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry1->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry1->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry1->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry1->setDescription('User 1 work');
+		$entry1->setIsManualEntry(false);
+		$entry1->setCreatedAt(new \DateTime());
+		$entry1->setUpdatedAt(new \DateTime());
 
-		$entry2 = $this->createMock(TimeEntry::class);
-		$entry2->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry2->method('getEndTime')->willReturn(new \DateTime('2024-01-16 17:00:00'));
-		$entry2->method('getStartTime')->willReturn(new \DateTime('2024-01-16 08:00:00'));
-		$entry2->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry2->method('getDescription')->willReturn('User 2 work');
+		$entry2 = new TimeEntry();
+		$entry2->setId(2);
+		$entry2->setUserId('user2');
+		$entry2->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry2->setStartTime(new \DateTime('2024-01-16 08:00:00'));
+		$entry2->setEndTime(new \DateTime('2024-01-16 17:00:00'));
+		$entry2->setBreaks(json_encode([[
+			'start' => '2024-01-16T12:00:00+00:00',
+			'end' => '2024-01-16T13:00:00+00:00',
+		]]));
+		$entry2->setDescription('User 2 work');
+		$entry2->setIsManualEntry(false);
+		$entry2->setCreatedAt(new \DateTime());
+		$entry2->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->exactly(2))
 			->method('findByUserAndDateRange')
 			->willReturnOnConsecutiveCalls([$entry1], [$entry2]);
-
-		// Mock lohnart_normal for each user's entries
-		$this->config->expects($this->exactly(2))
-			->method('getAppValue')
-			->with('arbeitszeitcheck', 'datev_lohnart_normal', '1000')
-			->willReturn('1000');
 
 		$result = $this->service->exportMultipleUsers($userIds, $startDate, $endDate);
 
@@ -372,12 +430,14 @@ class DatevExportServiceTest extends TestCase
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-31');
 
-		$this->config->expects($this->exactly(2))
-			->method('getAppValue')
-			->willReturnMap([
-				['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
-				['arbeitszeitcheck', 'datev_mandantennummer', '', '12345']
-			]);
+		$this->config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default): string {
+			return match ($key) {
+				'datev_beraternummer' => '1234567',
+				'datev_mandantennummer' => '12345',
+				'datev_lohnart_normal' => '1000',
+				default => $default,
+			};
+		});
 
 		// Mock user values: user1 has Personalnummer, user2 doesn't
 		$this->config->expects($this->exactly(2))
@@ -388,23 +448,25 @@ class DatevExportServiceTest extends TestCase
 			]);
 
 		// Mock time entries only for user1
-		$entry1 = $this->createMock(TimeEntry::class);
-		$entry1->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry1->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry1->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$entry1->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry1->method('getDescription')->willReturn('User 1 work');
+		$entry1 = new TimeEntry();
+		$entry1->setId(1);
+		$entry1->setUserId('user1');
+		$entry1->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry1->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry1->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry1->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry1->setDescription('User 1 work');
+		$entry1->setIsManualEntry(false);
+		$entry1->setCreatedAt(new \DateTime());
+		$entry1->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
 			->with('user1', $startDate, $endDate)
 			->willReturn([$entry1]);
-
-		// Mock lohnart_normal
-		$this->config->expects($this->once())
-			->method('getAppValue')
-			->with('arbeitszeitcheck', 'datev_lohnart_normal', '1000')
-			->willReturn('1000');
 
 		$result = $this->service->exportMultipleUsers($userIds, $startDate, $endDate);
 
@@ -477,12 +539,20 @@ class DatevExportServiceTest extends TestCase
 			->method('getUserValue')
 			->willReturn('123'); // Should be padded to 8 digits
 
-		$entry = $this->createMock(TimeEntry::class);
-		$entry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('');
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$entry->setDescription('');
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')

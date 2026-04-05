@@ -67,7 +67,9 @@
 	border-top: 1px solid var(--arbeitszeitcheck-color-border);
 	background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover, rgba(0, 0, 0, 0.03)));
 	border-radius: var(--radius-base, 8px);
-	padding: var(--space-6, 1.5rem);
+	padding-right: var(--space-6, 1.5rem);
+	padding-bottom: var(--space-6, 1.5rem);
+	padding-left: var(--space-6, 1.5rem);
 	margin-left: calc(-1 * var(--space-6, 1.5rem));
 	margin-right: calc(-1 * var(--space-6, 1.5rem));
 	margin-bottom: 0;
@@ -193,6 +195,22 @@
 
 .stats-section-desc {
 	margin: 0 0 var(--space-5, 1.25rem);
+}
+
+.stats-section__intro {
+	font-size: var(--arbeitszeitcheck-font-size-base);
+	color: var(--arbeitszeitcheck-color-text-secondary);
+	line-height: var(--arbeitszeitcheck-line-height-relaxed);
+	margin: 0 0 var(--space-6, 1.5rem);
+	max-width: 48rem;
+}
+
+.stat-card__meta {
+	display: block;
+	font-size: 0.875rem;
+	color: var(--arbeitszeitcheck-color-text-secondary);
+	margin-top: var(--space-2, 0.5rem);
+	line-height: 1.4;
 }
 
 /* Stats Grid */
@@ -355,23 +373,34 @@
 	opacity: 1;
 	background-color: var(--color-background-hover);
 	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
 }
 
-/* WCAG 2.1 AA: darkened backgrounds for contrast with white text */
+/* Theme-safe badges: readable text + visible semantic borders */
 .absence-type-badge.type-vacation {
-	background-color: color-mix(in srgb, var(--color-success) 70%, var(--color-main-background));
-	color: var(--color-primary-text);
+	background-color: color-mix(in srgb, var(--color-success) 24%, var(--color-main-background));
+	color: var(--color-main-text);
+	border-color: color-mix(in srgb, var(--color-success) 60%, var(--color-border-maxcontrast));
 }
 
 .absence-type-badge.type-sick,
 .absence-type-badge.type-sick_leave {
-	background-color: color-mix(in srgb, var(--color-error) 70%, var(--color-main-background));
-	color: var(--color-primary-text);
+	background-color: color-mix(in srgb, var(--color-error) 30%, var(--color-main-background));
+	color: var(--color-main-text);
+	border-color: color-mix(in srgb, var(--color-error) 70%, var(--color-border-maxcontrast));
+}
+
+.absence-type-badge.type-home-office,
+.absence-type-badge.type-home_office {
+	background-color: color-mix(in srgb, var(--color-warning) 24%, var(--color-main-background));
+	color: var(--color-main-text);
+	border-color: color-mix(in srgb, var(--color-warning) 60%, var(--color-border-maxcontrast));
 }
 
 .absence-type-badge.type-other {
-	background-color: var(--color-primary-element);
-	color: var(--color-primary-element-text);
+	background-color: color-mix(in srgb, var(--color-primary-element) 22%, var(--color-main-background));
+	color: var(--color-main-text);
+	border-color: color-mix(in srgb, var(--color-primary-element) 60%, var(--color-border-maxcontrast));
 }
 
 /* Table Cell Styles */

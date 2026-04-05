@@ -62,6 +62,8 @@
         formData.enableViolationNotifications = isChecked(formData.enableViolationNotifications);
         formData.exportMidnightSplitEnabled = isChecked(formData.exportMidnightSplitEnabled);
         formData.sendIcalApprovedAbsences = isChecked(formData.sendIcalApprovedAbsences);
+        formData.calendarSyncAbsencesEnabled = isChecked(formData.calendarSyncAbsencesEnabled);
+        formData.calendarSyncHolidaysEnabled = isChecked(formData.calendarSyncHolidaysEnabled);
         formData.sendIcalToSubstitute = isChecked(formData.sendIcalToSubstitute);
         formData.sendIcalToManagers = isChecked(formData.sendIcalToManagers);
         formData.sendEmailSubstitutionRequest = isChecked(formData.sendEmailSubstitutionRequest);
@@ -76,6 +78,8 @@
         formData.minRestPeriod = num(formData.minRestPeriod, 11);
         formData.defaultWorkingHours = num(formData.defaultWorkingHours, 8);
         formData.retentionPeriod = int(formData.retentionPeriod, 2);
+        formData.vacationCarryoverExpiryMonth = int(formData.vacationCarryoverExpiryMonth, 3);
+        formData.vacationCarryoverExpiryDay = int(formData.vacationCarryoverExpiryDay, 31);
 
         // Validate
         if (!validateForm(formData)) {
@@ -124,6 +128,17 @@
 
         if (data.retentionPeriod < 1 || data.retentionPeriod > 10) {
             const msg = (window.t && window.t('arbeitszeitcheck', 'Retention period must be between 1 and 10 years')) || 'Retention period must be between 1 and 10 years';
+            Messaging.showError(msg);
+            return false;
+        }
+
+        if (data.vacationCarryoverExpiryMonth < 1 || data.vacationCarryoverExpiryMonth > 12) {
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Carryover expiry month must be between 1 and 12')) || 'Carryover expiry month must be between 1 and 12';
+            Messaging.showError(msg);
+            return false;
+        }
+        if (data.vacationCarryoverExpiryDay < 1 || data.vacationCarryoverExpiryDay > 31) {
+            const msg = (window.t && window.t('arbeitszeitcheck', 'Carryover expiry day must be between 1 and 31')) || 'Carryover expiry day must be between 1 and 31';
             Messaging.showError(msg);
             return false;
         }

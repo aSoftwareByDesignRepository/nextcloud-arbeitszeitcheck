@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IUser;
 use OCP\IUserManager;
@@ -35,6 +36,9 @@ class NotificationServiceTest extends TestCase
 	/** @var IUserManager|MockObject */
 	private $userManager;
 
+	/** @var IConfig|MockObject */
+	private $config;
+
 	/** @var NotificationService */
 	private $service;
 
@@ -46,6 +50,8 @@ class NotificationServiceTest extends TestCase
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->userSettingsMapper = $this->createMock(UserSettingsMapper::class);
 		$this->userManager = $this->createMock(IUserManager::class);
+		$this->config = $this->createMock(IConfig::class);
+		$this->config->method('getAppValue')->willReturnCallback(static fn ($app, $key, $default = '') => $default);
 
 		// Simple translation passthrough
 		$this->l10n->method('t')
@@ -60,7 +66,8 @@ class NotificationServiceTest extends TestCase
 			$this->notificationManager,
 			$this->l10n,
 			$this->userSettingsMapper,
-			$this->userManager
+			$this->userManager,
+			$this->config
 		);
 	}
 

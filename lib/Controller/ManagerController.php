@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
+use OCA\ArbeitszeitCheck\Service\AbsencePrivacyPolicy;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
@@ -1163,12 +1164,11 @@ class ManagerController extends Controller
 							'id' => $absence->getId(),
 							'userId' => $absence->getUserId(),
 							'displayName' => $this->getDisplayName($absence->getUserId()),
-							'type' => $absence->getType(),
-							'startDate' => ($startDate = $absence->getStartDate()) ? $startDate->format('Y-m-d') : null,
-							'endDate' => ($endDate = $absence->getEndDate()) ? $endDate->format('Y-m-d') : null,
+							'startDate' => ($sdCal = $absence->getStartDate()) ? $sdCal->format('Y-m-d') : null,
+							'endDate' => ($edCal = $absence->getEndDate()) ? $edCal->format('Y-m-d') : null,
 							'days' => $absence->getDays(),
 							'status' => $absence->getStatus(),
-							'summary' => $absence->getSummary()
+							'summary' => AbsencePrivacyPolicy::summaryForTeamViewer($absence),
 						];
 					} catch (\Throwable $e) {
 						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing absence ' . $absence->getId() . ' in calendar data: ' . $e->getMessage(), ["exception" => $e]);

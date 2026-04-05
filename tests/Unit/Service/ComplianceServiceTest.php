@@ -18,7 +18,9 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IUserManager;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +54,12 @@ class ComplianceServiceTest extends TestCase
 	/** @var NotificationService|\PHPUnit\Framework\MockObject\MockObject */
 	private $notificationService;
 
+	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	private $holidayCalendarService;
+
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $config;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -63,6 +71,11 @@ class ComplianceServiceTest extends TestCase
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
+		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->config = $this->createMock(IConfig::class);
+		$this->config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = ''): string {
+			return $default;
+		});
 
 		// Setup l10n mock to return translation keys
 		$this->l10n->method('t')
@@ -77,7 +90,9 @@ class ComplianceServiceTest extends TestCase
 			$this->userWorkingTimeModelMapper,
 			$this->userManager,
 			$this->l10n,
-			$this->notificationService
+			$this->notificationService,
+			$this->holidayCalendarService,
+			$this->config
 		);
 	}
 
@@ -89,7 +104,7 @@ class ComplianceServiceTest extends TestCase
 		$userId = 'testuser';
 
 		// Mock no previous entry (first clock-in) - getLastCompletedEntry uses findByUser
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUser')
 			->with($userId)
 			->willReturn([]);
@@ -113,14 +128,20 @@ class ComplianceServiceTest extends TestCase
 		$userId = 'testuser';
 
 		// Mock previous entry that ended less than 11 hours ago
-		$lastEntry = $this->createMock(TimeEntry::class);
 		$endTime = new \DateTime();
 		$endTime->modify('-10 hours'); // Only 10 hours ago
-		$lastEntry->method('getEndTime')->willReturn($endTime);
-		$lastEntry->method('getStatus')->willReturn(TimeEntry::STATUS_COMPLETED);
+		$lastEntry = new TimeEntry();
+		$lastEntry->setId(1);
+		$lastEntry->setUserId($userId);
+		$lastEntry->setStartTime((clone $endTime)->modify('-8 hours'));
+		$lastEntry->setEndTime($endTime);
+		$lastEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$lastEntry->setIsManualEntry(false);
+		$lastEntry->setCreatedAt(new \DateTime());
+		$lastEntry->setUpdatedAt(new \DateTime());
 
 		// getLastCompletedEntry uses findByUser and filters for completed entries
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUser')
 			->with($userId)
 			->willReturn([$lastEntry]);
@@ -146,7 +167,7 @@ class ComplianceServiceTest extends TestCase
 		$userId = 'testuser';
 
 		// Mock no previous entry
-		$this->timeEntryMapper->expects($this->once())
+		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUser')
 			->with($userId)
 			->willReturn([]);
@@ -170,18 +191,23 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutMissing30MinBreak(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
-
-		// Mock time entry with 6.5 hours work but only 15 minutes break
-		$timeEntry->method('getDurationHours')->willReturn(6.5);
-		$timeEntry->method('getBreakDurationHours')->willReturn(0.25); // 15 minutes
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getEndTime')->willReturn(new \DateTime());
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime(new \DateTime('2024-01-15 10:15:00')); // total 6h45m
+		$timeEntry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-15T13:00:00+00:00',
+			'end' => '2024-01-15T13:15:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
 		// Mock violation creation
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getId')->willReturn(456);
+		$violation = new ComplianceViolation();
+		$violation->setId(456);
 		$this->violationMapper->expects($this->once())
 			->method('createViolation')
 			->with(
@@ -208,18 +234,23 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutMissing45MinBreak(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
-
-		// Mock time entry with 9.5 hours work but only 30 minutes break
-		$timeEntry->method('getDurationHours')->willReturn(9.5);
-		$timeEntry->method('getBreakDurationHours')->willReturn(0.5); // 30 minutes
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getEndTime')->willReturn(new \DateTime());
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime(new \DateTime('2024-01-15 07:00:00')); // total 10h
+		$timeEntry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:30:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
 		// Mock violation creation
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getId')->willReturn(456);
+		$violation = new ComplianceViolation();
+		$violation->setId(456);
 		$this->violationMapper->expects($this->once())
 			->method('createViolation')
 			->with(
@@ -246,29 +277,44 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutExcessiveHours(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime(new \DateTime('2024-01-15 05:00:00')); // total 12h
+		$timeEntry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
-		// Mock time entry with 11 hours work
-		$timeEntry->method('getDurationHours')->willReturn(11.0);
-		$timeEntry->method('getBreakDurationHours')->willReturn(1.0); // 1 hour break
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getEndTime')->willReturn(new \DateTime());
-
-		// Mock violation creation
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getId')->willReturn(456);
-		$this->violationMapper->expects($this->once())
+		// Mock violation creation (excessive hours + night work info)
+		$violation = new ComplianceViolation();
+		$violation->setId(456);
+		$this->violationMapper->expects($this->exactly(2))
 			->method('createViolation')
-			->with(
-				$userId,
-				ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,
-				$this->stringContains('10 hours'),
-				$this->isInstanceOf(\DateTime::class),
-				123,
-				ComplianceViolation::SEVERITY_ERROR
+			->withConsecutive(
+				[
+					$userId,
+					ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS,
+					$this->stringContains('Working hours exceeded'),
+					$this->isInstanceOf(\DateTime::class),
+					123,
+					ComplianceViolation::SEVERITY_ERROR
+				],
+				[
+					$userId,
+					ComplianceViolation::TYPE_NIGHT_WORK,
+					$this->stringContains('Night work detected'),
+					$this->isInstanceOf(\DateTime::class),
+					123,
+					ComplianceViolation::SEVERITY_INFO
+				]
 			)
-			->willReturn($violation);
+			->willReturnOnConsecutiveCalls($violation, $violation);
 
 		// Mock notification
 		$this->notificationService->expects($this->once())
@@ -284,15 +330,19 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutCompliant(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
-
-		// Mock time entry with 8 hours work and 45 minutes break (compliant)
-		$timeEntry->method('getDurationHours')->willReturn(8.0);
-		$timeEntry->method('getBreakDurationHours')->willReturn(0.75); // 45 minutes
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getEndTime')->willReturn(new \DateTime());
-		$timeEntry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 08:00:00'));
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime(new \DateTime('2024-01-15 08:00:00')); // total 8h45m
+		$timeEntry->setEndTime(new \DateTime('2024-01-15 16:45:00'));
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T12:45:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
 		// Should not create any violations
 		$this->violationMapper->expects($this->never())
@@ -309,6 +359,28 @@ class ComplianceServiceTest extends TestCase
 	 */
 	public function testIsGermanPublicHoliday(): void
 	{
+		$this->holidayCalendarService->method('isHolidayForState')->willReturnCallback(
+			static function (string $state, \DateTime $date): bool {
+				$key = $state . '|' . $date->format('Y-m-d');
+				$map = [
+					'BY|2024-01-01' => true,
+					'BE|2024-01-01' => true,
+					'BW|2024-01-01' => true,
+
+					'BY|2024-12-25' => true,
+					'BE|2024-12-25' => true,
+
+					'BY|2024-01-15' => false,
+					'BE|2024-01-15' => false,
+
+					'BY|2024-01-06' => true,
+					'BE|2024-01-06' => false,
+				];
+
+				return $map[$key] ?? false;
+			}
+		);
+
 		// Test New Year's Day (should be holiday in all states)
 		$newYear = new \DateTime('2024-01-01');
 		$this->assertTrue($this->service->isGermanPublicHoliday($newYear, 'BY'));
@@ -337,22 +409,28 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutSundayWork(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
+		$timeEntry = new TimeEntry();
 
 		// Mock time entry on Sunday (compliant hours and breaks)
 		$sundayStart = new \DateTime('2024-01-07 08:00:00'); // Sunday
 		$sundayEnd = new \DateTime('2024-01-07 17:00:00'); // Sunday
 
-		$timeEntry->method('getDurationHours')->willReturn(8.0);
-		$timeEntry->method('getBreakDurationHours')->willReturn(0.75);
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getStartTime')->willReturn($sundayStart);
-		$timeEntry->method('getEndTime')->willReturn($sundayEnd);
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime($sundayStart);
+		$timeEntry->setEndTime($sundayEnd);
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-07T12:00:00+00:00',
+			'end' => '2024-01-07T12:45:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
 		// Mock violation creation for Sunday work
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getId')->willReturn(456);
+		$violation = new ComplianceViolation();
+		$violation->setId(456);
 		$this->violationMapper->expects($this->once())
 			->method('createViolation')
 			->with(
@@ -374,22 +452,25 @@ class ComplianceServiceTest extends TestCase
 	public function testCheckComplianceAfterClockOutNightWork(): void
 	{
 		$userId = 'testuser';
-		$timeEntry = $this->createMock(TimeEntry::class);
+		$timeEntry = new TimeEntry();
 
 		// Mock time entry with night work (11 PM - 2 AM)
 		$nightStart = new \DateTime('2024-01-15 23:00:00');
 		$nightEnd = new \DateTime('2024-01-16 02:00:00');
 
-		$timeEntry->method('getDurationHours')->willReturn(3.0);
-		$timeEntry->method('getBreakDurationHours')->willReturn(0.0);
-		$timeEntry->method('getUserId')->willReturn($userId);
-		$timeEntry->method('getId')->willReturn(123);
-		$timeEntry->method('getStartTime')->willReturn($nightStart);
-		$timeEntry->method('getEndTime')->willReturn($nightEnd);
+		$timeEntry->setId(123);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime($nightStart);
+		$timeEntry->setEndTime($nightEnd);
+		$timeEntry->setBreaks(json_encode([]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
 
 		// Mock violation creation for night work
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getId')->willReturn(456);
+		$violation = new ComplianceViolation();
+		$violation->setId(456);
 		$this->violationMapper->expects($this->once())
 			->method('createViolation')
 			->with(
@@ -440,9 +521,11 @@ class ComplianceServiceTest extends TestCase
 		$userId = 'testuser';
 
 		// Mock violations
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getViolationType')->willReturn(ComplianceViolation::TYPE_MISSING_BREAK);
-		$violation->method('getSeverity')->willReturn(ComplianceViolation::SEVERITY_ERROR);
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId($userId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_ERROR);
 
 		$this->violationMapper->expects($this->once())
 			->method('findByUser')
@@ -468,15 +551,17 @@ class ComplianceServiceTest extends TestCase
 		$userId = 'testuser';
 
 		// Mock violations
-		$violation1 = $this->createMock(ComplianceViolation::class);
-		$violation1->method('getViolationType')->willReturn(ComplianceViolation::TYPE_MISSING_BREAK);
-		$violation1->method('getSeverity')->willReturn(ComplianceViolation::SEVERITY_ERROR);
-		$violation1->method('getUserId')->willReturn($userId);
+		$violation1 = new ComplianceViolation();
+		$violation1->setId(1);
+		$violation1->setUserId($userId);
+		$violation1->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation1->setSeverity(ComplianceViolation::SEVERITY_ERROR);
 
-		$violation2 = $this->createMock(ComplianceViolation::class);
-		$violation2->method('getViolationType')->willReturn(ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS);
-		$violation2->method('getSeverity')->willReturn(ComplianceViolation::SEVERITY_WARNING);
-		$violation2->method('getUserId')->willReturn($userId);
+		$violation2 = new ComplianceViolation();
+		$violation2->setId(2);
+		$violation2->setUserId($userId);
+		$violation2->setViolationType(ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS);
+		$violation2->setSeverity(ComplianceViolation::SEVERITY_WARNING);
 
 		$this->violationMapper->expects($this->once())
 			->method('findByDateRange')

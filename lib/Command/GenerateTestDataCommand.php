@@ -63,6 +63,7 @@ class GenerateTestDataCommand extends Command
 			->addOption('weeks', 'w', InputOption::VALUE_REQUIRED, 'How many weeks of weekday entries to generate (default: 8).', '8')
 			->addOption('with-team', null, InputOption::VALUE_NONE, 'Create a demo app team and add the user as member + manager (if not already present).')
 			->addOption('with-violations', null, InputOption::VALUE_NONE, 'Insert a few demo compliance violations.')
+			->addOption('with-overnight', null, InputOption::VALUE_NONE, 'Add one completed time entry crossing midnight (22:00 → next day 06:00) for export/split testing.')
 			->addOption('clear-demo', null, InputOption::VALUE_NONE, 'Remove rows previously created by this command for the target user (matched by demo marker), then continue unless --clear-only.')
 			->addOption('clear-only', null, InputOption::VALUE_NONE, 'Only run the demo cleanup; do not insert new data.')
 			->addOption('force', 'f', InputOption::VALUE_NONE, 'Required in non-interactive mode (e.g. cron/CI) to confirm.');
@@ -113,6 +114,10 @@ class GenerateTestDataCommand extends Command
 		$this->ensureUserWorkingTimeModel($userId, $modelId);
 
 		$insertedEntries = $this->seedTimeEntries($userId, $weeks);
+		if ((bool)$input->getOption('with-overnight')) {
+			$this->insertOvernightDemo($userId);
+			$insertedEntries++;
+		}
 		$insertedAbsences = $this->seedAbsences($userId);
 		$insertedViolations = 0;
 		if ((bool)$input->getOption('with-violations')) {
@@ -280,6 +285,35 @@ class GenerateTestDataCommand extends Command
 		}
 
 		return $count;
+	}
+
+	/**
+	 * Single booking from 22:00 on a weekday to 06:00 the next day (for Mitternachts-Split in exports).
+	 */
+	private function insertOvernightDemo(string $userId): void
+	{
+		$today = new \DateTime('today');
+		$startDay = (clone $today)->modify('-7 days');
+		while ((int)$startDay->format('N') >= 6) {
+			$startDay->modify('-1 day');
+		}
+
+		$dateStr = $startDay->format('Y-m-d');
+		$start = new \DateTime($dateStr . ' 22:00:00');
+		$end = (clone $start)->modify('+1 day')->setTime(6, 0, 0);
+
+		$now = new \DateTime();
+		$entry = new TimeEntry();
+		$entry->setUserId($userId);
+		$entry->setStartTime($start);
+		$entry->setEndTime($end);
+		$entry->setBreaks(json_encode([], JSON_THROW_ON_ERROR));
+		$entry->setDescription('Nachtschicht über Mitternacht (Demo) ' . self::DEMO_MARKER);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt($now);
+		$entry->setUpdatedAt($now);
+		$this->timeEntryMapper->insert($entry);
 	}
 
 	/**

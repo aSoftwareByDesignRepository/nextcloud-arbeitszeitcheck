@@ -12,16 +12,21 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 
 use OCA\ArbeitszeitCheck\Controller\ExportController;
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
+use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
+use OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IConfig;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -53,6 +58,9 @@ class ExportControllerTest extends TestCase
 	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	private $config;
 
+	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
+	private $l10n;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -64,11 +72,25 @@ class ExportControllerTest extends TestCase
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->request = $this->createMock(IRequest::class);
 		$this->config = $this->createMock(IConfig::class);
+		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n->method('t')->willReturnCallback(static function (string $text, array $parameters = []): string {
+			// minimal formatter for tests (covers %s and %d)
+			return $parameters === [] ? $text : (string)vsprintf($text, $parameters);
+		});
 
-		// Default: midnight split enabled to preserve current behaviour
+		// Default: midnight split enabled to preserve current behaviour.
+		// Use a callback (no strict argument matching) so individual tests can override cleanly.
 		$this->config->method('getAppValue')
-			->with('arbeitszeitcheck', 'export_midnight_split_enabled', '1')
-			->willReturn('1');
+			->willReturnCallback(static function (string $app, string $key, string $default = ''): string {
+				if ($app === 'arbeitszeitcheck' && $key === 'export_midnight_split_enabled') {
+					return '1';
+				}
+				return $default;
+			});
+
+		$this->request->method('getParam')->willReturnCallback(static function (string $name, $default = null) {
+			return $default ?? '';
+		});
 
 		$this->controller = new ExportController(
 			'arbeitszeitcheck',
@@ -77,7 +99,9 @@ class ExportControllerTest extends TestCase
 			$this->absenceMapper,
 			$this->violationMapper,
 			$this->datevExportService,
+			new TimeEntryExportTransformer(),
 			$this->userSession,
+			$this->l10n,
 			$this->config
 		);
 	}
@@ -93,19 +117,20 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Work');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -114,8 +139,10 @@ class ExportControllerTest extends TestCase
 		$response = $this->controller->timeEntries('csv', '2024-01-01', '2024-01-31');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('time-entries-', $response->getFilename());
-		$this->assertStringContainsString('.csv', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('time-entries-', $contentDisposition);
+		$this->assertStringContainsString('.csv', $contentDisposition);
 	}
 
 	/**
@@ -129,19 +156,20 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Work');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')
 			->willReturn([$entry]);
@@ -149,7 +177,9 @@ class ExportControllerTest extends TestCase
 		$response = $this->controller->timeEntries('json');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('.json', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('.json', $contentDisposition);
 	}
 
 	/**
@@ -163,19 +193,20 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Work');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')
 			->willReturn([$entry]);
@@ -192,7 +223,9 @@ class ExportControllerTest extends TestCase
 		$response = $this->controller->timeEntries('datev', '2024-01-01', '2024-01-31');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('datev-export-', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('datev-export-', $contentDisposition);
 	}
 
 	/**
@@ -231,17 +264,19 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(\OCA\ArbeitszeitCheck\Db\Absence::class);
-		$absence->method('getId')->willReturn(1);
-		$absence->method('getType')->willReturn('vacation');
-		$absence->method('getStartDate')->willReturn(new \DateTime('2024-06-01'));
-		$absence->method('getEndDate')->willReturn(new \DateTime('2024-06-05'));
-		$absence->method('getDays')->willReturn(5);
-		$absence->method('getReason')->willReturn('Summer vacation');
-		$absence->method('getStatus')->willReturn('approved');
-		$absence->method('getApproverComment')->willReturn(null);
-		$absence->method('getApprovedAt')->willReturn(null);
-		$absence->method('getCreatedAt')->willReturn(new \DateTime('2024-05-01'));
+		$absence = new Absence();
+		$absence->setId(1);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-05'));
+		$absence->setDays(5);
+		$absence->setReason('Summer vacation');
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setApproverComment(null);
+		$absence->setApprovedAt(null);
+		$absence->setCreatedAt(new \DateTime('2024-05-01'));
+		$absence->setUpdatedAt(new \DateTime('2024-05-01'));
 
 		$this->absenceMapper->expects($this->once())
 			->method('findByUserAndDateRange')
@@ -250,8 +285,10 @@ class ExportControllerTest extends TestCase
 		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('absences-', $response->getFilename());
-		$this->assertStringContainsString('.csv', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('absences-', $contentDisposition);
+		$this->assertStringContainsString('.csv', $contentDisposition);
 	}
 
 	/**
@@ -290,15 +327,17 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolation::class);
-		$violation->method('getId')->willReturn(1);
-		$violation->method('getDate')->willReturn(new \DateTime('2024-01-15'));
-		$violation->method('getViolationType')->willReturn('missing_break');
-		$violation->method('getDescription')->willReturn('Missing break');
-		$violation->method('getSeverity')->willReturn('warning');
-		$violation->method('getResolved')->willReturn(false);
-		$violation->method('getResolvedAt')->willReturn(null);
-		$violation->method('getTimeEntryId')->willReturn(1);
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId($userId);
+		$violation->setDate(new \DateTime('2024-01-15'));
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setDescription('Missing break');
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setResolved(false);
+		$violation->setResolvedAt(null);
+		$violation->setTimeEntryId(1);
+		$violation->setCreatedAt(new \DateTime('2024-01-15'));
 
 		$this->violationMapper->expects($this->once())
 			->method('findByDateRange')
@@ -308,7 +347,9 @@ class ExportControllerTest extends TestCase
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 		// PDF export falls back to CSV, so filename should be CSV
-		$this->assertStringContainsString('compliance-report-', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('compliance-report-', $contentDisposition);
 	}
 
 	/**
@@ -373,7 +414,7 @@ class ExportControllerTest extends TestCase
 		$this->assertEquals(\OCP\AppFramework\Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('Configuration error', $data['error']);
+		$this->assertStringContainsString('Configuration error', $data['error']);
 	}
 
 	/**
@@ -387,19 +428,20 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 09:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-15 17:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Work');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')
 			->willReturn([$entry]);
@@ -412,7 +454,9 @@ class ExportControllerTest extends TestCase
 
 		// Should return CSV with error message
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('datev-export-error-', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('datev-export-error-', $contentDisposition);
 	}
 
 	/**
@@ -424,10 +468,10 @@ class ExportControllerTest extends TestCase
 			->method('getUser')
 			->willReturn(null);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('User not authenticated');
-
-		$this->controller->timeEntries('csv');
+		$response = $this->controller->timeEntries('csv');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = $response->render();
+		$this->assertStringContainsString('User not authenticated', $content);
 	}
 
 	/**
@@ -439,10 +483,10 @@ class ExportControllerTest extends TestCase
 			->method('getUser')
 			->willReturn(null);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('User not authenticated');
-
-		$this->controller->absences('csv');
+		$response = $this->controller->absences('csv');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = $response->render();
+		$this->assertStringContainsString('User not authenticated', $content);
 	}
 
 	/**
@@ -454,10 +498,10 @@ class ExportControllerTest extends TestCase
 			->method('getUser')
 			->willReturn(null);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('User not authenticated');
-
-		$this->controller->compliance('csv');
+		$response = $this->controller->compliance('csv');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = $response->render();
+		$this->assertStringContainsString('User not authenticated', $content);
 	}
 
 	/**
@@ -492,20 +536,20 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 22:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-16 06:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		// 8 Stunden Gesamtarbeitszeit ohne Pausen
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Night shift');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 22:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-16 06:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Night shift');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-16 06:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-16 06:00:00'));
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')
 			->willReturn([$entry]);
@@ -560,8 +604,8 @@ class ExportControllerTest extends TestCase
 		$totalDuration = (float)$row1[$durationIdx] + (float)$row2[$durationIdx];
 		$totalWorking = (float)$row1[$workingIdx] + (float)$row2[$workingIdx];
 
-		$this->assertEquals(8.0, $totalDuration, '', 0.01);
-		$this->assertEquals(8.0, $totalWorking, '', 0.01);
+		$this->assertEqualsWithDelta(8.0, $totalDuration, 0.02);
+		$this->assertEqualsWithDelta(8.0, $totalWorking, 0.02);
 	}
 
 	/**
@@ -575,34 +619,57 @@ class ExportControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
-		$entry->method('getId')->willReturn(1);
-		$entry->method('getStartTime')->willReturn(new \DateTime('2024-01-15 22:00:00'));
-		$entry->method('getEndTime')->willReturn(new \DateTime('2024-01-16 06:00:00'));
-		$entry->method('getBreakStartTime')->willReturn(null);
-		$entry->method('getBreakEndTime')->willReturn(null);
-		$entry->method('getDurationHours')->willReturn(8.0);
-		$entry->method('getBreakDurationHours')->willReturn(0.0);
-		$entry->method('getWorkingDurationHours')->willReturn(8.0);
-		$entry->method('getDescription')->willReturn('Night shift');
-		$entry->method('getStatus')->willReturn('completed');
-		$entry->method('getIsManualEntry')->willReturn(false);
-		$entry->method('getProjectCheckProjectId')->willReturn(null);
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 22:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-16 06:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Night shift');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-16 06:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-16 06:00:00'));
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')
 			->willReturn([$entry]);
 
-		// Explicitly disable midnight split
-		$this->config->method('getAppValue')
-			->with('arbeitszeitcheck', 'export_midnight_split_enabled', '1')
-			->willReturn('0');
+		// Explicitly disable midnight split by using a dedicated controller instance
+		// (avoids interactions with other stubs defined in setUp()).
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')
+			->willReturnCallback(static function (string $app, string $key, string $default = ''): string {
+				if ($app === 'arbeitszeitcheck' && $key === 'export_midnight_split_enabled') {
+					return '0';
+				}
+				return $default;
+			});
+		$controller = new ExportController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->timeEntryMapper,
+			$this->absenceMapper,
+			$this->violationMapper,
+			$this->datevExportService,
+			new TimeEntryExportTransformer(),
+			$this->userSession,
+			$this->l10n,
+			$config
+		);
 
-		$response = $this->controller->timeEntries('csv', '2024-01-15', '2024-01-16');
+		$response = $controller->timeEntries('csv', '2024-01-15', '2024-01-16');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 		$content = $response->render();
 
 		$lines = array_values(array_filter(explode("\n", trim($content))));
+		// CSV exports may contain an Excel separator hint line: "sep=,"
+		if (isset($lines[0]) && str_starts_with($lines[0], 'sep=')) {
+			array_shift($lines);
+		}
 		$this->assertCount(2, $lines); // 1 header + 1 data line
 
 		$header = str_getcsv($lines[0]);

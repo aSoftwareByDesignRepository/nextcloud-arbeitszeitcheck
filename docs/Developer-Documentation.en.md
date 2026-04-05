@@ -1,7 +1,7 @@
 # Developer Documentation – ArbeitszeitCheck
 
-**Version:** 1.0.0  
-**Last Updated:** 2025-12-29
+**Version:** 1.1.0  
+**Last Updated:** 2026-04-05
 
 This guide is for developers who want to contribute to ArbeitszeitCheck or integrate with it.
 
@@ -19,6 +19,7 @@ This guide is for developers who want to contribute to ArbeitszeitCheck or integ
 8. [Contributing](#contributing)
 9. [Code Standards](#code-standards)
 10. [Security Guidelines](#security-guidelines)
+11. [Vacation carryover (Resturlaub)](#vacation-carryover-resturlaub)
 
 ---
 
@@ -90,7 +91,7 @@ apps/arbeitszeitcheck/
 1. **Clone repository:**
    ```bash
    cd /path/to/nextcloud/apps/
-   git clone https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git arbeitszeitcheck
+   git clone https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck.git arbeitszeitcheck
    cd arbeitszeitcheck
    ```
 
@@ -373,6 +374,7 @@ All tables use the `at_` prefix (short for arbeitszeitcheck):
 
 - `oc_at_entries` - Time entries
 - `oc_at_absences` - Absence requests
+- `oc_at_vacation_year_balance` - Per user and calendar year: opening **carryover** days (Resturlaub from prior year, as recorded for year *Y*)
 - `oc_at_violations` - Compliance violations
 - `oc_at_models` - Working time models
 - `oc_at_user_models` - User working time model assignments
@@ -413,6 +415,29 @@ class Version1000Date20241229000000 extends SimpleMigrationStep
     }
 }
 ```
+
+### Vacation carryover (Resturlaub)
+
+Carryover is **not** a separate “adjustment” column: the editable opening balance is `carryover_days` on `at_vacation_year_balance` for `(user_id, year)`.
+
+**Config (app `IConfig`, keys in `Constants.php`):**
+
+- `vacation_carryover_expiry_month` (1–12, default `3`)
+- `vacation_carryover_expiry_day` (1–31, default `31`)
+
+For calendar year *Y*, carryover from that row may only apply to vacation working days on dates **on or before** that month/day in year *Y*. After that date, **new** requests cannot consume remaining carryover for *Y*; annual entitlement from the working time model still applies. Consumption order for **approved** vacation is **FIFO** (sort by `start_date`, then `id`), implemented in `VacationAllocationService` and used by `AbsenceService::getVacationStats` and vacation validation (including re-check on approve / auto-approve).
+
+**CLI (initial migration from other HR systems):**
+
+```bash
+php occ arbeitszeitcheck:import-vacation-balance /path/to/balances.csv --dry-run
+```
+
+CSV columns: `user_id`, `year`, `carryover_days` (header row). Validates users exist; use `--dry-run` to preview.
+
+**Privacy:** `UserDeletedListener` deletes all `at_vacation_year_balance` rows for the removed user id.
+
+**Known limitations (product):** Entitlement per historical year uses the **current** working time model assignment unless extended later; concurrent pending vacation requests are not “soft reserved” in the DB—approval-time validation prevents overdraw on commit under normal use.
 
 ---
 
@@ -561,50 +586,52 @@ composer test
 
 ### JavaScript Tests
 
-JavaScript tests can be written using Jest or similar testing frameworks:
-
-```javascript
-// tests/js/example.test.js
-describe('Example JavaScript', () => {
-  beforeEach(() => {
-    // Setup DOM
-    document.body.innerHTML = '<div id="test-container"></div>';
-  });
-
-  it('handles click events', () => {
-    const button = document.createElement('button');
-    button.id = 'test-button';
-    document.body.appendChild(button);
-    
-    let clicked = false;
-    button.addEventListener('click', () => {
-      clicked = true;
-    });
-    
-    button.click();
-    expect(clicked).toBe(true);
-  });
-});
-```
-```
+JavaScript unit tests are run with **Vitest** (jsdom environment).
 
 Run tests:
 ```bash
 npm test
 ```
 
-### Accessibility Tests
+### E2E workflow tests (Playwright)
 
-```javascript
-import { axe, toHaveNoViolations } from 'jest-axe'
+E2E tests run against a real Nextcloud instance and cover role-based workflows.
 
-expect.extend(toHaveNoViolations)
+Environment variables required:
+- `NC_BASE_URL` (example: `http://localhost:8081`)
+- `NC_EMPLOYEE_USER` / `NC_EMPLOYEE_PASS`
+- `NC_MANAGER_USER` / `NC_MANAGER_PASS`
+- `NC_ADMIN_USER` / `NC_ADMIN_PASS` (for admin-only scenarios when added)
+- `NC_SUBSTITUTE_USER` / `NC_SUBSTITUTE_PASS`
 
-test('component is accessible', async () => {
-  const { container } = render(Component)
-  const results = await axe(container)
-  expect(results).toHaveNoViolations()
-})
+Run:
+```bash
+npm run e2e
+```
+
+### Docker-based development (optional)
+
+If you use a Docker Compose stack for Nextcloud (service name often `nextcloud`), run tests inside the container from the app directory under `custom_apps`:
+
+Run PHP tests inside the Nextcloud container:
+```bash
+docker compose exec -T nextcloud bash -lc "cd /var/www/html/custom_apps/arbeitszeitcheck && composer test"
+docker compose exec -T nextcloud bash -lc "cd /var/www/html/custom_apps/arbeitszeitcheck && composer test:unit"
+docker compose exec -T nextcloud bash -lc "cd /var/www/html/custom_apps/arbeitszeitcheck && composer test:integration"
+```
+
+Run JS unit tests inside the Nextcloud container:
+```bash
+docker compose exec -T nextcloud bash -lc "cd /var/www/html/custom_apps/arbeitszeitcheck && npm ci && npm test"
+```
+
+Run E2E tests from your host machine (recommended) against the Dockerized Nextcloud at `http://localhost:8081`:
+```bash
+NC_BASE_URL="http://localhost:8081" \
+NC_EMPLOYEE_USER="employee1" NC_EMPLOYEE_PASS="..." \
+NC_MANAGER_USER="manager1" NC_MANAGER_PASS="..." \
+NC_SUBSTITUTE_USER="substitute1" NC_SUBSTITUTE_PASS="..." \
+npm run e2e
 ```
 
 ---

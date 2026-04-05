@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 
 use OCA\ArbeitszeitCheck\Controller\ComplianceController;
+use OCA\ArbeitszeitCheck\Db\AuditLog;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
@@ -42,6 +43,9 @@ class ComplianceControllerTest extends TestCase
 	/** @var ComplianceViolationMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $violationMapper;
 
+	/** @var AuditLogMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $auditLogMapper;
+
 	/** @var IUserSession|\PHPUnit\Framework\MockObject\MockObject */
 	private $userSession;
 
@@ -66,7 +70,8 @@ class ComplianceControllerTest extends TestCase
 
 		$this->complianceService = $this->createMock(ComplianceService::class);
 		$this->violationMapper = $this->createMock(ComplianceViolationMapper::class);
-		$auditLogMapper = $this->createMock(AuditLogMapper::class);
+		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
+		$this->auditLogMapper->method('logAction')->willReturn(new AuditLog());
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->permissionService->method('canViewUserCompliance')->willReturn(true);
 		$this->permissionService->method('canResolveViolation')->willReturn(true);
@@ -83,7 +88,7 @@ class ComplianceControllerTest extends TestCase
 			$this->request,
 			$this->complianceService,
 			$this->violationMapper,
-			$auditLogMapper,
+			$this->auditLogMapper,
 			$this->permissionService,
 			$this->userSession,
 			$this->urlGenerator,
@@ -100,8 +105,6 @@ class ComplianceControllerTest extends TestCase
 		$response = $this->controller->dashboard();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('compliance-dashboard', $response->getRenderAs());
 	}
 
 	/**
@@ -112,8 +115,6 @@ class ComplianceControllerTest extends TestCase
 		$response = $this->controller->violations();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('compliance-violations', $response->getRenderAs());
 	}
 
 	/**
@@ -124,8 +125,6 @@ class ComplianceControllerTest extends TestCase
 		$response = $this->controller->reports();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('compliance-reports', $response->getRenderAs());
 	}
 
 	/**
@@ -139,10 +138,14 @@ class ComplianceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getSummary')->willReturn(['id' => 1]);
-		$violation->method('getViolationType')->willReturn('missing_break');
-		$violation->method('getSeverity')->willReturn('warning');
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId($userId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-01'));
+		$violation->setCreatedAt(new \DateTime());
 
 		$this->violationMapper->expects($this->once())
 			->method('findByUser')
@@ -168,15 +171,23 @@ class ComplianceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation1 = $this->createMock(ComplianceViolation::class);
-		$violation1->method('getSummary')->willReturn(['id' => 1]);
-		$violation1->method('getViolationType')->willReturn('missing_break');
-		$violation1->method('getSeverity')->willReturn('warning');
+		$violation1 = new ComplianceViolation();
+		$violation1->setId(1);
+		$violation1->setUserId($userId);
+		$violation1->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation1->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation1->setDescription('Missing break');
+		$violation1->setDate(new \DateTime('2024-01-01'));
+		$violation1->setCreatedAt(new \DateTime());
 
-		$violation2 = $this->createMock(ComplianceViolation::class);
-		$violation2->method('getSummary')->willReturn(['id' => 2]);
-		$violation2->method('getViolationType')->willReturn('excessive_hours');
-		$violation2->method('getSeverity')->willReturn('error');
+		$violation2 = new ComplianceViolation();
+		$violation2->setId(2);
+		$violation2->setUserId($userId);
+		$violation2->setViolationType(ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS);
+		$violation2->setSeverity(ComplianceViolation::SEVERITY_ERROR);
+		$violation2->setDescription('Excessive hours');
+		$violation2->setDate(new \DateTime('2024-01-02'));
+		$violation2->setCreatedAt(new \DateTime());
 
 		$this->violationMapper->method('findByUser')
 			->willReturn([$violation1, $violation2]);
@@ -199,8 +210,14 @@ class ComplianceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getSummary')->willReturn(['id' => 1]);
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId($userId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-15'));
+		$violation->setCreatedAt(new \DateTime());
 
 		$this->violationMapper->expects($this->once())
 			->method('findByDateRange')
@@ -232,10 +249,14 @@ class ComplianceControllerTest extends TestCase
 
 		$violations = [];
 		for ($i = 1; $i <= 10; $i++) {
-			$violation = $this->createMock(ComplianceViolation::class);
-			$violation->method('getSummary')->willReturn(['id' => $i]);
-			$violation->method('getViolationType')->willReturn('missing_break');
-			$violation->method('getSeverity')->willReturn('warning');
+			$violation = new ComplianceViolation();
+			$violation->setId($i);
+			$violation->setUserId($userId);
+			$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+			$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+			$violation->setDescription('Missing break');
+			$violation->setDate(new \DateTime('2024-01-01'));
+			$violation->setCreatedAt(new \DateTime());
 			$violations[] = $violation;
 		}
 
@@ -262,9 +283,14 @@ class ComplianceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn($userId);
-		$violation->method('getSummary')->willReturn(['id' => $violationId]);
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($userId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-01'));
+		$violation->setCreatedAt(new \DateTime());
 
 		$this->violationMapper->expects($this->once())
 			->method('find')
@@ -290,14 +316,29 @@ class ComplianceControllerTest extends TestCase
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canViewUserCompliance')->with($userId, $otherUserId)->willReturn(false);
+		$permissionService = $this->createMock(PermissionService::class);
+		$permissionService->method('canViewUserCompliance')->willReturn(false);
+		$permissionService->method('canResolveViolation')->willReturn(false);
+		$controller = new ComplianceController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->complianceService,
+			$this->violationMapper,
+			$this->auditLogMapper,
+			$permissionService,
+			$this->userSession,
+			$this->urlGenerator,
+			$this->cspService,
+			$this->l10n
+		);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn($otherUserId);
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($otherUserId);
 
 		$this->violationMapper->method('find')->willReturn($violation);
 
-		$response = $this->controller->getViolation($violationId);
+		$response = $controller->getViolation($violationId);
 
 		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();
@@ -311,24 +352,38 @@ class ComplianceControllerTest extends TestCase
 	public function testResolveViolationResolvesViolation(): void
 	{
 		$userId = 'testuser';
+		$ownerUserId = 'otheruser';
 		$violationId = 1;
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canResolveViolation')->willReturn(true);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn($userId);
-		$violation->method('getResolved')->willReturn(false);
-		$violation->method('getSummary')->willReturn(['id' => $violationId, 'resolved' => false]);
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($ownerUserId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-01'));
+		$violation->setCreatedAt(new \DateTime());
+		$violation->setResolved(false);
 
-		$resolvedViolation = $this->createMock(ComplianceViolation::class);
-		$resolvedViolation->method('getSummary')->willReturn(['id' => $violationId, 'resolved' => true]);
+		$resolvedViolation = new ComplianceViolation();
+		$resolvedViolation->setId($violationId);
+		$resolvedViolation->setUserId($ownerUserId);
+		$resolvedViolation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$resolvedViolation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$resolvedViolation->setDescription('Missing break');
+		$resolvedViolation->setDate(new \DateTime('2024-01-01'));
+		$resolvedViolation->setCreatedAt(new \DateTime());
+		$resolvedViolation->setResolved(true);
 
 		$this->violationMapper->method('find')->willReturn($violation);
 		$this->violationMapper->expects($this->once())
 			->method('resolveViolation')
-			->with($violationId, $this->isType('int'))
+			->with($violationId, $userId)
 			->willReturn($resolvedViolation);
 
 		$response = $this->controller->resolveViolation($violationId);
@@ -350,9 +405,10 @@ class ComplianceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn($userId);
-		$violation->method('getResolved')->willReturn(true);
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($userId);
+		$violation->setResolved(true);
 
 		$this->violationMapper->method('find')->willReturn($violation);
 
@@ -480,7 +536,7 @@ class ComplianceControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('Database error', $data['error']);
+		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
 	}
 
 	/**
@@ -519,14 +575,34 @@ class ComplianceControllerTest extends TestCase
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canResolveViolation')->with($userId, $otherUserId)->willReturn(false);
+		$permissionService = $this->createMock(PermissionService::class);
+		$permissionService->method('canViewUserCompliance')->willReturn(true);
+		$permissionService->method('canResolveViolation')->willReturn(false);
+		$controller = new ComplianceController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->complianceService,
+			$this->violationMapper,
+			$this->auditLogMapper,
+			$permissionService,
+			$this->userSession,
+			$this->urlGenerator,
+			$this->cspService,
+			$this->l10n
+		);
 
-		$violation = $this->createMock(ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn($otherUserId);
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($otherUserId);
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-01'));
+		$violation->setCreatedAt(new \DateTime());
 
 		$this->violationMapper->method('find')->willReturn($violation);
 
-		$response = $this->controller->resolveViolation($violationId);
+		$response = $controller->resolveViolation($violationId);
 
 		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();

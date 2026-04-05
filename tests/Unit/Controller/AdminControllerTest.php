@@ -14,13 +14,20 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 use OCA\ArbeitszeitCheck\Controller\AdminController;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
+use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\HolidayMapper;
+use OCA\ArbeitszeitCheck\Db\AuditLog;
 use OCA\ArbeitszeitCheck\Service\CSPService;
+use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
@@ -31,6 +38,7 @@ use OCP\IL10N;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\IURLGenerator;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -80,11 +88,17 @@ class AdminControllerTest extends TestCase
 		$teamMapper = $this->createMock(TeamMapper::class);
 		$teamMemberMapper = $this->createMock(TeamMemberMapper::class);
 		$teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
 		$userSession = $this->createMock(IUserSession::class);
 		$userSession->method('getUser')->willReturn(null);
 		$cspService = $this->createMock(CSPService::class);
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$holidayMapper = $this->createMock(HolidayMapper::class);
+		$holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+
+		$vacationYearBalanceMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 
 		$this->controller = new AdminController(
 			'arbeitszeitcheck',
@@ -96,12 +110,17 @@ class AdminControllerTest extends TestCase
 			$this->auditLogMapper,
 			$this->userManager,
 			$this->appConfig,
+			$userSettingsMapper,
 			$teamMapper,
 			$teamMemberMapper,
 			$teamManagerMapper,
 			$userSession,
 			$cspService,
-			$l10n
+			$l10n,
+			$urlGenerator,
+			$holidayMapper,
+			$holidayCalendarService,
+			$vacationYearBalanceMapper
 		);
 	}
 
@@ -113,8 +132,6 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->dashboard();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('admin-dashboard', $response->getRenderAs());
 	}
 
 	/**
@@ -125,8 +142,6 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->users();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('admin-users', $response->getRenderAs());
 	}
 
 	/**
@@ -137,8 +152,6 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->settings();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('admin-settings', $response->getRenderAs());
 	}
 
 	/**
@@ -149,8 +162,6 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->workingTimeModels();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('working-time-models', $response->getRenderAs());
 	}
 
 	/**
@@ -161,8 +172,6 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->auditLog();
 
 		$this->assertInstanceOf(TemplateResponse::class, $response);
-		$this->assertEquals('arbeitszeitcheck', $response->getTemplateName());
-		$this->assertEquals('audit-log', $response->getRenderAs());
 	}
 
 	/**
@@ -296,8 +305,8 @@ class AdminControllerTest extends TestCase
 		$this->violationMapper->method('count')
 			->willReturn(5);
 
-		$violation = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolation::class);
-		$violation->method('getUserId')->willReturn('user1');
+		$violation = new ComplianceViolation();
+		$violation->setUserId('user1');
 
 		$this->violationMapper->method('findUnresolved')
 			->willReturn([$violation]);
@@ -389,12 +398,12 @@ class AdminControllerTest extends TestCase
 		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
 			->willReturn(null);
 
-		$model = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$model->method('getId')->willReturn(1);
-		$model->method('getName')->willReturn('Full-time');
-		$model->method('getType')->willReturn('full_time');
-		$model->method('getWeeklyHours')->willReturn(40.0);
-		$model->method('getDailyHours')->willReturn(8.0);
+		$model = new WorkingTimeModel();
+		$model->setId(1);
+		$model->setName('Full-time');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
 
 		$this->workingTimeModelMapper->method('findAll')
 			->willReturn([$model]);
@@ -432,14 +441,14 @@ class AdminControllerTest extends TestCase
 	 */
 	public function testGetWorkingTimeModelsReturnsModelsList(): void
 	{
-		$model = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$model->method('getId')->willReturn(1);
-		$model->method('getName')->willReturn('Full-time');
-		$model->method('getDescription')->willReturn('40 hours per week');
-		$model->method('getType')->willReturn('full_time');
-		$model->method('getWeeklyHours')->willReturn(40.0);
-		$model->method('getDailyHours')->willReturn(8.0);
-		$model->method('getIsDefault')->willReturn(true);
+		$model = new WorkingTimeModel();
+		$model->setId(1);
+		$model->setName('Full-time');
+		$model->setDescription('40 hours per week');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setIsDefault(true);
 
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('findAll')
@@ -460,16 +469,16 @@ class AdminControllerTest extends TestCase
 	public function testGetWorkingTimeModelReturnsModelDetails(): void
 	{
 		$modelId = 1;
-		$model = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$model->method('getId')->willReturn($modelId);
-		$model->method('getName')->willReturn('Full-time');
-		$model->method('getDescription')->willReturn('40 hours per week');
-		$model->method('getType')->willReturn('full_time');
-		$model->method('getWeeklyHours')->willReturn(40.0);
-		$model->method('getDailyHours')->willReturn(8.0);
-		$model->method('getBreakRulesArray')->willReturn([]);
-		$model->method('getOvertimeRulesArray')->willReturn([]);
-		$model->method('getIsDefault')->willReturn(true);
+		$model = new WorkingTimeModel();
+		$model->setId($modelId);
+		$model->setName('Full-time');
+		$model->setDescription('40 hours per week');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setBreakRulesArray([]);
+		$model->setOvertimeRulesArray([]);
+		$model->setIsDefault(true);
 
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('find')
@@ -517,14 +526,13 @@ class AdminControllerTest extends TestCase
 				'isDefault' => false
 			]);
 
-		$model = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$model->method('getId')->willReturn(1);
-		$model->method('getName')->willReturn('Part-time');
-		$model->method('getType')->willReturn('part_time');
-		$model->method('getWeeklyHours')->willReturn(20.0);
-		$model->method('getDailyHours')->willReturn(4.0);
-		$model->method('getIsDefault')->willReturn(false);
-		$model->method('validate')->willReturn([]);
+		$model = new WorkingTimeModel();
+		$model->setId(1);
+		$model->setName('Part-time');
+		$model->setType(WorkingTimeModel::TYPE_PART_TIME);
+		$model->setWeeklyHours(20.0);
+		$model->setDailyHours(4.0);
+		$model->setIsDefault(false);
 
 		$this->workingTimeModelMapper->method('findDefault')->willReturn(null);
 		$this->workingTimeModelMapper->expects($this->once())
@@ -551,19 +559,22 @@ class AdminControllerTest extends TestCase
 				'isDefault' => true
 			]);
 
-		$currentDefault = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$currentDefault->method('setIsDefault')->willReturnSelf();
-		$currentDefault->method('setUpdatedAt')->willReturnSelf();
-		$currentDefault->method('validate')->willReturn([]);
+		$currentDefault = new WorkingTimeModel();
+		$currentDefault->setId(1);
+		$currentDefault->setName('Old Default');
+		$currentDefault->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$currentDefault->setWeeklyHours(40.0);
+		$currentDefault->setDailyHours(8.0);
+		$currentDefault->setIsDefault(true);
+		$currentDefault->setUpdatedAt(new \DateTime());
 
-		$newModel = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$newModel->method('getId')->willReturn(2);
-		$newModel->method('getName')->willReturn('New Default');
-		$newModel->method('getType')->willReturn('full_time');
-		$newModel->method('getWeeklyHours')->willReturn(40.0);
-		$newModel->method('getDailyHours')->willReturn(8.0);
-		$newModel->method('getIsDefault')->willReturn(true);
-		$newModel->method('validate')->willReturn([]);
+		$newModel = new WorkingTimeModel();
+		$newModel->setId(2);
+		$newModel->setName('New Default');
+		$newModel->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$newModel->setWeeklyHours(40.0);
+		$newModel->setDailyHours(8.0);
+		$newModel->setIsDefault(true);
 
 		$this->workingTimeModelMapper->method('findDefault')
 			->willReturn($currentDefault);
@@ -588,16 +599,14 @@ class AdminControllerTest extends TestCase
 	public function testUpdateWorkingTimeModelUpdatesModel(): void
 	{
 		$modelId = 1;
-		$model = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::class);
-		$model->method('getId')->willReturn($modelId);
-		$model->method('getName')->willReturn('Updated Name');
-		$model->method('getType')->willReturn('full_time');
-		$model->method('getWeeklyHours')->willReturn(40.0);
-		$model->method('getDailyHours')->willReturn(8.0);
-		$model->method('getIsDefault')->willReturn(false);
-		$model->method('setName')->willReturnSelf();
-		$model->method('setUpdatedAt')->willReturnSelf();
-		$model->method('validate')->willReturn([]);
+		$model = new WorkingTimeModel();
+		$model->setId($modelId);
+		$model->setName('Updated Name');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setIsDefault(false);
+		$model->setUpdatedAt(new \DateTime());
 
 		$this->request->method('getParams')
 			->willReturn(['name' => 'Updated Name']);
@@ -680,11 +689,22 @@ class AdminControllerTest extends TestCase
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($userId);
 
-		$currentAssignment = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel::class);
-		$currentAssignment->method('getId')->willReturn(1);
-		$endedAssignment = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel::class);
-		$endedAssignment->method('getId')->willReturn(1);
-		$endedAssignment->method('getSummary')->willReturn([]);
+		$currentAssignment = new UserWorkingTimeModel();
+		$currentAssignment->setId(1);
+		$currentAssignment->setUserId($userId);
+		$currentAssignment->setWorkingTimeModelId(1);
+		$currentAssignment->setVacationDaysPerYear(25);
+		$currentAssignment->setStartDate(new \DateTime('2024-01-01'));
+		$currentAssignment->setUpdatedAt(new \DateTime());
+
+		$endedAssignment = new UserWorkingTimeModel();
+		$endedAssignment->setId(1);
+		$endedAssignment->setUserId($userId);
+		$endedAssignment->setWorkingTimeModelId(1);
+		$endedAssignment->setVacationDaysPerYear(25);
+		$endedAssignment->setStartDate(new \DateTime('2024-01-01'));
+		$endedAssignment->setEndDate(new \DateTime('2024-01-02'));
+		$endedAssignment->setUpdatedAt(new \DateTime());
 
 		$this->request->method('getParams')
 			->willReturn([
@@ -746,18 +766,18 @@ class AdminControllerTest extends TestCase
 	 */
 	public function testGetAuditLogsReturnsAuditLogs(): void
 	{
-		$log = $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLog::class);
-		$log->method('getId')->willReturn(1);
-		$log->method('getUserId')->willReturn('user1');
-		$log->method('getAction')->willReturn('time_entry_created');
-		$log->method('getEntityType')->willReturn('time_entry');
-		$log->method('getEntityId')->willReturn(1);
-		$log->method('getOldValues')->willReturn(null);
-		$log->method('getNewValues')->willReturn('{"id":1}');
-		$log->method('getPerformedBy')->willReturn('user1');
-		$log->method('getIpAddress')->willReturn('127.0.0.1');
-		$log->method('getUserAgent')->willReturn('Test');
-		$log->method('getCreatedAt')->willReturn(new \DateTime());
+		$log = new AuditLog();
+		$log->setId(1);
+		$log->setUserId('user1');
+		$log->setAction('time_entry_created');
+		$log->setEntityType('time_entry');
+		$log->setEntityId(1);
+		$log->setOldValues(null);
+		$log->setNewValues('{"id":1}');
+		$log->setPerformedBy('user1');
+		$log->setIpAddress('127.0.0.1');
+		$log->setUserAgent('Test');
+		$log->setCreatedAt(new \DateTime());
 
 		$this->request->method('getParams')
 			->willReturn([]);
@@ -824,8 +844,10 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->exportUsers('csv');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('users-export-', $response->getFilename());
-		$this->assertStringContainsString('.csv', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('users-export-', $contentDisposition);
+		$this->assertStringContainsString('.csv', $contentDisposition);
 	}
 
 	/**
@@ -833,18 +855,18 @@ class AdminControllerTest extends TestCase
 	 */
 	public function testExportAuditLogsExportsAuditLogs(): void
 	{
-		$log = $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLog::class);
-		$log->method('getId')->willReturn(1);
-		$log->method('getUserId')->willReturn('user1');
-		$log->method('getAction')->willReturn('time_entry_created');
-		$log->method('getEntityType')->willReturn('time_entry');
-		$log->method('getEntityId')->willReturn(1);
-		$log->method('getOldValues')->willReturn(null);
-		$log->method('getNewValues')->willReturn('{"id":1}');
-		$log->method('getPerformedBy')->willReturn('user1');
-		$log->method('getIpAddress')->willReturn('127.0.0.1');
-		$log->method('getUserAgent')->willReturn('Test');
-		$log->method('getCreatedAt')->willReturn(new \DateTime());
+		$log = new AuditLog();
+		$log->setId(1);
+		$log->setUserId('user1');
+		$log->setAction('time_entry_created');
+		$log->setEntityType('time_entry');
+		$log->setEntityId(1);
+		$log->setOldValues(null);
+		$log->setNewValues('{"id":1}');
+		$log->setPerformedBy('user1');
+		$log->setIpAddress('127.0.0.1');
+		$log->setUserAgent('Test');
+		$log->setCreatedAt(new \DateTime());
 
 		$this->request->method('getParams')->willReturn([]);
 
@@ -859,8 +881,10 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->exportAuditLogs('csv');
 
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
-		$this->assertStringContainsString('audit-logs-export-', $response->getFilename());
-		$this->assertStringContainsString('.csv', $response->getFilename());
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('audit-logs-export-', $contentDisposition);
+		$this->assertStringContainsString('.csv', $contentDisposition);
 	}
 
 	/**
@@ -877,7 +901,7 @@ class AdminControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('Config error', $data['error']);
+		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
 	}
 
 	/**

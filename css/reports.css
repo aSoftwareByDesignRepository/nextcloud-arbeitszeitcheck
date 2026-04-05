@@ -26,6 +26,15 @@
 	line-height: 1.5;
 }
 
+.reports-section__desc--secondary {
+	margin-top: calc(-1 * var(--space-4, 1rem));
+	font-size: 0.9375rem;
+}
+
+.reports-step {
+	scroll-margin-top: var(--space-4, 1rem);
+}
+
 /* ========== Scope selection (WCAG 2.1 AA – radio targets, focus, contrast) ========== */
 .report-scope-section .form-fieldset {
 	border: none;
@@ -135,6 +144,10 @@
 	margin-top: var(--space-4, 1rem);
 }
 
+.report-types-grid--simple {
+	margin-top: var(--space-3, 0.75rem);
+}
+
 .report-type-card {
 	background: var(--color-main-background);
 	border: 2px solid var(--color-border);
@@ -151,6 +164,11 @@
 	box-sizing: border-box;
 }
 
+.report-type-card--primary {
+	border-color: var(--color-primary-light);
+	background: var(--color-background-dark);
+}
+
 .report-type-card:hover {
 	border-color: var(--color-primary-element);
 	box-shadow: 0 2px 8px var(--arbeitszeitcheck-color-shadow-light, var(--color-box-shadow));
@@ -161,10 +179,45 @@
 	outline-offset: 2px;
 }
 
+.report-type-card.is-selected {
+	border-color: var(--color-primary-element);
+	box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
 .report-type-icon {
-	font-size: 2.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 3.25rem;
+	height: 3.25rem;
 	margin-bottom: var(--space-3, 0.75rem);
+	border-radius: var(--border-radius-large, 10px);
+	border: 2px solid var(--color-border);
+	background: var(--color-main-background);
 	line-height: 1;
+	box-sizing: border-box;
+}
+
+.report-type-icon__abbr {
+	font-size: 0.9375rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	color: var(--color-main-text);
+}
+
+.report-type-icon--working-time {
+	border-color: var(--color-primary-element);
+	background: var(--color-primary-light);
+}
+
+.report-type-icon--absence {
+	border-color: var(--color-success);
+	background: var(--color-success-hover, var(--color-background-dark));
+}
+
+.report-type-icon--compliance {
+	border-color: var(--color-warning);
+	background: var(--color-background-dark);
 }
 
 .report-type-card h4 {
@@ -212,19 +265,46 @@
 	border-top: 1px solid var(--color-border);
 	padding-top: var(--space-6, 1.5rem);
 	margin-top: var(--space-6, 1.5rem);
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
 }
 
 .report-form {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-6, 1.5rem);
-	max-width: 28rem;
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+/* Start/end dates: stack on narrow screens, two columns from tablet up */
+.report-form__date-row {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-6, 1.5rem);
+	width: 100%;
+	min-width: 0;
+}
+
+.report-form__date-row .form-group {
+	min-width: 0;
+}
+
+@media (min-width: 640px) {
+	.report-form__date-row {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
+	}
 }
 
 .report-form .form-group {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2, 0.5rem);
+	width: 100%;
 }
 
 .report-form .form-label {
@@ -239,6 +319,7 @@
 
 .report-form .form-input,
 .report-form .form-select {
+	width: 100%;
 	min-height: var(--default-clickable-area, 44px);
 	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
 	border: 2px solid var(--color-border);
@@ -246,6 +327,7 @@
 	background: var(--color-main-background);
 	color: var(--color-main-text);
 	font-size: 1rem;
+	box-sizing: border-box;
 }
 
 .report-form .form-input:focus,
@@ -322,6 +404,11 @@
 	padding: var(--space-6, 1.5rem);
 	min-height: 8rem;
 	margin-top: var(--space-4, 1rem);
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
 }
 
 .report-result {
@@ -440,6 +527,28 @@
 
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
+	.reports-section {
+		padding-left: max(var(--space-4, 1rem), env(safe-area-inset-left));
+		padding-right: max(var(--space-4, 1rem), env(safe-area-inset-right));
+	}
+
+	.report-parameters-section {
+		padding-top: var(--space-4, 1rem);
+		margin-top: var(--space-4, 1rem);
+	}
+
+	.report-form {
+		gap: var(--space-4, 1rem);
+	}
+
+	.report-preview-content {
+		padding: var(--space-4, 1rem);
+	}
+
+	.report-preview-content .report-table {
+		min-width: max-content;
+	}
+
 	.report-types-grid {
 		grid-template-columns: 1fr;
 		gap: var(--space-3, 0.75rem);

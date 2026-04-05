@@ -193,7 +193,6 @@
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-5);
-    padding: var(--space-5);
   }
 
   /* Page header - readable typography on small screens */

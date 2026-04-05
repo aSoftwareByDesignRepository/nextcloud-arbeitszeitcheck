@@ -80,12 +80,16 @@
                 <div class="form-group">
                     <label for="model-weekly-hours" class="form-label">${weeklyHoursLabel} <span class="form-required">*</span></label>
                     <input type="number" id="model-weekly-hours" name="weeklyHours" class="form-input" 
-                           min="0" max="168" step="0.5" value="40" required>
+                           min="0" max="168" step="0.1" value="40" required
+                           aria-describedby="model-weekly-hours-help">
+                    <p id="model-weekly-hours-help" class="form-help">${window.ArbeitszeitCheck?.l10n?.weeklyHoursHelp || ''}</p>
                 </div>
                 <div class="form-group">
                     <label for="model-daily-hours" class="form-label">${dailyHoursLabel} <span class="form-required">*</span></label>
                     <input type="number" id="model-daily-hours" name="dailyHours" class="form-input" 
-                           min="0" max="24" step="0.5" value="8" required>
+                           min="0" max="24" step="0.1" value="8" required
+                           aria-describedby="model-daily-hours-help">
+                    <p id="model-daily-hours-help" class="form-help">${window.ArbeitszeitCheck?.l10n?.dailyHoursHelp || ''}</p>
                 </div>
                 <div class="form-group">
                     <div class="form-checkbox">
@@ -204,12 +208,16 @@
                 <div class="form-group">
                     <label for="edit-model-weekly-hours" class="form-label">${weeklyHoursLabel} <span class="form-required">*</span></label>
                     <input type="number" id="edit-model-weekly-hours" name="weeklyHours" class="form-input" 
-                           min="0" max="168" step="0.5" value="${model.weeklyHours || 40}" required>
+                           min="0" max="168" step="0.1" value="${model.weeklyHours || 40}" required
+                           aria-describedby="edit-model-weekly-hours-help">
+                    <p id="edit-model-weekly-hours-help" class="form-help">${window.ArbeitszeitCheck?.l10n?.weeklyHoursHelp || ''}</p>
                 </div>
                 <div class="form-group">
                     <label for="edit-model-daily-hours" class="form-label">${dailyHoursLabel} <span class="form-required">*</span></label>
                     <input type="number" id="edit-model-daily-hours" name="dailyHours" class="form-input" 
-                           min="0" max="24" step="0.5" value="${model.dailyHours || 8}" required>
+                           min="0" max="24" step="0.1" value="${model.dailyHours || 8}" required
+                           aria-describedby="edit-model-daily-hours-help">
+                    <p id="edit-model-daily-hours-help" class="form-help">${window.ArbeitszeitCheck?.l10n?.dailyHoursHelp || ''}</p>
                 </div>
                 <div class="form-group">
                     <div class="form-checkbox">
@@ -375,7 +383,7 @@
             </div>
         `;
 
-        const modal = Components.createModal({
+        const _modal = Components.createModal({
             id: 'delete-model-modal',
             title: title,
             content: content,

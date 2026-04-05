@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.7 - 2026-04-05
+
+### Added
+
+- **Vacation carryover (Resturlaub)**: Per user and calendar year, opening balance `carryover_days` in `at_vacation_year_balance`; global admin setting for carryover expiry (month/day, default 31 March). `VacationAllocationService` applies FIFO consumption of approved vacation (by `start_date`, then `id`) and splits working days before/after expiry so carryover is used first where still valid.
+- **Validation & approvals**: Vacation requests are re-validated when a manager approves (and on auto-approve) so concurrent pending requests cannot overdraw balances after approval.
+- **API & UI**: `AbsenceController::stats` exposes entitlement, carryover, totals, expiry-related fields; dashboard and absences pages show a clear vacation summary; admin settings include expiry fields.
+- **GDPR**: `UserDeletedListener` removes vacation year balance rows when a user account is deleted.
+- **Migration / bulk setup**: `occ arbeitszeitcheck:import-vacation-balance` imports CSV `user_id,year,carryover_days` with `--dry-run`.
+
+### Tests
+
+- Unit tests for `VacationAllocationService`; extended `AbsenceService` and related controller tests.
+
+## 1.1.6 - 2026-03-27
+
+### Added
+
+- **Development tooling**: `occ arbeitszeitcheck:generate-test-data` CLI for deterministic demo data (time entries, absences, optional violations, demo app team) to exercise UI, reports, and workflows locally.
+- **Exports**: `TimeEntryExportTransformer` centralizes field mapping and CSV shaping for time-entry exports; `ExportController` delegates to it for a single, testable pipeline.
+
+### Fixed
+
+- **Reports UI**: Report type cards are no longer incorrectly disabled when a team-related scope is selected (team scopes still use the team report API where applicable).
+- **Reports (tests)**: Team report CSV download test now reads download bodies via `DataDownloadResponse::render()` (Nextcloud API).
+- **Team reports**: Deduplicate user IDs before permission checks and aggregation to avoid double-counting when users appear in multiple teams.
+- **Absence type badges**: Stronger, theme-safe contrast for vacation / sick / home office / other badges (readable on pale Nextcloud palettes).
+
+### Changed
+
+- **Compatibility (dev)**: Local development stacks aligned with Nextcloud 33.x (example: official `nextcloud` Docker image).
+- **Reports layout**: Reverted an overly aggressive “full width” parameter form rule that could interfere with scrolling/layout on the reports page.
+- **Reports UI**: Templates, JavaScript, and styling updates for the reports page; admin settings hook for related options.
+- **Reporting**: `ReportController` and `ReportingService` adjustments aligned with the export refactor.
+
+### Tests
+
+- Unit tests for `TimeEntryExportTransformer`; expanded `ReportController` tests; `ExportController` tests updated for the new wiring.
+
 ## 1.1.5 - 2026-03-26
 
 ### Fixed

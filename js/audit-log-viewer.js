@@ -118,7 +118,8 @@
         if (action) params.append('action', action);
 
         // Redirect to export endpoint
-        window.location.href = OC.generateUrl('/apps/arbeitszeitcheck/api/admin/audit-logs/export/csv?' + params.toString());
+        params.append('format', 'csv');
+        window.location.href = OC.generateUrl('/apps/arbeitszeitcheck/api/admin/audit-logs/export?' + params.toString());
     }
 
     // Initialize on DOM ready

@@ -26,6 +26,7 @@ use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\IConfig;
 use OCP\AppFramework\Db\DoesNotExistException;
 use PHPUnit\Framework\TestCase;
 
@@ -67,6 +68,9 @@ class AbsenceControllerTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $config;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -81,7 +85,18 @@ class AbsenceControllerTest extends TestCase
 		$this->cspService = $this->createMock(CSPService::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(fn ($s) => $s);
+		$this->config = $this->createMock(IConfig::class);
+		$this->config->method('getAppValue')->willReturn('[]');
 		$this->request = $this->createMock(IRequest::class);
+		$this->request->method('getHeader')->willReturnCallback(static function (string $name): string {
+			if ($name === 'Accept') {
+				return 'application/json';
+			}
+			if ($name === 'Content-Type') {
+				return 'application/json';
+			}
+			return '';
+		});
 
 		$this->controller = new AbsenceController(
 			'arbeitszeitcheck',
@@ -94,7 +109,8 @@ class AbsenceControllerTest extends TestCase
 			$this->urlGenerator,
 			$this->userManager,
 			$this->cspService,
-			$this->l10n
+			$this->l10n,
+			$this->config
 		);
 	}
 
@@ -215,8 +231,16 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(Absence::class);
-		$absence->method('getSummary')->willReturn(['id' => 1]);
+		$absence = new Absence();
+		$absence->setId(1);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-05'));
+		$absence->setReason('Summer vacation');
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$absence->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
 
 		$this->absenceService->expects($this->once())
 			->method('createAbsence')
@@ -225,13 +249,21 @@ class AbsenceControllerTest extends TestCase
 					'type' => 'vacation',
 					'start_date' => '2024-06-01',
 					'end_date' => '2024-06-05',
-					'reason' => 'Summer vacation'
+					'reason' => 'Summer vacation',
+					'substitute_user_id' => null,
 				],
 				$userId
 			)
 			->willReturn($absence);
 
-		$response = $this->controller->store('vacation', '2024-06-01', '2024-06-05', 'Summer vacation');
+		$this->request->method('getParams')->willReturn([
+			'type' => 'vacation',
+			'start_date' => '2024-06-01',
+			'end_date' => '2024-06-05',
+			'reason' => 'Summer vacation',
+		]);
+
+		$response = $this->controller->store();
 
 		$this->assertInstanceOf(JSONResponse::class, $response);
 		$this->assertEquals(Http::STATUS_CREATED, $response->getStatus());
@@ -255,7 +287,13 @@ class AbsenceControllerTest extends TestCase
 			->method('createAbsence')
 			->willThrowException(new \Exception('Overlapping absence'));
 
-		$response = $this->controller->store('vacation', '2024-06-01', '2024-06-05');
+		$this->request->method('getParams')->willReturn([
+			'type' => 'vacation',
+			'start_date' => '2024-06-01',
+			'end_date' => '2024-06-05',
+		]);
+
+		$response = $this->controller->store();
 
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
@@ -310,6 +348,21 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-05'));
+		$absence->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$absence->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+
 		$this->absenceService->expects($this->once())
 			->method('deleteAbsence')
 			->with($absenceId, $userId);
@@ -333,9 +386,15 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(Absence::class);
-		$absence->method('getUserId')->willReturn($employeeId);
-		$absence->method('getSummary')->willReturn(['id' => $absenceId]);
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-01-01'));
+		$absence->setEndDate(new \DateTime('2024-01-02'));
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$absence->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')
@@ -370,9 +429,15 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(Absence::class);
-		$absence->method('getUserId')->willReturn($employeeId);
-		$absence->method('getSummary')->willReturn(['id' => $absenceId]);
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-01-01'));
+		$absence->setEndDate(new \DateTime('2024-01-02'));
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$absence->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')
@@ -407,8 +472,9 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(Absence::class);
-		$absence->method('getUserId')->willReturn($employeeId);
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')
@@ -441,8 +507,9 @@ class AbsenceControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
-		$absence = $this->createMock(Absence::class);
-		$absence->method('getUserId')->willReturn($employeeId);
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')
@@ -526,7 +593,7 @@ class AbsenceControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('not authenticated', $data['error']);
+		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
 	}
 
 	/**

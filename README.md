@@ -12,7 +12,7 @@ Die App läuft vollständig innerhalb Ihrer selbst gehosteten Nextcloud‑Instan
   - Automatische Pausenberechnung nach ArbZG §4 (30/45 Minuten, nur Pausen ≥ 15 Minuten)
   - Ruhezeiten (11h) mit Blockierung von Clock‑In und manuellen Einträgen
   - Erkennung von Nacht‑, Sonn‑ und Feiertagsarbeit inkl. Dokumentation
-- **Abwesenheitsmanagement**: Urlaub, Krankheit, Sonderurlaub, unbezahlter Urlaub mit Genehmigungsworkflow
+- **Abwesenheitsmanagement**: Urlaub, Krankheit, Sonderurlaub, unbezahlter Urlaub mit Genehmigungsworkflow; **Resturlaub / Vorjahres‑Tage** mit konfigurierbarem Ablaufdatum (z. B. 31.03.), FIFO‑Verbrauch, Admin‑Pflege und optional CSV‑Import (`occ arbeitszeitcheck:import-vacation-balance`)
 - **Team‑ und Manager‑Ansicht**: Genehmigungen, Team‑Übersichten, Compliance‑Status
 - **Berichte & Exporte**: Tages/Wochen/Monats‑Reports, Overtime‑Reports, Absenzberichte, DATEV‑Export
 - **Audit‑Logs**: Lückenlose Nachvollziehbarkeit von Änderungen an Zeiten, Abwesenheiten und Einstellungen
@@ -46,7 +46,7 @@ Die App läuft vollständig innerhalb Ihrer selbst gehosteten Nextcloud‑Instan
 **Manuelle Installation aus Git**
 
 ```bash
-git clone https://github.com/aSoftwareByDesignRepository/ArbeitszeitCheck.git /path/to/nextcloud/apps/arbeitszeitcheck
+git clone https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck.git /path/to/nextcloud/apps/arbeitszeitcheck
 cd /path/to/nextcloud
 # Optional: PHP‑/JS‑Abhängigkeiten (falls nicht über Release‑Tarball installiert)
 # cd apps/arbeitszeitcheck && composer install && npm install
@@ -61,17 +61,19 @@ Unterstützte Umgebungen:
 
 ### Dokumentation
 
+- **Versionshistorie**: `CHANGELOG.md` (EN) / `CHANGELOG.de.md` (DE) — Release- und Änderungsübersicht (Keep a Changelog).
+
 Die wichtigsten öffentlich mitgelieferten Begleitdokumente liegen im Ordner `docs/`:
 
+- **Anwender**
+  - `User-Manual.de.md` / `User-Manual.en.md` – Benutzerhandbuch: Navigation, Rollen, Zeiterfassung, Abwesenheiten, Manager‑Abläufe, Exporte
 - **Compliance**
   - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – technische Umsetzung der ArbZG‑Regeln
   - `GDPR-Compliance-Guide.en.md` – Betrieb der App im Einklang mit DSGVO/GDPR
 - **Entwicklung**
   - `Developer-Documentation.en.md` – Architekturüberblick und Hinweise für Beitragende
 
-Weitere, detailliertere Arbeits‑ und Compliance‑Dokumente (z. B. Rollen‑/Rechtematrix, ArbZG‑Analyse, Store‑Publishing‑How‑to) werden intern in einem separaten Dokumentations‑Repository gepflegt und bewusst nicht mit der App ausgeliefert.
-
-Die Endnutzer‑Oberfläche ist so gestaltet, dass sie ohne separates Handbuch verständlich ist; zusätzliche Handbücher oder rechtliche Vorlagen werden bewusst nicht mit ausgeliefert und können organisationsspezifisch ergänzt werden.
+Weitere, detailliertere interne Dokumente (z. B. erweiterte Rollen‑/Rechtematrix, ArbZG‑Analyse, Store‑Publishing‑How‑to) können in einem separaten Dokumentations‑Repository gepflegt werden. Organisations­spezifische Vorlagen und Anleitungen können zusätzlich zum mitgelieferten Handbuch ergänzt werden.
 
 ### Projekt & Support
 

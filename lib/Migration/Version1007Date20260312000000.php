@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Create at_holidays table for per-state holiday definitions.
  *
  * This table stores statutory, company and custom holidays per German
- * state (Bundesland). It is used by HolidayCalendarService as the
+ * state (Bundesland). It is used by HolidayService as the
  * single source of truth for holiday calculations.
  *
  * NOTE:

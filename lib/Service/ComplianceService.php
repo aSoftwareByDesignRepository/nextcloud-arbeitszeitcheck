@@ -33,7 +33,7 @@ class ComplianceService
     private IUserManager $userManager;
     private IL10N $l10n;
     private ?NotificationService $notificationService;
-    private HolidayCalendarService $holidayCalendarService;
+    private HolidayService $holidayCalendarService;
     private IConfig $config;
 
     public function __construct(
@@ -44,7 +44,7 @@ class ComplianceService
         IUserManager $userManager,
         IL10N $l10n,
         ?NotificationService $notificationService,
-        HolidayCalendarService $holidayCalendarService,
+        HolidayService $holidayCalendarService,
         IConfig $config
     ) {
         $this->timeEntryMapper = $timeEntryMapper;
@@ -838,7 +838,7 @@ class ComplianceService
             );
         }
 
-        // Check if work was done on public holiday (state-aware, via HolidayCalendarService)
+        // Check if work was done on public holiday (state-aware, via HolidayService)
         $isHoliday = false;
         try {
             $isHoliday = $this->holidayCalendarService->isHolidayForUser(

@@ -634,7 +634,7 @@ class AbsenceController extends Controller
 				$substituteDisplayName = $subUser !== null ? $subUser->getDisplayName() : $subId;
 			}
 
-			// Precompute working days when days=NULL (HolidayCalendarService, state-aware)
+			// Precompute working days when days=NULL (HolidayService, state-aware)
 			$displayDays = $absence->getDays() !== null
 				? (float)$absence->getDays()
 				: $this->absenceService->getWorkingDaysForDisplay($absence);

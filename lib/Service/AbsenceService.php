@@ -42,7 +42,7 @@ class AbsenceService
 	private ?NotificationService $notificationService;
 	private ?AbsenceIcalMailService $absenceIcalMailService;
 	private ?AbsenceNotificationMailService $absenceNotificationMailService;
-	private HolidayCalendarService $holidayCalendarService;
+	private HolidayService $holidayCalendarService;
 	private VacationYearBalanceMapper $vacationYearBalanceMapper;
 	private VacationAllocationService $vacationAllocationService;
 
@@ -58,7 +58,7 @@ class AbsenceService
 		IL10N $l10n,
 		?NotificationService $notificationService,
 		?AbsenceIcalMailService $absenceIcalMailService,
-		HolidayCalendarService $holidayCalendarService,
+		HolidayService $holidayCalendarService,
 		VacationYearBalanceMapper $vacationYearBalanceMapper,
 		VacationAllocationService $vacationAllocationService,
 		?AbsenceNotificationMailService $absenceNotificationMailService = null
@@ -1329,7 +1329,7 @@ class AbsenceService
 
 	/**
 	 * Get working days for display (state-aware).
-	 * Uses stored days when set; otherwise computes via HolidayCalendarService
+	 * Uses stored days when set; otherwise computes via HolidayService
 	 * for consistency with vacation stats and company/state holidays.
 	 */
 	public function getWorkingDaysForDisplay(Absence $absence): float
@@ -1363,7 +1363,7 @@ class AbsenceService
 	private function buildExtraHolidayWeights(\DateTime $start, \DateTime $end, string $userId): array
 	{
 		// Legacy helper is kept for backward compatibility with Absence::calculateWorkingDays()
-		// and will internally delegate to HolidayCalendarService in future iterations if needed.
+		// and will internally delegate to HolidayService in future iterations if needed.
 		unset($start, $end, $userId);
 		return [];
 	}

@@ -29,7 +29,7 @@ class ReportingService
 	private OvertimeService $overtimeService;
 	private IUserManager $userManager;
 	private IL10N $l10n;
-	private HolidayCalendarService $holidayCalendarService;
+	private HolidayService $holidayCalendarService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -38,7 +38,7 @@ class ReportingService
 		OvertimeService $overtimeService,
 		IUserManager $userManager,
 		IL10N $l10n,
-		HolidayCalendarService $holidayCalendarService
+		HolidayService $holidayCalendarService
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->absenceMapper = $absenceMapper;
@@ -536,7 +536,7 @@ class ReportingService
 
 			$startDate = $absence->getStartDate();
 			$endDate = $absence->getEndDate();
-			// Use stored days; fallback to HolidayCalendarService (state-aware) for legacy null
+			// Use stored days; fallback to HolidayService (state-aware) for legacy null
 			if ($absence->getDays() !== null) {
 				$days = (float)$absence->getDays();
 			} elseif ($startDate && $endDate) {

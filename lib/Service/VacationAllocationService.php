@@ -28,7 +28,7 @@ class VacationAllocationService
 		private UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		private UserSettingsMapper $userSettingsMapper,
 		private VacationYearBalanceMapper $vacationYearBalanceMapper,
-		private HolidayCalendarService $holidayCalendarService,
+		private HolidayService $holidayCalendarService,
 	) {
 	}
 

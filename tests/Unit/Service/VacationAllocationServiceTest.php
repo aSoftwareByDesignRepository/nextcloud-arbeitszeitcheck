@@ -10,7 +10,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCP\IConfig;
 use PHPUnit\Framework\TestCase;
@@ -23,7 +23,7 @@ class VacationAllocationServiceTest extends TestCase
 		UserWorkingTimeModelMapper $userWtmMapper,
 		UserSettingsMapper $userSettingsMapper,
 		VacationYearBalanceMapper $balanceMapper,
-		HolidayCalendarService $holiday,
+		HolidayService $holiday,
 	): VacationAllocationService {
 		return new VacationAllocationService(
 			$config,
@@ -47,13 +47,13 @@ class VacationAllocationServiceTest extends TestCase
 		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
 		$settings = $this->createMock(UserSettingsMapper::class);
 		$balance = $this->createMock(VacationYearBalanceMapper::class);
-		$holiday = $this->createMock(HolidayCalendarService::class);
+		$holiday = $this->createMock(HolidayService::class);
 		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
 		$d = $s->getCarryoverExpiryDateForYear(2026);
 		$this->assertSame('2026-02-28', $d->format('Y-m-d'));
 	}
 
-	public function testSplitDelegatesToHolidayCalendar(): void
+	public function testSplitDelegatesToHolidayService(): void
 	{
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturnMap([
@@ -64,7 +64,7 @@ class VacationAllocationServiceTest extends TestCase
 		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
 		$settings = $this->createMock(UserSettingsMapper::class);
 		$balance = $this->createMock(VacationYearBalanceMapper::class);
-		$holiday = $this->createMock(HolidayCalendarService::class);
+		$holiday = $this->createMock(HolidayService::class);
 		$holiday->expects($this->exactly(2))
 			->method('computeWorkingDaysForUser')
 			->willReturnCallback(function (string $uid, \DateTime $start, \DateTime $end) {
@@ -107,7 +107,7 @@ class VacationAllocationServiceTest extends TestCase
 		$balance = $this->createMock(VacationYearBalanceMapper::class);
 		$balance->method('getCarryoverDays')->willReturn(5.0);
 
-		$holiday = $this->createMock(HolidayCalendarService::class);
+		$holiday = $this->createMock(HolidayService::class);
 		$holiday->method('computeWorkingDaysForUser')->willReturn(5.0);
 
 		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
@@ -136,7 +136,7 @@ class VacationAllocationServiceTest extends TestCase
 		$balance = $this->createMock(VacationYearBalanceMapper::class);
 		$balance->method('getCarryoverDays')->willReturn(0.0);
 
-		$holiday = $this->createMock(HolidayCalendarService::class);
+		$holiday = $this->createMock(HolidayService::class);
 		$holiday->method('computeWorkingDaysForUser')->willReturn(10.0);
 
 		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
@@ -170,7 +170,7 @@ class VacationAllocationServiceTest extends TestCase
 		$balance = $this->createMock(VacationYearBalanceMapper::class);
 		$balance->method('getCarryoverDays')->willReturn(3.0);
 
-		$holiday = $this->createMock(HolidayCalendarService::class);
+		$holiday = $this->createMock(HolidayService::class);
 		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
 
 		$r = $s->computeYearAllocation('u1', 2026, null, null, null, new \DateTime('2026-04-15'));

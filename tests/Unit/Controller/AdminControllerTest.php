@@ -27,7 +27,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\HolidayMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLog;
 use OCA\ArbeitszeitCheck\Service\CSPService;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
@@ -96,7 +96,7 @@ class AdminControllerTest extends TestCase
 		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$holidayMapper = $this->createMock(HolidayMapper::class);
-		$holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$holidayCalendarService = $this->createMock(HolidayService::class);
 
 		$vacationYearBalanceMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 

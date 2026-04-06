@@ -398,7 +398,7 @@ class PageController extends Controller
 			return in_array($a->getStatus(), ['pending', 'substitute_pending'], true);
 		}));
 
-		// Precompute working days for absences with days=NULL (HolidayCalendarService, state-aware)
+		// Precompute working days for absences with days=NULL (HolidayService, state-aware)
 		$computedWorkingDays = [];
 		foreach ($absences as $a) {
 			if ($a->getDays() === null) {

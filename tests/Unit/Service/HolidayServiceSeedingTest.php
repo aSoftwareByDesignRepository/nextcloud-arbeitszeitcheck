@@ -7,7 +7,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 use OCA\ArbeitszeitCheck\Db\Holiday;
 use OCA\ArbeitszeitCheck\Db\HolidayMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\ICache;
 use OCP\ICacheFactory;
 use OCP\IConfig;
@@ -17,13 +17,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Focused tests for HolidayCalendarService seeding + delete behaviour.
- *
- * We do not hit the real DB; instead we mock HolidayMapper and verify
- * that seeding happens exactly once per (state, year) and that deletions
- * do not cause re-seeding on subsequent reads.
+ * DB seeding and cache behaviour for HolidayService (state-aware holidays).
  */
-class HolidayCalendarServiceTest extends TestCase
+class HolidayServiceSeedingTest extends TestCase
 {
 	/** @var HolidayMapper|MockObject */
 	private $holidayMapper;
@@ -46,7 +42,7 @@ class HolidayCalendarServiceTest extends TestCase
 	/** @var LoggerInterface|MockObject */
 	private $logger;
 
-	/** @var HolidayCalendarService */
+	/** @var HolidayService */
 	private $service;
 
 	/** @var array<string,string> */
@@ -69,12 +65,10 @@ class HolidayCalendarServiceTest extends TestCase
 			->with('arbeitszeitcheck_holidays')
 			->willReturn($this->cache);
 
-		// By default, no per-user state override is used in these tests.
 		$this->userSettingsMapper
 			->method('getStringSetting')
 			->willReturn('');
 
-		// Simulate persistent app config storage for the service.
 		$this->configStore = [];
 		$this->config
 			->method('getAppValue')
@@ -93,14 +87,13 @@ class HolidayCalendarServiceTest extends TestCase
 				$this->configStore[$key] = $value;
 			});
 
-		// Simple echo-style translator for holiday names
 		$this->l10n
 			->method('t')
 			->willReturnCallback(static function (string $msg) {
 				return $msg;
 			});
 
-		$this->service = new HolidayCalendarService(
+		$this->service = new HolidayService(
 			$this->holidayMapper,
 			$this->userSettingsMapper,
 			$this->config,
@@ -115,8 +108,6 @@ class HolidayCalendarServiceTest extends TestCase
 		$state = 'NW';
 		$year = 2030;
 
-		// For simplicity we simulate that after seeding, one entity exists
-		// and that findByStateAndYear always returns that entity.
 		$holiday = new Holiday();
 		$holiday->setState($state);
 		$holiday->setName('New Year');
@@ -132,7 +123,6 @@ class HolidayCalendarServiceTest extends TestCase
 			->with($state, $year)
 			->willReturn([$holiday]);
 
-		// First call: no statutory -> seed. Second call: statutory exist (from first seed) -> use cache.
 		$this->holidayMapper
 			->method('hasStatutoryHolidaysForStateAndYear')
 			->with($state, $year)
@@ -142,7 +132,6 @@ class HolidayCalendarServiceTest extends TestCase
 			->expects($this->atLeastOnce())
 			->method('insert');
 
-		// First call triggers initialisation + (simulated) seeding
 		$result1 = $this->service->getHolidaysForRange(
 			$state,
 			new \DateTime("$year-01-01"),
@@ -150,8 +139,6 @@ class HolidayCalendarServiceTest extends TestCase
 		);
 		$this->assertNotEmpty($result1);
 
-		// 2) Second call for the same state/year must NOT call
-		// hasHolidaysForStateAndYear again; expectation above enforces this.
 		$result2 = $this->service->getHolidaysForRange(
 			$state,
 			new \DateTime("$year-01-01"),
@@ -160,4 +147,3 @@ class HolidayCalendarServiceTest extends TestCase
 		$this->assertNotEmpty($result2);
 	}
 }
-

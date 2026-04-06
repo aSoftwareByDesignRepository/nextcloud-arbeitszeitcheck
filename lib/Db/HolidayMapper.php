@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * Provides convenient query methods to retrieve holidays by state,
  * year and date ranges. This mapper is intentionally minimal and
- * stateless; higher-level business rules live in HolidayCalendarService.
+ * stateless; higher-level business rules live in HolidayService.
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later

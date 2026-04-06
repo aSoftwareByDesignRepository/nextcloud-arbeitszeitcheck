@@ -26,7 +26,7 @@ use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Db\Holiday;
 use OCA\ArbeitszeitCheck\Db\HolidayMapper;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -70,7 +70,7 @@ class AdminController extends Controller
 	private IUserSession $userSession;
 	private IURLGenerator $urlGenerator;
 	private HolidayMapper $holidayMapper;
-	private HolidayCalendarService $holidayCalendarService;
+	private HolidayService $holidayCalendarService;
 	private VacationYearBalanceMapper $vacationYearBalanceMapper;
 
 	public function __construct(
@@ -92,7 +92,7 @@ class AdminController extends Controller
 		IL10N $l10n,
 		IURLGenerator $urlGenerator,
 		HolidayMapper $holidayMapper,
-		HolidayCalendarService $holidayCalendarService,
+		HolidayService $holidayCalendarService,
 		VacationYearBalanceMapper $vacationYearBalanceMapper
 	) {
 		parent::__construct($appName, $request);
@@ -683,7 +683,7 @@ class AdminController extends Controller
 			$start = new \DateTimeImmutable(sprintf('%04d-01-01', $year));
 			$end = new \DateTimeImmutable(sprintf('%04d-12-31', $year));
 
-			// Use HolidayCalendarService as primary source (DB-backed, incl. any
+			// Use HolidayService as primary source (DB-backed, incl. any
 			// manually erfasste Firmen-/Custom-Feiertage).
 			$dtoList = $this->holidayCalendarService->getHolidaysForRange(
 				$state,

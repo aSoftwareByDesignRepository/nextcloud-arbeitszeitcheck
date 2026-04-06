@@ -1,3 +1,21 @@
+## 1.1.9 – 2026-04-05
+
+### Entfernt
+
+- **Nextcloud-Kalender-App (CalDAV)**: Synchronisation von Abwesenheiten in die Kalender-App ist entfernt; Migration `Version1012Date20260406120000` entfernt die Tabelle `at_absence_calendar`. Bereits angelegte Kalender in der Kalender-App bleiben bestehen, bis Nutzer sie dort löschen.
+
+### Geändert
+
+- **Feiertage / Kalenderlogik**: In der Klasse `HolidayService` gebündelt.
+
+### Behoben
+
+- **AdminController**: Doppelte `use`-Anweisung für `HolidayService` führte zu einem PHP-Fatal (u. a. beim Laden durch PHPUnit).
+
+### Dokumentation
+
+- Nutzerhandbücher EN/DE (`docs/User-Manual.*`), README- und Entwicklerdokumentation aktualisiert; Hilfsskript `docker/run-app-phpunit.sh` für PHPUnit im Container.
+
 ## 1.1.7 – 2026-04-05
 
 ### Hinzugefügt

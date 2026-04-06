@@ -63,17 +63,19 @@ Unterstützte Umgebungen:
 
 - **Versionshistorie**: `CHANGELOG.md` (EN) / `CHANGELOG.de.md` (DE) — Release- und Änderungsübersicht (Keep a Changelog).
 
-Die wichtigsten öffentlich mitgelieferten Begleitdokumente liegen im Ordner `docs/`:
+Index und Kurzbeschreibungen: **`docs/README.md`**. Mitgelieferte Dokumente im Ordner `docs/`:
 
+- **Nutzer**
+  - `User-Manual.de.md` / `User-Manual.en.md` — Kurzanleitung (u. a. Kalenderansicht in der App vs. Nextcloud-Kalender-App; keine CalDAV-Synchronisation)
 - **Compliance**
-  - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` – technische Umsetzung der ArbZG‑Regeln
-  - `GDPR-Compliance-Guide.en.md` – Betrieb der App im Einklang mit DSGVO/GDPR
+  - `Compliance-Implementation.de.md` / `Compliance-Implementation.en.md` — technische Umsetzung der ArbZG‑Regeln
+  - `GDPR-Compliance-Guide.en.md` — Betrieb der App im Einklang mit DSGVO/GDPR
 - **Entwicklung**
-  - `Developer-Documentation.en.md` – Architekturüberblick und Hinweise für Beitragende
+  - `Developer-Documentation.en.md` — Architekturüberblick und Hinweise für Beitragende
 
-Weitere, detailliertere Arbeits‑ und Compliance‑Dokumente (z. B. Rollen‑/Rechtematrix, ArbZG‑Analyse, Store‑Publishing‑How‑to) werden intern in einem separaten Dokumentations‑Repository gepflegt und bewusst nicht mit der App ausgeliefert.
+Weitere interne Arbeits‑ und Compliance‑Dokumente (z. B. erweiterte Rollenmatrix, Store‑Publishing‑How‑to) können in einem separaten Repository gepflegt werden.
 
-Die Endnutzer‑Oberfläche ist so gestaltet, dass sie ohne separates Handbuch verständlich ist; zusätzliche Handbücher oder rechtliche Vorlagen werden bewusst nicht mit ausgeliefert und können organisationsspezifisch ergänzt werden.
+**Hinweis Kalender:** ArbeitszeitCheck **synchronisiert nicht** mit der Nextcloud-**Kalender**-App (CalDAV). Die integrierte Monatsansicht gehört zur App; optional können E-Mails mit `.ics`-Anhang zum manuellen Import versendet werden.
 
 ### Projekt & Support
 
@@ -101,9 +103,9 @@ Diese Dateien werden vom Nextcloud App Store für Listung, Detailseite und Revie
 - PHPUnit‑Tests: `composer test` (bzw. `phpunit` mit bereitgestellter `phpunit.xml`)  
 - JS‑Build: `npm run build`, Dev‑Watch: `npm run watch`  
 - Test‑Abdeckung:
-  - Controller‑Tests (`tests/unit/Controller/*Test.php`)
+  - Controller‑Tests (`tests/Unit/Controller/*Test.php`)
   - Service‑Tests (z. B. `ComplianceServiceTest`, `TimeTrackingServiceTest`, `OvertimeServiceTest`)
-  - Integrationstests für zentrale API‑Flows (`tests/integration/ApiTest.php`)
+  - Integrationstests für zentrale API‑Flows (`tests/Integration/`, falls vorhanden)
 
 Weitere Details zur Architektur und zu Beitrag‑Richtlinien finden sich in `docs/Developer-Documentation.en.md`.
 

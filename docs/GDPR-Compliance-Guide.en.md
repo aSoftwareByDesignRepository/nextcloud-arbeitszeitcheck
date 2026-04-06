@@ -78,6 +78,8 @@ ArbeitszeitCheck supports optional features that you should carefully evaluate:
   - Train users **not** to enter sensitive data (e.g. diagnoses, political views)
 - **Integrations (e.g. DATEV export)**
   - Ensure that only necessary fields are exported
+- **Email with `.ics` attachments (optional)**
+  - Some workflows send iCalendar files by email so recipients can import events into a calendar client manually. This is **not** automatic synchronization with the Nextcloud Calendar app; evaluate purpose and recipients under Art. 6 GDPR like any other notification.
 
 Use the **admin settings** in ArbeitszeitCheck to:
 

@@ -1,6 +1,6 @@
 # Developer Documentation – ArbeitszeitCheck
 
-**Version:** 1.1.0  
+**Version:** 1.1.9  
 **Last Updated:** 2026-04-05
 
 This guide is for developers who want to contribute to ArbeitszeitCheck or integrate with it.
@@ -380,6 +380,8 @@ All tables use the `at_` prefix (short for arbeitszeitcheck):
 - `oc_at_user_models` - User working time model assignments
 - `oc_at_settings` - User settings
 - `oc_at_audit` - Audit logs
+
+There is **no** `at_absence_calendar` table in current releases: migration `Version1012Date20260406120000` drops it. ArbeitszeitCheck does **not** integrate with the Nextcloud **Calendar** app (no CalDAV, no `OCA\Calendar` API). The in-app month view and optional email `.ics` attachments are separate from Calendar-app sync.
 
 ### Migrations
 
@@ -776,8 +778,8 @@ $qb->where($qb->expr()->eq('user_id', "'$userId'"));
 - **MDN Web Docs:** https://developer.mozilla.org/
 - **Nextcloud App Framework:** https://docs.nextcloud.com/server/latest/developer_manual/
 - **PHPUnit Documentation:** https://phpunit.de/
-- **Jest Documentation:** https://jestjs.io/
+- **Vitest Documentation:** https://vitest.dev/ (JavaScript unit tests, if used)
 
 ---
 
-**Last Updated:** 2025-12-29
+**Last Updated:** 2026-04-05

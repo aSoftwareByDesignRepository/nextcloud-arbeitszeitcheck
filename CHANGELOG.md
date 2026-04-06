@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.9 - 2026-04-05
+
+### Removed
+
+- **Nextcloud Calendar app (CalDAV)**: Absence sync into the Calendar app is removed; migration `Version1012Date20260406120000` drops the `at_absence_calendar` table. Calendars previously created in the Calendar app are not deleted automatically.
+
+### Changed
+
+- **Holiday service**: Public holiday calendar logic consolidated in `HolidayService`.
+
+### Fixed
+
+- **AdminController**: Duplicate `use` statement for `HolidayService` caused a PHP fatal error (e.g. when PHPUnit loaded the class).
+
+### Documentation
+
+- User manuals (EN/DE) in `docs/`, README and developer documentation updated; helper script `docker/run-app-phpunit.sh` for containerized PHPUnit.
+
 ## 1.1.7 - 2026-04-05
 
 ### Added

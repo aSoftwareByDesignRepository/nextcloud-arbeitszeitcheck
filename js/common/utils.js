@@ -522,6 +522,9 @@ const ArbeitszeitCheckUtils = {
     tt('Sun'), tt('Mon'), tt('Tue'), tt('Wed'),
     tt('Thu'), tt('Fri'), tt('Sat'),
   ];
+  l10n.openCalendar = l10n.openCalendar || tt('Open calendar');
+  l10n.previousMonth = l10n.previousMonth || tt('Previous month');
+  l10n.nextMonth = l10n.nextMonth || tt('Next month');
 })();
 
 // Export for use in other modules

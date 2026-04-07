@@ -43,6 +43,19 @@ final class Constants
 	public const CONFIG_VACATION_CARRYOVER_EXPIRY_DAY = 'vacation_carryover_expiry_day';
 
 	/**
+	 * Optional max opening carryover days (empty = no cap). Tarifvertrag-specific; not legal advice.
+	 */
+	public const CONFIG_VACATION_CARRYOVER_MAX_DAYS = 'vacation_carryover_max_days';
+
+	/** When "1", background job may write next year opening from unused carryover remainder (see docs). */
+	public const CONFIG_VACATION_ROLLOVER_ENABLED = 'vacation_rollover_enabled';
+
+	/**
+	 * When "1" and rollover enabled, also roll unused annual entitlement (off by default; Tarifvertrag-specific).
+	 */
+	public const CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL = 'vacation_rollover_include_unused_annual';
+
+	/**
 	 * Maximum duration in days for absence requests (validation).
 	 */
 	public const MAX_ABSENCE_DAYS = 365;

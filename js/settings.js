@@ -131,7 +131,7 @@
             
             if (submitButton) {
                 submitButton.disabled = true;
-                submitButton.textContent = (window.t && window.t('arbeitszeitcheck', 'Saving...')) || 'Saving...';
+                submitButton.textContent = window.ArbeitszeitCheck?.l10n?.saving || (window.t && window.t('arbeitszeitcheck', 'Saving...')) || 'Saving...';
             }
 
             let apiUrl = window.ArbeitszeitCheck?.apiUrl?.updateSettings;
@@ -174,7 +174,8 @@
                 }
             })
             .catch(error => {
-                const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to save settings')) ||
+                const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToSaveSettings ||
+                    (window.t && window.t('arbeitszeitcheck', 'Failed to save settings')) ||
                     'Failed to save settings';
                 
                 if (window.ArbeitszeitCheckMessaging) {

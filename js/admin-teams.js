@@ -52,6 +52,10 @@
     }
 
     function t(key, fallback) {
+        const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.teamsL10n;
+        if (map && Object.prototype.hasOwnProperty.call(map, key) && map[key] !== undefined && map[key] !== '') {
+            return map[key];
+        }
         if (typeof window.t === 'function') {
             return window.t('arbeitszeitcheck', key);
         }

@@ -40,6 +40,7 @@ Exact permissions depend on your Nextcloud groups and app configuration.
 
 - **Clock in / out** and **breaks**: Use the time tracking UI; follow your organization’s rules for corrections and comments.
 - **Absences**: Create requests; wait for approval if your workflow requires it. Vacation balances and carryover (**Resturlaub**) may be shown if your admin configured them.
+- **Manager dashboard** (if you are a team lead): Under **Pending approvals**, absence requests list each person with the **absence type in your language** (e.g. vacation vs sick leave), not raw internal codes.
 - **Reports**: Generate period reports or exports your admin allows (CSV, DATEV, etc.).
 - **Compliance**: The app may flag violations (e.g. missing breaks); your employer defines how those are handled.
 

@@ -177,4 +177,99 @@ class VacationAllocationServiceTest extends TestCase
 		$this->assertEqualsWithDelta(0.0, $r['carryover_usable_for_new_requests'], 0.001);
 		$this->assertEqualsWithDelta(25.0, $r['total_remaining_for_new_requests'], 0.001);
 	}
+
+	public function testProspectiveAfterDeadlineWithoutGrandfatheringCannotUseCarryover(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$absenceMapper->method('findVacationApprovedOverlappingYear')->willReturn([]);
+
+		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$userWtm->method('findCurrentByUser')->willReturn(null);
+		$settings = $this->createMock(UserSettingsMapper::class);
+		$settings->method('getIntegerSetting')->willReturn(2);
+
+		$balance = $this->createMock(VacationYearBalanceMapper::class);
+		$balance->method('getCarryoverDays')->willReturn(10.0);
+
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('computeWorkingDaysForUser')->willReturn(4.0);
+
+		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
+		$r = $s->computeYearAllocation(
+			'u1',
+			2026,
+			null,
+			new \DateTime('2026-02-02'),
+			new \DateTime('2026-02-06'),
+			new \DateTime('2026-04-15'),
+			null
+		);
+		$this->assertFalse($r['allocation_valid']);
+		$this->assertGreaterThan(0.0, $r['shortfall']);
+	}
+
+	public function testProspectiveAfterDeadlineWithGrandfatheringMayUseCarryover(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$absenceMapper->method('findVacationApprovedOverlappingYear')->willReturn([]);
+
+		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$userWtm->method('findCurrentByUser')->willReturn(null);
+		$settings = $this->createMock(UserSettingsMapper::class);
+		$settings->method('getIntegerSetting')->willReturn(0);
+
+		$balance = $this->createMock(VacationYearBalanceMapper::class);
+		$balance->method('getCarryoverDays')->willReturn(10.0);
+
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('computeWorkingDaysForUser')->willReturn(4.0);
+
+		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
+		$r = $s->computeYearAllocation(
+			'u1',
+			2026,
+			null,
+			new \DateTime('2026-02-02'),
+			new \DateTime('2026-02-06'),
+			new \DateTime('2026-04-15'),
+			new \DateTime('2026-02-01')
+		);
+		$this->assertTrue($r['allocation_valid']);
+		$this->assertEqualsWithDelta(6.0, $r['carryover_remaining_after_approved'], 0.001);
+	}
+
+	public function testMaxCarryoverCapClampsOpeningBalance(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS, '', '5'],
+		]);
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$absenceMapper->method('findVacationApprovedOverlappingYear')->willReturn([]);
+
+		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$userWtm->method('findCurrentByUser')->willReturn(null);
+		$settings = $this->createMock(UserSettingsMapper::class);
+		$settings->method('getIntegerSetting')->willReturn(25);
+
+		$balance = $this->createMock(VacationYearBalanceMapper::class);
+		$balance->method('getCarryoverDays')->willReturn(20.0);
+
+		$holiday = $this->createMock(HolidayService::class);
+		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
+		$r = $s->computeYearAllocation('u1', 2026, null, null, null, new \DateTime('2026-02-15'));
+		$this->assertEqualsWithDelta(5.0, $r['carryover_opening'], 0.001);
+	}
 }

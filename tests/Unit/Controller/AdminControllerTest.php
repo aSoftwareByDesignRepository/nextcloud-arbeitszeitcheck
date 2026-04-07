@@ -99,6 +99,8 @@ class AdminControllerTest extends TestCase
 		$holidayCalendarService = $this->createMock(HolidayService::class);
 
 		$vacationYearBalanceMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$vacationAllocationService = $this->createMock(\OCA\ArbeitszeitCheck\Service\VacationAllocationService::class);
+		$vacationAllocationService->method('applyCapToOpeningBalance')->willReturnCallback(fn (float $d) => $d);
 
 		$this->controller = new AdminController(
 			'arbeitszeitcheck',
@@ -120,7 +122,8 @@ class AdminControllerTest extends TestCase
 			$urlGenerator,
 			$holidayMapper,
 			$holidayCalendarService,
-			$vacationYearBalanceMapper
+			$vacationYearBalanceMapper,
+			$vacationAllocationService
 		);
 	}
 

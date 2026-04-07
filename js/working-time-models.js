@@ -12,6 +12,36 @@
     const Components = window.ArbeitszeitCheckComponents || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
 
+    /** Prefer server-injected l10n; window.t may be unavailable. */
+    function wtmMsg(key, englishFallback) {
+        const v = window.ArbeitszeitCheck?.l10n?.[key];
+        if (v !== undefined && v !== '') {
+            return v;
+        }
+        if (typeof window.t === 'function' && englishFallback) {
+            return window.t('arbeitszeitcheck', englishFallback);
+        }
+        return englishFallback || '';
+    }
+
+    /** Option tags for working-time model type; labels from working-time-models.php l10n. */
+    function modelTypeSelectOptions(selectedType) {
+        const rows = [
+            ['full_time', 'fullTime', 'Full-Time'],
+            ['part_time', 'partTime', 'Part-Time'],
+            ['flexible', 'flexible', 'Flexible'],
+            ['trust_based', 'trustBased', 'Trust-Based'],
+            ['shift_work', 'shiftWork', 'Shift Work'],
+        ];
+        return rows.map(function(row) {
+            const value = row[0];
+            const l10nKey = row[1];
+            const en = row[2];
+            const sel = selectedType === value ? ' selected' : '';
+            return '<option value="' + value + '"' + sel + '>' + Utils.escapeHtml(wtmMsg(l10nKey, en)) + '</option>';
+        }).join('');
+    }
+
     /**
      * Initialize models page
      */
@@ -70,11 +100,7 @@
                 <div class="form-group">
                     <label for="model-type" class="form-label">${typeLabel}</label>
                     <select id="model-type" name="type" class="form-select">
-                        <option value="full_time">${(window.t ? window.t('arbeitszeitcheck', 'Full-Time') : 'Full-Time')}</option>
-                        <option value="part_time">${(window.t ? window.t('arbeitszeitcheck', 'Part-Time') : 'Part-Time')}</option>
-                        <option value="flexible">${(window.t ? window.t('arbeitszeitcheck', 'Flexible') : 'Flexible')}</option>
-                        <option value="trust_based">${(window.t ? window.t('arbeitszeitcheck', 'Trust-Based') : 'Trust-Based')}</option>
-                        <option value="shift_work">${(window.t ? window.t('arbeitszeitcheck', 'Shift Work') : 'Shift Work')}</option>
+                        ${modelTypeSelectOptions()}
                     </select>
                 </div>
                 <div class="form-group">
@@ -198,11 +224,7 @@
                 <div class="form-group">
                     <label for="edit-model-type" class="form-label">${typeLabel}</label>
                     <select id="edit-model-type" name="type" class="form-select">
-                        <option value="full_time" ${model.type === 'full_time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.fullTime || (window.t && window.t('arbeitszeitcheck', 'Full-Time')) || 'Full-Time'}</option>
-                        <option value="part_time" ${model.type === 'part_time' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.partTime || (window.t && window.t('arbeitszeitcheck', 'Part-Time')) || 'Part-Time'}</option>
-                        <option value="flexible" ${model.type === 'flexible' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.flexible || (window.t && window.t('arbeitszeitcheck', 'Flexible')) || 'Flexible'}</option>
-                        <option value="trust_based" ${model.type === 'trust_based' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.trustBased || (window.t && window.t('arbeitszeitcheck', 'Trust-Based')) || 'Trust-Based'}</option>
-                        <option value="shift_work" ${model.type === 'shift_work' ? 'selected' : ''}>${window.ArbeitszeitCheck?.l10n?.shiftWork || (window.t && window.t('arbeitszeitcheck', 'Shift Work')) || 'Shift Work'}</option>
+                        ${modelTypeSelectOptions(model.type)}
                     </select>
                 </div>
                 <div class="form-group">
@@ -352,7 +374,7 @@
 
         const row = button.closest('tr');
         const rawName = row?.querySelector('td:first-child')?.textContent?.trim();
-        const modelName = rawName || (window.t && window.t('arbeitszeitcheck', 'this work schedule')) || 'this work schedule';
+        const modelName = rawName || window.ArbeitszeitCheck?.l10n?.thisWorkSchedule || (window.t && window.t('arbeitszeitcheck', 'this work schedule')) || 'this work schedule';
 
         const title = window.ArbeitszeitCheck?.l10n?.deleteModelTitle ||
             (window.t && window.t('arbeitszeitcheck', 'Delete working time model')) ||
@@ -437,8 +459,8 @@
                     },
                     onError: function(_error) {
                         Components.closeModal(modalEl);
-                        const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to delete model')) ||
-                            window.ArbeitszeitCheck?.l10n?.failedToDeleteModel ||
+                        const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToDeleteModel ||
+                            (window.t && window.t('arbeitszeitcheck', 'Failed to delete model')) ||
                             'Failed to delete model';
                         Messaging.showError(errorMsg);
                     }

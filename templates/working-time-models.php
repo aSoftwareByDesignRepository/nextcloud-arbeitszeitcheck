@@ -141,4 +141,13 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.dailyHoursHelp = <?php echo json_encode($l->t('Usual hours per workday (e.g. 7.74 if 38.7 h/week over five days). Overtime compares worked time to the weekly contract hours × (working days ÷ 5).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelCreated = <?php echo json_encode($l->t('Model created successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelUpdated = <?php echo json_encode($l->t('Model updated successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.failedToLoadModel = <?php echo json_encode($l->t('Failed to load model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.invalidModelData = <?php echo json_encode($l->t('Invalid model data'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.failedToCreateModel = <?php echo json_encode($l->t('Failed to create model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.failedToUpdateModel = <?php echo json_encode($l->t('Failed to update model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.failedToDeleteModel = <?php echo json_encode($l->t('Failed to delete model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.modelDeleted = <?php echo json_encode($l->t('Working time model deleted successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.deleteModelTitle = <?php echo json_encode($l->t('Delete working time model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.delete = <?php echo json_encode($l->t('Delete'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.thisWorkSchedule = <?php echo json_encode($l->t('this work schedule'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>

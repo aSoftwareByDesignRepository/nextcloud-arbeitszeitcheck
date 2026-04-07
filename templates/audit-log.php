@@ -113,3 +113,16 @@ $endDate = $_['endDate'] ?? '';
     </div>
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
+
+<?php
+$auditLogViewerL10n = [
+	'Loading…' => $l->t('Loading…'),
+	'Error loading audit logs' => $l->t('Error loading audit logs'),
+	'Failed to load audit logs. Please try again.' => $l->t('Failed to load audit logs. Please try again.'),
+	'No audit log entries found' => $l->t('No audit log entries found'),
+];
+?>
+<script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+window.ArbeitszeitCheck.auditLogViewerL10n = <?php echo json_encode($auditLogViewerL10n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+</script>

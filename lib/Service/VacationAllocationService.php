@@ -22,6 +22,11 @@ use OCP\IConfig;
 
 class VacationAllocationService
 {
+	/**
+	 * Synthetic absence id for the prospective chunk in FIFO merge (must not collide with real rows).
+	 */
+	private const PROSPECTIVE_ABSENCE_PLACEHOLDER_ID = 2147483647;
+
 	public function __construct(
 		private IConfig $config,
 		private AbsenceMapper $absenceMapper,
@@ -62,6 +67,35 @@ class VacationAllocationService
 	}
 
 	/**
+	 * Optional global cap on opening carryover days (null = unlimited).
+	 */
+	public function getMaxCarryoverOpeningCap(): ?float
+	{
+		$raw = trim((string)$this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS, ''));
+		if ($raw === '') {
+			return null;
+		}
+		$v = (float)str_replace(',', '.', $raw);
+		if (!is_finite($v)) {
+			return null;
+		}
+		return max(0.0, min(366.0, $v));
+	}
+
+	/**
+	 * Clamp stored opening carryover to configured max (and 0–366).
+	 */
+	public function applyCapToOpeningBalance(float $carryoverDays): float
+	{
+		$v = max(0.0, min(366.0, $carryoverDays));
+		$cap = $this->getMaxCarryoverOpeningCap();
+		if ($cap !== null) {
+			$v = min($v, $cap);
+		}
+		return $v;
+	}
+
+	/**
 	 * Whether carryover from year Y's opening balance can still be used for new requests (date-only, server "today").
 	 */
 	public function isCarryoverUsableForNewRequests(int $year, ?\DateTimeInterface $asOf = null): bool
@@ -74,6 +108,30 @@ class VacationAllocationService
 		$exp = new \DateTime($expiry->format('Y-m-d'));
 		$exp->setTime(0, 0, 0);
 		return $asDate <= $exp;
+	}
+
+	/**
+	 * Whether a **prospective** vacation chunk (validate/create/update/approve) may still draw from the
+	 * carryover pool for year Y.
+	 *
+	 * After the carryover deadline, new submissions cannot use carryover; requests **created on or before**
+	 * the deadline may still do so when approved later (grandfathering). Purely prospective rows with no
+	 * creation date (stats-only) use the deadline only.
+	 */
+	public function canProspectiveUseCarryoverPool(int $year, ?\DateTimeInterface $requestCreatedAt, \DateTimeInterface $validationDate): bool
+	{
+		if ($this->isCarryoverUsableForNewRequests($year, $validationDate)) {
+			return true;
+		}
+		if ($requestCreatedAt === null) {
+			return false;
+		}
+		$expiry = $this->getCarryoverExpiryDateForYear($year);
+		$created = new \DateTime($requestCreatedAt->format('Y-m-d'));
+		$created->setTime(0, 0, 0);
+		$exp = new \DateTime($expiry->format('Y-m-d'));
+		$exp->setTime(0, 0, 0);
+		return $created <= $exp;
 	}
 
 	/**
@@ -185,11 +243,12 @@ class VacationAllocationService
 		?\DateTime $prospectiveStart = null,
 		?\DateTime $prospectiveEnd = null,
 		?\DateTimeInterface $asOf = null,
+		?\DateTimeInterface $prospectiveRequestCreatedAt = null,
 	): array {
 		$asOf = $asOf ?? new \DateTime('today');
 		$annualEntitlement = (float)$this->getAnnualEntitlementDays($userId);
 		$carryoverOpening = $this->vacationYearBalanceMapper->getCarryoverDays($userId, $year);
-		$carryoverOpening = max(0.0, min(366.0, $carryoverOpening));
+		$carryoverOpening = $this->applyCapToOpeningBalance($carryoverOpening);
 
 		$expiry = $this->getCarryoverExpiryDateForYear($year);
 		$carryoverExpiresOn = $carryoverOpening > 0.0001 ? $expiry->format('Y-m-d') : null;
@@ -204,7 +263,7 @@ class VacationAllocationService
 		}
 		if ($prospectiveStart !== null && $prospectiveEnd !== null) {
 			$p = new Absence();
-			$p->setId(2147483647);
+			$p->setId(self::PROSPECTIVE_ABSENCE_PLACEHOLDER_ID);
 			$p->setStartDate(clone $prospectiveStart);
 			$p->setEndDate(clone $prospectiveEnd);
 			$merged[] = $p;
@@ -235,6 +294,20 @@ class VacationAllocationService
 			$wdAfter = $split['after'];
 			$chunk = $wdBefore + $wdAfter;
 			$usedTotal += $chunk;
+
+			$isProspective = ($absence->getId() === self::PROSPECTIVE_ABSENCE_PLACEHOLDER_ID);
+			if ($isProspective && !$this->canProspectiveUseCarryoverPool($year, $prospectiveRequestCreatedAt, $asOf)) {
+				// Deadline passed for new carryover use: annual entitlement only (matches carryover_usable display).
+				$need = $chunk;
+				$fromA = min($annualPool, $need);
+				$annualPool -= $fromA;
+				$need -= $fromA;
+				if ($need > 0.0001) {
+					$valid = false;
+					$shortfall += $need;
+				}
+				continue;
+			}
 
 			$need = $wdBefore;
 			$fromC = min($carryoverPool, $need);

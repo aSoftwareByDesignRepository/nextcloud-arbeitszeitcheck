@@ -499,7 +499,7 @@ $colleagues = $_['colleagues'] ?? [];
             </section>
         <?php else: ?>
             <!-- Stats Cards: Vacation only (sick leave etc. excluded) -->
-            <section class="section section--stats" aria-labelledby="stats-title">
+            <section class="section section--stats vacation-stats" aria-labelledby="stats-title">
                 <h3 id="stats-title" class="section__title stats-section-title">
                     <?php p($l->t('Vacation balance') . ' ' . (string)($stats['vacation_year'] ?? date('Y'))); ?>
                 </h3>
@@ -516,6 +516,7 @@ $colleagues = $_['colleagues'] ?? [];
                         $carryoverExpiresFmt = (string)$carryoverExpiresOn;
                     }
                 }
+                $carryoverLockedAfterDeadline = !empty($stats['vacation_carryover_locked_after_deadline']);
                 ?>
                 <?php if (!empty($stats)): ?>
                     <p class="stats-section__intro" id="stats-intro">
@@ -523,9 +524,18 @@ $colleagues = $_['colleagues'] ?? [];
                         <?php if ($carryoverExpiresFmt !== '' && (float)($stats['vacation_carryover_days'] ?? 0) > 0.0001) { ?>
                             <?php p(' ' . $l->t('Carryover expiry this year: %s.', [$carryoverExpiresFmt])); ?>
                         <?php } ?>
+                        <?php if (isset($stats['vacation_carryover_max_cap']) && $stats['vacation_carryover_max_cap'] !== null && $stats['vacation_carryover_max_cap'] !== '') { ?>
+                            <?php p(' ' . $l->t('Admin cap on opening carryover: %s days.', [(string)round((float)$stats['vacation_carryover_max_cap'], 1)])); ?>
+                        <?php } ?>
                     </p>
-                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc stats-intro">
-                        <div class="stat-card stat-card--carryover">
+                    <?php if ($carryoverLockedAfterDeadline && $carryoverExpiresFmt !== '') { ?>
+                    <div class="vacation-stats__notice vacation-stats__notice--deadline" role="status" aria-live="polite" id="stats-carryover-deadline-notice">
+                        <p class="vacation-stats__notice-text"><?php p($l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining days. The opening balance above is your HR record; approved vacation already reduced it.', [$carryoverExpiresFmt])); ?></p>
+                        <p class="vacation-stats__notice-text vacation-stats__notice-text--secondary"><?php p($l->t('You still have days left on paper, but they can no longer be booked as carryover—use your regular annual entitlement for new requests.')); ?></p>
+                    </div>
+                    <?php } ?>
+                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc stats-intro<?php echo $carryoverLockedAfterDeadline ? ' stats-carryover-deadline-notice' : ''; ?>">
+                        <div class="stat-card stat-card--carryover<?php echo $carryoverLockedAfterDeadline ? ' stat-card--carryover-locked' : ''; ?>">
                             <span class="stat-label" id="stat-carryover-label"><?php p($l->t('Carryover (opening balance)')); ?></span>
                             <span class="stat-value" aria-labelledby="stat-carryover-label"><?php p((string)round($stats['vacation_carryover_days'] ?? 0, 1)); ?></span>
                             <span class="stat-sublabel"><?php p($l->t('vacation days')); ?></span>
@@ -537,6 +547,16 @@ $colleagues = $_['colleagues'] ?? [];
                             <span class="stat-label" id="stat-entitlement-label"><?php p($l->t('Annual entitlement')); ?></span>
                             <span class="stat-value" aria-labelledby="stat-entitlement-label"><?php p((string)round($stats['vacation_annual_entitlement'] ?? 0, 1)); ?></span>
                             <span class="stat-sublabel"><?php p($l->t('vacation days')); ?></span>
+                        </div>
+                        <div class="stat-card stat-card--annual-left">
+                            <span class="stat-label" id="stat-annual-left-label"><?php p($l->t('Annual leave left')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-annual-left-label"><?php p((string)round((float)($stats['vacation_annual_remaining'] ?? 0), 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($l->t('after approved absences')); ?></span>
+                        </div>
+                        <div class="stat-card stat-card--carryover-pool">
+                            <span class="stat-label" id="stat-carryover-pool-label"><?php p($l->t('Carryover pool left')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-carryover-pool-label"><?php p((string)round((float)($stats['vacation_carryover_remaining'] ?? 0), 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($l->t('after approved absences')); ?></span>
                         </div>
                         <div class="stat-card stat-card--remaining">
                             <span class="stat-label" id="stat-remaining-label"><?php p($l->t('Remaining')); ?></span>
@@ -699,6 +719,8 @@ $colleagues = $_['colleagues'] ?? [];
     </div>
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
+
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

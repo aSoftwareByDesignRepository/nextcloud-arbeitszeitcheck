@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
@@ -48,6 +49,7 @@ class UserDeletedListener implements IEventListener
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
 		private readonly VacationYearBalanceMapper $vacationYearBalanceMapper,
+		private readonly VacationRolloverLogMapper $vacationRolloverLogMapper,
 		private readonly NotificationService $notificationService,
 		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger,
@@ -71,6 +73,7 @@ class UserDeletedListener implements IEventListener
 			$this->deleteUserSettings($userId);
 			$this->deleteUserWorkingTimeModels($userId);
 			$this->vacationYearBalanceMapper->deleteByUserId($userId);
+			$this->vacationRolloverLogMapper->deleteByUserId($userId);
 			$this->teamMemberMapper->deleteByUserId($userId);
 			$this->teamManagerMapper->deleteByUserId($userId);
 		} catch (\Throwable $e) {

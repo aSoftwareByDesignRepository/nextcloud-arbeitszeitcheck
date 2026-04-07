@@ -375,6 +375,7 @@ All tables use the `at_` prefix (short for arbeitszeitcheck):
 - `oc_at_entries` - Time entries
 - `oc_at_absences` - Absence requests
 - `oc_at_vacation_year_balance` - Per user and calendar year: opening **carryover** days (Resturlaub from prior year, as recorded for year *Y*)
+- `oc_at_vacation_rollover_log` - Idempotency for automatic carryover rollover from year *Y* to *Y+1* (one row per user/from_year/to_year when rollover ran)
 - `oc_at_violations` - Compliance violations
 - `oc_at_models` - Working time models
 - `oc_at_user_models` - User working time model assignments
@@ -426,8 +427,17 @@ Carryover is **not** a separate “adjustment” column: the editable opening ba
 
 - `vacation_carryover_expiry_month` (1–12, default `3`)
 - `vacation_carryover_expiry_day` (1–31, default `31`)
+- `vacation_carryover_max_days` (optional, empty = no cap): clamps opening carryover everywhere (allocation, admin save, CSV import).
+- `vacation_rollover_enabled` (`0`/`1`, default `1`): enables the daily `VacationRolloverJob`.
+- `vacation_rollover_include_unused_annual` (`0`/`1`, default `0`): if `1`, rollover adds unused **annual** remainder to next year’s opening (Tarifvertrag-specific; off by default).
 
-For calendar year *Y*, carryover from that row may only apply to vacation working days on dates **on or before** that month/day in year *Y*. After that date, **new** requests cannot consume remaining carryover for *Y*; annual entitlement from the working time model still applies. Consumption order for **approved** vacation is **FIFO** (sort by `start_date`, then `id`), implemented in `VacationAllocationService` and used by `AbsenceService::getVacationStats` and vacation validation (including re-check on approve / auto-approve).
+For calendar year *Y*, carryover from that row may only apply to vacation working days on dates **on or before** that month/day in year *Y*. After that calendar deadline, **new** vacation submissions (prospective validation with no prior request date) cannot draw from the carryover pool; they consume **annual entitlement only** for the whole chunk, matching `carryover_usable_for_new_requests` in `VacationAllocationService::computeYearAllocation`.
+
+**Grandfathering (pending requests):** If an absence row already exists with `created_at` **on or before** the carryover deadline for year *Y*, validation at update/approve/auto-approve still allows FIFO carryover for that request, so a request filed in time is not blocked because approval happens later.
+
+**Year transition (automatic rollover):** After the carryover deadline for year *Y*, unused carryover pool (FIFO `carryover_remaining_after_approved`, evaluated with `asOf` = first day after the deadline) can be written to opening `carryover_days` for year *Y+1* by `VacationRolloverService`, subject to the global cap and idempotency in `at_vacation_rollover_log`. The daily `VacationRolloverJob` runs when `vacation_rollover_enabled` is on; manual runs: `occ arbeitszeitcheck:vacation-rollover` (`--dry-run`, `--force`, `--year`, `--user`, `--ignore-disabled`). If `at_vacation_year_balance` already has a non-zero opening for *Y+1*, automatic rollover **skips** that user unless `--force`. HR may still set or import balances via **Admin → Users** or `occ arbeitszeitcheck:import-vacation-balance`.
+
+Consumption order for **approved** vacation is **FIFO** (sort by `start_date`, then `id`), implemented in `VacationAllocationService` and used by `AbsenceService::getVacationStats` and vacation validation (including re-check on approve / auto-approve).
 
 **CLI (initial migration from other HR systems):**
 
@@ -435,11 +445,17 @@ For calendar year *Y*, carryover from that row may only apply to vacation workin
 php occ arbeitszeitcheck:import-vacation-balance /path/to/balances.csv --dry-run
 ```
 
-CSV columns: `user_id`, `year`, `carryover_days` (header row). Validates users exist; use `--dry-run` to preview.
+CSV columns: `user_id`, `year`, `carryover_days` (header row). Validates users exist; use `--dry-run` to preview. Values are clamped to `vacation_carryover_max_days` when set.
 
-**Privacy:** `UserDeletedListener` deletes all `at_vacation_year_balance` rows for the removed user id.
+**CLI (rollover):**
 
-**Known limitations (product):** Entitlement per historical year uses the **current** working time model assignment unless extended later; concurrent pending vacation requests are not “soft reserved” in the DB—approval-time validation prevents overdraw on commit under normal use.
+```bash
+php occ arbeitszeitcheck:vacation-rollover --dry-run
+```
+
+**Privacy:** `UserDeletedListener` deletes all `at_vacation_year_balance` and `at_vacation_rollover_log` rows for the removed user id.
+
+**Known limitations (product):** Entitlement per historical year uses the **current** working time model assignment unless extended later; concurrent pending vacation requests are not “soft reserved” in the DB—approval-time validation prevents overdraw on commit under normal use. Rollover uses the **server date**; align organisation policy with the instance timezone.
 
 ---
 
@@ -466,6 +482,14 @@ CSV columns: `user_id`, `year`, `carryover_days` (header row). Validates users e
 3. **Document behaviour where relevant:**
    - If the endpoint is public or security‑relevant, add a short note to `README.md` or the appropriate doc in `docs/` (z. B. Rollen/Compliance)
    - Include request/response examples in code comments or tests if they are non‑obvious
+
+### Manager API: pending approvals
+
+`GET /apps/arbeitszeitcheck/api/manager/pending-approvals` (see `ManagerController::getPendingApprovals`) returns `pendingApprovals[]` items. For **`type=absence`**, each item includes **`summary`** from `Absence::getSummary()` plus a server-added field:
+
+- **`summary.typeLabel`** — Localized human-readable absence type (same translations as elsewhere in the app, e.g. `Vacation` → German *Urlaub*). The manager dashboard UI prefers this for card titles so labels stay correct even if the raw `summary.type` code varies in edge cases.
+
+The dashboard script `js/manager-dashboard.js` falls back to mapping `summary.type` client-side when `typeLabel` is absent (older responses).
 
 ### Error Handling
 

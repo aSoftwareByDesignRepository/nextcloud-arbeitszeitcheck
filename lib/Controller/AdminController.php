@@ -27,6 +27,7 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Db\Holiday;
 use OCA\ArbeitszeitCheck\Db\HolidayMapper;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
+use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -71,6 +72,7 @@ class AdminController extends Controller
 	private HolidayMapper $holidayMapper;
 	private HolidayService $holidayCalendarService;
 	private VacationYearBalanceMapper $vacationYearBalanceMapper;
+	private VacationAllocationService $vacationAllocationService;
 
 	public function __construct(
 		string $appName,
@@ -92,7 +94,8 @@ class AdminController extends Controller
 		IURLGenerator $urlGenerator,
 		HolidayMapper $holidayMapper,
 		HolidayService $holidayCalendarService,
-		VacationYearBalanceMapper $vacationYearBalanceMapper
+		VacationYearBalanceMapper $vacationYearBalanceMapper,
+		VacationAllocationService $vacationAllocationService
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -112,6 +115,7 @@ class AdminController extends Controller
 		$this->holidayMapper = $holidayMapper;
 		$this->holidayCalendarService = $holidayCalendarService;
 		$this->vacationYearBalanceMapper = $vacationYearBalanceMapper;
+		$this->vacationAllocationService = $vacationAllocationService;
 		$this->setCspService($cspService);
 	}
 
@@ -422,6 +426,9 @@ class AdminController extends Controller
 			'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8'),
 			'vacationCarryoverExpiryMonth' => max(1, min(12, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3'))),
 			'vacationCarryoverExpiryDay' => max(1, min(31, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31'))),
+			'vacationCarryoverMaxDays' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS, ''),
+			'vacationRolloverEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_ENABLED, '1') === '1',
+			'vacationRolloverIncludeUnusedAnnual' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0') === '1',
 		];
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-settings', [
@@ -1147,7 +1154,7 @@ class AdminController extends Controller
 				'userId' => $log->getUserId(),
 				'userDisplayName' => $user ? $user->getDisplayName() : $log->getUserId(),
 				'action' => $this->l10n->t($log->getAction()),
-				'entityType' => $log->getEntityType(),
+				'entityType' => $this->translateAuditEntityType($log->getEntityType()),
 				'entityId' => $log->getEntityId(),
 				'performedBy' => $log->getPerformedBy(),
 				'performedByDisplayName' => $performedBy ? $performedBy->getDisplayName() : ($log->getPerformedBy() ?? $log->getUserId()),
@@ -1168,6 +1175,16 @@ class AdminController extends Controller
 			'showAdminNav' => true,
 		]);
 		return $this->configureCSP($response, 'admin');
+	}
+
+	/**
+	 * Translate audit log entity_type for UI/export (msgid "user" is reserved for a generic word elsewhere).
+	 */
+	private function translateAuditEntityType(string $entityType): string {
+		if ($entityType === 'user') {
+			return $this->l10n->t('User (audit log entity)');
+		}
+		return $this->l10n->t($entityType);
 	}
 
 	/**
@@ -1203,6 +1220,9 @@ class AdminController extends Controller
 				'defaultWorkingHours' => (float)$this->appConfig->getAppValueString('default_working_hours', '8'),
 				'vacationCarryoverExpiryMonth' => max(1, min(12, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3'))),
 				'vacationCarryoverExpiryDay' => max(1, min(31, (int)$this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31'))),
+				'vacationCarryoverMaxDays' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS, ''),
+				'vacationRolloverEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_ENABLED, '1') === '1',
+				'vacationRolloverIncludeUnusedAnnual' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0') === '1',
 			];
 
 			return new JSONResponse([
@@ -1250,6 +1270,9 @@ class AdminController extends Controller
 				'defaultWorkingHours' => 'default_working_hours',
 				'vacationCarryoverExpiryMonth' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
 				'vacationCarryoverExpiryDay' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
+				'vacationCarryoverMaxDays' => Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
+				'vacationRolloverEnabled' => Constants::CONFIG_VACATION_ROLLOVER_ENABLED,
+				'vacationRolloverIncludeUnusedAnnual' => Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL,
 			];
 
 			$updatedSettings = [];
@@ -1265,7 +1288,8 @@ class AdminController extends Controller
 						'exportMidnightSplitEnabled',
 						'sendIcalApprovedAbsences', 'sendIcalToSubstitute', 'sendIcalToManagers',
 						'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee', 'sendEmailSubstituteApprovedToManager',
-						'statutoryAutoReseed'
+						'statutoryAutoReseed',
+						'vacationRolloverEnabled', 'vacationRolloverIncludeUnusedAnnual',
 					], true)) {
 						$value = ($value === true || $value === 'true' || $value === '1') ? '1' : '0';
 					} elseif ($paramKey === 'maxDailyHours' || $paramKey === 'minRestPeriod' || $paramKey === 'defaultWorkingHours') {
@@ -1300,6 +1324,20 @@ class AdminController extends Controller
 					} elseif ($paramKey === 'vacationCarryoverExpiryDay') {
 						$d = max(1, min(31, (int)$value));
 						$value = (string)$d;
+					} elseif ($paramKey === 'vacationCarryoverMaxDays') {
+						$s = trim((string)$value);
+						if ($s === '') {
+							$value = '';
+						} else {
+							$max = (float)str_replace(',', '.', $s);
+							if (!is_finite($max) || $max < 0 || $max > 366) {
+								return new JSONResponse([
+									'success' => false,
+									'error' => $this->l10n->t('Maximum carryover days must be empty (unlimited) or between 0 and 366')
+								], Http::STATUS_BAD_REQUEST);
+							}
+							$value = (string)$max;
+						}
 					} elseif ($paramKey === 'requireSubstituteTypes') {
 						$validTypes = ['vacation', 'sick_leave', 'personal_leave', 'parental_leave', 'special_leave', 'unpaid_leave', 'home_office', 'business_trip'];
 						$arr = is_array($value) ? $value : (is_string($value) ? json_decode($value, true) : []);
@@ -1750,6 +1788,7 @@ class AdminController extends Controller
 						'error' => $this->l10n->t('Vacation carryover must be between 0 and 366 days')
 					], Http::STATUS_BAD_REQUEST);
 				}
+				$carryoverVal = $this->vacationAllocationService->applyCapToOpeningBalance($carryoverVal);
 				$this->vacationYearBalanceMapper->upsert($userId, $carryoverYear, $carryoverVal);
 			}
 
@@ -2323,7 +2362,7 @@ class AdminController extends Controller
 					'user_id' => $log->getUserId(),
 					'user_display_name' => $user ? $user->getDisplayName() : $log->getUserId(),
 					'action' => $this->l10n->t($log->getAction()),
-					'entity_type' => $log->getEntityType(),
+					'entity_type' => $this->translateAuditEntityType($log->getEntityType()),
 					'entity_id' => $log->getEntityId(),
 					'old_values' => $log->getOldValues() ? json_decode($log->getOldValues(), true) : null,
 					'new_values' => $log->getNewValues() ? json_decode($log->getNewValues(), true) : null,
@@ -2455,8 +2494,8 @@ class AdminController extends Controller
 					'date_time' => ($createdAt = $log->getCreatedAt()) ? $createdAt->format('Y-m-d H:i:s') : '',
 					'user_id' => $log->getUserId(),
 					'user_display_name' => $user ? $user->getDisplayName() : $log->getUserId(),
-					'action' => $log->getAction(),
-					'entity_type' => $log->getEntityType(),
+					'action' => $this->l10n->t($log->getAction()),
+					'entity_type' => $this->translateAuditEntityType($log->getEntityType()),
 					'entity_id' => $log->getEntityId(),
 					'performed_by' => $log->getPerformedBy() ?? $log->getUserId(),
 					'performed_by_display_name' => $performedBy ? $performedBy->getDisplayName() : ($log->getPerformedBy() ?? $log->getUserId()),

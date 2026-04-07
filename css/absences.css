@@ -185,6 +185,42 @@
 	gap: var(--space-3, 0.75rem);
 }
 
+/* Vacation stats: deadline notice (high contrast, readable) */
+.vacation-stats__notice {
+	margin: 0 0 var(--space-6, 1.5rem);
+	padding: var(--space-5, 1.25rem) var(--space-6, 1.5rem);
+	border-radius: var(--radius-xl, 12px);
+	border: 1px solid var(--arbeitszeitcheck-color-border);
+	background: var(--arbeitszeitcheck-color-background-hover, rgba(0, 0, 0, 0.04));
+	box-shadow: var(--arbeitszeitcheck-shadow-subtle);
+	max-width: 52rem;
+}
+
+.vacation-stats__notice--deadline {
+	border-left: 4px solid var(--arbeitszeitcheck-color-warning, var(--color-warning, #b88100));
+}
+
+.vacation-stats__notice-text {
+	margin: 0 0 var(--space-3, 0.75rem);
+	font-size: var(--arbeitszeitcheck-font-size-base, 0.9375rem);
+	line-height: 1.55;
+	color: var(--arbeitszeitcheck-color-main-text);
+}
+
+.vacation-stats__notice-text:last-child {
+	margin-bottom: 0;
+}
+
+.vacation-stats__notice-text--secondary {
+	font-size: 0.875rem;
+	color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.stat-card--carryover-locked {
+	border-style: dashed;
+	opacity: 0.95;
+}
+
 /* Stats Section: clear hierarchy, WCAG 2.1 AA */
 .stats-section-title {
 	font-size: 1.125rem;
@@ -289,6 +325,14 @@
 }
 
 /* Emphasize remaining days for clarity */
+.stat-card--annual-left {
+	border-color: var(--arbeitszeitcheck-color-border);
+}
+
+.stat-card--carryover-pool {
+	border-color: var(--arbeitszeitcheck-color-border);
+}
+
 .stat-card--remaining {
 	border-color: var(--arbeitszeitcheck-color-primary);
 	box-shadow: 0 0 0 1px var(--arbeitszeitcheck-color-primary);

@@ -139,7 +139,7 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                 <fieldset class="form-fieldset" aria-labelledby="vacation-carryover-expiry-legend">
                     <legend id="vacation-carryover-expiry-legend" class="form-legend"><?php p($l->t('Vacation carryover expiry')); ?></legend>
                     <p class="form-help form-help--block" id="vacation-carryover-expiry-intro">
-                        <?php p($l->t('This is the last calendar day in each year when carryover from the opening balance (Resturlaub) may still be used for vacation. You enter each person’s opening balance per calendar year under Users. After this date, new vacation requests can only use the annual vacation entitlement from the working time model—not carryover. This applies to everyone.')); ?>
+                        <?php p($l->t('This is the last calendar day in each year when carryover from the opening balance (Resturlaub) may still be used for vacation. You enter each person\'s opening balance per calendar year under Users. After this date, new vacation requests can only use the annual vacation entitlement from the working time model—not carryover. This applies to everyone.')); ?>
                     </p>
                     <p class="form-help form-help--block form-help--note" id="vacation-carryover-expiry-how">
                         <?php p($l->t('Only approved vacation counts. For working days on or before this date, carryover is used before annual entitlement. Approved absences are applied in chronological order (by start date, then id).')); ?>
@@ -163,6 +163,38 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                     <p id="vacation-carryover-expiry-help" class="form-help">
                         <?php p($l->t('Typical value in Germany: 31 March (month 3, day 31). If that day does not exist in a month (e.g. 31 February), the last day of that month is used automatically.')); ?>
                     </p>
+                    <div class="form-group">
+                        <label for="vacationCarryoverMaxDays" class="form-label"><?php p($l->t('Maximum carryover days (optional)')); ?></label>
+                        <input type="text" class="form-input" id="vacationCarryoverMaxDays" name="vacationCarryoverMaxDays" inputmode="decimal"
+                            placeholder="<?php p($l->t('Empty = no limit')); ?>"
+                            value="<?php p((string)($settings['vacationCarryoverMaxDays'] ?? '')); ?>"
+                            aria-describedby="vacation-carryover-max-help">
+                        <p id="vacation-carryover-max-help" class="form-help">
+                            <?php p($l->t('If set, opening carryover per user cannot exceed this many days (Tarifvertrag / company policy). Leave empty for no cap. Imports and admin edits are clamped to this value.')); ?>
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="vacationRolloverEnabled" name="vacationRolloverEnabled" value="1"
+                                <?php echo ($settings['vacationRolloverEnabled'] ?? true) ? 'checked' : ''; ?>
+                                aria-describedby="vacation-rollover-enabled-help">
+                            <label for="vacationRolloverEnabled" class="form-label"><?php p($l->t('Automatic vacation rollover job')); ?></label>
+                        </div>
+                        <p id="vacation-rollover-enabled-help" class="form-help">
+                            <?php p($l->t('When enabled, a daily task may copy unused carryover (and optionally unused annual days, see below) into the next calendar year’s opening balance after the carryover deadline, unless a balance already exists for that year. Use the occ command for manual runs.')); ?>
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="vacationRolloverIncludeUnusedAnnual" name="vacationRolloverIncludeUnusedAnnual" value="1"
+                                <?php echo ($settings['vacationRolloverIncludeUnusedAnnual'] ?? false) ? 'checked' : ''; ?>
+                                aria-describedby="vacation-rollover-annual-help">
+                            <label for="vacationRolloverIncludeUnusedAnnual" class="form-label"><?php p($l->t('Include unused annual entitlement in rollover (advanced)')); ?></label>
+                        </div>
+                        <p id="vacation-rollover-annual-help" class="form-help form-help--note">
+                            <?php p($l->t('Off by default. Only enable if your collective agreement allows transferring unused annual leave; consult HR / legal. When on, unused annual days for the year may be added to the next year’s carryover opening, subject to the maximum carryover cap above.')); ?>
+                        </p>
+                    </div>
                 </fieldset>
                 <fieldset class="form-fieldset" aria-labelledby="send-ical-legend">
                     <legend id="send-ical-legend" class="form-legend"><?php p($l->t('Absences: Send iCal via email')); ?></legend>
@@ -450,4 +482,16 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
 window.ArbeitszeitCheck.adminSettingsApiUrl = <?php echo json_encode($apiSettingsUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
+window.ArbeitszeitCheck.l10n.settingsSavedSuccessfully = <?php echo json_encode($l->t('Settings saved successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.failedToSaveSettings = <?php echo json_encode($l->t('Failed to save settings'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.errorSavingSettings = <?php echo json_encode($l->t('An error occurred while saving settings'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.maxDailyHoursRange = <?php echo json_encode($l->t('Maximum daily hours must be between 1 and 24'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.minRestPeriodRange = <?php echo json_encode($l->t('Minimum rest period must be between 1 and 24 hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.defaultWorkingHoursRange = <?php echo json_encode($l->t('Default working hours must be between 1 and 24'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.retentionPeriodRange = <?php echo json_encode($l->t('Retention period must be between 1 and 10 years'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.carryoverMonthRange = <?php echo json_encode($l->t('Carryover expiry month must be between 1 and 12'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.carryoverDayRange = <?php echo json_encode($l->t('Carryover expiry day must be between 1 and 31'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.maxCarryoverDaysRange = <?php echo json_encode($l->t('Maximum carryover days must be empty (unlimited) or between 0 and 366'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.l10n.valueBetweenMinMax = <?php echo json_encode($l->t('Value must be between {min} and {max}'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>

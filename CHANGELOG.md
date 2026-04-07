@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Manager dashboard — pending absences**: API now includes `summary.typeLabel` (server-localized absence type); UI prefers it so cards show translated labels (e.g. German *Urlaub*) instead of raw codes like `vacation`.
+
+### Documentation
+
+- `docs/Developer-Documentation.en.md`: pending-approvals API note for `typeLabel`; user manuals (EN/DE): manager pending approvals show localized absence types.
+
 ## 1.1.9 - 2026-04-05
 
 ### Removed

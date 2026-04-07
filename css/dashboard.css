@@ -506,10 +506,51 @@
 .dashboard-vacation-card__hint {
     margin: 0;
     max-width: 42rem;
+    line-height: 1.55;
+}
+
+.dashboard-vacation-card__hint--locked {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg, 10px);
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover));
+    color: var(--arbeitszeitcheck-color-text);
 }
 
 .dashboard-vacation-card__actions {
     margin-top: var(--space-2);
+}
+
+.dashboard-vacation-card__breakdown {
+    margin: var(--space-4) 0 0;
+    padding: var(--space-4);
+    border-radius: var(--radius-lg, 10px);
+    border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+    background: var(--arbeitszeitcheck-color-background-elevated, var(--color-background-plain));
+    display: grid;
+    gap: var(--space-3);
+}
+
+.dashboard-vacation-card__breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.dashboard-vacation-card__breakdown dt {
+    margin: 0;
+    font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+    font-weight: 600;
+    color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.dashboard-vacation-card__breakdown dd {
+    margin: 0;
+    font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
+    color: var(--arbeitszeitcheck-color-text);
 }
 
 @media (max-width: 768px) {

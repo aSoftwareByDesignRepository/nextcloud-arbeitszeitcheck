@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
+use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
@@ -120,6 +121,12 @@ class Application extends App implements IBootstrap {
 
 		$context->registerService(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper(
 				$c->query(IDBConnection::class)
 			);
 		});
@@ -254,6 +261,17 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
 				$c->query(HolidayService::class)
+			);
+		});
+
+		$context->registerService(VacationRolloverService::class, function($c) {
+			return new VacationRolloverService(
+				$c->query(\OCP\IConfig::class),
+				$c->query(VacationAllocationService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class)
 			);
 		});
 

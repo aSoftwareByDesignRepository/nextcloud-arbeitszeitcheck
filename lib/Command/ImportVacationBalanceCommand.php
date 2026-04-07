@@ -15,6 +15,7 @@ namespace OCA\ArbeitszeitCheck\Command;
 
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -29,6 +30,7 @@ class ImportVacationBalanceCommand extends Command
 		private IUserManager $userManager,
 		private VacationYearBalanceMapper $vacationYearBalanceMapper,
 		private AuditLogMapper $auditLogMapper,
+		private VacationAllocationService $vacationAllocationService,
 	) {
 		parent::__construct();
 	}
@@ -109,7 +111,8 @@ class ImportVacationBalanceCommand extends Command
 			}
 
 			if (!$dryRun) {
-				$this->vacationYearBalanceMapper->upsert($userId, $year, $days);
+				$stored = $this->vacationAllocationService->applyCapToOpeningBalance($days);
+				$this->vacationYearBalanceMapper->upsert($userId, $year, $stored);
 				try {
 					$this->auditLogMapper->logAction(
 						$userId,
@@ -117,7 +120,7 @@ class ImportVacationBalanceCommand extends Command
 						'vacation_year_balance',
 						null,
 						null,
-						['year' => $year, 'carryover_days' => $days],
+						['year' => $year, 'carryover_days' => $stored, 'carryover_days_csv' => $days],
 						'cli'
 					);
 				} catch (\Throwable $e) {

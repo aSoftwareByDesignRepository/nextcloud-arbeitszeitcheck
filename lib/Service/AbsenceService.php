@@ -258,7 +258,7 @@ class AbsenceService
 		if (array_key_exists('substitute_user_id', $data)) {
 			$validateData['substitute_user_id'] = $data['substitute_user_id'];
 		}
-		$this->validateAbsenceData($validateData, $userId, $id);
+		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt());
 
 		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
 		$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
@@ -550,7 +550,7 @@ class AbsenceService
 				$sd = $absence->getStartDate();
 				$ed = $absence->getEndDate();
 				if ($sd && $ed) {
-					$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null);
+					$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null, $absence->getCreatedAt());
 				}
 			}
 
@@ -904,12 +904,17 @@ class AbsenceService
 
 		try {
 			$today = new \DateTime('today');
-			$alloc = $this->vacationAllocationService->computeYearAllocation($userId, $year, null, null, null, $today);
+			$alloc = $this->vacationAllocationService->computeYearAllocation($userId, $year, null, null, null, $today, null);
 			$totalEntitlement = (float)$alloc['entitlement'];
 			$carryoverOpening = (float)$alloc['carryover_opening'];
 			$totalAvailable = $totalEntitlement + $carryoverOpening;
 			$usedDays = (float)$alloc['used_total_working_days'];
 			$remaining = (float)$alloc['total_remaining_for_new_requests'];
+			$carryoverRem = (float)($alloc['carryover_remaining_after_approved'] ?? 0);
+			$annualRem = (float)($alloc['annual_remaining_after_approved'] ?? 0);
+			$carryoverBlocked = $carryoverRem > 0.0001
+				&& !$this->vacationAllocationService->isCarryoverUsableForNewRequests($year, $today);
+			$cap = $this->vacationAllocationService->getMaxCarryoverOpeningCap();
 
 			return [
 				'year' => $year,
@@ -917,6 +922,10 @@ class AbsenceService
 				'carryover_days' => round($carryoverOpening, 2),
 				'carryover_usable' => round((float)$alloc['carryover_usable_for_new_requests'], 2),
 				'carryover_expires_on' => $alloc['carryover_expires_on'],
+				'carryover_unused_locked_after_deadline' => $carryoverBlocked,
+				'carryover_remaining_after_approved' => round($carryoverRem, 2),
+				'annual_remaining_after_approved' => round($annualRem, 2),
+				'carryover_max_cap' => $cap !== null ? round($cap, 2) : null,
 				'total_available' => round($totalAvailable, 2),
 				'used' => round($usedDays, 2),
 				'remaining' => round($remaining, 2),
@@ -930,6 +939,10 @@ class AbsenceService
 				'carryover_days' => 0.0,
 				'carryover_usable' => 0.0,
 				'carryover_expires_on' => null,
+				'carryover_unused_locked_after_deadline' => false,
+				'carryover_remaining_after_approved' => 0.0,
+				'annual_remaining_after_approved' => 0.0,
+				'carryover_max_cap' => null,
 				'total_available' => (float)Constants::DEFAULT_VACATION_DAYS_PER_YEAR,
 				'used' => 0.0,
 				'remaining' => (float)Constants::DEFAULT_VACATION_DAYS_PER_YEAR,
@@ -943,7 +956,7 @@ class AbsenceService
 	 *
 	 * @throws \Exception
 	 */
-	private function assertVacationAllocationForRequest(string $userId, \DateTime $startDate, \DateTime $endDate, ?int $excludeAbsenceId = null): void
+	private function assertVacationAllocationForRequest(string $userId, \DateTime $startDate, \DateTime $endDate, ?int $excludeAbsenceId = null, ?\DateTimeInterface $prospectiveRequestCreatedAt = null): void
 	{
 		$requestedWorkingDaysPerYear = $this->computeWorkingDaysPerYear($startDate, $endDate, $userId);
 		if ($requestedWorkingDaysPerYear === []) {
@@ -965,7 +978,8 @@ class AbsenceService
 				$excludeAbsenceId,
 				$startDate,
 				$endDate,
-				$today
+				$today,
+				$prospectiveRequestCreatedAt
 			);
 			if ($alloc['allocation_valid']) {
 				continue;
@@ -976,7 +990,8 @@ class AbsenceService
 				$excludeAbsenceId,
 				null,
 				null,
-				$today
+				$today,
+				null
 			);
 			$msg = $this->l10n->t(
 				'Not enough vacation days remaining. You have %1$s days left for %2$s but requested %3$s days.',
@@ -998,7 +1013,7 @@ class AbsenceService
 	 * @param int|null $excludeAbsenceId When updating, ID of the absence to exclude from overlap check
 	 * @throws \Exception
 	 */
-	private function validateAbsenceData(array $data, string $userId, ?int $excludeAbsenceId = null): void
+	private function validateAbsenceData(array $data, string $userId, ?int $excludeAbsenceId = null, ?\DateTimeInterface $vacationRequestCreatedAt = null): void
 	{
 		// Validate required fields
 		if (empty($data['type']) || empty($data['start_date']) || empty($data['end_date'])) {
@@ -1089,7 +1104,7 @@ class AbsenceService
 			if ($totalRequested < 0.01) {
 				throw new \Exception($this->l10n->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.'));
 			}
-			$this->assertVacationAllocationForRequest($userId, $startDate, $endDate, $excludeAbsenceId);
+			$this->assertVacationAllocationForRequest($userId, $startDate, $endDate, $excludeAbsenceId, $vacationRequestCreatedAt);
 		}
 
 		// Require substitute for configured types (admin setting)
@@ -1204,7 +1219,7 @@ class AbsenceService
 			$sd = $absence->getStartDate();
 			$ed = $absence->getEndDate();
 			if ($sd && $ed) {
-				$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null);
+				$this->assertVacationAllocationForRequest($absence->getUserId(), $sd, $ed, null, $absence->getCreatedAt());
 			}
 		}
 

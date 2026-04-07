@@ -373,6 +373,8 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
 
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
+
 <!-- Initialize JavaScript: keep configuration inline, move behaviour into bundled reports.js -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};

@@ -11,12 +11,17 @@
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
     const Components = window.ArbeitszeitCheckComponents || {};
-    const l10n = window.ArbeitszeitCheck?.l10n || {};
 
     let refreshInterval = null;
 
+    /** Always read current l10n (inline template may run after this file; other scripts may replace the object). */
     function t(key, fallback) {
-        return (l10n[key] !== undefined ? l10n[key] : (typeof window.t === 'function' ? window.t('arbeitszeitcheck', fallback || key) : fallback || key));
+        const bundle = window.ArbeitszeitCheck?.l10n || {};
+        const v = bundle[key];
+        if (v !== undefined && v !== '') {
+            return v;
+        }
+        return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', fallback || key) : fallback || key);
     }
 
     function escapeHtml(str) {
@@ -24,6 +29,65 @@
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function parseSummary(summary) {
+        if (summary == null) {
+            return {};
+        }
+        if (typeof summary === 'object' && !Array.isArray(summary)) {
+            return summary;
+        }
+        if (typeof summary === 'string') {
+            try {
+                const o = JSON.parse(summary);
+                return (typeof o === 'object' && o !== null && !Array.isArray(o)) ? o : {};
+            } catch (e) {
+                return {};
+            }
+        }
+        return {};
+    }
+
+    /** Maps API absence type codes to l10n keys (same strings as absences form). */
+    var ABSENCE_TYPE_TO_L10N_KEY = {
+        vacation: 'Vacation',
+        sick_leave: 'Sick leave',
+        personal_leave: 'Personal leave',
+        parental_leave: 'Parental leave',
+        special_leave: 'Special leave',
+        unpaid_leave: 'Unpaid leave',
+        home_office: 'Home office',
+        business_trip: 'Business trip'
+    };
+
+    /** Normalize codes from API (hyphens, stray unicode) so the map lookup succeeds. */
+    function normalizeAbsenceTypeCode(raw) {
+        if (raw == null) {
+            return '';
+        }
+        let s = String(raw).trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+        s = s.replace(/-/g, '_').toLowerCase();
+        return s;
+    }
+
+    function absenceTypeDisplay(raw) {
+        const code = normalizeAbsenceTypeCode(raw);
+        if (code === '' || code === 'absence') {
+            return t('Absence', 'Absence');
+        }
+        const msgKey = ABSENCE_TYPE_TO_L10N_KEY[code];
+        if (msgKey) {
+            return t(msgKey, msgKey);
+        }
+        return String(raw).trim();
+    }
+
+    function absenceTitleTypeDisplay(s, typeCode) {
+        if (s.typeLabel != null && String(s.typeLabel).trim() !== '') {
+            return String(s.typeLabel).trim();
+        }
+        return absenceTypeDisplay(typeCode);
     }
 
     function init() {
@@ -104,14 +168,17 @@
     }
 
     function renderAbsenceCard(item) {
-        const s = item.summary || {};
-        const typeLabel = s.type || item.type || 'absence';
+        const s = parseSummary(item.summary);
+        // Prefer absence kind from summary; API uses camelCase (type). item.type is always "absence" for the record — do not use it as the kind.
+        const typeCode = s.type != null && s.type !== ''
+            ? s.type
+            : (s.absence_type || s.absenceType || 'absence');
         const start = s.start_date || s.startDate || '';
         const end = s.end_date || s.endDate || '';
         const days = s.days != null ? s.days : '';
         const id = item.id;
         const displayName = escapeHtml(item.displayName || item.userId || '');
-        const typeDisplay = escapeHtml(typeLabel);
+        const typeDisplay = escapeHtml(absenceTitleTypeDisplay(s, typeCode));
         return (
             '<div class="pending-approval-card pending-approval-card--absence" data-absence-id="' + escapeHtml(String(id)) + '" role="article">' +
             '  <div class="pending-approval-card__body">' +

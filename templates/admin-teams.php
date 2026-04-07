@@ -95,3 +95,5 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 </div><!-- /#arbeitszeitcheck-app -->
 
 <div role="status" aria-live="polite" id="admin-teams-status" class="visually-hidden"></div>
+
+<?php include __DIR__ . '/common/teams-l10n.php'; ?>

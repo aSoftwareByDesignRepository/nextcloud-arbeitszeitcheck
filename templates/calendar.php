@@ -157,6 +157,8 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
 
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
+
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};

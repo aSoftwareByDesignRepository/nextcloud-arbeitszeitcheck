@@ -67,7 +67,19 @@ function initializeDatepicker(input, options = {}) {
 		return null;
 	}
 
-	const t = (s) => (typeof window !== 'undefined' && window.t ? window.t('arbeitszeitcheck', s) : s);
+	const l10n = window.ArbeitszeitCheck?.l10n || {};
+	const t = (s) => {
+		if (s === 'Open calendar' && l10n.openCalendar) {
+			return l10n.openCalendar;
+		}
+		if (s === 'Previous month' && l10n.previousMonth) {
+			return l10n.previousMonth;
+		}
+		if (s === 'Next month' && l10n.nextMonth) {
+			return l10n.nextMonth;
+		}
+		return (typeof window !== 'undefined' && window.t ? window.t('arbeitszeitcheck', s) : s);
+	};
 	const monthNames = [t('January'), t('February'), t('March'), t('April'), t('May'), t('June'),
 		t('July'), t('August'), t('September'), t('October'), t('November'), t('December')];
 	const dayNames = [t('Mon'), t('Tue'), t('Wed'), t('Thu'), t('Fri'), t('Sat'), t('Sun')];

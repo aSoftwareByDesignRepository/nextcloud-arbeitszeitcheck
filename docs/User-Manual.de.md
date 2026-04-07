@@ -40,6 +40,7 @@ Die genauen Rechte hängen von Nextcloud-Gruppen und der App-Konfiguration ab.
 
 - **Kommen/Gehen und Pausen** über die Zeiterfassung; Korrekturen und Begründungen nach internen Regeln.
 - **Abwesenheiten** beantragen und ggf. auf Freigabe warten. **Resturlaub** und Überträge werden angezeigt, wenn die Administration das gepflegt hat.
+- **Manager-Dashboard** (als Führungskraft): Unter **Ausstehende Genehmigungen** erscheint der **Abwesenheitstyp in Ihrer Sprache** (z. B. Urlaub, Krankheit), nicht technische Kurzbezeichnungen.
 - **Berichte** für Zeiträume erstellen und erlaubte Exporte nutzen (CSV, DATEV, …).
 - **Compliance-Hinweise** (z. B. fehlende Pausen) nach Vorgabe des Arbeitgebers bearbeiten.
 

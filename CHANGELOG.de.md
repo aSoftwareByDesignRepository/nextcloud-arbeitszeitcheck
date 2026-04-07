@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Behoben
+
+- **Manager-Dashboard — ausstehende Abwesenheiten**: Die API liefert jetzt `summary.typeLabel` (serverseitig übersetzter Abwesenheitstyp); die Oberfläche nutzt das bevorzugt, damit Karten lokalisierte Bezeichnungen zeigen (z. B. *Urlaub*) statt Rohcodes wie `vacation`.
+
+### Dokumentation
+
+- `docs/Developer-Documentation.en.md`: API-Hinweis zu `typeLabel` bei Pending Approvals; Nutzerhandbücher EN/DE: Hinweis zu lokalisierten Abwesenheitstypen bei ausstehenden Genehmigungen.
+
 ## 1.1.9 – 2026-04-05
 
 ### Entfernt

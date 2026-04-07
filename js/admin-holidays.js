@@ -10,6 +10,47 @@
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
 
+    const HOLIDAYS_UI_JSON_ID = 'arbeitszeitcheck-admin-holidays-ui-strings';
+
+    let holidaysUiStringsFromDomApplied = false;
+
+    /**
+     * Load translated strings from the JSON script at the bottom of admin-holidays.php.
+     * Ensures server translations win over window.t fallbacks once the DOM node exists.
+     */
+    function ensureHolidaysUiStrings() {
+        if (holidaysUiStringsFromDomApplied) {
+            return;
+        }
+        const el = document.getElementById(HOLIDAYS_UI_JSON_ID);
+        if (!el || !el.textContent || !el.textContent.trim()) {
+            return;
+        }
+        try {
+            const parsed = JSON.parse(el.textContent);
+            if (parsed && typeof parsed === 'object') {
+                window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+                window.ArbeitszeitCheck.holidaysUiStrings = parsed;
+                holidaysUiStringsFromDomApplied = true;
+            }
+        } catch (e) {
+            console.error('[admin-holidays] Could not parse holidays UI translations', e);
+        }
+    }
+
+    /** Prefer server-injected strings; window.t is not always available in this view. */
+    function tAzc(msgid) {
+        ensureHolidaysUiStrings();
+        const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.holidaysUiStrings;
+        if (map && Object.prototype.hasOwnProperty.call(map, msgid) && map[msgid] !== undefined && map[msgid] !== '') {
+            return map[msgid];
+        }
+        if (typeof window.t === 'function') {
+            return window.t('arbeitszeitcheck', msgid);
+        }
+        return msgid;
+    }
+
     let initialized = false;
 
     function init() {
@@ -17,6 +58,7 @@
             return;
         }
         initialized = true;
+        ensureHolidaysUiStrings();
         bindEvents();
         loadExistingHolidays();
     }
@@ -66,7 +108,7 @@
         dateInput.name = 'date';
         dateInput.required = true;
         dateInput.className = 'form-input datepicker-input';
-        dateInput.placeholder = (window.t && window.t('arbeitszeitcheck', 'dd.mm.yyyy')) || 'dd.mm.yyyy';
+        dateInput.placeholder = tAzc('dd.mm.yyyy');
         dateInput.setAttribute('pattern', '\\d{2}\\.\\d{2}\\.\\d{4}');
         dateInput.setAttribute('maxlength', '10');
         dateCell.appendChild(dateInput);
@@ -87,10 +129,10 @@
         typeSelect.className = 'form-select';
         const optFull = document.createElement('option');
         optFull.value = 'full';
-        optFull.textContent = (window.t && window.t('arbeitszeitcheck', 'Full-day holiday')) || 'Full-day holiday';
+        optFull.textContent = tAzc('Full-day holiday');
         const optHalf = document.createElement('option');
         optHalf.value = 'half';
-        optHalf.textContent = (window.t && window.t('arbeitszeitcheck', 'Half-day holiday')) || 'Half-day holiday';
+        optHalf.textContent = tAzc('Half-day holiday');
         typeSelect.appendChild(optFull);
         typeSelect.appendChild(optHalf);
         typeCell.appendChild(typeSelect);
@@ -101,9 +143,9 @@
         scopeSelect.name = 'scope';
         scopeSelect.className = 'form-select';
         const scopes = [
-            { value: 'company', label: (window.t && window.t('arbeitszeitcheck', 'Company holiday')) || 'Company holiday' },
-            { value: 'custom', label: (window.t && window.t('arbeitszeitcheck', 'custom')) || 'Custom' },
-            { value: 'statutory', label: (window.t && window.t('arbeitszeitcheck', 'Statutory')) || 'Statutory' }
+            { value: 'company', label: tAzc('Company holiday') },
+            { value: 'custom', label: tAzc('custom') },
+            { value: 'statutory', label: tAzc('Statutory') }
         ];
         scopes.forEach(function(s) {
             const opt = document.createElement('option');
@@ -118,7 +160,7 @@
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'btn btn--primary btn--sm';
-        saveBtn.textContent = (window.t && window.t('arbeitszeitcheck', 'Save')) || 'Save';
+        saveBtn.textContent = tAzc('Save');
         Utils.on(saveBtn, 'click', function() {
             saveHolidayRow(row);
         });
@@ -126,7 +168,7 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'btn btn--secondary btn--sm';
-        deleteBtn.textContent = (window.t && window.t('arbeitszeitcheck', 'Remove')) || 'Remove';
+        deleteBtn.textContent = tAzc('Remove');
         Utils.on(deleteBtn, 'click', function() {
             row.remove();
         });
@@ -157,7 +199,7 @@
         const scopeSelect = row.querySelector('select[name="scope"]');
 
         if (!dateInput || !nameInput || !typeSelect || !scopeSelect) {
-            const msg = (window.t && window.t('arbeitszeitcheck', 'Technical error: Required fields for the holiday could not be found.')) || 'Technical error: Required fields for the holiday could not be found.';
+            const msg = tAzc('Technical error: Required fields for the holiday could not be found.');
             if (Messaging && Messaging.showError) {
                 Messaging.showError(msg);
             } else {
@@ -180,7 +222,7 @@
         };
 
         if (!payload.date || !payload.name) {
-            const msg = (window.t && window.t('arbeitszeitcheck', 'Please specify date and name of the holiday.')) || 'Please specify date and name of the holiday.';
+            const msg = tAzc('Please specify date and name of the holiday.');
             if (Messaging && Messaging.showError) {
                 Messaging.showError(msg);
             } else {
@@ -207,11 +249,11 @@
                 }
                 loadExistingHolidays();
                 if (Messaging && Messaging.showSuccess) {
-                    const msg = window.t ? window.t('arbeitszeitcheck', 'Holiday was saved.') : 'Holiday was saved.';
+                    const msg = tAzc('Holiday was saved.');
                     Messaging.showSuccess(msg);
                 }
             } else {
-                const errorMsg = (data && data.error) || (window.t && window.t('arbeitszeitcheck', 'Holiday could not be saved.')) || 'Holiday could not be saved.';
+                const errorMsg = (data && data.error) || tAzc('Holiday could not be saved.');
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(errorMsg);
                 } else {
@@ -219,7 +261,7 @@
                 }
             }
         }).catch(function() {
-            const msg = (window.t && window.t('arbeitszeitcheck', 'An error occurred while saving the holiday.')) || 'An error occurred while saving the holiday.';
+            const msg = tAzc('An error occurred while saving the holiday.');
             if (Messaging && Messaging.showError) {
                 Messaging.showError(msg);
             } else {
@@ -253,7 +295,7 @@
             if (!data || data.success !== true || !Array.isArray(data.holidays)) {
                 renderEmptyHolidaysRow(tbody);
                 if (Messaging && Messaging.showError) {
-                    const msg = window.t ? window.t('arbeitszeitcheck', 'Holidays could not be loaded.') : 'Holidays could not be loaded.';
+                    const msg = tAzc('Holidays could not be loaded.');
                     Messaging.showError(msg);
                 }
                 return;
@@ -270,7 +312,7 @@
         }).catch(function() {
             renderEmptyHolidaysRow(tbody);
             if (Messaging && Messaging.showError) {
-                const msg = window.t ? window.t('arbeitszeitcheck', 'Holidays could not be loaded.') : 'Holidays could not be loaded.';
+                const msg = tAzc('Holidays could not be loaded.');
                 Messaging.showError(msg);
             }
         });
@@ -294,8 +336,8 @@
 
         const typeCell = document.createElement('td');
         const kindLabel = item.kind === 'half'
-            ? ((window.t && window.t('arbeitszeitcheck', 'Half-day holiday')) || 'Half-day holiday')
-            : ((window.t && window.t('arbeitszeitcheck', 'Full-day holiday')) || 'Full-day holiday');
+            ? tAzc('Half-day holiday')
+            : tAzc('Full-day holiday');
         const typeBadge = document.createElement('span');
         typeBadge.className = 'admin-holidays-badge ' + (item.kind === 'half' ? 'admin-holidays-badge--half' : 'admin-holidays-badge--full');
         typeBadge.textContent = kindLabel;
@@ -305,13 +347,13 @@
         let scopeLabel = '';
         let scopeBadgeClass = 'admin-holidays-badge--custom';
         if (item.scope === 'statutory') {
-            scopeLabel = window.t ? window.t('arbeitszeitcheck', 'Statutory') : 'Statutory';
+            scopeLabel = tAzc('Statutory');
             scopeBadgeClass = 'admin-holidays-badge--statutory';
         } else if (item.scope === 'company') {
-            scopeLabel = window.t ? window.t('arbeitszeitcheck', 'Company holiday') : 'Company holiday';
+            scopeLabel = tAzc('Company holiday');
             scopeBadgeClass = 'admin-holidays-badge--company';
         } else {
-            scopeLabel = window.t ? window.t('arbeitszeitcheck', 'custom') : 'Custom';
+            scopeLabel = tAzc('custom');
             scopeBadgeClass = 'admin-holidays-badge--custom';
         }
         const scopeBadge = document.createElement('span');
@@ -324,29 +366,23 @@
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.className = 'btn btn--secondary btn--sm';
-            deleteBtn.textContent = (window.t && window.t('arbeitszeitcheck', 'Remove')) || 'Remove';
-            if (window.t) {
-                const labelTemplate = window.t('arbeitszeitcheck', 'Remove holiday {name} on {date}');
-                const ariaLabel = labelTemplate
-                    .replace('{name}', item.name || '')
-                    .replace('{date}', displayDate || '');
-                deleteBtn.setAttribute('aria-label', ariaLabel);
-            }
+            deleteBtn.textContent = tAzc('Remove');
+            const labelTemplate = tAzc('Remove holiday {name} on {date}');
+            const ariaLabel = labelTemplate
+                .replace('{name}', item.name || '')
+                .replace('{date}', displayDate || '');
+            deleteBtn.setAttribute('aria-label', ariaLabel);
             Utils.on(deleteBtn, 'click', function() {
                 const name = item.name || '';
-                const title = window.t ? window.t('arbeitszeitcheck', 'Remove holiday') : 'Remove holiday';
+                const title = tAzc('Remove holiday');
 
-                const baseMessage = window.t
-                    ? window.t('arbeitszeitcheck', 'Do you really want to remove the holiday "{name}" on {date}?')
-                        .replace('{name}', name)
-                        .replace('{date}', displayDate || '')
-                    : ('Do you really want to remove the holiday "' + name + '" on ' + (displayDate || '') + '?');
+                const baseMessage = tAzc('Do you really want to remove the holiday "{name}" on {date}?')
+                    .replace('{name}', name)
+                    .replace('{date}', displayDate || '');
 
                 let extra = '';
                 if (item.scope === 'statutory') {
-                    extra = window.t
-                        ? window.t('arbeitszeitcheck', 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.')
-                        : 'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.';
+                    extra = tAzc('Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.');
                 }
 
                 const body = extra ? (extra + '<br><br>' + baseMessage) : baseMessage;
@@ -360,10 +396,10 @@
                         </div>
                         <div class="form-actions">
                             <button type="button" class="btn btn--secondary" data-action="close-modal">
-                                ${(window.t && window.t('arbeitszeitcheck', 'Cancel')) || 'Cancel'}
+                                ${tAzc('Cancel')}
                             </button>
                             <button type="button" class="btn btn--primary btn--danger" data-action="confirm-delete-holiday">
-                                ${(window.t && window.t('arbeitszeitcheck', 'Remove')) || 'Remove'}
+                                ${tAzc('Remove')}
                             </button>
                         </div>
                     `;
@@ -437,8 +473,7 @@
         const cell = document.createElement('td');
         cell.colSpan = 5;
         cell.className = 'admin-holidays-empty';
-        cell.textContent = (window.t && window.t('arbeitszeitcheck', 'No holidays configured for this year.')) ||
-            'No holidays configured for this year.';
+        cell.textContent = tAzc('No holidays configured for this year.');
         row.appendChild(cell);
         tbody.appendChild(row);
     }
@@ -461,17 +496,17 @@
             if (data && data.success) {
                 row.remove();
                 if (Messaging && Messaging.showSuccess) {
-                    const msg = (window.t && window.t('arbeitszeitcheck', 'Holiday was removed.')) || 'Holiday was removed.';
+                    const msg = tAzc('Holiday was removed.');
                     Messaging.showSuccess(msg);
                 }
             } else {
-                const errorMsg = (data && data.error) || (window.t ? window.t('arbeitszeitcheck', 'Holiday could not be removed.') : 'Holiday could not be removed.');
+                const errorMsg = (data && data.error) || tAzc('Holiday could not be removed.');
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(errorMsg);
                 }
             }
         }).catch(function() {
-            const msg = (window.t && window.t('arbeitszeitcheck', 'An error occurred while removing the holiday.')) || 'An error occurred while removing the holiday.';
+            const msg = tAzc('An error occurred while removing the holiday.');
             if (Messaging && Messaging.showError) {
                 Messaging.showError(msg);
             }

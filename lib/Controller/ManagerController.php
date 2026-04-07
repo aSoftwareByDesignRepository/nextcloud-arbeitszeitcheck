@@ -208,6 +208,24 @@ class ManagerController extends Controller
 	}
 
 	/**
+	 * Localized label for an absence type code (same strings as the absences UI / manager-dashboard l10n).
+	 */
+	private function getAbsenceTypeLabel(string $type): string
+	{
+		$map = [
+			'vacation' => $this->l10n->t('Vacation'),
+			'sick_leave' => $this->l10n->t('Sick leave'),
+			'personal_leave' => $this->l10n->t('Personal leave'),
+			'parental_leave' => $this->l10n->t('Parental leave'),
+			'special_leave' => $this->l10n->t('Special leave'),
+			'unpaid_leave' => $this->l10n->t('Unpaid leave'),
+			'home_office' => $this->l10n->t('Home office'),
+			'business_trip' => $this->l10n->t('Business trip'),
+		];
+		return $map[$type] ?? $type;
+	}
+
+	/**
 	 * Manager dashboard page
 	 *
 	 */
@@ -455,12 +473,14 @@ class ManagerController extends Controller
 				foreach ($pendingAbsences as $absence) {
 					try {
 						$createdAt = $absence->getCreatedAt();
+						$summary = $absence->getSummary();
+						$summary['typeLabel'] = $this->getAbsenceTypeLabel($absence->getType());
 						$pendingApprovals[] = [
 							'id' => $absence->getId(),
 							'type' => 'absence',
 							'userId' => $absence->getUserId(),
 							'displayName' => $this->getDisplayName($absence->getUserId()),
-							'summary' => $absence->getSummary(),
+							'summary' => $summary,
 							'requestedAt' => $createdAt ? $createdAt->format('c') : null
 						];
 					} catch (\Throwable $e) {

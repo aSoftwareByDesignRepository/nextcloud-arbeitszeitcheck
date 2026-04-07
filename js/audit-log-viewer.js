@@ -11,6 +11,14 @@
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
 
+    function alT(msg) {
+        const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.auditLogViewerL10n;
+        if (map && Object.prototype.hasOwnProperty.call(map, msg) && map[msg] !== undefined && map[msg] !== '') {
+            return map[msg];
+        }
+        return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', msg) : msg);
+    }
+
     /**
      * Initialize audit log viewer
      */
@@ -52,7 +60,7 @@
 
         const tbody = Utils.$('#audit-log-tbody');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Loading…') : 'Loading…') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + alT('Loading…') + '</td></tr>';
         }
 
         Utils.ajax('/apps/arbeitszeitcheck/api/admin/audit-logs?' + params.toString(), {
@@ -61,13 +69,13 @@
                 if (data.success && data.logs) {
                     renderAuditLogs(data.logs);
                 } else {
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading audit logs') : 'Error loading audit logs') + '</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + alT('Error loading audit logs') + '</td></tr>';
                 }
             },
             onError: function(_error) {
-                if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading audit logs') : 'Error loading audit logs') + '</td></tr>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + alT('Error loading audit logs') + '</td></tr>';
                 if (Messaging && Messaging.showError) {
-                    Messaging.showError(window.t ? window.t('arbeitszeitcheck', 'Failed to load audit logs. Please try again.') : 'Failed to load audit logs. Please try again.');
+                    Messaging.showError(alT('Failed to load audit logs. Please try again.'));
                 }
             }
         });
@@ -81,7 +89,7 @@
         if (!tbody) return;
 
         if (logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'No audit log entries found') : 'No audit log entries found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + alT('No audit log entries found') + '</td></tr>';
             return;
         }
 

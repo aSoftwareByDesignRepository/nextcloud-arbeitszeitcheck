@@ -873,47 +873,6 @@ class ManagerControllerTest extends TestCase
 		$this->assertTrue($data['success']);
 		$this->assertArrayHasKey('absences', $data);
 		$this->assertCount(1, $data['absences']);
-		$this->assertSame(Absence::TYPE_VACATION, $data['absences'][0]['summary']['type']);
-	}
-
-	/**
-	 * Team absence calendar must not expose reason or exact sick-leave type.
-	 */
-	public function testGetTeamAbsenceCalendarRedactsSensitiveFields(): void
-	{
-		$managerId = 'manager1';
-		$teamMemberId = 'employee1';
-		$user = $this->createMock(IUser::class);
-		$user->method('getUID')->willReturn($managerId);
-
-		$teamMember = $this->createMock(IUser::class);
-		$teamMember->method('getUID')->willReturn($teamMemberId);
-
-		$this->userSession->method('getUser')->willReturn($user);
-		$this->userManager->method('get')->with($managerId)->willReturn($user);
-		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
-		$this->userManager->method('getDisplayName')->willReturn('Employee One');
-
-		$absence = new Absence();
-		$absence->setId(9);
-		$absence->setUserId($teamMemberId);
-		$absence->setType(Absence::TYPE_SICK_LEAVE);
-		$absence->setStartDate(new \DateTime('2024-06-01'));
-		$absence->setEndDate(new \DateTime('2024-06-02'));
-		$absence->setDays(2);
-		$absence->setReason('should not leak');
-		$absence->setStatus(Absence::STATUS_APPROVED);
-		$absence->setCreatedAt(new \DateTime());
-		$absence->setUpdatedAt(new \DateTime());
-
-		$this->absenceMapper->method('findByUserAndDateRange')
-			->willReturn([$absence]);
-
-		$response = $this->controller->getTeamAbsenceCalendar('2024-06-01', '2024-06-30');
-		$data = $response->getData();
-		$row = $data['absences'][0];
-		$this->assertArrayNotHasKey('reason', $row['summary']);
-		$this->assertSame('absence', $row['summary']['type']);
 	}
 
 	/**

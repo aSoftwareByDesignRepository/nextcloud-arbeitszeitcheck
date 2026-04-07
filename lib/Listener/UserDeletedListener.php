@@ -25,10 +25,9 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
-use OCA\ArbeitszeitCheck\Service\AbsenceCalendarSyncService;
-use OCA\ArbeitszeitCheck\Service\HolidayNcCalendarSyncService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCP\IL10N;
 use Psr\Log\LoggerInterface;
@@ -50,8 +49,7 @@ class UserDeletedListener implements IEventListener
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
 		private readonly VacationYearBalanceMapper $vacationYearBalanceMapper,
-		private readonly AbsenceCalendarSyncService $absenceCalendarSyncService,
-		private readonly HolidayNcCalendarSyncService $holidayNcCalendarSyncService,
+		private readonly VacationRolloverLogMapper $vacationRolloverLogMapper,
 		private readonly NotificationService $notificationService,
 		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger,
@@ -68,16 +66,6 @@ class UserDeletedListener implements IEventListener
 
 		try {
 			$this->deleteTimeEntries($userId);
-			try {
-				$this->absenceCalendarSyncService->removeAllMappingsForUser($userId);
-			} catch (\Throwable $e) {
-				$this->logger->warning('Absence calendar cleanup failed for deleted user', ['exception' => $e, 'userId' => $userId]);
-			}
-			try {
-				$this->holidayNcCalendarSyncService->removeAllForUser($userId);
-			} catch (\Throwable $e) {
-				$this->logger->warning('Holiday calendar cleanup failed for deleted user', ['exception' => $e, 'userId' => $userId]);
-			}
 			$this->deleteAbsences($userId);
 			$this->clearSubstituteFromAbsences($userId);
 			$this->deleteComplianceViolations($userId);
@@ -85,6 +73,7 @@ class UserDeletedListener implements IEventListener
 			$this->deleteUserSettings($userId);
 			$this->deleteUserWorkingTimeModels($userId);
 			$this->vacationYearBalanceMapper->deleteByUserId($userId);
+			$this->vacationRolloverLogMapper->deleteByUserId($userId);
 			$this->teamMemberMapper->deleteByUserId($userId);
 			$this->teamManagerMapper->deleteByUserId($userId);
 		} catch (\Throwable $e) {

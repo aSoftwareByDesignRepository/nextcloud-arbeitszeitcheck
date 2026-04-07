@@ -18,11 +18,41 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 
 $defaultState = $_['defaultState'] ?? 'NW';
 $currentYear = (int)date('Y');
+
+// Server-side strings for admin-holidays.js (window.t is not always available in this view)
+$holidaysUiStrings = [
+	'dd.mm.yyyy' => $l->t('dd.mm.yyyy'),
+	'Full-day holiday' => $l->t('Full-day holiday'),
+	'Half-day holiday' => $l->t('Half-day holiday'),
+	'Company holiday' => $l->t('Company holiday'),
+	'custom' => $l->t('custom'),
+	'Statutory' => $l->t('Statutory'),
+	'Save' => $l->t('Save'),
+	'Remove' => $l->t('Remove'),
+	'Technical error: Required fields for the holiday could not be found.' => $l->t('Technical error: Required fields for the holiday could not be found.'),
+	'Please specify date and name of the holiday.' => $l->t('Please specify date and name of the holiday.'),
+	'Holiday was saved.' => $l->t('Holiday was saved.'),
+	'Holiday could not be saved.' => $l->t('Holiday could not be saved.'),
+	'An error occurred while saving the holiday.' => $l->t('An error occurred while saving the holiday.'),
+	'Holidays could not be loaded.' => $l->t('Holidays could not be loaded.'),
+	'Remove holiday {name} on {date}' => $l->t('Remove holiday {name} on {date}'),
+	'Remove holiday' => $l->t('Remove holiday'),
+	'Do you really want to remove the holiday "{name}" on {date}?' => $l->t('Do you really want to remove the holiday "{name}" on {date}?'),
+	'Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.' => $l->t('Statutory holidays are automatically restored when the calendar is viewed, unless "Auto-restore statutory holidays" is disabled in Settings.'),
+	'Cancel' => $l->t('Cancel'),
+	'No holidays configured for this year.' => $l->t('No holidays configured for this year.'),
+	'Holiday was removed.' => $l->t('Holiday was removed.'),
+	'Holiday could not be removed.' => $l->t('Holiday could not be removed.'),
+	'An error occurred while removing the holiday.' => $l->t('An error occurred while removing the holiday.'),
+];
 ?>
 
 <?php include __DIR__ . '/common/navigation.php'; ?>
 
 <div id="app-content" class="admin-holidays-page">
+<script type="application/json" nonce="<?php p($_['cspNonce'] ?? ''); ?>" id="arbeitszeitcheck-admin-holidays-ui-strings">
+<?php echo json_encode($holidaysUiStrings, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+</script>
     <div id="app-content-wrapper">
             <div class="section admin-holidays-section">
                 <header class="section-header admin-holidays-section__header">

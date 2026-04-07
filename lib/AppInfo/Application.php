@@ -20,13 +20,12 @@ use OCA\ArbeitszeitCheck\Listener\UserDeletedListener;
 use OCA\ArbeitszeitCheck\Notification\Notifier;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
-use OCA\ArbeitszeitCheck\Service\AbsenceCalendarSyncService;
-use OCA\ArbeitszeitCheck\Service\HolidayNcCalendarSyncService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
+use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
@@ -126,54 +125,9 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
-		$context->registerService(\OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper::class, function($c) {
-			return new \OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper(
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper(
 				$c->query(IDBConnection::class)
-			);
-		});
-
-		$context->registerService(AbsenceCalendarSyncService::class, function($c) {
-			$calDav = null;
-			try {
-				$calDav = $c->query(\OCA\DAV\CalDAV\CalDavBackend::class);
-			} catch (\Throwable $e) {
-				// DAV app not available in some contexts (e.g. unit tests without full stack)
-			}
-			return new AbsenceCalendarSyncService(
-				$c->query(\OCP\Calendar\IManager::class),
-				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceCalendarMapper::class),
-				$c->query(\OCP\L10N\IFactory::class),
-				$c->query(\OCP\IUserManager::class),
-				$c->query(\OCP\AppFramework\Utility\ITimeFactory::class),
-				$c->query(\OCP\IURLGenerator::class),
-				$c->query(\OCP\IConfig::class),
-				$calDav
-			);
-		});
-
-		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper::class, function($c) {
-			return new \OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper(
-				$c->query(IDBConnection::class)
-			);
-		});
-
-		$context->registerService(HolidayNcCalendarSyncService::class, function($c) {
-			$calDav = null;
-			try {
-				$calDav = $c->query(\OCA\DAV\CalDAV\CalDavBackend::class);
-			} catch (\Throwable $e) {
-			}
-			return new HolidayNcCalendarSyncService(
-				$c->query(\OCP\Calendar\IManager::class),
-				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayCalendarMapper::class),
-				$c->query(HolidayCalendarService::class),
-				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
-				$c->query(\OCP\IUserManager::class),
-				$c->query(\OCP\L10N\IFactory::class),
-				$c->query(\OCP\AppFramework\Utility\ITimeFactory::class),
-				$c->query(\OCP\IURLGenerator::class),
-				$c->query(\OCP\IConfig::class),
-				$calDav
 			);
 		});
 
@@ -196,7 +150,7 @@ class Application extends App implements IBootstrap {
 		$context->registerService(BackfillAbsenceDays::class, function($c) {
 			return new BackfillAbsenceDays(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
-				$c->query(HolidayCalendarService::class)
+				$c->query(HolidayService::class)
 			);
 		});
 
@@ -267,11 +221,10 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IL10N::class),
 				$c->query(NotificationService::class),
 				$c->query(AbsenceIcalMailService::class),
-				$c->query(HolidayCalendarService::class),
+				$c->query(HolidayService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
 				$c->query(VacationAllocationService::class),
-				$c->query(AbsenceNotificationMailService::class),
-				$c->query(AbsenceCalendarSyncService::class)
+				$c->query(AbsenceNotificationMailService::class)
 			);
 		});
 
@@ -284,13 +237,13 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(NotificationService::class),
-				$c->query(HolidayCalendarService::class),
+				$c->query(HolidayService::class),
 				$c->query(\OCP\IConfig::class)
 			);
 		});
 
-		$context->registerService(HolidayCalendarService::class, function($c) {
-			return new HolidayCalendarService(
+		$context->registerService(HolidayService::class, function($c) {
+			return new HolidayService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
 				$c->query(\OCP\IConfig::class),
@@ -307,7 +260,18 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
-				$c->query(HolidayCalendarService::class)
+				$c->query(HolidayService::class)
+			);
+		});
+
+		$context->registerService(VacationRolloverService::class, function($c) {
+			return new VacationRolloverService(
+				$c->query(\OCP\IConfig::class),
+				$c->query(VacationAllocationService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class)
 			);
 		});
 
@@ -327,7 +291,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
 				$c->query(\OCP\IL10N::class),
-				$c->query(HolidayCalendarService::class)
+				$c->query(HolidayService::class)
 			);
 		});
 
@@ -351,7 +315,7 @@ class Application extends App implements IBootstrap {
 				$c->query(OvertimeService::class),
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
-				$c->query(HolidayCalendarService::class)
+				$c->query(HolidayService::class)
 			);
 		});
 

@@ -42,14 +42,9 @@ class AccessibilityTest extends TestCase {
 			// Do not hard-require role= or landmarks here, because many templates pull
 			// semantic landmarks via PHP includes (not visible in raw file content).
 
-			// Check for proper button elements (not just divs with click handlers).
-			// Some panels only include forms via PHP partials (buttons live in the partial).
-			$hasButton = strpos($content, '<button') !== false;
-			$pullsFormPartial = strpos($content, 'user-settings-forms.php') !== false;
-			$this->assertTrue(
-				$hasButton || $pullsFormPartial,
-				"Template should use proper button elements (in file or shared partial): $templateFile"
-			);
+			// Check for proper button elements (not just divs with click handlers)
+			$this->assertStringContainsString('<button', $content,
+				"Template should use proper button elements: $templateFile");
 
 			// Check for form labels only when the template contains form controls.
 			// Not all pages include forms/inputs (e.g. dashboard tables).

@@ -135,3 +135,29 @@ $total = $_['total'] ?? 0;
     </div>
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
+
+<?php
+$complianceViolationsL10n = [
+	'Loading...' => $l->t('Loading...'),
+	'Error loading violations' => $l->t('Error loading violations'),
+	'Failed to load violations. Please try again.' => $l->t('Failed to load violations. Please try again.'),
+	'No violations found' => $l->t('No violations found'),
+	'Resolved' => $l->t('Resolved'),
+	'Unresolved' => $l->t('Unresolved'),
+	'Missing break' => $l->t('Missing break'),
+	'Excessive working hours' => $l->t('Excessive working hours'),
+	'Insufficient rest period' => $l->t('Insufficient rest period'),
+	'Daily hours limit exceeded' => $l->t('Daily hours limit exceeded'),
+	'Weekly hours limit exceeded' => $l->t('Weekly hours limit exceeded'),
+	'Night work' => $l->t('Night work'),
+	'Sunday work' => $l->t('Sunday work'),
+	'Holiday work' => $l->t('Holiday work'),
+	'High' => $l->t('High'),
+	'Medium' => $l->t('Medium'),
+	'Low' => $l->t('Low'),
+];
+?>
+<script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+window.ArbeitszeitCheck.complianceViolationsL10n = <?php echo json_encode($complianceViolationsL10n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+</script>

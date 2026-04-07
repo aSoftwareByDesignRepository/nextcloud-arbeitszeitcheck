@@ -18,11 +18,11 @@ use OCP\Util;
 Util::addScript('arbeitszeitcheck', 'common/navigation');
 Util::addScript('arbeitszeitcheck', 'common/navigation-icons');
 
-// URL generator and translation should be passed from the controller; fall back for embedded settings
+// URL generator and translation must be passed in from the controller
 /** @var \OCP\IURLGenerator $urlGenerator */
 /** @var \OCP\IL10N $l */
-$urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
-$l = $_['l'] ?? Util::getL10N('arbeitszeitcheck');
+$urlGenerator = $_['urlGenerator'];
+$l = $_['l'];
 
 // Get current page to highlight active navigation item
 $currentPage = $_SERVER['REQUEST_URI'] ?? '';

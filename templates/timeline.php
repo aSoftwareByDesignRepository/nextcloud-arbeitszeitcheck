@@ -91,6 +91,8 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
 
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
+
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};

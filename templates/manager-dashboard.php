@@ -18,6 +18,24 @@ $teamStats = $_['teamStats'] ?? [];
 $teamMembers = $_['teamMembers'] ?? [];
 ?>
 
+<script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+(function() {
+	window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+	window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
+	Object.assign(window.ArbeitszeitCheck.l10n, {
+		"Absence": <?php echo json_encode($l->t('Absence'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Vacation": <?php echo json_encode($l->t('Vacation'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Sick leave": <?php echo json_encode($l->t('Sick leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Personal leave": <?php echo json_encode($l->t('Personal leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Parental leave": <?php echo json_encode($l->t('Parental leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Special leave": <?php echo json_encode($l->t('Special leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Unpaid leave": <?php echo json_encode($l->t('Unpaid leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Home office": <?php echo json_encode($l->t('Home office'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+	});
+})();
+</script>
+
 <?php include __DIR__ . '/common/navigation.php'; ?>
 
 <div id="app-content" class="manager-dashboard">
@@ -177,6 +195,15 @@ $teamMembers = $_['teamMembers'] ?? [];
         "Total Violations": <?php echo json_encode($l->t('Total Violations'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         "Some team members have compliance issues. Check the Compliance section for details.": <?php echo json_encode($l->t('Some team members have compliance issues. Check the Compliance section for details.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         "All team members are compliant.": <?php echo json_encode($l->t('All team members are compliant.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        "No team members.": <?php echo json_encode($l->t('No team members.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        "No team members.": <?php echo json_encode($l->t('No team members.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Absence": <?php echo json_encode($l->t('Absence'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Vacation": <?php echo json_encode($l->t('Vacation'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Sick leave": <?php echo json_encode($l->t('Sick leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Personal leave": <?php echo json_encode($l->t('Personal leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Parental leave": <?php echo json_encode($l->t('Parental leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Special leave": <?php echo json_encode($l->t('Special leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Unpaid leave": <?php echo json_encode($l->t('Unpaid leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Home office": <?php echo json_encode($l->t('Home office'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        "Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     });
 </script>

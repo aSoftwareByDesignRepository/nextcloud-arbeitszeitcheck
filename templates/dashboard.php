@@ -299,18 +299,45 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
                             <span class="dashboard-vacation-card__label"><?php p($l->t('Remaining vacation days')); ?></span>
                             <span class="dashboard-vacation-card__value" aria-describedby="dashboard-vacation-heading"><?php p((string)round((float)($dashStats['vacation_days_remaining'] ?? 0), 1)); ?></span>
                         </div>
+                        <dl class="dashboard-vacation-card__breakdown" aria-label="<?php p($l->t('Vacation breakdown')); ?>">
+                            <div class="dashboard-vacation-card__breakdown-row">
+                                <dt><?php p($l->t('Annual leave left (bookable)')); ?></dt>
+                                <dd><?php p((string)round((float)($dashStats['vacation_annual_remaining'] ?? 0), 1)); ?></dd>
+                            </div>
+                            <div class="dashboard-vacation-card__breakdown-row">
+                                <dt><?php p($l->t('Carryover pool left')); ?></dt>
+                                <dd><?php p((string)round((float)($dashStats['vacation_carryover_remaining'] ?? 0), 1)); ?></dd>
+                            </div>
+                            <?php if (isset($dashStats['vacation_carryover_max_cap']) && $dashStats['vacation_carryover_max_cap'] !== null && $dashStats['vacation_carryover_max_cap'] !== '') { ?>
+                            <div class="dashboard-vacation-card__breakdown-row">
+                                <dt><?php p($l->t('Max. carryover (admin cap)')); ?></dt>
+                                <dd><?php p((string)round((float)$dashStats['vacation_carryover_max_cap'], 1)); ?></dd>
+                            </div>
+                            <?php } ?>
+                        </dl>
                         <?php
                         $vcExp = $dashStats['vacation_carryover_expires_on'] ?? null;
                         $vcUsable = (float)($dashStats['vacation_carryover_usable'] ?? 0);
-                        if ($vcExp && ($dashStats['vacation_carryover_days'] ?? 0) > 0) {
+                        $vcCoDays = (float)($dashStats['vacation_carryover_days'] ?? 0);
+                        $vcLocked = !empty($dashStats['vacation_carryover_locked_after_deadline']);
+                        $vcExpFmt = '';
+                        if ($vcExp) {
                             try {
                                 $vcExpFmt = (new \DateTimeImmutable((string)$vcExp))->format('d.m.Y');
                             } catch (\Throwable $e) {
                                 $vcExpFmt = (string)$vcExp;
                             }
+                        }
+                        if ($vcExpFmt !== '' && $vcCoDays > 0.0001) {
                             ?>
-                        <p class="form-help dashboard-vacation-card__hint" id="dashboard-vacation-carryover-hint">
-                            <?php p($l->t('Carryover from last year: use by %1$s (%2$s days still usable for new requests).', [$vcExpFmt, (string)round($vcUsable, 1)])); ?>
+                        <p class="form-help dashboard-vacation-card__hint<?php echo $vcLocked ? ' dashboard-vacation-card__hint--locked' : ''; ?>"
+                            id="dashboard-vacation-carryover-hint"
+                            role="status">
+                            <?php if ($vcLocked) {
+                                p($l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining days. The opening balance above is your HR record; approved vacation already reduced it.', [$vcExpFmt]));
+                            } else {
+                                p($l->t('Carryover from last year: use by %1$s (%2$s days still usable for new requests).', [$vcExpFmt, (string)round($vcUsable, 1)]));
+                            } ?>
                         </p>
                         <?php } ?>
                         <div class="dashboard-vacation-card__actions">
@@ -555,6 +582,8 @@ if (($status['status'] ?? 'clocked_out') === 'break' && !empty($status['current_
     </div>
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
+
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

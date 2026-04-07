@@ -18,7 +18,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -54,7 +54,7 @@ class ComplianceServiceTest extends TestCase
 	/** @var NotificationService|\PHPUnit\Framework\MockObject\MockObject */
 	private $notificationService;
 
-	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	/** @var HolidayService|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayCalendarService;
 
 	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
@@ -71,7 +71,7 @@ class ComplianceServiceTest extends TestCase
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
-		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 		$this->config = $this->createMock(IConfig::class);
 		$this->config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = ''): string {
 			return $default;

@@ -812,6 +812,8 @@ $error = $_['error'] ?? null;
 </div>
 </div><!-- /#arbeitszeitcheck-app -->
 
+<?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
+
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" type="text/javascript">
     // Pass essential data to JS

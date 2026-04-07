@@ -15,7 +15,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Repair;
 
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 
@@ -23,7 +23,7 @@ class BackfillAbsenceDays implements IRepairStep
 {
 	public function __construct(
 		private AbsenceMapper $absenceMapper,
-		private HolidayCalendarService $holidayCalendarService
+		private HolidayService $holidayCalendarService
 	) {
 	}
 

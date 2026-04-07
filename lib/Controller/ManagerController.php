@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
-use OCA\ArbeitszeitCheck\Service\AbsencePrivacyPolicy;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
@@ -206,6 +205,24 @@ class ManagerController extends Controller
 	{
 		$displayName = $this->userManager->getDisplayName($userId);
 		return $displayName ?: $userId;
+	}
+
+	/**
+	 * Localized label for an absence type code (same strings as the absences UI / manager-dashboard l10n).
+	 */
+	private function getAbsenceTypeLabel(string $type): string
+	{
+		$map = [
+			'vacation' => $this->l10n->t('Vacation'),
+			'sick_leave' => $this->l10n->t('Sick leave'),
+			'personal_leave' => $this->l10n->t('Personal leave'),
+			'parental_leave' => $this->l10n->t('Parental leave'),
+			'special_leave' => $this->l10n->t('Special leave'),
+			'unpaid_leave' => $this->l10n->t('Unpaid leave'),
+			'home_office' => $this->l10n->t('Home office'),
+			'business_trip' => $this->l10n->t('Business trip'),
+		];
+		return $map[$type] ?? $type;
 	}
 
 	/**
@@ -456,12 +473,14 @@ class ManagerController extends Controller
 				foreach ($pendingAbsences as $absence) {
 					try {
 						$createdAt = $absence->getCreatedAt();
+						$summary = $absence->getSummary();
+						$summary['typeLabel'] = $this->getAbsenceTypeLabel($absence->getType());
 						$pendingApprovals[] = [
 							'id' => $absence->getId(),
 							'type' => 'absence',
 							'userId' => $absence->getUserId(),
 							'displayName' => $this->getDisplayName($absence->getUserId()),
-							'summary' => $absence->getSummary(),
+							'summary' => $summary,
 							'requestedAt' => $createdAt ? $createdAt->format('c') : null
 						];
 					} catch (\Throwable $e) {
@@ -1164,11 +1183,12 @@ class ManagerController extends Controller
 							'id' => $absence->getId(),
 							'userId' => $absence->getUserId(),
 							'displayName' => $this->getDisplayName($absence->getUserId()),
-							'startDate' => ($sdCal = $absence->getStartDate()) ? $sdCal->format('Y-m-d') : null,
-							'endDate' => ($edCal = $absence->getEndDate()) ? $edCal->format('Y-m-d') : null,
+							'type' => $absence->getType(),
+							'startDate' => ($startDate = $absence->getStartDate()) ? $startDate->format('Y-m-d') : null,
+							'endDate' => ($endDate = $absence->getEndDate()) ? $endDate->format('Y-m-d') : null,
 							'days' => $absence->getDays(),
 							'status' => $absence->getStatus(),
-							'summary' => AbsencePrivacyPolicy::summaryForTeamViewer($absence),
+							'summary' => $absence->getSummary()
 						];
 					} catch (\Throwable $e) {
 						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing absence ' . $absence->getId() . ' in calendar data: ' . $e->getMessage(), ["exception" => $e]);

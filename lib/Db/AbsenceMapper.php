@@ -255,22 +255,6 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
-	 * @return Absence[]
-	 */
-	public function findApprovedBatch(int $limit, int $offset = 0): array
-	{
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('*')
-			->from($this->getTableName())
-			->where($qb->expr()->eq('status', $qb->createNamedParameter(Absence::STATUS_APPROVED)))
-			->orderBy('id', 'ASC')
-			->setMaxResults($limit)
-			->setFirstResult($offset);
-
-		return $this->findEntities($qb);
-	}
-
-	/**
 	 * Delete all absences for a user (used on user deletion)
 	 *
 	 * @param string $userId

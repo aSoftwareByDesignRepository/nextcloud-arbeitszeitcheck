@@ -211,6 +211,10 @@ class PageController extends Controller
 					'vacation_carryover_days' => (float)($vacationStats['carryover_days'] ?? 0),
 					'vacation_carryover_usable' => (float)($vacationStats['carryover_usable'] ?? 0),
 					'vacation_carryover_expires_on' => $vacationStats['carryover_expires_on'] ?? null,
+					'vacation_carryover_locked_after_deadline' => (bool)($vacationStats['carryover_unused_locked_after_deadline'] ?? false),
+					'vacation_annual_remaining' => (float)($vacationStats['annual_remaining_after_approved'] ?? 0),
+					'vacation_carryover_remaining' => (float)($vacationStats['carryover_remaining_after_approved'] ?? 0),
+					'vacation_carryover_max_cap' => $vacationStats['carryover_max_cap'] ?? null,
 					'vacation_annual_entitlement' => (float)($vacationStats['entitlement'] ?? 0),
 					'vacation_year' => $currentYear,
 				],
@@ -239,6 +243,10 @@ class PageController extends Controller
 					'vacation_carryover_days' => 0,
 					'vacation_carryover_usable' => 0,
 					'vacation_carryover_expires_on' => null,
+					'vacation_carryover_locked_after_deadline' => false,
+					'vacation_annual_remaining' => 0,
+					'vacation_carryover_remaining' => 0,
+					'vacation_carryover_max_cap' => null,
 					'vacation_annual_entitlement' => 0,
 					'vacation_year' => (int)date('Y'),
 				],
@@ -375,7 +383,11 @@ class PageController extends Controller
 		$vacationCarryoverDays = (float)($vacationStats['carryover_days'] ?? 0);
 		$vacationCarryoverUsable = (float)($vacationStats['carryover_usable'] ?? 0);
 		$vacationCarryoverExpiresOn = $vacationStats['carryover_expires_on'] ?? null;
+		$vacationCarryoverLockedAfterDeadline = (bool)($vacationStats['carryover_unused_locked_after_deadline'] ?? false);
 		$vacationAnnualEntitlement = (float)($vacationStats['entitlement'] ?? 0);
+		$vacationAnnualRemaining = (float)($vacationStats['annual_remaining_after_approved'] ?? 0);
+		$vacationCarryoverRemaining = (float)($vacationStats['carryover_remaining_after_approved'] ?? 0);
+		$vacationCarryoverMaxCap = $vacationStats['carryover_max_cap'] ?? null;
 
 		// Current filter values for the form (European format for date inputs)
 		$filterStartDate = $filterStartDt ? $filterStartDt->format('d.m.Y') : '';
@@ -398,7 +410,7 @@ class PageController extends Controller
 			return in_array($a->getStatus(), ['pending', 'substitute_pending'], true);
 		}));
 
-		// Precompute working days for absences with days=NULL (HolidayCalendarService, state-aware)
+		// Precompute working days for absences with days=NULL (HolidayService, state-aware)
 		$computedWorkingDays = [];
 		foreach ($absences as $a) {
 			if ($a->getDays() === null) {
@@ -422,6 +434,10 @@ class PageController extends Controller
 				'vacation_carryover_days' => $vacationCarryoverDays,
 				'vacation_carryover_usable' => $vacationCarryoverUsable,
 				'vacation_carryover_expires_on' => $vacationCarryoverExpiresOn,
+				'vacation_carryover_locked_after_deadline' => $vacationCarryoverLockedAfterDeadline,
+				'vacation_annual_remaining' => $vacationAnnualRemaining,
+				'vacation_carryover_remaining' => $vacationCarryoverRemaining,
+				'vacation_carryover_max_cap' => $vacationCarryoverMaxCap,
 				'vacation_annual_entitlement' => $vacationAnnualEntitlement,
 				'vacation_year' => $currentYear,
 				'pending_requests' => $pendingCount,
@@ -447,7 +463,7 @@ class PageController extends Controller
 				'filterEndDate' => '',
 				'filterStatus' => '',
 				'error' => $errorMessage,
-				'stats' => ['total_time_entries' => 0, 'total_absences' => 0, 'vacation_days_remaining' => 0, 'vacation_days_used_this_year' => 0, 'vacation_carryover_days' => 0, 'vacation_carryover_usable' => 0, 'vacation_carryover_expires_on' => null, 'vacation_annual_entitlement' => 0, 'vacation_year' => (int)date('Y'), 'pending_requests' => 0],
+				'stats' => ['total_time_entries' => 0, 'total_absences' => 0, 'vacation_days_remaining' => 0, 'vacation_days_used_this_year' => 0, 'vacation_carryover_days' => 0, 'vacation_carryover_usable' => 0, 'vacation_carryover_expires_on' => null, 'vacation_carryover_locked_after_deadline' => false, 'vacation_annual_remaining' => 0, 'vacation_carryover_remaining' => 0, 'vacation_carryover_max_cap' => null, 'vacation_annual_entitlement' => 0, 'vacation_year' => (int)date('Y'), 'pending_requests' => 0],
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 				'showSubstitutionLink' => false,

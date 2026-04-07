@@ -11,6 +11,14 @@
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
 
+    function cvT(msg) {
+        const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.complianceViolationsL10n;
+        if (map && Object.prototype.hasOwnProperty.call(map, msg) && map[msg] !== undefined && map[msg] !== '') {
+            return map[msg];
+        }
+        return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', msg) : msg);
+    }
+
     /**
      * Initialize violations page
      */
@@ -45,7 +53,7 @@
 
         const tbody = Utils.$('#violations-tbody');
         if (tbody) {
-            const loadingMsg = (window.t && window.t('arbeitszeitcheck', 'Loading...')) || 'Loading...';
+            const loadingMsg = cvT('Loading...');
             tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(loadingMsg) + '</td></tr>';
         }
 
@@ -55,15 +63,15 @@
                 if (data.success && data.violations) {
                     renderViolations(data.violations);
                 } else {
-                    const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Error loading violations')) || 'Error loading violations';
+                    const errorMsg = cvT('Error loading violations');
                     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 }
             },
             onError: function (_error) {
-                const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Error loading violations')) || 'Error loading violations';
+                const errorMsg = cvT('Error loading violations');
                 if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 if (Messaging && Messaging.showError) {
-                    const failMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to load violations. Please try again.')) || 'Failed to load violations. Please try again.';
+                    const failMsg = cvT('Failed to load violations. Please try again.');
                     Messaging.showError(failMsg);
                 }
             }
@@ -78,28 +86,28 @@
         if (!tbody) return;
 
         if (violations.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'No violations found') : 'No violations found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + cvT('No violations found') + '</td></tr>';
             return;
         }
 
-        const resolvedLabel = (window.t && window.t('arbeitszeitcheck', 'Resolved')) || 'Resolved';
-        const unresolvedLabel = (window.t && window.t('arbeitszeitcheck', 'Unresolved')) || 'Unresolved';
+        const resolvedLabel = cvT('Resolved');
+        const unresolvedLabel = cvT('Unresolved');
 
         const typeLabels = {
-            missing_break: (window.t && window.t('arbeitszeitcheck', 'Missing break')) || 'Missing break',
-            excessive_working_hours: (window.t && window.t('arbeitszeitcheck', 'Excessive working hours')) || 'Excessive working hours',
-            insufficient_rest_period: (window.t && window.t('arbeitszeitcheck', 'Insufficient rest period')) || 'Insufficient rest period',
-            daily_hours_limit_exceeded: (window.t && window.t('arbeitszeitcheck', 'Daily hours limit exceeded')) || 'Daily hours limit exceeded',
-            weekly_hours_limit_exceeded: (window.t && window.t('arbeitszeitcheck', 'Weekly hours limit exceeded')) || 'Weekly hours limit exceeded',
-            night_work: (window.t && window.t('arbeitszeitcheck', 'Night work')) || 'Night work',
-            sunday_work: (window.t && window.t('arbeitszeitcheck', 'Sunday work')) || 'Sunday work',
-            holiday_work: (window.t && window.t('arbeitszeitcheck', 'Holiday work')) || 'Holiday work',
+            missing_break: cvT('Missing break'),
+            excessive_working_hours: cvT('Excessive working hours'),
+            insufficient_rest_period: cvT('Insufficient rest period'),
+            daily_hours_limit_exceeded: cvT('Daily hours limit exceeded'),
+            weekly_hours_limit_exceeded: cvT('Weekly hours limit exceeded'),
+            night_work: cvT('Night work'),
+            sunday_work: cvT('Sunday work'),
+            holiday_work: cvT('Holiday work'),
         };
 
         const severityLabels = {
-            error: (window.t && window.t('arbeitszeitcheck', 'High')) || 'High',
-            warning: (window.t && window.t('arbeitszeitcheck', 'Medium')) || 'Medium',
-            info: (window.t && window.t('arbeitszeitcheck', 'Low')) || 'Low',
+            error: cvT('High'),
+            warning: cvT('Medium'),
+            info: cvT('Low'),
         };
 
         tbody.innerHTML = violations.map(v => `

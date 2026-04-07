@@ -16,7 +16,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -31,7 +31,7 @@ class HolidayController extends Controller
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private readonly HolidayCalendarService $holidayCalendarService,
+		private readonly HolidayService $holidayCalendarService,
 		private readonly IUserSession $userSession,
 		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger

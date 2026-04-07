@@ -11,10 +11,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
-use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
-use OCA\ArbeitszeitCheck\Service\HolidayNcCalendarSyncService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\IURLGenerator;
@@ -43,7 +41,6 @@ class SettingsController extends Controller
 	private IL10N $l10n;
 	private IURLGenerator $urlGenerator;
 	private PermissionService $permissionService;
-	private ?HolidayNcCalendarSyncService $holidayNcCalendarSyncService;
 
 	public function __construct(
 		string $appName,
@@ -54,8 +51,7 @@ class SettingsController extends Controller
 		IL10N $l10n,
 		CSPService $cspService,
 		IURLGenerator $urlGenerator,
-		PermissionService $permissionService,
-		?HolidayNcCalendarSyncService $holidayNcCalendarSyncService = null,
+		PermissionService $permissionService
 	) {
 		parent::__construct($appName, $request);
 		$this->userSession = $userSession;
@@ -64,7 +60,6 @@ class SettingsController extends Controller
 		$this->l10n = $l10n;
 		$this->urlGenerator = $urlGenerator;
 		$this->permissionService = $permissionService;
-		$this->holidayNcCalendarSyncService = $holidayNcCalendarSyncService;
 		$this->setCspService($cspService);
 	}
 
@@ -153,8 +148,6 @@ class SettingsController extends Controller
 		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
 		Util::addStyle('arbeitszeitcheck', 'navigation');
 		Util::addStyle('arbeitszeitcheck', 'arbeitszeitcheck-main');
-		Util::addStyle('arbeitszeitcheck', 'settings');
-		Util::addStyle('arbeitszeitcheck', 'personal-embedded');
 
 		// Add common JavaScript files
 		Util::addScript('arbeitszeitcheck', 'common/utils');
@@ -186,8 +179,6 @@ class SettingsController extends Controller
 		$response = new TemplateResponse('arbeitszeitcheck', 'personal-settings', [
 			'l' => $this->l10n,
 			'urlGenerator' => $this->urlGenerator,
-			'embedded' => true,
-			'showAppSettingsLink' => false,
 			'showSubstitutionLink' => $showSubstitutionLink,
 			'showManagerLink' => $showManagerLink,
 			'showReportsLink' => $showReportsLink,
@@ -216,8 +207,7 @@ class SettingsController extends Controller
 			$allowedKeys = [
 				'notifications_enabled',
 				'break_reminders_enabled',
-				'auto_break_calculation',
-				Constants::USER_SETTING_CALENDAR_SYNC_HOLIDAYS,
+				'auto_break_calculation'
 			];
 
 			$updatedSettings = [];
@@ -234,8 +224,7 @@ class SettingsController extends Controller
 					$value = $params[$key];
 
 					// Validate value based on key type
-					if ($key === 'notifications_enabled' || $key === 'break_reminders_enabled' || $key === 'auto_break_calculation'
-						|| $key === Constants::USER_SETTING_CALENDAR_SYNC_HOLIDAYS) {
+					if ($key === 'notifications_enabled' || $key === 'break_reminders_enabled' || $key === 'auto_break_calculation') {
 						$value = $value === true || $value === 'true' || $value === '1' ? '1' : '0';
 					} else {
 						$value = (string)$value;
@@ -262,18 +251,6 @@ class SettingsController extends Controller
 				$oldValues,
 				$updatedSettings
 			);
-
-			if ($this->holidayNcCalendarSyncService !== null && isset($updatedSettings[Constants::USER_SETTING_CALENDAR_SYNC_HOLIDAYS])) {
-				try {
-					if ($updatedSettings[Constants::USER_SETTING_CALENDAR_SYNC_HOLIDAYS] === '1') {
-						$this->holidayNcCalendarSyncService->syncForUser($userId);
-					} else {
-						$this->holidayNcCalendarSyncService->removeAllForUser($userId);
-					}
-				} catch (\Throwable $e) {
-					\OCP\Log\logger('arbeitszeitcheck')->warning('Holiday calendar sync after settings: ' . $e->getMessage(), ['exception' => $e]);
-				}
-			}
 
 			return new JSONResponse([
 				'success' => true,

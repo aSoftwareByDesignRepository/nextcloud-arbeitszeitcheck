@@ -17,6 +17,15 @@
         return div.innerHTML;
     }
 
+    /** Prefer server-injected mainUiStrings; window.t is not always available. */
+    function mainT(msg) {
+        const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.mainUiStrings;
+        if (map && Object.prototype.hasOwnProperty.call(map, msg) && map[msg] !== undefined && map[msg] !== '') {
+            return map[msg];
+        }
+        return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', msg) : msg);
+    }
+
     /**
      * Format a Date as YYYY-MM-DD using local calendar values only (no timezone shifts).
      *
@@ -303,9 +312,7 @@
                                     
                                     // Show critical notification
                                     if (window.OC && OC.Notification) {
-                                        const criticalMsg = (window.t && window.t('arbeitszeitcheck', 
-                                            'CRITICAL: Maximum daily working hours (10h) exceeded! Automatically clocking out to comply with German labor law (ArbZG §3).')) ||
-                                            'CRITICAL: Maximum daily working hours (10h) exceeded! Automatically clocking out to comply with German labor law (ArbZG §3).';
+                                        const criticalMsg = mainT('CRITICAL: Maximum daily working hours (10h) exceeded! Automatically clocking out to comply with German labor law (ArbZG §3).');
                                         OC.Notification.showTemporary(criticalMsg, { 
                                             type: 'error', 
                                             timeout: 20000 
@@ -334,9 +341,7 @@
                                     timerEl.dataset.infoShown = 'true';
                                     
                                     if (window.OC && OC.Notification) {
-                                        const infoMsg = (window.t && window.t('arbeitszeitcheck', 
-                                            'Note: You are approaching the maximum working hours. Extended hours must be compensated within 6 months (ArbZG §3).')) ||
-                                            'Note: You are approaching the maximum working hours. Extended hours must be compensated within 6 months (ArbZG §3).';
+                                        const infoMsg = mainT('Note: You are approaching the maximum working hours. Extended hours must be compensated within 6 months (ArbZG §3).');
                                         OC.Notification.showTemporary(infoMsg, { 
                                             type: 'info', 
                                             timeout: 10000 
@@ -451,7 +456,7 @@
             deleteButtons.forEach(button => {
                 button.addEventListener('click', (e) => {
                     e.preventDefault();
-                    if (confirm(this.config.l10n?.confirmDelete || (window.t && window.t('arbeitszeitcheck', 'Are you sure you want to delete this item?')) || 'Are you sure you want to delete this item?')) {
+                    if (confirm(this.config.l10n?.confirmDelete || mainT('Are you sure you want to delete this item?'))) {
                         const endpoint = button.dataset.deleteEndpoint;
                         this.callApi(endpoint, 'DELETE');
                     }
@@ -582,10 +587,9 @@
                     const entryId = button.dataset.entryId;
                     if (!entryId) return;
                     
-                    const confirmMsg = this.config.l10n?.confirmDeleteTimeEntry || 
-                                     this.config.l10n?.confirmDelete || 
-                                     (window.t && window.t('arbeitszeitcheck', 'Are you sure you want to delete this time entry?')) ||
-                                     'Are you sure you want to delete this time entry?';
+                    const confirmMsg = this.config.l10n?.confirmDeleteTimeEntry ||
+                                     this.config.l10n?.confirmDelete ||
+                                     mainT('Are you sure you want to delete this time entry?');
                     
                     if (confirm(confirmMsg)) {
                         // Build delete URL using the API URL pattern or fallback
@@ -609,8 +613,7 @@
                                 
                                 // Show success message
                                 const successMsg = this.config.l10n?.deleted || 
-                                    (window.t && window.t('arbeitszeitcheck', 'Time entry deleted successfully')) || 
-                                    'Time entry deleted successfully';
+                                    mainT('Time entry deleted successfully');
                                 this.showSuccess(successMsg);
                             })
                             .catch(error => {
@@ -662,8 +665,8 @@
             const shortenError = params.get('shorten_error');
             if (created === '1' || updated === '1') {
                 const msg = created === '1'
-                    ? (window.t && window.t('arbeitszeitcheck', 'Absence request submitted successfully')) || 'Absence request submitted successfully'
-                    : (window.t && window.t('arbeitszeitcheck', 'Absence request updated')) || 'Absence request updated';
+                    ? mainT('Absence request submitted successfully')
+                    : mainT('Absence request updated');
                 if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {
                     window.OC.Notification.showTemporary(msg, { type: 'success' });
                 }
@@ -671,7 +674,7 @@
                 params.delete('updated');
             }
             if (shortened === '1') {
-                const msg = (window.t && window.t('arbeitszeitcheck', 'Absence shortened successfully. Your actual last day of absence has been updated.')) || 'Absence shortened successfully. Your actual last day of absence has been updated.';
+                const msg = mainT('Absence shortened successfully. Your actual last day of absence has been updated.');
                 if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {
                     window.OC.Notification.showTemporary(msg, { type: 'success' });
                 }
@@ -684,7 +687,7 @@
                 params.delete('shorten_error');
             }
             if (cancelled === '1') {
-                const msg = (window.t && window.t('arbeitszeitcheck', 'Absence cancelled successfully.')) || 'Absence cancelled successfully.';
+                const msg = mainT('Absence cancelled successfully.');
                 if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {
                     window.OC.Notification.showTemporary(msg, { type: 'success' });
                 }
@@ -789,9 +792,8 @@
                     const absenceId = button.dataset.absenceId;
                     if (!absenceId) return;
                     
-                    const confirmMsg = this.config.l10n?.confirmCancel || 
-                                     (window.t && window.t('arbeitszeitcheck', 'Are you sure you want to cancel this absence request?')) ||
-                                     'Are you sure you want to cancel this absence request?';
+                    const confirmMsg = this.config.l10n?.confirmCancel ||
+                                     mainT('Are you sure you want to cancel this absence request?');
                     
                     if (confirm(confirmMsg)) {
                         // Build delete URL using the API URL pattern or fallback
@@ -815,8 +817,7 @@
                                 
                                 // Show success message
                                 const successMsg = this.config.l10n?.canceled || 
-                                    (window.t && window.t('arbeitszeitcheck', 'Absence request cancelled successfully')) || 
-                                    'Absence request cancelled successfully';
+                                    mainT('Absence request cancelled successfully');
                                 this.showSuccess(successMsg);
                             })
                             .catch(error => {
@@ -1485,27 +1486,27 @@
                 const date = new Date(dateKey);
                 // Format date using translated month and weekday names
                 const months = this.config.l10n?.months || [
-                (window.t && window.t('arbeitszeitcheck', 'January')) || 'January',
-                (window.t && window.t('arbeitszeitcheck', 'February')) || 'February',
-                (window.t && window.t('arbeitszeitcheck', 'March')) || 'March',
-                (window.t && window.t('arbeitszeitcheck', 'April')) || 'April',
-                (window.t && window.t('arbeitszeitcheck', 'May')) || 'May',
-                (window.t && window.t('arbeitszeitcheck', 'June')) || 'June',
-                (window.t && window.t('arbeitszeitcheck', 'July')) || 'July',
-                (window.t && window.t('arbeitszeitcheck', 'August')) || 'August',
-                (window.t && window.t('arbeitszeitcheck', 'September')) || 'September',
-                (window.t && window.t('arbeitszeitcheck', 'October')) || 'October',
-                (window.t && window.t('arbeitszeitcheck', 'November')) || 'November',
-                (window.t && window.t('arbeitszeitcheck', 'December')) || 'December'
+                mainT('January'),
+                mainT('February'),
+                mainT('March'),
+                mainT('April'),
+                mainT('May'),
+                mainT('June'),
+                mainT('July'),
+                mainT('August'),
+                mainT('September'),
+                mainT('October'),
+                mainT('November'),
+                mainT('December')
             ];
                 const weekdays = this.config.l10n?.weekdays || [
-                    (window.t && window.t('arbeitszeitcheck', 'Sunday')) || 'Sunday',
-                    (window.t && window.t('arbeitszeitcheck', 'Monday')) || 'Monday',
-                    (window.t && window.t('arbeitszeitcheck', 'Tuesday')) || 'Tuesday',
-                    (window.t && window.t('arbeitszeitcheck', 'Wednesday')) || 'Wednesday',
-                    (window.t && window.t('arbeitszeitcheck', 'Thursday')) || 'Thursday',
-                    (window.t && window.t('arbeitszeitcheck', 'Friday')) || 'Friday',
-                    (window.t && window.t('arbeitszeitcheck', 'Saturday')) || 'Saturday'
+                    mainT('Sunday'),
+                    mainT('Monday'),
+                    mainT('Tuesday'),
+                    mainT('Wednesday'),
+                    mainT('Thursday'),
+                    mainT('Friday'),
+                    mainT('Saturday')
                 ];
                 const weekdayName = weekdays[date.getDay()];
                 const monthName = months[date.getMonth()];
@@ -1598,7 +1599,7 @@
             if (breakDurationHours > 0) {
                 const breakHours = Math.floor(breakDurationHours);
                 const breakMinutes = Math.floor((breakDurationHours - breakHours) * 60);
-                const breakLabel = (window.t && window.t('arbeitszeitcheck', 'Break Time')) || this.config.l10n?.breakTime || 'Break';
+                const breakLabel = this.config.l10n?.breakTime || mainT('Break Time') || 'Break';
                 durationStr += ` (${breakLabel}: ${breakHours}h ${breakMinutes}m)`;
             }
 
@@ -1652,7 +1653,7 @@
             if (absenceTypes[key]) {
                 return absenceTypes[key];
             }
-            const translated = (window.t && window.t('arbeitszeitcheck', labelKey)) || labelKey;
+            const translated = mainT(labelKey) || labelKey;
             return translated;
         },
 
@@ -1683,18 +1684,18 @@
             
             // Format dates using translated month names
             const _months = this.config.l10n?.months || [
-                (window.t && window.t('arbeitszeitcheck', 'January')) || 'January',
-                (window.t && window.t('arbeitszeitcheck', 'February')) || 'February',
-                (window.t && window.t('arbeitszeitcheck', 'March')) || 'March',
-                (window.t && window.t('arbeitszeitcheck', 'April')) || 'April',
-                (window.t && window.t('arbeitszeitcheck', 'May')) || 'May',
-                (window.t && window.t('arbeitszeitcheck', 'June')) || 'June',
-                (window.t && window.t('arbeitszeitcheck', 'July')) || 'July',
-                (window.t && window.t('arbeitszeitcheck', 'August')) || 'August',
-                (window.t && window.t('arbeitszeitcheck', 'September')) || 'September',
-                (window.t && window.t('arbeitszeitcheck', 'October')) || 'October',
-                (window.t && window.t('arbeitszeitcheck', 'November')) || 'November',
-                (window.t && window.t('arbeitszeitcheck', 'December')) || 'December'
+                mainT('January'),
+                mainT('February'),
+                mainT('March'),
+                mainT('April'),
+                mainT('May'),
+                mainT('June'),
+                mainT('July'),
+                mainT('August'),
+                mainT('September'),
+                mainT('October'),
+                mainT('November'),
+                mainT('December')
             ];
             const formatDate = (date) => {
                 if (!date) return '-';
@@ -1751,17 +1752,11 @@
 
             let scopeLabel;
             if (scope === 'statutory') {
-                scopeLabel = this.config.l10n?.publicHoliday
-                    || (window.t && window.t('arbeitszeitcheck', 'Public holiday'))
-                    || 'Public holiday';
+                scopeLabel = this.config.l10n?.publicHoliday || mainT('Public holiday');
             } else if (scope === 'company') {
-                scopeLabel = this.config.l10n?.companyHoliday
-                    || (window.t && window.t('arbeitszeitcheck', 'Company holiday'))
-                    || 'Company holiday';
+                scopeLabel = this.config.l10n?.companyHoliday || mainT('Company holiday');
             } else {
-                scopeLabel = this.config.l10n?.customHoliday
-                    || (window.t && window.t('arbeitszeitcheck', 'Custom holiday'))
-                    || 'Custom holiday';
+                scopeLabel = this.config.l10n?.customHoliday || mainT('Custom holiday');
             }
 
             const displayName = name !== '' ? name : scopeLabel;
@@ -1954,13 +1949,13 @@
             // Weekday headers
             html += '<div class="calendar-weekdays">';
             const weekdays = this.config.l10n?.weekdaysShort || [
-                (window.t && window.t('arbeitszeitcheck', 'Sun')) || 'Sun',
-                (window.t && window.t('arbeitszeitcheck', 'Mon')) || 'Mon',
-                (window.t && window.t('arbeitszeitcheck', 'Tue')) || 'Tue',
-                (window.t && window.t('arbeitszeitcheck', 'Wed')) || 'Wed',
-                (window.t && window.t('arbeitszeitcheck', 'Thu')) || 'Thu',
-                (window.t && window.t('arbeitszeitcheck', 'Fri')) || 'Fri',
-                (window.t && window.t('arbeitszeitcheck', 'Sat')) || 'Sat'
+                mainT('Sun'),
+                mainT('Mon'),
+                mainT('Tue'),
+                mainT('Wed'),
+                mainT('Thu'),
+                mainT('Fri'),
+                mainT('Sat')
             ];
             weekdays.forEach(day => {
                 html += `<div class="calendar-weekday">${day}</div>`;
@@ -2346,18 +2341,18 @@
 
             const date = this.calendarData.currentDate;
             const months = this.config.l10n?.months || [
-                (window.t && window.t('arbeitszeitcheck', 'January')) || 'January',
-                (window.t && window.t('arbeitszeitcheck', 'February')) || 'February',
-                (window.t && window.t('arbeitszeitcheck', 'March')) || 'March',
-                (window.t && window.t('arbeitszeitcheck', 'April')) || 'April',
-                (window.t && window.t('arbeitszeitcheck', 'May')) || 'May',
-                (window.t && window.t('arbeitszeitcheck', 'June')) || 'June',
-                (window.t && window.t('arbeitszeitcheck', 'July')) || 'July',
-                (window.t && window.t('arbeitszeitcheck', 'August')) || 'August',
-                (window.t && window.t('arbeitszeitcheck', 'September')) || 'September',
-                (window.t && window.t('arbeitszeitcheck', 'October')) || 'October',
-                (window.t && window.t('arbeitszeitcheck', 'November')) || 'November',
-                (window.t && window.t('arbeitszeitcheck', 'December')) || 'December'
+                mainT('January'),
+                mainT('February'),
+                mainT('March'),
+                mainT('April'),
+                mainT('May'),
+                mainT('June'),
+                mainT('July'),
+                mainT('August'),
+                mainT('September'),
+                mainT('October'),
+                mainT('November'),
+                mainT('December')
             ];
             
             if (this.calendarData.currentView === 'month') {
@@ -2406,7 +2401,7 @@
                 .map(h => h.name)
                 .filter(Boolean);
             if (holidayNames.length > 0) {
-                const label = this.config.l10n?.holiday || (window.t ? window.t('arbeitszeitcheck', 'Holiday') : 'Holiday');
+                const label = this.config.l10n?.holiday || mainT('Holiday');
                 const namesText = holidayNames.join(', ');
                 html += `
                     <div class="day-details-section">

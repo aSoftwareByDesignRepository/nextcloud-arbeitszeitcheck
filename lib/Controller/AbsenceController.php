@@ -634,7 +634,7 @@ class AbsenceController extends Controller
 				$substituteDisplayName = $subUser !== null ? $subUser->getDisplayName() : $subId;
 			}
 
-			// Precompute working days when days=NULL (HolidayCalendarService, state-aware)
+			// Precompute working days when days=NULL (HolidayService, state-aware)
 			$displayDays = $absence->getDays() !== null
 				? (float)$absence->getDays()
 				: $this->absenceService->getWorkingDaysForDisplay($absence);
@@ -1043,6 +1043,10 @@ class AbsenceController extends Controller
 					'carryover_days' => $stats['carryover_days'] ?? 0,
 					'carryover_usable' => $stats['carryover_usable'] ?? 0,
 					'carryover_expires_on' => $stats['carryover_expires_on'] ?? null,
+					'carryover_unused_locked_after_deadline' => (bool)($stats['carryover_unused_locked_after_deadline'] ?? false),
+					'carryover_remaining_after_approved' => (float)($stats['carryover_remaining_after_approved'] ?? 0),
+					'annual_remaining_after_approved' => (float)($stats['annual_remaining_after_approved'] ?? 0),
+					'carryover_max_cap' => $stats['carryover_max_cap'] ?? null,
 					'remaining' => $stats['remaining'],
 				],
 				'sickLeaveStats' => [

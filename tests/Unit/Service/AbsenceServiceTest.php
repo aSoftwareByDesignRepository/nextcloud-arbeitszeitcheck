@@ -18,7 +18,7 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
@@ -55,7 +55,7 @@ class AbsenceServiceTest extends TestCase
 	/** @var NotificationService|\PHPUnit\Framework\MockObject\MockObject */
 	private $notificationService;
 
-	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	/** @var HolidayService|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayCalendarService;
 
 	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
@@ -102,7 +102,7 @@ class AbsenceServiceTest extends TestCase
 		$this->vacationYearBalanceMapper->method('getCarryoverDays')->willReturn(0.0);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
-		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 
 		$this->l10n->method('t')
 			->willReturnCallback(function ($text) {
@@ -112,8 +112,8 @@ class AbsenceServiceTest extends TestCase
 		$this->vacationAllocationStub = null;
 		$this->vacationAllocationFailProspective = false;
 		$this->vacationAllocationService = $this->createMock(VacationAllocationService::class);
-		$this->vacationAllocationService->method('computeYearAllocation')->willReturnCallback(function ($userId, $year, $exclude, $pStart, $pEnd, $asOf) {
-			unset($userId, $year, $exclude, $asOf);
+		$this->vacationAllocationService->method('computeYearAllocation')->willReturnCallback(function ($userId, $year, $exclude, $pStart, $pEnd, $asOf, $createdAt = null) {
+			unset($userId, $year, $exclude, $asOf, $createdAt);
 			if ($this->vacationAllocationStub !== null) {
 				return $this->vacationAllocationStub;
 			}
@@ -156,7 +156,6 @@ class AbsenceServiceTest extends TestCase
 			$this->holidayCalendarService,
 			$this->vacationYearBalanceMapper,
 			$this->vacationAllocationService,
-			null,
 			null
 		);
 	}

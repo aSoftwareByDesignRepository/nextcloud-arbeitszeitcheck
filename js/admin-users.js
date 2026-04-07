@@ -12,6 +12,18 @@
     const Components = window.ArbeitszeitCheckComponents || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
 
+    /** Prefer server-injected l10n; window.t may be unavailable. */
+    function auMsg(key, englishFallback) {
+        const v = window.ArbeitszeitCheck?.l10n?.[key];
+        if (v !== undefined && v !== '') {
+            return v;
+        }
+        if (typeof window.t === 'function' && englishFallback) {
+            return window.t('arbeitszeitcheck', englishFallback);
+        }
+        return englishFallback || '';
+    }
+
     let searchTimeout = null;
 
     /**
@@ -62,7 +74,7 @@
         if (!tbody) return;
 
         // Show loading
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Loading…') : 'Loading…') + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + auMsg('loadingEllipsis', 'Loading…') + '</td></tr>';
 
         const url = '/apps/arbeitszeitcheck/api/admin/users' + (search ? '?search=' + encodeURIComponent(search) : '');
         
@@ -72,13 +84,13 @@
                 if (data.success && data.users) {
                     renderUsers(data.users);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'Error loading users') : 'Error loading users') + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + auMsg('errorLoadingUsers', 'Error loading users') + '</td></tr>';
                 }
             },
             onError: function(_error) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + ((window.t && window.t('arbeitszeitcheck', 'Error loading users')) || 'Error loading users') + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + auMsg('errorLoadingUsers', 'Error loading users') + '</td></tr>';
                 if (Messaging && Messaging.showError) {
-                    Messaging.showError((window.t && window.t('arbeitszeitcheck', 'Failed to load users. Please try again.')) || 'Failed to load users. Please try again.');
+                    Messaging.showError(auMsg('failedToLoadUsersRetry', 'Failed to load users. Please try again.'));
                 }
             }
         });
@@ -92,7 +104,7 @@
         if (!tbody) return;
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (window.t ? window.t('arbeitszeitcheck', 'No users found') : 'No users found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + auMsg('noUsersFound', 'No users found') + '</td></tr>';
             return;
         }
 
@@ -101,7 +113,7 @@
             const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
             return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
         };
-        const ongoingLabel = (window.t && window.t('arbeitszeitcheck', 'ongoing')) || window.ArbeitszeitCheck?.l10n?.ongoing || 'ongoing';
+        const ongoingLabel = auMsg('ongoing', 'ongoing');
 
         tbody.innerHTML = users.map(user => {
             const vacation = user.vacationDaysPerYear != null ? String(user.vacationDaysPerYear) : '-';
@@ -115,29 +127,29 @@
                 <td>
                     ${user.workingTimeModel 
                         ? Utils.escapeHtml(user.workingTimeModel.name) 
-                        : `<span class="text-muted">${(window.t && window.t('arbeitszeitcheck', 'Not assigned')) || window.ArbeitszeitCheck?.l10n?.notAssigned || 'Not assigned'}</span>`}
+                        : `<span class="text-muted">${auMsg('notAssigned', 'Not assigned')}</span>`}
                 </td>
                 <td>${Utils.escapeHtml(vacation)}</td>
                 <td>${Utils.escapeHtml(validity)}</td>
                 <td>
                     <span class="badge badge--${user.enabled ? 'success' : 'error'}">
                         ${user.enabled 
-                        ? (window.t && window.t('arbeitszeitcheck', 'enabled')) || window.ArbeitszeitCheck?.l10n?.enabled || 'Enabled'
-                        : (window.t && window.t('arbeitszeitcheck', 'disabled')) || window.ArbeitszeitCheck?.l10n?.disabled || 'Disabled'}
+                        ? auMsg('enabled', 'Enabled')
+                        : auMsg('disabled', 'Disabled')}
                     </span>
                 </td>
                 <td>
-                    <div class="user-actions" role="group" aria-label="${(window.t && window.t('arbeitszeitcheck', 'Actions')) || 'Actions'}">
+                    <div class="user-actions" role="group" aria-label="${Utils.escapeHtml(auMsg('actions', 'Actions'))}">
                         <button type="button" class="btn btn--sm btn--tertiary" 
                             data-action="history-user" 
                             data-user-id="${Utils.escapeHtml(user.userId)}"
                             data-user-name="${Utils.escapeHtml(user.displayName || user.userId)}">
-                            ${(window.t && window.t('arbeitszeitcheck', 'History')) || window.ArbeitszeitCheck?.l10n?.history || 'History'}
+                            ${Utils.escapeHtml(auMsg('history', 'History'))}
                         </button>
                         <button type="button" class="btn btn--sm btn--secondary" 
                             data-action="edit-user" 
                             data-user-id="${Utils.escapeHtml(user.userId)}">
-                            ${(window.t && window.t('arbeitszeitcheck', 'Edit')) || window.ArbeitszeitCheck?.l10n?.edit || 'Edit'}
+                            ${Utils.escapeHtml(auMsg('edit', 'Edit'))}
                         </button>
                     </div>
                 </td>
@@ -177,12 +189,12 @@
                 if (data.success && data.user) {
                     showEditUserModal(data.user);
                 } else {
-                    const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to load user details')) || window.ArbeitszeitCheck?.l10n?.failedToLoadUserDetails || 'Failed to load user details';
+                    const errorMsg = auMsg('failedToLoadUserDetails', 'Failed to load user details');
                     Messaging.showError(errorMsg);
                 }
             },
             onError: function(_error) {
-                Messaging.showError((window.t && window.t('arbeitszeitcheck', 'Failed to load user details')) || 'Failed to load user details');
+                Messaging.showError(auMsg('failedToLoadUserDetails', 'Failed to load user details'));
             }
         });
     }
@@ -192,7 +204,7 @@
      */
     function showEditUserModal(user) {
         if (!user || !user.userId) {
-            const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Invalid user data')) || window.ArbeitszeitCheck?.l10n?.invalidUserData || 'Invalid user data';
+            const errorMsg = auMsg('invalidUserData', 'Invalid user data');
             Messaging.showError(errorMsg);
             return;
         }
@@ -204,10 +216,10 @@
      * Show history modal for a user
      */
     function showHistoryModal(userId, userName) {
-        const t = (s, fallback) => window.ArbeitszeitCheck?.l10n?.[s] || (window.t && window.t('arbeitszeitcheck', fallback || s)) || fallback || s;
+        const t = (key, english) => auMsg(key, english);
         const title = t('assignmentHistory', 'Assignment history') + ': ' + (userName || userId);
         const closeLabel = t('close', 'Close');
-        const loadingText = t('loading', 'Loading') + '…';
+        const loadingText = auMsg('loadingEllipsis', 'Loading…');
 
         const content = `
             <p class="history-modal__loading" id="history-modal-loading">${loadingText}</p>
@@ -246,14 +258,14 @@
                         const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
                         return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
                     };
-                    const workScheduleHdr = Utils.escapeHtml(t('workSchedule'));
-                    const vacationDaysHdr = Utils.escapeHtml(t('vacationDaysCol'));
-                    const validFromHdr = Utils.escapeHtml(t('validFrom'));
-                    const validToHdr = Utils.escapeHtml(t('validTo'));
-                    const statusHdr = Utils.escapeHtml(t('status'));
-                    const ongoingVal = Utils.escapeHtml(t('ongoing'));
-                    const activeVal = Utils.escapeHtml(t('active'));
-                    const endedVal = Utils.escapeHtml(t('ended'));
+                    const workScheduleHdr = Utils.escapeHtml(t('workSchedule', 'Work schedule'));
+                    const vacationDaysHdr = Utils.escapeHtml(t('vacationDaysCol', 'Vacation days'));
+                    const validFromHdr = Utils.escapeHtml(t('validFrom', 'Valid from'));
+                    const validToHdr = Utils.escapeHtml(t('validTo', 'Valid to'));
+                    const statusHdr = Utils.escapeHtml(t('status', 'Status'));
+                    const ongoingVal = Utils.escapeHtml(t('ongoing', 'ongoing'));
+                    const activeVal = Utils.escapeHtml(t('active', 'Active'));
+                    const endedVal = Utils.escapeHtml(t('ended', 'Ended'));
                     const rows = data.history.map(item => {
                         const model = Utils.escapeHtml(item.modelName);
                         const vacation = String(item.vacationDaysPerYear);
@@ -264,8 +276,8 @@
                             : '<span class="badge">' + endedVal + '</span>';
                         return '<tr><td>' + model + '</td><td>' + vacation + '</td><td>' + from + '</td><td>' + to + '</td><td>' + status + '</td></tr>';
                     }).join('');
-                    contentEl.innerHTML = '<div class="table-responsive" role="region" aria-label="' + Utils.escapeHtml(t('assignmentHistory')) + '">' +
-                        '<table class="table history-modal__table" role="table" aria-label="' + Utils.escapeHtml(t('assignmentHistory')) + '">' +
+                    contentEl.innerHTML = '<div class="table-responsive" role="region" aria-label="' + Utils.escapeHtml(t('assignmentHistory', 'Assignment history')) + '">' +
+                        '<table class="table history-modal__table" role="table" aria-label="' + Utils.escapeHtml(t('assignmentHistory', 'Assignment history')) + '">' +
                         '<thead><tr>' +
                         '<th scope="col">' + workScheduleHdr + '</th>' +
                         '<th scope="col">' + vacationDaysHdr + '</th>' +
@@ -274,7 +286,7 @@
                         '<th scope="col">' + statusHdr + '</th>' +
                         '</tr></thead><tbody>' + rows + '</tbody></table></div>';
                 } else {
-                    contentEl.innerHTML = '<p class="history-modal__empty">' + Utils.escapeHtml(t('noAssignmentHistory')) + '</p>';
+                    contentEl.innerHTML = '<p class="history-modal__empty">' + Utils.escapeHtml(t('noAssignmentHistory', 'No assignment history')) + '</p>';
                 }
                 contentEl.style.display = 'block';
             },
@@ -283,7 +295,7 @@
                 const contentEl = document.getElementById('history-modal-content');
                 if (!loadingEl || !contentEl) return;
                 loadingEl.style.display = 'none';
-                contentEl.innerHTML = '<p class="history-modal__empty">' + Utils.escapeHtml(t('errorLoadingHistory', 'Error loading assignment history')) + '</p>';
+                contentEl.innerHTML = '<p class="history-modal__empty">' + Utils.escapeHtml(auMsg('errorLoadingHistory', 'Error loading assignment history')) + '</p>';
                 contentEl.style.display = 'block';
             }
         });
@@ -293,20 +305,21 @@
      * Show edit user modal with working time models loaded
      */
     function showEditUserModalWithModels(user, models) {
-        const t = (s) => window.ArbeitszeitCheck?.l10n?.[s] || s;
-        const title = t('editUser') + ': ' + (user.displayName || user.userId);
-        const saveLabel = t('save');
-        const cancelLabel = t('cancel');
-        const modelLabel = t('workingTimeModel');
-        const vacationDaysLabel = t('vacationDaysPerYear');
-        const carryoverLabel = t('vacationCarryoverLabel');
-        const carryoverYearLabel = t('vacationCarryoverYearLabel');
-        const startDateLabel = t('startDate');
-        const endDateLabel = t('endDateOptional');
-        const noModelLabel = t('noModel');
-        const germanStateLabel = t('germanStateLabel');
-        const germanStateHelp = t('germanStateHelp');
-        const germanStateDefault = t('germanStateDefault');
+        const t = (key, english) => auMsg(key, english);
+        const title = t('editUser', 'Edit User') + ': ' + (user.displayName || user.userId);
+        const saveLabel = t('save', 'Save');
+        const cancelLabel = t('cancel', 'Cancel');
+        const modelLabel = t('workingTimeModel', 'Working Time Model');
+        const vacationDaysLabel = t('vacationDaysPerYear', 'Vacation Days Per Year');
+        const carryoverLabel = t('vacationCarryoverLabel', 'Vacation carryover (opening balance)');
+        const carryoverYearLabel = t('vacationCarryoverYearLabel', 'Year for carryover balance');
+        const startDateLabel = t('startDate', 'Start Date');
+        const endDateLabel = t('endDateOptional', 'End Date (Optional)');
+        const noModelLabel = t('noModel', 'No Model Assigned');
+        const germanStateLabel = t('germanStateLabel', 'Federal state for holidays / calendar');
+        const germanStateHelp = t('germanStateHelp', 'Select the federal state whose holiday calendar applies to this person. If not set, the global default state is used.');
+        const germanStateDefault = t('germanStateDefault', 'Use global default state');
+        const datePlaceholder = Utils.escapeHtml(t('ddmmYYYY', 'dd.mm.yyyy'));
 
         const DEFAULT_VACATION_DAYS = 25; // German standard; must match Constants::DEFAULT_VACATION_DAYS_PER_YEAR
         const vacation = user.vacationDaysPerYear ?? user.userWorkingTimeModel?.vacationDaysPerYear ?? DEFAULT_VACATION_DAYS;
@@ -339,7 +352,7 @@
                     <select id="user-model" name="workingTimeModelId" class="form-select" aria-describedby="user-model-help">
                         ${modelOptions}
                     </select>
-                    <p id="user-model-help" class="form-help">${t('selectWorkScheduleHelp')}</p>
+                    <p id="user-model-help" class="form-help">${t('selectWorkScheduleHelp', 'Select a work schedule to assign to this employee')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-german-state" class="form-label">${germanStateLabel}</label>
@@ -351,26 +364,26 @@
                 <div class="form-group">
                     <label for="user-vacation-days" class="form-label">${vacationDaysLabel}</label>
                     <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" min="0" max="365" value="${vacation}" aria-describedby="user-vacation-help">
-                    <p id="user-vacation-help" class="form-help">${t('vacationDaysHelp')}</p>
+                    <p id="user-vacation-help" class="form-help">${t('vacationDaysHelp', 'Number of vacation days per year (standard in Germany: 25 days)')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-vacation-carryover" class="form-label">${carryoverLabel}</label>
                     <input type="number" id="user-vacation-carryover" name="vacationCarryoverDays" class="form-input" min="0" max="366" step="0.1" value="${carryover}" aria-describedby="user-carryover-help">
-                    <p id="user-carryover-help" class="form-help">${t('vacationCarryoverHelp')}</p>
+                    <p id="user-carryover-help" class="form-help">${t('vacationCarryoverHelp', 'Opening balance of carryover days for the selected calendar year (Resturlaub), e.g. from HR or migration. This is not the annual vacation entitlement from the working time model. The last day carryover can be used is set globally in Admin settings.')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-vacation-carryover-year" class="form-label">${carryoverYearLabel}</label>
                     <input type="number" id="user-vacation-carryover-year" name="vacationCarryoverYear" class="form-input" min="2000" max="2100" step="1" value="${carryYear}" aria-describedby="user-carryover-year-help">
-                    <p id="user-carryover-year-help" class="form-help">${t('vacationCarryoverYearHelp')}</p>
+                    <p id="user-carryover-year-help" class="form-help">${t('vacationCarryoverYearHelp', 'The calendar year this opening balance applies to (same year as in employees’ vacation statistics—usually the current year). When a new year starts or after migrating from another system, set the Resturlaub opening balance for that year here or use the CSV import command; the app does not roll balances forward automatically.')}</p>
                 </div>
                 <div class="form-group">
                     <label for="user-start-date" class="form-label">${startDateLabel}</label>
-                    <input type="text" id="user-start-date" name="startDate" class="form-input datepicker-input" placeholder="${t('ddmmYYYY') || (window.t ? window.t('arbeitszeitcheck', 'dd.mm.yyyy') : 'dd.mm.yyyy')}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${startVal}" autocomplete="off">
+                    <input type="text" id="user-start-date" name="startDate" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${startVal}" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="user-end-date" class="form-label">${endDateLabel}</label>
-                    <input type="text" id="user-end-date" name="endDate" class="form-input datepicker-input" placeholder="${t('ddmmYYYY') || (window.t ? window.t('arbeitszeitcheck', 'dd.mm.yyyy') : 'dd.mm.yyyy')}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${endVal}" autocomplete="off">
-                    <p class="form-help">${t('endDateHelp')}</p>
+                    <input type="text" id="user-end-date" name="endDate" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${endVal}" autocomplete="off">
+                    <p class="form-help">${t('endDateHelp', 'Leave empty if the assignment has no end date')}</p>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn--secondary" data-action="close-modal">${cancelLabel}</button>
@@ -445,18 +458,18 @@
             data: data,
             onSuccess: function(response) {
                 if (response.success) {
-                    const successMsg = window.ArbeitszeitCheck?.l10n?.userUpdated || 'User updated successfully';
+                    const successMsg = auMsg('userUpdated', 'User updated successfully');
                     Messaging.showSuccess(successMsg);
                     Components.closeModal(document.getElementById('edit-user-modal'));
                     // Reload users list
                     loadUsers();
                 } else {
-                    const errorMsg = response.error || (window.t && window.t('arbeitszeitcheck', 'Failed to update user')) || window.ArbeitszeitCheck?.l10n?.failedToUpdateUser || 'Failed to update user';
+                    const errorMsg = response.error || auMsg('failedToUpdateUser', 'Failed to update user');
                     Messaging.showError(errorMsg);
                 }
             },
             onError: function(_error) {
-                const errorMsg = (window.t && window.t('arbeitszeitcheck', 'Failed to update user')) || window.ArbeitszeitCheck?.l10n?.failedToUpdateUser || 'Failed to update user';
+                const errorMsg = auMsg('failedToUpdateUser', 'Failed to update user');
                 Messaging.showError(errorMsg);
             }
         });

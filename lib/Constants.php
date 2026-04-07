@@ -43,6 +43,19 @@ final class Constants
 	public const CONFIG_VACATION_CARRYOVER_EXPIRY_DAY = 'vacation_carryover_expiry_day';
 
 	/**
+	 * Optional max opening carryover days (empty = no cap). Tarifvertrag-specific; not legal advice.
+	 */
+	public const CONFIG_VACATION_CARRYOVER_MAX_DAYS = 'vacation_carryover_max_days';
+
+	/** When "1", background job may write next year opening from unused carryover remainder (see docs). */
+	public const CONFIG_VACATION_ROLLOVER_ENABLED = 'vacation_rollover_enabled';
+
+	/**
+	 * When "1" and rollover enabled, also roll unused annual entitlement (off by default; Tarifvertrag-specific).
+	 */
+	public const CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL = 'vacation_rollover_include_unused_annual';
+
+	/**
 	 * Maximum duration in days for absence requests (validation).
 	 */
 	public const MAX_ABSENCE_DAYS = 365;
@@ -69,25 +82,6 @@ final class Constants
 	public const COMPLIANCE_SCORE_WARNING_WEIGHT = 10;
 	public const COMPLIANCE_SCORE_INFO_WEIGHT = 5;
 	public const COMPLIANCE_SCORE_MAX_DEDUCTION = 100;
-
-	/**
-	 * CalDAV calendar URI for app-managed absence events (share this calendar for team visibility).
-	 */
-	public const CALENDAR_URI_ABSENCES = 'arbeitszeitcheck-absences';
-
-	/**
-	 * CalDAV calendar URI for app-managed public-holiday events (per-user state).
-	 */
-	public const CALENDAR_URI_HOLIDAYS = 'arbeitszeitcheck-holidays';
-
-	/** App config: sync approved absences into Nextcloud Calendar (CalDAV). */
-	public const CONFIG_CALENDAR_SYNC_ABSENCES_ENABLED = 'calendar_sync_absences_enabled';
-
-	/** App config: allow syncing public holidays into users' Nextcloud calendars. */
-	public const CONFIG_CALENDAR_SYNC_HOLIDAYS_ENABLED = 'calendar_sync_holidays_enabled';
-
-	/** User setting: sync Feiertage into dedicated Nextcloud calendar. */
-	public const USER_SETTING_CALENDAR_SYNC_HOLIDAYS = 'nc_calendar_sync_holidays';
 
 	private function __construct()
 	{

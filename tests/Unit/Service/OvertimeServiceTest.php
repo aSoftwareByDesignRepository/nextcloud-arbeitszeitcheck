@@ -17,7 +17,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
-use OCA\ArbeitszeitCheck\Service\HolidayCalendarService;
+use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
@@ -42,7 +42,7 @@ class OvertimeServiceTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
-	/** @var HolidayCalendarService|\PHPUnit\Framework\MockObject\MockObject */
+	/** @var HolidayService|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayCalendarService;
 
 	protected function setUp(): void
@@ -53,7 +53,7 @@ class OvertimeServiceTest extends TestCase
 		$this->workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
 		$this->l10n = $this->createMock(IL10N::class);
-		$this->holidayCalendarService = $this->createMock(HolidayCalendarService::class);
+		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(5.0);
 
 		$this->service = new OvertimeService(

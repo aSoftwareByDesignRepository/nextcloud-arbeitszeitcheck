@@ -54,7 +54,7 @@ gehosteten Nextcloud.
 - PHP 8.1–8.4
 	]]></description>
 
-	<version>1.1.7</version>
+	<version>1.1.10</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="info@software-by-design.de" homepage="https://software-by-design.de">Alexander Mäule</author>
 
@@ -81,7 +81,7 @@ gehosteten Nextcloud.
 	<commands>
 		<command>OCA\ArbeitszeitCheck\Command\GenerateTestDataCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\ImportVacationBalanceCommand</command>
-		<command>OCA\ArbeitszeitCheck\Command\CalendarSyncBackfillCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\VacationRolloverCommand</command>
 	</commands>
 
 	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
@@ -134,6 +134,11 @@ gehosteten Nextcloud.
 		<keyword>timeguard</keyword>
 	</keywords>
 
+	<settings>
+		<admin>OCA\ArbeitszeitCheck\Settings\AdminSettings</admin>
+		<personal>OCA\ArbeitszeitCheck\Settings\PersonalSettings</personal>
+	</settings>
+
 	<repair-steps>
 		<post-migration>
 			<step>OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays</step>
@@ -144,6 +149,6 @@ gehosteten Nextcloud.
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\ClockOutReminderJob</job>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\MissingTimeEntryJob</job>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\BreakReminderJob</job>
-		<job>OCA\ArbeitszeitCheck\BackgroundJob\HolidayCalendarSyncJob</job>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\VacationRolloverJob</job>
 	</background-jobs>
 </info>

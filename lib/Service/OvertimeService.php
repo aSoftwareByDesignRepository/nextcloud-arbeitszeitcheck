@@ -26,14 +26,14 @@ class OvertimeService
 	private WorkingTimeModelMapper $workingTimeModelMapper;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private IL10N $l10n;
-	private HolidayCalendarService $holidayCalendarService;
+	private HolidayService $holidayCalendarService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
 		WorkingTimeModelMapper $workingTimeModelMapper,
 		UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		IL10N $l10n,
-		HolidayCalendarService $holidayCalendarService
+		HolidayService $holidayCalendarService
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->workingTimeModelMapper = $workingTimeModelMapper;
@@ -218,7 +218,7 @@ class OvertimeService
 	 */
 	private function countWorkingDays(string $userId, \DateTime $startDate, \DateTime $endDate): float
 	{
-		// Delegate to HolidayCalendarService so that statutory and company holidays
+		// Delegate to HolidayService so that statutory and company holidays
 		// (including half days) are treated consistently across the app.
 		return $this->holidayCalendarService->computeWorkingDaysForUser($userId, $startDate, $endDate);
 	}

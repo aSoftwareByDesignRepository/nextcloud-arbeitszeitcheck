@@ -87,8 +87,7 @@ class SettingsControllerTest extends TestCase
 			$this->l10n,
 			$this->cspService,
 			$this->urlGenerator,
-			$this->permissionService,
-			null
+			$this->permissionService
 		);
 	}
 

@@ -1,3 +1,41 @@
+## [Unreleased]
+
+## 1.1.10 – 2026-04-07
+
+### Hinzugefügt
+
+- **Urlaubsübertrag / Rollover**: `VacationRolloverService`, Hintergrundauftrag, `occ arbeitszeitcheck:vacation-rollover`, Migration `Version1013Date20260407120000` mit `at_vacation_rollover_log`; Unit-Tests.
+
+### Geändert
+
+- **Frontend-L10n**: Gemeinsame Partials `templates/common/main-ui-l10n.php` und `teams-l10n.php`, damit Übersetzungen früh verfügbar sind; zugehörige Template- und JS-Anpassungen.
+
+### Behoben
+
+- **Manager-Dashboard — ausstehende Abwesenheiten**: Die API liefert `summary.typeLabel` (serverseitig übersetzter Abwesenheitstyp); die Oberfläche nutzt das bevorzugt, damit Karten lokalisierte Bezeichnungen zeigen (z. B. *Urlaub*) statt Rohcodes wie `vacation`.
+
+### Dokumentation
+
+- `docs/Developer-Documentation.en.md`: API-Hinweis zu `typeLabel` bei Pending Approvals; Nutzerhandbücher EN/DE: Hinweis zu lokalisierten Abwesenheitstypen bei ausstehenden Genehmigungen.
+
+## 1.1.9 – 2026-04-05
+
+### Entfernt
+
+- **Nextcloud-Kalender-App (CalDAV)**: Synchronisation von Abwesenheiten in die Kalender-App ist entfernt; Migration `Version1012Date20260406120000` entfernt die Tabelle `at_absence_calendar`. Bereits angelegte Kalender in der Kalender-App bleiben bestehen, bis Nutzer sie dort löschen.
+
+### Geändert
+
+- **Feiertage / Kalenderlogik**: In der Klasse `HolidayService` gebündelt.
+
+### Behoben
+
+- **AdminController**: Doppelte `use`-Anweisung für `HolidayService` führte zu einem PHP-Fatal (u. a. beim Laden durch PHPUnit).
+
+### Dokumentation
+
+- Nutzerhandbücher EN/DE (`docs/User-Manual.*`), README- und Entwicklerdokumentation aktualisiert; Hilfsskript `docker/run-app-phpunit.sh` für PHPUnit im Container.
+
 ## 1.1.7 – 2026-04-05
 
 ### Hinzugefügt

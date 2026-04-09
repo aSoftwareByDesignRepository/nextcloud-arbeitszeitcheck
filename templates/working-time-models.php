@@ -85,6 +85,14 @@ $models = $_['models'] ?? [];
                                     <?php endif; ?>
                                 </td>
                                 <td>
+                                    <button type="button"
+                                            class="btn btn--sm btn--secondary"
+                                            data-action="duplicate-model"
+                                            data-model-id="<?php p($model['id']); ?>"
+                                            aria-label="<?php p($l->t('Copy this work schedule')); ?>"
+                                            title="<?php p($l->t('Create a copy of this work schedule as a starting point for a new one')); ?>">
+                                        <?php p($l->t('Copy')); ?>
+                                    </button>
                                     <button type="button" 
                                             class="btn btn--sm btn--secondary" 
                                             data-action="edit-model" 
@@ -147,6 +155,13 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.failedToUpdateModel = <?php echo json_encode($l->t('Failed to update model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.failedToDeleteModel = <?php echo json_encode($l->t('Failed to delete model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelDeleted = <?php echo json_encode($l->t('Working time model deleted successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.modelCopied = <?php echo json_encode($l->t('Model copied successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.failedToCopyModel = <?php echo json_encode($l->t('Failed to copy model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.copySuffix = <?php echo json_encode($l->t('Copy'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.copyNoun = <?php echo json_encode($l->t('Copy (noun)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.copyModelTitle = <?php echo json_encode($l->t('Copy Working Time Model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.copy = <?php echo json_encode($l->t('Copy'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.sourceModel = <?php echo json_encode($l->t('Source model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.deleteModelTitle = <?php echo json_encode($l->t('Delete working time model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.delete = <?php echo json_encode($l->t('Delete'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.thisWorkSchedule = <?php echo json_encode($l->t('this work schedule'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

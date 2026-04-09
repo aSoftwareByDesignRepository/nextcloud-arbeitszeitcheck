@@ -42,6 +42,11 @@
         }).join('');
     }
 
+    function isGermanLocale() {
+        const locale = String(window.ArbeitszeitCheck?.dateLocale || document.documentElement.lang || '').toLowerCase();
+        return locale.startsWith('de');
+    }
+
     /**
      * Initialize models page
      */
@@ -61,6 +66,11 @@
         const editButtons = Utils.$$('[data-action="edit-model"]');
         editButtons.forEach(btn => {
             Utils.on(btn, 'click', handleEditModel);
+        });
+
+        const duplicateButtons = Utils.$$('[data-action="duplicate-model"]');
+        duplicateButtons.forEach(btn => {
+            Utils.on(btn, 'click', handleDuplicateModel);
         });
 
         const deleteButtons = Utils.$$('[data-action="delete-model"]');
@@ -186,6 +196,177 @@
                 Messaging.showError(errorMsg);
             }
         });
+    }
+
+    /**
+     * Duplicate an existing model as a new model.
+     */
+    function handleDuplicateModel(e) {
+        const button = e.currentTarget || e.target;
+        const modelId = button.dataset.modelId;
+        if (!modelId) {
+            return;
+        }
+        if (button.disabled) {
+            return;
+        }
+        button.disabled = true;
+
+        Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models/' + modelId, {
+            method: 'GET',
+            onSuccess: function(data) {
+                button.disabled = false;
+                if (!data.success || !data.model) {
+                    const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToCopyModel || 'Failed to copy model';
+                    Messaging.showError(errorMsg);
+                    return;
+                }
+
+                showDuplicateModal(data.model);
+            },
+            onError: function(_error) {
+                button.disabled = false;
+                const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToCopyModel || 'Failed to copy model';
+                Messaging.showError(errorMsg);
+            }
+        });
+    }
+
+    /**
+     * Show duplicate modal with editable target name.
+     */
+    function showDuplicateModal(model) {
+        const copyTitle = window.ArbeitszeitCheck?.l10n?.copyModelTitle || 'Copy Working Time Model';
+        const copyLabel = window.ArbeitszeitCheck?.l10n?.copy || 'Copy';
+        const cancelLabel = window.ArbeitszeitCheck?.l10n?.cancel || 'Cancel';
+        const nameLabel = window.ArbeitszeitCheck?.l10n?.name || 'Name';
+        const sourceLabel = window.ArbeitszeitCheck?.l10n?.sourceModel || 'Source model';
+        const copyNoun = window.ArbeitszeitCheck?.l10n?.copyNoun || 'Copy';
+        const suggestedName = getUniqueCopyName(String(model.name || 'Model'), copyNoun);
+
+        const content = `
+            <form id="duplicate-model-form" class="form">
+                <div class="form-group">
+                    <label class="form-label">${sourceLabel}</label>
+                    <div class="form-help" role="note">${Utils.escapeHtml(model.name || '')}</div>
+                </div>
+                <div class="form-group">
+                    <label for="duplicate-model-name" class="form-label">${nameLabel} <span class="form-required">*</span></label>
+                    <input type="text" id="duplicate-model-name" name="name" class="form-input" required value="${Utils.escapeHtml(suggestedName)}">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn--secondary" data-action="close-modal">${cancelLabel}</button>
+                    <button type="submit" class="btn btn--primary">${copyLabel}</button>
+                </div>
+            </form>
+        `;
+
+        const modal = Components.createModal({
+            id: 'duplicate-model-modal',
+            title: copyTitle,
+            content: content,
+            size: 'md',
+            closable: true,
+            onClose: function() {
+                const modalEl = document.getElementById('duplicate-model-modal');
+                if (modalEl && modalEl.parentNode) {
+                    modalEl.parentNode.remove();
+                }
+            }
+        });
+
+        Components.openModal('duplicate-model-modal');
+
+        const form = document.getElementById('duplicate-model-form');
+        if (form) {
+            form.addEventListener('submit', function(ev) {
+                ev.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn?.disabled) {
+                    return;
+                }
+                const targetName = String(new FormData(form).get('name') || '').trim();
+                if (!targetName) {
+                    Messaging.showError(window.ArbeitszeitCheck?.l10n?.failedToCopyModel || 'Failed to copy model');
+                    return;
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+
+                const payload = {
+                    name: targetName,
+                    description: model.description || null,
+                    type: model.type || 'full_time',
+                    weeklyHours: Number(model.weeklyHours) || 40,
+                    dailyHours: Number(model.dailyHours) || 8,
+                    breakRules: model.breakRules || [],
+                    overtimeRules: model.overtimeRules || [],
+                    isDefault: false
+                };
+
+                Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models', {
+                    method: 'POST',
+                    data: payload,
+                    onSuccess: function(createResponse) {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                        }
+                        if (createResponse.success) {
+                            Components.closeModal(document.getElementById('duplicate-model-modal'));
+                            const successMsg = window.ArbeitszeitCheck?.l10n?.modelCopied || 'Model copied successfully';
+                            Messaging.showSuccess(successMsg);
+                            setTimeout(() => location.reload(), 700);
+                        } else {
+                            const errorMsg = createResponse.error || window.ArbeitszeitCheck?.l10n?.failedToCopyModel || 'Failed to copy model';
+                            Messaging.showError(errorMsg);
+                        }
+                    },
+                    onError: function(_error) {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                        }
+                        const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToCopyModel || 'Failed to copy model';
+                        Messaging.showError(errorMsg);
+                    }
+                });
+            });
+        }
+
+        const cancelBtn = modal.querySelector('[data-action="close-modal"]');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() {
+                Components.closeModal(modal);
+            });
+        }
+    }
+
+    function getExistingModelNamesLowerCase() {
+        const rows = Utils.$$('#models-tbody tr[data-model-id]');
+        const names = new Set();
+        rows.forEach((row) => {
+            const nameCell = row.querySelector('td:first-child');
+            const name = String(nameCell?.textContent || '').trim().toLowerCase();
+            if (name) {
+                names.add(name);
+            }
+        });
+        return names;
+    }
+
+    function getUniqueCopyName(baseName, copyNoun) {
+        const existing = getExistingModelNamesLowerCase();
+        const primary = `${baseName} (${copyNoun})`;
+        if (!existing.has(primary.toLowerCase())) {
+            return primary;
+        }
+        let n = 2;
+        let candidate = `${baseName} (${copyNoun} ${n})`;
+        while (existing.has(candidate.toLowerCase())) {
+            n += 1;
+            candidate = `${baseName} (${copyNoun} ${n})`;
+        }
+        return candidate;
     }
 
     /**
@@ -376,23 +557,33 @@
         const rawName = row?.querySelector('td:first-child')?.textContent?.trim();
         const modelName = rawName || window.ArbeitszeitCheck?.l10n?.thisWorkSchedule || (window.t && window.t('arbeitszeitcheck', 'this work schedule')) || 'this work schedule';
 
-        const title = window.ArbeitszeitCheck?.l10n?.deleteModelTitle ||
+        const titleFromL10n = window.ArbeitszeitCheck?.l10n?.deleteModelTitle ||
             (window.t && window.t('arbeitszeitcheck', 'Delete working time model')) ||
             'Delete working time model';
+        const title = (isGermanLocale() && titleFromL10n === 'Delete working time model')
+            ? 'Arbeitszeitmodell löschen'
+            : titleFromL10n;
 
-        const bodyTemplate = window.ArbeitszeitCheck?.l10n?.confirmDeleteModelWithName ||
+        const bodyTemplateFromL10n = window.ArbeitszeitCheck?.l10n?.confirmDeleteModelWithName ||
             window.ArbeitszeitCheck?.l10n?.confirmDeleteModel ||
             (window.t && window.t(
                 'arbeitszeitcheck',
                 'Are you sure you want to delete "{name}"?\n\nThis will permanently remove this work schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone.'
             )) ||
             'Are you sure you want to delete "{name}"?\n\nThis will permanently remove this work schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone.';
+        const germanFallbackTemplate = 'Möchten Sie „{name}“ wirklich löschen?\n\nDieses Arbeitszeitmodell wird dauerhaft entfernt. Wenn Mitarbeitende dieses Modell verwenden, weisen Sie ihnen vorher ein anderes Modell zu.\n\nDiese Aktion kann nicht rückgängig gemacht werden.';
+        const bodyTemplate = (isGermanLocale() && bodyTemplateFromL10n.includes('Are you sure you want to delete'))
+            ? germanFallbackTemplate
+            : bodyTemplateFromL10n;
 
-        const body = String(bodyTemplate).replace(/\{name\}/g, modelName).replace(/\n/g, '<br>');
+        const body = String(bodyTemplate)
+            .replace(/\{name\}/g, modelName)
+            // Support both real newlines and escaped \n sequences.
+            .replace(/\\n/g, '<br>')
+            .replace(/\n/g, '<br>');
 
         const content = `
             <div class="modal-section">
-                <h2 id="wtm-delete-title" class="modal-title">${title}</h2>
                 <p id="wtm-delete-body" class="modal-text">${body}</p>
             </div>
             <div class="form-actions">
@@ -411,7 +602,6 @@
             content: content,
             size: 'md',
             closable: true,
-            ariaLabelledBy: 'wtm-delete-title',
             ariaDescribedBy: 'wtm-delete-body',
             onClose: function() {
                 const modalEl = document.getElementById('delete-model-modal');

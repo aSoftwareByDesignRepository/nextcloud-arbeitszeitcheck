@@ -175,22 +175,22 @@ $holidaysUiStrings = [
                                 <button type="button"
                                         id="holiday-add-entry"
                                         class="btn btn--primary"
-                                        aria-label="<?php p($l->t('Neuen Feiertag anlegen')); ?>">
-                                    <?php p($l->t('Neuen Feiertag hinzufügen')); ?>
+                                        aria-label="<?php p($l->t('Create new holiday')); ?>">
+                                    <?php p($l->t('Add new holiday')); ?>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="table-container admin-holidays-table-container" role="region" aria-label="<?php p($l->t('Liste der Feiertage für das ausgewählte Bundesland und Jahr')); ?>">
+                    <div class="table-container admin-holidays-table-container" role="region" aria-label="<?php p($l->t('List of holidays for the selected federal state and year')); ?>">
                         <table class="table table--hover admin-holidays-table" id="holiday-table">
                             <thead>
                                 <tr>
-                                    <th scope="col"><?php p($l->t('Datum')); ?></th>
-                                    <th scope="col"><?php p($l->t('Name des Feiertags')); ?></th>
-                                    <th scope="col"><?php p($l->t('Art')); ?></th>
-                                    <th scope="col"><?php p($l->t('Geltungsbereich')); ?></th>
-                                    <th scope="col"><?php p($l->t('Aktionen')); ?></th>
+                                    <th scope="col"><?php p($l->t('Date')); ?></th>
+                                    <th scope="col"><?php p($l->t('Holiday name')); ?></th>
+                                    <th scope="col"><?php p($l->t('Type')); ?></th>
+                                    <th scope="col"><?php p($l->t('Scope')); ?></th>
+                                    <th scope="col"><?php p($l->t('Actions')); ?></th>
                                 </tr>
                             </thead>
                             <tbody id="holiday-tbody">
@@ -199,12 +199,12 @@ $holidaysUiStrings = [
                         </table>
                     </div>
 
-                    <div class="admin-holidays-legend" aria-label="<?php p($l->t('Erläuterung der Spalten')); ?>">
+                    <div class="admin-holidays-legend" aria-label="<?php p($l->t('Column explanations')); ?>">
                         <p class="form-help">
-                            <?php p($l->t('„Art“ bestimmt, ob ein Tag als voller Feiertag (zählt nicht als Arbeitstag) oder als halber Feiertag (z. B. 0,5 Urlaubstag) behandelt wird.')); ?>
+                            <?php p($l->t('"Type" determines whether a day is treated as a full-day holiday (not counted as a working day) or as a half-day holiday (e.g., 0.5 vacation day).')); ?>
                         </p>
                         <p class="form-help">
-                            <?php p($l->t('„Geltungsbereich“ unterscheidet zwischen gesetzlichen Feiertagen, organisationsweiten Firmenfeiertagen und benutzerdefinierten Einträgen. Gesetzliche Feiertage werden immer als ganze Tage behandelt.')); ?>
+                            <?php p($l->t('"Scope" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are always treated as full-day holidays.')); ?>
                         </p>
                     </div>
                     </section>

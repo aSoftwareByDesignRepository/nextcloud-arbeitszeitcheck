@@ -60,21 +60,25 @@
                 });
             });
 
-            // Admin submenu toggle (Verwaltung)
-            const adminToggle = this.menuNav.querySelector('.nav-parent-toggle');
-            const adminSubmenu = this.menuNav.querySelector('#admin-subnav');
-            if (adminToggle && adminSubmenu) {
-                adminToggle.addEventListener('click', (e) => {
+            // Generic submenu toggle support (e.g., Manager, Administration)
+            const parentToggles = this.menuNav.querySelectorAll('.nav-parent-toggle');
+            parentToggles.forEach((toggle) => {
+                const submenuId = toggle.getAttribute('aria-controls');
+                const submenu = submenuId ? this.menuNav.querySelector(`#${submenuId}`) : null;
+                if (!submenu) {
+                    return;
+                }
+                toggle.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const isExpanded = adminToggle.getAttribute('aria-expanded') === 'true';
-                    adminToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+                    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
                     if (isExpanded) {
-                        adminSubmenu.setAttribute('hidden', '');
+                        submenu.setAttribute('hidden', '');
                     } else {
-                        adminSubmenu.removeAttribute('hidden');
+                        submenu.removeAttribute('hidden');
                     }
                 });
-            }
+            });
 
             // Close menu on Escape key
             document.addEventListener('keydown', (e) => {

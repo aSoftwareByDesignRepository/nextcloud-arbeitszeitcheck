@@ -31,6 +31,28 @@
         return div.innerHTML;
     }
 
+    function getDateLocale() {
+        return window.ArbeitszeitCheck?.dateLocale || document.documentElement.lang || undefined;
+    }
+
+    function formatDateForDisplay(dateString) {
+        if (!dateString) return '';
+        const locale = getDateLocale();
+
+        // Handle plain yyyy-mm-dd dates (absence ranges) explicitly to avoid timezone shifts.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+            const [y, m, d] = dateString.split('-').map((v) => parseInt(v, 10));
+            const date = new Date(y, m - 1, d, 12, 0, 0);
+            if (Number.isNaN(date.getTime())) return dateString;
+            return new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+        }
+
+        // Fallback for ISO timestamps or other parseable values.
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return dateString;
+        return new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    }
+
     function parseSummary(summary) {
         if (summary == null) {
             return {};
@@ -173,8 +195,8 @@
         const typeCode = s.type != null && s.type !== ''
             ? s.type
             : (s.absence_type || s.absenceType || 'absence');
-        const start = s.start_date || s.startDate || '';
-        const end = s.end_date || s.endDate || '';
+        const start = formatDateForDisplay(s.start_date || s.startDate || '');
+        const end = formatDateForDisplay(s.end_date || s.endDate || '');
         const days = s.days != null ? s.days : '';
         const id = item.id;
         const displayName = escapeHtml(item.displayName || item.userId || '');
@@ -332,7 +354,7 @@
         const s = item.summary || {};
         const id = item.id;
         const displayName = escapeHtml(item.displayName || item.userId || '');
-        const date = s.date || '';
+        const date = formatDateForDisplay(s.date || '');
         const startTime = s.startTime || '';
         const endTime = s.endTime || '';
         const durationHours = s.durationHours != null ? s.durationHours : '';

@@ -1,0 +1,60 @@
+.manager-time-entries-page {
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+.manager-time-entries-page__content {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.manager-time-entries-page .section {
+	margin-bottom: 0;
+}
+
+.manager-time-entries-page__header h1 {
+	margin: 0 0 0.5rem;
+	font-size: 1.5rem;
+}
+
+.manager-time-entries-page__filters .form-grid {
+	align-items: end;
+}
+
+.manager-time-entries-page__filter-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.manager-time-entries-page__results-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.manager-time-entries-page__count {
+	margin: 0;
+	color: var(--color-text-maxcontrast);
+}
+
+.manager-time-entries-page__pagination {
+	margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+	.manager-time-entries-page__results-header {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.manager-time-entries-page__filter-actions {
+		width: 100%;
+	}
+
+	.manager-time-entries-page__filter-actions .btn {
+		flex: 1 1 auto;
+	}
+}

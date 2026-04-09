@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Constants;
@@ -119,6 +120,10 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_managed_teams');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
 
 			// If app teams are not enabled, there is no concept of multiple named teams for managers.
 			if (!$this->teamResolver->useAppTeams()) {
@@ -208,6 +213,38 @@ class ManagerController extends Controller
 	}
 
 	/**
+	 * Guard read-only manager/admin endpoints.
+	 *
+	 * @return JSONResponse|null Returns a 403 response when access is denied, otherwise null.
+	 */
+	private function ensureManagerReadAccess(string $actorUserId, string $action): ?JSONResponse
+	{
+		if ($this->permissionService->isAdmin($actorUserId) || $this->permissionService->canAccessManagerDashboard($actorUserId)) {
+			return null;
+		}
+
+		$this->permissionService->logPermissionDenied($actorUserId, $action, 'manager_api');
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('Access denied. This area is available to managers and administrators only.'),
+		], Http::STATUS_FORBIDDEN);
+	}
+
+	private function normalizeLimit(?int $limit): int
+	{
+		$normalized = $limit ?? Constants::DEFAULT_LIST_LIMIT;
+		if ($normalized < 1) {
+			$normalized = Constants::DEFAULT_LIST_LIMIT;
+		}
+		return min($normalized, Constants::MAX_LIST_LIMIT);
+	}
+
+	private function normalizeOffset(?int $offset): int
+	{
+		return max(0, (int)($offset ?? 0));
+	}
+
+	/**
 	 * Localized label for an absence type code (same strings as the absences UI / manager-dashboard l10n).
 	 */
 	private function getAbsenceTypeLabel(string $type): string
@@ -223,6 +260,22 @@ class ManagerController extends Controller
 			'business_trip' => $this->l10n->t('Business trip'),
 		];
 		return $map[$type] ?? $type;
+	}
+
+	/**
+	 * Localized label for an absence status code.
+	 */
+	private function getAbsenceStatusLabel(string $status): string
+	{
+		$map = [
+			'pending' => $this->l10n->t('Pending'),
+			'substitute_pending' => $this->l10n->t('Substitute pending'),
+			'substitute_declined' => $this->l10n->t('Substitute declined'),
+			'approved' => $this->l10n->t('Approved'),
+			'rejected' => $this->l10n->t('Rejected'),
+			'cancelled' => $this->l10n->t('Cancelled'),
+		];
+		return $map[$status] ?? $status;
 	}
 
 	/**
@@ -347,6 +400,138 @@ class ManagerController extends Controller
 		}
 	}
 
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function employeeTimeEntriesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
+	{
+		Util::addTranslations('arbeitszeitcheck');
+
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
+		Util::addStyle('arbeitszeitcheck', 'common/base');
+		Util::addStyle('arbeitszeitcheck', 'common/components');
+		Util::addStyle('arbeitszeitcheck', 'common/layout');
+		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
+		Util::addStyle('arbeitszeitcheck', 'manager-time-entries');
+
+		Util::addScript('arbeitszeitcheck', 'common/utils');
+		Util::addScript('arbeitszeitcheck', 'common/messaging');
+		Util::addScript('arbeitszeitcheck', 'common/datepicker');
+		Util::addScript('arbeitszeitcheck', 'manager-time-entries');
+
+		try {
+			$actorUserId = $this->getUserId();
+			if (!$this->permissionService->isAdmin($actorUserId) && !$this->permissionService->canAccessManagerDashboard($actorUserId)) {
+				$redirect = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index');
+				return new \OCP\AppFramework\Http\RedirectResponse($redirect);
+			}
+
+			$showSubstitutionLink = false;
+			try {
+				$pending = $this->absenceMapper->findSubstitutePendingForUser($actorUserId, 1, 0);
+				$showSubstitutionLink = \is_array($pending) && \count($pending) > 0;
+			} catch (\Throwable $e) {
+				$showSubstitutionLink = false;
+			}
+
+			$isAdmin = $this->permissionService->isAdmin($actorUserId);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-time-entries', [
+				'showManagerLink' => true,
+				'showSubstitutionLink' => $showSubstitutionLink,
+				'showReportsLink' => true,
+				'showAdminNav' => $isAdmin,
+				'urlGenerator' => $this->urlGenerator,
+				'l' => $this->l10n,
+			]);
+			return $this->configureCSP($response);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::employeeTimeEntriesPage',
+				['exception' => $e]
+			);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-time-entries', [
+				'showManagerLink' => true,
+				'showSubstitutionLink' => false,
+				'showReportsLink' => true,
+				'showAdminNav' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+				'urlGenerator' => $this->urlGenerator,
+				'l' => $this->l10n,
+			]);
+			return $this->configureCSP($response);
+		}
+	}
+
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function employeeAbsencesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
+	{
+		Util::addTranslations('arbeitszeitcheck');
+
+		Util::addStyle('arbeitszeitcheck', 'common/colors');
+		Util::addStyle('arbeitszeitcheck', 'common/typography');
+		Util::addStyle('arbeitszeitcheck', 'common/base');
+		Util::addStyle('arbeitszeitcheck', 'common/components');
+		Util::addStyle('arbeitszeitcheck', 'common/layout');
+		Util::addStyle('arbeitszeitcheck', 'common/utilities');
+		Util::addStyle('arbeitszeitcheck', 'common/accessibility');
+		Util::addStyle('arbeitszeitcheck', 'common/app-layout');
+		Util::addStyle('arbeitszeitcheck', 'common/responsive');
+		Util::addStyle('arbeitszeitcheck', 'navigation');
+		Util::addStyle('arbeitszeitcheck', 'manager-time-entries');
+
+		Util::addScript('arbeitszeitcheck', 'common/utils');
+		Util::addScript('arbeitszeitcheck', 'common/messaging');
+		Util::addScript('arbeitszeitcheck', 'common/datepicker');
+		Util::addScript('arbeitszeitcheck', 'manager-absences');
+
+		try {
+			$actorUserId = $this->getUserId();
+			if (!$this->permissionService->isAdmin($actorUserId) && !$this->permissionService->canAccessManagerDashboard($actorUserId)) {
+				$redirect = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index');
+				return new \OCP\AppFramework\Http\RedirectResponse($redirect);
+			}
+
+			$showSubstitutionLink = false;
+			try {
+				$pending = $this->absenceMapper->findSubstitutePendingForUser($actorUserId, 1, 0);
+				$showSubstitutionLink = \is_array($pending) && \count($pending) > 0;
+			} catch (\Throwable $e) {
+				$showSubstitutionLink = false;
+			}
+
+			$isAdmin = $this->permissionService->isAdmin($actorUserId);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-absences', [
+				'showManagerLink' => true,
+				'showSubstitutionLink' => $showSubstitutionLink,
+				'showReportsLink' => true,
+				'showAdminNav' => $isAdmin,
+				'urlGenerator' => $this->urlGenerator,
+				'l' => $this->l10n,
+			]);
+			return $this->configureCSP($response);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::employeeAbsencesPage',
+				['exception' => $e]
+			);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-absences', [
+				'showManagerLink' => true,
+				'showSubstitutionLink' => false,
+				'showReportsLink' => true,
+				'showAdminNav' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+				'urlGenerator' => $this->urlGenerator,
+				'l' => $this->l10n,
+			]);
+			return $this->configureCSP($response);
+		}
+	}
+
 	/**
 	 * Get team overview data
 	 *
@@ -360,6 +545,12 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_team_overview');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			$limit = $this->normalizeLimit($limit);
+			$offset = $this->normalizeOffset($offset);
 			
 			// Get actual team member IDs from Nextcloud groups
 			$teamUserIds = $this->getTeamMemberIds($managerId);
@@ -373,7 +564,7 @@ class ManagerController extends Controller
 			}
 
 			// Apply pagination
-			$paginatedUserIds = array_slice($teamUserIds, $offset ?? 0, $limit ?? 50);
+			$paginatedUserIds = array_slice($teamUserIds, $offset, $limit);
 
 			$teamMembers = [];
 			$today = new \DateTime();
@@ -438,6 +629,343 @@ class ManagerController extends Controller
 	}
 
 	/**
+	 * Read-only employee time entries list for managers/admins.
+	 * Query executes only when start_date and end_date are provided (empty-safe default).
+	 */
+	#[NoAdminRequired]
+	public function getEmployeeTimeEntries(
+		?string $employeeId = null,
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $status = null,
+		?int $limit = Constants::DEFAULT_LIST_LIMIT,
+		?int $offset = 0
+	): JSONResponse {
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'view_employee_time_entries');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+
+			$isAdmin = $this->permissionService->isAdmin($actorUserId);
+			$normalizedLimit = $this->normalizeLimit($limit);
+			$normalizedOffset = $this->normalizeOffset($offset);
+			$status = $status !== null ? trim($status) : null;
+			$allowedStatuses = [
+				TimeEntry::STATUS_ACTIVE,
+				TimeEntry::STATUS_BREAK,
+				TimeEntry::STATUS_PAUSED,
+				TimeEntry::STATUS_COMPLETED,
+				TimeEntry::STATUS_PENDING_APPROVAL,
+				TimeEntry::STATUS_REJECTED,
+			];
+			$statusFilter = ($status !== null && $status !== '' && in_array($status, $allowedStatuses, true)) ? $status : null;
+
+			$scopedUserIds = $isAdmin
+				? array_values(array_map(static fn ($u) => $u->getUID(), $this->userManager->search('', Constants::MAX_LIST_LIMIT, 0)))
+				: $this->getTeamMemberIds($actorUserId);
+			sort($scopedUserIds);
+
+			$employees = [];
+			foreach ($scopedUserIds as $uid) {
+				$user = $this->userManager->get($uid);
+				if ($user === null) {
+					continue;
+				}
+				$employees[] = [
+					'userId' => $uid,
+					'displayName' => $this->getDisplayName($uid),
+					'enabled' => $user->isEnabled(),
+				];
+			}
+
+			$scopedLookup = array_fill_keys(array_column($employees, 'userId'), true);
+			if ($employeeId !== null && $employeeId !== '') {
+				if (!isset($scopedLookup[$employeeId])) {
+					$this->permissionService->logPermissionDenied($actorUserId, 'view_employee_time_entries_user_filter', 'user', $employeeId);
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Access denied. You can only view time entries for employees in your scope.'),
+					], Http::STATUS_FORBIDDEN);
+				}
+				$scopedUserIds = [$employeeId];
+			}
+
+			$hasRequiredFilters = !empty($startDate) && !empty($endDate);
+			if (!$hasRequiredFilters || empty($scopedUserIds)) {
+				return new JSONResponse([
+					'success' => true,
+					'requiresFilters' => true,
+					'entries' => [],
+					'total' => 0,
+					'employees' => $employees,
+					'filters' => [
+						'employeeId' => $employeeId,
+						'startDate' => $startDate,
+						'endDate' => $endDate,
+						'status' => $statusFilter,
+						'limit' => $normalizedLimit,
+						'offset' => $normalizedOffset,
+					],
+				]);
+			}
+
+			try {
+				$start = new \DateTimeImmutable($startDate . ' 00:00:00');
+				$endExclusive = (new \DateTimeImmutable($endDate . ' 00:00:00'))->modify('+1 day');
+			} catch (\Throwable $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date range. Please use valid dates in YYYY-MM-DD format.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			if ($start >= $endExclusive) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date range. The start date must be before the end date.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$entries = $this->timeEntryMapper->findByUsersAndDateRange(
+				$scopedUserIds,
+				$start,
+				$endExclusive,
+				$statusFilter,
+				$normalizedLimit,
+				$normalizedOffset
+			);
+			$total = $this->timeEntryMapper->countByUsersAndDateRange(
+				$scopedUserIds,
+				$start,
+				$endExclusive,
+				$statusFilter
+			);
+
+			$entryRows = [];
+			foreach ($entries as $entry) {
+				$entryRows[] = [
+					'id' => $entry->getId(),
+					'userId' => $entry->getUserId(),
+					'displayName' => $this->getDisplayName($entry->getUserId()),
+					'startTime' => $entry->getStartTime()?->format('c'),
+					'endTime' => $entry->getEndTime()?->format('c'),
+					'durationHours' => $entry->getDurationHours(),
+					'workingDurationHours' => $entry->getWorkingDurationHours(),
+					'breakDurationHours' => $entry->getBreakDurationHours(),
+					'description' => $entry->getDescription(),
+					'status' => $entry->getStatus(),
+					'isManualEntry' => $entry->getIsManualEntry(),
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'requiresFilters' => false,
+				'entries' => $entryRows,
+				'total' => $total,
+				'employees' => $employees,
+				'filters' => [
+					'employeeId' => $employeeId,
+					'startDate' => $startDate,
+					'endDate' => $endDate,
+					'status' => $statusFilter,
+					'limit' => $normalizedLimit,
+					'offset' => $normalizedOffset,
+				],
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::getEmployeeTimeEntries',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Read-only employee absences list for managers/admins.
+	 * Query executes only when start_date and end_date are provided (empty-safe default).
+	 */
+	#[NoAdminRequired]
+	public function getEmployeeAbsences(
+		?string $employeeId = null,
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $status = null,
+		?string $type = null,
+		?int $limit = Constants::DEFAULT_LIST_LIMIT,
+		?int $offset = 0
+	): JSONResponse {
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'view_employee_absences');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+
+			$isAdmin = $this->permissionService->isAdmin($actorUserId);
+			$normalizedLimit = $this->normalizeLimit($limit);
+			$normalizedOffset = $this->normalizeOffset($offset);
+
+			$status = $status !== null ? trim($status) : null;
+			$type = $type !== null ? trim($type) : null;
+			$allowedStatuses = [
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING,
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_PENDING,
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_DECLINED,
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_REJECTED,
+				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_CANCELLED,
+			];
+			$allowedTypes = [
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PERSONAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PARENTAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SPECIAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_UNPAID_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_HOME_OFFICE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_BUSINESS_TRIP,
+			];
+			$statusFilter = ($status !== null && $status !== '' && in_array($status, $allowedStatuses, true)) ? $status : null;
+			$typeFilter = ($type !== null && $type !== '' && in_array($type, $allowedTypes, true)) ? $type : null;
+
+			$scopedUserIds = $isAdmin
+				? array_values(array_map(static fn ($u) => $u->getUID(), $this->userManager->search('', Constants::MAX_LIST_LIMIT, 0)))
+				: $this->getTeamMemberIds($actorUserId);
+			sort($scopedUserIds);
+
+			$employees = [];
+			foreach ($scopedUserIds as $uid) {
+				$user = $this->userManager->get($uid);
+				if ($user === null) {
+					continue;
+				}
+				$employees[] = [
+					'userId' => $uid,
+					'displayName' => $this->getDisplayName($uid),
+					'enabled' => $user->isEnabled(),
+				];
+			}
+
+			$scopedLookup = array_fill_keys(array_column($employees, 'userId'), true);
+			if ($employeeId !== null && $employeeId !== '') {
+				if (!isset($scopedLookup[$employeeId])) {
+					$this->permissionService->logPermissionDenied($actorUserId, 'view_employee_absences_user_filter', 'user', $employeeId);
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Access denied. You can only view absences for employees in your scope.'),
+					], Http::STATUS_FORBIDDEN);
+				}
+				$scopedUserIds = [$employeeId];
+			}
+
+			$hasRequiredFilters = !empty($startDate) && !empty($endDate);
+			if (!$hasRequiredFilters || empty($scopedUserIds)) {
+				return new JSONResponse([
+					'success' => true,
+					'requiresFilters' => true,
+					'entries' => [],
+					'total' => 0,
+					'employees' => $employees,
+					'filters' => [
+						'employeeId' => $employeeId,
+						'startDate' => $startDate,
+						'endDate' => $endDate,
+						'status' => $statusFilter,
+						'type' => $typeFilter,
+						'limit' => $normalizedLimit,
+						'offset' => $normalizedOffset,
+					],
+				]);
+			}
+
+			try {
+				$start = new \DateTimeImmutable($startDate . ' 00:00:00');
+				$end = new \DateTimeImmutable($endDate . ' 23:59:59');
+			} catch (\Throwable $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date range. Please use valid dates in YYYY-MM-DD format.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			if ($start > $end) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date range. The start date must be before the end date.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$absences = $this->absenceMapper->findByUsersAndDateRange(
+				$scopedUserIds,
+				$start,
+				$end,
+				$statusFilter,
+				$typeFilter,
+				$normalizedLimit,
+				$normalizedOffset
+			);
+			$total = $this->absenceMapper->countByUsersAndDateRange(
+				$scopedUserIds,
+				$start,
+				$end,
+				$statusFilter,
+				$typeFilter
+			);
+
+			$rows = [];
+			foreach ($absences as $absence) {
+				$rows[] = [
+					'id' => $absence->getId(),
+					'userId' => $absence->getUserId(),
+					'displayName' => $this->getDisplayName($absence->getUserId()),
+					'type' => $absence->getType(),
+					'typeLabel' => $this->getAbsenceTypeLabel($absence->getType()),
+					'startDate' => $absence->getStartDate()?->format('Y-m-d'),
+					'endDate' => $absence->getEndDate()?->format('Y-m-d'),
+					'days' => $absence->getDays(),
+					'status' => $absence->getStatus(),
+					'statusLabel' => $this->getAbsenceStatusLabel($absence->getStatus()),
+					'reason' => $absence->getReason(),
+					'createdAt' => $absence->getCreatedAt()?->format('c'),
+				];
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'requiresFilters' => false,
+				'entries' => $rows,
+				'total' => $total,
+				'employees' => $employees,
+				'filters' => [
+					'employeeId' => $employeeId,
+					'startDate' => $startDate,
+					'endDate' => $endDate,
+					'status' => $statusFilter,
+					'type' => $typeFilter,
+					'limit' => $normalizedLimit,
+					'offset' => $normalizedOffset,
+				],
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::getEmployeeAbsences',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
 	 * Get pending approvals
 	 *
 	 *
@@ -451,6 +979,12 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_pending_approvals');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			$limit = $this->normalizeLimit($limit);
+			$offset = $this->normalizeOffset($offset);
 
 			// Get actual team member IDs from Nextcloud groups
 			$teamUserIds = $this->getTeamMemberIds($managerId);
@@ -536,7 +1070,7 @@ class ManagerController extends Controller
 
 			// Apply pagination
 			$total = count($pendingApprovals);
-			$paginatedApprovals = array_slice($pendingApprovals, $offset ?? 0, $limit ?? Constants::DEFAULT_LIST_LIMIT);
+			$paginatedApprovals = array_slice($pendingApprovals, $offset, $limit);
 
 			return new JSONResponse([
 				'success' => true,
@@ -566,6 +1100,10 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_team_compliance');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
 
 			// Get actual team member IDs from Nextcloud groups
 			$teamUserIds = $this->getTeamMemberIds($managerId);
@@ -643,6 +1181,10 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_team_hours_summary');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
 
 			// Get actual team member IDs from Nextcloud groups
 			$teamUserIds = $this->getTeamMemberIds($managerId);
@@ -1072,6 +1614,10 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_pending_time_entry_corrections');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
 			$teamUserIds = $this->getTeamMemberIds($managerId);
 
 			if (empty($teamUserIds)) {
@@ -1153,6 +1699,10 @@ class ManagerController extends Controller
 	{
 		try {
 			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'view_team_absence_calendar');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
 
 			// Get actual team member IDs from Nextcloud groups
 			$teamUserIds = $this->getTeamMemberIds($managerId);

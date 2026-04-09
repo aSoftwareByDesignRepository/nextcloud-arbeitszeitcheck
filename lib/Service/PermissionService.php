@@ -45,6 +45,11 @@ class PermissionService
 		if ($this->groupManager->isAdmin($managerUserId)) {
 			return true;
 		}
+		// Security hardening: manager-level access to sensitive employee data requires
+		// explicit app-team manager assignments. Legacy group-based inference is too broad.
+		if (!$this->teamResolver->useAppTeams()) {
+			return false;
+		}
 		return $this->teamResolver->canUserManageEmployee($managerUserId, $employeeUserId);
 	}
 
@@ -55,6 +60,10 @@ class PermissionService
 	{
 		if ($this->groupManager->isAdmin($userId)) {
 			return true;
+		}
+		// Security hardening: manager area requires explicit app-team manager assignments.
+		if (!$this->teamResolver->useAppTeams()) {
+			return false;
 		}
 		$teamMemberIds = $this->teamResolver->getTeamMemberIds($userId);
 		return count($teamMemberIds) > 0;

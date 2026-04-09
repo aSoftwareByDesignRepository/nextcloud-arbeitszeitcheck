@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.1.11 - 2026-04-09
+
+### Added
+
+- **Manager employee absences view**: New in-app page and API for managers/admins to review employee absences with secure scope filtering, pagination, and localized status labels.
+- **Working time model copy flow**: Added copy action with modal UX, unique default naming, and safeguards against duplicate submits.
+
+### Changed
+
+- **Manager navigation structure**: Sidebar regrouped into clearer manager/admin submenus; reports moved under manager context; compliance link placement adjusted for reduced top-level clutter.
+- **Manager employee time entries UX**: Date defaults and formatting/translation handling improved for clearer filtering behavior.
+- **Calendar behavior (rollback cleanup)**: Removed in-progress direct calendar-write functionality and related admin controls/status/test endpoints. The supported behavior remains unchanged: no Nextcloud Calendar app sync; optional `.ics` attachments are sent by email for configured absence workflows.
+
+### Fixed
+
+- **Working time model modals**: Corrected copy modal interaction flow, source-model presentation, and delete-confirmation localization/rendering issues.
+- **Absence iCal hardening**: Added stricter status/date guards, recipient deduplication, and privacy-safe event descriptions for substitute/manager recipients.
+
+### Documentation
+
+- User manuals and changelogs updated to reflect the final calendar model (email `.ics` optional, no direct Nextcloud Calendar app sync) and current manager/admin UX structure.
+
 ## 1.1.10 - 2026-04-07
 
 ### Added

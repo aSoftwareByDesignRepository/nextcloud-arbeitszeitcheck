@@ -656,7 +656,6 @@ class AbsenceService
 				'days' => $updatedAbsence->getDays()
 			], $comment);
 		}
-
 		return $updatedAbsence;
 	}
 
@@ -761,7 +760,6 @@ class AbsenceService
 				$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
 			}
 		}
-
 		return $updatedAbsence;
 	}
 
@@ -835,7 +833,6 @@ class AbsenceService
 				$comment
 			);
 		}
-
 		return $updatedAbsence;
 	}
 

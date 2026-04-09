@@ -442,6 +442,80 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Find entries for a set of users in a date range (start inclusive, end exclusive).
+	 *
+	 * @param list<string> $userIds
+	 * @param \DateTimeInterface $startDate
+	 * @param \DateTimeInterface $endDateExclusive
+	 * @param string|null $status
+	 * @param int|null $limit
+	 * @param int|null $offset
+	 * @return TimeEntry[]
+	 */
+	public function findByUsersAndDateRange(
+		array $userIds,
+		\DateTimeInterface $startDate,
+		\DateTimeInterface $endDateExclusive,
+		?string $status = null,
+		?int $limit = null,
+		?int $offset = null
+	): array {
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->in('user_id', $qb->createNamedParameter($userIds, IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startDate->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($endDateExclusive->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->orderBy('start_time', 'DESC')
+			->addOrderBy('id', 'DESC');
+
+		if ($status !== null && $status !== '') {
+			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status, IQueryBuilder::PARAM_STR)));
+		}
+		if ($limit !== null) {
+			$qb->setMaxResults($limit);
+		}
+		if ($offset !== null) {
+			$qb->setFirstResult($offset);
+		}
+
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Count entries for a set of users in a date range (start inclusive, end exclusive).
+	 *
+	 * @param list<string> $userIds
+	 */
+	public function countByUsersAndDateRange(
+		array $userIds,
+		\DateTimeInterface $startDate,
+		\DateTimeInterface $endDateExclusive,
+		?string $status = null
+	): int {
+		if (empty($userIds)) {
+			return 0;
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from($this->getTableName())
+			->where($qb->expr()->in('user_id', $qb->createNamedParameter($userIds, IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startDate->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($endDateExclusive->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+
+		if ($status !== null && $status !== '') {
+			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status, IQueryBuilder::PARAM_STR)));
+		}
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Find time entries that overlap with the given time range for a user
 	 * Two entries overlap if they have any time in common
 	 *

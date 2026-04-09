@@ -201,6 +201,12 @@ $apiSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.updateAdmin
                     <p class="form-help form-help--block">
                         <?php p($l->t('For approved absences, an email with an iCal attachment (.ics) can be sent automatically.')); ?>
                     </p>
+                    <p class="form-help form-help--block form-help--note">
+                        <?php p($l->t('Important: This is best-effort email delivery, not a guaranteed real-time calendar sync. Delivery can be delayed or fail due to mail server/network issues. Source of truth remains ArbeitszeitCheck.')); ?>
+                    </p>
+                    <p class="form-help form-help--block form-help--note">
+                        <?php p($l->t('Privacy note: To reduce sensitive data exposure, iCal details for substitutes/managers intentionally avoid private absence reasons.')); ?>
+                    </p>
                     <div class="form-group">
                         <div class="form-checkbox">
                             <input type="checkbox" id="sendIcalApprovedAbsences" name="sendIcalApprovedAbsences" value="1"

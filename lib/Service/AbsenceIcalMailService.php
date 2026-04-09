@@ -50,6 +50,10 @@ class AbsenceIcalMailService
 	 */
 	public function sendIcalForApprovedAbsence(Absence $absence): void
 	{
+		// Defensive guard: never emit iCal for non-approved absences.
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			return;
+		}
 		if (in_array($absence->getType(), self::SKIP_ICAL_TYPES, true)) {
 			return;
 		}
@@ -64,10 +68,20 @@ class AbsenceIcalMailService
 			return;
 		}
 
+		$seenEmails = [];
+		$sendUnique = function (?string $email, string $displayName, bool $isSubstitute) use (&$seenEmails, $absence, $icalBody): void {
+			$normalized = strtolower(trim((string)$email));
+			if ($normalized === '' || isset($seenEmails[$normalized])) {
+				return;
+			}
+			$seenEmails[$normalized] = true;
+			$this->sendOneIcalEmail($absence, $email, $displayName, $icalBody, $isSubstitute);
+		};
+
 		// Send to employee
 		$employee = $this->userManager->get($absence->getUserId());
-		if ($employee !== null) {
-			$this->sendOneIcalEmail($absence, $employee->getEMailAddress(), $employee->getDisplayName(), $icalBody, false);
+		if ($employee !== null && $employee->isEnabled()) {
+			$sendUnique($employee->getEMailAddress(), $employee->getDisplayName(), false);
 		}
 
 		// Optionally send to substitute (when manager approves)
@@ -76,7 +90,7 @@ class AbsenceIcalMailService
 			if ($substituteId !== null && $substituteId !== '') {
 				$substitute = $this->userManager->get($substituteId);
 				if ($substitute !== null && $substitute->isEnabled()) {
-					$this->sendOneIcalEmail($absence, $substitute->getEMailAddress(), $substitute->getDisplayName(), $icalBody, true);
+					$sendUnique($substitute->getEMailAddress(), $substitute->getDisplayName(), true);
 				}
 			}
 		}
@@ -90,17 +104,12 @@ class AbsenceIcalMailService
 					if ($manager === null || !$manager->isEnabled()) {
 						continue;
 					}
-					$this->sendOneIcalEmail(
-						$absence,
-						$manager->getEMailAddress(),
-						$manager->getDisplayName(),
-						$icalBody,
-						true
-					);
+					$sendUnique($manager->getEMailAddress(), $manager->getDisplayName(), true);
 				}
 			}
 		}
 	}
+
 
 	/**
 	 * Send iCal email to the substitute when they approve the substitution (Vertretungs-Freigabe).
@@ -109,6 +118,9 @@ class AbsenceIcalMailService
 	 */
 	public function sendIcalToSubstituteOnSubstitutionApproval(Absence $absence): void
 	{
+		if ($absence->getStatus() !== Absence::STATUS_PENDING && $absence->getStatus() !== Absence::STATUS_APPROVED) {
+			return;
+		}
 		if (in_array($absence->getType(), self::SKIP_ICAL_TYPES, true)) {
 			return;
 		}
@@ -312,6 +324,10 @@ class AbsenceIcalMailService
 		if ($start === null || $end === null) {
 			return null;
 		}
+		// Defensive guard against invalid ranges from corrupted legacy records.
+		if ($start > $end) {
+			return null;
+		}
 
 		$dtStart = $start->format('Ymd');
 		$endDay = (clone $end)->modify('+1 day');
@@ -331,8 +347,9 @@ class AbsenceIcalMailService
 		$summary = $this->escapeIcalText($summaryRaw);
 		$description = $summary;
 		$reason = $absence->getReason();
-		if ($reason !== null && trim($reason) !== '') {
-			$description = $this->escapeIcalText(trim($reason));
+		if (!$asSubstitute && $reason !== null && trim($reason) !== '') {
+			// Keep owner event useful while preventing oversized payloads.
+			$description = $this->escapeIcalText(mb_substr(trim($reason), 0, 1000));
 		}
 
 		$summaryLine = 'SUMMARY:' . $summary;
@@ -358,6 +375,7 @@ class AbsenceIcalMailService
 
 		return implode("\r\n", $lines);
 	}
+
 
 	/**
 	 * Escape text for iCalendar (RFC 5545): backslash, semicolon, comma, newline

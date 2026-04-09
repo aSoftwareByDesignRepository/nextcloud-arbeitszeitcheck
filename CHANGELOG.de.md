@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## 1.1.11 – 2026-04-09
+
+### Hinzugefügt
+
+- **Manager-Ansicht „Mitarbeiter-Abwesenheiten“**: Neue In-App-Seite und API für Manager/Admins zur Einsicht von Abwesenheiten mit sicherer Bereichsfilterung, Pagination und lokalisierten Statusbezeichnungen.
+- **Kopierfunktion für Arbeitszeitmodelle**: Neue Kopieraktion mit Modal-UX, eindeutiger Namensvorschlag-Logik und Schutz gegen Doppelklicks.
+
+### Geändert
+
+- **Manager-Navigation / Sidebar**: Struktur in klarere Manager-/Admin-Untermenüs überführt; Berichte in den Manager-Kontext verschoben; Compliance-Link zur besseren Übersicht umgruppiert.
+- **UX Mitarbeiter-Zeiteinträge (Manager)**: Standard-Datumswerte sowie Datums-/Übersetzungsdarstellung im Filterfluss verbessert.
+- **Kalender-Verhalten (Rollback-Bereinigung)**: Angefangene Funktionalität für direkte Kalendereinträge sowie zugehörige Admin-Optionen/Status/Test-Endpunkte wurde entfernt. Das unterstützte Verhalten bleibt unverändert: keine Synchronisation mit der Nextcloud-Kalender-App; optionale `.ics`-Anhänge werden weiterhin per E-Mail in den konfigurierten Abwesenheits-Workflows versendet.
+
+### Behoben
+
+- **Arbeitszeitmodell-Modaldialoge**: Interaktionsprobleme im Kopier-Modal, Darstellung des Quellmodells sowie Lokalisierung/Formatierung im Lösch-Dialog korrigiert.
+- **Abwesenheits-iCal-Härtung**: Strengere Status-/Datumsprüfungen, Empfänger-Deduplizierung und datenschutzärmere Beschreibungen für Vertretung/Manager ergänzt.
+
+### Dokumentation
+
+- Nutzerhandbücher und Changelogs an das finale Kalenderverhalten (optionale `.ics`-Mail, keine direkte Kalender-App-Synchronisation) sowie die aktuelle Manager/Admin-UX-Struktur angepasst.
+
 ## 1.1.10 – 2026-04-07
 
 ### Hinzugefügt

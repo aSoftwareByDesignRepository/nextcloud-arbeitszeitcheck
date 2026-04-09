@@ -33,6 +33,9 @@ $isCalendar = strpos($currentPage, '/calendar') !== false;
 $isTimeline = strpos($currentPage, '/timeline') !== false;
 $isSettings = strpos($currentPage, '/settings') !== false;
 $isManagerPage = strpos($currentPage, '/manager') !== false;
+$isManagerTimeEntries = strpos($currentPage, '/manager/time-entries') !== false;
+$isManagerAbsences = strpos($currentPage, '/manager/absences') !== false;
+$isManagerDashboard = $isManagerPage && !$isManagerTimeEntries && !$isManagerAbsences;
 $isSubstitutionRequests = strpos($currentPage, '/substitution-requests') !== false;
 $isCompliance = strpos($currentPage, '/compliance') !== false;
 $isAdmin = strpos($currentPage, '/admin') !== false;
@@ -119,24 +122,6 @@ $showAdminNav = !empty($_['showAdminNav']);
                     <span><?php p($l->t('Abwesenheiten')); ?></span>
                 </a>
             </li>
-            <?php if ($showReportsLink): ?>
-                <li class="<?php p($isReports ? 'active' : ''); ?>" <?php p($isReports ? 'aria-current="page"' : ''); ?>>
-                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.reports')); ?>"
-                        title="<?php p($l->t('Berichte für Team- und Organisationsübersichten (nur für Leitungen und Administratoren sichtbar)')); ?>"
-                        aria-label="<?php p($l->t('Zu den Berichten wechseln, um Übersichten für Team oder Organisation zu erstellen (nur für Leitungen und Administratoren)')); ?>">
-                        <i data-lucide="file-text" class="lucide-icon" aria-hidden="true"></i>
-                        <span><?php p($l->t('Berichte')); ?></span>
-                    </a>
-                </li>
-            <?php endif; ?>
-            <li class="<?php p($isCompliance ? 'active' : ''); ?>" <?php p($isCompliance ? 'aria-current="page"' : ''); ?>>
-                <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard')); ?>"
-                    title="<?php p($l->t('Arbeitszeit-Compliance: Prüfen, ob Ihre Arbeitszeit dem deutschen Arbeitszeitgesetz entspricht')); ?>"
-                    aria-label="<?php p($l->t('Zur Arbeitszeit-Compliance wechseln, um die Einhaltung der Arbeitszeitregeln zu prüfen')); ?>">
-                    <i data-lucide="shield-check" class="lucide-icon" aria-hidden="true"></i>
-                    <span><?php p($l->t('Arbeitszeit-Compliance')); ?></span>
-                </a>
-            </li>
             <li class="<?php p($isCalendar ? 'active' : ''); ?>" <?php p($isCalendar ? 'aria-current="page"' : ''); ?>>
                 <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.calendar')); ?>"
                     title="<?php p($l->t('Kalender: Arbeitszeiten und Abwesenheiten im Kalender sehen')); ?>"
@@ -151,6 +136,14 @@ $showAdminNav = !empty($_['showAdminNav']);
                     aria-label="<?php p($l->t('Zu „Zeitachse“ wechseln, um die Arbeitszeithistorie zu sehen')); ?>">
                     <i data-lucide="activity" class="lucide-icon" aria-hidden="true"></i>
                     <span><?php p($l->t('Zeitachse')); ?></span>
+                </a>
+            </li>
+            <li class="<?php p($isCompliance ? 'active' : ''); ?>" <?php p($isCompliance ? 'aria-current="page"' : ''); ?>>
+                <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard')); ?>"
+                    title="<?php p($l->t('Arbeitszeit-Compliance: Prüfen, ob Ihre Arbeitszeit dem deutschen Arbeitszeitgesetz entspricht')); ?>"
+                    aria-label="<?php p($l->t('Zur Arbeitszeit-Compliance wechseln, um die Einhaltung der Arbeitszeitregeln zu prüfen')); ?>">
+                    <i data-lucide="shield-check" class="lucide-icon" aria-hidden="true"></i>
+                    <span><?php p($l->t('Arbeitszeit-Compliance')); ?></span>
                 </a>
             </li>
             <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
@@ -227,19 +220,72 @@ $showAdminNav = !empty($_['showAdminNav']);
             <?php endif; ?>
             <?php if ($showManagerLink): ?>
                 <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
-                <li class="<?php p($isManagerPage ? 'active' : ''); ?>" <?php p($isManagerPage ? 'aria-current="page"' : ''); ?>>
-                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.dashboard')); ?>"
-                        title="<?php p($l->t('Manager: Abwesenheiten und Zeiteintrag-Korrekturen genehmigen, Teamüberblick')); ?>"
-                        aria-label="<?php p($l->t('Zum Manager-Dashboard, um Anträge zu genehmigen und Ihr Team zu sehen')); ?>">
+                <li class="nav-item-has-children <?php p($isManagerPage ? 'is-open' : ''); ?>">
+                    <button class="nav-parent-toggle"
+                        type="button"
+                        aria-expanded="<?php p($isManagerPage ? 'true' : 'false'); ?>"
+                        aria-controls="manager-subnav">
                         <i data-lucide="users" class="lucide-icon" aria-hidden="true"></i>
                         <span><?php p($l->t('Manager')); ?></span>
-                    </a>
+                    </button>
+                    <ul id="manager-subnav" class="nav-submenu" <?php p($isManagerPage ? '' : 'hidden'); ?>>
+                        <li class="<?php p($isManagerDashboard ? 'active' : ''); ?>" <?php p($isManagerDashboard ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.dashboard')); ?>"
+                                title="<?php p($l->t('Manager: Abwesenheiten und Zeiteintrag-Korrekturen genehmigen, Teamüberblick')); ?>"
+                                aria-label="<?php p($l->t('Zum Manager-Dashboard, um Anträge zu genehmigen und Ihr Team zu sehen')); ?>">
+                                <span><?php p($l->t('Übersicht')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isManagerTimeEntries ? 'active' : ''); ?>" <?php p($isManagerTimeEntries ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.employeeTimeEntriesPage')); ?>"
+                                title="<?php p($l->t('View employee time entries directly in the app (for managers and administrators)')); ?>"
+                                aria-label="<?php p($l->t('Open employee time entries')); ?>">
+                                <span><?php p($l->t('Employee time entries')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isManagerAbsences ? 'active' : ''); ?>" <?php p($isManagerAbsences ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.employeeAbsencesPage')); ?>"
+                                title="<?php p($l->t('View employee absences directly in the app (for managers and administrators)')); ?>"
+                                aria-label="<?php p($l->t('Open employee absences')); ?>">
+                                <span><?php p($l->t('Employee absences')); ?></span>
+                            </a>
+                        </li>
+                        <?php if ($showReportsLink): ?>
+                            <li class="<?php p($isReports ? 'active' : ''); ?>" <?php p($isReports ? 'aria-current="page"' : ''); ?>>
+                                <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.reports')); ?>"
+                                    title="<?php p($l->t('Berichte für Team- und Organisationsübersichten (nur für Leitungen und Administratoren sichtbar)')); ?>"
+                                    aria-label="<?php p($l->t('Zu den Berichten wechseln, um Übersichten für Team oder Organisation zu erstellen (nur für Leitungen und Administratoren)')); ?>">
+                                    <span><?php p($l->t('Berichte')); ?></span>
+                                </a>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($showSubstitutionLink): ?>
+                            <li class="<?php p($isSubstitutionRequests ? 'active' : ''); ?>" <?php p($isSubstitutionRequests ? 'aria-current="page"' : ''); ?>>
+                                <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.substitute.index')); ?>"
+                                    title="<?php p($l->t('Vertretungsanfragen: Anfragen zum Vertreten von Kolleg*innen annehmen oder ablehnen')); ?>"
+                                    aria-label="<?php p($l->t('Zu den Vertretungsanfragen wechseln')); ?>">
+                                    <span><?php p($l->t('Vertretungsanfragen')); ?></span>
+                                </a>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
                 </li>
             <?php endif; ?>
             <?php if (!$showManagerLink && $showSubstitutionLink): ?>
                 <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
             <?php endif; ?>
-            <?php if ($showSubstitutionLink): ?>
+            <?php if (!$showManagerLink && $showReportsLink): ?>
+                <li class="nav-section-divider" role="separator" aria-hidden="true"></li>
+                <li class="<?php p($isReports ? 'active' : ''); ?>" <?php p($isReports ? 'aria-current="page"' : ''); ?>>
+                    <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.reports')); ?>"
+                        title="<?php p($l->t('Berichte für Team- und Organisationsübersichten (nur für Leitungen und Administratoren sichtbar)')); ?>"
+                        aria-label="<?php p($l->t('Zu den Berichten wechseln, um Übersichten für Team oder Organisation zu erstellen (nur für Leitungen und Administratoren)')); ?>">
+                        <i data-lucide="file-text" class="lucide-icon" aria-hidden="true"></i>
+                        <span><?php p($l->t('Berichte')); ?></span>
+                    </a>
+                </li>
+            <?php endif; ?>
+            <?php if ($showSubstitutionLink && !$showManagerLink): ?>
                 <li class="<?php p($isSubstitutionRequests ? 'active' : ''); ?>" <?php p($isSubstitutionRequests ? 'aria-current="page"' : ''); ?>>
                     <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.substitute.index')); ?>"
                         title="<?php p($l->t('Vertretungsanfragen: Anfragen zum Vertreten von Kolleg*innen annehmen oder ablehnen')); ?>"

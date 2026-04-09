@@ -79,7 +79,11 @@ return [
 
 		// Manager routes
 		['name' => 'manager#dashboard', 'url' => '/manager', 'verb' => 'GET'],
+		['name' => 'manager#employeeTimeEntriesPage', 'url' => '/manager/time-entries', 'verb' => 'GET'],
+		['name' => 'manager#employeeAbsencesPage', 'url' => '/manager/absences', 'verb' => 'GET'],
 		['name' => 'manager#getTeamOverview', 'url' => '/api/manager/team-overview', 'verb' => 'GET'],
+		['name' => 'manager#getEmployeeTimeEntries', 'url' => '/api/manager/employee-time-entries', 'verb' => 'GET'],
+		['name' => 'manager#getEmployeeAbsences', 'url' => '/api/manager/employee-absences', 'verb' => 'GET'],
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
 		['name' => 'manager#getTeamCompliance', 'url' => '/api/manager/team-compliance', 'verb' => 'GET'],
 		['name' => 'manager#getTeamHoursSummary', 'url' => '/api/manager/team-hours', 'verb' => 'GET'],

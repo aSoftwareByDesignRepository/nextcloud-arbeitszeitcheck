@@ -25,6 +25,10 @@ Alle Daten verbleiben in Ihrer **Nextcloud-Instanz**.
 
 ---
 
+> Betriebshinweis: Direkte Einträge/Synchronisation in die Nextcloud-Kalender-App sind bewusst nicht aktiv. Für Kalendereinträge bitte den optionalen `.ics`-E-Mail-Workflow nutzen.
+
+---
+
 ## 3. Rollen (typisch)
 
 - **Mitarbeitende**: Zeiten erfassen, Abwesenheiten beantragen, eigene Daten einsehen.

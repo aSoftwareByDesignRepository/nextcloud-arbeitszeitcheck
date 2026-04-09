@@ -25,6 +25,10 @@ All data stays in your **Nextcloud** instance.
 
 ---
 
+> Operational note: Direct write/sync into the Nextcloud Calendar app is intentionally not active. If you need calendar entries, use the optional `.ics` email flow.
+
+---
+
 ## 3. Roles (typical setup)
 
 - **Employee**: Record time, request absences, view own data.

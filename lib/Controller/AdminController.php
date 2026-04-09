@@ -1377,6 +1377,7 @@ class AdminController extends Controller
 		}
 	}
 
+
 	/**
 	 * Get admin dashboard statistics (admin-only by default)
 	 *

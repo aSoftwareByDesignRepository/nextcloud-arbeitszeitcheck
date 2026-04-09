@@ -46,6 +46,9 @@ use PHPUnit\Framework\TestCase;
  */
 class ManagerControllerTest extends TestCase
 {
+	private bool $isAdminAccess = false;
+	private bool $canAccessManagerDashboard = true;
+
 	/** @var ManagerController */
 	private $controller;
 
@@ -131,6 +134,14 @@ class ManagerControllerTest extends TestCase
 		$this->timeEntryMapper = $this->createMock(TimeEntryMapper::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->config = $this->createMock(IConfig::class);
+		$this->permissionService->method('canAccessManagerDashboard')
+			->willReturnCallback(function (string $userId): bool {
+				return $this->canAccessManagerDashboard;
+			});
+		$this->permissionService->method('isAdmin')
+			->willReturnCallback(function (string $userId): bool {
+				return $this->isAdminAccess;
+			});
 
 		$this->controller = new ManagerController(
 			'arbeitszeitcheck',
@@ -188,7 +199,7 @@ class ManagerControllerTest extends TestCase
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn('employee1');
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canAccessManagerDashboard')->with('employee1')->willReturn(false);
+		$this->canAccessManagerDashboard = false;
 
 		$response = $this->controller->dashboard();
 
@@ -236,7 +247,7 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->getTeamOverview();
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
+		$this->assertTrue($data['success'], json_encode($data));
 		$this->assertArrayHasKey('teamMembers', $data);
 	}
 
@@ -255,7 +266,7 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->getTeamOverview();
 		$data = $response->getData();
 
-		$this->assertTrue($data['success']);
+		$this->assertTrue($data['success'], json_encode($data));
 		$this->assertEmpty($data['teamMembers']);
 		$this->assertEquals(0, $data['total']);
 	}
@@ -908,4 +919,117 @@ class ManagerControllerTest extends TestCase
 		$this->assertFalse($data['success']);
 		$this->assertEquals('An internal error occurred. Please contact your administrator.', $data['error']);
 	}
+
+	public function testGetTeamOverviewReturnsForbiddenWhenNoManagerAccess(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('employee1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->isAdminAccess = false;
+		$this->canAccessManagerDashboard = false;
+
+		$response = $this->controller->getTeamOverview();
+		$data = $response->getData();
+
+		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+	}
+
+	public function testGetEmployeeAbsencesRequiresDateRange(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$employee = $this->createMock(IUser::class);
+		$employee->method('isEnabled')->willReturn(true);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+		$this->userManager->method('get')->willReturn($employee);
+		$this->userManager->method('getDisplayName')->willReturn('Employee One');
+
+		$response = $this->controller->getEmployeeAbsences();
+		$data = $response->getData();
+
+		$this->assertEquals(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertTrue($data['requiresFilters']);
+		$this->assertEquals(0, $data['total']);
+		$this->assertCount(1, $data['employees']);
+	}
+
+	public function testGetEmployeeAbsencesReturnsForbiddenForOutOfScopeEmployee(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$employee = $this->createMock(IUser::class);
+		$employee->method('isEnabled')->willReturn(true);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+		$this->userManager->method('get')->willReturn($employee);
+		$this->userManager->method('getDisplayName')->willReturn('Employee One');
+
+		$response = $this->controller->getEmployeeAbsences(
+			'employee2',
+			'2026-03-01',
+			'2026-03-31',
+			null,
+			null,
+			25,
+			0
+		);
+		$data = $response->getData();
+
+		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+	}
+
+	public function testGetEmployeeAbsencesReturnsFilteredRows(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$employee = $this->createMock(IUser::class);
+		$employee->method('isEnabled')->willReturn(true);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+		$this->userManager->method('get')->willReturn($employee);
+		$this->userManager->method('getDisplayName')->willReturn('Employee One');
+
+		$absence = new Absence();
+		$absence->setId(10);
+		$absence->setUserId('employee1');
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2026-03-10'));
+		$absence->setEndDate(new \DateTime('2026-03-12'));
+		$absence->setDays(3.0);
+		$absence->setReason('Family trip');
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setCreatedAt(new \DateTime('2026-03-01 09:00:00'));
+		$absence->setUpdatedAt(new \DateTime('2026-03-01 09:00:00'));
+
+		$this->absenceMapper->expects($this->once())
+			->method('findByUsersAndDateRange')
+			->willReturn([$absence]);
+		$this->absenceMapper->expects($this->once())
+			->method('countByUsersAndDateRange')
+			->willReturn(1);
+
+		$response = $this->controller->getEmployeeAbsences(
+			'employee1',
+			'2026-03-01',
+			'2026-03-31',
+			Absence::STATUS_APPROVED,
+			Absence::TYPE_VACATION,
+			25,
+			0
+		);
+		$data = $response->getData();
+
+		$this->assertEquals(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success'], json_encode($data));
+		$this->assertFalse($data['requiresFilters']);
+		$this->assertEquals(1, $data['total']);
+		$this->assertCount(1, $data['entries']);
+		$this->assertSame('employee1', $data['entries'][0]['userId']);
+		$this->assertSame('vacation', $data['entries'][0]['type']);
+	}
+
 }

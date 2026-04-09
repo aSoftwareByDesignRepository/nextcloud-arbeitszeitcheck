@@ -36,12 +36,27 @@ class PermissionServiceTest extends TestCase
 		$this->assertTrue($service->canManageEmployee('admin1', 'employee1'));
 	}
 
+	public function testCanManageEmployeeDeniedWhenAppTeamsDisabledForNonAdmin(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(false);
+		$teamResolver->expects($this->never())->method('canUserManageEmployee');
+		$logger = $this->createMock(LoggerInterface::class);
+
+		$service = new PermissionService($groupManager, $teamResolver, $logger);
+
+		$this->assertFalse($service->canManageEmployee('manager1', 'employee1'));
+	}
+
 	public function testCanManageEmployeeDelegatesToTeamResolver(): void
 	{
 		$groupManager = $this->createMock(IGroupManager::class);
 		$groupManager->method('isAdmin')->willReturn(false);
 
 		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
 		$teamResolver->expects($this->once())
 			->method('canUserManageEmployee')
 			->with('manager1', 'employee1')
@@ -72,6 +87,7 @@ class PermissionServiceTest extends TestCase
 		$groupManager = $this->createMock(IGroupManager::class);
 		$groupManager->method('isAdmin')->willReturn(false);
 		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
 		$teamResolver->method('getTeamMemberIds')->willReturnCallback(static fn (string $uid): array => match ($uid) {
 			'manager1' => ['employee1'],
 			default => [],
@@ -84,11 +100,26 @@ class PermissionServiceTest extends TestCase
 		$this->assertFalse($service->canAccessManagerDashboard('userNoTeam'));
 	}
 
+	public function testCanAccessManagerDashboardDeniedWhenAppTeamsDisabledForNonAdmin(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(false);
+		$teamResolver->expects($this->never())->method('getTeamMemberIds');
+		$logger = $this->createMock(LoggerInterface::class);
+
+		$service = new PermissionService($groupManager, $teamResolver, $logger);
+
+		$this->assertFalse($service->canAccessManagerDashboard('manager1'));
+	}
+
 	public function testCanViewUserReportSelfAllowedOtherwiseDelegates(): void
 	{
 		$groupManager = $this->createMock(IGroupManager::class);
 		$groupManager->method('isAdmin')->willReturn(false);
 		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
 		$teamResolver->method('canUserManageEmployee')->with('manager1', 'employee1')->willReturn(true);
 		$logger = $this->createMock(LoggerInterface::class);
 
@@ -104,6 +135,7 @@ class PermissionServiceTest extends TestCase
 		$groupManager->method('isAdmin')->willReturnCallback(static fn (string $uid): bool => $uid === 'admin1');
 
 		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
 		$teamResolver->method('canUserManageEmployee')->with('manager1', 'employee1')->willReturn(true);
 
 		$logger = $this->createMock(LoggerInterface::class);

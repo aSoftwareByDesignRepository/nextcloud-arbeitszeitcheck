@@ -27,7 +27,6 @@
         if (form) {
             Utils.on(form, 'submit', handleFormSubmit);
         }
-
         // Real-time validation
         const numberInputs = Utils.$$('#admin-settings-form input[type="number"]');
         numberInputs.forEach(input => {

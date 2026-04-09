@@ -96,6 +96,93 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
+	 * Find absences for multiple users overlapping a date range.
+	 *
+	 * @param string[] $userIds
+	 * @param \DateTimeInterface $startDate Inclusive
+	 * @param \DateTimeInterface $endDate Inclusive
+	 * @param string|null $status
+	 * @param string|null $type
+	 * @param int|null $limit
+	 * @param int|null $offset
+	 * @return Absence[]
+	 */
+	public function findByUsersAndDateRange(
+		array $userIds,
+		\DateTimeInterface $startDate,
+		\DateTimeInterface $endDate,
+		?string $status = null,
+		?string $type = null,
+		?int $limit = null,
+		?int $offset = null
+	): array {
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->in('user_id', $qb->createNamedParameter(array_values($userIds), IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($endDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->gte('end_date', $qb->createNamedParameter($startDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)))
+			->orderBy('start_date', 'DESC')
+			->addOrderBy('id', 'DESC');
+
+		if ($status !== null && $status !== '') {
+			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status)));
+		}
+		if ($type !== null && $type !== '') {
+			$qb->andWhere($qb->expr()->eq('type', $qb->createNamedParameter($type)));
+		}
+		if ($limit !== null) {
+			$qb->setMaxResults($limit);
+		}
+		if ($offset !== null) {
+			$qb->setFirstResult($offset);
+		}
+
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Count absences for multiple users overlapping a date range.
+	 *
+	 * @param string[] $userIds
+	 * @param \DateTimeInterface $startDate Inclusive
+	 * @param \DateTimeInterface $endDate Inclusive
+	 * @param string|null $status
+	 * @param string|null $type
+	 */
+	public function countByUsersAndDateRange(
+		array $userIds,
+		\DateTimeInterface $startDate,
+		\DateTimeInterface $endDate,
+		?string $status = null,
+		?string $type = null
+	): int {
+		if (empty($userIds)) {
+			return 0;
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from($this->getTableName())
+			->where($qb->expr()->in('user_id', $qb->createNamedParameter(array_values($userIds), IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($endDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->gte('end_date', $qb->createNamedParameter($startDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)));
+
+		if ($status !== null && $status !== '') {
+			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status)));
+		}
+		if ($type !== null && $type !== '') {
+			$qb->andWhere($qb->expr()->eq('type', $qb->createNamedParameter($type)));
+		}
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Find absences by date range (all users)
 	 *
 	 * @param \DateTime $startDate

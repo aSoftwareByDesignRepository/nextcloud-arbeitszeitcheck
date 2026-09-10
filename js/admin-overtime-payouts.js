@@ -342,6 +342,12 @@
 		}
 	}
 
+	if (typeof window !== 'undefined') {
+		window.__ArbeitszeitCheckOvertimePayoutsTestables = {
+			processBulk: processBulk,
+		};
+	}
+
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', init);
 	} else {

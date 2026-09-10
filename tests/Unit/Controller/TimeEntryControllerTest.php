@@ -1592,4 +1592,81 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertFalse($response->getData()['success']);
 		$this->assertSame('Access denied', $response->getData()['error']);
 	}
+
+	public function testApiStoreComplianceStrictModeInvokesStrictCheckAndBlocks(): void
+	{
+		$this->appConfigValues['compliance_strict_mode'] = '1';
+
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->request->method('getParams')->willReturn([
+			'date' => '2024-01-15',
+			'startTime' => '08:00',
+			'endTime' => '17:00',
+		]);
+
+		$this->complianceService->method('blockingIssuesForCompletedEntry')->willReturn([]);
+		$this->complianceService->expects($this->once())
+			->method('checkComplianceForCompletedEntry')
+			->with($this->isInstanceOf(TimeEntry::class), true, false)
+			->willThrowException(new \Exception('Rest period violation under complianceStrictMode'));
+
+		$this->timeEntryMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->apiStore();
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertSame('compliance_blocked', $data['error_code']);
+		$this->assertStringContainsString('Rest period', $data['error']);
+	}
+
+	public function testApiStoreWithoutComplianceStrictModeSkipsStrictGateWhenNoBlockingIssues(): void
+	{
+		$this->appConfigValues['compliance_strict_mode'] = '0';
+
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->request->method('getParams')->willReturn([
+			'date' => '2024-01-15',
+			'startTime' => '09:00',
+			'endTime' => '17:00',
+		]);
+
+		$this->complianceService->method('blockingIssuesForCompletedEntry')->willReturn([]);
+		$strictCalls = 0;
+		$this->complianceService->method('checkComplianceForCompletedEntry')
+			->willReturnCallback(function ($entry, $strict = false, ...$rest) use (&$strictCalls) {
+				unset($entry, $rest);
+				if ($strict === true) {
+					$strictCalls++;
+				}
+				return [];
+			});
+
+		$savedEntry = new TimeEntry();
+		$savedEntry->setId(42);
+		$savedEntry->setUserId($userId);
+		$savedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$savedEntry->setIsManualEntry(true);
+		$savedEntry->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$savedEntry->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$savedEntry->setCreatedAt(new \DateTime());
+		$savedEntry->setUpdatedAt(new \DateTime());
+
+		$this->timeEntryMapper->expects($this->once())
+			->method('insert')
+			->willReturn($savedEntry);
+
+		$response = $this->controller->apiStore();
+		$this->assertSame(Http::STATUS_CREATED, $response->getStatus());
+		$this->assertTrue($response->getData()['success']);
+		$this->assertSame(0, $strictCalls, 'compliance_strict_mode=0 must not run strict checkComplianceForCompletedEntry gate');
+	}
 }

@@ -1130,4 +1130,10 @@
 	} else {
 		init();
 	}
+
+	if (typeof window !== 'undefined') {
+		window.__ArbeitszeitCheckTariffRulesTestables = {
+			confirmAndCall: confirmAndCall,
+		};
+	}
 })();

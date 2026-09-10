@@ -1109,6 +1109,12 @@
     }
 
     // Initialize on DOM ready
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckAdminSettingsTestables = {
+            handleMonthReopen: handleMonthReopen,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

@@ -968,45 +968,8 @@
                 .replace('{name}', item.name || '')
                 .replace('{date}', displayDate || '');
             deleteBtn.setAttribute('aria-label', ariaLabel);
-            Utils.on(deleteBtn, 'click', async function() {
-                const name = item.name || '';
-                const title = tAzc('Remove holiday');
-
-                const baseMessage = tAzc('Do you really want to remove the holiday "{name}" on {date}?')
-                    .replace('{name}', name)
-                    .replace('{date}', displayDate || '');
-
-                let extra = '';
-                if (item.scope === 'statutory') {
-                    extra = isStatutoryAutoReseedEnabled()
-                        ? tAzc('Removed statutory holidays are restored automatically while auto-restore is enabled in settings.')
-                        : tAzc('Statutory holiday removal is permanent because auto-restore is disabled in settings.');
-                }
-
-                // Plain-text message only — confirmDialog escapes HTML (no XSS via holiday names).
-                const message = extra ? (extra + '\n\n' + baseMessage) : baseMessage;
-                const Components = window.AzcComponents || window.ArbeitszeitCheckComponents;
-                let confirmed = false;
-                if (Components && typeof Components.confirmDialog === 'function') {
-                    const result = await Components.confirmDialog({
-                        title: title,
-                        message: message,
-                        confirmLabel: tAzc('Remove'),
-                        cancelLabel: tAzc('Cancel'),
-                        variant: 'destructive',
-                    });
-                    confirmed = result === true || !!(result && result.confirmed);
-                } else if (window.ArbeitszeitCheckUtils && typeof window.ArbeitszeitCheckUtils.confirmDestructiveAction === 'function') {
-                    confirmed = !!(await window.ArbeitszeitCheckUtils.confirmDestructiveAction({
-                        title: title,
-                        message: message,
-                        confirmLabel: tAzc('Remove'),
-                        variant: 'destructive',
-                    }));
-                }
-                if (confirmed) {
-                    deleteHoliday(item.id, row, item.scope);
-                }
+            Utils.on(deleteBtn, 'click', function() {
+                confirmRemoveHoliday(item, row, displayDate);
             });
             const actionsWrap = document.createElement('div');
             actionsWrap.className = 'azc-table-actions admin-holidays__row-actions';
@@ -1035,6 +998,54 @@
         cell.textContent = tAzc('No holidays configured for this year.');
         row.appendChild(cell);
         tbody.appendChild(row);
+    }
+
+    /**
+     * Confirm then DELETE a holiday row (shared by table actions + Vitest).
+     * @param {{id?: number|string, name?: string, scope?: string}} item
+     * @param {HTMLElement|null} row
+     * @param {string} [displayDate]
+     * @returns {Promise<boolean>} whether delete was confirmed
+     */
+    async function confirmRemoveHoliday(item, row, displayDate) {
+        const name = (item && item.name) || '';
+        const title = tAzc('Remove holiday');
+        const baseMessage = tAzc('Do you really want to remove the holiday "{name}" on {date}?')
+            .replace('{name}', name)
+            .replace('{date}', displayDate || '');
+
+        let extra = '';
+        if (item && item.scope === 'statutory') {
+            extra = isStatutoryAutoReseedEnabled()
+                ? tAzc('Removed statutory holidays are restored automatically while auto-restore is enabled in settings.')
+                : tAzc('Statutory holiday removal is permanent because auto-restore is disabled in settings.');
+        }
+
+        // Plain-text message only — confirmDialog escapes HTML (no XSS via holiday names).
+        const message = extra ? (extra + '\n\n' + baseMessage) : baseMessage;
+        const Components = window.AzcComponents || window.ArbeitszeitCheckComponents;
+        let confirmed = false;
+        if (Components && typeof Components.confirmDialog === 'function') {
+            const result = await Components.confirmDialog({
+                title: title,
+                message: message,
+                confirmLabel: tAzc('Remove'),
+                cancelLabel: tAzc('Cancel'),
+                variant: 'destructive',
+            });
+            confirmed = result === true || !!(result && result.confirmed);
+        } else if (window.ArbeitszeitCheckUtils && typeof window.ArbeitszeitCheckUtils.confirmDestructiveAction === 'function') {
+            confirmed = !!(await window.ArbeitszeitCheckUtils.confirmDestructiveAction({
+                title: title,
+                message: message,
+                confirmLabel: tAzc('Remove'),
+                variant: 'destructive',
+            }));
+        }
+        if (confirmed && item && item.id != null) {
+            deleteHoliday(item.id, row, item.scope);
+        }
+        return confirmed;
     }
 
     function deleteHoliday(id, row, scope) {
@@ -1083,12 +1094,18 @@
         });
     }
 
-    // Test surface for Vitest (pure helpers only — no DOM side effects required).
+    // Test surface for Vitest (helpers + confirm call-site handlers).
     if (typeof window !== 'undefined') {
         window.__ArbeitszeitCheckAdminHolidaysTestables = {
             countryOfRegion: countryOfRegion,
             rebuildRegionSelect: rebuildRegionSelect,
             parseRegionDataFromDom: parseRegionDataFromDom,
+            handleCountryChange: handleCountryChange,
+            handleRegionChange: handleRegionChange,
+            confirmRemoveHoliday: confirmRemoveHoliday,
+            setPersistedCountry: function(country) {
+                persistedCountry = String(country || 'DE').toUpperCase();
+            },
             suggestedKindFromPayload: function(suggestion) {
                 return (suggestion && suggestion.kind === 'half') ? 'half' : 'full';
             },

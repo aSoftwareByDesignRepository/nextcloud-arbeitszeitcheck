@@ -53,6 +53,26 @@
     }
 
     /**
+     * Unsaved-leave confirm shared by sidebar + back-link guards.
+     * @param {{message?: string}=} opts
+     * @returns {Promise<*>}
+     */
+    async function promptUnsavedLeave(opts) {
+        const message = (opts && opts.message)
+            || auMsg('unsavedChanges', 'You have unsaved changes. Leave this page anyway?');
+        if (!Utils.confirmDestructiveAction) {
+            return null;
+        }
+        return Utils.confirmDestructiveAction({
+            title: auMsg('unsavedChangesTitle', 'Unsaved changes'),
+            message: message,
+            confirmLabel: auMsg('leaveWithoutSaving', 'Leave without saving'),
+            cancelLabel: auMsg('stayOnPage', 'Stay on page'),
+            variant: 'warning',
+        });
+    }
+
+    /**
      * Plain-language summary for HR (never raw JSON).
      *
      * @param {object|string|null|undefined} trace
@@ -806,18 +826,12 @@
                     if (!href) {
                         return;
                     }
-                    const confirmed = Utils.confirmDestructiveAction
-                        ? await Utils.confirmDestructiveAction({
-                            title: auMsg('unsavedChangesTitle', 'Unsaved changes'),
-                            message: auMsg(
-                                'discardUnsavedConfirm',
-                                'You have unsaved changes. Leave this page without saving?',
-                            ),
-                            confirmLabel: auMsg('leaveWithoutSaving', 'Leave without saving'),
-                            cancelLabel: auMsg('stayOnPage', 'Stay on page'),
-                            variant: 'warning',
-                        })
-                        : null;
+                    const confirmed = await promptUnsavedLeave({
+                        message: auMsg(
+                            'discardUnsavedConfirm',
+                            'You have unsaved changes. Leave this page without saving?',
+                        ),
+                    });
                     if (confirmed) {
                         window.location.href = href;
                     }
@@ -1008,15 +1022,7 @@
                 if (!href) {
                     return;
                 }
-                const confirmed = Utils.confirmDestructiveAction
-                    ? await Utils.confirmDestructiveAction({
-                        title: auMsg('unsavedChangesTitle', 'Unsaved changes'),
-                        message: auMsg('unsavedChanges', 'You have unsaved changes. Leave this page anyway?'),
-                        confirmLabel: auMsg('leaveWithoutSaving', 'Leave without saving'),
-                        cancelLabel: auMsg('stayOnPage', 'Stay on page'),
-                        variant: 'warning',
-                    })
-                    : null;
+                const confirmed = await promptUnsavedLeave();
                 if (confirmed) {
                     window.location.href = href;
                 }
@@ -1608,6 +1614,12 @@
     }
 
     // Initialize on DOM ready
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckAdminUserDetailTestables = {
+            promptUnsavedLeave: promptUnsavedLeave,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

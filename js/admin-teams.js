@@ -899,6 +899,15 @@
         bindEvents();
     }
 
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckAdminTeamsTestables = {
+            confirmDestructiveCompat: confirmDestructiveCompat,
+            confirmRemoveMember: confirmRemoveMember,
+            confirmRemoveManager: confirmRemoveManager,
+            showSimpleDeleteConfirm: showSimpleDeleteConfirm,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

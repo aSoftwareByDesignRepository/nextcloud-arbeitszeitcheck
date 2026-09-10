@@ -532,14 +532,19 @@ describe('history delete workflow', () => {
     expect(confirm).toBeTruthy();
     expect(confirm.disabled).toBe(false);
     expect(document.querySelector('.confirm-dialog__cancel')).toBeTruthy();
+    document.querySelector('.confirm-dialog__cancel').click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('.confirm-dialog')).toBeFalsy();
+    });
   });
 
-  it('issues DELETE when destructive action is confirmed', async () => {
-    vi.spyOn(window.ArbeitszeitCheckUtils, 'confirmDestructiveAction')
-      .mockResolvedValue({ confirmed: true, reason: '' });
-
+  it('issues DELETE when destructive dialog is confirmed (real confirm click)', async () => {
     const deleteBtn = document.querySelector('[data-delete-org="7"]');
     deleteBtn.click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('.confirm-dialog__confirm')).toBeTruthy();
+    });
+    document.querySelector('.confirm-dialog__confirm').click();
     await vi.waitFor(() => {
       expect(ajaxSpy.mock.calls.some((call) => call[1] && call[1].method === 'DELETE')).toBe(true);
     });
@@ -549,12 +554,14 @@ describe('history delete workflow', () => {
     expect(window.ArbeitszeitCheckMessaging.showSuccess).toHaveBeenCalled();
   });
 
-  it('does not delete when destructive action is cancelled', async () => {
-    vi.spyOn(window.ArbeitszeitCheckUtils, 'confirmDestructiveAction')
-      .mockResolvedValue(null);
-
+  it('does not delete when destructive dialog is cancelled (real cancel click)', async () => {
     const deleteBtn = document.querySelector('[data-delete-org="7"]');
     deleteBtn.click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('.confirm-dialog__cancel')).toBeTruthy();
+    });
+    document.querySelector('.confirm-dialog__cancel').click();
+    await Promise.resolve();
     await Promise.resolve();
 
     const deleteCall = ajaxSpy.mock.calls.find((call) => call[1] && call[1].method === 'DELETE');
@@ -562,9 +569,6 @@ describe('history delete workflow', () => {
   });
 
   it('blocks concurrent delete requests while one is in flight', async () => {
-    vi.spyOn(window.ArbeitszeitCheckUtils, 'confirmDestructiveAction')
-      .mockResolvedValue({ confirmed: true, reason: '' });
-
     let finishDelete;
     const blocked = new Promise((resolve) => { finishDelete = resolve; });
     const baseAjax = ajaxSpy;
@@ -581,6 +585,10 @@ describe('history delete workflow', () => {
 
     const deleteBtn = document.querySelector('[data-delete-org="7"]');
     deleteBtn.click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('.confirm-dialog__confirm')).toBeTruthy();
+    });
+    document.querySelector('.confirm-dialog__confirm').click();
     await vi.waitFor(() => {
       expect(trackingAjax.mock.calls.filter((call) => call[1] && call[1].method === 'DELETE').length).toBe(1);
     });

@@ -116,6 +116,12 @@
         });
     }
 
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckComplianceDashboardTestables = {
+            runComplianceCheck: runComplianceCheck,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

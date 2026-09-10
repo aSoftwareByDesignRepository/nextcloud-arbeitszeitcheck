@@ -506,6 +506,14 @@ final class Constants
 	public const CONFIG_OVERTIME_BLOCK_MONTH_CLOSURE_PENDING_PAYOUT = 'overtime_block_month_closure_pending_payout';
 
 	/**
+	 * G2 — org opt-in for DutyCheck rotation Soll in AZC overtime/vacation (default off).
+	 */
+	public const CONFIG_DUTY_ROTATION_SOLL_ENABLED = 'duty_rotation_soll_enabled';
+
+	/** Default app-config value for {@see CONFIG_DUTY_ROTATION_SOLL_ENABLED}. */
+	public const CONFIG_DUTY_ROTATION_SOLL_DEFAULT = '0';
+
+	/**
 	 * Compliance score weights (critical, warning, info).
 	 */
 	public const COMPLIANCE_SCORE_CRITICAL_WEIGHT = 25;

@@ -1016,6 +1016,12 @@
     }
 
     // Initialize on DOM ready
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckWorkingTimeModelsTestables = {
+            handleDeleteModel: handleDeleteModel,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

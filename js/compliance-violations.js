@@ -184,6 +184,12 @@
     }
 
     // Initialize on DOM ready
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckComplianceViolationsTestables = {
+            resolveViolation: resolveViolation,
+        };
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

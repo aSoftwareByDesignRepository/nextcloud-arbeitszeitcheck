@@ -21,6 +21,8 @@ use OCP\Util;
 // post-load [data-lucide] placeholders on other pages.
 Util::addScript('arbeitszeitcheck', 'common/navigation');
 Util::addScript('arbeitszeitcheck', 'common/navigation-icons');
+// In-page Menu + drawer (replaces unreliable core #app-navigation-toggle on mobile).
+Util::addScript('arbeitszeitcheck', 'common/mobile-nav');
 // Soft keyboard / visualViewport: keep focused notes & inputs above the IME on phones.
 Util::addScript('arbeitszeitcheck', 'common/keep-focused-visible');
 

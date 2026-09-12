@@ -1,8 +1,8 @@
 /**
  * Navigation JavaScript for ArbeitszeitCheck App
- * Submenu toggles and keyboard navigation. Mobile drawer uses Nextcloud core
- * (#app-navigation-toggle / body.snapjs-left below 1024px), same as BudgetCheck
- * and DutyCheck.
+ * Submenu toggles and keyboard navigation. Mobile drawer uses in-page Menu
+ * (`js/common/mobile-nav.js`) — not core #app-navigation-toggle (unreliable /
+ * clipped under #content overflow:hidden; see GH #33).
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later

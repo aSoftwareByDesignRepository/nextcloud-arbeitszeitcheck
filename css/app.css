@@ -16,6 +16,7 @@
 @import url('common/manager-scope-filter.css');
 @import url('common/utilities.css');
 @import url('common/responsive.css');
+@import url('common/mobile-nav.css');
 @import url('common/accessibility.css');
 @import url('common/semantic-surfaces.css');
 @import url('common/callout-banner.css');

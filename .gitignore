@@ -57,3 +57,4 @@ release/*.b64
 # Local dev scripts (e.g. signing helper, not for public repo)
 scripts/*
 !scripts/check-l10n-placeholders.phpl10n/_pl_translate_cache.json
+tests/Mutation/.originals/

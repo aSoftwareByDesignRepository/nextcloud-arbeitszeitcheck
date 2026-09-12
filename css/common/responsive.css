@@ -1,7 +1,7 @@
 /**
  * Responsive Design CSS for ArbeitszeitCheck App
- * Mobile/tablet navigation uses Nextcloud core (#app-navigation-toggle /
- * body.snapjs-left below 1024px), same as BudgetCheck and DutyCheck.
+ * Mobile/tablet navigation: in-page Menu + drawer (css/common/mobile-nav.css +
+ * js/common/mobile-nav.js). Do not rely on core #app-navigation-toggle alone.
  *
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later

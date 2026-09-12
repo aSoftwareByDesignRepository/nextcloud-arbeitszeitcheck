@@ -1,0 +1,144 @@
+/**
+ * Mobile navigation drawer + in-page Menu button (<1024px).
+ * Hides broken core #app-navigation-toggle (white square / fights NC header).
+ * Drawer opens via .azc-nav--open; JS portals to body while open so overflow:hidden
+ * on #content / #arbeitszeitcheck-app cannot clip it.
+ */
+
+@media (width < 1024px) {
+	#content.app-arbeitszeitcheck #app-navigation-toggle {
+		display: none !important;
+		visibility: hidden !important;
+		pointer-events: none !important;
+	}
+}
+
+/* In-page menu control (page-start.php) */
+.azc-nav-toggle {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	gap: var(--azc-space-2, 0.5rem);
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 var(--azc-space-3, 0.75rem);
+	margin: 0 0 var(--azc-space-3, 0.75rem);
+	border: 1px solid var(--color-border, var(--azc-border));
+	border-radius: var(--azc-radius-md, 8px);
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+	font-family: inherit;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+	touch-action: manipulation;
+	flex-shrink: 0;
+	box-shadow: 0 1px 2px color-mix(in srgb, var(--color-main-text, #000) 8%, transparent);
+}
+
+.azc-nav-toggle__icon {
+	display: inline-flex;
+	width: 1.25rem;
+	height: 1.25rem;
+	color: inherit;
+}
+
+.azc-nav-toggle__icon .azc-icon,
+.azc-nav-toggle__icon svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+.azc-nav-toggle:hover {
+	background-color: var(--color-background-hover);
+	border-color: var(--color-primary-element);
+}
+
+.azc-nav-toggle:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+.azc-nav-toggle[aria-expanded='true'] {
+	background-color: color-mix(
+		in srgb,
+		var(--color-primary-element, #0082c9) 12%,
+		var(--color-main-background)
+	);
+	border-color: var(--color-primary-element);
+}
+
+.azc-nav-backdrop {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 1998;
+	background: color-mix(in srgb, var(--color-main-text, #000) 35%, transparent);
+	border: 0;
+	padding: 0;
+	margin: 0;
+	cursor: pointer;
+}
+
+body.azc-nav-open .azc-nav-backdrop {
+	display: block;
+}
+
+@media (width < 1024px) {
+	.azc-nav-toggle {
+		display: inline-flex;
+	}
+
+	#content.app-arbeitszeitcheck #app-navigation.azc-nav:not(.vue),
+	body > #app-navigation.azc-nav:not(.vue) {
+		position: fixed !important;
+		top: var(--header-height, 50px) !important;
+		inset-inline-start: 0;
+		width: min(18rem, 88vw) !important;
+		max-width: 88vw;
+		height: var(--body-height, calc(100dvh - var(--header-height, 50px))) !important;
+		z-index: 1999;
+		transform: translateX(-105%) !important;
+		transition: transform 180ms ease;
+		box-shadow:
+			0 4px 16px color-mix(in srgb, var(--color-main-text, #000) 18%, transparent),
+			0 0 0 1px var(--color-border);
+		overflow-x: hidden;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		background: var(--color-main-background);
+	}
+
+	#content.app-arbeitszeitcheck #app-navigation.azc-nav.azc-nav--open,
+	body > #app-navigation.azc-nav.azc-nav--open {
+		transform: translateX(0) !important;
+	}
+
+	body.azc-nav-open {
+		overflow: hidden;
+	}
+}
+
+@media (min-width: 1024px) {
+	.azc-nav-toggle {
+		display: none !important;
+	}
+
+	.azc-nav-backdrop {
+		display: none !important;
+	}
+}
+
+@media (width < 1024px) and (forced-colors: active) {
+	.azc-nav-toggle {
+		border: 2px solid ButtonText;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#content.app-arbeitszeitcheck #app-navigation.azc-nav:not(.vue),
+	body > #app-navigation.azc-nav:not(.vue) {
+		transition: none;
+	}
+}

@@ -81,6 +81,20 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 	<div id="azc-alert-region" class="azc-sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 	<div id="app-content-wrapper" class="azc-shell<?php p($shellWidthClass); ?>">
 		<header class="azc-page-header" aria-labelledby="azc-page-title">
+			<button type="button"
+				class="azc-nav-toggle"
+				id="azc-nav-toggle"
+				data-azc-nav-toggle
+				aria-controls="app-navigation"
+				aria-expanded="false"
+				aria-label="<?php p($l->t('Open navigation menu')); ?>"
+				data-aria-label-open="<?php p($l->t('Open navigation menu')); ?>"
+				data-aria-label-close="<?php p($l->t('Close navigation menu')); ?>">
+				<span class="azc-nav-toggle__icon" aria-hidden="true">
+					<?php print_unescaped(IconCatalog::render('menu', 'azc-nav-toggle__icon-svg')); ?>
+				</span>
+				<span class="azc-nav-toggle__label"><?php p($l->t('Menu')); ?></span>
+			</button>
 			<nav class="azc-breadcrumb" aria-label="<?php p($l->t('Breadcrumb')); ?>">
 				<ol class="azc-breadcrumb__list">
 					<li class="azc-breadcrumb__item">

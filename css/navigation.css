@@ -592,7 +592,7 @@
     opacity: 0.7;
 }
 
-/* Sidebar structure (mobile drawer: Nextcloud core below 1024px). */
+/* Sidebar structure (mobile drawer: in-page Menu — see common/mobile-nav.css). */
 #app-navigation.azc-nav {
     display: flex;
     flex-direction: column;

@@ -447,8 +447,16 @@
 		})
 	}
 
-	function rotateSubscription(entry, triggerButton) {
-		if (!window.confirm(l10n.outlookRotateConfirm || 'Rotate the subscription link now? Calendar apps will stop refreshing the old link immediately.')) {
+	async function rotateSubscription(entry, triggerButton) {
+		// Fail closed when confirm API missing — never native window.confirm (§7.3 / Soft→Full inventory).
+		const confirmed = await (window.ArbeitszeitCheckUtils?.confirmDestructiveAction?.({
+			title: l10n.outlookRotateLink || 'Rotate link',
+			message: l10n.outlookRotateConfirm
+				|| 'Rotate the subscription link now? Calendar apps will stop refreshing the old link immediately.',
+			variant: 'danger',
+			confirmLabel: l10n.outlookRotateLink || 'Rotate link',
+		}) ?? Promise.resolve(null))
+		if (!confirmed) {
 			return
 		}
 
@@ -753,6 +761,12 @@
 		refreshCreateForm()
 		if (teamPickerApi && App.outlookIcalOrgWideAvailable) {
 			teamPickerApi.prefetchOrgWide?.()
+		}
+	}
+
+	if (typeof window !== 'undefined') {
+		window.__ArbeitszeitCheckOutlookIcalTestables = {
+			rotateSubscription: rotateSubscription,
 		}
 	}
 

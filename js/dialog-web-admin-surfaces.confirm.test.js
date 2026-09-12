@@ -79,6 +79,9 @@ afterEach(() => {
 		'__ArbeitszeitCheckTariffRulesTestables',
 		'__ArbeitszeitCheckOvertimePayoutsTestables',
 		'__ArbeitszeitCheckAdminSettingsTestables',
+		'__ArbeitszeitCheckOutlookIcalTestables',
+		'__ArbeitszeitCheckNotificationsVacationTestables',
+		'__ArbeitszeitCheckAdminUserDetailTestables',
 	].forEach((k) => { delete window[k] })
 })
 
@@ -188,7 +191,31 @@ describe('dlg-web admin-teams product handlers', () => {
 		})
 		await openCancelConfirm(() => { t.confirmRemoveMember(3, 'alice', 'Alice') })
 		await vi.waitFor(() => {
-			expect(ajax.mock.calls.filter((c) => c[1] && c[1].method === 'DELETE')).toHaveLength(1)
+			const deletes = ajax.mock.calls.filter((c) => c[1] && c[1].method === 'DELETE')
+			expect(deletes).toHaveLength(1)
+			expect(String(deletes[0][0])).toContain('/members/')
+		})
+	})
+
+	it('confirmRemoveManager cancel skips DELETE; confirm DELETEs /managers/', async () => {
+		const t = window.__ArbeitszeitCheckAdminTeamsTestables
+		expect(t && typeof t.confirmRemoveManager).toBe('function')
+		const ajax = window.ArbeitszeitCheckUtils.ajax
+		ajax.mockClear()
+		ajax.mockImplementation((url, opts) => {
+			if (opts && opts.method === 'DELETE') {
+				Promise.resolve().then(() => opts.onSuccess && opts.onSuccess({ success: true }))
+				return Promise.resolve({ success: true })
+			}
+			Promise.resolve().then(() => opts && opts.onSuccess && opts.onSuccess({ success: true }))
+			return Promise.resolve({ success: true })
+		})
+		await openCancelConfirm(() => { t.confirmRemoveManager(3, 'bob', 'Bob') })
+		await vi.waitFor(() => {
+			const deletes = ajax.mock.calls.filter((c) => c[1] && c[1].method === 'DELETE')
+			expect(deletes).toHaveLength(1)
+			expect(String(deletes[0][0])).toContain('/managers/')
+			expect(String(deletes[0][0])).not.toContain('/members/')
 		})
 	})
 
@@ -429,6 +456,56 @@ describe('dlg-web compliance / WTM / tariff / overtime / settings reopen (produc
 		await vi.waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('bulk'))).toBe(true))
 	})
 
+	it('admin-overtime confirmAndProcessOne cancel then confirm POSTs process', async () => {
+		vi.resetModules()
+		await loadUtilsComponents()
+		window.ARBEITSZEITCHECK_OT_PAYOUT = {
+			bankEnabled: true,
+			apiBulk: '/apps/arbeitszeitcheck/api/admin/overtime/bulk',
+			apiList: '/apps/arbeitszeitcheck/api/admin/overtime/list',
+			apiProcess: '/apps/arbeitszeitcheck/api/admin/overtime/process',
+			apiExport: '/apps/arbeitszeitcheck/api/admin/overtime/export',
+			i18n: {
+				confirmTitle: 'Confirm payout',
+				confirmOne: 'Record payout for %s?',
+				confirmBtn: 'Confirm',
+			},
+		}
+		document.getElementById('azc-main-content').innerHTML = `
+			<input id="ot-payout-year" value="2026" />
+			<input id="ot-payout-month" value="3" />
+			<div id="ot-payout-live"></div>
+			<button id="ot-payout-bulk">Bulk</button>
+			<button id="ot-payout-refresh"></button>
+			<button id="ot-payout-export"></button>
+			<table><tbody id="ot-payout-tbody"></tbody></table>`
+		const fetchMock = vi.fn(async (url) => {
+			if (String(url).includes('/overtime/process')) {
+				return { ok: true, json: async () => ({ success: true }) }
+			}
+			if (String(url).includes('/overtime/list')) {
+				return { ok: true, json: async () => ({ success: true, data: { items: [], summary: {}, meta: {} } }) }
+			}
+			return { ok: true, json: async () => ({ success: true }) }
+		})
+		vi.stubGlobal('fetch', fetchMock)
+		await import('./admin-overtime-payouts.js')
+		const t = window.__ArbeitszeitCheckOvertimePayoutsTestables
+		expect(typeof t.confirmAndProcessOne).toBe('function')
+		// Detached button — init() loadList() would wipe an in-DOM .ot-payout-one before we open the dialog.
+		const btn = document.createElement('button')
+		btn.setAttribute('data-user-id', 'emp1')
+		btn.setAttribute('data-name', 'Ada')
+		btn.setAttribute('data-hours', '4.5')
+		await openCancelConfirm(() => t.confirmAndProcessOne(btn))
+		await vi.waitFor(() => {
+			const processCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/overtime/process'))
+			expect(processCalls.length).toBeGreaterThanOrEqual(1)
+			expect(processCalls[0][1]?.method).toBe('POST')
+		})
+		expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('bulk'))).toBe(false)
+	})
+
 	it('admin-settings handleMonthReopen cancel then confirm', async () => {
 		window.ArbeitszeitCheckUtils.$ = (sel) => document.querySelector(sel)
 		window.ArbeitszeitCheckUtils.on = (el, ev, fn) => el && el.addEventListener(ev, fn)
@@ -541,6 +618,111 @@ describe('dlg-web admin-license seat remove (product listener)', () => {
 		await openCancelConfirm(() => document.querySelector('.azc-seat-remove').click())
 		await vi.waitFor(() => {
 			expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('remove-seat'))).toBe(true)
+		})
+	})
+})
+
+describe('dlg-web outlook rotateSubscription (confirmDestructiveAction)', () => {
+	beforeEach(async () => {
+		await loadUtilsComponents()
+		document.getElementById('azc-main-content').innerHTML = `
+			<div id="outlookIcalLive"></div>
+			<div id="section-outlook-subscription-heading"></div>`
+		window.ArbeitszeitCheck = {
+			l10n: {
+				outlookRotateConfirm: 'Rotate the subscription link now?',
+				outlookRotateLink: 'Rotate link',
+			},
+			outlookIcalRotateUrl: '/apps/arbeitszeitcheck/api/admin/outlook-ical/rotate',
+		}
+		const ajax = vi.fn((url, opts) => {
+			Promise.resolve().then(() => opts && opts.onSuccess && opts.onSuccess({ success: true }))
+			return Promise.resolve({ success: true })
+		})
+		window.ArbeitszeitCheckUtils.ajax = ajax
+		window.__outlookAjax = ajax
+		await import('./admin-outlook-ical-subscription.js')
+	})
+
+	it('rotateSubscription cancel skips POST; confirm POSTs rotate', async () => {
+		const t = window.__ArbeitszeitCheckOutlookIcalTestables
+		expect(t && typeof t.rotateSubscription).toBe('function')
+		const ajax = window.__outlookAjax
+		ajax.mockClear()
+		const entry = { id: 9, teamId: 3, feedLanguageCode: 'de' }
+		await openCancelConfirm(() => t.rotateSubscription(entry, null))
+		await vi.waitFor(() => {
+			const posts = ajax.mock.calls.filter((c) => c[1] && c[1].method === 'POST')
+			expect(posts.length).toBeGreaterThanOrEqual(1)
+			expect(String(posts[0][0])).toMatch(/rotate|outlook/i)
+		})
+	})
+})
+
+describe('dlg-web notifications vacation-unit migrate confirms', () => {
+	async function loadVacationMigrate({ currentUnit }) {
+		await loadUtilsComponents()
+		const reloadSpy = vi.fn()
+		try {
+			vi.spyOn(window.location, 'reload').mockImplementation(reloadSpy)
+		} catch {
+			Object.defineProperty(window, 'location', {
+				configurable: true,
+				value: { reload: reloadSpy, href: 'http://localhost/' },
+			})
+		}
+		document.getElementById('azc-main-content').innerHTML = `
+			<div id="vacation-unit-status" data-current-unit="${currentUnit}"></div>
+			<input id="vacationHoursPerDay" value="8" />
+			<label><input type="checkbox" id="vacationUnitClientConfirmed" checked /></label>
+			<input type="radio" name="vacationUnitChoice" value="hours" ${currentUnit === 'days' ? 'checked' : ''} />
+			<input type="radio" name="vacationUnitChoice" value="days" ${currentUnit === 'hours' ? 'checked' : ''} />
+			<button type="button" id="btn-vacation-unit-apply">Apply</button>
+			<div id="vacation-unit-migrate-status"></div>
+			<div id="vacation-unit-migrate-error" hidden></div>`
+		window.ArbeitszeitCheck = {
+			l10n: {
+				vacationUnitConfirmHours: 'Convert to hours using %s?',
+				vacationUnitConfirmDays: 'Convert to days using %s?',
+				vacationUnitConfirmTitle: 'Convert vacation unit',
+				vacationUnitConfirmBtn: 'Convert',
+			},
+			apiUrl: { migrateVacationUnit: '/apps/arbeitszeitcheck/api/admin/vacation-unit/migrate' },
+		}
+		const ajax = vi.fn((url, opts) => {
+			Promise.resolve().then(() => opts && opts.onSuccess && opts.onSuccess({ success: true, message: 'ok' }))
+			return Promise.resolve({ success: true })
+		})
+		window.ArbeitszeitCheckUtils.ajax = ajax
+		window.__vacationAjax = ajax
+		await import('./admin-notifications.js')
+	}
+
+	it('confirmAndMigrate hours cancel skips POST; confirm migrates', async () => {
+		await loadVacationMigrate({ currentUnit: 'days' })
+		const t = window.__ArbeitszeitCheckNotificationsVacationTestables
+		expect(t && typeof t.confirmAndMigrate).toBe('function')
+		const ajax = window.__vacationAjax
+		ajax.mockClear()
+		await openCancelConfirm(() => t.confirmAndMigrate('hours'))
+		await vi.waitFor(() => {
+			const posts = ajax.mock.calls.filter((c) => c[1] && c[1].method === 'POST')
+			expect(posts).toHaveLength(1)
+			expect(posts[0][1].data.targetUnit).toBe('hours')
+		})
+	})
+
+	it('confirmAndMigrate days cancel skips POST; confirm migrates', async () => {
+		await loadVacationMigrate({ currentUnit: 'hours' })
+		const t = window.__ArbeitszeitCheckNotificationsVacationTestables
+		expect(t && typeof t.confirmAndMigrate).toBe('function')
+		const ajax = window.__vacationAjax
+		ajax.mockClear()
+		await openCancelConfirm(() => t.confirmAndMigrate('days'))
+		await vi.waitFor(() => {
+			const posts = ajax.mock.calls.filter((c) => c[1] && c[1].method === 'POST')
+			expect(posts).toHaveLength(1)
+			expect(posts[0][1].data.targetUnit).toBe('days')
 		})
 	})
 })

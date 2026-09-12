@@ -1148,6 +1148,36 @@
                 });
             }
 
+            // Apply / clear absences list filters (query: start_date, end_date, status)
+            const applyAbsenceFilterBtn = document.getElementById('btn-apply-filter');
+            if (applyAbsenceFilterBtn && filterSection) {
+                applyAbsenceFilterBtn.addEventListener('click', () => {
+                    const dp = window.ArbeitszeitCheckDatepicker;
+                    const toISO = dp ? dp.convertEuropeanToISO : function (s) { return s; };
+                    const startDate = toISO(document.getElementById('filter-start-date')?.value || '');
+                    const endDate = toISO(document.getElementById('filter-end-date')?.value || '');
+                    const status = document.getElementById('filter-status')?.value;
+                    const params = new URLSearchParams();
+                    if (startDate) params.append('start_date', startDate);
+                    if (endDate) params.append('end_date', endDate);
+                    if (status) params.append('status', status);
+                    const queryString = params.toString();
+                    window.location.href = window.location.pathname + (queryString ? '?' + queryString : '');
+                });
+            }
+            const clearAbsenceFilterBtn = document.getElementById('btn-clear-filter');
+            if (clearAbsenceFilterBtn && filterSection) {
+                clearAbsenceFilterBtn.addEventListener('click', () => {
+                    const startEl = document.getElementById('filter-start-date');
+                    const endEl = document.getElementById('filter-end-date');
+                    const statusEl = document.getElementById('filter-status');
+                    if (startEl) startEl.value = '';
+                    if (endEl) endEl.value = '';
+                    if (statusEl) statusEl.value = '';
+                    window.location.href = window.location.pathname;
+                });
+            }
+
             // Edit buttons in table rows (for pending absences)
             const editButtons = document.querySelectorAll('table tbody .btn-icon--edit[data-absence-id]');
             editButtons.forEach(button => {

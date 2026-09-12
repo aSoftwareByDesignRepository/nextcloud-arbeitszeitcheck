@@ -882,7 +882,7 @@
 			}
 		}
 
-		function confirmAndMigrate(targetUnit) {
+		async function confirmAndMigrate(targetUnit) {
 			const hoursPerDay = readHoursPerDay();
 			if (targetUnit === currentUnit) {
 				// Persist hours-per-day factor without re-converting balances.
@@ -918,24 +918,44 @@
 					}
 					return;
 				}
-				if (!window.confirm(formatWithFactor(
-					l10n.vacationUnitConfirmHours
-						|| 'Convert all open vacation balances and absences to hours using %s hours per day? This cannot be undone without converting back.',
-					hoursPerDay
-				))) {
+				// Fail closed when confirm API missing — never native window.confirm.
+				const confirmedHours = await (window.ArbeitszeitCheckUtils?.confirmDestructiveAction?.({
+					title: l10n.vacationUnitConfirmTitle || 'Convert vacation unit',
+					message: formatWithFactor(
+						l10n.vacationUnitConfirmHours
+							|| 'Convert all open vacation balances and absences to hours using %s hours per day? This cannot be undone without converting back.',
+						hoursPerDay
+					),
+					variant: 'danger',
+					confirmLabel: l10n.vacationUnitConfirmBtn || 'Convert',
+				}) ?? Promise.resolve(null));
+				if (!confirmedHours) {
 					return;
 				}
 				runMigrate('hours');
 				return;
 			}
-			if (!window.confirm(formatWithFactor(
-				l10n.vacationUnitConfirmDays
-					|| 'Convert all open vacation balances back to days using %s hours per day?',
-				hoursPerDay
-			))) {
+			const confirmedDays = await (window.ArbeitszeitCheckUtils?.confirmDestructiveAction?.({
+				title: l10n.vacationUnitConfirmTitle || 'Convert vacation unit',
+				message: formatWithFactor(
+					l10n.vacationUnitConfirmDays
+						|| 'Convert all open vacation balances back to days using %s hours per day?',
+					hoursPerDay
+				),
+				variant: 'danger',
+				confirmLabel: l10n.vacationUnitConfirmBtn || 'Convert',
+			}) ?? Promise.resolve(null));
+			if (!confirmedDays) {
 				return;
 			}
 			runMigrate('days');
+		}
+
+		if (typeof window !== 'undefined') {
+			window.__ArbeitszeitCheckNotificationsVacationTestables = {
+				confirmAndMigrate: confirmAndMigrate,
+				runMigrate: runMigrate,
+			};
 		}
 
 		if (btnBanss && hoursInput) {

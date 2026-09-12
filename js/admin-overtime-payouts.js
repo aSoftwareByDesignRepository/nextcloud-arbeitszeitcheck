@@ -72,19 +72,25 @@
 
 	async function apiGet(url, params) {
 		const qs = new URLSearchParams(params).toString();
+		const token = (typeof OC !== 'undefined' && OC.requestToken)
+			|| (typeof window !== 'undefined' && window.OC && window.OC.requestToken)
+			|| '';
 		const res = await fetch(url + (qs ? '?' + qs : ''), {
-			headers: { requesttoken: OC.requestToken },
+			headers: { requesttoken: token },
 			credentials: 'same-origin',
 		});
 		return res.json();
 	}
 
 	async function apiPost(url, body) {
+		const token = (typeof OC !== 'undefined' && OC.requestToken)
+			|| (typeof window !== 'undefined' && window.OC && window.OC.requestToken)
+			|| '';
 		const res = await fetch(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				requesttoken: OC.requestToken,
+				requesttoken: token,
 			},
 			credentials: 'same-origin',
 			body: JSON.stringify(body),
@@ -173,22 +179,27 @@
 		}).join('');
 
 		tbody.querySelectorAll('.ot-payout-one').forEach((btn) => {
-			btn.addEventListener('click', async () => {
-				const name = btn.getAttribute('data-name') || '';
-				const hours = btn.getAttribute('data-hours') || '';
-				const msg = (i18n.confirmOne || 'Record payout for %s?')
-					.replace('%s', name + ' (' + hours + ' h)');
-				const confirmed = await (window.ArbeitszeitCheckUtils?.confirmDestructiveAction?.({
-					title: i18n.confirmTitle || 'Confirm payout',
-					message: msg,
-					variant: 'danger',
-					confirmLabel: i18n.confirmBtn || 'Confirm',
-				}) ?? Promise.resolve(null));
-				if (confirmed) {
-					processOne(btn.getAttribute('data-user-id'));
-				}
+			btn.addEventListener('click', () => {
+				confirmAndProcessOne(btn);
 			});
 		});
+	}
+
+	async function confirmAndProcessOne(btn) {
+		const name = (btn && btn.getAttribute('data-name')) || '';
+		const hours = (btn && btn.getAttribute('data-hours')) || '';
+		const userId = (btn && btn.getAttribute('data-user-id')) || '';
+		const msg = (i18n.confirmOne || 'Record payout for %s?')
+			.replace('%s', name + ' (' + hours + ' h)');
+		const confirmed = await (window.ArbeitszeitCheckUtils?.confirmDestructiveAction?.({
+			title: i18n.confirmTitle || 'Confirm payout',
+			message: msg,
+			variant: 'danger',
+			confirmLabel: i18n.confirmBtn || 'Confirm',
+		}) ?? Promise.resolve(null));
+		if (confirmed) {
+			await processOne(userId);
+		}
 	}
 
 	async function loadList() {
@@ -345,6 +356,8 @@
 	if (typeof window !== 'undefined') {
 		window.__ArbeitszeitCheckOvertimePayoutsTestables = {
 			processBulk: processBulk,
+			confirmAndProcessOne: confirmAndProcessOne,
+			processOne: processOne,
 		};
 	}
 

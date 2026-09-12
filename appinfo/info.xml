@@ -42,6 +42,10 @@ Also listed as **TimeGuard** in some App Store searches.
 - Technical violation reports against your profile are not a third-party certification.
 - Declared databases: MySQL and PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
 
+## Feedback welcome
+
+We improve this app with real-world use. Bug reports, rough edges, and ideas help — open a GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) or write to info@software-by-design.de. Your feedback directly shapes what we build next.
+
 ## Requirements
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL or PostgreSQL
@@ -71,6 +75,10 @@ In manchen App-Store-Suchen auch als **TimeGuard**.
 - Technische Verstoßmeldungen am Profil sind keine Fremdzertifizierung.
 - Deklarierte Datenbanken: MySQL und PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
 
+## Feedback willkommen
+
+Wir verbessern diese App mit Rückmeldungen aus der Praxis. Fehlerberichte, Stolpersteine und Ideen helfen — öffnen Sie ein GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) oder schreiben Sie an info@software-by-design.de. Ihr Feedback prägt direkt, was wir als Nächstes bauen.
+
 ## Voraussetzungen
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL oder PostgreSQL
@@ -93,7 +101,11 @@ Suivi du temps pour l'Allemagne, l'Autriche et la Suisse (DACH). Enregistrez les
 
 - Nextcloud 32–35
 - PHP 8.1–8.5
-	]]></description>
+
+## Retours bienvenus
+
+Nous améliorons cette app grâce à votre usage réel. Bugs, frottements et idées aident — ouvrez une GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) ou écrivez à info@software-by-design.de. Vos retours façonnent directement la suite.
+]]></description>
 	<description lang="da"><![CDATA[
 # ArbeitszeitCheck
 
@@ -107,6 +119,10 @@ Tidsregistrering for Tyskland, Østrig og Schweiz (DACH). Registrer arbejdstid, 
 - **Fravær og orlov** — godkendelsesworkflows og rapportering
 - **Eksporter og revisionslog** — f.eks. til DATEV og interne revisioner
 - 100 % selvhostet — ingen data forlader din server
+
+## Feedback er velkommen
+
+Vi forbedrer denne app med brug i praksis. Fejlrapporter, friktioner og idéer hjælper — åbn et GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Jeres feedback former direkte det, vi bygger næste gang.
 
 ## Krav
 
@@ -126,6 +142,10 @@ Registro de tiempo para Alemania, Austria y Suiza (DACH). Registra horas de trab
 - **Ausencias y permisos** — flujos de aprobación e informes
 - **Exportaciones y registro de auditoría** — p. ej. para DATEV y auditorías internas
 - 100 % autoalojado — ningún dato sale de tu servidor
+
+## Comentarios bienvenidos
+
+Mejoramos esta app con el uso real. Informes de errores, fricciones e ideas ayudan — abra un GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o escriba a info@software-by-design.de. Su feedback da forma directa a lo que construimos después.
 
 ## Requisitos
 
@@ -158,6 +178,10 @@ Ook bekend als **TimeGuard** in sommige App Store-zoekopdrachten.
 - Technische rapporten over schendingen tegen uw profiel zijn geen certificering door derden.
 - Gedeclareerde databases: MySQL en PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
 
+## Feedback welkom
+
+We verbeteren deze app met gebruik in de praktijk. Bugmeldingen, struikelblokken en ideeën helpen — open een GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) of mail naar info@software-by-design.de. Uw feedback bepaalt mede wat we als volgende bouwen.
+
 ## Vereisten
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL of PostgreSQL
@@ -186,6 +210,10 @@ Inoltre indicato come **TimeGuard** in alcune ricerche dell’App Store.
 - Questa app **non è una consulenza legale**. Resta a voi la responsabilità dei modelli di orario di lavoro, dei contratti collettivi, della configurazione e di come vengono usati i dati registrati. Chiedete consulenza quando necessario.
 - I report tecnici sulle violazioni contro il vostro profilo non sono una certificazione di terze parti.
 - Database dichiarati: MySQL e PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
+
+## Feedback benvenuto
+
+Miglioriamo questa app con l’uso reale. Segnalazioni di bug, punti deboli e idee aiutano — aprite una GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o scrivete a info@software-by-design.de. Il vostro feedback guida direttamente ciò che costruiamo dopo.
 
 ## Requisiti
 
@@ -216,6 +244,10 @@ W niektórych wyszukiwaniach w App Store aplikacja jest też znana jako **TimeGu
 - Techniczne raporty o naruszeniach względem twojego profilu nie są certyfikacją strony trzeciej.
 - Deklarowane bazy danych: MySQL i PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
 
+## Feedback mile widziany
+
+Ulepszamy tę aplikację dzięki realnemu użyciu. Zgłoszenia błędów, tarcia i pomysły pomagają — otwórz GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) lub napisz na info@software-by-design.de. Wasza opinia bezpośrednio kształtuje to, co budujemy dalej.
+
 ## Wymagania
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL lub PostgreSQL
@@ -245,6 +277,10 @@ Appen finns också listad som **TimeGuard** i vissa App Store-sökningar.
 - Tekniska rapporter om regelbrott mot er profil är inte en tredjepartscertifiering.
 - Deklarerade databaser: MySQL och PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
 
+## Feedback välkomnas
+
+Vi förbättrar den här appen med verklig användning. Felrapporter, friktioner och idéer hjälper — öppna en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv till info@software-by-design.de. Er feedback formar direkt det vi bygger härnäst.
+
 ## Krav
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL eller PostgreSQL
@@ -273,6 +309,10 @@ Appen står også oppført som **TimeGuard** i noen App Store-søk.
 - Denne appen er **ikke juridisk rådgivning**. Dere er fortsatt ansvarlige for modeller for arbeidstid, tariffavtaler, konfigurasjon og hvordan registrerte data brukes. Spør om råd ved behov.
 - Tekniske rapporter om regelbrudd mot profilen deres er ikke en tredjepartssertifisering.
 - Deklarerte databaser: MySQL og PostgreSQL. Nextcloud 32–35, PHP 8.1–8.5.
+
+## Feedback er velkommen
+
+Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer hjelper — åpne en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Tilbakemeldingen deres former direkte det vi bygger videre.
 
 ## Krav
 

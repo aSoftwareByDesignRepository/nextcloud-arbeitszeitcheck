@@ -332,11 +332,13 @@ $content = '';
 </div><!-- /#arbeitszeitcheck-app -->
 
 <!-- Initialize JavaScript -->
+<?php include __DIR__ . '/common/hours-display-bootstrap.php'; ?>
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     // Pass essential data to JS
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.status = <?php echo json_encode($status, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.maxDailyHours = <?php echo json_encode($maxDailyHours, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.hoursDisplay = <?php echo json_encode($azcHoursDisplayMode, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
     window.ArbeitszeitCheck.l10n.clockIn = <?php echo json_encode($l->t('Clock In'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.clockOut = <?php echo json_encode($l->t('Clock Out'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

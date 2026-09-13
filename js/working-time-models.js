@@ -384,6 +384,12 @@
         } else {
             delete base.weekday_schedule;
         }
+        const allowSunday = !!form.querySelector('#wtm-model-allow-sunday-work')?.checked;
+        if (allowSunday) {
+            base.allow_sunday_work = true;
+        } else {
+            delete base.allow_sunday_work;
+        }
         return Object.keys(base).length ? base : null;
     }
 
@@ -458,6 +464,12 @@
         const dailyHoursLabel = window.ArbeitszeitCheck?.l10n?.dailyHours || 'Daily Hours';
         const workDaysPerWeekLabel = window.ArbeitszeitCheck?.l10n?.workDaysPerWeek || 'Work days per week';
         const isDefaultLabel = window.ArbeitszeitCheck?.l10n?.isDefault || 'Set as Default';
+        const allowSundayLabel = window.ArbeitszeitCheck?.l10n?.allowSundayWork
+            || (window.t ? window.t('arbeitszeitcheck', 'Sunday work permitted') : 'Sunday work permitted');
+        const allowSundayHelp = window.ArbeitszeitCheck?.l10n?.allowSundayWorkHelp
+            || (window.t
+                ? window.t('arbeitszeitcheck', 'When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.')
+                : 'When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.');
 
         const nameVal = isEdit ? Utils.escapeHtml(model.name || '') : '';
         const descVal = isEdit ? Utils.escapeHtml(model.description || '') : '';
@@ -467,6 +479,7 @@
         const workDaysVal = isEdit ? (model.workDaysPerWeek || 5) : 5;
         const typeSelected = isEdit ? (model.type || 'full_time') : 'full_time';
         const isDefaultChecked = isEdit && model.isDefault ? ' checked' : '';
+        const allowSundayChecked = (isEdit && model.breakRules && !!model.breakRules.allow_sunday_work) ? ' checked' : '';
         const schedulePrefix = isEdit ? 'edit-wtm' : 'create-wtm';
         const existingSchedule = (isEdit && model.breakRules && model.breakRules.weekday_schedule)
             ? model.breakRules.weekday_schedule
@@ -531,6 +544,14 @@
                         <input type="checkbox" id="wtm-model-is-default" name="isDefault" value="1"${isDefaultChecked}>
                         <label for="wtm-model-is-default">${Utils.escapeHtml(isDefaultLabel)}</label>
                     </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-checkbox">
+                        <input type="checkbox" id="wtm-model-allow-sunday-work" name="allowSundayWork" value="1"${allowSundayChecked}
+                               aria-describedby="wtm-model-allow-sunday-work-help">
+                        <label for="wtm-model-allow-sunday-work">${Utils.escapeHtml(allowSundayLabel)}</label>
+                    </div>
+                    <p id="wtm-model-allow-sunday-work-help" class="form-help">${Utils.escapeHtml(allowSundayHelp)}</p>
                 </div>
                 <details class="wtm-editor-desc"${descOpen}>
                     <summary class="wtm-editor-desc__summary">${Utils.escapeHtml(descriptionMore)}</summary>

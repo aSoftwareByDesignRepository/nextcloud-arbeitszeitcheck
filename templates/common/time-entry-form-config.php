@@ -26,7 +26,9 @@ $timeEntryFormConfig = [
 	'autoBreakEnabled' => (bool)($_['timeEntryFormAutoBreakEnabled'] ?? false),
 	'maxDailyHours' => (float)($_['maxDailyHours'] ?? 10),
 	'maxBreaks' => 10,
-	'minuteStep' => \OCA\ArbeitszeitCheck\Constants::TIME_PICKER_MINUTE_STEP,
+	'minuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::resolve(
+		\OCP\Server::get(\OCP\IConfig::class)
+	),
 	'submitUrl' => $submitUrl,
 	'redirectUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
 	'timeEntriesListUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),

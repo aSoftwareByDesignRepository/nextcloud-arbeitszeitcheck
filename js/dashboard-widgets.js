@@ -249,7 +249,12 @@
 			return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 		};
 
-		const formatHours = (hours) => Number.isFinite(hours) ? hours.toFixed(2) : '0.00';
+		const formatHours = (hours) => {
+			if (window.ArbeitszeitCheckUtils && typeof window.ArbeitszeitCheckUtils.formatHours === 'function') {
+				return window.ArbeitszeitCheckUtils.formatHours(hours);
+			}
+			return Number.isFinite(hours) ? String(Math.round(hours * 100) / 100) : '0';
+		};
 
 		const statusIcon = (status) => {
 			const map = {

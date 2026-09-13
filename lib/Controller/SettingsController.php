@@ -223,6 +223,7 @@ class SettingsController extends Controller
 				'break_reminders_enabled',
 				'auto_break_calculation',
 				'missing_clock_in_reminders_enabled',
+				'hours_display',
 			];
 
 			$updatedSettings = [];
@@ -238,9 +239,14 @@ class SettingsController extends Controller
 					// Update setting
 					$value = $params[$key];
 
-					// All allowed personal settings are boolean toggles: coerce to
-					// the canonical '1' / '0' string the rest of the app expects.
-					$value = ($value === true || $value === 'true' || $value === '1' || $value === 1) ? '1' : '0';
+					if ($key === 'hours_display') {
+						$value = \OCA\ArbeitszeitCheck\Support\HoursDisplay::normalize(
+							is_scalar($value) ? (string)$value : null
+						);
+					} else {
+						// Boolean toggles: coerce to canonical '1' / '0'.
+						$value = ($value === true || $value === 'true' || $value === '1' || $value === 1) ? '1' : '0';
+					}
 
 					$this->userSettingsMapper->setSetting($userId, $key, $value);
 					$updatedSettings[$key] = $value;

@@ -628,12 +628,30 @@ const ArbeitszeitCheckUtils = {
   },
 
   /**
-   * Format hours (decimal to HH:MM)
+   * Format hours for display.
+   * Respects ArbeitszeitCheck.hoursDisplay: 'decimal' (legacy) or 'hours_minutes' ("5h 30").
    */
   formatHours(hours) {
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    return `${h}:${String(m).padStart(2, '0')}`;
+    const mode = (typeof window !== 'undefined'
+      && window.ArbeitszeitCheck
+      && window.ArbeitszeitCheck.hoursDisplay === 'hours_minutes')
+      ? 'hours_minutes'
+      : 'decimal';
+    const safe = Number.isFinite(hours) ? Math.max(0, Number(hours)) : 0;
+    if (mode === 'hours_minutes') {
+      const totalMinutes = Math.round(safe * 60);
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      if (m === 0) {
+        return `${h}h`;
+      }
+      return `${h}h ${String(m).padStart(2, '0')}`;
+    }
+    const rounded = Math.round(safe * 100) / 100;
+    if (Math.abs(rounded - Math.round(rounded)) < 0.001) {
+      return String(Math.round(rounded));
+    }
+    return String(rounded);
   },
 
   /**

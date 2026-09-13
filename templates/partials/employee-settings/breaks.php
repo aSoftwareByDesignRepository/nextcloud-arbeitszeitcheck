@@ -47,6 +47,19 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 					?>
 				</p>
 			</div>
+			<div class="settings-form__group">
+				<label for="hours-display" class="form-label"><?php p($l->t('Hours display')); ?></label>
+				<select id="hours-display"
+					name="hours_display"
+					class="form-select"
+					aria-describedby="hours-display-help">
+					<option value="decimal" selected><?php p($l->t('Decimal hours (5.5)')); ?></option>
+					<option value="hours_minutes"><?php p($l->t('Hours and minutes (5h 30)')); ?></option>
+				</select>
+				<p id="hours-display-help" class="settings-form__help">
+					<?php p($l->t('How working time totals are shown in the app. Decimal stays the default; choose hours and minutes if you prefer clock-style durations.')); ?>
+				</p>
+			</div>
 			<div class="settings-form__actions">
 				<button type="submit"
 					class="azc-btn azc-btn--primary"

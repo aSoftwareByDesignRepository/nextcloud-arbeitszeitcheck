@@ -96,6 +96,32 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                         <?php p($l->t('Default daily working hours. Used for new employees until individual models are set. Decimal hours are allowed (e.g. 7.74).')); ?>
                     </p>
                 </div>
+
+                <div class="form-group">
+                    <label for="timePickerMinuteStep" class="form-label">
+                        <?php p($l->t('Time picker minute step')); ?>
+                    </label>
+                    <?php $minuteStep = (int)($settings['timePickerMinuteStep'] ?? 1); ?>
+                    <select id="timePickerMinuteStep"
+                            name="timePickerMinuteStep"
+                            class="form-select"
+                            aria-describedby="timePickerMinuteStep-help">
+                        <?php foreach ([1, 5, 10, 15] as $stepOpt): ?>
+                            <option value="<?php p((string)$stepOpt); ?>"<?php echo $minuteStep === $stepOpt ? ' selected' : ''; ?>>
+                                <?php
+                                if ($stepOpt === 1) {
+                                    p($l->t('Every minute (11:51)'));
+                                } else {
+                                    p($l->t('Every %s minutes', [(string)$stepOpt]));
+                                }
+                                ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p id="timePickerMinuteStep-help" class="form-help">
+                        <?php p($l->t('Minute choices in manual time entry and corrections. Default is every minute. Choose 5/10/15 if your payroll rounds to those steps.')); ?>
+                    </p>
+                </div>
                 </div><!-- /.azc-card__body -->
                 </section>
 

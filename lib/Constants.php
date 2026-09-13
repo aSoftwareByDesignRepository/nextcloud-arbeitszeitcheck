@@ -23,9 +23,15 @@ final class Constants
 
 	/**
 	 * Default minute step for time pickers (manual entry + correction).
-	 * Odd minutes remain enterable via free typing / preserved on edit.
+	 * Admin may override via {@see self::CONFIG_TIME_PICKER_MINUTE_STEP}.
+	 * Default 1 = every minute (legacy installs without the key get 1).
 	 */
-	public const TIME_PICKER_MINUTE_STEP = 5;
+	public const TIME_PICKER_MINUTE_STEP = 1;
+
+	/**
+	 * App config: minute step for HH:MM pickers (1, 5, 10, or 15).
+	 */
+	public const CONFIG_TIME_PICKER_MINUTE_STEP = 'time_picker_minute_step';
 
 	/**
 	 * Default number of items per page for list endpoints (time entries, absences, violations, etc.).

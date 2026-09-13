@@ -4957,7 +4957,7 @@
 		"Ask a Nextcloud administrator to add you under ArbeitszeitCheck → Administration → Global settings → Access, or to grant you the Nextcloud admin role." : "Bitten Sie eine Nextcloud-Administration, Sie unter ArbeitszeitCheck → Administration → Globale Einstellungen → Zugriff hinzuzufügen oder Ihnen die Nextcloud-Admin-Rolle zu geben.",
 		"Dedicated app administrators appear in the list together with Nextcloud admins. Use search to find colleagues, then tick them. After saving they can open Administration (and Manager) without Nextcloud admin rights. You cannot remove your own last app-admin seat — ask a Nextcloud admin if you need to step down." : "Dedizierte App-Administratoren erscheinen in der Liste zusammen mit Nextcloud-Admins. Suchen Sie Kolleginnen und Kollegen und markieren Sie sie. Nach dem Speichern können sie Administration (und Verwalter) ohne Nextcloud-Adminrechte öffnen. Sie können Ihren letzten App-Admin-Sitz nicht selbst entfernen — bitten Sie bei Bedarf eine Nextcloud-Administration.",
 		"(none)" : "(keine)",
-		"A correction request is still pending for an unfinished session. Cancel it or wait for approval before clocking in." : "A correction request is still pending for an unfinished session. Cancel it or wait for approval before clocking in.",
+		"A correction request is still pending for an unfinished session. Cancel it or wait for approval before clocking in." : "Für eine offene Sitzung liegt noch ein Korrekturantrag vor. Stornieren Sie ihn oder warten Sie auf die Freigabe, bevor Sie einstempeln.",
 		"Bank maximum" : "Bank-Maximum",
 		"Banked hours" : "Angesparte Stunden",
 		"Download balance PDF" : "Saldo als PDF herunterladen",
@@ -4973,7 +4973,17 @@
 		"Time zones" : "Zeitzonen",
 		"Tip" : "Tipp",
 		"When you started (e.g. 09:00). Minutes use 5-minute steps — or type any time as HH:MM." : "Wann Sie begonnen haben (z. B. 09:00). Minuten in 5-Minuten-Schritten — oder beliebige Zeit als HH:MM eingeben.",
-		"Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight." : "Mindestens %1$d Stunden Ruhezeit zwischen Schichten erforderlich (%2$s). Ihre letzte Schicht endete am %3$s um %4$s. Sie können nach %5$s wieder einstempeln (in %6$.1f Stunden). Für eine kurze Unterbrechung in derselben Sitzung nutzen Sie Pause statt Ausstempeln. Vormittags- und Nachmittagsblöcke am selben Kalendertag (geteilte Arbeitszeit) sind erlaubt, wenn der vorherige Block nicht über Mitternacht lief."
+		"Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight." : "Mindestens %1$d Stunden Ruhezeit zwischen Schichten erforderlich (%2$s). Ihre letzte Schicht endete am %3$s um %4$s. Sie können nach %5$s wieder einstempeln (in %6$.1f Stunden). Für eine kurze Unterbrechung in derselben Sitzung nutzen Sie Pause statt Ausstempeln. Vormittags- und Nachmittagsblöcke am selben Kalendertag (geteilte Arbeitszeit) sind erlaubt, wenn der vorherige Block nicht über Mitternacht lief.",
+		"Decimal hours (5.5)" : "Dezimalstunden (5,5)",
+		"Every %s minutes" : "Alle %s Minuten",
+		"Every minute (11:51)" : "Jede Minute (11:51)",
+		"Hours and minutes (5h 30)" : "Stunden und Minuten (5h 30)",
+		"Hours display" : "Stundenanzeige",
+		"How working time totals are shown in the app. Decimal stays the default; choose hours and minutes if you prefer clock-style durations." : "So werden Arbeitszeitsummen in der App angezeigt. Dezimal bleibt Standard; wählen Sie Stunden und Minuten, wenn Sie uhrzeitähnliche Dauern bevorzugen.",
+		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minutenauswahl bei manueller Zeiterfassung und Korrekturen. Standard ist jede Minute. Wählen Sie 5\/10\/15, wenn die Lohnabrechnung auf diese Schritte rundet.",
+		"Sunday work permitted" : "Sonntagsarbeit erlaubt",
+		"Time picker minute step" : "Minutenschritt der Zeitauswahl",
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "Wenn aktiviert, erzeugen Sonntagseinträge für Personen mit diesem Modell keine Sonntagsarbeits-Warnungen. Feiertagsprüfungen bleiben aktiv."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

@@ -157,6 +157,7 @@ final class AdminSettingsSectionCatalog
 			'maxDailyHours',
 			'minRestPeriod',
 			'defaultWorkingHours',
+			'timePickerMinuteStep',
 		],
 		self::SECTION_REGIONAL => [
 			'country',

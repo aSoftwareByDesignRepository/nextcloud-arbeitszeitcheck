@@ -712,6 +712,52 @@ class ComplianceServiceTest extends TestCase
 	}
 
 	/**
+	 * Opt-in allow_sunday_work on the assigned model suppresses Sunday warnings (legacy-safe).
+	 */
+	public function testCheckComplianceAfterClockOutSkipsSundayWhenModelAllows(): void
+	{
+		$userId = 'sunday-worker';
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(321);
+		$timeEntry->setUserId($userId);
+		$timeEntry->setStartTime(new \DateTime('2024-01-07 08:00:00'));
+		$timeEntry->setEndTime(new \DateTime('2024-01-07 17:00:00'));
+		$timeEntry->setBreaks(json_encode([[
+			'start' => '2024-01-07T12:00:00+00:00',
+			'end' => '2024-01-07T12:45:00+00:00',
+		]]));
+		$timeEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$timeEntry->setIsManualEntry(false);
+		$timeEntry->setCreatedAt(new \DateTime());
+		$timeEntry->setUpdatedAt(new \DateTime());
+
+		$assignment = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(9);
+		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+
+		$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
+		$model->setBreakRulesArray(['allow_sunday_work' => true]);
+		$this->workingTimeModelMapper->method('find')->with(9)->willReturn($model);
+
+		$calls = [];
+		$this->violationMapper->method('createViolation')->willReturnCallback(function (...$args) use (&$calls): ComplianceViolation {
+			$calls[] = $args;
+			$v = new ComplianceViolation();
+			$v->setId(count($calls));
+			return $v;
+		});
+
+		$this->service->checkComplianceAfterClockOut($timeEntry);
+
+		$sunday = array_values(array_filter(
+			$calls,
+			static fn (array $a): bool => $a[1] === ComplianceViolation::TYPE_SUNDAY_WORK
+		));
+		$this->assertCount(0, $sunday, 'Sunday work warning must be suppressed when the model allows Sunday work');
+	}
+
+	/**
 	 * Saturday 22:00 → Sunday 02:00: Sunday work must be recorded even though the shift started on Saturday.
 	 */
 	public function testCheckComplianceAfterClockOutSundayWorkWhenShiftStartedSaturday(): void

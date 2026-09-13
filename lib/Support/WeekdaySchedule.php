@@ -264,6 +264,11 @@ final class WeekdaySchedule
 		return (float)$n;
 	}
 
+	public function isWorkDay(string $day): bool
+	{
+		return !empty($this->days[$day]['work']);
+	}
+
 	public function averageDailyNetHours(): float
 	{
 		$days = $this->workDaysPerWeek();

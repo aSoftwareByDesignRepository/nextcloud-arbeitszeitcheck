@@ -1018,6 +1018,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
         </section>
 
 <?php include __DIR__ . '/common/main-ui-l10n.php'; ?>
+<?php include __DIR__ . '/common/hours-display-bootstrap.php'; ?>
 
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
@@ -1026,6 +1027,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
     window.ArbeitszeitCheck.status = <?php echo json_encode($status, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.overtime = <?php echo json_encode($overtime, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.maxDailyHours = <?php echo json_encode($maxDailyHours, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.hoursDisplay = <?php echo json_encode($azcHoursDisplayMode, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.page = 'dashboard';
 
     // L10n strings

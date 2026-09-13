@@ -76,6 +76,11 @@
                         autoBreakCalc.checked = result.settings.auto_break_calculation === '1' || result.settings.auto_break_calculation === true;
                     }
 
+                    const hoursDisplay = document.getElementById('hours-display');
+                    if (hoursDisplay && result.settings.hours_display) {
+                        hoursDisplay.value = result.settings.hours_display === 'hours_minutes' ? 'hours_minutes' : 'decimal';
+                    }
+
                     const notificationsEnabled = document.getElementById('notifications-enabled');
                     if (notificationsEnabled) {
                         notificationsEnabled.checked = result.settings.notifications_enabled === '1' || result.settings.notifications_enabled === true;
@@ -193,8 +198,10 @@
             if (!autoBreak) {
                 return;
             }
+            const hoursDisplay = form.querySelector('#hours-display');
             const data = {
-                auto_break_calculation: !!autoBreak.checked
+                auto_break_calculation: !!autoBreak.checked,
+                hours_display: hoursDisplay && hoursDisplay.value === 'hours_minutes' ? 'hours_minutes' : 'decimal'
             };
 
             this.submitSettings(data, 'working-time-settings-form');

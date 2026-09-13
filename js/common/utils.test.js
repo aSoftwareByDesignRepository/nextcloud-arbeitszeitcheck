@@ -472,5 +472,23 @@ describe('ArbeitszeitCheckUtils', () => {
     expect(u.isAssignableTariffRuleSet({ id: 3, status: 'retired' }, { keepId: 3 })).toBe(true)
     expect(u.isAssignableTariffRuleSet({ id: 3, status: 'retired' })).toBe(false)
   })
+
+  it('formatHours defaults to legacy decimal and supports hours_minutes (#36)', () => {
+    const u = window.ArbeitszeitCheckUtils
+    const prev = window.ArbeitszeitCheck
+    window.ArbeitszeitCheck = { ...(prev || {}), hoursDisplay: 'decimal' }
+    expect(u.formatHours(5.5)).toBe('5.5')
+    expect(u.formatHours(8)).toBe('8')
+    expect(u.formatHours(-1)).toBe('0')
+    expect(u.formatHours(Number.NaN)).toBe('0')
+
+    window.ArbeitszeitCheck.hoursDisplay = 'hours_minutes'
+    expect(u.formatHours(5.5)).toBe('5h 30')
+    expect(u.formatHours(8)).toBe('8h')
+    expect(u.formatHours(1 + 1 / 60)).toBe('1h 01')
+    expect(u.formatHours(0)).toBe('0h')
+
+    window.ArbeitszeitCheck = prev
+  })
 })
 

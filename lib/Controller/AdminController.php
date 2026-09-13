@@ -927,6 +927,12 @@ class AdminController extends Controller
 			'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
 			'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', $this->getProfileMaxDailyHoursDefault()),
 			'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', $this->getProfileMinRestHoursDefault()),
+			'timePickerMinuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize(
+				(int)$this->appConfig->getAppValueString(
+					Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
+					(string)\OCA\ArbeitszeitCheck\Constants::TIME_PICKER_MINUTE_STEP
+				)
+			),
 			'country' => $this->getConfiguredCountry(),
 			'germanState' => $this->getConfiguredDefaultRegion(),
 			'weeklyAbsoluteMaxHours' => $this->getConfiguredSwissWeeklyAbsoluteMax(),
@@ -2256,6 +2262,12 @@ class AdminController extends Controller
 				'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
 				'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', $this->getProfileMaxDailyHoursDefault()),
 				'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', $this->getProfileMinRestHoursDefault()),
+				'timePickerMinuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize(
+					(int)$this->appConfig->getAppValueString(
+						Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
+						(string)\OCA\ArbeitszeitCheck\Constants::TIME_PICKER_MINUTE_STEP
+					)
+				),
 				'country' => $this->getConfiguredCountry(),
 				'germanState' => $this->getConfiguredDefaultRegion(),
 				'weeklyAbsoluteMaxHours' => $this->getConfiguredSwissWeeklyAbsoluteMax(),
@@ -2363,6 +2375,7 @@ class AdminController extends Controller
 				'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
 				'maxDailyHours' => 'max_daily_hours',
 				'minRestPeriod' => 'min_rest_period',
+				'timePickerMinuteStep' => Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
 				// 'country' must precede 'germanState' so a combined save
 				// validates the region against the country from this request.
 				'country' => 'country',
@@ -2490,6 +2503,8 @@ class AdminController extends Controller
 					} elseif ($paramKey === 'breakAutoFallbackMinutes') {
 						$m = max(15, min(720, (int)$value));
 						$value = (string)$m;
+					} elseif ($paramKey === 'timePickerMinuteStep') {
+						$value = (string)\OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize((int)$value);
 					} elseif ($paramKey === 'breakAutoFallbackFlexWindowStart') {
 						$value = (string)max(0, min(23, (int)$value));
 					} elseif ($paramKey === 'breakAutoFallbackFlexWindowEnd') {

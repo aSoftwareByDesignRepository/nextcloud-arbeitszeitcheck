@@ -44,7 +44,10 @@
 		if (Number.isNaN(num)) {
 			return '-';
 		}
-		return num.toFixed(2);
+		if (window.ArbeitszeitCheckUtils && typeof window.ArbeitszeitCheckUtils.formatHours === 'function') {
+			return window.ArbeitszeitCheckUtils.formatHours(num);
+		}
+		return String(Math.round(num * 100) / 100);
 	}
 
 	function formatBreaks(entry) {

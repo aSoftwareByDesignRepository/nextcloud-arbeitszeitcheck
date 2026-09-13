@@ -23,6 +23,7 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Support\BreakSplitValidator;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfile;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
+use OCA\ArbeitszeitCheck\Support\SundayWorkPolicy;
 use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IUserManager;
@@ -1244,17 +1245,19 @@ class ComplianceService
             $occurredAt = $startTime > $cursor ? clone $startTime : clone $cursor;
 
             if ((int)$cursor->format('w') === 0) {
-                $this->violationMapper->createViolation(
-                    $userId,
-                    ComplianceViolation::TYPE_SUNDAY_WORK,
-                    $this->l10n->t(
-                        'Work performed on Sunday (%s)',
-                        [$this->profile($userId)->lawLabel('sundayHoliday')]
-                    ),
-                    $occurredAt,
-                    $entryId,
-                    ComplianceViolation::SEVERITY_WARNING
-                );
+                if (!$this->isSundayWorkAllowedForUser($userId, $cursor)) {
+                    $this->violationMapper->createViolation(
+                        $userId,
+                        ComplianceViolation::TYPE_SUNDAY_WORK,
+                        $this->l10n->t(
+                            'Work performed on Sunday (%s)',
+                            [$this->profile($userId)->lawLabel('sundayHoliday')]
+                        ),
+                        $occurredAt,
+                        $entryId,
+                        ComplianceViolation::SEVERITY_WARNING
+                    );
+                }
             }
 
             $isHoliday = false;
@@ -1282,6 +1285,28 @@ class ComplianceService
             }
 
             $cursor->modify('+1 day');
+        }
+    }
+
+    /**
+     * True when the user's assigned working-time model opts into Sunday work
+     * (explicit allow_sunday_work or weekday_schedule Sunday work day).
+     */
+    private function isSundayWorkAllowedForUser(string $userId, \DateTimeInterface $onDate): bool
+    {
+        try {
+            $date = \DateTime::createFromInterface($onDate);
+            $assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $date);
+            if ($assignment === null) {
+                $assignment = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+            }
+            if ($assignment === null) {
+                return false;
+            }
+            $model = $this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
+            return SundayWorkPolicy::isAllowed($model->getBreakRulesArray());
+        } catch (\Throwable) {
+            return false;
         }
     }
 

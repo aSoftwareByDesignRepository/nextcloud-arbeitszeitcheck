@@ -4958,7 +4958,17 @@
         "Time zones": "Time zones",
         "Tip": "Tip",
         "When you started (e.g. 09:00). Minutes use 5-minute steps — or type any time as HH:MM.": "When you started (e.g. 09:00). Minutes use 5-minute steps — or type any time as HH:MM.",
-        "Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight.": "Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight."
+        "Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight.": "Minimum %1$d-hour rest period required between shifts (%2$s). Your last shift ended on %3$s at %4$s. You can clock in after %5$s (in %6$.1f hours). For a short break in the same session, use Pause instead of clocking out. Morning and afternoon blocks on the same calendar day (split shift) are allowed when the previous block did not run overnight.",
+        "Decimal hours (5.5)": "Decimal hours (5.5)",
+        "Every %s minutes": "Every %s minutes",
+        "Every minute (11:51)": "Every minute (11:51)",
+        "Hours and minutes (5h 30)": "Hours and minutes (5h 30)",
+        "Hours display": "Hours display",
+        "How working time totals are shown in the app. Decimal stays the default; choose hours and minutes if you prefer clock-style durations.": "How working time totals are shown in the app. Decimal stays the default; choose hours and minutes if you prefer clock-style durations.",
+        "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.": "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
+        "Sunday work permitted": "Sunday work permitted",
+        "Time picker minute step": "Time picker minute step",
+        "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.": "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

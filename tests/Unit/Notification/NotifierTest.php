@@ -71,7 +71,10 @@ class NotifierTest extends TestCase
 		$this->assertNotNull($capturedMessage);
 		$this->assertStringNotContainsString('0 day', (string)$capturedMessage);
 		$this->assertStringNotContainsString('vacation request for 0', (string)$capturedMessage);
-		$this->assertMatchesRegularExpression('/3\s+working\s+day/', (string)$capturedMessage);
+		// Factory may resolve host default (de) even when prepare(..., 'en') — assert days, not locale.
+		$this->assertMatchesRegularExpression('/(?:3\s+working\s+days?|3\s+Arbeitstage)/u', (string)$capturedMessage);
+		$this->assertStringContainsString('2026-06-02', (string)$capturedMessage);
+		$this->assertStringContainsString('2026-06-06', (string)$capturedMessage);
 	}
 
 	public function testPrepareAbsenceApprovedWithSubjectOnlyDaysStillWorks(): void
@@ -98,7 +101,7 @@ class NotifierTest extends TestCase
 
 		$this->notifier->prepare($notification, 'en');
 
-		$this->assertMatchesRegularExpression('/2\s+working\s+day/', (string)$capturedMessage);
+		$this->assertMatchesRegularExpression('/(?:2\s+working\s+days?|2\s+Arbeitstage)/u', (string)$capturedMessage);
 		$this->assertStringNotContainsString('sick_leave', (string)$capturedMessage);
 	}
 

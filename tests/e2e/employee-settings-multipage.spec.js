@@ -5,7 +5,7 @@ import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
 
 /** Every My settings section + a primary control that proves the page rendered. */
 const SECTIONS = [
-	{ id: 'breaks', marker: '#auto-break-calculation' },
+	{ id: 'breaks', marker: '#hours-display' },
 	{ id: 'notifications', marker: '#notifications-enabled' },
 	{ id: 'data-privacy', marker: '#btn-gdpr-delete' },
 	{ id: 'about', marker: '#settings-compliance-heading' },

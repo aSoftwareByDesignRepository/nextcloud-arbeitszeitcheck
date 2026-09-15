@@ -343,6 +343,128 @@
         return path;
     }
 
+    /**
+     * Load / apply overtime Saldo ledger adjustments (does not touch time entries).
+     */
+    function bindOvertimeAdjustmentControls(userId) {
+        const balanceEl = document.getElementById('user-overtime-effective-balance');
+        const historyEl = document.getElementById('user-overtime-adj-history');
+        const applyBtn = document.getElementById('btn-overtime-adj-apply');
+        const resetBtn = document.getElementById('btn-overtime-adj-reset');
+        if (!balanceEl || !applyBtn || !resetBtn) {
+            return;
+        }
+
+        const base = '/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/overtime-adjustments';
+
+        function renderHistory(payload) {
+            const bal = payload && typeof payload.effective_balance === 'number'
+                ? payload.effective_balance
+                : null;
+            if (bal !== null) {
+                const prefix = bal > 0.005 ? '+' : '';
+                balanceEl.textContent = auMsg('overtimeEffectiveBalance', 'Current Saldo: %1$s h')
+                    .replace('%1$s', prefix + bal.toFixed(2));
+            }
+            if (!historyEl) {
+                return;
+            }
+            const items = (payload && Array.isArray(payload.items)) ? payload.items : [];
+            if (items.length === 0) {
+                historyEl.innerHTML = '<p class="form-help">' + Utils.escapeHtml(auMsg('overtimeAdjustNone', 'No adjustments recorded this year.')) + '</p>';
+                return;
+            }
+            let html = '<ul class="user-overtime-adj-history__list">';
+            items.slice(0, 12).forEach((row) => {
+                const delta = Number(row.hours_delta || 0);
+                const dPrefix = delta > 0 ? '+' : '';
+                html += '<li><strong>' + Utils.escapeHtml(String(row.effective_on || '')) + '</strong>: '
+                    + Utils.escapeHtml(dPrefix + delta.toFixed(2)) + ' h'
+                    + ' <span class="form-help">(' + Utils.escapeHtml(String(row.reason_code || '')) + ')</span>'
+                    + (row.note ? ' — ' + Utils.escapeHtml(String(row.note)) : '')
+                    + '</li>';
+            });
+            html += '</ul>';
+            historyEl.innerHTML = html;
+        }
+
+        function refresh() {
+            Utils.ajax(buildApiUrl(base), {
+                method: 'GET',
+                onSuccess: function (resp) {
+                    if (resp && resp.success) {
+                        renderHistory(resp);
+                    }
+                },
+                onError: function () {
+                    balanceEl.textContent = auMsg('overtimeEffectiveBalanceError', 'Could not load current balance.');
+                },
+            });
+        }
+
+        applyBtn.addEventListener('click', async function () {
+            const hoursRaw = String(document.getElementById('user-overtime-adj-hours')?.value || '').trim();
+            const reason = String(document.getElementById('user-overtime-adj-reason')?.value || 'custom');
+            const note = String(document.getElementById('user-overtime-adj-note')?.value || '').trim();
+            if (!hoursRaw) {
+                Messaging.showError(auMsg('overtimeAdjustHoursRequired', 'Enter a hours delta (e.g. -10 or 5).'));
+                return;
+            }
+            applyBtn.disabled = true;
+            try {
+                const response = await Utils.ajax(buildApiUrl(base), {
+                    method: 'POST',
+                    data: { hoursDelta: hoursRaw, reasonCode: reason, note: note },
+                });
+                if (!response || response.success === false) {
+                    throw new Error((response && response.error) || auMsg('overtimeAdjustFailed', 'Failed to apply adjustment'));
+                }
+                Messaging.showSuccess(auMsg('overtimeAdjustApplied', 'Overtime adjustment recorded.'));
+                const hoursEl = document.getElementById('user-overtime-adj-hours');
+                if (hoursEl) {
+                    hoursEl.value = '';
+                }
+                refresh();
+            } catch (err) {
+                Messaging.showError((err && err.message) || auMsg('overtimeAdjustFailed', 'Failed to apply adjustment'));
+            } finally {
+                applyBtn.disabled = false;
+            }
+        });
+
+        resetBtn.addEventListener('click', async function () {
+            const confirmed = window.confirm(auMsg(
+                'overtimeAdjustResetConfirm',
+                'Reset this employee’s overtime Saldo to zero? Recorded working time is not changed. Continues only with an audited ledger entry.',
+            ));
+            if (!confirmed) {
+                return;
+            }
+            resetBtn.disabled = true;
+            try {
+                const response = await Utils.ajax(buildApiUrl(base + '/reset'), {
+                    method: 'POST',
+                    data: { note: 'Balance reset to zero (Nullung)' },
+                });
+                if (!response || response.success === false) {
+                    throw new Error((response && response.error) || auMsg('overtimeAdjustFailed', 'Failed to apply adjustment'));
+                }
+                if (response.action === 'skipped_zero') {
+                    Messaging.showSuccess(auMsg('overtimeAdjustAlreadyZero', 'Balance is already zero — nothing to do.'));
+                } else {
+                    Messaging.showSuccess(auMsg('overtimeAdjustResetDone', 'Overtime balance reset to zero.'));
+                }
+                refresh();
+            } catch (err) {
+                Messaging.showError((err && err.message) || auMsg('overtimeAdjustFailed', 'Failed to apply adjustment'));
+            } finally {
+                resetBtn.disabled = false;
+            }
+        });
+
+        refresh();
+    }
+
     function fetchTariffRuleSets() {
         return new Promise((resolve) => {
             Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/admin/tariff-rule-sets'), {
@@ -701,7 +823,7 @@
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('overtimeSettings', 'Overtime balance'))}</span>
                     </summary>
                     <div class="user-edit-section__body">
-                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideOvertime', 'Optional: set the overtime start date (Stichtag) and an opening balance for a calendar year.'))}</p>
+                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideOvertime', 'Optional: set the overtime start date (Stichtag) and an opening balance for a calendar year. Use adjustments below to book payouts or period Nullung without changing recorded working time.'))}</p>
                 <div class="form-group">
                     <label for="user-overtime-tracking-from" class="form-label">${Utils.escapeHtml(t('overtimeTrackingFrom', 'Overtime tracking from (Stichtag)'))}</label>
                     <input type="text" id="user-overtime-tracking-from" name="overtimeTrackingFrom" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${Utils.escapeHtml(overtimeTrackingVal)}" autocomplete="off" aria-describedby="user-overtime-tracking-from-help">
@@ -716,6 +838,40 @@
                     <label for="user-overtime-opening-year" class="form-label">${Utils.escapeHtml(t('overtimeOpeningBalanceYear', 'Year for opening balance'))}</label>
                     <input type="text" id="user-overtime-opening-year" name="overtimeOpeningBalanceYear" class="form-input" inputmode="numeric" pattern="\\d{4}" maxlength="4" autocomplete="off" value="${Utils.escapeHtml(overtimeOpeningYear)}" aria-describedby="user-overtime-opening-year-help">
                     <p id="user-overtime-opening-year-help" class="form-help">${Utils.escapeHtml(t('yearFourDigitsHelp', 'Enter a four-digit year (e.g. 2026).'))}</p>
+                </div>
+                <div class="azc-callout azc-callout--info user-overtime-adjust" id="user-overtime-adjust" role="region" aria-labelledby="user-overtime-adjust-title">
+                    <div class="azc-callout__body">
+                        <p class="azc-callout__title" id="user-overtime-adjust-title">${Utils.escapeHtml(t('overtimeAdjustTitle', 'Overtime Saldo'))}</p>
+                        <p class="form-help" id="user-overtime-effective-balance" aria-live="polite">${Utils.escapeHtml(t('overtimeEffectiveBalanceLoading', 'Loading current balance…'))}</p>
+                        <p class="form-help" id="user-overtime-adjust-help">${Utils.escapeHtml(t('overtimeAdjustHelpShort', 'One tap resets the hour Saldo to zero. Working time records stay unchanged.'))}</p>
+                        <div class="form-actions user-overtime-adjust__primary">
+                            <button type="button" class="azc-btn azc-btn--primary" id="btn-overtime-adj-reset">${Utils.escapeHtml(t('overtimeAdjustReset', 'Reset balance to zero'))}</button>
+                        </div>
+                        <details class="user-overtime-adjust__more">
+                            <summary class="user-overtime-adjust__more-summary">${Utils.escapeHtml(t('overtimeAdjustMore', 'Custom hours (advanced)'))}</summary>
+                            <div class="user-overtime-adjust__more-body">
+                                <div class="form-group">
+                                    <label for="user-overtime-adj-hours" class="form-label">${Utils.escapeHtml(t('overtimeAdjustHours', 'Hours delta'))}</label>
+                                    <input type="text" id="user-overtime-adj-hours" class="form-input" inputmode="decimal" autocomplete="off" aria-describedby="user-overtime-adjust-help" placeholder="-10">
+                                </div>
+                                <div class="form-group">
+                                    <label for="user-overtime-adj-reason" class="form-label">${Utils.escapeHtml(t('overtimeAdjustReason', 'Reason'))}</label>
+                                    <select id="user-overtime-adj-reason" class="form-select">
+                                        <option value="manual_payout">${Utils.escapeHtml(t('overtimeReasonManualPayout', 'Manual payout booking'))}</option>
+                                        <option value="period_nullung">${Utils.escapeHtml(t('overtimeReasonPeriodNullung', 'Period reset (plus → 0)'))}</option>
+                                        <option value="undertime_waiver">${Utils.escapeHtml(t('overtimeReasonUndertimeWaiver', 'Undertime waiver (minus → 0)'))}</option>
+                                        <option value="custom" selected>${Utils.escapeHtml(t('overtimeReasonCustom', 'Custom'))}</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="user-overtime-adj-note" class="form-label">${Utils.escapeHtml(t('overtimeAdjustNote', 'Note (optional)'))}</label>
+                                    <input type="text" id="user-overtime-adj-note" class="form-input" maxlength="500" autocomplete="off">
+                                </div>
+                                <button type="button" class="azc-btn azc-btn--secondary" id="btn-overtime-adj-apply">${Utils.escapeHtml(t('overtimeAdjustApply', 'Apply adjustment'))}</button>
+                            </div>
+                        </details>
+                        <div id="user-overtime-adj-history" class="user-overtime-adj-history" aria-live="polite"></div>
+                    </div>
                 </div>
                     </div>
                 </details>
@@ -838,6 +994,8 @@
                 });
             });
         }
+
+        bindOvertimeAdjustmentControls(user.userId);
 
         // Cross-border note: visible when holiday region country differs from the
         // effective labour-law country (instance default OR per-user override).

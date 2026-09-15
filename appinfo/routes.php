@@ -259,6 +259,9 @@ return [
 		['name' => 'admin#retireTariffRuleSet', 'url' => '/api/admin/tariff-rule-sets/{id}/retire', 'verb' => 'POST'],
 		['name' => 'admin#assignVacationPolicy', 'url' => '/api/admin/users/{userId}/vacation-policy', 'verb' => 'PUT'],
 		['name' => 'admin#updateUserOvertimeSettings', 'url' => '/api/admin/users/{userId}/overtime-settings', 'verb' => 'PUT'],
+		['name' => 'admin#listUserOvertimeAdjustments', 'url' => '/api/admin/users/{userId}/overtime-adjustments', 'verb' => 'GET'],
+		['name' => 'admin#createUserOvertimeAdjustment', 'url' => '/api/admin/users/{userId}/overtime-adjustments', 'verb' => 'POST'],
+		['name' => 'admin#resetUserOvertimeBalance', 'url' => '/api/admin/users/{userId}/overtime-adjustments/reset', 'verb' => 'POST'],
 		['name' => 'admin#updateUserTimeCaptureSettings', 'url' => '/api/admin/users/{userId}/time-capture-settings', 'verb' => 'PUT'],
 		['name' => 'admin#simulateVacationPolicy', 'url' => '/api/admin/vacation-policy/simulate', 'verb' => 'POST'],
 

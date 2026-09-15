@@ -61,6 +61,7 @@ final class UninstallDropTables implements IRepairStep
 		'at_month_closure',
 		'at_month_closure_revision',
 		'at_org_vacation_defaults',
+		'at_ot_adj',
 		'at_ot_payout',
 		'at_settings',
 		'at_tariff_rule_modules',

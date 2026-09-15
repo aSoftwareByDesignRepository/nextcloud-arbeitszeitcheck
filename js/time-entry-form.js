@@ -91,6 +91,7 @@ class TimeEntryFormManager {
 		this.setupFormValidation();
 		this.setupFormSubmission();
 		this.prefillDescriptionFromQuery();
+		this.prefillDateFromQuery();
 
 		// Initial summary; auto-breaks only when the user opted in (toggle on, not dismissed).
 		setTimeout(() => {
@@ -122,6 +123,36 @@ class TimeEntryFormManager {
 			}
 			this.descriptionTextarea.value = raw.slice(0, 500);
 			this.descriptionTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+		} catch (e) {
+			// Ignore malformed query strings — create form stays usable.
+		}
+	}
+
+	/**
+	 * Calendar day panel: ?date=YYYY-MM-DD or ?date=dd.mm.yyyy on create form only.
+	 */
+	prefillDateFromQuery() {
+		if (!this.dateInput || this.formConfig.mode === 'edit') {
+			return;
+		}
+		try {
+			const params = new URLSearchParams(window.location.search || '');
+			const raw = String(params.get('date') || params.get('start') || '').trim();
+			if (raw === '') {
+				return;
+			}
+			let display = '';
+			const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+			const de = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw);
+			if (iso) {
+				display = `${iso[3]}.${iso[2]}.${iso[1]}`;
+			} else if (de) {
+				display = raw;
+			} else {
+				return;
+			}
+			this.dateInput.value = display;
+			this.dateInput.dispatchEvent(new Event('change', { bubbles: true }));
 		} catch (e) {
 			// Ignore malformed query strings — create form stays usable.
 		}

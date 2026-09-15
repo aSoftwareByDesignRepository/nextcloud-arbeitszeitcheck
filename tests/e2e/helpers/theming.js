@@ -9,6 +9,27 @@ const nextcloudRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..
 export const USER_THEMES = ['light', 'dark', 'light-highcontrast', 'dark-highcontrast']
 
 /**
+ * Repair corrupted theming prefs (int `0` vs JSON `[]`) that make OCS theme
+ * enable/disable return HTTP 500 (TypeConflictException).
+ * @param {string} userId
+ */
+export function repairUserThemePrefs(userId) {
+	if (!userId) return
+	for (const app of ['theming', 'accessibility']) {
+		try {
+			occ(['user:setting', userId, app, 'enabled-themes', '--delete'])
+		} catch {
+			/* absent is fine */
+		}
+		try {
+			occ(['user:setting', userId, app, 'enabled-themes', '[]'])
+		} catch {
+			/* best-effort */
+		}
+	}
+}
+
+/**
  * Enable exactly one user theme through Nextcloud's OCS theming API, then
  * reload and wait for body[data-theme-*] to prove the switch landed.
  *
@@ -16,7 +37,7 @@ export const USER_THEMES = ['light', 'dark', 'light-highcontrast', 'dark-highcon
  * @param {string} themeId
  */
 export async function setUserTheme(page, themeId) {
-	const failures = await page.evaluate(async ({ target, all }) => {
+	const attempt = async () => page.evaluate(async ({ target, all }) => {
 		const token = (typeof window.OC !== 'undefined' && window.OC.requestToken)
 			|| document.querySelector('head[data-requesttoken]')?.getAttribute('data-requesttoken')
 			|| ''
@@ -38,6 +59,14 @@ export async function setUserTheme(page, themeId) {
 		}
 		return problems
 	}, { target: themeId, all: USER_THEMES })
+
+	let failures = await attempt()
+	if (failures.some((f) => /HTTP 500/.test(f))) {
+		const userId = await page.evaluate(() => window.OC?.currentUser || document.querySelector('head[data-user]')?.getAttribute('data-user') || '')
+		repairUserThemePrefs(userId)
+		await page.reload({ waitUntil: 'domcontentloaded' })
+		failures = await attempt()
+	}
 	if (failures.length > 0) {
 		throw new Error(`Theme switch to "${themeId}" failed: ${failures.join('; ')}`)
 	}

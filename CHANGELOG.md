@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.5 - 2026-09-15
+
+### Added
+- **Opt-in sick-leave planned-hours credit (Entgeltausfall / Ausfallprinzip):** Admin → Overtime settings. Default off so existing Saldo stays unchanged. When enabled, approved sick leave credits planned net hours (weekday schedule or duty roster, including planned Sat/Sun) into the overtime balance; free weekends stay 0. Dashboard and companion widget show year-to-date credited hours when present (#40).
+- **Audited overtime Saldo adjustments (Nullung):** Admin can credit/debit flextime hours or reset Saldo to zero without rewriting punches; ledger table `at_ot_adj`; displayBalance includes adjustments (#39).
+- **Hours at a glance:** Today / Week / Month / Year Ist vs Soll on the employee dashboard and companion widget (#37).
+- **Calendar day panel:** Primary “Add working time” (and secondary absence) from the day detail (#38).
+
+### Changed
+- Dashboard Bachus simplify: progressive Month/Year disclosure; clearer overtime formula copy; mobile-friendly policy checkbox touch targets (≥44px below 768px).
+
+### Fixed
+- Theme × viewport hardening for overtime settings and dashboard credit note (Light / Dark / High Contrast; no horizontal overflow).
+
 ## 1.7.3 - 2026-09-13
 
 ### Added

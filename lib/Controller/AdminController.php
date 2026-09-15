@@ -3167,6 +3167,12 @@ class AdminController extends Controller
 					$this->toBool($params['overtimeBlockMonthClosurePendingPayout']) ? '1' : '0'
 				);
 			}
+			if (array_key_exists('paidAbsencePlannedHoursCreditEnabled', $params)) {
+				$this->appConfig->setAppValueString(
+					Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT,
+					$this->toBool($params['paidAbsencePlannedHoursCreditEnabled']) ? '1' : '0'
+				);
+			}
 
 			$allowedKeys = [
 				'missingClockInRemindersEnabled' => 'missing_clock_in_reminders_enabled',
@@ -3643,6 +3649,10 @@ class AdminController extends Controller
 			'overtimePayoutNotifyInApp' => $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_IN_APP, '1') === '1',
 			'overtimePayoutNotifyEmail' => $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_EMAIL, '1') === '1',
 			'overtimeBlockMonthClosurePendingPayout' => $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_BLOCK_MONTH_CLOSURE_PENDING_PAYOUT, '0') === '1',
+			'paidAbsencePlannedHoursCreditEnabled' => $this->appConfig->getAppValueString(
+				Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT,
+				Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT_DEFAULT
+			) === '1',
 			'premiumSurchargesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '0') === '1',
 			'premiumPolicy' => $this->decodePremiumPolicyForAdmin(),
 			'premiumPolicyVersion' => (int)$this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_POLICY_VERSION, '0'),
@@ -5383,6 +5393,101 @@ class AdminController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('Failed to update overtime settings'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * List audited overtime balance adjustments (Nullung / manual payout ledger).
+	 */
+	#[NoAdminRequired]
+	public function listUserOvertimeAdjustments(string $userId): JSONResponse
+	{
+		try {
+			if ($this->userManager->get($userId) === null) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_NOT_FOUND);
+			}
+			$yearRaw = $this->request->getParam('year');
+			$year = $yearRaw !== null && $yearRaw !== '' ? (int)$yearRaw : null;
+			$limit = max(1, min(100, (int)($this->request->getParam('limit') ?? 50)));
+			$offset = max(0, (int)($this->request->getParam('offset') ?? 0));
+			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$data = $svc->listForUser($userId, $year, $limit, $offset);
+			return new JSONResponse(array_merge(['success' => true], $data));
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('listUserOvertimeAdjustments failed', ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Failed to load overtime adjustments'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Create an audited overtime balance adjustment. Does not change time entries.
+	 */
+	#[NoAdminRequired]
+	public function createUserOvertimeAdjustment(string $userId): JSONResponse
+	{
+		try {
+			if ($this->userManager->get($userId) === null) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_NOT_FOUND);
+			}
+			$params = $this->request->getParams();
+			$hoursRaw = str_replace(',', '.', trim((string)($params['hoursDelta'] ?? $params['hours_delta'] ?? '')));
+			if ($hoursRaw === '' || !is_numeric($hoursRaw)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Hours delta must be a number (use negative to reduce the balance).'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$reason = trim((string)($params['reasonCode'] ?? $params['reason_code'] ?? \OCA\ArbeitszeitCheck\Db\OvertimeAdjustment::REASON_CUSTOM));
+			$note = isset($params['note']) ? (string)$params['note'] : null;
+			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$result = $svc->createAdjustment(
+				$userId,
+				(float)$hoursRaw,
+				$reason,
+				$note,
+				$this->getPerformedBy()
+			);
+			return new JSONResponse(array_merge(['success' => true], $result), Http::STATUS_CREATED);
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('createUserOvertimeAdjustment failed', ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Failed to create overtime adjustment'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Zero the employee overtime Saldo via one compensating ledger row (Nullung).
+	 */
+	#[NoAdminRequired]
+	public function resetUserOvertimeBalance(string $userId): JSONResponse
+	{
+		try {
+			if ($this->userManager->get($userId) === null) {
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_NOT_FOUND);
+			}
+			$note = $this->request->getParam('note');
+			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$result = $svc->resetBalanceToZero(
+				$userId,
+				$this->getPerformedBy(),
+				is_string($note) ? $note : null
+			);
+			return new JSONResponse(array_merge(['success' => true], $result));
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('resetUserOvertimeBalance failed', ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Failed to reset overtime balance'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}

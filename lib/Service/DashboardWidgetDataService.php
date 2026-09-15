@@ -125,6 +125,8 @@ class DashboardWidgetDataService {
 		$projectCheckAvailable = $this->projectCheckIntegration->isProjectCheckAvailable();
 		$vacationDebitSnap = $this->vacationHoursDebitService->snapshotForUser($userId);
 
+		$hoursGlanceBundle = $this->buildHoursGlancePeriods($userId, $weekly);
+
 		$payload = [
 			'userId'                 => $userId,
 			'status'                 => (string)($status['status'] ?? 'clocked_out'),
@@ -145,6 +147,10 @@ class DashboardWidgetDataService {
 			'impliedDailyHours'      => (float)($weekly['implied_daily_hours'] ?? 0.0),
 			'cumulativeBalance'      => (float)($weekly['cumulative_balance'] ?? 0.0),
 			'displayBalance'         => $this->overtimeDisplayService->getYearToDateBalanceForTrafficLight($userId),
+			// Additive GH #40 — YTD planned-hours credit when Entgeltausfall opt-in is on.
+			'absenceCreditHoursYtd'  => (float)($hoursGlanceBundle['absence_credit_hours_ytd'] ?? 0.0),
+			// Additive GH #37 — old companions ignore; keys are stable for client l10n.
+			'hoursGlance'            => $hoursGlanceBundle['periods'],
 			'overtimeBankEnabled'    => $this->overtimeBankService->isEnabled(),
 			'trafficLightState'      => $this->overtimeDisplayService->buildTrafficLightViewModel($userId)['state'] ?? 'green',
 			'breakRequired'          => (bool)($breakStatus['break_required'] ?? false),
@@ -505,6 +511,64 @@ class DashboardWidgetDataService {
 			'sick' => count($sickUsers),
 			'other_absent' => count($otherUsers),
 			'total_absent' => count($totalAbsentUsers),
+		];
+	}
+
+	/**
+	 * Additive hours Ist/Soll glance for mobile/web companions (GH #37).
+	 * Stable keys: today|week|month|year — clients own labels.
+	 *
+	 * @param array<string, mixed> $weekly Already-fetched weekly overtime row (avoid double work).
+	 * @return array{
+	 *   periods: list<array{key: string, worked: float, target: float, delta: float, period: string}>,
+	 *   absence_credit_hours_ytd: float
+	 * }
+	 */
+	private function buildHoursGlancePeriods(string $userId, array $weekly): array
+	{
+		$safe = static function (callable $fn): array {
+			try {
+				$row = $fn();
+				return \is_array($row) ? $row : [];
+			} catch (\Throwable $e) {
+				return [];
+			}
+		};
+
+		$day = $safe(fn (): array => $this->overtimeService->getDailyOvertime($userId));
+		$month = $safe(fn (): array => $this->overtimeService->calculateMonthlyOvertime($userId));
+		$year = $safe(fn (): array => $this->overtimeService->calculateYearlyOvertime($userId));
+
+		$formatPeriod = static function (array $row): string {
+			$start = (string)($row['period_start'] ?? '');
+			$end = (string)($row['period_end'] ?? '');
+			if ($start !== '' && $end !== '' && $start !== $end) {
+				return $start . ' – ' . $end;
+			}
+			return $start !== '' ? $start : $end;
+		};
+
+		$pack = static function (string $key, array $row) use ($formatPeriod): array {
+			$worked = round((float)($row['total_hours_worked'] ?? 0), 2);
+			$target = round((float)($row['required_hours'] ?? 0), 2);
+			return [
+				'key' => $key,
+				'worked' => $worked,
+				'target' => $target,
+				'delta' => round($worked - $target, 2),
+				'period' => $formatPeriod($row),
+			];
+		};
+
+		return [
+			'periods' => [
+				$pack('today', $day),
+				$pack('week', $weekly),
+				$pack('month', $month),
+				$pack('year', $year),
+			],
+			// GH #40 — companions show note when opt-in credit > 0; old clients ignore key.
+			'absence_credit_hours_ytd' => round(max(0.0, (float)($year['absence_credit_hours'] ?? 0.0)), 2),
 		];
 	}
 }

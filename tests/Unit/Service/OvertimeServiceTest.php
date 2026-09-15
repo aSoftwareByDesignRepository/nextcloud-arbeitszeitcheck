@@ -670,4 +670,64 @@ class OvertimeServiceTest extends TestCase
 		$this->assertSame('weekly_contract', $result['required_hours_basis']);
 		$this->assertEqualsWithDelta(40.0, $result['required_hours'], 0.01);
 	}
+
+	/**
+	 * Opt-in credit service absent/null → absence_credit_hours is 0 (legacy-identical Saldo).
+	 */
+	public function testAbsenceCreditHoursZeroWhenCreditServiceMissing(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-01');
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(1.0);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$result = $this->service->calculateOvertime($userId, $startDate, $endDate, false);
+
+		$this->assertArrayHasKey('absence_credit_hours', $result);
+		$this->assertSame(0.0, $result['absence_credit_hours']);
+	}
+
+	/**
+	 * When credit service returns planned hours, overtime Ist includes them without inflating total_hours_worked.
+	 */
+	public function testPaidAbsenceCreditAddsToOvertimeWithoutInflatingWorkedHours(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2026-09-12');
+		$endDate = new \DateTime('2026-09-12');
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$credit = $this->createMock(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+		$credit->expects($this->once())
+			->method('creditHoursForRange')
+			->with($userId, $this->anything(), $this->anything(), [])
+			->willReturn(['hours' => 10.0, 'days_credited' => 1]);
+
+		$service = new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$this->holidayCalendarService,
+			$this->overtimeSettingsService,
+			null,
+			$credit,
+		);
+
+		$result = $service->calculateOvertime($userId, $startDate, $endDate, false);
+
+		$this->assertSame(0.0, $result['total_hours_worked']);
+		$this->assertEqualsWithDelta(10.0, $result['absence_credit_hours'], 0.001);
+		// Credit must feed Ist for Saldo even when clocked hours stay 0.
+		$this->assertEqualsWithDelta(
+			$result['absence_credit_hours'] - $result['required_hours'],
+			$result['overtime_hours'],
+			0.001
+		);
+	}
 }

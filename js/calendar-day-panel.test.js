@@ -145,4 +145,34 @@ describe('calendar day details panel', () => {
     expect(app.isDayDetailsPanelOpen()).toBe(false)
     expect(app.loadCalendarData).toHaveBeenCalled()
   })
+
+  it('offers working time and absence actions in the day panel', () => {
+    const app = globalThis.window.ArbeitszeitCheckApp
+    app.config.timeCapture = { manualTimeEntryEnabled: true, clockStampingEnabled: true }
+    app.config.apiUrl = {
+      absenceCreate: '/apps/arbeitszeitcheck/absences/create',
+      timeEntryCreate: '/apps/arbeitszeitcheck/time-entries/create',
+    }
+    app.config.l10n = {
+      ...(app.config.l10n || {}),
+      dayPanelShortHelp: 'Pick one: add hours or request absence for this day.',
+      addWorkingTimeThisDay: 'Add working time',
+    }
+    app.calendarData = {
+      timeEntries: [],
+      absences: [],
+      holidays: [],
+      currentDate: new Date('2026-05-01'),
+      currentView: 'month',
+    }
+    app.showDayDetails('2026-05-01', document.querySelector('.calendar-day[data-date="2026-05-01"]'))
+    const html = document.getElementById('day-details-content').innerHTML
+    expect(html).toContain('time-entries/create?date=2026-05-01')
+    expect(html).toContain('absences/create?')
+    expect(html).toContain('azc-btn--primary')
+    expect(html).toContain('azc-btn--secondary')
+    expect(html).toContain('Pick one:')
+    expect(html).not.toContain('Past dates are allowed for migration')
+    expect(html).toContain('day-details-actions__link--primary')
+  })
 })

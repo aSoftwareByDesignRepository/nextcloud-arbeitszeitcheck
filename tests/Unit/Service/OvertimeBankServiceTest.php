@@ -80,6 +80,38 @@ class OvertimeBankServiceTest extends TestCase
 		$this->assertSame(100.0, $status['banked_hours']);
 	}
 
+	public function testGetBankStatusAppliesAdjustmentsWhenBankDisabled(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_ENABLED, '0', '0'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_MAX_HOURS, (string)OvertimeBankService::DEFAULT_BANK_MAX_HOURS, '100'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_YELLOW_PERCENT, '80', '80'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_RED_PERCENT, '95', '95'],
+		]);
+
+		$overtime = $this->createMock(OvertimeService::class);
+		$overtime->method('calculateOvertime')->willReturn([
+			'cumulative_balance' => 12.0,
+		]);
+
+		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
+		$payoutMapper->method('sumHoursPaidForYearThroughMonth')->willReturn(5.0);
+
+		$adjMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class);
+		$adjMapper->method('sumHoursDeltaForYearThroughDate')->willReturn(-4.0);
+
+		$service = new OvertimeBankService($config, $overtime, $payoutMapper, $adjMapper);
+		$status = $service->getBankStatus('user1');
+
+		// Bank off → payouts ignored (legacy); adjustments still applied: 12 + (-4) = 8
+		$this->assertFalse($status['enabled']);
+		$this->assertSame(12.0, $status['raw_balance']);
+		$this->assertSame(5.0, $status['total_payouts_ytd']);
+		$this->assertSame(-4.0, $status['total_adjustments_ytd']);
+		$this->assertSame(8.0, $status['effective_balance']);
+	}
+
 	private function makeService(bool $enabled, float $maxHours): OvertimeBankService
 	{
 		$config = $this->createMock(IConfig::class);

@@ -768,6 +768,16 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   margin-top: var(--space-2, 0.5rem);
   margin-bottom: 0;
   line-height: var(--arbeitszeitcheck-line-height-relaxed, 1.6);
+  /* Long DE admin / Entgeltausfall help must wrap on narrow viewports — no clip. */
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+/* Dashboard YTD sick-leave credit note (tokenized muted help). */
+#app-content.azc-app--dashboard .dashboard-overtime-card__absence-credit {
+  margin-top: var(--azc-space-2, 0.5rem);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* .form-help follows .form-help--error in the cascade and would mute error text on tinted surfaces. */

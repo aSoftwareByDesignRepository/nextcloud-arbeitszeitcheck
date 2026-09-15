@@ -382,6 +382,44 @@
 	width: 100%;
 }
 
+/*
+ * Mobile (<768): policy checkbox rows need ≥44×44 touch (WCAG 2.5.5).
+ * Desktop (≥768) keeps compact flex-start row — no visual regression.
+ */
+#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox,
+#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox,
+#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox {
+	min-height: var(--azc-touch, 44px);
+	align-items: center;
+	width: 100%;
+	box-sizing: border-box;
+	padding-block: var(--azc-space-1, 0.25rem);
+}
+
+#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox input[type="checkbox"],
+#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox input[type="checkbox"],
+#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox input[type="checkbox"] {
+	margin-block-start: 0;
+}
+
+@media (min-width: 768px) {
+	/* Tablet/desktop: restore compact checkbox alignment (pre-GH#40 parity). */
+	#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox,
+	#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox,
+	#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox {
+		min-height: unset;
+		align-items: flex-start;
+		width: auto;
+		padding-block: 0;
+	}
+
+	#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox input[type="checkbox"],
+	#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox input[type="checkbox"],
+	#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox input[type="checkbox"] {
+		margin-block-start: 0.2rem;
+	}
+}
+
 /* ── Overtime quick links ───────────────────────────────────── */
 #app-content.azc-app--admin-notifications .admin-overtime-quicklinks,
 #app-content.azc-app--admin-overtime-settings .admin-overtime-quicklinks,

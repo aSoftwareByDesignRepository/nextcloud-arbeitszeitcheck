@@ -170,6 +170,13 @@ class DashboardWidgetDataServiceTest extends TestCase {
 		$this->assertSame('org_hours_per_day', $data['vacationDebitBasis']);
 		$this->assertSame(8.0, $data['vacationOneDayHours']);
 		$this->assertSame(8.0, $data['vacationAverageDailyHours']);
+		$this->assertArrayHasKey('hoursGlance', $data);
+		$this->assertIsArray($data['hoursGlance']);
+		$this->assertCount(4, $data['hoursGlance']);
+		$this->assertSame(['today', 'week', 'month', 'year'], array_column($data['hoursGlance'], 'key'));
+		$this->assertSame(2.5, $data['displayBalance']);
+		$this->assertArrayHasKey('absenceCreditHoursYtd', $data);
+		$this->assertSame(0.0, $data['absenceCreditHoursYtd']);
 	}
 
 	public function testEmployeeWidgetDataIncludesAssignableProjectCheckProjects(): void {

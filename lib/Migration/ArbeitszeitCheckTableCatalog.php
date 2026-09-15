@@ -43,6 +43,7 @@ final class ArbeitszeitCheckTableCatalog
 		'at_month_closure_revision',
 		'at_org_vacation_defaults',
 		'at_ot_payout',
+		'at_ot_adj',
 		'at_settings',
 		'at_tariff_rule_modules',
 		'at_tariff_rule_sets',

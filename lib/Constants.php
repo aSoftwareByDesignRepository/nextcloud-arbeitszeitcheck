@@ -520,6 +520,17 @@ final class Constants
 	public const CONFIG_DUTY_ROTATION_SOLL_DEFAULT = '0';
 
 	/**
+	 * When "1", approved sick leave credits planned net hours into overtime Ist
+	 * (Entgeltausfall / Ausfallprinzip). Default off — legacy Saldo unchanged until admin enables.
+	 *
+	 * @see \OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService
+	 */
+	public const CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT = 'paid_absence_planned_hours_credit';
+
+	/** Default for {@see CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT}. */
+	public const CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT_DEFAULT = '0';
+
+	/**
 	 * Compliance score weights (critical, warning, info).
 	 */
 	public const COMPLIANCE_SCORE_CRITICAL_WEIGHT = 25;

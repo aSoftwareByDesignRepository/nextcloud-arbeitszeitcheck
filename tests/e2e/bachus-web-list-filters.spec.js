@@ -143,3 +143,66 @@ test.describe('Bachus: manager time-entries + absences filters', () => {
 		await expect(emptyOrTable.first()).toBeVisible();
 	});
 });
+
+test.describe('Bachus: manager reports date-range filters', () => {
+	test.beforeEach(async ({ page }) => {
+		await loginAs(page, 'MANAGER');
+	});
+
+	/**
+	 * Reports datepickers are readonly (calendar widget). Drive values via the DOM
+	 * so each range is toggled honestly without depending on the picker UI.
+	 * @param {import('@playwright/test').Locator} locator
+	 * @param {string} value
+	 */
+	async function setDatepickerValue(locator, value) {
+		await locator.evaluate((el, v) => {
+			el.removeAttribute('readonly');
+			el.value = v;
+			el.dispatchEvent(new Event('input', { bubbles: true }));
+			el.dispatchEvent(new Event('change', { bubbles: true }));
+		}, value);
+		await expect(locator).toHaveValue(value);
+	}
+
+	test('J-RF-01: reports #start-date/#end-date toggled + invalid/empty stay honest', async ({ page }) => {
+		test.setTimeout(90_000);
+		await gotoApp(page, '/apps/arbeitszeitcheck/reports');
+		await assertArbeitszeitcheckLoaded(page);
+
+		const monthly = page.locator('.report-type-card.btn-select-report[data-report="monthly"]').first();
+		await expect(monthly).toBeVisible({ timeout: 30000 });
+		await monthly.click();
+
+		const params = page.locator('#report-parameters');
+		await expect(params).toBeVisible();
+		const start = page.locator('#start-date');
+		const end = page.locator('#end-date');
+		await expect(start).toBeVisible();
+		await expect(end).toBeVisible();
+
+		// Toggle each range value (bachus-style concrete fills — not API-only query params).
+		await setDatepickerValue(start, '01.01.2024');
+		await setDatepickerValue(end, '31.01.2024');
+
+		await setDatepickerValue(start, '01.06.2026');
+		await setDatepickerValue(end, '30.06.2026');
+
+		// Inverted range → plain language alert, no fake report KPI chrome.
+		await setDatepickerValue(start, '15.06.2026');
+		await setDatepickerValue(end, '01.06.2026');
+		await page.locator('#btn-preview-report').click();
+		const invertedAlert = page.locator('#report-preview-content .report-error[role="alert"]');
+		await expect(invertedAlert).toBeVisible({ timeout: 15000 });
+		await expect(invertedAlert).toContainText(/before or equal|früher|gleich|Start/i);
+
+		// Cleared dates → params-required alert (honest empty, not fabricated rows).
+		await setDatepickerValue(start, '');
+		await setDatepickerValue(end, '');
+		await page.locator('#btn-preview-report').click();
+		const emptyAlert = page.locator('#report-preview-content .report-error[role="alert"]');
+		await expect(emptyAlert).toBeVisible({ timeout: 15000 });
+		await expect(emptyAlert).toContainText(/fill in|start date|end date|ausfüllen|Startdatum|Enddatum/i);
+		await expect(page.locator('#report-preview-content table')).toHaveCount(0);
+	});
+});

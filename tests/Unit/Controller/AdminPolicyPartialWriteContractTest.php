@@ -47,6 +47,7 @@ class AdminPolicyPartialWriteContractTest extends TestCase
 		$this->assertStringContainsString("match (\$policyScope)", $src);
 		// Premium / DATEV / vacation keys remain opt-in via isset / array_key_exists.
 		$this->assertStringContainsString("array_key_exists('premiumPolicy', \$params)", $src);
+		$this->assertStringContainsString("array_key_exists('paidAbsencePlannedHoursCreditEnabled', \$params)", $src);
 		$this->assertStringContainsString('if (!isset($params[$paramKey]))', $src);
 		$this->assertStringContainsString('Pre-validate carryover max', $src);
 	}
@@ -60,10 +61,12 @@ class AdminPolicyPartialWriteContractTest extends TestCase
 		$this->assertStringContainsString("const hasTraffic = !!form.querySelector('#overtimeTrafficLightEnabled')", $js);
 		$this->assertStringContainsString("const hasBank = !!form.querySelector('#overtimeBankEnabled')", $js);
 		$this->assertStringContainsString("const hasPremium = !!form.querySelector('#premiumSurchargesEnabled')", $js);
+		$this->assertStringContainsString("const hasPaidAbsenceCredit = !!form.querySelector('#paidAbsencePlannedHoursCreditEnabled')", $js);
 		$this->assertStringContainsString("const hasVacation = !!form.querySelector('input[name=\"vacationYearMode\"]')", $js);
 		$this->assertStringContainsString('form.admin-policy-settings-form', $js);
 		$this->assertStringContainsString('if (hasHr) {', $js);
 		$this->assertStringContainsString('if (hasBank) {', $js);
+		$this->assertStringContainsString('if (hasPaidAbsenceCredit) {', $js);
 		$this->assertStringContainsString('if (hasPremium) {', $js);
 		$this->assertStringContainsString('if (hasVacation) {', $js);
 		$this->assertStringContainsString('payload.hrNotificationsEnabled = enabled', $js);

@@ -72,6 +72,9 @@ test.describe('Admin policy settings IA', () => {
 		await assertArbeitszeitcheckLoaded(page)
 		await expect(page.locator('#admin-overtime-settings-form')).toBeVisible()
 		await expect(page.locator('#overtime-bank-heading')).toBeVisible()
+		await expect(page.locator('#paid-absence-credit-heading')).toBeVisible()
+		await expect(page.locator('#paidAbsencePlannedHoursCreditEnabled')).toBeVisible()
+		await expect(page.locator('#paidAbsencePlannedHoursCreditEnabled-help')).toBeVisible()
 		await expect(page.locator('#premium-surcharges-heading')).toBeVisible()
 
 		const enable = page.locator('#premiumSurchargesEnabled')

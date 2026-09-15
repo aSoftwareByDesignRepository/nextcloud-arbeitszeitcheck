@@ -17,6 +17,11 @@ use OCA\ArbeitszeitCheck\Service\IconCatalog;
 
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
 $currentMonth = $_['currentMonth'] ?? date('Y-m');
+$timeCapture = is_array($_['timeCapture'] ?? null) ? $_['timeCapture'] : [
+	'clockStampingEnabled' => true,
+	'manualTimeEntryEnabled' => true,
+];
+$timeEntryCreateUrl = (string)($_['timeEntryCreateUrl'] ?? $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.create'));
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -180,6 +185,10 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
     window.ArbeitszeitCheck.l10n.pastRecord = <?php echo json_encode($l->t('Past record'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.requestAbsenceThisDay = <?php echo json_encode($l->t('Request absence for this day'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.requestAbsenceThisDayHelp = <?php echo json_encode($l->t('Request absence (opens form with this day prefilled). Past dates are allowed for migration.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.addWorkingTimeThisDay = <?php echo json_encode($l->t('Add working time'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.addWorkingTimeThisDayHelp = <?php echo json_encode($l->t('Opens the time entry form with this day prefilled. Breaks and compliance checks stay the same as under Time entries.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.dayPanelShortHelp = <?php echo json_encode($l->t('Pick one: add hours or request absence for this day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.dayPanelActions = <?php echo json_encode($l->t('Add working time or absence'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.historicalAbsenceLegend = <?php echo json_encode($l->t('Historical absence (already ended)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.statusPending = <?php echo json_encode($l->t('Pending'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.statusApproved = <?php echo json_encode($l->t('Approved'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
@@ -205,8 +214,13 @@ $currentMonth = $_['currentMonth'] ?? date('Y-m');
         calendar: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         absences: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         holidays: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.holiday.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        absenceCreate: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.create'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        absenceCreate: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.create'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        timeEntryCreate: <?php echo json_encode($timeEntryCreateUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };
+    window.ArbeitszeitCheck.timeCapture = <?php echo json_encode([
+        'clockStampingEnabled' => !empty($timeCapture['clockStampingEnabled']),
+        'manualTimeEntryEnabled' => !empty($timeCapture['manualTimeEntryEnabled']),
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 </div><!-- /.azc-page-stack -->
 <?php include __DIR__ . '/common/page-end.php'; ?>

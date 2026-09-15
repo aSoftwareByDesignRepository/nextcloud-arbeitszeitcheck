@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Sjukfrånvaro och planerade timmar",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Valfri Entgeltausfall \/ Ausfallprinzip för flextidssaldot. Av som standard så befintliga saldon förblir oförändrade.",
+		"Credit planned hours for approved sick leave" : "Tillgodoräkna planerade timmar vid godkänd sjukfrånvaro",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "När det är aktiverat tillgodoräknas godkänd sjukfrånvaro dagens planerade nettotimmar i övertidssaldot (veckoschema eller turlista, inklusive planerad lör\/sön). Fria helger förblir 0. Aktivering räknar om det live-saldot för tidigare sjukdagar i öppna perioder — stäm av mot Betriebsvereinbarung eller Tarifvertrag. Obetald ledighet tillgodoräknas aldrig. Semester och andra frånvarotyper ingår ännu inte.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Inkluderar %s h tillgodoräknade från godkänd sjukfrånvaro (planerade timmar)."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

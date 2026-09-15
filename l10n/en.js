@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Sick leave and planned hours",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged.",
+		"Credit planned hours for approved sick leave" : "Credit planned hours for approved sick leave",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Includes %s h credited from approved sick leave (planned hours)."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimePayout;
 use OCA\ArbeitszeitCheck\Db\OvertimePayoutMapper;
 use OCP\IConfig;
@@ -31,6 +32,7 @@ class OvertimeBankService
 		private readonly IConfig $config,
 		private readonly OvertimeService $overtimeService,
 		private readonly OvertimePayoutMapper $payoutMapper,
+		private readonly ?OvertimeAdjustmentMapper $adjustmentMapper = null,
 	) {
 	}
 
@@ -72,6 +74,7 @@ class OvertimeBankService
 	 *   bank_max_hours: float,
 	 *   raw_balance: float,
 	 *   total_payouts_ytd: float,
+	 *   total_adjustments_ytd: float,
 	 *   effective_balance: float,
 	 *   banked_hours: float,
 	 *   bank_room_hours: float,
@@ -101,7 +104,12 @@ class OvertimeBankService
 			$year,
 			(int)$asOfDt->format('n')
 		);
-		$effectiveBalance = round($rawBalance - $totalPayoutsYtd, 2);
+		// Legacy-safe: when the bank feature is off, payouts are not applied to the
+		// displayed Saldo (same as pre-adjustment behaviour). Adjustments always apply
+		// so admin Nullung works with or without the bank.
+		$payoutsApplied = $enabled ? $totalPayoutsYtd : 0.0;
+		$totalAdjustmentsYtd = $this->sumAdjustmentsThrough($userId, $year, $asOfDt);
+		$effectiveBalance = round($rawBalance - $payoutsApplied + $totalAdjustmentsYtd, 2);
 
 		$bankedHours = 0.0;
 		$bankRoom = $bankMax;
@@ -132,6 +140,7 @@ class OvertimeBankService
 			'bank_max_hours' => $bankMax,
 			'raw_balance' => round($rawBalance, 2),
 			'total_payouts_ytd' => $totalPayoutsYtd,
+			'total_adjustments_ytd' => $totalAdjustmentsYtd,
 			'effective_balance' => $effectiveBalance,
 			'banked_hours' => round($bankedHours, 2),
 			'bank_room_hours' => round($bankRoom, 2),
@@ -167,7 +176,8 @@ class OvertimeBankService
 		$rawBalance = (float)($rawData['cumulative_balance'] ?? 0.0);
 
 		$payoutsBefore = $this->payoutMapper->sumHoursPaidForYear($userId, $year, $month);
-		$effectiveBalance = round($rawBalance - $payoutsBefore, 2);
+		$adjustments = $this->sumAdjustmentsThrough($userId, $year, $lastDay);
+		$effectiveBalance = round($rawBalance - $payoutsBefore + $adjustments, 2);
 		$payoutEligible = max(0.0, round($effectiveBalance - $bankMax, 2));
 
 		return [
@@ -176,7 +186,25 @@ class OvertimeBankService
 			'payout_eligible_hours' => $payoutEligible,
 			'bank_max_hours' => $bankMax,
 			'total_payouts_before_month' => $payoutsBefore,
+			'total_adjustments_ytd' => $adjustments,
 		];
+	}
+
+	private function sumAdjustmentsThrough(string $userId, int $year, \DateTimeInterface $through): float
+	{
+		if ($this->adjustmentMapper === null) {
+			return 0.0;
+		}
+		try {
+			return $this->adjustmentMapper->sumHoursDeltaForYearThroughDate($userId, $year, $through);
+		} catch (\Throwable $e) {
+			// Table may not exist yet during upgrade — keep Saldo readable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Overtime adjustments sum failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return 0.0;
+		}
 	}
 
 	/**

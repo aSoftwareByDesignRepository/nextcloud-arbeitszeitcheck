@@ -52,6 +52,7 @@ final class UpgradeBackupCatalog
 		'at_month_closure',
 		'at_month_closure_revision',
 		'at_org_vacation_defaults',
+		'at_ot_adj',
 		'at_ot_payout',
 		'at_settings',
 		'at_tariff_rule_modules',
@@ -68,8 +69,8 @@ final class UpgradeBackupCatalog
 		'at_violations',
 		'azc_license_state',
 		'azc_mobile_seat',
-		'azc_terminal_device',
 		'azc_outlook_ical_tokens',
+		'azc_terminal_device',
 	];
 
 	/** @var list<string> */
@@ -90,6 +91,7 @@ final class UpgradeBackupCatalog
 		'at_month_closure',
 		'at_month_closure_revision',
 		'at_org_vacation_defaults',
+		'at_ot_adj',
 		'at_ot_payout',
 		'at_settings',
 		'at_tariff_rule_modules',
@@ -106,8 +108,8 @@ final class UpgradeBackupCatalog
 		'at_violations',
 		'azc_license_state',
 		'azc_mobile_seat',
-		'azc_terminal_device',
 		'azc_outlook_ical_tokens',
+		'azc_terminal_device',
 	];
 
 	public static function isBackupTable(string $table): bool

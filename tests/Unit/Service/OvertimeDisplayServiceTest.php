@@ -30,13 +30,17 @@ class OvertimeDisplayServiceTest extends TestCase
 		$this->assertSame(42.5, $service->getYearToDateBalanceForTrafficLight('user1'));
 	}
 
-	public function testUsesCumulativeBalanceWhenBankDisabled(): void
+	public function testUsesBankEffectiveBalanceWhenBankDisabledIncludingAdjustments(): void
 	{
 		$bank = $this->createMock(OvertimeBankService::class);
-		$bank->method('getBankStatus')->willReturn(['enabled' => false]);
+		$bank->method('getBankStatus')->willReturn([
+			'enabled' => false,
+			'effective_balance' => 7.25,
+			'total_adjustments_ytd' => -2.0,
+		]);
 
 		$overtime = $this->createMock(OvertimeService::class);
-		$overtime->method('calculateOvertime')->willReturn(['cumulative_balance' => 7.25]);
+		$overtime->expects($this->never())->method('calculateOvertime');
 
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturn('0');

@@ -208,6 +208,7 @@ class PageController extends Controller
 				'bank_max_hours' => 100.0,
 				'raw_balance' => 0.0,
 				'total_payouts_ytd' => 0.0,
+				'total_adjustments_ytd' => 0.0,
 				'effective_balance' => 0.0,
 				'banked_hours' => 0.0,
 				'bank_room_hours' => 100.0,
@@ -344,6 +345,23 @@ class PageController extends Controller
 			} catch (\Throwable $e) {
 				$weekOvertime = [];
 			}
+			try {
+				$dayOvertime = $this->overtimeService->getDailyOvertime($userId);
+			} catch (\Throwable $e) {
+				$dayOvertime = [];
+			}
+			try {
+				$monthOvertime = $this->overtimeService->calculateMonthlyOvertime($userId);
+			} catch (\Throwable $e) {
+				$monthOvertime = [];
+			}
+			try {
+				$yearOvertime = $this->overtimeService->calculateYearlyOvertime($userId);
+			} catch (\Throwable $e) {
+				$yearOvertime = [];
+			}
+			$hoursGlance = $this->buildHoursGlancePeriods($dayOvertime, $weekOvertime, $monthOvertime, $yearOvertime);
+			$absenceCreditHoursYtd = round((float)($yearOvertime['absence_credit_hours'] ?? 0), 2);
 			$overtimeExtras = $this->loadDashboardOvertimeExtras($userId);
 			try {
 				$overtimeYtdBalance = $this->overtimeDisplayService->getYearToDateBalanceForTrafficLight($userId);
@@ -403,7 +421,9 @@ class PageController extends Controller
 				'status' => $status,
 				'overtime' => $overtimeData,
 				'weekOvertime' => $weekOvertime,
+				'hoursGlance' => $hoursGlance,
 				'overtimeYtdBalance' => $overtimeYtdBalance,
+				'absenceCreditHoursYtd' => $absenceCreditHoursYtd,
 				'overtimeBalancePdfUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.overtimeBalancePdf'),
 				'overtimeBank' => $overtimeExtras['overtimeBank'],
 				'overtimeTrafficLight' => $overtimeExtras['overtimeTrafficLight'],
@@ -456,7 +476,9 @@ class PageController extends Controller
 				'status' => [],
 				'overtime' => [],
 				'weekOvertime' => [],
+				'hoursGlance' => [],
 				'overtimeYtdBalance' => 0.0,
+				'absenceCreditHoursYtd' => 0.0,
 				'overtimeBank' => ['enabled' => false, 'bank_max_hours' => 100.0, 'banked_hours' => 0.0, 'bank_fill_percent' => 0.0, 'payout_eligible_hours' => 0.0, 'effective_balance' => 0.0, 'bank_state' => 'disabled'],
 				'overtimeTrafficLight' => ['enabled' => false, 'state' => 'green', 'direction' => null, 'level' => null, 'balance' => 0.0],
 				'overtimePayoutHistory' => ['items' => [], 'total' => 0],
@@ -839,6 +861,7 @@ class PageController extends Controller
 			$timeEntryCount = $this->timeEntryMapper->countByUser($userId);
 			$absenceCount = $this->absenceMapper->countByUser($userId);
 			$navFlags = $this->getNavigationFlags($userId);
+			$timeCapture = $this->timeCaptureMethodService->getSettings($userId);
 
 			$params = $this->buildShellParams(
 				'calendar',
@@ -847,6 +870,8 @@ class PageController extends Controller
 				$navFlags,
 			) + [
 				'currentMonth' => $currentMonth,
+				'timeCapture' => $timeCapture,
+				'timeEntryCreateUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.create'),
 				'stats' => [
 					'total_time_entries' => $timeEntryCount,
 					'total_absences' => $absenceCount,
@@ -1168,5 +1193,53 @@ class PageController extends Controller
 
 			return false;
 		}
+	}
+
+	/**
+	 * Ist/Soll period tiles for “Hours at a glance” (does not replace year Saldo).
+	 *
+	 * @param array<string, mixed> $day
+	 * @param array<string, mixed> $week
+	 * @param array<string, mixed> $month
+	 * @param array<string, mixed> $year
+	 * @return list<array{
+	 *   key: string,
+	 *   label: string,
+	 *   period: string,
+	 *   worked: float,
+	 *   target: float,
+	 *   delta: float
+	 * }>
+	 */
+	private function buildHoursGlancePeriods(array $day, array $week, array $month, array $year): array
+	{
+		$formatPeriod = static function (array $row): string {
+			$start = (string)($row['period_start'] ?? '');
+			$end = (string)($row['period_end'] ?? '');
+			if ($start !== '' && $end !== '' && $start !== $end) {
+				return $start . ' – ' . $end;
+			}
+			return $start !== '' ? $start : $end;
+		};
+
+		$pack = static function (string $key, string $label, array $row) use ($formatPeriod): array {
+			$worked = round((float)($row['total_hours_worked'] ?? 0), 2);
+			$target = round((float)($row['required_hours'] ?? 0), 2);
+			return [
+				'key' => $key,
+				'label' => $label,
+				'period' => $formatPeriod($row),
+				'worked' => $worked,
+				'target' => $target,
+				'delta' => round($worked - $target, 2),
+			];
+		};
+
+		return [
+			$pack('today', $this->l10n->t('Today'), $day),
+			$pack('week', $this->l10n->t('This week'), $week),
+			$pack('month', $this->l10n->t('This month'), $month),
+			$pack('year', $this->l10n->t('This year'), $year),
+		];
 	}
 }

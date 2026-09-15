@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Zwolnienie chorobowe i zaplanowane godziny",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Opcjonalne Entgeltausfall \/ Ausfallprinzip dla salda godzin. Domyślnie wyłączone, aby istniejące salda pozostały bez zmian.",
+		"Credit planned hours for approved sick leave" : "Zaliczać zaplanowane godziny przy zatwierdzonym L4",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "Po włączeniu zatwierdzone L4 zalicza zaplanowane godziny netto danego dnia do salda nadgodzin (harmonogram tygodniowy lub grafiki, w tym zaplanowana sobota\/niedziela). Wolne weekendy zostają 0. Włączenie przelicza saldo na żywo dla wcześniejszych dni chorobowych w otwartych okresach — potwierdź zgodność z Betriebsvereinbarung lub Tarifvertrag. Urlop bezpłatny nigdy nie jest zaliczany. Urlop i inne typy absencji nie są jeszcze objęte.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Uwzględnia %s h zaliczonych z zatwierdzonego L4 (zaplanowane godziny)."
 		},
 		"nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 	);

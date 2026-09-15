@@ -30,6 +30,7 @@ class OvertimeService
 	private HolidayService $holidayCalendarService;
 	private UserOvertimeSettingsService $overtimeSettingsService;
 	private ?DutyRotationSollProvider $dutyRotationSollProvider;
+	private ?PaidAbsencePlannedHoursCreditService $paidAbsenceCreditService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -39,6 +40,7 @@ class OvertimeService
 		HolidayService $holidayCalendarService,
 		UserOvertimeSettingsService $overtimeSettingsService,
 		?DutyRotationSollProvider $dutyRotationSollProvider = null,
+		?PaidAbsencePlannedHoursCreditService $paidAbsenceCreditService = null,
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->workingTimeModelMapper = $workingTimeModelMapper;
@@ -47,6 +49,7 @@ class OvertimeService
 		$this->holidayCalendarService = $holidayCalendarService;
 		$this->overtimeSettingsService = $overtimeSettingsService;
 		$this->dutyRotationSollProvider = $dutyRotationSollProvider;
+		$this->paidAbsenceCreditService = $paidAbsenceCreditService;
 	}
 
 	/**
@@ -114,6 +117,7 @@ class OvertimeService
 				'period_start' => $periodStart->format('Y-m-d'),
 				'period_end' => $endDate->format('Y-m-d'),
 				'total_hours_worked' => 0.0,
+				'absence_credit_hours' => 0.0,
 				'required_hours' => 0.0,
 				'overtime_hours' => 0.0,
 				'cumulative_balance_before' => round($balanceBefore, 2),
@@ -134,9 +138,35 @@ class OvertimeService
 		$timeEntries = $this->timeEntryMapper->findByUserAndDateRange($userId, $periodStart, $endDate);
 
 		$totalHoursWorked = 0.0;
+		/** @var array<string, float> $workedByDay */
+		$workedByDay = [];
 		foreach ($timeEntries as $entry) {
 			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && $entry->getEndTime() !== null) {
-				$totalHoursWorked += $entry->getWorkingDurationHours();
+				$hours = (float)$entry->getWorkingDurationHours();
+				$totalHoursWorked += $hours;
+				$start = $entry->getStartTime();
+				if ($start !== null) {
+					$key = $start->format('Y-m-d');
+					$workedByDay[$key] = ($workedByDay[$key] ?? 0.0) + $hours;
+				}
+			}
+		}
+
+		$absenceCreditHours = 0.0;
+		if ($this->paidAbsenceCreditService !== null) {
+			try {
+				$credit = $this->paidAbsenceCreditService->creditHoursForRange(
+					$userId,
+					$periodStart,
+					$endDate,
+					$workedByDay,
+				);
+				$absenceCreditHours = max(0.0, (float)($credit['hours'] ?? 0.0));
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->error(
+					'Paid absence planned-hours credit failed: ' . $e->getMessage()
+				);
+				$absenceCreditHours = 0.0;
 			}
 		}
 
@@ -170,7 +200,9 @@ class OvertimeService
 				}
 			}
 		}
-		$overtimeHours = $totalHoursWorked - $requiredHours;
+		// Ist for Saldo = clocked hours + optional paid-absence planned-hours credit.
+		// total_hours_worked stays clocked-only so reports do not invent worked time.
+		$overtimeHours = ($totalHoursWorked + $absenceCreditHours) - $requiredHours;
 
 		$carryInDelta = 0.0;
 		if ($calculateCumulative) {
@@ -192,6 +224,7 @@ class OvertimeService
 			'period_start' => $startDate->format('Y-m-d'),
 			'period_end' => $endDate->format('Y-m-d'),
 			'total_hours_worked' => round($totalHoursWorked, 2),
+			'absence_credit_hours' => round($absenceCreditHours, 2),
 			'required_hours' => round($requiredHours, 2),
 			'overtime_hours' => round($overtimeHours, 2),
 			'cumulative_balance_before' => round($balanceBefore, 2),

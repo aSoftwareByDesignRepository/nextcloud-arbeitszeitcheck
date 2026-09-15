@@ -47,6 +47,7 @@ use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
+use OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
@@ -811,6 +812,17 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(PaidAbsencePlannedHoursCreditService::class, function ($c) {
+			return new PaidAbsencePlannedHoursCreditService(
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+				$c->query(HolidayService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class),
+			);
+		});
+
 		$context->registerService(OvertimeService::class, function($c) {
 			return new OvertimeService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
@@ -820,6 +832,7 @@ class Application extends App implements IBootstrap {
 				$c->query(HolidayService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class),
+				$c->query(PaidAbsencePlannedHoursCreditService::class),
 			);
 		});
 
@@ -850,11 +863,27 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper(
+				$c->query(IDBConnection::class)
+			);
+		});
+
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Service\OvertimeBankService(
 				$c->query(\OCP\IConfig::class),
 				$c->query(OvertimeService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\OvertimePayoutMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService(
+				$c->query(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCP\IUserManager::class),
 			);
 		});
 

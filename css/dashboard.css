@@ -500,23 +500,105 @@
     color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
+#app-content.azc-app--dashboard .azc-dashboard-metric__value--ratio {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metric__ratio-sep {
+    margin: 0 0.2rem;
+    font-weight: 500;
+    color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metrics-more {
+    margin-top: var(--azc-space-4, 1rem);
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary {
+    cursor: pointer;
+    min-height: var(--azc-touch, 44px);
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+    color: var(--azc-text, var(--color-main-text));
+    list-style: none;
+    border-radius: var(--azc-radius-sm, 6px);
+    padding-inline: var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary::-webkit-details-marker {
+    display: none;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary:focus-visible {
+    outline: 3px solid var(--color-primary-element);
+    outline-offset: 2px;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metrics-more[open] .azc-dashboard-metrics--more {
+    margin-top: var(--azc-space-3, 0.75rem);
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-manual-cta .azc-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--azc-space-3, 0.75rem);
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-manual-cta__btn {
+    min-height: var(--azc-touch-lg, 48px);
+    font-size: var(--azc-fs-md, 1rem);
+    font-weight: 700;
+    justify-content: center;
+    width: 100%;
+    max-width: 22rem;
+}
+
+/* <768px: manual CTA spans content column — no side-by-side squeeze */
+@media (max-width: 767px) {
+    #app-content.azc-app--dashboard .azc-dashboard-manual-cta__btn {
+        max-width: none;
+    }
+}
+
+@media (forced-colors: active) {
+    #app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary:focus-visible,
+    #app-content.azc-app--dashboard .azc-dashboard-manual-cta__btn:focus-visible {
+        outline: 3px solid CanvasText;
+        outline-offset: 2px;
+    }
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-metric__delta {
+    font-size: var(--azc-fs-sm, 0.875rem);
+    font-weight: 600;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+    color: var(--azc-text, var(--color-main-text));
+}
+
 #app-content.azc-app--dashboard .azc-dashboard-metric__value--positive,
 #app-content.azc-app--dashboard .azc-dashboard-metric__value--negative {
     color: var(--azc-text, var(--color-main-text));
 }
 
-#app-content.azc-app--dashboard .azc-dashboard-metric__value--positive {
+#app-content.azc-app--dashboard .azc-dashboard-metric__value--positive,
+#app-content.azc-app--dashboard .azc-dashboard-metric__delta.azc-dashboard-metric__value--positive {
     background: var(--azc-tint-success);
     border: 1px solid color-mix(in srgb, var(--color-success) 45%, var(--color-border));
     border-radius: var(--azc-radius-sm, 6px);
     padding: 0.1rem 0.45rem;
+    align-self: flex-start;
 }
 
-#app-content.azc-app--dashboard .azc-dashboard-metric__value--negative {
+#app-content.azc-app--dashboard .azc-dashboard-metric__value--negative,
+#app-content.azc-app--dashboard .azc-dashboard-metric__delta.azc-dashboard-metric__value--negative {
     background: var(--azc-tint-danger);
     border: 1px solid color-mix(in srgb, var(--color-error) 50%, var(--color-border));
     border-radius: var(--azc-radius-sm, 6px);
     padding: 0.1rem 0.45rem;
+    align-self: flex-start;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-overtime.azc-card,

@@ -91,3 +91,30 @@ declare(strict_types=1);
 					</div>
                     </div>
 				</section>
+
+				<section class="azc-card azc-admin-policy-section admin-settings-section" aria-labelledby="paid-absence-credit-heading">
+					<header class="azc-card__header">
+						<div class="azc-card__header-text">
+							<h2 id="paid-absence-credit-heading" class="azc-card__title"><?php p($l->t('Sick leave and planned hours')); ?></h2>
+							<p class="azc-card__lead"><?php p($l->t('Optional Entgeltausfall / Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged.')); ?></p>
+						</div>
+					</header>
+					<div class="azc-card__body">
+						<div class="form-group">
+							<div class="form-checkbox">
+								<input type="checkbox"
+									id="paidAbsencePlannedHoursCreditEnabled"
+									name="paidAbsencePlannedHoursCreditEnabled"
+									value="1"
+									<?php echo ($settings['paidAbsencePlannedHoursCreditEnabled'] ?? false) ? 'checked' : ''; ?>
+									aria-describedby="paidAbsencePlannedHoursCreditEnabled-help">
+								<label for="paidAbsencePlannedHoursCreditEnabled" class="form-label">
+									<?php p($l->t('Credit planned hours for approved sick leave')); ?>
+								</label>
+							</div>
+							<p id="paidAbsencePlannedHoursCreditEnabled-help" class="form-help">
+								<?php p($l->t('When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet.')); ?>
+							</p>
+						</div>
+					</div>
+				</section>

@@ -3460,19 +3460,32 @@
 
             let html = '';
 
-            const createBase = (this.config.apiUrl && this.config.apiUrl.absenceCreate)
+            const createAbsBase = (this.config.apiUrl && this.config.apiUrl.absenceCreate)
                 || this.resolveRequestUrl('/apps/arbeitszeitcheck/absences/create');
-            const createUrl = createBase + (createBase.indexOf('?') >= 0 ? '&' : '?')
+            const createAbsUrl = createAbsBase + (createAbsBase.indexOf('?') >= 0 ? '&' : '?')
                 + 'start=' + encodeURIComponent(dateKey) + '&end=' + encodeURIComponent(dateKey);
+            const timeEntryCreateBase = (this.config.apiUrl && this.config.apiUrl.timeEntryCreate)
+                || this.resolveRequestUrl('/apps/arbeitszeitcheck/time-entries/create');
+            const createTimeUrl = timeEntryCreateBase + (timeEntryCreateBase.indexOf('?') >= 0 ? '&' : '?')
+                + 'date=' + encodeURIComponent(dateKey);
+            const manualEnabled = this.config.timeCapture?.manualTimeEntryEnabled !== false
+                && this.config.timeCapture?.manualTimeEntryEnabled !== 0;
             const reqAbsLabelPlain = this.config.l10n?.requestAbsenceThisDay || mainT('Request absence for this day');
-            const reqAbsHelpPlain = this.config.l10n?.requestAbsenceThisDayHelp || mainT('Request absence (opens form with this day prefilled). Past dates are allowed for migration.');
-            const reqAbsLabel = escapeHtml(reqAbsLabelPlain);
-            const reqAbsHelp = escapeHtml(reqAbsHelpPlain);
-            const reqAbsAria = escapeHtml(reqAbsLabelPlain);
-            html += `<div class="day-details-actions" role="region" aria-label="${reqAbsAria}">`;
-            html += `<p class="day-details-actions__help" id="day-details-absence-help">${reqAbsHelp}</p>`;
-            html += `<a class="azc-btn azc-btn--primary day-details-actions__link" href="${escapeHtml(createUrl)}">${reqAbsLabel}</a>`;
-            html += '</div>';
+            const addTimeLabelPlain = this.config.l10n?.addWorkingTimeThisDay || mainT('Add working time');
+            const actionsAria = this.config.l10n?.dayPanelActions || mainT('Add working time or absence');
+            const shortHelp = manualEnabled
+                ? (this.config.l10n?.dayPanelShortHelp || mainT('Pick one: add hours or request absence for this day.'))
+                : (this.config.l10n?.requestAbsenceThisDayHelp || mainT('Request absence for this day.'));
+            html += `<div class="day-details-actions" role="region" aria-label="${escapeHtml(actionsAria)}">`;
+            html += `<p class="day-details-actions__help" id="day-details-actions-help">${escapeHtml(shortHelp)}</p>`;
+            html += `<div class="day-details-actions__buttons">`;
+            if (manualEnabled) {
+                html += `<a class="azc-btn azc-btn--primary day-details-actions__link day-details-actions__link--primary" href="${escapeHtml(createTimeUrl)}">${escapeHtml(addTimeLabelPlain)}</a>`;
+                html += `<a class="azc-btn azc-btn--secondary day-details-actions__link" href="${escapeHtml(createAbsUrl)}">${escapeHtml(reqAbsLabelPlain)}</a>`;
+            } else {
+                html += `<a class="azc-btn azc-btn--primary day-details-actions__link day-details-actions__link--primary" href="${escapeHtml(createAbsUrl)}">${escapeHtml(reqAbsLabelPlain)}</a>`;
+            }
+            html += `</div></div>`;
 
             // Holiday info
             const holidays = Array.isArray(this.calendarData.holidays) ? this.calendarData.holidays : [];
@@ -3519,7 +3532,7 @@
                         entryHtml += `)</li>`;
                         html += entryHtml;
                     });
-                    html += '</ul></div>';
+                    html += `</ul></div>`;
                 }
 
                 if (dayData.absences.length > 0) {
@@ -3535,7 +3548,7 @@
                         html += `<li><span class="day-details-absence-label">${escapeHtml(displayLabel)}</span>`
                             + ` <span class="badge badge--${badgeClass}">${escapeHtml(statusLabel)}</span>${pastBadge}</li>`;
                     });
-                    html += '</ul></div>';
+                    html += `</ul></div>`;
                 }
             }
 

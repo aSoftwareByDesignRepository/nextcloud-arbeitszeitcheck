@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minutenauswahl bei manueller Zeiterfassung und Korrekturen. Standard ist jede Minute. Wählen Sie 5\/10\/15, wenn die Lohnabrechnung auf diese Schritte rundet.",
 		"Sunday work permitted" : "Sonntagsarbeit erlaubt",
 		"Time picker minute step" : "Minutenschritt der Zeitauswahl",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "Wenn aktiviert, erzeugen Sonntagseinträge für Personen mit diesem Modell keine Sonntagsarbeits-Warnungen. Feiertagsprüfungen bleiben aktiv."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "Wenn aktiviert, erzeugen Sonntagseinträge für Personen mit diesem Modell keine Sonntagsarbeits-Warnungen. Feiertagsprüfungen bleiben aktiv.",
+		"Sick leave and planned hours" : "Krankheit und geplante Stunden",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Optionaler Entgeltausfall \/ Ausfallprinzip für das Arbeitszeitkonto. Standardmäßig aus, damit bestehende Salden unverändert bleiben.",
+		"Credit planned hours for approved sick leave" : "Geplante Stunden bei genehmigter Krankmeldung gutschreiben",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "Wenn aktiviert, werden bei genehmigter Krankmeldung die geplanten Netto-Stunden des Tages dem Überstunden-Saldo gutgeschrieben (Wochentagsplan oder Dienstplan, inklusive geplanter Samstags-\/Sonntagsschichten). Freie Wochenenden bleiben bei 0. Beim Einschalten wird der Live-Saldo für frühere Krankheitstage in offenen Perioden neu berechnet — bitte mit Betriebsvereinbarung oder Tarifvertrag abstimmen. Unbezahlter Urlaub wird nie gutgeschrieben. Urlaub und andere Abwesenheitstypen sind noch nicht enthalten.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Enthält %s h Gutschrift aus genehmigter Krankmeldung (geplante Stunden)."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

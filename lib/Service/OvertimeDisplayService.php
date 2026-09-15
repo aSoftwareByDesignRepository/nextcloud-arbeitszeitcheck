@@ -19,21 +19,15 @@ class OvertimeDisplayService
 
 	/**
 	 * Balance used for balance traffic-light thresholds (YTD).
-	 * When the bank is enabled, uses effective balance after recorded payouts.
+	 * Always uses OvertimeBankService effective Saldo: raw work delta, minus
+	 * bank payouts when the bank is on, plus audited adjustments (Nullung).
+	 * With no payouts and no adjustments this matches legacy cumulative YTD.
 	 */
 	public function getYearToDateBalanceForTrafficLight(string $userId): float
 	{
 		$bank = $this->bankService->getBankStatus($userId);
-		if ($bank['enabled']) {
-			return (float)$bank['effective_balance'];
-		}
 
-		$yearStart = new \DateTime(date('Y-01-01 00:00:00'));
-		$now = new \DateTime();
-		$now->setTime(23, 59, 59);
-		$data = $this->overtimeService->calculateOvertime($userId, $yearStart, $now);
-
-		return (float)($data['cumulative_balance'] ?? 0.0);
+		return (float)($bank['effective_balance'] ?? 0.0);
 	}
 
 	/**

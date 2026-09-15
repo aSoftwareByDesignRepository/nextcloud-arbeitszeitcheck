@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Baja por enfermedad y horas planificadas",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Entgeltausfall \/ Ausfallprinzip opcional para el saldo de horas. Desactivado por defecto para no cambiar saldos existentes.",
+		"Credit planned hours for approved sick leave" : "Acreditar horas planificadas en bajas por enfermedad aprobadas",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "Si está activado, la baja por enfermedad aprobada acredita las horas netas planificadas del día en el saldo de horas extra (horario semanal o turno, incluidos sábados\/domingos planificados). Los fines de semana libres quedan en 0. Al activarlo se recalcula el saldo en vivo de días de baja en periodos abiertos — confirme que encaja con su Betriebsvereinbarung o Tarifvertrag. El permiso no remunerado nunca se acredita. Vacaciones y otros tipos de ausencia aún no están incluidos.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Incluye %s h acreditadas de baja por enfermedad aprobada (horas planificadas)."
 		}
 	);
 	});

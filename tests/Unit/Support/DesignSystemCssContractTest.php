@@ -371,4 +371,55 @@ final class DesignSystemCssContractTest extends TestCase
 			'Calendar day grid must use minmax(0,1fr) to avoid 7-column overflow on 320px',
 		);
 	}
+
+	public function testBachusSimplifySurfacesUseThemeTokensAndFocusRings(): void
+	{
+		$dashboard = (string) file_get_contents($this->appRoot . '/css/dashboard.css');
+		$calendar = (string) file_get_contents($this->appRoot . '/css/calendar.css');
+		$adminUsers = (string) file_get_contents($this->appRoot . '/css/admin-users.css');
+		$mobileNav = (string) file_get_contents($this->appRoot . '/css/common/mobile-nav.css');
+
+		foreach (['dashboard' => $dashboard, 'calendar' => $calendar, 'admin-users' => $adminUsers, 'mobile-nav' => $mobileNav] as $label => $css) {
+			self::assertDoesNotMatchRegularExpression(
+				'/#[0-9a-fA-F]{3,8}\b/',
+				preg_replace('/\/\*.*?\*\//s', '', $css) ?? $css,
+				"{$label}.css must not ship raw hex outside comments",
+			);
+		}
+
+		self::assertMatchesRegularExpression(
+			'/\.azc-dashboard-metrics-more__summary:focus-visible[^{]*\{[^}]*outline:\s*3px solid var\(--color-primary-element\)/s',
+			$dashboard,
+		);
+		self::assertMatchesRegularExpression(
+			'/\.azc-dashboard-manual-cta__btn[^{]*\{[^}]*min-height:\s*var\(--azc-touch-lg/s',
+			$dashboard,
+		);
+		self::assertMatchesRegularExpression(
+			'/\.day-details-actions[^{]*\{[^}]*border:\s*1px solid var\(--azc-border/s',
+			$calendar,
+		);
+		self::assertMatchesRegularExpression(
+			'/\.calendar-day:focus-visible[^{]*\{[^}]*outline:\s*3px solid var\(--color-primary-element\)/s',
+			$calendar,
+		);
+		self::assertDoesNotMatchRegularExpression(
+			'/\.calendar-day:focus-visible[^{]*\{[^}]*outline:[^;]*var\(--color-primary\)(?!-element)/s',
+			$calendar,
+			'Calendar focus must use --color-primary-element (AA-adjusted), not raw --color-primary',
+		);
+		self::assertMatchesRegularExpression(
+			'/\.view-toggle \.btn\.active[^{]*\{[^}]*background:\s*var\(--color-primary-element\)/s',
+			$calendar,
+		);
+		self::assertMatchesRegularExpression(
+			'/\.user-overtime-adjust__more-summary:focus-visible[^{]*\{[^}]*outline:\s*3px solid var\(--color-primary-element\)/s',
+			$adminUsers,
+		);
+		self::assertStringContainsString('@media (forced-colors: active)', $adminUsers);
+		self::assertMatchesRegularExpression(
+			'/\.azc-nav-toggle:focus-visible[^{]*\{[^}]*outline:\s*3px solid var\(--color-primary-element\)/s',
+			$mobileNav,
+		);
+	}
 }

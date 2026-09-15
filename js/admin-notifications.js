@@ -438,6 +438,7 @@
 		const hasTraffic = !!form.querySelector('#overtimeTrafficLightEnabled');
 		const hasBank = !!form.querySelector('#overtimeBankEnabled');
 		const hasPremium = !!form.querySelector('#premiumSurchargesEnabled');
+		const hasPaidAbsenceCredit = !!form.querySelector('#paidAbsencePlannedHoursCreditEnabled');
 		const hasVacation = !!form.querySelector('input[name="vacationYearMode"]');
 		const hasReminders = !!form.querySelector('#missingClockInRemindersEnabled');
 		const hasCalendarEmail = !!form.querySelector('#sendIcalApprovedAbsences');
@@ -581,6 +582,10 @@
 				payload.overtimePayoutNotifyInApp = domChecked('#overtimePayoutNotifyInApp');
 				payload.overtimePayoutNotifyEmail = domChecked('#overtimePayoutNotifyEmail');
 				payload.overtimeBlockMonthClosurePendingPayout = domChecked('#overtimeBlockMonthClosurePendingPayout');
+			}
+
+			if (hasPaidAbsenceCredit) {
+				payload.paidAbsencePlannedHoursCreditEnabled = domChecked('#paidAbsencePlannedHoursCreditEnabled');
 			}
 
 			if (hasReminders) {

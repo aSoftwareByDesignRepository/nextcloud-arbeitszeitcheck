@@ -863,3 +863,71 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
     justify-content: center;
   }
 }
+
+/* Overtime Nullung — one primary CTA; advanced under details */
+.user-overtime-adjust__primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--azc-space-3, 0.75rem);
+  margin: var(--azc-space-3, 0.75rem) 0;
+}
+
+.user-overtime-adjust__primary .azc-btn {
+  min-height: var(--azc-touch-lg, 48px);
+  font-weight: 700;
+}
+
+.user-overtime-adjust__more {
+  margin-top: var(--azc-space-3, 0.75rem);
+}
+
+.user-overtime-adjust__more-summary {
+  cursor: pointer;
+  min-height: var(--azc-touch, 44px);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--azc-text, var(--color-main-text));
+  border-radius: var(--azc-radius-sm, 6px);
+  padding-inline: var(--azc-space-2, 0.5rem);
+  list-style: none;
+}
+
+.user-overtime-adjust__more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.user-overtime-adjust__more-summary:focus-visible {
+  outline: 3px solid var(--color-primary-element);
+  outline-offset: 2px;
+}
+
+.user-overtime-adjust__more-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--azc-space-3, 0.75rem);
+  margin-top: var(--azc-space-3, 0.75rem);
+}
+
+.user-overtime-adjust__more-body .form-input,
+.user-overtime-adjust__more-body .form-select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ≤768px: reset CTA full width for thumb reach */
+@media (max-width: 768px) {
+  .user-overtime-adjust__primary .azc-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (forced-colors: active) {
+  .user-overtime-adjust__more-summary:focus-visible,
+  .user-overtime-adjust__primary .azc-btn:focus-visible {
+    outline: 3px solid CanvasText;
+    outline-offset: 2px;
+  }
+}

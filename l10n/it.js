@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Malattia e ore pianificate",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Entgeltausfall \/ Ausfallprinzip opzionale per il saldo ore. Disattivato di default così i saldi esistenti restano invariati.",
+		"Credit planned hours for approved sick leave" : "Accreditare le ore pianificate per malattia approvata",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "Se attivo, la malattia approvata accredita le ore nette pianificate del giorno nel saldo straordinari (orario settimanale o turno, inclusi sabato\/domenica pianificati). I weekend liberi restano a 0. L’attivazione ricalcola il saldo live dei giorni di malattia nei periodi aperti — verificate la conformità a Betriebsvereinbarung o Tarifvertrag. Il permesso non retribuito non viene mai accreditato. Ferie e altri tipi di assenza non sono ancora inclusi.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Include %s h accreditate da malattia approvata (ore pianificate)."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

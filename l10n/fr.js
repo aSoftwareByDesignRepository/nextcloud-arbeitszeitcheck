@@ -4983,7 +4983,12 @@
 		"Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps." : "Minute choices in manual time entry and corrections. Default is every minute. Choose 5\/10\/15 if your payroll rounds to those steps.",
 		"Sunday work permitted" : "Sunday work permitted",
 		"Time picker minute step" : "Time picker minute step",
-		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active."
+		"When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active." : "When enabled, Sunday entries for people on this model do not create Sunday-work compliance warnings. Public-holiday checks stay active.",
+		"Sick leave and planned hours" : "Arrêt maladie et heures planifiées",
+		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Entgeltausfall \/ Ausfallprinzip optionnel pour le solde d’heures. Désactivé par défaut afin de ne pas modifier les soldes existants.",
+		"Credit planned hours for approved sick leave" : "Créditer les heures planifiées pour les arrêts maladie approuvés",
+		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet." : "Si activé, un arrêt maladie approuvé crédite les heures nettes planifiées du jour dans le solde d’heures supplémentaires (planning hebdomadaire ou vacation, y compris samedi\/dimanche planifiés). Les week-ends libres restent à 0. L’activation recalcule le solde live des jours de maladie des périodes ouvertes — vérifiez la cohérence avec votre Betriebsvereinbarung ou Tarifvertrag. Le congé non payé n’est jamais crédité. Congés et autres absences ne sont pas encore inclus.",
+		"Includes %s h credited from approved sick leave (planned hours)." : "Inclut %s h créditées au titre d’arrêts maladie approuvés (heures planifiées)."
 		}
 	);
 	});

@@ -1,58 +1,58 @@
 {
-    "name": "arbeitszeitcheck",
-    "version": "1.6.14",
-    "description": "DACH labour-law compliant time tracking (ArbZG / AZG / ArG) for Nextcloud",
-    "type": "module",
-    "scripts": {
-        "lint": "eslint js/",
-        "lint:fix": "eslint js/ --fix",
-        "stylelint": "stylelint 'css/**/*.css'",
-        "stylelint:fix": "stylelint 'css/**/*.css' --fix",
-        "test": "vitest run",
-        "test:php:docker": "bash ../../docker/run-app-phpunit.sh arbeitszeitcheck",
-        "test:watch": "vitest",
-        "e2e": "playwright test",
-        "e2e:ui": "playwright test --ui",
-        "check:l10n": "php scripts/check-l10n-placeholders.php",
-        "build": "echo \"No build step\" && exit 0",
-        "test:a11y": "playwright test tests/e2e/a11y-smoke.spec.js"
-    },
-    "keywords": [
-        "nextcloud",
-        "time-tracking",
-        "arbeitszeit",
-        "dach",
-        "german-law",
-        "arbzg",
-        "azg",
-        "arg",
-        "austria",
-        "switzerland",
-        "gdpr"
-    ],
-    "author": "Alexander Mäule <info@software-by-design.de> (http://nextcloud.software-by-design.de)",
-    "license": "AGPL-3.0-or-later",
-    "devDependencies": {
-        "@nextcloud/eslint-config": "^8.3.0",
-        "@nextcloud/stylelint-config": "^3.0.1",
-        "@axe-core/playwright": "^4.10.2",
-        "@playwright/test": "^1.55.0",
-        "eslint": "^8.57.1",
-        "eslint-plugin-arbeitszeitcheck": "file:scripts/eslint/eslint-plugin-arbeitszeitcheck",
-        "jsdom": "^26.0.0",
-        "vitest": "^3.2.4",
-        "stylelint": "^17.1.1"
-    },
-    "dependencies": {
-        "@nextcloud/axios": "^2.5.0",
-        "@nextcloud/l10n": "^3.1.0",
-        "date-fns": "^2.30.0"
-    },
-    "browserslist": [
-        "extends @nextcloud/browserslist-config"
-    ],
-    "engines": {
-        "node": "^20.0.0 || ^22.0.0",
-        "npm": "^10.0.0"
-    }
+  "name": "arbeitszeitcheck",
+  "version": "1.7.6",
+  "description": "DACH labour-law compliant time tracking (ArbZG / AZG / ArG) for Nextcloud",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint js/",
+    "lint:fix": "eslint js/ --fix",
+    "stylelint": "stylelint 'css/**/*.css'",
+    "stylelint:fix": "stylelint 'css/**/*.css' --fix",
+    "test": "vitest run",
+    "test:php:docker": "bash ../../docker/run-app-phpunit.sh arbeitszeitcheck",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "check:l10n": "php scripts/check-l10n-placeholders.php",
+    "build": "echo \"No build step\" && exit 0",
+    "test:a11y": "playwright test tests/e2e/a11y-smoke.spec.js"
+  },
+  "keywords": [
+    "nextcloud",
+    "time-tracking",
+    "arbeitszeit",
+    "dach",
+    "german-law",
+    "arbzg",
+    "azg",
+    "arg",
+    "austria",
+    "switzerland",
+    "gdpr"
+  ],
+  "author": "Alexander M\u00e4ule <info@software-by-design.de> (http://nextcloud.software-by-design.de)",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@nextcloud/eslint-config": "^8.3.0",
+    "@nextcloud/stylelint-config": "^3.0.1",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.55.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-arbeitszeitcheck": "file:scripts/eslint/eslint-plugin-arbeitszeitcheck",
+    "jsdom": "^26.0.0",
+    "vitest": "^3.2.4",
+    "stylelint": "^17.1.1"
+  },
+  "dependencies": {
+    "@nextcloud/axios": "^2.5.0",
+    "@nextcloud/l10n": "^3.1.0",
+    "date-fns": "^2.30.0"
+  },
+  "browserslist": [
+    "extends @nextcloud/browserslist-config"
+  ],
+  "engines": {
+    "node": "^20.0.0 || ^22.0.0",
+    "npm": "^10.0.0"
+  }
 }

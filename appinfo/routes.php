@@ -203,6 +203,7 @@ return [
 		['name' => 'kiosk#users', 'url' => '/api/kiosk/users', 'verb' => 'GET'],
 		['name' => 'kiosk#identify', 'url' => '/api/kiosk/identify', 'verb' => 'POST'],
 		['name' => 'kiosk#action', 'url' => '/api/kiosk/action', 'verb' => 'POST'],
+		['name' => 'kiosk#stamp', 'url' => '/api/kiosk/stamp', 'verb' => 'POST'],
 		['name' => 'kiosk#heartbeat', 'url' => '/api/kiosk/heartbeat', 'verb' => 'POST'],
 		['name' => 'kiosk#enrollScan', 'url' => '/api/kiosk/enroll-scan', 'verb' => 'POST'],
 		['name' => 'admin#notifications', 'url' => '/admin/notifications', 'verb' => 'GET'],

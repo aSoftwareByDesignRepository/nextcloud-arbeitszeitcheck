@@ -273,7 +273,13 @@
 
 .calendar-day-hours {
 	font-size: 0.75rem;
-	color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
+	/* Mix primary into main text so hours stay brand-tinted and WCAG AA on dark themes
+	   (raw --color-primary alone can be ~2.7:1 on --color-main-background). */
+	color: color-mix(
+		in srgb,
+		var(--color-primary-element, var(--arbeitszeitcheck-color-primary, var(--color-primary))) 40%,
+		var(--arbeitszeitcheck-color-main-text, var(--color-main-text, var(--arbeitszeitcheck-color-text)))
+	);
 	font-weight: 500;
 	margin-top: auto;
 }

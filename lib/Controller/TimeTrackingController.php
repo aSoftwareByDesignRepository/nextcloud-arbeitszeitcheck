@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
+use OCA\ArbeitszeitCheck\Exception\StampReplayException;
+use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException;
@@ -34,6 +36,7 @@ use OCP\Lock\LockedException;
 class TimeTrackingController extends Controller
 {
 	private TimeTrackingService $timeTrackingService;
+	private MobileStampReplayService $stampReplayService;
 	private IUserSession $userSession;
 	private IL10N $l10n;
 
@@ -41,11 +44,13 @@ class TimeTrackingController extends Controller
 		string $appName,
 		IRequest $request,
 		TimeTrackingService $timeTrackingService,
+		MobileStampReplayService $stampReplayService,
 		IUserSession $userSession,
 		IL10N $l10n
 	) {
 		parent::__construct($appName, $request);
 		$this->timeTrackingService = $timeTrackingService;
+		$this->stampReplayService = $stampReplayService;
 		$this->userSession = $userSession;
 		$this->l10n = $l10n;
 	}
@@ -135,23 +140,26 @@ class TimeTrackingController extends Controller
 	#[NoCSRFRequired]
 	#[BruteForceProtection(action: 'arbeitszeitcheck_clock')]
 	#[UserRateLimit(limit: 20, period: 60)]
-	public function clockIn(?string $projectCheckProjectId = null, ?string $description = null): JSONResponse
-	{
+	public function clockIn(
+		?string $projectCheckProjectId = null,
+		?string $description = null,
+		?string $clientRequestId = null,
+		?string $client_request_id = null,
+		?string $occurredAt = null,
+		?string $occurred_at = null,
+	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
-			$timeEntry = $this->timeTrackingService->clockIn($userId, $projectCheckProjectId, $description);
-
-			try {
-				$summary = $timeEntry->getSummary();
-			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary in clockIn: ' . $e->getMessage(), ["exception" => $e]);
-				$summary = ['id' => $timeEntry->getId(), 'userId' => $userId, 'status' => $timeEntry->getStatus()];
-			}
-
-			return new JSONResponse([
-				'success' => true,
-				'timeEntry' => $summary
-			]);
+			$payload = $this->stampReplayService->clockIn(
+				$userId,
+				$projectCheckProjectId,
+				$description,
+				$clientRequestId ?? $client_request_id,
+				$occurredAt ?? $occurred_at,
+			);
+			return new JSONResponse($payload);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (MonthFinalizedException $e) {
 			return $this->monthFinalizedResponse();
 		} catch (\Throwable $e) {
@@ -167,23 +175,22 @@ class TimeTrackingController extends Controller
 	#[NoCSRFRequired]
 	#[BruteForceProtection(action: 'arbeitszeitcheck_clock')]
 	#[UserRateLimit(limit: 20, period: 60)]
-	public function clockOut(): JSONResponse
-	{
+	public function clockOut(
+		?string $clientRequestId = null,
+		?string $client_request_id = null,
+		?string $occurredAt = null,
+		?string $occurred_at = null,
+	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
-			$timeEntry = $this->timeTrackingService->clockOut($userId);
-
-			try {
-				$summary = $timeEntry->getSummary();
-			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary in clockOut: ' . $e->getMessage(), ["exception" => $e]);
-				$summary = ['id' => $timeEntry->getId(), 'userId' => $userId, 'status' => $timeEntry->getStatus()];
-			}
-
-			return new JSONResponse([
-				'success' => true,
-				'timeEntry' => $summary
-			]);
+			$payload = $this->stampReplayService->clockOut(
+				$userId,
+				$clientRequestId ?? $client_request_id,
+				$occurredAt ?? $occurred_at,
+			);
+			return new JSONResponse($payload);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (MonthFinalizedException $e) {
 			return $this->monthFinalizedResponse();
 		} catch (\Throwable $e) {
@@ -263,23 +270,22 @@ class TimeTrackingController extends Controller
 	#[NoCSRFRequired]
 	#[BruteForceProtection(action: 'arbeitszeitcheck_clock')]
 	#[UserRateLimit(limit: 20, period: 60)]
-	public function startBreak(): JSONResponse
-	{
+	public function startBreak(
+		?string $clientRequestId = null,
+		?string $client_request_id = null,
+		?string $occurredAt = null,
+		?string $occurred_at = null,
+	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
-			$timeEntry = $this->timeTrackingService->startBreak($userId);
-
-			try {
-				$summary = $timeEntry->getSummary();
-			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary in startBreak: ' . $e->getMessage(), ["exception" => $e]);
-				$summary = ['id' => $timeEntry->getId(), 'userId' => $userId, 'status' => $timeEntry->getStatus()];
-			}
-
-			return new JSONResponse([
-				'success' => true,
-				'timeEntry' => $summary
-			]);
+			$payload = $this->stampReplayService->startBreak(
+				$userId,
+				$clientRequestId ?? $client_request_id,
+				$occurredAt ?? $occurred_at,
+			);
+			return new JSONResponse($payload);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (MonthFinalizedException $e) {
 			return $this->monthFinalizedResponse();
 		} catch (\Throwable $e) {
@@ -295,29 +301,50 @@ class TimeTrackingController extends Controller
 	#[NoCSRFRequired]
 	#[BruteForceProtection(action: 'arbeitszeitcheck_clock')]
 	#[UserRateLimit(limit: 20, period: 60)]
-	public function endBreak(): JSONResponse
-	{
+	public function endBreak(
+		?string $clientRequestId = null,
+		?string $client_request_id = null,
+		?string $occurredAt = null,
+		?string $occurred_at = null,
+	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
-			$timeEntry = $this->timeTrackingService->endBreak($userId);
-
-			try {
-				$summary = $timeEntry->getSummary();
-			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary in endBreak: ' . $e->getMessage(), ["exception" => $e]);
-				$summary = ['id' => $timeEntry->getId(), 'userId' => $userId, 'status' => $timeEntry->getStatus()];
-			}
-
-			return new JSONResponse([
-				'success' => true,
-				'timeEntry' => $summary
-			]);
+			$payload = $this->stampReplayService->endBreak(
+				$userId,
+				$clientRequestId ?? $client_request_id,
+				$occurredAt ?? $occurred_at,
+			);
+			return new JSONResponse($payload);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (MonthFinalizedException $e) {
 			return $this->monthFinalizedResponse();
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeTrackingController: ' . $e->getMessage(), ["exception" => $e]);
 			return $this->buildSafeErrorResponse($e);
 		}
+	}
+
+	private function stampReplayErrorResponse(StampReplayException $e): JSONResponse
+	{
+		$code = $e->getErrorCode();
+		$message = match ($code) {
+			'STAMP_OCCURRED_AT_OUT_OF_BOUNDS' => $this->l10n->t('The recorded time is outside the allowed range. Check the device clock and try again.'),
+			'STAMP_OCCURRED_AT_INVALID' => $this->l10n->t('The recorded time is invalid.'),
+			'STAMP_CLIENT_REQUEST_ID_INVALID' => $this->l10n->t('Invalid offline sync reference.'),
+			'STAMP_CLIENT_REQUEST_ID_REQUIRED' => $this->l10n->t('Offline sync requires a client reference id.'),
+			'STAMP_CLIENT_REQUEST_IN_FLIGHT' => $this->l10n->t('That stamp is still being processed. Please wait a moment.'),
+			default => $this->l10n->t('Could not apply the offline stamp.'),
+		};
+		$status = $code === 'STAMP_CLIENT_REQUEST_IN_FLIGHT'
+			? Http::STATUS_CONFLICT
+			: Http::STATUS_UNPROCESSABLE_ENTITY;
+		return new JSONResponse([
+			'success' => false,
+			'error' => $message,
+			'message' => $message,
+			'error_code' => $code,
+		], $status);
 	}
 
 	/**

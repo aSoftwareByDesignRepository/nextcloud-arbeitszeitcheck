@@ -14,17 +14,58 @@ namespace OCA\ArbeitszeitCheck\Tests\Mutation;
 
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
 use OCA\ArbeitszeitCheck\Controller\TimeTrackingController;
+use OCA\ArbeitszeitCheck\Db\MobileStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\Service\TimeZoneService;
+use OCA\ArbeitszeitCheck\Support\StampOccurredAtParser;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\IConfig;
+use OCP\IDateTimeZone;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 class ClockInErrorEnvelopeMutationTest extends TestCase
 {
+	private function makeController(TimeTrackingService $service, IUserSession $userSession, IRequest $request, IL10N $l10n): TimeTrackingController
+	{
+		$tzConfig = $this->createMock(IConfig::class);
+		$tzConfig->method('getAppValue')->willReturnCallback(static fn ($app, $key, $default) => match ($key) {
+			'app_timezone' => 'UTC',
+			default => $default,
+		});
+		$tzDateTime = $this->createMock(IDateTimeZone::class);
+		$tzDateTime->method('getTimeZone')->willReturn(new \DateTimeZone('UTC'));
+		$tzUserSession = $this->createMock(IUserSession::class);
+		$tzUserSession->method('getUser')->willReturn(null);
+		$timeZoneService = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
+		$idempotency = $this->createMock(MobileStampIdempotencyMapper::class);
+		$idempotency->method('findByUserAndRequestId')->willReturn(null);
+		$idempotency->method('tryInsert')->willReturn(true);
+		$timeFactory = $this->createMock(ITimeFactory::class);
+		$timeFactory->method('getTime')->willReturn(time());
+		$stampReplay = new MobileStampReplayService(
+			$service,
+			$idempotency,
+			new StampOccurredAtParser($timeZoneService),
+			$timeFactory,
+		);
+		return new TimeTrackingController(
+			'arbeitszeitcheck',
+			$request,
+			$service,
+			$stampReplay,
+			$userSession,
+			$l10n,
+		);
+	}
+
 	public function testBusinessRuleFailureIncludesErrorCodeAndMessageDuplicate(): void
 	{
 		$service = $this->createMock(TimeTrackingService::class);
@@ -42,13 +83,7 @@ class ClockInErrorEnvelopeMutationTest extends TestCase
 			BusinessRuleCode::DAILY_HOURS_LIMIT,
 		));
 
-		$controller = new TimeTrackingController(
-			'arbeitszeitcheck',
-			$request,
-			$service,
-			$userSession,
-			$l10n,
-		);
+		$controller = $this->makeController($service, $userSession, $request, $l10n);
 
 		$response = $controller->clockIn();
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
@@ -87,13 +122,7 @@ class ClockInErrorEnvelopeMutationTest extends TestCase
 			],
 		));
 
-		$controller = new TimeTrackingController(
-			'arbeitszeitcheck',
-			$request,
-			$service,
-			$userSession,
-			$l10n,
-		);
+		$controller = $this->makeController($service, $userSession, $request, $l10n);
 
 		$data = $controller->clockIn()->getData();
 		$this->assertSame(BusinessRuleCode::REST_PERIOD_REQUIRED, $data['error_code']);
@@ -119,13 +148,7 @@ class ClockInErrorEnvelopeMutationTest extends TestCase
 
 		$service->method('clockIn')->willThrowException(new BusinessRuleException('plain rule'));
 
-		$controller = new TimeTrackingController(
-			'arbeitszeitcheck',
-			$request,
-			$service,
-			$userSession,
-			$l10n,
-		);
+		$controller = $this->makeController($service, $userSession, $request, $l10n);
 
 		$data = $controller->clockIn()->getData();
 		$this->assertSame('plain rule', $data['error']);

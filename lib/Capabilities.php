@@ -106,6 +106,11 @@ class Capabilities implements ICapability {
 								Constants::CONFIG_PROJECTCHECK_INTEGRATION_DEFAULT,
 							) === '1',
 					],
+					'offlineStampQueue' => [
+						'enabled' => true,
+						'maxQueueSize' => 32,
+						'maxOccurredSkewPastHours' => 24,
+					],
 				],
 				// Companion API floor — clients fail closed to app_outdated when missing/mismatched.
 				'arbeitszeitcheck.companion.min' => 1,

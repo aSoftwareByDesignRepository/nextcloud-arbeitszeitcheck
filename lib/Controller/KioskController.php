@@ -6,7 +6,9 @@ namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Config\VendorPublicKey;
 use OCA\ArbeitszeitCheck\Middleware\KioskUnauthorizedException;
+use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskActionService;
+use OCA\ArbeitszeitCheck\Service\Kiosk\KioskOfflineStampService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskAuthService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskEnrollmentService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskErrorMessages;
@@ -22,6 +24,7 @@ use OCP\AppFramework\Http\Attribute\BruteForceProtection;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IL10N;
 use OCP\IRequest;
 use OCP\Security\Bruteforce\IThrottler;
 use Psr\Log\LoggerInterface;
@@ -34,6 +37,7 @@ class KioskController extends Controller
 		private readonly KioskTerminalService $terminalService,
 		private readonly KioskAuthService $authService,
 		private readonly KioskActionService $actionService,
+		private readonly KioskOfflineStampService $offlineStampService,
 		private readonly KioskEnrollmentService $enrollmentService,
 		private readonly KioskErrorMessages $kioskErrorMessages,
 		private readonly LicenseService $licenseService,
@@ -41,6 +45,7 @@ class KioskController extends Controller
 		private readonly TimeZoneService $timeZoneService,
 		private readonly LoggerInterface $logger,
 		private readonly IThrottler $throttler,
+		private readonly IL10N $l10n,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -165,6 +170,40 @@ class KioskController extends Controller
 
 	#[PublicPage]
 	#[NoCSRFRequired]
+	public function stamp(
+		string $method = '',
+		string $rfidUid = '',
+		string $action = '',
+		string $clientRequestId = '',
+		string $client_request_id = '',
+		string $occurredAt = '',
+		string $occurred_at = '',
+	): JSONResponse {
+		$terminal = $this->requireTerminal();
+		try {
+			if ($method !== 'rfid' || trim($rfidUid) === '') {
+				throw new KioskException('KIOSK_ACTION_INVALID');
+			}
+			$payload = $this->offlineStampService->stampRfid(
+				$terminal,
+				trim($rfidUid),
+				$action,
+				$clientRequestId !== '' ? $clientRequestId : ($client_request_id !== '' ? $client_request_id : null),
+				$occurredAt !== '' ? $occurredAt : ($occurred_at !== '' ? $occurred_at : null),
+			);
+			return new JSONResponse($payload);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
+		} catch (KioskException $e) {
+			return $this->kioskError($e, 'arbeitszeitcheck_kiosk_identify');
+		} catch (\Throwable $e) {
+			$this->logger->error('Kiosk stamp failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->kioskError(new KioskException('KIOSK_INTERNAL_ERROR'));
+		}
+	}
+
+	#[PublicPage]
+	#[NoCSRFRequired]
 	public function heartbeat(): JSONResponse
 	{
 		$terminal = $this->requireTerminal();
@@ -237,5 +276,27 @@ class KioskController extends Controller
 		}
 
 		return $response;
+	}
+
+	private function stampReplayErrorResponse(StampReplayException $e): JSONResponse
+	{
+		$code = $e->getErrorCode();
+		$message = match ($code) {
+			'STAMP_OCCURRED_AT_OUT_OF_BOUNDS' => $this->l10n->t('The recorded time is outside the allowed range. Check the device clock and try again.'),
+			'STAMP_OCCURRED_AT_INVALID' => $this->l10n->t('The recorded time is invalid.'),
+			'STAMP_CLIENT_REQUEST_ID_INVALID' => $this->l10n->t('Invalid offline sync reference.'),
+			'STAMP_CLIENT_REQUEST_ID_REQUIRED' => $this->l10n->t('Offline sync requires a client reference id.'),
+			'STAMP_CLIENT_REQUEST_IN_FLIGHT' => $this->l10n->t('That stamp is still being processed. Please wait a moment.'),
+			default => $this->l10n->t('Could not apply the offline stamp.'),
+		};
+		$status = $code === 'STAMP_CLIENT_REQUEST_IN_FLIGHT'
+			? Http::STATUS_CONFLICT
+			: Http::STATUS_UNPROCESSABLE_ENTITY;
+		return new JSONResponse([
+			'success' => false,
+			'error' => $code,
+			'error_code' => $code,
+			'message' => $message,
+		], $status);
 	}
 }

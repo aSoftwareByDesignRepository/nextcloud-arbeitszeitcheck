@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\AppInfo\Application;
+use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Controller\FakeControllerForMiddlewareTest;
 use OCA\ArbeitszeitCheck\Exception\AppAccessDeniedException;
 use OCA\ArbeitszeitCheck\Middleware\AppAccessMiddleware;
@@ -12,13 +13,17 @@ use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\App\IAppManager;
+use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use Test\TestCase;
 
-/** Nextcloud app-group restriction gate (IAppManager::enableAppForGroups). */
+/**
+ * Portfolio access door — PermissionService restriction flag + group allowlist
+ * (not only legacy IAppManager::enableAppForGroups when restriction is Open).
+ */
 final class AppAccessGateIntegrationTest extends TestCase
 {
 	private const ALLOWED = 'azc_gate_allowed';
@@ -29,6 +34,12 @@ final class AppAccessGateIntegrationTest extends TestCase
 	/** @var list<string> */
 	private array $prevAppRestriction = [];
 
+	private string $prevRestrictionEnabled = '';
+
+	private string $prevAllowedGroups = '';
+
+	private string $prevAllowedUsers = '';
+
 	protected function setUp(): void
 	{
 		if (!class_exists(\OC::class) || !isset(\OC::$server)) {
@@ -38,6 +49,24 @@ final class AppAccessGateIntegrationTest extends TestCase
 		/** @var IAppManager $appManager */
 		$appManager = \OC::$server->get(IAppManager::class);
 		$this->prevAppRestriction = $appManager->getAppRestriction(Application::APP_ID);
+
+		/** @var IConfig $config */
+		$config = \OC::$server->get(IConfig::class);
+		$this->prevRestrictionEnabled = $config->getAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
+			'',
+		);
+		$this->prevAllowedGroups = $config->getAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS,
+			'',
+		);
+		$this->prevAllowedUsers = $config->getAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS,
+			'',
+		);
 
 		/** @var IUserManager $userManager */
 		$userManager = \OC::$server->get(IUserManager::class);
@@ -54,9 +83,43 @@ final class AppAccessGateIntegrationTest extends TestCase
 			return;
 		}
 
+		/** @var IConfig $config */
+		$config = \OC::$server->get(IConfig::class);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
+			$this->prevRestrictionEnabled,
+		);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS,
+			$this->prevAllowedGroups,
+		);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS,
+			$this->prevAllowedUsers,
+		);
+
 		/** @var IAppManager $appManager */
 		$appManager = \OC::$server->get(IAppManager::class);
-		$appManager->enableAppForGroups(Application::APP_ID, $this->prevAppRestriction);
+		// Empty group list for enableAppForGroups means "enabled for nobody".
+		// Restore unrestricted installs with enableApp(), not enableAppForGroups([]).
+		if ($this->prevAppRestriction === []) {
+			$appManager->enableApp(Application::APP_ID);
+		} else {
+			$appManager->enableAppForGroups(Application::APP_ID, $this->prevAppRestriction);
+		}
+
+		/** @var IUserManager $canaryUsers */
+		$canaryUsers = \OC::$server->get(IUserManager::class);
+		$canary = $canaryUsers->get('admin') ?? $canaryUsers->get('e2e_employee');
+		if ($canary !== null) {
+			$this->assertTrue(
+				$appManager->isEnabledForUser(Application::APP_ID, $canary),
+				'Access-gate tearDown must leave arbeitszeitcheck enabled for existing users',
+			);
+		}
 
 		/** @var IGroupManager $groupManager */
 		$groupManager = \OC::$server->get(IGroupManager::class);
@@ -79,6 +142,8 @@ final class AppAccessGateIntegrationTest extends TestCase
 
 	public function testUserOutsideAllowedGroupsBlockedByMiddleware(): void
 	{
+		$this->enableRestrictedDoor([self::GATE_GROUP]);
+
 		/** @var IUserManager $userManager */
 		$userManager = \OC::$server->get(IUserManager::class);
 		$userManager->createUser(self::ALLOWED, self::PASSWORD);
@@ -116,6 +181,8 @@ final class AppAccessGateIntegrationTest extends TestCase
 
 	public function testUserInAllowedGroupPassesGate(): void
 	{
+		$this->enableRestrictedDoor([self::GATE_GROUP]);
+
 		/** @var IUserManager $userManager */
 		$userManager = \OC::$server->get(IUserManager::class);
 		$userManager->createUser(self::ALLOWED, self::PASSWORD);
@@ -140,6 +207,30 @@ final class AppAccessGateIntegrationTest extends TestCase
 		$this->addToAssertionCount(1);
 	}
 
+	/**
+	 * @param list<string> $groupIds
+	 */
+	private function enableRestrictedDoor(array $groupIds): void
+	{
+		/** @var IConfig $config */
+		$config = \OC::$server->get(IConfig::class);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
+			'1',
+		);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS,
+			json_encode(array_values($groupIds), JSON_THROW_ON_ERROR),
+		);
+		$config->setAppValue(
+			Application::APP_ID,
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS,
+			'[]',
+		);
+	}
+
 	private function middlewareWithMockRequest(): AppAccessMiddleware
 	{
 		$request = $this->createMock(IRequest::class);
@@ -159,6 +250,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 			\OC::$server->get(\OCP\IURLGenerator::class),
 			\OC::$server->get(\OCP\L10N\IFactory::class),
 			\OC::$server->get(\Psr\Log\LoggerInterface::class),
+			\OC::$server->get(\OCP\AppFramework\Utility\IControllerMethodReflector::class),
 		);
 	}
 }

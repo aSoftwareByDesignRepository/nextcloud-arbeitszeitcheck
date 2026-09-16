@@ -161,6 +161,20 @@ class KioskAuthService
 		$this->assertUserEligible($userId);
 	}
 
+	/**
+	 * Resolve RFID to a user id without creating a one-shot kiosk session (offline stamp replay).
+	 */
+	public function resolveUserIdFromRfid(KioskTerminal $terminal, string $rfidUid): string
+	{
+		$now = $this->timeFactory->getDateTime();
+		$this->assertNoActiveEnrollment($terminal->getTerminalId(), $now);
+		$cred = $this->resolveRfidCredential($rfidUid);
+		$userIdResolved = $cred->getUserId();
+		$this->assertUserEligible($userIdResolved);
+		$this->credentialService->resetFailedAttempts($cred);
+		return $userIdResolved;
+	}
+
 	/** @return list<array{userId: string, displayName: string}> */
 	public function listPinUsers(): array
 	{

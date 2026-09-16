@@ -370,6 +370,11 @@ final class DesignSystemCssContractTest extends TestCase
 			$calendar,
 			'Calendar day grid must use minmax(0,1fr) to avoid 7-column overflow on 320px',
 		);
+		self::assertMatchesRegularExpression(
+			'/\.calendar-day-hours\s*\{[^}]*color:\s*color-mix\(/s',
+			$calendar,
+			'Calendar hours ink must color-mix primary into main-text for dark-theme AA',
+		);
 	}
 
 	public function testBachusSimplifySurfacesUseThemeTokensAndFocusRings(): void

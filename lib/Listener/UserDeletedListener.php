@@ -59,6 +59,7 @@ class UserDeletedListener implements IEventListener
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
 		private readonly MobileSeatMapper $mobileSeatMapper,
+		private readonly \OCA\ArbeitszeitCheck\Db\MobileStampIdempotencyMapper $mobileStampIdempotencyMapper,
 		private readonly KioskCredMapper $kioskCredMapper,
 		private readonly KioskSessionMapper $kioskSessionMapper,
 		private readonly KioskSettingsService $kioskSettingsService,
@@ -103,6 +104,7 @@ class UserDeletedListener implements IEventListener
 			$this->teamMemberMapper->deleteByUserId($userId);
 			$this->teamManagerMapper->deleteByUserId($userId);
 			$this->mobileSeatMapper->deleteByUserId($userId);
+			$this->mobileStampIdempotencyMapper->deleteByUserId($userId);
 			$this->kioskCredMapper->deleteByUserId($userId);
 			$this->kioskSessionMapper->deleteByUserId($userId);
 			$this->kioskSettingsService->setUserKioskAllowed($userId, false);

@@ -12,17 +12,25 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 
 use OCA\ArbeitszeitCheck\Controller\TimeTrackingController;
+use OCA\ArbeitszeitCheck\Db\MobileStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException;
+use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\Service\TimeZoneService;
+use OCA\ArbeitszeitCheck\Support\StampOccurredAtParser;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\IConfig;
+use OCP\IDateTimeZone;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * Class TimeTrackingControllerTest
@@ -51,10 +59,33 @@ class TimeTrackingControllerTest extends TestCase
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $p ? (string)vsprintf($s, $p) : $s);
 
+		$tzConfig = $this->createMock(IConfig::class);
+		$tzConfig->method('getAppValue')->willReturnCallback(static fn ($app, $key, $default) => match ($key) {
+			'app_timezone' => 'UTC',
+			default => $default,
+		});
+		$tzDateTime = $this->createMock(IDateTimeZone::class);
+		$tzDateTime->method('getTimeZone')->willReturn(new \DateTimeZone('UTC'));
+		$tzUserSession = $this->createMock(IUserSession::class);
+		$tzUserSession->method('getUser')->willReturn(null);
+		$timeZoneService = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
+		$idempotency = $this->createMock(MobileStampIdempotencyMapper::class);
+		$idempotency->method('findByUserAndRequestId')->willReturn(null);
+		$idempotency->method('tryInsert')->willReturn(true);
+		$timeFactory = $this->createMock(ITimeFactory::class);
+		$timeFactory->method('getTime')->willReturn(time());
+		$stampReplay = new MobileStampReplayService(
+			$this->timeTrackingService,
+			$idempotency,
+			new StampOccurredAtParser($timeZoneService),
+			$timeFactory,
+		);
+
 		$this->controller = new TimeTrackingController(
 			'arbeitszeitcheck',
 			$this->request,
 			$this->timeTrackingService,
+			$stampReplay,
 			$this->userSession,
 			$l10n
 		);

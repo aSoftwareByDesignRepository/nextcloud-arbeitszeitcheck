@@ -177,12 +177,12 @@ class ComplianceService
      * @param string $userId
      * @return array Array of compliance issues (empty if compliant)
      */
-    public function checkComplianceBeforeClockIn(string $userId): array
+    public function checkComplianceBeforeClockIn(string $userId, ?\DateTimeInterface $at = null): array
     {
         $issues = [];
 
         // Check rest period (11 hours between shifts) - CRITICAL: Always enforce (ArbZG §5)
-        $restEvaluation = $this->evaluateRestPeriodForClockIn($userId);
+        $restEvaluation = $this->evaluateRestPeriodForClockIn($userId, $at);
         if (!$restEvaluation['valid']) {
             $issues[] = [
                 'type' => ComplianceViolation::TYPE_INSUFFICIENT_REST_PERIOD,
@@ -651,9 +651,15 @@ class ComplianceService
      *
      * @return array{valid: bool, message: string|null, lastEndTime: ?\DateTime, earliestClockIn: ?\DateTime, details?: array<string, mixed>}
      */
-    private function evaluateRestPeriodForClockIn(string $userId): array
+    private function evaluateRestPeriodForClockIn(string $userId, ?\DateTimeInterface $at = null): array
     {
-        $now = $this->timeZoneService->nowInStorage();
+        if ($at instanceof \DateTime) {
+            $now = clone $at;
+        } elseif ($at instanceof \DateTimeInterface) {
+            $now = \DateTime::createFromInterface($at);
+        } else {
+            $now = $this->timeZoneService->nowInStorage();
+        }
         $minRest = $this->getMinRestPeriod($userId);
 
         // Prefer the last completed entry so we can apply the same intraday-split

@@ -112,6 +112,11 @@ class KioskActionService
 		return 'working';
 	}
 
+	public function actionMessageFor(string $action): string
+	{
+		return $this->actionMessage($action);
+	}
+
 	private function actionMessage(string $action): string
 	{
 		return match ($action) {

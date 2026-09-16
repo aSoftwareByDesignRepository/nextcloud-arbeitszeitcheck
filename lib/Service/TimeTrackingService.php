@@ -152,6 +152,35 @@ class TimeTrackingService
 		return $this->timeZoneService->nowInStorage();
 	}
 
+	private function resolveEffectiveAt(?\DateTimeInterface $effectiveAt): \DateTime
+	{
+		if ($effectiveAt === null) {
+			return $this->nowForAtEntries();
+		}
+		if ($effectiveAt instanceof \DateTime) {
+			return clone $effectiveAt;
+		}
+		return \DateTime::createFromInterface($effectiveAt);
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function offlineCaptureAuditMeta(?\DateTimeInterface $effectiveAt, string $userId): array
+	{
+		if ($effectiveAt === null) {
+			return [];
+		}
+		return [
+			'capture_source' => 'offline_sync',
+			'client_occurred_at' => $this->timeZoneService->formatForDisplay(
+				$effectiveAt instanceof \DateTime ? $effectiveAt : \DateTime::createFromInterface($effectiveAt),
+				'c',
+				$userId,
+			),
+		];
+	}
+
 	/**
 	 * Inclusive/exclusive bounds of the current calendar day in {@see getAppConfiguredTimeZone()},
 	 * formatted as naive `Y-m-d H:i:s` values (same convention as stored `at_entries` timestamps).
@@ -337,14 +366,19 @@ class TimeTrackingService
 	 * @return TimeEntry
 	 * @throws \Exception
 	 */
-	public function clockIn(string $userId, ?string $projectCheckProjectId = null, ?string $description = null): TimeEntry
-	{
+	public function clockIn(
+		string $userId,
+		?string $projectCheckProjectId = null,
+		?string $description = null,
+		?\DateTimeInterface $effectiveAt = null,
+	): TimeEntry {
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
 			$this->repairStalePausedAutomaticEntries($userId);
 			$this->db->beginTransaction();
 			try {
-				$this->monthClosureGuard->assertUserDayMutable($userId, $this->nowForAtEntries());
+				$eventAt = $this->resolveEffectiveAt($effectiveAt);
+				$this->monthClosureGuard->assertUserDayMutable($userId, $eventAt);
 				$projectCheckProjectId = $this->normalizeAndAssertProjectCheckForClockIn($userId, $projectCheckProjectId);
 				$activeEntry = $this->timeEntryMapper->findActiveByUser($userId);
 				if ($activeEntry !== null) {
@@ -392,7 +426,7 @@ class TimeTrackingService
 
 				$this->timeCaptureMethodService->assertClockStampingAllowed($userId);
 
-				$this->checkComplianceBeforeClockIn($userId);
+				$this->checkComplianceBeforeClockIn($userId, $eventAt);
 				$todayHours = $this->getTodayHours($userId);
 				$maxDailyHours = $this->getMaxDailyHours();
 				if ($todayHours >= $maxDailyHours) {
@@ -405,7 +439,7 @@ class TimeTrackingService
 					);
 				}
 
-				$now = $this->nowForAtEntries();
+				$now = $eventAt;
 				$timeEntry = new TimeEntry();
 				$timeEntry->setUserId($userId);
 				$timeEntry->setStartTime($now);
@@ -425,7 +459,7 @@ class TimeTrackingService
 					'time_entry',
 					$savedEntry->getId(),
 					null,
-					$this->safeGetSummary($savedEntry, $userId)
+					array_merge($this->safeGetSummary($savedEntry, $userId), $this->offlineCaptureAuditMeta($effectiveAt, $userId))
 				);
 				$this->clearAutoClockoutNotice($userId);
 				$this->db->commit();
@@ -449,9 +483,9 @@ class TimeTrackingService
 	public function clockOut(
 		string $userId,
 		string $endedReason = TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT,
-		string $policyApplied = 'standard'
-	): TimeEntry
-	{
+		string $policyApplied = 'standard',
+		?\DateTimeInterface $effectiveAt = null,
+	): TimeEntry {
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
 			// Phase 1: persist the clock-out atomically. Compliance checks are
@@ -472,7 +506,7 @@ class TimeTrackingService
 
 				$this->monthClosureGuard->assertTimeEntryMutable($currentEntry);
 				$oldSummary = $this->safeGetSummary($currentEntry, $userId);
-				$now = $this->nowForAtEntries();
+				$now = $this->resolveEffectiveAt($effectiveAt);
 				if ($currentEntry->getStatus() === TimeEntry::STATUS_BREAK && $currentEntry->getBreakStartTime() !== null) {
 					$this->archiveBreakToJson($currentEntry, $currentEntry->getBreakStartTime(), $now);
 					$currentEntry->setBreakStartTime(null);
@@ -682,7 +716,7 @@ class TimeTrackingService
 	 * @return TimeEntry
 	 * @throws \Exception
 	 */
-	public function startBreak(string $userId): TimeEntry
+	public function startBreak(string $userId, ?\DateTimeInterface $effectiveAt = null): TimeEntry
 	{
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
@@ -704,7 +738,7 @@ class TimeTrackingService
 				}
 
 				$oldSummary = $this->safeGetSummary($activeEntry, $userId);
-				$now = $this->nowForAtEntries();
+				$now = $this->resolveEffectiveAt($effectiveAt);
 				if ($activeEntry->getBreakStartTime() !== null && $activeEntry->getBreakEndTime() !== null) {
 					$this->archiveBreakToJson($activeEntry, $activeEntry->getBreakStartTime(), $activeEntry->getBreakEndTime());
 					$activeEntry->setBreakStartTime($now);
@@ -741,7 +775,7 @@ class TimeTrackingService
 	 * @return TimeEntry
 	 * @throws \Exception
 	 */
-	public function endBreak(string $userId): TimeEntry
+	public function endBreak(string $userId, ?\DateTimeInterface $effectiveAt = null): TimeEntry
 	{
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
@@ -757,7 +791,7 @@ class TimeTrackingService
 
 				$this->monthClosureGuard->assertTimeEntryMutable($breakEntry);
 				$oldSummary = $this->safeGetSummary($breakEntry, $userId);
-				$now = $this->nowForAtEntries();
+				$now = $this->resolveEffectiveAt($effectiveAt);
 				$breakEntry->setBreakEndTime($now);
 				$breakEntry->setStatus(TimeEntry::STATUS_ACTIVE);
 				$breakEntry->setUpdatedAt($now);
@@ -1098,9 +1132,9 @@ class TimeTrackingService
 	 * @param string $userId
 	 * @throws \Exception
 	 */
-	private function checkComplianceBeforeClockIn(string $userId): void
+	private function checkComplianceBeforeClockIn(string $userId, ?\DateTimeInterface $at = null): void
 	{
-		$issues = $this->complianceService->checkComplianceBeforeClockIn($userId);
+		$issues = $this->complianceService->checkComplianceBeforeClockIn($userId, $at);
 
 		if (!empty($issues)) {
 			$criticalIssues = array_filter($issues, fn($issue) => $issue['severity'] === 'error');

@@ -11,6 +11,7 @@ use OCA\ArbeitszeitCheck\Service\Kiosk\KioskActionService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskAuthService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskEnrollmentService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskErrorMessages;
+use OCA\ArbeitszeitCheck\Service\Kiosk\KioskOfflineStampService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskTerminalService;
 use OCA\ArbeitszeitCheck\Service\LicenseService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
@@ -77,6 +78,7 @@ class KioskControllerAtlasTest extends TestCase
 			$this->terminalService,
 			$this->authService,
 			$this->createMock(KioskActionService::class),
+			$this->createMock(KioskOfflineStampService::class),
 			$this->enrollmentService,
 			new KioskErrorMessages($l10n),
 			$this->licenseService,
@@ -84,6 +86,7 @@ class KioskControllerAtlasTest extends TestCase
 			$this->timeZoneService,
 			$this->createMock(LoggerInterface::class),
 			$this->createMock(IThrottler::class),
+			$l10n,
 		);
 	}
 

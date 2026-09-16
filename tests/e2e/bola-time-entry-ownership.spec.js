@@ -27,9 +27,25 @@ test.describe('BOLA time-entry ownership (live)', () => {
 		const date = String(serverNow).slice(0, 10)
 		expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 
-		const created = await apiAllowFailure(victim, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
-			data: { date, startTime: '09:00', endTime: '12:00' },
-		})
+		// Avoid collisions with today's live clock/manual blocks — probe free evening slots.
+		const slots = [
+			['18:05', '18:25'],
+			['18:35', '18:55'],
+			['19:05', '19:25'],
+			['19:35', '19:55'],
+			['20:05', '20:25'],
+			['21:05', '21:25'],
+			['22:05', '22:25'],
+		]
+		let created = { ok: false, json: {} }
+		for (const [startTime, endTime] of slots) {
+			created = await apiAllowFailure(victim, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
+				data: { date, startTime, endTime },
+			})
+			if (created.ok) {
+				break
+			}
+		}
 		test.skip(!created.ok, 'Could not seed victim entry: ' + JSON.stringify(created.json))
 		const entryId =
 			created.json?.data?.id ?? created.json?.id ?? created.json?.entry?.id ?? null

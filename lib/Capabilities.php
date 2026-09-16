@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Service\MonthClosureFeature;
 use OCA\ArbeitszeitCheck\Service\OvertimeBankService;
 use OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
+use OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Services\IAppConfig;
@@ -109,7 +110,7 @@ class Capabilities implements ICapability {
 					'offlineStampQueue' => [
 						'enabled' => true,
 						'maxQueueSize' => 32,
-						'maxOccurredSkewPastHours' => 24,
+						'maxOccurredSkewPastHours' => OfflineStampSkewPolicy::fromConfig($this->config),
 					],
 				],
 				// Companion API floor — clients fail closed to app_outdated when missing/mismatched.

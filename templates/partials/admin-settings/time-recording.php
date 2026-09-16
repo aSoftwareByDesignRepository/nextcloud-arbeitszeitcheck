@@ -99,6 +99,37 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             ?>
                         </p>
                     </fieldset>
+                    <?php
+                    $offlineStampMaxPastHours = (int)($settings['offlineStampMaxPastHours'] ?? \OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::DEFAULT_PAST_HOURS);
+                    $offlineStampMaxPastHours = \OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::normalizePastHours($offlineStampMaxPastHours);
+                    ?>
+                    <fieldset class="form-fieldset" aria-labelledby="offline-stamp-skew-heading">
+                        <legend id="offline-stamp-skew-heading" class="form-legend"><?php p($l->t('Offline stamp sync')); ?></legend>
+                        <p id="offlineStampMaxPastHours-help" class="form-help">
+                            <?php p($l->t('How old a stamp may be when the phone or kiosk uploads it after an outage. Longer windows help over weekends; they also leave more room for wrong device clocks. 24 hours is the safe default.')); ?>
+                        </p>
+                        <div class="form-group">
+                            <label for="offlineStampMaxPastHours"><?php p($l->t('Accept offline stamps up to')); ?></label>
+                            <select id="offlineStampMaxPastHours"
+                                    name="offlineStampMaxPastHours"
+                                    class="form-select"
+                                    aria-describedby="offlineStampMaxPastHours-help">
+                                <?php foreach (\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::PRESET_PAST_HOURS as $presetHours): ?>
+                                <option value="<?php p((string)$presetHours); ?>"<?php echo $offlineStampMaxPastHours === $presetHours ? ' selected' : ''; ?>>
+                                    <?php
+                                    if ($presetHours === 24) {
+                                        p($l->t('24 hours (default)'));
+                                    } elseif ($presetHours === 48) {
+                                        p($l->t('48 hours'));
+                                    } else {
+                                        p($l->t('72 hours'));
+                                    }
+                                    ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </fieldset>
                     </div><!-- /.azc-card__body -->
                 </section>
 

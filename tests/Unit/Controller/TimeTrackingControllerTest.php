@@ -77,7 +77,7 @@ class TimeTrackingControllerTest extends TestCase
 		$stampReplay = new MobileStampReplayService(
 			$this->timeTrackingService,
 			$idempotency,
-			new StampOccurredAtParser($timeZoneService),
+			new StampOccurredAtParser($timeZoneService, $tzConfig),
 			$timeFactory,
 		);
 

@@ -48,7 +48,7 @@ class MobileStampReplayServiceTest extends TestCase
 		$this->service = new MobileStampReplayService(
 			$this->timeTracking,
 			$this->idempotency,
-			new StampOccurredAtParser($tz),
+			new StampOccurredAtParser($tz, $tzConfig),
 			$timeFactory,
 		);
 	}

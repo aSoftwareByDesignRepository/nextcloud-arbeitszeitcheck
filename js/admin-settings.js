@@ -735,6 +735,11 @@
         } else {
             delete formData.breakAutoFallbackMinutes;
         }
+        if (hasField('offlineStampMaxPastHours')) {
+            formData.offlineStampMaxPastHours = int(formData.offlineStampMaxPastHours, 24);
+        } else {
+            delete formData.offlineStampMaxPastHours;
+        }
         if (hasField('breakAutoFallbackFlexWindowStart')) {
             formData.breakAutoFallbackFlexWindowStart = int(formData.breakAutoFallbackFlexWindowStart, 11);
         } else {
@@ -1038,6 +1043,13 @@
             return fail(
                 window.ArbeitszeitCheck?.l10n?.retentionPeriodRange || (window.t && window.t('arbeitszeitcheck', 'Retention period must be between 1 and 10 years')) || 'Retention period must be between 1 and 10 years',
                 'retentionPeriod'
+            );
+        }
+
+        if (data.offlineStampMaxPastHours !== undefined && (data.offlineStampMaxPastHours < 24 || data.offlineStampMaxPastHours > 72)) {
+            return fail(
+                window.ArbeitszeitCheck?.l10n?.offlineStampMaxPastHoursRange || (window.t && window.t('arbeitszeitcheck', 'Offline stamp retention must be between 24 and 72 hours')) || 'Offline stamp retention must be between 24 and 72 hours',
+                'offlineStampMaxPastHours'
             );
         }
 

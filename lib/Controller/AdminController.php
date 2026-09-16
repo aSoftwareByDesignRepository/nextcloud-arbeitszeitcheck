@@ -949,6 +949,12 @@ class AdminController extends Controller
 			'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1',
 			'clockStampingEnabled' => $this->timeCaptureMethodService->isOrganizationClockStampingEnabled(),
 			'manualTimeEntryEnabled' => $this->timeCaptureMethodService->isOrganizationManualTimeEntryEnabled(),
+			'offlineStampMaxPastHours' => \OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::fromAppConfigString(
+				$this->appConfig->getAppValueString(
+					Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
+					(string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::DEFAULT_PAST_HOURS
+				)
+			),
 			'accessRestrictionEnabled' => $this->isAccessRestrictionEnabledFromConfig(),
 			'accessAllowedGroups' => $this->getAllowedAccessGroupsFromConfig(),
 			'accessAllowedUserIds' => $this->getConfiguredAccessAllowedUserIds(),
@@ -2282,6 +2288,12 @@ class AdminController extends Controller
 				'vacationRolloverIncludeUnusedAnnual' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0') === '1',
 				'clockStampingEnabled' => $this->timeCaptureMethodService->isOrganizationClockStampingEnabled(),
 				'manualTimeEntryEnabled' => $this->timeCaptureMethodService->isOrganizationManualTimeEntryEnabled(),
+				'offlineStampMaxPastHours' => \OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::fromAppConfigString(
+					$this->appConfig->getAppValueString(
+						Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
+						(string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::DEFAULT_PAST_HOURS
+					)
+				),
 				'accessRestrictionEnabled' => $this->isAccessRestrictionEnabledFromConfig(),
 				'accessAllowedGroups' => $this->getAllowedAccessGroupsFromConfig(),
 				'accessAllowedUserIds' => $this->getConfiguredAccessAllowedUserIds(),
@@ -2392,6 +2404,7 @@ class AdminController extends Controller
 				'timeEntryChangesRequireApproval' => Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL,
 				'manualTimeEntriesRequireApproval' => Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL,
 				'projectCheckIntegrationEnabled' => Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED,
+				'offlineStampMaxPastHours' => Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
 			];
 
 			$updatedSettings = [];
@@ -2503,6 +2516,15 @@ class AdminController extends Controller
 					} elseif ($paramKey === 'breakAutoFallbackMinutes') {
 						$m = max(15, min(720, (int)$value));
 						$value = (string)$m;
+					} elseif ($paramKey === 'offlineStampMaxPastHours') {
+						$hours = (int)$value;
+						if (!\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::isAllowedPastHours($hours)) {
+							return new JSONResponse([
+								'success' => false,
+								'error' => $this->l10n->t('Offline stamp retention must be between 24 and 72 hours'),
+							], Http::STATUS_BAD_REQUEST);
+						}
+						$value = (string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::normalizePastHours($hours);
 					} elseif ($paramKey === 'timePickerMinuteStep') {
 						$value = (string)\OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize((int)$value);
 					} elseif ($paramKey === 'breakAutoFallbackFlexWindowStart') {

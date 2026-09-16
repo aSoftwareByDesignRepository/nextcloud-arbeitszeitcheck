@@ -53,7 +53,7 @@ class ClockInErrorEnvelopeMutationTest extends TestCase
 		$stampReplay = new MobileStampReplayService(
 			$service,
 			$idempotency,
-			new StampOccurredAtParser($timeZoneService),
+			new StampOccurredAtParser($timeZoneService, $tzConfig),
 			$timeFactory,
 		);
 		return new TimeTrackingController(

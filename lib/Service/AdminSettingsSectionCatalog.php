@@ -136,6 +136,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_TIME_RECORDING => [
 			'clockStampingEnabled',
 			'manualTimeEntryEnabled',
+			'offlineStampMaxPastHours',
 		],
 		self::SECTION_TIME_APPROVALS => [
 			'timeEntryChangesRequireApproval',
@@ -229,7 +230,7 @@ final class AdminSettingsSectionCatalog
 		return match ($section) {
 			self::SECTION_ACCESS => $l->t('Choose who may administer ArbeitszeitCheck and who may open the app.'),
 			self::SECTION_COMPLIANCE => $l->t('Compliance checks, substitute rules, and break fallback.'),
-			self::SECTION_TIME_RECORDING => $l->t('Choose how the organisation records working time.'),
+			self::SECTION_TIME_RECORDING => $l->t('Choose how the organisation records working time, including how long offline stamps may be replayed.'),
 			self::SECTION_TIME_APPROVALS => $l->t('When edits and new manual entries need manager approval.'),
 			self::SECTION_EXPORTS => $l->t('Midnight split for exports and DATEV payroll numbers.'),
 			self::SECTION_OUTLOOK_SUBSCRIPTION => $l->t('Generate privacy-safe calendar subscription links per team and manager scope.'),

@@ -174,6 +174,12 @@ final class Constants
 	/** Kiosk feature gate — default off until admin enables. */
 	public const CONFIG_KIOSK_ENABLED = 'kiosk_enabled';
 
+	/**
+	 * Max age (hours) of `occurredAt` accepted on offline stamp replay.
+	 * Clamped 24–72; default 24. Server authority — clients mirror via capabilities.
+	 */
+	public const CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS = 'offline_stamp_max_past_hours';
+
 	/** Per-install HMAC salt for RFID lookup hashes (never store raw UIDs). */
 	public const CONFIG_KIOSK_RFID_SALT = 'kiosk_rfid_hmac_salt';
 

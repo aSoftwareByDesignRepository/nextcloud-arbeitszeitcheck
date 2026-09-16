@@ -123,6 +123,7 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertContains('timeEntryChangesRequireApproval', $catalog->allowedParamKeys(AdminSettingsSectionCatalog::SECTION_TIME_APPROVALS) ?? []);
 		$this->assertNotContains('timeEntryChangesRequireApproval', $catalog->allowedParamKeys(AdminSettingsSectionCatalog::SECTION_TIME_RECORDING) ?? []);
 		$this->assertContains('clockStampingEnabled', $catalog->allowedParamKeys(AdminSettingsSectionCatalog::SECTION_TIME_RECORDING) ?? []);
+		$this->assertContains('offlineStampMaxPastHours', $catalog->allowedParamKeys(AdminSettingsSectionCatalog::SECTION_TIME_RECORDING) ?? []);
 
 		$this->assertNotContains('retentionPeriod', $compliance);
 		$retention = $catalog->allowedParamKeys(AdminSettingsSectionCatalog::SECTION_RETENTION);

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.7 - 2026-09-16
+
+### Added
+- **Admin-configurable offline stamp retention (24–72 h):** Global settings → Time recording. Default stays 24 hours; admins may raise to 48 or 72 for weekend outages. Server enforces the skew on `occurredAt`; capability `mobile.offlineStampQueue.maxOccurredSkewPastHours` mirrors the value. Hard ceiling remains 72 hours (not open-ended offline payroll).
+
 ## 1.7.6 - 2026-09-16
 
 ### Added

@@ -8,7 +8,7 @@ import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
 const SECTIONS = [
 	{ id: 'access', marker: '#accessMode-help, [name="accessRestrictionEnabled"]' },
 	{ id: 'compliance', marker: '#autoComplianceCheck' },
-	{ id: 'time-recording', marker: '#clockStampingEnabled' },
+	{ id: 'time-recording', marker: '#clockStampingEnabled, #offlineStampMaxPastHours' },
 	{ id: 'time-approvals', marker: '#timeEntryChangesRequireApproval' },
 	{ id: 'exports', marker: '#exportMidnightSplitEnabled' },
 	{ id: 'outlook-subscription', marker: '#section-outlook-subscription-heading' },
@@ -82,6 +82,8 @@ test.describe('Admin global settings multipage', () => {
 		await page.goto('/apps/arbeitszeitcheck/admin/settings/time-recording')
 		await assertArbeitszeitcheckLoaded(page)
 		await expect(page.locator('#clockStampingEnabled')).toBeAttached()
+		await expect(page.locator('#offlineStampMaxPastHours')).toBeVisible()
+		await expect(page.locator('#offlineStampMaxPastHours')).toHaveValue(/^(24|48|72)$/)
 		await expect(page.locator('.admin-time-capture__card').first()).toBeVisible()
 		await expect(page.locator('#timeEntryChangesRequireApproval')).toHaveCount(0)
 	})
@@ -155,7 +157,14 @@ test.describe('Admin global settings multipage', () => {
 				await route.continue()
 			})
 
-			await page.locator('#admin-settings-save').click()
+			// Outlook subscription uses dedicated create/rotate APIs — no sticky Save footer.
+			const save = page.locator('#admin-settings-save')
+			if ((await save.count()) === 0) {
+				expect(section.id).toBe('outlook-subscription')
+				return
+			}
+
+			await save.click()
 			await expect
 				.poll(() => {
 					try {

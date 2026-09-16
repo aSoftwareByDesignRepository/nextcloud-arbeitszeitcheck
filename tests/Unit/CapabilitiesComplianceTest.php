@@ -159,6 +159,56 @@ class CapabilitiesComplianceTest extends TestCase
 		$this->assertSame('AA', $caps['arbeitszeitcheck']['accessibility']['wcag-level']);
 	}
 
+	public function testOfflineStampQueueExposesConfigurableSkewDefault24(): void
+	{
+		$caps = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)->getCapabilities();
+		$queue = $caps['arbeitszeitcheck']['mobile']['offlineStampQueue'];
+		$this->assertTrue($queue['enabled']);
+		$this->assertSame(32, $queue['maxQueueSize']);
+		$this->assertSame(24, $queue['maxOccurredSkewPastHours']);
+	}
+
+	public function testOfflineStampQueueReadsConfiguredSkew(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, $default = '') {
+				if ($app === 'arbeitszeitcheck' && $key === 'country') {
+					return RegionRegistry::COUNTRY_DE;
+				}
+				if ($app === 'arbeitszeitcheck' && $key === \OCA\ArbeitszeitCheck\Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS) {
+					return '72';
+				}
+				return is_string($default) ? $default : (string)$default;
+			}
+		);
+		$appConfig = $this->createMock(IAppConfig::class);
+		$appConfig->method('getAppValueString')->willReturnCallback(
+			static fn (string $key, string $default = '') => $default
+		);
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppVersion')->willReturn('1.7.7');
+		$appManager->method('isEnabledForUser')->willReturn(false);
+		$appManager->method('isInstalled')->willReturn(false);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn(null);
+		$overtimeBank = $this->createMock(OvertimeBankService::class);
+		$overtimeBank->method('isEnabled')->willReturn(false);
+		$timeCapture = $this->createMock(TimeCaptureMethodService::class);
+
+		$caps = (new Capabilities(
+			$config,
+			$appConfig,
+			$overtimeBank,
+			$appManager,
+			$userSession,
+			$timeCapture,
+			new LaborLawProfileFactory($config),
+		))->getCapabilities();
+
+		$this->assertSame(72, $caps['arbeitszeitcheck']['mobile']['offlineStampQueue']['maxOccurredSkewPastHours']);
+	}
+
 	public function testProjectCheckAvailableUsesInstanceInstallNotCurrentUser(): void
 	{
 		$config = $this->createMock(IConfig::class);

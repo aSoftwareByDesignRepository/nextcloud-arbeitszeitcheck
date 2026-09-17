@@ -8,14 +8,14 @@
 	max-height: min(92vh, 52rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .modal-body,
 .azc-manager-correction-modal .modal-body {
 	padding: var(--space-5, 1.25rem) var(--space-6, 1.5rem);
 	flex: 1;
 	overflow-y: auto;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal > .modal-footer,
 .azc-manager-correction-modal > .modal-footer {
 	flex-shrink: 0;
 	padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
@@ -23,7 +23,7 @@
 	gap: var(--space-3, 0.75rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__inner,
 .azc-manager-correction-modal .correction-dialog__inner {
 	margin: 0;
 	display: flex;
@@ -31,7 +31,7 @@
 	gap: var(--space-5, 1.25rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__intro,
 .azc-manager-correction-modal .correction-dialog__intro {
 	margin: 0;
 	padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
@@ -43,26 +43,26 @@
 	line-height: 1.5;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block,
 .azc-manager-correction-modal .correction-dialog__block {
 	margin: 0;
 	padding: 0;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block + .correction-dialog__block,
 .azc-manager-correction-modal .correction-dialog__block + .correction-dialog__block,
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block + .correction-fieldset,
 .azc-manager-correction-modal .correction-dialog__block + .correction-fieldset,
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-fieldset + .correction-fieldset,
 .azc-manager-correction-modal .correction-fieldset + .correction-fieldset {
 	margin-top: var(--space-5, 1.25rem);
 	padding-top: var(--space-5, 1.25rem);
 	border-top: 1px solid var(--color-border);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block-title,
 .azc-manager-correction-modal .correction-dialog__block-title,
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__section-title,
 .azc-manager-correction-modal .correction-dialog__section-title {
 	margin: 0 0 var(--space-3, 0.75rem);
 	padding: 0;
@@ -72,9 +72,9 @@
 	color: var(--color-main-text);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block-hint,
 .azc-manager-correction-modal .correction-dialog__block-hint,
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-help,
 .azc-manager-correction-modal .form-help {
 	font-size: 0.9375rem;
 	line-height: 1.45;
@@ -82,12 +82,12 @@
 	opacity: 0.85;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__block-hint,
 .azc-manager-correction-modal .correction-dialog__block-hint {
 	margin: 0 0 var(--space-4, 1rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-fieldset,
 .azc-manager-correction-modal .correction-fieldset {
 	margin: 0;
 	padding: 0;
@@ -95,9 +95,9 @@
 	min-width: 0;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-fieldset--breaks,
 .azc-manager-correction-modal .correction-fieldset--breaks,
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-fieldset--reason,
 .azc-manager-correction-modal .correction-fieldset--reason {
 	padding: var(--space-4, 1rem);
 	border: 1px solid var(--color-border);
@@ -105,23 +105,23 @@
 	background: var(--color-background-hover);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__date,
 .azc-manager-correction-modal .correction-dialog__date {
 	margin-bottom: var(--space-4, 1rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__date .form-group,
 .azc-manager-correction-modal .correction-dialog__date .form-group {
 	max-width: 100%;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-label,
 .azc-manager-correction-modal .form-label {
 	color: var(--color-main-text);
 	font-weight: 600;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-input-wrapper--date,
 .azc-manager-correction-modal .form-input-wrapper--date {
 	display: flex;
 	flex-wrap: wrap;
@@ -129,26 +129,26 @@
 	gap: var(--space-2, 0.5rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-input-wrapper--date > div:first-child,
 .azc-manager-correction-modal .form-input-wrapper--date > div:first-child {
 	flex: 1 1 10rem;
 	min-width: 0;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-date-today,
 .azc-manager-correction-modal .correction-date-today {
 	flex: 0 0 auto;
 	min-height: 44px;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__hint,
 .azc-manager-correction-modal .correction-dialog__hint {
 	margin-top: var(--space-2, 0.5rem);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .time-pair-matrix__intro,
 .azc-manager-correction-modal .time-pair-matrix__intro,
-#time-entry-correction-modal,
+#time-entry-correction-modal .time-pair-matrix__colhead,
 .azc-manager-correction-modal .time-pair-matrix__colhead {
 	color: var(--color-main-text);
 	font-weight: 600;
@@ -156,7 +156,7 @@
 }
 
 /* Currently stored — readable table (all themes) */
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__wrap,
 .azc-manager-correction-modal .correction-snapshot__wrap {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-large, 8px);
@@ -164,7 +164,7 @@
 	overflow: hidden;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__table,
 .azc-manager-correction-modal .correction-snapshot__table {
 	width: 100%;
 	border-collapse: collapse;
@@ -172,7 +172,7 @@
 	line-height: 1.45;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__table tbody th,
 .azc-manager-correction-modal .correction-snapshot__table tbody th {
 	width: 32%;
 	padding: 0.625rem 0.875rem;
@@ -184,7 +184,7 @@
 	border-bottom: 1px solid var(--color-border);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__table tbody td,
 .azc-manager-correction-modal .correction-snapshot__table tbody td {
 	padding: 0.625rem 0.875rem;
 	color: var(--color-main-text);
@@ -193,14 +193,14 @@
 	word-break: break-word;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__table tbody tr:last-child th,
 .azc-manager-correction-modal .correction-snapshot__table tbody tr:last-child th,
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-snapshot__table tbody tr:last-child td,
 .azc-manager-correction-modal .correction-snapshot__table tbody tr:last-child td {
 	border-bottom: none;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-breaks-empty,
 .azc-manager-correction-modal .correction-breaks-empty {
 	margin: 0 0 var(--space-3, 0.75rem);
 	padding: 0.625rem 0.875rem;
@@ -212,13 +212,13 @@
 	border-radius: var(--border-radius, 6px);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-breaks-empty[hidden],
 .azc-manager-correction-modal .correction-breaks-empty[hidden] {
 	display: none;
 }
 
 /* Justification length feedback — high contrast on every theme */
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__char-count,
 .azc-manager-correction-modal .correction-dialog__char-count {
 	display: block;
 	margin: var(--space-3, 0.75rem) 0 0;
@@ -232,7 +232,7 @@
 	border-radius: var(--border-radius, 6px);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__char-count:empty,
 .azc-manager-correction-modal .correction-dialog__char-count:empty {
 	display: none;
 	margin: 0;
@@ -240,7 +240,7 @@
 	border: none;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__char-count--warn,
 .azc-manager-correction-modal .correction-dialog__char-count--warn {
 	border-color: var(--color-warning);
 	border-left-width: 4px;
@@ -248,7 +248,7 @@
 	color: var(--color-main-text);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__char-count--ok,
 .azc-manager-correction-modal .correction-dialog__char-count--ok {
 	border-color: var(--color-success);
 	border-left-width: 4px;
@@ -256,7 +256,7 @@
 	color: var(--color-main-text);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__status,
 .azc-manager-correction-modal .correction-dialog__status {
 	min-height: 0;
 	margin: 0;
@@ -268,21 +268,21 @@
 	border-radius: var(--border-radius, 6px);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__status:empty,
 .azc-manager-correction-modal .correction-dialog__status:empty {
 	display: none;
 	padding: 0;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__status:not(:empty),
 .azc-manager-correction-modal .correction-dialog__status:not(:empty) {
 	background: var(--color-background-hover);
 	border: 1px solid var(--color-border);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__status--error:not(:empty),
 .azc-manager-correction-modal .correction-dialog__status--error:not(:empty),
-#time-entry-correction-modal,
+#time-entry-correction-modal .correction-dialog__status.inline-message--error:not(:empty),
 .azc-manager-correction-modal .correction-dialog__status.inline-message--error:not(:empty) {
 	background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
 	border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
@@ -291,56 +291,56 @@
 	color: var(--color-main-text);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .modal-footer .btn,
 .azc-manager-correction-modal .modal-footer .btn {
 	min-height: 44px;
 	min-width: 9rem;
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-input,
 .azc-manager-correction-modal .form-input,
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-textarea,
 .azc-manager-correction-modal .form-textarea,
-#time-entry-correction-modal,
+#time-entry-correction-modal select,
 .azc-manager-correction-modal select {
 	color: var(--color-main-text);
 	background: var(--color-main-background);
 	border-color: var(--color-border);
 }
 
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-input:focus-visible,
 .azc-manager-correction-modal .form-input:focus-visible,
-#time-entry-correction-modal,
+#time-entry-correction-modal .form-textarea:focus-visible,
 .azc-manager-correction-modal .form-textarea:focus-visible,
-#time-entry-correction-modal,
+#time-entry-correction-modal select:focus-visible,
 .azc-manager-correction-modal select:focus-visible,
-#time-entry-correction-modal,
+#time-entry-correction-modal .btn:focus-visible,
 .azc-manager-correction-modal .btn:focus-visible {
 	outline: 2px solid var(--color-primary-element);
 	outline-offset: 2px;
 }
 
 @media (max-width: 768px) {
-	#time-entry-correction-modal,
-.azc-manager-correction-modal .modal-body,
-	#time-entry-correction-modal,
-.azc-manager-correction-modal > .modal-footer {
+	#time-entry-correction-modal .modal-body,
+	.azc-manager-correction-modal .modal-body,
+	#time-entry-correction-modal > .modal-footer,
+	.azc-manager-correction-modal > .modal-footer {
 		padding-left: var(--space-4, 1rem);
 		padding-right: var(--space-4, 1rem);
 	}
 
-	#time-entry-correction-modal,
-.azc-manager-correction-modal > .modal-footer {
+	#time-entry-correction-modal > .modal-footer,
+	.azc-manager-correction-modal > .modal-footer {
 		flex-direction: column-reverse;
 	}
 
-	#time-entry-correction-modal,
-.azc-manager-correction-modal .modal-footer .btn {
+	#time-entry-correction-modal .modal-footer .btn,
+	.azc-manager-correction-modal .modal-footer .btn {
 		width: 100%;
 	}
 
-	#time-entry-correction-modal,
-.azc-manager-correction-modal .correction-snapshot__table tbody th {
+	#time-entry-correction-modal .correction-snapshot__table tbody th,
+	.azc-manager-correction-modal .correction-snapshot__table tbody th {
 		width: 38%;
 	}
 }

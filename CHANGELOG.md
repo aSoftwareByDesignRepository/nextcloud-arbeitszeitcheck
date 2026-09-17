@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.8 - 2026-09-17
+
+### Fixed
+- **Request correction modal layout:** Employee “Request time entry correction” dialog no longer shifts form content to the right and clips fields. Broken CSS selector pairing had applied descendant rules (including a horizontal flex wrap) to the modal root. Manager correction dialogs were unaffected.
+
 ## 1.7.7 - 2026-09-17
 
 ### Added

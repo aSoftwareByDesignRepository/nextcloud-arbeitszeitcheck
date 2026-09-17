@@ -775,6 +775,39 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                         </fieldset>
 
+                        <?php if ($mode === 'create' && $manualTimeEntriesRequireApproval): ?>
+                        <fieldset class="time-entry-form-fieldset time-entry-form-fieldset--justification" aria-labelledby="entry-justification-heading">
+                            <legend id="entry-justification-heading" class="time-entry-form-fieldset__legend">
+                                <?php p($l->t('Reason for manager')); ?>
+                                <span class="form-required" aria-hidden="true">*</span>
+                            </legend>
+                            <p class="time-entry-form__justification-hint" id="entry-justification-block-hint">
+                                <?php p($l->t('Required for the audit trail (at least 10 characters).')); ?>
+                            </p>
+                            <div class="form-group">
+                                <label for="entry-justification" id="entry-justification-label" class="form-label">
+                                    <?php p($l->t('Why are you adding this time?')); ?>
+                                    <span class="sr-only"><?php p($l->t('required')); ?></span>
+                                </label>
+                                <textarea id="entry-justification"
+                                    name="justification"
+                                    class="form-textarea"
+                                    rows="4"
+                                    required
+                                    minlength="10"
+                                    maxlength="2000"
+                                    aria-required="true"
+                                    aria-invalid="false"
+                                    aria-labelledby="entry-justification-label"
+                                    aria-describedby="entry-justification-block-hint entry-justification-help entry-justification-count entry-justification-error"
+                                    placeholder="<?php p($l->t('Short reason for your manager…')); ?>"></textarea>
+                                <p id="entry-justification-help" class="form-help"><?php p($l->t('Explain why this time was not stamped automatically — for example a forgotten clock-out or work outside the office.')); ?></p>
+                                <p id="entry-justification-count" class="time-entry-form__char-count" aria-live="polite"></p>
+                                <div id="entry-justification-error" role="alert" class="form-error-container" style="display: none;"></div>
+                            </div>
+                        </fieldset>
+                        <?php endif; ?>
+
                         <div class="form-actions time-entry-form__actions" role="group" aria-label="<?php p($l->t('Form actions')); ?>">
                             <button type="submit"
                                     id="submit-button"

@@ -5049,7 +5049,11 @@
 		"Time recording is managed for you" : "Time recording is managed for you",
 		"Undertime waiver (minus → 0)" : "Undertime waiver (minus → 0)",
 		"Worked \/ target. Overtime Saldo is in the next card." : "Worked \/ target. Overtime Saldo is in the next card.",
-		"Your hours, overtime, and vacation." : "Your hours, overtime, and vacation."
+		"Your hours, overtime, and vacation." : "Your hours, overtime, and vacation.",
+		"Explain why this time was not stamped automatically — for example a forgotten clock-out or work outside the office." : "Explain why this time was not stamped automatically — for example a forgotten clock-out or work outside the office.",
+		"Reason for manager" : "Reason for manager",
+		"Short reason for your manager…" : "Short reason for your manager…",
+		"Why are you adding this time?" : "Why are you adding this time?"
 		}
 	);
 	});

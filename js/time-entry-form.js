@@ -65,6 +65,9 @@ class TimeEntryFormManager {
 		this.summaryBreakTime = document.getElementById('summary-break-time');
 		this.complianceStatus = document.getElementById('compliance-status');
 		this.descriptionTextarea = document.getElementById('entry-description');
+		this.justificationTextarea = document.getElementById('entry-justification');
+		this.justificationCount = document.getElementById('entry-justification-count');
+		this.justificationError = document.getElementById('entry-justification-error');
 		this.breakRequirementIndicator = document.getElementById('break-requirement-indicator');
 		this.breakRequirementText = document.getElementById('break-requirement-text');
 		this.autoBreakToggle = document.getElementById('auto-break-enabled');
@@ -77,6 +80,10 @@ class TimeEntryFormManager {
 		this.userDismissedAutoBreak = false;
 		this.maxWorkingHours = this.formConfig.maxDailyHours != null ? this.formConfig.maxDailyHours : 10;
 		this.maxBreaks = this.formConfig.maxBreaks != null ? this.formConfig.maxBreaks : 10;
+		const minJustRaw = parseInt(this.formConfig.minJustificationLength, 10);
+		this.minJustificationLength = (!isNaN(minJustRaw) && minJustRaw >= 1) ? minJustRaw : 10;
+		this.manualTimeEntriesRequireApproval = !!this.formConfig.manualTimeEntriesRequireApproval
+			|| !!(this.justificationTextarea && this.justificationTextarea.name === 'justification');
 
 		this.init();
 	}
@@ -88,6 +95,7 @@ class TimeEntryFormManager {
 		this.setupExistingBreakEntries();
 		this.setupTodayButton();
 		this.setupDateValidation();
+		this.setupJustificationField();
 		this.setupFormValidation();
 		this.setupFormSubmission();
 		this.prefillDescriptionFromQuery();
@@ -126,6 +134,116 @@ class TimeEntryFormManager {
 		} catch (e) {
 			// Ignore malformed query strings — create form stays usable.
 		}
+	}
+
+	/**
+	 * Four-eyes manual create: live character counter + a11y state for justification.
+	 */
+	setupJustificationField() {
+		if (!this.justificationTextarea) {
+			return;
+		}
+		this.justificationTouched = false;
+		const update = () => this.updateJustificationCount();
+		this.justificationTextarea.addEventListener('input', () => {
+			this.justificationTouched = true;
+			update();
+		});
+		this.justificationTextarea.addEventListener('blur', () => {
+			this.justificationTouched = true;
+			update();
+		});
+		update();
+	}
+
+	updateJustificationCount() {
+		if (!this.justificationTextarea) {
+			return;
+		}
+		const len = String(this.justificationTextarea.value || '').trim().length;
+		const min = this.minJustificationLength;
+		const remaining = Math.max(0, min - len);
+		const ready = len >= min;
+
+		if (this.justificationCount) {
+			if (ready) {
+				this.justificationCount.textContent = t('justificationReady')
+					.replace('{count}', String(len));
+				this.justificationCount.classList.remove('time-entry-form__char-count--warn');
+				this.justificationCount.classList.add('time-entry-form__char-count--ok');
+			} else {
+				this.justificationCount.textContent = t('justificationRemaining')
+					.replace('{remaining}', String(remaining))
+					.replace('{count}', String(len))
+					.replace('{min}', String(min));
+				this.justificationCount.classList.add('time-entry-form__char-count--warn');
+				this.justificationCount.classList.remove('time-entry-form__char-count--ok');
+			}
+		}
+
+		if (this.justificationTouched || this.formSubmitted) {
+			this.justificationTextarea.setAttribute('aria-invalid', ready ? 'false' : 'true');
+		} else {
+			this.justificationTextarea.setAttribute('aria-invalid', 'false');
+		}
+		if (ready) {
+			this.clearJustificationError();
+		}
+	}
+
+	clearJustificationError() {
+		if (!this.justificationError) {
+			return;
+		}
+		this.justificationError.style.display = 'none';
+		this.justificationError.textContent = '';
+	}
+
+	showJustificationError(message) {
+		if (!this.justificationError) {
+			return;
+		}
+		this.justificationError.textContent = message;
+		this.justificationError.style.display = 'block';
+	}
+
+	/**
+	 * @returns {string}
+	 */
+	getJustificationValue() {
+		if (!this.justificationTextarea) {
+			return '';
+		}
+		return String(this.justificationTextarea.value || '').trim().slice(0, 2000);
+	}
+
+	/**
+	 * Server contract: when four-eyes is on, justification must be ≥ min length.
+	 * @returns {boolean}
+	 */
+	validateJustification() {
+		if (!this.manualTimeEntriesRequireApproval && !this.justificationTextarea) {
+			return true;
+		}
+		if (!this.justificationTextarea) {
+			// Config says approval is required but the field is missing — fail closed.
+			this.showErrorNotification(t('justificationRequired'));
+			return false;
+		}
+		const text = this.getJustificationValue();
+		if (text.length < this.minJustificationLength) {
+			this.justificationTextarea.setAttribute('aria-invalid', 'true');
+			this.justificationTextarea.setCustomValidity(t('justificationRequired'));
+			this.showJustificationError(t('justificationRequired'));
+			this.updateJustificationCount();
+			this.justificationTextarea.focus();
+			this.justificationTextarea.reportValidity();
+			return false;
+		}
+		this.justificationTextarea.setCustomValidity('');
+		this.justificationTextarea.setAttribute('aria-invalid', 'false');
+		this.clearJustificationError();
+		return true;
 	}
 
 	/**
@@ -1525,6 +1643,10 @@ class TimeEntryFormManager {
 			isValid = false;
 		}
 
+		if (!this.validateJustification()) {
+			isValid = false;
+		}
+
 		return isValid;
 	}
 
@@ -1739,6 +1861,10 @@ class TimeEntryFormManager {
 				endTime: endTimeValue,
 				description: (formData.get('description') || '').trim()
 			};
+
+			if (this.manualTimeEntriesRequireApproval || this.justificationTextarea) {
+				data.justification = this.getJustificationValue();
+			}
 
 			const projectField = formData.get('projectCheckProjectId');
 			if (projectField !== null && String(projectField).trim() !== '') {

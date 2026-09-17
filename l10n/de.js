@@ -5049,7 +5049,11 @@
 		"Time recording is managed for you" : "Time recording is managed for you",
 		"Undertime waiver (minus → 0)" : "Undertime waiver (minus → 0)",
 		"Worked \/ target. Overtime Saldo is in the next card." : "Worked \/ target. Overtime Saldo is in the next card.",
-		"Your hours, overtime, and vacation." : "Your hours, overtime, and vacation."
+		"Your hours, overtime, and vacation." : "Your hours, overtime, and vacation.",
+		"Explain why this time was not stamped automatically — for example a forgotten clock-out or work outside the office." : "Erklären Sie, warum diese Zeit nicht automatisch gestempelt wurde — zum Beispiel vergessenes Ausstempeln oder Arbeit außer Haus.",
+		"Reason for manager" : "Begründung für die Führungskraft",
+		"Short reason for your manager…" : "Kurze Begründung für Ihre Führungskraft…",
+		"Why are you adding this time?" : "Warum tragen Sie diese Zeit nach?"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

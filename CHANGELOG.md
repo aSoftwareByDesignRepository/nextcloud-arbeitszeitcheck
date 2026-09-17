@@ -5,10 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.7.7 - 2026-09-16
+## 1.7.7 - 2026-09-17
 
 ### Added
 - **Admin-configurable offline stamp retention (24–72 h):** Global settings → Time recording. Default stays 24 hours; admins may raise to 48 or 72 for weekend outages. Server enforces the skew on `occurredAt`; capability `mobile.offlineStampQueue.maxOccurredSkewPastHours` mirrors the value. Hard ceiling remains 72 hours (not open-ended offline payroll).
+- **UI↔API client contracts:** Registry + workspace checker so server-required fields (e.g. justification) cannot ship without matching web and companion UI.
+
+### Fixed
+- **Manual time entry under manager approval:** When “Require manager approval for new manual time entries” is enabled, the create form now shows a required justification field (≥10 characters) and submits it. Previously the API rejected every save while the form had no place to enter a reason. Admin settings GET also returns the approval flags so clients can read them.
 
 ## 1.7.6 - 2026-09-16
 

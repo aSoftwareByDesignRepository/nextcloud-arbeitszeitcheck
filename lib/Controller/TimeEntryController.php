@@ -1033,7 +1033,8 @@ class TimeEntryController extends Controller
 				if (mb_strlen($justificationText) < 10) {
 					return new JSONResponse([
 						'success' => false,
-						'error' => $this->l10n->t('A justification of at least 10 characters is required for manual time entries.')
+						'error' => $this->l10n->t('A justification of at least 10 characters is required for manual time entries.'),
+						'error_code' => 'justification_too_short',
 					], Http::STATUS_BAD_REQUEST);
 				}
 			} else {

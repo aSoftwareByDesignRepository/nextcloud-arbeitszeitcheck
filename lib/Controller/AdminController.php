@@ -2286,6 +2286,8 @@ class AdminController extends Controller
 				'vacationCarryoverMaxDays' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS, ''),
 				'vacationRolloverEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_ENABLED, '1') === '1',
 				'vacationRolloverIncludeUnusedAnnual' => $this->appConfig->getAppValueString(Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0') === '1',
+				'timeEntryChangesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL, '0') === '1',
+				'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1',
 				'clockStampingEnabled' => $this->timeCaptureMethodService->isOrganizationClockStampingEnabled(),
 				'manualTimeEntryEnabled' => $this->timeCaptureMethodService->isOrganizationManualTimeEntryEnabled(),
 				'offlineStampMaxPastHours' => \OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::fromAppConfigString(

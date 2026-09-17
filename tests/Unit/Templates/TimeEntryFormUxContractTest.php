@@ -62,4 +62,23 @@ class TimeEntryFormUxContractTest extends TestCase
 		$this->assertStringContainsString('$tzMismatchForm', $this->template);
 		$this->assertStringContainsString('$tzMismatchList', $this->template);
 	}
+
+	public function testManualCreateShowsJustificationWhenApprovalRequired(): void
+	{
+		$this->assertStringContainsString('$manualTimeEntriesRequireApproval', $this->template);
+		$this->assertStringContainsString('id="entry-justification"', $this->template);
+		$this->assertStringContainsString('name="justification"', $this->template);
+		$this->assertStringContainsString('time-entry-form-fieldset--justification', $this->template);
+		$this->assertStringContainsString('Why are you adding this time?', $this->template);
+		$this->assertMatchesRegularExpression(
+			'/\$mode === \'create\' && \$manualTimeEntriesRequireApproval[\s\S]*id="entry-justification"/',
+			$this->template
+		);
+		// Callout alone is not enough — the field must be gated with the same flag.
+		$calloutPos = strpos($this->template, 'New manual entries need manager approval');
+		$fieldPos = strpos($this->template, 'id="entry-justification"');
+		$this->assertNotFalse($calloutPos);
+		$this->assertNotFalse($fieldPos);
+		$this->assertLessThan($fieldPos, $calloutPos);
+	}
 }

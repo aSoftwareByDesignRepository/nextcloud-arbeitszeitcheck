@@ -1420,6 +1420,48 @@
 	align-items: center;
 }
 
+/* Four-eyes justification: high-contrast length feedback (WCAG AA) */
+#app-content.azc-app--time-entries .time-entry-form-fieldset--justification {
+	border-color: var(--color-primary-element, var(--color-border));
+}
+
+#app-content.azc-app--time-entries .time-entry-form__justification-hint {
+	margin: 0 0 var(--azc-space-3, 0.75rem);
+	font-size: 0.9375rem;
+	line-height: 1.45;
+	color: var(--color-text-maxcontrast, var(--color-main-text));
+}
+
+#app-content.azc-app--time-entries .time-entry-form__char-count {
+	display: block;
+	margin: var(--azc-space-3, 0.75rem) 0 0;
+	padding: 0.625rem 0.875rem;
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1.45;
+	color: var(--color-main-text);
+	background: var(--color-main-background);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius, 6px);
+}
+
+#app-content.azc-app--time-entries .time-entry-form__char-count:empty {
+	display: none;
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+
+#app-content.azc-app--time-entries .time-entry-form__char-count--warn {
+	border-color: var(--color-warning);
+	border-left-width: 4px;
+}
+
+#app-content.azc-app--time-entries .time-entry-form__char-count--ok {
+	border-color: var(--color-success);
+	border-left-width: 4px;
+}
+
 #app-content.azc-app--time-entries .time-pair-matrix__row-label .form-label-icon {
 	margin-inline-end: 0.25rem;
 	color: var(--color-primary-element);

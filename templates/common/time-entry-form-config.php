@@ -29,6 +29,9 @@ $timeEntryFormConfig = [
 	'minuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::resolve(
 		\OCP\Server::get(\OCP\IConfig::class)
 	),
+	'manualTimeEntriesRequireApproval' => $mode === 'create'
+		&& !empty($_['manualTimeEntriesRequireApproval']),
+	'minJustificationLength' => 10,
 	'submitUrl' => $submitUrl,
 	'redirectUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
 	'timeEntriesListUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),

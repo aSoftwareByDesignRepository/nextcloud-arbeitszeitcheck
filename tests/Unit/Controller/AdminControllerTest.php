@@ -533,6 +533,10 @@ class AdminControllerTest extends TestCase
 		$this->assertTrue($data['settings']['missingClockInRemindersEnabled']);
 		$this->assertEquals(10.0, $data['settings']['maxDailyHours']);
 		$this->assertArrayHasKey('accessAllowedGroups', $data['settings']);
+		$this->assertArrayHasKey('manualTimeEntriesRequireApproval', $data['settings']);
+		$this->assertArrayHasKey('timeEntryChangesRequireApproval', $data['settings']);
+		$this->assertFalse($data['settings']['manualTimeEntriesRequireApproval']);
+		$this->assertFalse($data['settings']['timeEntryChangesRequireApproval']);
 	}
 
 	public function testGetNotificationSettingsReturnsNormalizedPayload(): void

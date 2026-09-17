@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "appId": "arbeitszeitcheck",
+  "companionDir": "mobile/arbeitszeitcheck",
+  "contracts": [
+    {
+      "id": "manual-time-entry-justification",
+      "param": "justification",
+      "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
+      "errorCodes": ["justification_too_short"],
+      "server": [
+        {
+          "file": "lib/Controller/TimeEntryController.php",
+          "needles": [
+            "params['justification']",
+            "justification_too_short",
+            "A justification of at least 10 characters is required for manual time entries."
+          ]
+        }
+      ],
+      "web": [
+        {
+          "file": "templates/time-entries.php",
+          "needles": [
+            "id=\"entry-justification\"",
+            "name=\"justification\"",
+            "$manualTimeEntriesRequireApproval"
+          ]
+        },
+        {
+          "file": "js/time-entry-form.js",
+          "needles": [
+            "validateJustification",
+            "data.justification = this.getJustificationValue()"
+          ]
+        },
+        {
+          "file": "lib/Controller/AdminController.php",
+          "needles": [
+            "'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1'"
+          ]
+        }
+      ],
+      "mobile": [
+        {
+          "file": "src/screens/CreateTimeEntryScreen.tsx",
+          "needles": [
+            "testID=\"time.create.justification\"",
+            "manualTimeEntriesRequireApproval",
+            "justification.trim().length >= 10"
+          ]
+        },
+        {
+          "file": "src/api/client.ts",
+          "needles": [
+            "justification?: string",
+            "requestBody.justification = justification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "time-entry-correction-justification",
+      "param": "justification",
+      "description": "Employee correction requests require ≥10 character justification on web and mobile.",
+      "errorCodes": ["justification_required", "justification_too_short"],
+      "server": [
+        {
+          "file": "lib/Controller/TimeEntryController.php",
+          "needles": [
+            "justification_required",
+            "justification_too_short",
+            "Justification is required for correction requests"
+          ]
+        }
+      ],
+      "web": [
+        {
+          "file": "templates/time-entries.php",
+          "needles": [
+            "id=\"correction-justification\"",
+            "name=\"justification\""
+          ]
+        },
+        {
+          "file": "js/time-entry-correction.js",
+          "needles": [
+            "correction-justification",
+            "justification:"
+          ]
+        }
+      ],
+      "mobile": [
+        {
+          "file": "src/screens/RequestCorrectionScreen.tsx",
+          "needles": [
+            "justification",
+            "MIN_CORRECTION_JUSTIFICATION"
+          ]
+        },
+        {
+          "file": "src/utils/correctionRequest.ts",
+          "needles": [
+            "MIN_CORRECTION_JUSTIFICATION",
+            "justification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "manager-correction-reason",
+      "param": "reason",
+      "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
+      "errorCodes": [],
+      "server": [
+        {
+          "file": "lib/Controller/ManagerController.php",
+          "needles": [
+            "A reason of at least 10 characters is required."
+          ]
+        }
+      ],
+      "web": [
+        {
+          "file": "js/common/time-entry-clock-form.js",
+          "needles": [
+            "minlength=\"10\"",
+            "reason.trim().length < 10",
+            "reason: reason.trim()"
+          ]
+        },
+        {
+          "file": "js/manager-correction-dialog.js",
+          "needles": [
+            "reason: result.payload.reason"
+          ]
+        }
+      ],
+      "mobile": null
+    }
+  ]
+}

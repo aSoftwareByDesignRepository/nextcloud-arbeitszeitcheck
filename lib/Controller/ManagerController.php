@@ -33,6 +33,7 @@ use OCA\ArbeitszeitCheck\Service\MonthClosureGuard;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Service\TimeZoneService;
 use OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService;
@@ -447,7 +448,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-dashboard', 'manager-dashboard', ['time-entry-correction']);
+		$this->registerFrontEndAssets('manager-dashboard', 'manager-dashboard', ['time-entry-correction'], ['manager-pending-time-entry-card']);
 
 		try {
 			$managerId = $this->getUserId();
@@ -2028,6 +2029,9 @@ class ManagerController extends Controller
 						$endTime = $entry->getEndTime();
 						$createdAt = $entry->getCreatedAt();
 						
+						$requestType = (($justificationData['type'] ?? '') === 'manual_create')
+							? 'manual_create'
+							: 'correction';
 						$pendingApprovals[] = [
 							'id' => $entry->getId(),
 							'type' => 'time_entry',
@@ -2041,6 +2045,7 @@ class ManagerController extends Controller
 								'durationHours' => $entry->getDurationHours(),
 								'description' => $entry->getDescription(),
 								'justification' => $justificationData['justification'] ?? '',
+								'requestType' => $requestType,
 								'original' => $justificationData['original'] ?? [],
 								'proposed' => $justificationData['proposed'] ?? []
 							],
@@ -2502,12 +2507,14 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($timeEntryId);
 
-			// Verify entry is pending approval
+			// Verify entry is pending approval — already decided → 409 so clients
+			// uniformly refresh (same envelope as ConcurrentDecisionException).
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Time entry is not pending approval')
-				], Http::STATUS_BAD_REQUEST);
+					'error' => $this->l10n->t('This time entry was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
 			}
 
 			// Verify manager may manage this employee (admin or team)
@@ -2549,6 +2556,8 @@ class ManagerController extends Controller
 					'success' => false,
 					'error' => $e->getMessage()
 				], Http::STATUS_BAD_REQUEST);
+			} catch (ConcurrentDecisionException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 			}
 
 			// Create audit log (full before/after for payroll evidence)
@@ -2580,6 +2589,8 @@ class ManagerController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('Time entry not found')
 			], Http::STATUS_NOT_FOUND);
+		} catch (ConcurrentDecisionException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
 				'Error in ManagerController::approveTimeEntryCorrection',
@@ -2608,12 +2619,14 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($timeEntryId);
 
-			// Verify entry is pending approval
+			// Verify entry is pending approval — already decided → 409 so clients
+			// uniformly refresh (same envelope as ConcurrentDecisionException).
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Time entry is not pending approval')
-				], Http::STATUS_BAD_REQUEST);
+					'error' => $this->l10n->t('This time entry was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
 			}
 
 			// Verify manager may manage this employee (admin or team)
@@ -2682,6 +2695,8 @@ class ManagerController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('Time entry not found')
 			], Http::STATUS_NOT_FOUND);
+		} catch (ConcurrentDecisionException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
 				'Error in ManagerController::rejectTimeEntryCorrection',
@@ -2857,6 +2872,9 @@ class ManagerController extends Controller
 						// Parse justification to get correction details
 						$justificationData = json_decode($entry->getJustification() ?? '{}', true);
 						
+						$requestType = (($justificationData['type'] ?? '') === 'manual_create')
+							? 'manual_create'
+							: 'correction';
 						$corrections[] = [
 							'id' => $entry->getId(),
 							'userId' => $entry->getUserId(),
@@ -2867,6 +2885,7 @@ class ManagerController extends Controller
 							'description' => $entry->getDescription(),
 							'status' => $entry->getStatus(),
 							'justification' => $justificationData['justification'] ?? '',
+							'requestType' => $requestType,
 							'original' => $justificationData['original'] ?? [],
 							'proposed' => $justificationData['proposed'] ?? [],
 							'requestedAt' => $justificationData['requested_at'] ?? null,

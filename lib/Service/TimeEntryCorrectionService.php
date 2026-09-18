@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
@@ -294,7 +295,7 @@ class TimeEntryCorrectionService
 		$encoded = json_encode($justificationData, JSON_THROW_ON_ERROR);
 		$entry->setJustification($encoded);
 
-		$updated = $this->timeEntryMapper->update($entry);
+		$updated = $this->persistPendingDecision($entry);
 		$this->runComplianceIfEnabled($updated);
 		$this->syncProjectCheckBilling($updated, $managerId);
 
@@ -332,7 +333,7 @@ class TimeEntryCorrectionService
 			$entry->setJustification($encoded);
 		}
 
-		$updated = $this->timeEntryMapper->update($entry);
+		$updated = $this->persistPendingDecision($entry);
 		$this->runComplianceIfEnabled($updated);
 		$this->syncProjectCheckBilling($updated, 'system');
 
@@ -344,6 +345,24 @@ class TimeEntryCorrectionService
 		$justificationData = json_decode($entry->getJustification() ?? '{}', true);
 		if (!is_array($justificationData)) {
 			$justificationData = [];
+		}
+
+		// Four-eyes reject of a *new* manual entry: there is no original snapshot to
+		// restore. restoreOriginalSnapshot([]) would keep the proposed clocks and set
+		// status=completed — i.e. "Reject" would silently approve hours. That is forbidden.
+		if (($justificationData['type'] ?? '') === 'manual_create') {
+			$entry->setStatus(TimeEntry::STATUS_REJECTED);
+			$entry->setApprovedByUserId(null);
+			$entry->setApprovedAt(null);
+			$entry->setUpdatedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
+			$justificationData['rejected_at'] = date('c');
+			$justificationData['rejected_by'] = $managerId;
+			if ($reason !== null && $reason !== '') {
+				$justificationData['rejection_reason'] = $reason;
+			}
+			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
+
+			return $this->persistPendingDecision($entry);
 		}
 
 		$originalData = is_array($justificationData['original'] ?? null) ? $justificationData['original'] : [];
@@ -359,7 +378,7 @@ class TimeEntryCorrectionService
 			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 		}
 
-		return $this->timeEntryMapper->update($entry);
+		return $this->persistPendingDecision($entry);
 	}
 
 	/**
@@ -383,7 +402,22 @@ class TimeEntryCorrectionService
 		$entry->setJustification(null);
 		$entry->setUpdatedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
 
-		return $this->timeEntryMapper->update($entry);
+		return $this->persistPendingDecision($entry);
+	}
+
+	/**
+	 * Write a pending-approval decision with an atomic status guard.
+	 *
+	 * @throws ConcurrentDecisionException When another manager already decided
+	 */
+	private function persistPendingDecision(TimeEntry $entry): TimeEntry
+	{
+		if (!$this->timeEntryMapper->updateIfPendingApproval($entry)) {
+			throw new ConcurrentDecisionException(
+				$this->l10n->t('This time entry was already decided by another manager.')
+			);
+		}
+		return $entry;
 	}
 
 	public function applyManagerCorrection(TimeEntry $entry, array $proposal, string $managerId, string $reason): TimeEntry

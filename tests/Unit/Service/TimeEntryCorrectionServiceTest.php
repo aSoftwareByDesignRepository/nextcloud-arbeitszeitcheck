@@ -8,6 +8,7 @@ declare(strict_types=1);
  * Focus is on the security-critical and audit-critical behaviour:
  *  - approve() persists the proposal AND triggers ArbZG §4/§3 adjustments
  *  - reject() restores the original (incl. breaks JSON)
+ *  - reject() of manual_create marks rejected (never completes hours)
  *  - cancelByEmployee() deletes manual_create rows / restores correction rows
  *  - applyBreaksJson semantics (15-minute floor, replace-not-merge)
  *  - applyManagerCorrection preserves the previous justification for traceability
@@ -80,6 +81,11 @@ class TimeEntryCorrectionServiceTest extends TestCase
 
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
 		$this->timeEntryMapper->method('update')->willReturnCallback(static fn (TimeEntry $e): TimeEntry => $e);
+		$this->timeEntryMapper->method('updateIfPendingApproval')->willReturnCallback(
+			static function (TimeEntry $e): bool {
+				return true;
+			}
+		);
 
 		$this->service = new TimeEntryCorrectionService(
 			$this->timeEntryMapper,
@@ -238,6 +244,80 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$result = $this->service->cancelByEmployee($entry);
 
 		$this->assertNull($result, 'manual_create cancellations must signal a row delete');
+	}
+
+	/**
+	 * Absolute No-Go regression: rejecting a four-eyes manual create must NOT
+	 * complete the hours (empty original snapshot previously flipped status to completed).
+	 */
+	public function testRejectManualCreateMarksRejectedNotCompleted(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setIsManualEntry(true);
+		$entry->setStartTime(new \DateTime('2026-09-17T09:00:00+02:00'));
+		$entry->setEndTime(new \DateTime('2026-09-17T14:00:00+02:00'));
+		$entry->setJustification(json_encode([
+			'type' => 'manual_create',
+			'justification' => 'estoy probando',
+			'proposed' => [
+				'startTime' => '2026-09-17T09:00:00+02:00',
+				'endTime' => '2026-09-17T14:00:00+02:00',
+				'description' => '',
+			],
+			'requested_at' => '2026-09-18T06:14:19+00:00',
+		]));
+
+		$result = $this->service->reject($entry, 'manager1', 'Not needed');
+
+		$this->assertSame(TimeEntry::STATUS_REJECTED, $result->getStatus());
+		$this->assertNotSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		$this->assertNull($result->getApprovedByUserId());
+		$this->assertNull($result->getApprovedAt());
+		// Clocks stay for audit; they must not become countable completed work.
+		$this->assertSame('2026-09-17T09:00:00+0200', $result->getStartTime()->format('Y-m-d\TH:i:sO'));
+		$this->assertSame('2026-09-17T14:00:00+0200', $result->getEndTime()->format('Y-m-d\TH:i:sO'));
+
+		$justification = json_decode((string)$result->getJustification(), true);
+		$this->assertSame('manual_create', $justification['type']);
+		$this->assertSame('Not needed', $justification['rejection_reason']);
+		$this->assertSame('manager1', $justification['rejected_by']);
+		$this->assertArrayHasKey('rejected_at', $justification);
+	}
+
+	public function testApproveManualCreateCompletesEntry(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setIsManualEntry(true);
+		$entry->setStartTime(new \DateTime('2026-09-17T09:00:00+02:00'));
+		$entry->setEndTime(new \DateTime('2026-09-17T14:00:00+02:00'));
+		$entry->setJustification(json_encode([
+			'type' => 'manual_create',
+			'justification' => 'estoy probando',
+			'proposed' => [
+				'startTime' => '2026-09-17T09:00:00+02:00',
+				'endTime' => '2026-09-17T14:00:00+02:00',
+				'description' => '',
+			],
+		]));
+
+		$this->timeTrackingService->expects($this->atLeastOnce())
+			->method('calculateAndSetAutomaticBreak')
+			->with($this->isInstanceOf(TimeEntry::class));
+		$this->timeTrackingService->expects($this->atLeastOnce())
+			->method('adjustEndTimeForDailyMaximum')
+			->with($this->isInstanceOf(TimeEntry::class));
+
+		$result = $this->service->approve($entry, 'manager1', 'OK');
+
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		$this->assertSame('manager1', $result->getApprovedByUserId());
+		$this->assertNotNull($result->getApprovedAt());
+		$justification = json_decode((string)$result->getJustification(), true);
+		$this->assertSame('manual_create', $justification['type']);
+		$this->assertSame('manager1', $justification['approved_by']);
+		$this->assertSame('OK', $justification['approval_comment']);
 	}
 
 	public function testCancelByEmployeeRestoresOriginalForCorrection(): void
@@ -501,5 +581,70 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		], 'manager1');
 
 		$this->assertNull($error);
+	}
+
+	public function testApproveThrowsWhenPendingDecisionLostRace(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setIsManualEntry(true);
+		$entry->setJustification(json_encode([
+			'type' => 'manual_create',
+			'justification' => 'estoy probando',
+			'proposed' => [],
+		]));
+
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('findOverlapping')->willReturn([]);
+		$mapper->expects($this->once())->method('updateIfPendingApproval')->willReturn(false);
+		$mapper->expects($this->never())->method('update');
+
+		$service = new TimeEntryCorrectionService(
+			$mapper,
+			$this->monthClosureGuard,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->notificationService,
+			$this->auditLogMapper,
+			$this->config,
+			$this->l10n,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+		);
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class);
+		$this->expectExceptionMessage('This time entry was already decided by another manager.');
+		$service->approve($entry, 'manager2', null);
+	}
+
+	public function testRejectThrowsWhenPendingDecisionLostRace(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setIsManualEntry(true);
+		$entry->setJustification(json_encode([
+			'type' => 'manual_create',
+			'justification' => 'estoy probando',
+			'proposed' => [],
+		]));
+
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->expects($this->once())->method('updateIfPendingApproval')->willReturn(false);
+
+		$service = new TimeEntryCorrectionService(
+			$mapper,
+			$this->monthClosureGuard,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->notificationService,
+			$this->auditLogMapper,
+			$this->config,
+			$this->l10n,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+		);
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class);
+		$service->reject($entry, 'manager2', 'too late');
 	}
 }

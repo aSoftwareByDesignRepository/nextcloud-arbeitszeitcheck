@@ -398,6 +398,72 @@ class ManagerControllerTest extends TestCase
 
 		$this->assertTrue($data['success']);
 		$this->assertArrayHasKey('pendingApprovals', $data);
+		$timeEntryRows = array_values(array_filter(
+			$data['pendingApprovals'],
+			static fn(array $row): bool => ($row['type'] ?? '') === 'time_entry'
+		));
+		$this->assertCount(1, $timeEntryRows);
+		$this->assertSame('correction', $timeEntryRows[0]['summary']['requestType']);
+		$this->assertSame('Correction needed', $timeEntryRows[0]['summary']['justification']);
+		$this->assertArrayHasKey('date', $timeEntryRows[0]['summary']);
+		$this->assertArrayHasKey('startTime', $timeEntryRows[0]['summary']);
+		$this->assertArrayHasKey('endTime', $timeEntryRows[0]['summary']);
+	}
+
+	/**
+	 * Manual create pending approvals expose requestType=manual_create inside summary.
+	 */
+	public function testGetPendingApprovalsExposesManualCreateRequestType(): void
+	{
+		$managerId = 'manager1';
+		$teamMemberId = 'employee1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
+		$this->userManager->method('getDisplayName')->willReturn('Iban Sesma');
+
+		$this->absenceMapper->method('findPendingForUsers')->willReturn([]);
+
+		$timeEntry = new TimeEntry();
+		$timeEntry->setId(8);
+		$timeEntry->setUserId($teamMemberId);
+		$timeEntry->setStartTime(new \DateTime('2026-09-17 09:00:00'));
+		$timeEntry->setEndTime(new \DateTime('2026-09-17 14:00:00'));
+		$timeEntry->setBreakStartTime(null);
+		$timeEntry->setBreakEndTime(null);
+		$timeEntry->setBreaks(null);
+		$timeEntry->setDescription('');
+		$timeEntry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$timeEntry->setIsManualEntry(true);
+		$timeEntry->setJustification(json_encode([
+			'type' => 'manual_create',
+			'justification' => 'estoy probando',
+			'proposed' => [
+				'startTime' => '2026-09-17T09:00:00+02:00',
+				'endTime' => '2026-09-17T14:00:00+02:00',
+				'description' => '',
+			],
+			'requested_at' => '2026-09-18T06:14:19+00:00',
+		]));
+		$timeEntry->setCreatedAt(new \DateTime('2026-09-18T06:14:19+00:00'));
+		$timeEntry->setUpdatedAt(new \DateTime('2026-09-18T06:14:19+00:00'));
+
+		$this->timeEntryMapper->method('findPendingApprovalForUsers')
+			->willReturn([$timeEntry]);
+
+		$response = $this->controller->getPendingApprovals('time_entry');
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertCount(1, $data['pendingApprovals']);
+		$row = $data['pendingApprovals'][0];
+		$this->assertSame('time_entry', $row['type']);
+		$this->assertSame('manual_create', $row['summary']['requestType']);
+		$this->assertSame('estoy probando', $row['summary']['justification']);
+		$this->assertSame([], $row['summary']['original']);
+		$this->assertIsArray($row['summary']['proposed']);
 	}
 
 	/**

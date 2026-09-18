@@ -355,7 +355,7 @@
                 const timeEntries = list.filter(function(item) { return item.type === 'time_entry'; });
                 if (timeEntries.length === 0) {
                     emptyEl.classList.remove('visually-hidden');
-                    emptyEl.textContent = t('No pending time entry corrections.', 'No pending time entry corrections.');
+                    emptyEl.textContent = t('No pending time entries.', 'No pending time entries.');
                     itemsEl.innerHTML = '';
                 } else {
                     emptyEl.classList.add('visually-hidden');
@@ -369,7 +369,7 @@
                 loadingEl.setAttribute('aria-hidden', 'true');
                 itemsEl.setAttribute('aria-hidden', 'true');
                 emptyEl.classList.remove('visually-hidden');
-                emptyEl.textContent = t('Error loading pending time entry corrections.', 'Error loading pending time entry corrections.');
+                emptyEl.textContent = t('Error loading pending time entries.', 'Error loading pending time entries.');
             }
         });
     }
@@ -407,41 +407,18 @@
     }
 
     function renderTimeEntryCard(item) {
-        const id = item.id;
-        const displayName = escapeHtml(item.displayName || item.userId || '');
-        const date = formatDateForDisplay((item.startTime || '').slice(0, 10));
-        const justificationText = item.justification || '';
-        const justification = justificationText ? escapeHtml(String(justificationText).substring(0, 300)) : '';
-        const orig = item.original || {};
-        const prop = item.proposed || {};
-
-        const diffHtml = [
-            '<div class="manager-correction-diff" role="group" aria-label="' + escapeHtml(t('Correction comparison', 'Correction comparison')) + '">',
-            '<div class="manager-correction-diff__header">',
-            '<span class="manager-correction-diff__field"></span>',
-            '<span class="manager-correction-diff__label">' + escapeHtml(t('Current (Ist)', 'Current (Ist)')) + '</span>',
-            '<span class="manager-correction-diff__label">' + escapeHtml(t('Proposed (Soll)', 'Proposed (Soll)')) + '</span>',
-            '</div>',
-            buildCorrectionDiffRow(t('Start', 'Start'), formatCorrectionTime(orig.startTime), formatCorrectionTime(prop.startTime)),
-            buildCorrectionDiffRow(t('End', 'End'), formatCorrectionTime(orig.endTime), formatCorrectionTime(prop.endTime)),
-            buildCorrectionDiffRow(t('Breaks', 'Breaks'), formatCorrectionBreaks(orig.breaks), formatCorrectionBreaks(prop.breaks)),
-            '</div>',
-        ].join('');
-
-        return (
-            '<div class="pending-approval-card pending-approval-card--time-entry" data-time-entry-id="' + escapeHtml(String(id)) + '" role="article">' +
-            '  <div class="pending-approval-card__body">' +
-            '    <p class="pending-approval-card__title"><strong>' + displayName + '</strong> – ' + escapeHtml(t('Time entry correction', 'Time entry correction')) + '</p>' +
-            '    <p class="pending-approval-card__meta">' + escapeHtml(date) + '</p>' +
-            diffHtml +
-            (justification ? '<p class="pending-approval-card__reason"><strong>' + escapeHtml(t('Reason:', 'Reason:')) + '</strong> <em>' + justification + (String(justificationText).length > 300 ? '…' : '') + '</em></p>' : '') +
-            '    <div class="pending-approval-card__actions">' +
-            '      <button type="button" class="azc-btn azc-btn--primary btn-approve-time-entry" data-time-entry-id="' + escapeHtml(String(id)) + '" aria-label="' + escapeHtml(t('Approve', 'Approve') + ' ' + (item.displayName || '')) + '">' + t('Approve', 'Approve') + '</button>' +
-            '      <button type="button" class="azc-btn azc-btn--secondary btn-reject-time-entry" data-time-entry-id="' + escapeHtml(String(id)) + '" aria-label="' + escapeHtml(t('Reject', 'Reject') + ' ' + (item.displayName || '')) + '">' + t('Reject', 'Reject') + '</button>' +
-            '    </div>' +
-            '  </div>' +
-            '</div>'
-        );
+        const Card = window.ArbeitszeitCheckManagerPendingTimeEntry;
+        if (!Card || typeof Card.renderTimeEntryApprovalCardHtml !== 'function') {
+            return '';
+        }
+        return Card.renderTimeEntryApprovalCardHtml(item, {
+            escapeHtml: escapeHtml,
+            t: t,
+            formatDateForDisplay: formatDateForDisplay,
+            formatCorrectionTime: formatCorrectionTime,
+            formatCorrectionBreaks: formatCorrectionBreaks,
+            buildCorrectionDiffRow: buildCorrectionDiffRow,
+        });
     }
 
     function bindTimeEntryButtons() {
@@ -460,12 +437,16 @@
     }
 
     function approveTimeEntry(timeEntryId) {
+        const card = document.querySelector('.pending-approval-card[data-time-entry-id="' + timeEntryId + '"]');
+        const isManualCreate = card && card.getAttribute('data-request-type') === 'manual_create';
         Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/time-entries/' + timeEntryId + '/approve-correction'), {
             method: 'POST',
             data: {},
             onSuccess: function(data) {
                 if (data.success) {
-                    Messaging.showSuccess(t('Time entry correction approved successfully', 'Time entry correction approved successfully'));
+                    Messaging.showSuccess(isManualCreate
+                        ? t('Manual time entry approved.', 'Manual time entry approved.')
+                        : t('Time entry correction approved successfully', 'Time entry correction approved successfully'));
                     removeTimeEntryCard(timeEntryId);
                     loadPendingTimeEntryCorrections();
                     loadTeamCompliance();
@@ -473,8 +454,19 @@
                     Messaging.showError(data.error || t('Failed to approve.', 'Failed to approve.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to approve time entry correction.', 'Failed to approve time entry correction.'));
+            onError: function(error) {
+                if (error && (error.status === 409 || (error.data && error.data.error_code === 'already_decided'))) {
+                    Messaging.showError(
+                        (error.data && error.data.error)
+                            || t('This time entry was already decided by another manager.', 'This time entry was already decided by another manager.')
+                    );
+                    removeTimeEntryCard(timeEntryId);
+                    loadPendingTimeEntryCorrections();
+                    return;
+                }
+                Messaging.showError(isManualCreate
+                    ? t('Failed to approve manual time entry.', 'Failed to approve manual time entry.')
+                    : t('Failed to approve time entry correction.', 'Failed to approve time entry correction.'));
             }
         });
     }
@@ -515,20 +507,35 @@
     }
 
     function rejectTimeEntry(timeEntryId, reason) {
+        const card = document.querySelector('.pending-approval-card[data-time-entry-id="' + timeEntryId + '"]');
+        const isManualCreate = card && card.getAttribute('data-request-type') === 'manual_create';
         Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/time-entries/' + timeEntryId + '/reject-correction'), {
             method: 'POST',
             data: { reason: reason || '' },
             onSuccess: function(data) {
                 if (data.success) {
-                    Messaging.showSuccess(t('Time entry correction rejected', 'Time entry correction rejected'));
+                    Messaging.showSuccess(isManualCreate
+                        ? t('Manual time entry rejected.', 'Manual time entry rejected.')
+                        : t('Time entry correction rejected', 'Time entry correction rejected'));
                     removeTimeEntryCard(timeEntryId);
                     loadPendingTimeEntryCorrections();
                 } else {
                     Messaging.showError(data.error || t('Failed to reject.', 'Failed to reject.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to reject time entry correction.', 'Failed to reject time entry correction.'));
+            onError: function(error) {
+                if (error && (error.status === 409 || (error.data && error.data.error_code === 'already_decided'))) {
+                    Messaging.showError(
+                        (error.data && error.data.error)
+                            || t('This time entry was already decided by another manager.', 'This time entry was already decided by another manager.')
+                    );
+                    removeTimeEntryCard(timeEntryId);
+                    loadPendingTimeEntryCorrections();
+                    return;
+                }
+                Messaging.showError(isManualCreate
+                    ? t('Failed to reject manual time entry.', 'Failed to reject manual time entry.')
+                    : t('Failed to reject time entry correction.', 'Failed to reject time entry correction.'));
             }
         });
     }

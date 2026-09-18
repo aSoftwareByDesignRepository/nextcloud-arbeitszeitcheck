@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.9 - 2026-09-18
+
+### Fixed
+- **Manager pending manual time entries:** Approval cards now read nested `summary` from the pending-approvals API (date, start/end, duration, justification) and label new manual entries as “New manual time entry” instead of an empty “Time entry correction” Ist/Soll card.
+- **Rejecting a four-eyes manual create:** Manager reject now marks the entry `rejected` instead of accidentally completing it (empty `original` snapshot previously restored clocks and set `completed`). Pending entries are also excluded from hour/break totals until approved.
+- **Concurrent approve/reject:** Pending time-entry decisions use an atomic `status = pending_approval` write guard; the losing manager gets HTTP 409 (`already_decided`) instead of overwriting the winner. Non-pending pre-checks on approve/reject also return 409 with the same code so clients refresh uniformly.
+- **Manager pending tab copy:** Tab/empty/error strings say “Time entries” (covers manual creates and corrections), not only “corrections.”
+- **Locale parity:** `New manual time entry` string present in all ship locales (da/fr/it/nb/nl/pl/pt_BR/sv).
+
+### Tests
+- E2E: `tests/e2e/manual-create-pending-approval.spec.js` (manager card + reject/approve ground truth).
+- Mutation: `tests/Mutation/run-pending-decision-race-mutations.sh`.
 ## 1.7.8 - 2026-09-17
 
 ### Fixed

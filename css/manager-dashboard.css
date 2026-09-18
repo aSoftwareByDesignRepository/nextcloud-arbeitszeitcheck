@@ -90,6 +90,30 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
+#app-content.azc-app--manager-dashboard .pending-approval-card__facts {
+	display: grid;
+	gap: var(--azc-space-1, 0.35rem);
+	margin: 0 0 var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app--manager-dashboard .pending-approval-card__fact {
+	display: grid;
+	grid-template-columns: minmax(5rem, 7rem) 1fr;
+	gap: var(--azc-space-2, 0.5rem);
+	margin: 0;
+	align-items: baseline;
+}
+
+#app-content.azc-app--manager-dashboard .pending-approval-card__fact dt {
+	margin: 0;
+	font-weight: 600;
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+#app-content.azc-app--manager-dashboard .pending-approval-card__fact dd {
+	margin: 0;
+}
+
 #app-content.azc-app--manager-dashboard .pending-approval-card__actions {
 	display: flex;
 	flex-wrap: wrap;

@@ -92,14 +92,14 @@ $teamMembers = $_['teamMembers'] ?? [];
 				<div class="azc-card__header-text">
 					<h2 id="pending-approvals-title" class="azc-card__title"><?php p($l->t('Pending approvals')); ?></h2>
 					<p class="azc-card__lead">
-						<?php p($l->t('Review and approve or reject absence requests and time entry corrections from your team.')); ?>
+						<?php p($l->t('Review and approve or reject absence requests and time entries from your team.')); ?>
 					</p>
 				</div>
 			</header>
 			<div class="azc-card__body">
 				<div class="pending-approvals-tabs" role="tablist" aria-label="<?php p($l->t('Filter pending approvals by type')); ?>">
 					<button type="button" class="pending-approvals-tab pending-approvals-tab--active" role="tab" aria-selected="true" aria-controls="pending-absences-panel" id="tab-absences"><?php p($l->t('Absences')); ?></button>
-					<button type="button" class="pending-approvals-tab" role="tab" aria-selected="false" aria-controls="pending-time-entries-panel" id="tab-time-entries"><?php p($l->t('Time entry corrections')); ?></button>
+					<button type="button" class="pending-approvals-tab" role="tab" aria-selected="false" aria-controls="pending-time-entries-panel" id="tab-time-entries"><?php p($l->t('Time entries')); ?></button>
 				</div>
 				<div id="pending-absences-panel" class="pending-approvals-panel" role="tabpanel" aria-labelledby="tab-absences">
 					<div id="pending-approvals-list" class="pending-approvals-list" role="region" aria-live="polite" aria-label="<?php p($l->t('List of pending absence requests')); ?>">
@@ -109,10 +109,10 @@ $teamMembers = $_['teamMembers'] ?? [];
 					</div>
 				</div>
 				<div id="pending-time-entries-panel" class="pending-approvals-panel pending-approvals-panel--hidden" role="tabpanel" aria-labelledby="tab-time-entries" aria-hidden="true">
-					<div id="pending-time-entries-list" class="pending-approvals-list" role="region" aria-live="polite" aria-label="<?php p($l->t('List of pending time entry corrections')); ?>">
+					<div id="pending-time-entries-list" class="pending-approvals-list" role="region" aria-live="polite" aria-label="<?php p($l->t('List of pending time entries')); ?>">
 						<p class="pending-approvals-loading" id="pending-time-entries-loading" aria-hidden="true"><?php p($l->t('Loading…')); ?></p>
 						<div id="pending-time-entries-items" class="pending-approvals-items" aria-hidden="true"></div>
-						<p class="pending-approvals-empty azc-empty-state__text visually-hidden" id="pending-time-entries-empty"><?php p($l->t('No pending time entry corrections.')); ?></p>
+						<p class="pending-approvals-empty azc-empty-state__text visually-hidden" id="pending-time-entries-empty"><?php p($l->t('No pending time entries.')); ?></p>
 					</div>
 				</div>
 			</div>
@@ -218,9 +218,9 @@ $teamMembers = $_['teamMembers'] ?? [];
 	window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
 	Object.assign(window.ArbeitszeitCheck.l10n, {
 		"No pending absence requests.": <?php echo json_encode($l->t('No pending absence requests.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-		"No pending time entry corrections.": <?php echo json_encode($l->t('No pending time entry corrections.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"No pending time entries.": <?php echo json_encode($l->t('No pending time entries.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Error loading pending approvals.": <?php echo json_encode($l->t('Error loading pending approvals.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-		"Error loading pending time entry corrections.": <?php echo json_encode($l->t('Error loading pending time entry corrections.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Error loading pending time entries.": <?php echo json_encode($l->t('Error loading pending time entries.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"days": <?php echo json_encode($l->t('days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Approve": <?php echo json_encode($l->t('Approve'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Reject": <?php echo json_encode($l->t('Reject'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
@@ -237,6 +237,9 @@ $teamMembers = $_['teamMembers'] ?? [];
 		"Failed to reject.": <?php echo json_encode($l->t('Failed to reject.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Failed to reject absence.": <?php echo json_encode($l->t('Failed to reject absence.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Time entry correction": <?php echo json_encode($l->t('Time entry correction'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"New manual time entry": <?php echo json_encode($l->t('New manual time entry'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Duration": <?php echo json_encode($l->t('Duration'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"hours": <?php echo json_encode($l->t('hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Original:": <?php echo json_encode($l->t('Original:'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Proposed:": <?php echo json_encode($l->t('Proposed:'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Time entry correction approved successfully": <?php echo json_encode($l->t('Time entry correction approved successfully'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,

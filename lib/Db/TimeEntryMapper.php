@@ -454,7 +454,9 @@ class TimeEntryMapper extends QBMapper
 		$entries = $this->findByUserAndDateRange($userId, $startDate, $endDate);
 		$totalHours = 0.0;
 		foreach ($entries as $entry) {
-			if (in_array($entry->getStatus(), [TimeEntry::STATUS_COMPLETED, TimeEntry::STATUS_PENDING_APPROVAL])) {
+			// Only completed entries count toward worked hours. Pending four-eyes
+			// manual creates / corrections must not inflate totals before approval.
+			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED) {
 				$totalHours += $entry->getWorkingDurationHours() ?? 0.0;
 			}
 		}
@@ -474,7 +476,7 @@ class TimeEntryMapper extends QBMapper
 		$entries = $this->findByUserAndDateRange($userId, $startDate, $endDate);
 		$totalBreakHours = 0.0;
 		foreach ($entries as $entry) {
-			if (in_array($entry->getStatus(), [TimeEntry::STATUS_COMPLETED, TimeEntry::STATUS_PENDING_APPROVAL])) {
+			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED) {
 				$totalBreakHours += $entry->getBreakDurationHours();
 			}
 		}
@@ -998,6 +1000,48 @@ class TimeEntryMapper extends QBMapper
 		} catch (DoesNotExistException $e) {
 			return null;
 		}
+	}
+
+	/**
+	 * Persist a pending-approval decision only while the row is still pending.
+	 *
+	 * Same shape as {@see QBMapper::update()}, plus `AND status = pending_approval`.
+	 * Returns false when another writer already left pending (0 rows) — callers must
+	 * treat that as a lost concurrency race, never overwrite completed/rejected rows.
+	 */
+	public function updateIfPendingApproval(TimeEntry $entry): bool
+	{
+		$properties = $entry->getUpdatedFields();
+		if (\count($properties) === 0) {
+			return true;
+		}
+
+		$id = $entry->getId();
+		if ($id === null) {
+			throw new \InvalidArgumentException('Entity which should be updated has no id');
+		}
+
+		unset($properties['id']);
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->tableName);
+
+		foreach ($properties as $property => $_updated) {
+			$column = $entry->propertyToColumn($property);
+			$getter = 'get' . ucfirst($property);
+			$value = $entry->$getter();
+			$type = $this->getParameterTypeForProperty($entry, $property);
+			$qb->set($column, $qb->createNamedParameter($value, $type));
+		}
+
+		$idType = $this->getParameterTypeForProperty($entry, 'id');
+		$qb->where($qb->expr()->eq('id', $qb->createNamedParameter($id, $idType)))
+			->andWhere($qb->expr()->eq(
+				'status',
+				$qb->createNamedParameter(TimeEntry::STATUS_PENDING_APPROVAL, IQueryBuilder::PARAM_STR)
+			));
+
+		return $qb->executeStatement() === 1;
 	}
 
 	/**

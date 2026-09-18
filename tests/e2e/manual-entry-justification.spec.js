@@ -1,7 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv } from './helpers/auth.js'
-import { api } from './helpers/api.js'
+import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
+
+function addDays(isoDate, days) {
+	const d = new Date(`${isoDate}T00:00:00Z`)
+	d.setUTCDate(d.getUTCDate() + days)
+	return d.toISOString().slice(0, 10)
+}
 
 test.describe('Manual time entry justification (four-eyes)', () => {
 	test.skip(!process.env.NC_ADMIN_USER || !process.env.NC_EMPLOYEE_USER, 'Requires NC_ADMIN_USER and NC_EMPLOYEE_USER')
@@ -56,19 +62,27 @@ test.describe('Manual time entry justification (four-eyes)', () => {
 			// Prefer API submit for the persistence proof (datepicker is readonly; form
 			// times collide with prior E2E/fixture rows). UI proof above already covers
 			// the missing-field bug; API proves justification is accepted end-to-end.
+			// Scan historical dates to avoid shared-dev overlap with today's clock slots.
 			const stamp = Date.now()
-			const startH = String(22 + (stamp % 2)).padStart(2, '0')
-			const startM = String((stamp % 12) * 5).padStart(2, '0')
-			const endM = String(Math.min(55, parseInt(startM, 10) + 25)).padStart(2, '0')
-			const isoDate = new Date().toISOString().slice(0, 10)
-			const create = await api(employeePage, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
-				data: {
-					date: isoDate,
-					startTime: `${startH}:${startM}`,
-					endTime: `${startH}:${endM}`,
-					justification: reason,
-				},
-			})
+			const base = addDays('1993-06-01', stamp % 300)
+			let create = null
+			for (let i = 0; i < 40; i++) {
+				const date = addDays(base, i)
+				const startH = String(10 + (i % 6)).padStart(2, '0')
+				const res = await apiAllowFailure(employeePage, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
+					data: {
+						date,
+						startTime: `${startH}:10`,
+						endTime: `${startH}:40`,
+						justification: reason,
+					},
+				})
+				if (res.ok) {
+					create = res.json
+					break
+				}
+			}
+			expect(create, 'seed manual create with justification').toBeTruthy()
 			expect(create.success).toBe(true)
 			expect(String(create.message || '')).toMatch(/approval/i)
 			expect(['pending_approval', 'completed']).toContain(create.entry?.status)

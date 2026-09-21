@@ -21,6 +21,7 @@ $kioskAdminUrl = (string)($_['kioskAdminUrl'] ?? '');
 $apiLicenseUrl = (string)($_['apiLicenseUrl'] ?? '');
 $apiClearLicenseUrl = (string)($_['apiClearLicenseUrl'] ?? '');
 $apiSeatsUrl = (string)($_['apiSeatsUrl'] ?? '');
+$apiSeatsBatchUrl = (string)($_['apiSeatsBatchUrl'] ?? '');
 $apiRemoveSeatUrl = (string)($_['apiRemoveSeatUrl'] ?? '');
 $apiSearchUsersUrl = (string)($_['apiSearchUsersUrl'] ?? '');
 $requesttoken = (string)($_['requesttoken'] ?? '');
@@ -88,6 +89,7 @@ $licenseContactActions = static function (\OCP\IL10N $l) use ($licenseRenewMailt
 	data-api-license="<?php p($apiLicenseUrl); ?>"
 	data-api-clear-license="<?php p($apiClearLicenseUrl); ?>"
 	data-api-seats="<?php p($apiSeatsUrl); ?>"
+	data-api-seats-batch="<?php p($apiSeatsBatchUrl); ?>"
 	data-api-remove-seat="<?php p($apiRemoveSeatUrl); ?>"
 	data-api-search-users="<?php p($apiSearchUsersUrl); ?>"
 	data-i18n="<?php p($i18nJson); ?>"
@@ -294,13 +296,18 @@ $licenseContactActions = static function (\OCP\IL10N $l) use ($licenseRenewMailt
 					<?php echo $mobileFull ? 'disabled aria-disabled="true"' : ''; ?>>
 				<ul id="azc-seat-search-results" class="azc-seat-search-results" role="listbox" hidden></ul>
 			</div>
-			<p id="azc-seat-picker-hint" class="azc-field__hint"><?php p($l->t('Type at least two characters, then select a person from the list.')); ?></p>
+			<p id="azc-seat-picker-hint" class="azc-field__hint"><?php p($l->t('Type at least two characters, tick several people, then assign them together.')); ?></p>
 			<p id="azc-seat-count" class="azc-license-seat-count" aria-live="polite">
 				<?php p($l->t('%1$d of %2$d seats assigned', [$mobileUsed, $mobileLimit])); ?>
 			</p>
+			<button type="button" id="azc-seat-assign-selected" class="azc-btn azc-btn--primary" hidden disabled
+				aria-live="polite">
+				<?php p($l->t('Assign selected')); ?>
+			</button>
 			<p id="azc-seats-full-hint" class="azc-field__hint azc-license-seats-full-hint" role="status" <?php echo $mobileFull ? '' : 'hidden'; ?>>
 				<?php p($l->t('All mobile seats are assigned. Remove a user or upgrade your license.')); ?>
 			</p>
+			<div id="azc-seat-batch-result" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></div>
 		</div>
 
 		<div class="table-container azc-license-seats-table-wrap">

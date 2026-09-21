@@ -344,6 +344,105 @@
     }
 
     /**
+     * Year-scoped admin balances (Resturlaub / overtime opening): when the year
+     * field changes, reload that year's stored value so the dialog cannot show
+     * a stale "0" for a year that already has a row.
+     *
+     * @param {string} userId
+     * @param {{
+     *   yearInputId: string,
+     *   valueInputId: string,
+     *   queryParam: string,
+     *   responseYearKey: string,
+     *   responseValueKey: string,
+     *   errorL10nKey: string,
+     *   errorFallback: string,
+     *   emptyValue?: string
+     * }} opts
+     */
+    function bindYearScopedBalanceReload(userId, opts) {
+        const yearEl = document.getElementById(opts.yearInputId);
+        const valueEl = document.getElementById(opts.valueInputId);
+        if (!yearEl || !valueEl || !userId) {
+            return;
+        }
+
+        let lastLoadedYear = String(yearEl.value || '').trim();
+        let inFlight = 0;
+
+        const loadForYear = function () {
+            const raw = String(yearEl.value || '').trim();
+            if (!/^\d{4}$/.test(raw)) {
+                return;
+            }
+            const year = parseInt(raw, 10);
+            if (year < 2000 || year > 2100) {
+                return;
+            }
+            if (raw === lastLoadedYear) {
+                return;
+            }
+
+            const seq = ++inFlight;
+            valueEl.setAttribute('aria-busy', 'true');
+            const path = '/apps/arbeitszeitcheck/api/admin/users/'
+                + encodeURIComponent(userId)
+                + '?' + encodeURIComponent(opts.queryParam) + '=' + encodeURIComponent(raw);
+            Utils.ajax(buildApiUrl(path), {
+                method: 'GET',
+                onSuccess: function (data) {
+                    if (seq !== inFlight) {
+                        return;
+                    }
+                    valueEl.removeAttribute('aria-busy');
+                    if (!(data && data.success && data.user)) {
+                        return;
+                    }
+                    const val = data.user[opts.responseValueKey];
+                    valueEl.value = val != null ? String(val) : String(opts.emptyValue ?? '0');
+                    lastLoadedYear = String(data.user[opts.responseYearKey] != null
+                        ? data.user[opts.responseYearKey]
+                        : raw);
+                },
+                onError: function () {
+                    if (seq !== inFlight) {
+                        return;
+                    }
+                    valueEl.removeAttribute('aria-busy');
+                    Messaging.showError(auMsg(opts.errorL10nKey, opts.errorFallback));
+                }
+            });
+        };
+
+        yearEl.addEventListener('change', loadForYear);
+        yearEl.addEventListener('blur', loadForYear);
+    }
+
+    function bindCarryoverYearReload(userId) {
+        bindYearScopedBalanceReload(userId, {
+            yearInputId: 'user-vacation-carryover-year',
+            valueInputId: 'user-vacation-carryover',
+            queryParam: 'carryoverYear',
+            responseYearKey: 'vacationCarryoverYear',
+            responseValueKey: 'vacationCarryoverDays',
+            errorL10nKey: 'failedToLoadCarryoverForYear',
+            errorFallback: 'Could not load vacation carryover for that year.',
+        });
+    }
+
+    function bindOvertimeOpeningYearReload(userId) {
+        bindYearScopedBalanceReload(userId, {
+            yearInputId: 'user-overtime-opening-year',
+            valueInputId: 'user-overtime-opening',
+            queryParam: 'overtimeOpeningBalanceYear',
+            responseYearKey: 'overtimeOpeningBalanceYear',
+            responseValueKey: 'overtimeOpeningBalanceHours',
+            errorL10nKey: 'failedToLoadOvertimeOpeningForYear',
+            errorFallback: 'Could not load overtime opening balance for that year.',
+        });
+    }
+
+    /**
      * Load / apply overtime Saldo ledger adjustments (does not touch time entries).
      */
     function bindOvertimeAdjustmentControls(userId) {
@@ -543,8 +642,22 @@
         loadUserDetail(userId);
     }
 
-    function loadUserDetail(userId) {
-        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId)), {
+    function loadUserDetail(userId, yearOpts) {
+        const opts = yearOpts && typeof yearOpts === 'object' ? yearOpts : {};
+        const params = new URLSearchParams();
+        const carryYear = String(opts.carryoverYear || '').trim();
+        const overtimeYear = String(opts.overtimeOpeningBalanceYear || '').trim();
+        if (/^\d{4}$/.test(carryYear)) {
+            params.set('carryoverYear', carryYear);
+        }
+        if (/^\d{4}$/.test(overtimeYear)) {
+            params.set('overtimeOpeningBalanceYear', overtimeYear);
+        }
+        const qs = params.toString();
+        const path = '/apps/arbeitszeitcheck/api/admin/users/'
+            + encodeURIComponent(userId)
+            + (qs ? ('?' + qs) : '');
+        Utils.ajax(buildApiUrl(path), {
             method: 'GET',
             onSuccess: function(data) {
                 if (data.success && data.user) {
@@ -814,7 +927,7 @@
                 <div class="form-group">
                     <label for="user-vacation-carryover-year" class="form-label">${carryoverYearLabel}</label>
                     <input type="text" id="user-vacation-carryover-year" name="vacationCarryoverYear" class="form-input" inputmode="numeric" pattern="\\d{4}" maxlength="4" autocomplete="off" value="${carryYear}" aria-describedby="user-carryover-year-help">
-                    <p id="user-carryover-year-help" class="form-help">${t('vacationCarryoverYearHelp', 'The calendar year this opening balance applies to (same year as in employees’ vacation statistics—usually the current year). When a new year starts or after migrating from another system, set the Resturlaub opening balance for that year here or use the CSV import command; the app does not roll balances forward automatically.')}</p>
+                    <p id="user-carryover-year-help" class="form-help">${t('vacationCarryoverYearHelp', 'The calendar year this opening balance applies to (same year as in employees’ vacation statistics—usually the current year). Changing the year loads the stored opening balance for that year. When a new year starts or after migrating from another system, set the Resturlaub opening balance for that year here or use the CSV import command; the app does not roll balances forward automatically.')}</p>
                 </div>
                     </div>
                 </details>
@@ -837,7 +950,7 @@
                 <div class="form-group">
                     <label for="user-overtime-opening-year" class="form-label">${Utils.escapeHtml(t('overtimeOpeningBalanceYear', 'Year for opening balance'))}</label>
                     <input type="text" id="user-overtime-opening-year" name="overtimeOpeningBalanceYear" class="form-input" inputmode="numeric" pattern="\\d{4}" maxlength="4" autocomplete="off" value="${Utils.escapeHtml(overtimeOpeningYear)}" aria-describedby="user-overtime-opening-year-help">
-                    <p id="user-overtime-opening-year-help" class="form-help">${Utils.escapeHtml(t('yearFourDigitsHelp', 'Enter a four-digit year (e.g. 2026).'))}</p>
+                    <p id="user-overtime-opening-year-help" class="form-help">${Utils.escapeHtml(t('yearFourDigitsHelp', 'Enter a four-digit year (e.g. 2026).'))} ${Utils.escapeHtml(t('overtimeOpeningYearReloadHelp', 'Changing the year loads the stored opening overtime balance for that year.'))}</p>
                 </div>
                 <div class="azc-callout azc-callout--info user-overtime-adjust" id="user-overtime-adjust" role="region" aria-labelledby="user-overtime-adjust-title">
                     <div class="azc-callout__body">
@@ -996,6 +1109,8 @@
         }
 
         bindOvertimeAdjustmentControls(user.userId);
+        bindCarryoverYearReload(user.userId);
+        bindOvertimeOpeningYearReload(user.userId);
 
         // Cross-border note: visible when holiday region country differs from the
         // effective labour-law country (instance default OR per-user override).
@@ -1748,7 +1863,15 @@
 
             clearDirty();
             Messaging.showSuccess(auMsg('userUpdated', 'User updated successfully'));
-            loadUserDetail(userId);
+            // Preserve the year fields the admin was editing — a bare reload
+            // always defaults to the current calendar year and looks like the
+            // just-saved Resturlaub / overtime opening balance "vanished".
+            loadUserDetail(userId, {
+                carryoverYear: payloads.workingTimeModel && payloads.workingTimeModel.vacationCarryoverYear,
+                overtimeOpeningBalanceYear: payloads.overtime
+                    && payloads.overtime.openingBalance
+                    && payloads.overtime.openingBalance.year,
+            });
         } catch (error) {
             const serverErrors = error && error.data && error.data.errors;
             const serverField = applyServerFieldErrors(form, serverErrors);
@@ -1775,6 +1898,10 @@
     if (typeof window !== 'undefined') {
         window.__ArbeitszeitCheckAdminUserDetailTestables = {
             promptUnsavedLeave: promptUnsavedLeave,
+            bindCarryoverYearReload: bindCarryoverYearReload,
+            bindOvertimeOpeningYearReload: bindOvertimeOpeningYearReload,
+            bindYearScopedBalanceReload: bindYearScopedBalanceReload,
+            loadUserDetail: loadUserDetail,
         };
     }
 

@@ -469,7 +469,8 @@ class ManagerController extends Controller
 				'total_members' => count($teamUserIds),
 				'active_today' => 0,
 				'total_hours_today' => 0,
-				'pending_absences' => 0
+				'pending_absences' => $this->absenceMapper->countPendingForUsers($teamUserIds),
+				'pending_time_entries' => $this->timeEntryMapper->countPendingApprovalForUsers($teamUserIds),
 			];
 
 			$teamMembers = [];
@@ -485,7 +486,6 @@ class ManagerController extends Controller
 					$teamStats['active_today']++;
 				}
 				$teamStats['total_hours_today'] += $todayHours;
-				$teamStats['pending_absences'] += count($pendingAbsences);
 
 				$teamMembers[] = [
 					'userId' => $userId,
@@ -537,7 +537,8 @@ class ManagerController extends Controller
 					'total_members' => 0,
 					'active_today' => 0,
 					'total_hours_today' => 0,
-					'pending_absences' => 0
+					'pending_absences' => 0,
+					'pending_time_entries' => 0,
 				],
 				'teamMembers' => [],
 				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
@@ -2416,6 +2417,14 @@ class ManagerController extends Controller
 		try {
 			$managerId = $this->getUserId();
 			$absence = $this->absenceMapper->find($absenceId);
+			// Already decided → 409 so clients uniformly refresh (same envelope as time-entry races).
+			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'approve_absence', 'absence', (string) $absenceId);
 				return new JSONResponse([
@@ -2423,7 +2432,17 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
 			}
-			$absence = $this->absenceService->approveAbsence($absenceId, $managerId, $comment);
+			try {
+				$absence = $this->absenceService->approveAbsence($absenceId, $managerId, $comment);
+			} catch (ConcurrentDecisionException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (\OCP\Lock\LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -2461,6 +2480,13 @@ class ManagerController extends Controller
 		try {
 			$managerId = $this->getUserId();
 			$absence = $this->absenceMapper->find($absenceId);
+			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'reject_absence', 'absence', (string) $absenceId);
 				return new JSONResponse([
@@ -2468,7 +2494,17 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
 			}
-			$absence = $this->absenceService->rejectAbsence($absenceId, $managerId, $comment);
+			try {
+				$absence = $this->absenceService->rejectAbsence($absenceId, $managerId, $comment);
+			} catch (ConcurrentDecisionException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (\OCP\Lock\LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 
 			return new JSONResponse([
 				'success' => true,

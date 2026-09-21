@@ -113,6 +113,10 @@ $useAppTeams = (bool)($_['useAppTeams'] ?? false);
 						aria-label="<?php p($l->t('Add member to team')); ?>">
 						<?php p($l->t('Add member')); ?>
 					</button>
+					<button type="button" id="team-add-members-bulk" class="azc-btn azc-btn--primary"
+						aria-label="<?php p($l->t('Add several people to this team')); ?>">
+						<?php p($l->t('Add several people…')); ?>
+					</button>
 				</div>
 				<ul id="team-members-list" class="admin-teams__list team-list" aria-label="<?php p($l->t('Team members')); ?>"></ul>
 			</div>
@@ -121,6 +125,10 @@ $useAppTeams = (bool)($_['useAppTeams'] ?? false);
 					<button type="button" id="team-add-manager" class="azc-btn azc-btn--secondary"
 						aria-label="<?php p($l->t('Add manager to team')); ?>">
 						<?php p($l->t('Add manager')); ?>
+					</button>
+					<button type="button" id="team-add-managers-bulk" class="azc-btn azc-btn--primary"
+						aria-label="<?php p($l->t('Add several managers to this team')); ?>">
+						<?php p($l->t('Add several managers…')); ?>
 					</button>
 				</div>
 				<ul id="team-managers-list" class="admin-teams__list team-list" aria-label="<?php p($l->t('Team managers')); ?>"></ul>

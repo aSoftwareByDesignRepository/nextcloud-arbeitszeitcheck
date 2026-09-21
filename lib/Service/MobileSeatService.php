@@ -116,6 +116,110 @@ class MobileSeatService
 	}
 
 	/**
+	 * Assign many seats under one capacity lock. Partial results; never over-assign.
+	 *
+	 * @param list<string> $userIds
+	 * @return array{
+	 *   ok: true,
+	 *   summary: array{assigned: int, skipped: int, failed: int},
+	 *   results: list<array{userId: string, status: string, error?: string}>,
+	 *   seats: list<array{userId: string, displayName: string, assignedAt: string, assignedBy: string}>,
+	 *   mobileSeatsUsed: int,
+	 *   mobileSeatsLimit: int
+	 * }|array{ok: false, error: string}
+	 */
+	public function assignSeatsBatch(array $userIds, string $assignedBy): array
+	{
+		if (!$this->licenseService->isMobilePlanActive()) {
+			return ['ok' => false, 'error' => 'no_mobile_plan'];
+		}
+
+		$seen = [];
+		$unique = [];
+		foreach ($userIds as $raw) {
+			$id = trim((string)$raw);
+			if ($id === '' || isset($seen[$id])) {
+				continue;
+			}
+			$seen[$id] = true;
+			$unique[] = $id;
+		}
+
+		$limit = $this->getSeatLimit();
+		$results = [];
+		$assigned = 0;
+		$skipped = 0;
+		$failed = 0;
+
+		$this->lockingProvider->acquireLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
+		try {
+			foreach ($unique as $userId) {
+				if ($this->userManager->get($userId) === null) {
+					$results[] = ['userId' => $userId, 'status' => 'failed', 'error' => 'user_not_found'];
+					$failed++;
+					continue;
+				}
+				if ($this->mobileSeatMapper->findByUserId($userId) !== null) {
+					$results[] = ['userId' => $userId, 'status' => 'skipped', 'error' => 'already_seated'];
+					$skipped++;
+					continue;
+				}
+				if ($this->mobileSeatMapper->countSeats() >= $limit) {
+					$results[] = ['userId' => $userId, 'status' => 'failed', 'error' => 'seat_limit_reached'];
+					$failed++;
+					continue;
+				}
+
+				$this->db->beginTransaction();
+				try {
+					if ($this->mobileSeatMapper->findByUserId($userId) !== null) {
+						$this->db->commit();
+						$results[] = ['userId' => $userId, 'status' => 'skipped', 'error' => 'already_seated'];
+						$skipped++;
+						continue;
+					}
+					if ($this->mobileSeatMapper->countSeats() >= $limit) {
+						$this->db->rollBack();
+						$results[] = ['userId' => $userId, 'status' => 'failed', 'error' => 'seat_limit_reached'];
+						$failed++;
+						continue;
+					}
+					$seat = new MobileSeat();
+					$seat->setUserId($userId);
+					$seat->setAssignedAt($this->timeFactory->getDateTime());
+					$seat->setAssignedBy($assignedBy);
+					$this->mobileSeatMapper->insert($seat);
+					$this->db->commit();
+					$results[] = ['userId' => $userId, 'status' => 'assigned'];
+					$assigned++;
+				} catch (\OCP\DB\Exception $e) {
+					$this->db->rollBack();
+					if ($this->mobileSeatMapper->findByUserId($userId) !== null) {
+						$results[] = ['userId' => $userId, 'status' => 'skipped', 'error' => 'already_seated'];
+						$skipped++;
+						continue;
+					}
+					throw $e;
+				} catch (\Throwable $e) {
+					$this->db->rollBack();
+					throw $e;
+				}
+			}
+		} finally {
+			$this->lockingProvider->releaseLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+		}
+
+		return [
+			'ok' => true,
+			'summary' => ['assigned' => $assigned, 'skipped' => $skipped, 'failed' => $failed],
+			'results' => $results,
+			'seats' => $this->listSeats(),
+			'mobileSeatsUsed' => $this->getAssignedCount(),
+			'mobileSeatsLimit' => $limit,
+		];
+	}
+
+	/**
 	 * @return array{ok: bool, error?: string}
 	 */
 	public function removeSeat(string $userId): array

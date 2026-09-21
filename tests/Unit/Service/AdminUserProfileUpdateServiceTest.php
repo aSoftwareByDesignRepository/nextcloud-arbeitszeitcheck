@@ -105,6 +105,358 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 	 * Austrian region must be accepted even on a German instance — normalised
 	 * to canonical uppercase form.
 	 */
+	/**
+	 * Existing assignment + only carryover in the payload must still upsert.
+	 * Regression: early-return on assignmentMatches skipped carryover/region/country.
+	 */
+	public function testApplyWorkingTimeModelPersistsCarryoverWhenAssignmentUnchanged(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->with(1)->willReturn($wtModel);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId(10);
+		$assignment->setUserId('alice');
+		$assignment->setWorkingTimeModelId(1);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('update');
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('insert');
+
+		$vacationYearBalanceMapper = $this->createMock(VacationYearBalanceMapper::class);
+		$vacationYearBalanceMapper->expects($this->once())
+			->method('upsert')
+			->with('alice', 2026, 5.0, null, true);
+		$vacationYearBalanceMapper->method('getCarryoverDays')->with('alice', 2026)->willReturn(5.0);
+
+		$vacationAllocation = $this->createMock(VacationAllocationService::class);
+		$vacationAllocation->method('applyCapToOpeningBalance')->willReturnCallback(fn (float $v) => $v);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$vacationYearBalanceMapper,
+			$vacationAllocation,
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$this->createMock(UserOvertimeSettingsService::class),
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		$result = $service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+			'vacationCarryoverDays' => '5',
+			'vacationCarryoverYear' => 2026,
+		], 'admin');
+
+		$this->assertArrayHasKey('userWorkingTimeModel', $result);
+		$this->assertArrayNotHasKey('unchanged', $result);
+		$this->assertSame(5.0, $result['vacationCarryoverDays']);
+		$this->assertSame(2026, $result['vacationCarryoverYear']);
+	}
+
+	public function testApplyWorkingTimeModelPersistsRegionWhenAssignmentUnchanged(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->with(1)->willReturn($wtModel);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId(10);
+		$assignment->setUserId('alice');
+		$assignment->setWorkingTimeModelId(1);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('update');
+
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+		$userSettingsMapper->expects($this->once())
+			->method('setSetting')
+			->with('alice', 'german_state', 'BY');
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$userSettingsMapper,
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(VacationAllocationService::class),
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$this->createMock(UserOvertimeSettingsService::class),
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		$service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+			'germanState' => 'BY',
+		], 'admin');
+	}
+
+	public function testApplyWorkingTimeModelPersistsLaborLawWhenAssignmentUnchanged(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->with(1)->willReturn($wtModel);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId(10);
+		$assignment->setUserId('alice');
+		$assignment->setWorkingTimeModelId(1);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('update');
+
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+		$userSettingsMapper->expects($this->once())
+			->method('setSetting')
+			->with('alice', LaborLawProfileFactory::USER_SETTING_LABOR_LAW_COUNTRY, 'AT');
+
+		$factory = $this->createMock(LaborLawProfileFactory::class);
+		$factory->expects($this->once())->method('clearCache');
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$userSettingsMapper,
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(VacationAllocationService::class),
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$this->createMock(UserOvertimeSettingsService::class),
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+			$factory,
+		);
+
+		$service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+			'laborLawCountry' => 'at',
+		], 'admin');
+	}
+
+	public function testApplyWorkingTimeModelPersistsZeroCarryoverWhenAssignmentUnchanged(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->with(1)->willReturn($wtModel);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId(10);
+		$assignment->setUserId('alice');
+		$assignment->setWorkingTimeModelId(1);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+
+		$vacationYearBalanceMapper = $this->createMock(VacationYearBalanceMapper::class);
+		$vacationYearBalanceMapper->expects($this->once())
+			->method('upsert')
+			->with('alice', 2026, 0.0, null, true);
+		$vacationYearBalanceMapper->method('getCarryoverDays')->willReturn(0.0);
+
+		$vacationAllocation = $this->createMock(VacationAllocationService::class);
+		$vacationAllocation->method('applyCapToOpeningBalance')->willReturnCallback(fn (float $v) => $v);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$vacationYearBalanceMapper,
+			$vacationAllocation,
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$this->createMock(UserOvertimeSettingsService::class),
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		$service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+			'vacationCarryoverDays' => 0,
+			'vacationCarryoverYear' => 2026,
+		], 'admin');
+	}
+
+	public function testApplyWorkingTimeModelAppliesCarryoverCapWhenAssignmentUnchanged(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->with(1)->willReturn($wtModel);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId(10);
+		$assignment->setUserId('alice');
+		$assignment->setWorkingTimeModelId(1);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+
+		$vacationYearBalanceMapper = $this->createMock(VacationYearBalanceMapper::class);
+		$vacationYearBalanceMapper->expects($this->once())
+			->method('upsert')
+			->with('alice', 2026, 3.0, null, true);
+		$vacationYearBalanceMapper->method('getCarryoverDays')->willReturn(3.0);
+
+		$vacationAllocation = $this->createMock(VacationAllocationService::class);
+		$vacationAllocation->expects($this->once())
+			->method('applyCapToOpeningBalance')
+			->with(10.0)
+			->willReturn(3.0);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$vacationYearBalanceMapper,
+			$vacationAllocation,
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$this->createMock(UserOvertimeSettingsService::class),
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		$service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+			'vacationCarryoverDays' => '10',
+			'vacationCarryoverYear' => 2026,
+		], 'admin');
+	}
+
+	/**
+	 * Source contract: assignmentMatches must never early-return before carryover.
+	 */
+	public function testApplyWorkingTimeModelSourceDoesNotEarlyReturnBeforeSideEffects(): void
+	{
+		$src = (string)file_get_contents(
+			dirname(__DIR__, 3) . '/lib/Service/AdminUserProfileUpdateService.php'
+		);
+		$needle = 'workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate))';
+		$pos = strpos($src, $needle);
+		$this->assertNotFalse($pos, 'assignmentMatches call site missing');
+		$window = substr($src, $pos, 280);
+		$this->assertStringContainsString('$updated = $currentModel;', $window);
+		$this->assertStringNotContainsString("'unchanged' => true", $window);
+		$this->assertDoesNotMatchRegularExpression('/\)\s*\{\s*return\s*\[/', $window);
+	}
+
+	public function testApplyOvertimeSettingsReturnsWrittenOpeningBalanceYear(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$overtime = $this->createMock(UserOvertimeSettingsService::class);
+		$overtime->expects($this->once())->method('setOpeningBalance')->with('alice', 2024, 12.5, 'admin');
+		$overtime->method('getTrackingFrom')->willReturn(null);
+		$overtime->expects($this->once())
+			->method('getOpeningBalanceHours')
+			->with('alice', 2024)
+			->willReturn(12.5);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(VacationAllocationService::class),
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$overtime,
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		$result = $service->applyOvertimeSettings('alice', [
+			'openingBalance' => ['year' => 2024, 'hours' => '12.5'],
+		], 'admin');
+
+		$this->assertSame(2024, $result['overtimeOpeningBalanceYear']);
+		$this->assertSame(12.5, $result['overtimeOpeningBalanceHours']);
+	}
+
 	public function testApplyWorkingTimeModelStoresNormalisedCrossBorderRegion(): void
 	{
 		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));

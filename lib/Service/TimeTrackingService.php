@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
@@ -172,7 +173,7 @@ class TimeTrackingService
 			return [];
 		}
 		return [
-			'capture_source' => 'offline_sync',
+			'capture_source' => Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
 			'client_occurred_at' => $this->timeZoneService->formatForDisplay(
 				$effectiveAt instanceof \DateTime ? $effectiveAt : \DateTime::createFromInterface($effectiveAt),
 				'c',

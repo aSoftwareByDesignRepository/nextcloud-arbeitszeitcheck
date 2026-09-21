@@ -61,6 +61,7 @@ $teamMembers = $_['teamMembers'] ?? [];
 		$activeToday = (int)($teamStats['active_today'] ?? 0);
 		$hoursToday = round((float)($teamStats['total_hours_today'] ?? 0), 1);
 		$pendingAbsences = (int)($teamStats['pending_absences'] ?? 0);
+		$pendingTimeEntries = (int)($teamStats['pending_time_entries'] ?? 0);
 		?>
 		<section class="azc-stat-strip manager-dashboard__stats" aria-label="<?php p($l->t('Team statistics')); ?>">
 			<article class="azc-stat-tile"
@@ -80,10 +81,19 @@ $teamMembers = $_['teamMembers'] ?? [];
 			</article>
 			<a class="azc-stat-tile <?php echo $pendingAbsences > 0 ? 'azc-stat-tile--warning' : 'azc-stat-tile--neutral'; ?>"
 				href="#pending-approvals-section"
+				data-manager-pending-tab="absences"
 				aria-label="<?php p($l->n('%n pending absence request — jump to approvals', '%n pending absence requests — jump to approvals', $pendingAbsences)); ?>">
 				<span class="azc-stat-tile__label"><?php p($l->t('Pending Absences')); ?></span>
 				<span class="azc-stat-tile__value" aria-hidden="true"><?php p($pendingAbsences); ?></span>
 				<span class="azc-stat-tile__meta"><?php p($l->t('Jump to approvals')); ?></span>
+			</a>
+			<a class="azc-stat-tile <?php echo $pendingTimeEntries > 0 ? 'azc-stat-tile--warning' : 'azc-stat-tile--neutral'; ?>"
+				href="#pending-approvals-section"
+				data-manager-pending-tab="time-entries"
+				aria-label="<?php p($l->n('%n pending time entry — jump to time entries', '%n pending time entries — jump to time entries', $pendingTimeEntries)); ?>">
+				<span class="azc-stat-tile__label"><?php p($l->t('Pending time entries')); ?></span>
+				<span class="azc-stat-tile__value" aria-hidden="true"><?php p($pendingTimeEntries); ?></span>
+				<span class="azc-stat-tile__meta"><?php p($l->t('Jump to time entries')); ?></span>
 			</a>
 		</section>
 

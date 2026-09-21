@@ -313,7 +313,7 @@
     }
 
     let searchTimeout = null;
-    const USERS_TABLE_COLS = 8;
+    const USERS_TABLE_COLS = 9;
     const FILTER_APP_ACCESS = 'app_access';
     const FILTER_ALL = 'all';
     const cfg = window.ArbeitszeitCheck && window.ArbeitszeitCheck.adminUsersConfig
@@ -763,6 +763,7 @@
                 : `<td${cls ? ` class="${cls}"` : ''}>${html}</td>`;
             return `
             <tr data-user-id="${Utils.escapeHtml(user.userId)}">
+                ${td(auMsg('select', 'Select'), `<input type="checkbox" class="admin-users-row-select" value="${Utils.escapeHtml(user.userId)}" aria-label="${Utils.escapeHtml(auMsg('selectPerson', 'Select') + ': ' + (user.displayName || user.userId))}">`, 'admin-users-select-col')}
                 ${td(auMsg('colName', 'Name'), Utils.escapeHtml(user.displayName))}
                 ${td(auMsg('colEmail', 'Email'), Utils.escapeHtml(user.email || '-'))}
                 ${td(auMsg('workingTimeModel', 'Working Time Model'), user.workingTimeModel
@@ -800,12 +801,262 @@
         `;
         }).join('');
 
+        bindBulkSelection();
+    }
+
+    const selectedEmployees = new Set();
+
+    function syncBulkBar() {
+        const bar = document.getElementById('admin-users-bulk-bar');
+        const countEl = document.getElementById('admin-users-bulk-count');
+        if (!bar || !countEl) return;
+        const n = selectedEmployees.size;
+        if (n === 0) {
+            bar.hidden = true;
+            countEl.textContent = '';
+            return;
+        }
+        bar.hidden = false;
+        countEl.textContent = auMsg('nSelectedApply', '%n selected — Apply…').replace('%n', String(n));
+    }
+
+    function bindBulkSelection() {
+        document.querySelectorAll('.admin-users-row-select').forEach(function(cb) {
+            cb.checked = selectedEmployees.has(cb.value);
+            cb.addEventListener('change', function() {
+                if (cb.checked) {
+                    selectedEmployees.add(cb.value);
+                } else {
+                    selectedEmployees.delete(cb.value);
+                }
+                syncBulkBar();
+            });
+        });
+        const all = document.getElementById('users-select-all');
+        if (all) {
+            all.onchange = function() {
+                document.querySelectorAll('.admin-users-row-select').forEach(function(cb) {
+                    cb.checked = all.checked;
+                    if (all.checked) {
+                        selectedEmployees.add(cb.value);
+                    } else {
+                        selectedEmployees.delete(cb.value);
+                    }
+                });
+                syncBulkBar();
+            };
+        }
+    }
+
+    function openBulkApplyDialog() {
+        const userIds = Array.from(selectedEmployees);
+        if (!userIds.length) {
+            Messaging && Messaging.showError && Messaging.showError(auMsg('selectPeopleFirst', 'Select at least one person.'));
+            return;
+        }
+        const teamsUrl = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.adminUsersConfig && window.ArbeitszeitCheck.adminUsersConfig.adminTeamsUrl)
+            || '/apps/arbeitszeitcheck/admin/teams';
+        const esc = Utils.escapeHtml ? Utils.escapeHtml.bind(Utils) : function(s) { return String(s); };
+        const today = new Date().toISOString().slice(0, 10);
+
+        Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models', {
+            method: 'GET',
+            onSuccess: function(modelsData) {
+                const models = (modelsData && modelsData.models) ? modelsData.models : [];
+                let modelOpts = '<option value="">' + esc(auMsg('noChange', '— no change —')) + '</option>';
+                models.forEach(function(m) {
+                    modelOpts += '<option value="' + esc(String(m.id)) + '">' + esc(m.name || String(m.id)) + '</option>';
+                });
+
+                const content = '<form id="admin-users-bulk-form" class="form" novalidate>'
+                    + '<p class="form-help">' + esc(auMsg('bulkApplyHelp', 'Apply the same work schedule and/or holiday region to the selected people.')) + '</p>'
+                    + '<div class="form-group"><label for="bulk-model-id" class="form-label">' + esc(auMsg('workingTimeModel', 'Working Time Model')) + '</label>'
+                    + '<select id="bulk-model-id" class="form-select">' + modelOpts + '</select></div>'
+                    + '<div class="form-group"><label for="bulk-start-date" class="form-label">' + esc(auMsg('startDate', 'Start date')) + '</label>'
+                    + '<input type="date" id="bulk-start-date" class="form-input" value="' + esc(today) + '"></div>'
+                    + '<div class="form-group"><label for="bulk-region" class="form-label">' + esc(auMsg('holidayRegion', 'Holiday region')) + '</label>'
+                    + '<select id="bulk-region" class="form-select">'
+                    + '<option value="__unchanged__">' + esc(auMsg('noChange', '— no change —')) + '</option>'
+                    + '<option value="">' + esc(auMsg('useOrgDefault', 'Use organisation default')) + '</option>'
+                    + '</select></div>'
+                    + '<div class="azc-callout azc-callout--info">'
+                    + '<p><strong>' + esc(auMsg('vacationRecommended', 'Recommended for vacation')) + ':</strong> '
+                    + esc(auMsg('vacationL2Hint', 'Put people on a team and use team vacation rules (L2).'))
+                    + ' <a href="' + esc(teamsUrl) + '">' + esc(auMsg('openTeams', 'Open teams')) + '</a></p>'
+                    + '<details><summary>' + esc(auMsg('vacationAdvanced', 'Advanced: same personal vacation rule (L3)')) + '</summary>'
+                    + '<p class="form-help">' + esc(auMsg('vacationL3Hint', 'Only for exceptions that are not modeled as a team.')) + '</p>'
+                    + '<label class="form-label" for="bulk-l3-days">' + esc(auMsg('vacationDaysCol', 'Vacation days')) + '</label>'
+                    + '<input type="number" id="bulk-l3-days" class="form-input" min="0" max="366" step="0.5" placeholder="25">'
+                    + '</details></div>'
+                    + '<div id="bulk-preview" class="azc-callout" role="status" aria-live="polite" hidden></div>'
+                    + '<div class="form-actions">'
+                    + '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(auMsg('cancel', 'Cancel')) + '</button>'
+                    + '<button type="button" id="bulk-preview-btn" class="btn btn--secondary">' + esc(auMsg('preview', 'Preview')) + '</button>'
+                    + '<button type="submit" class="btn btn--primary">' + esc(auMsg('confirmApply', 'Confirm apply')) + '</button>'
+                    + '</div></form>';
+
+                const modal = Components.createModal({
+                    id: 'modal-admin-users-bulk',
+                    title: auMsg('applyToSelected', 'Apply to selected…'),
+                    content: content,
+                    size: 'md',
+                    closable: true,
+                });
+                Components.openModal('modal-admin-users-bulk');
+
+                function buildFields() {
+                    const fields = {};
+                    const modelId = (document.getElementById('bulk-model-id') || {}).value;
+                    const startDate = (document.getElementById('bulk-start-date') || {}).value || today;
+                    if (modelId) {
+                        fields.workingTimeModel = { modelId: parseInt(modelId, 10), startDate: startDate };
+                    }
+                    const region = (document.getElementById('bulk-region') || {}).value;
+                    if (region !== '__unchanged__') {
+                        fields.holidayRegion = { germanState: region };
+                    }
+                    return fields;
+                }
+
+                const previewBtn = document.getElementById('bulk-preview-btn');
+                if (previewBtn) {
+                    previewBtn.addEventListener('click', function() {
+                        const fields = buildFields();
+                        if (!fields.workingTimeModel && !fields.holidayRegion) {
+                            Messaging && Messaging.showError && Messaging.showError(auMsg('chooseField', 'Choose a work schedule and/or holiday region.'));
+                            return;
+                        }
+                        Utils.ajax('/apps/arbeitszeitcheck/api/admin/users/batch-profile', {
+                            method: 'POST',
+                            data: { userIds: userIds, fields: fields, dryRun: true },
+                            onSuccess: function(res) {
+                                const el = document.getElementById('bulk-preview');
+                                if (!el) return;
+                                el.hidden = false;
+                                const s = res.summary || {};
+                                el.textContent = auMsg('previewSummary', 'Would update %1$d people (%2$d failed checks).')
+                                    .replace('%1$d', String(s.applied ?? 0))
+                                    .replace('%2$d', String(s.failed ?? 0));
+                            },
+                            onError: function(err) {
+                                Messaging && Messaging.showError && Messaging.showError((err && (err.message || err.error)) || auMsg('previewFailed', 'Preview failed'));
+                            }
+                        });
+                    });
+                }
+
+                const form = document.getElementById('admin-users-bulk-form');
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const fields = buildFields();
+                        const l3Days = (document.getElementById('bulk-l3-days') || {}).value;
+                        const hasL3 = l3Days !== '' && l3Days != null;
+                        if (!fields.workingTimeModel && !fields.holidayRegion && !hasL3) {
+                            Messaging && Messaging.showError && Messaging.showError(auMsg('chooseField', 'Choose a work schedule and/or holiday region.'));
+                            return;
+                        }
+                        if (!window.confirm(auMsg('confirmBulk', 'Apply these settings to %n people?').replace('%n', String(userIds.length)))) {
+                            return;
+                        }
+
+                        function finish(msg) {
+                            const resultEl = document.getElementById('admin-users-bulk-result');
+                            if (resultEl) {
+                                resultEl.hidden = false;
+                                resultEl.textContent = msg;
+                            }
+                            Messaging && Messaging.showSuccess && Messaging.showSuccess(msg);
+                            Components.closeModal(document.getElementById('modal-admin-users-bulk'));
+                            loadUsers();
+                        }
+
+                        function applyProfile(done) {
+                            if (!fields.workingTimeModel && !fields.holidayRegion) {
+                                done(null);
+                                return;
+                            }
+                            Utils.ajax('/apps/arbeitszeitcheck/api/admin/users/batch-profile', {
+                                method: 'POST',
+                                data: { userIds: userIds, fields: fields, dryRun: false },
+                                onSuccess: function(res) {
+                                    const s = res.summary || {};
+                                    done(auMsg('bulkDone', 'Updated %1$d, failed %2$d.')
+                                        .replace('%1$d', String(s.applied ?? 0))
+                                        .replace('%2$d', String(s.failed ?? 0)));
+                                },
+                                onError: function(err) {
+                                    Messaging && Messaging.showError && Messaging.showError((err && (err.message || err.error)) || auMsg('bulkFailed', 'Bulk update failed'));
+                                }
+                            });
+                        }
+
+                        function applyL3(prevMsg) {
+                            if (!hasL3) {
+                                finish(prevMsg || auMsg('done', 'Done'));
+                                return;
+                            }
+                            Utils.ajax('/apps/arbeitszeitcheck/api/admin/users/batch-vacation-policy', {
+                                method: 'POST',
+                                data: {
+                                    userIds: userIds,
+                                    vacationPolicy: {
+                                        vacationMode: 'manual_fixed',
+                                        manualDays: parseFloat(String(l3Days).replace(',', '.')),
+                                        inheritLowerLayers: false,
+                                        effectiveFrom: today,
+                                    },
+                                    dryRun: false,
+                                },
+                                onSuccess: function(res) {
+                                    const s = res.summary || {};
+                                    const l3Msg = auMsg('l3Done', 'L3 vacation: updated %1$d, failed %2$d.')
+                                        .replace('%1$d', String(s.applied ?? 0))
+                                        .replace('%2$d', String(s.failed ?? 0));
+                                    finish(prevMsg ? (prevMsg + ' ' + l3Msg) : l3Msg);
+                                },
+                                onError: function(err) {
+                                    Messaging && Messaging.showError && Messaging.showError((err && (err.message || err.error)) || auMsg('bulkFailed', 'Bulk update failed'));
+                                }
+                            });
+                        }
+
+                        applyProfile(function(msg) { applyL3(msg); });
+                    });
+                }
+            },
+            onError: function() {
+                Messaging && Messaging.showError && Messaging.showError(auMsg('errorLoadingModels', 'Could not load working time models'));
+            }
+        });
+    }
+
+    function initBulkBar() {
+        const applyBtn = document.getElementById('admin-users-bulk-apply');
+        const clearBtn = document.getElementById('admin-users-bulk-clear');
+        if (applyBtn) {
+            applyBtn.addEventListener('click', openBulkApplyDialog);
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                selectedEmployees.clear();
+                document.querySelectorAll('.admin-users-row-select').forEach(function(cb) { cb.checked = false; });
+                const all = document.getElementById('users-select-all');
+                if (all) all.checked = false;
+                syncBulkBar();
+            });
+        }
+        bindBulkSelection();
     }
 
     // Initialize on DOM ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            initBulkBar();
+        });
     } else {
         init();
+        initBulkBar();
     }
 })();

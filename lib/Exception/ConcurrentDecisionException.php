@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Thrown when two managers decide the same pending time entry concurrently.
- * The loser of the atomic status-guarded write must surface HTTP 409, not
+ * Thrown when two managers decide the same pending time entry or absence concurrently.
+ * The loser of the status-guarded write must surface HTTP 409, not
  * silently overwrite the winner's decision.
  *
  * @copyright Copyright (c) 2026

@@ -51,12 +51,21 @@ test.describe('Slice A/B Lebenswelt UX (live)', () => {
 		const summaryBox = await summary.boundingBox()
 		expect(primaryBox.y).toBeLessThan(summaryBox.y)
 
+		const minuteStep = await page.evaluate(() => {
+			const cfg = window.ArbeitszeitCheck?.timeEntryForm
+			return cfg && typeof cfg.minuteStep === 'number' ? cfg.minuteStep : 5
+		})
 		const minuteValues = await page.locator('#entry-start-time-minute option').evaluateAll(
 			(opts) => opts.map((o) => o.value).filter(Boolean)
 		)
 		expect(minuteValues).toContain('00')
-		expect(minuteValues).toContain('05')
-		expect(minuteValues).not.toContain('01')
+		if (minuteStep === 1) {
+			expect(minuteValues).toContain('01')
+			expect(minuteValues).toContain('05')
+		} else {
+			expect(minuteValues).toContain(String(minuteStep).padStart(2, '0'))
+			expect(minuteValues).not.toContain('01')
+		}
 
 		await page.locator('#entry-start-time-type').fill('08:07')
 		await page.locator('#entry-start-time-type').blur()

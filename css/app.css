@@ -842,7 +842,8 @@
 #app-content.azc-app .azc-callout__hint,
 .modal-backdrop .azc-callout__hint {
 	margin: 0;
-	color: var(--color-text-maxcontrast);
+	/* maxcontrast on tinted callout backgrounds (info banner ~#d6e7ef) fails WCAG AA at sm size */
+	color: var(--color-main-text);
 	font-size: var(--azc-fs-sm);
 	line-height: var(--azc-line-base);
 }

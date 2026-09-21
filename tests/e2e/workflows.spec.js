@@ -62,7 +62,13 @@ test('Time entry correction request -> manager approves', async ({ page, browser
   for (let i = 0; i < 40; i++) {
     const date = addDays(base, i)
     const res = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
-      data: { date, hours: 1.5, description: `E2E seed entry ${date}` },
+      data: {
+        date,
+        hours: 1.5,
+        description: `E2E seed entry ${date}`,
+        // Four-eyes / manual approval may be on — same gate as UI create form.
+        justification: 'Atlas E2E workflow seed justification.',
+      },
     })
     if (res.ok && res.json?.success) {
       created = res.json
@@ -78,16 +84,23 @@ test('Time entry correction request -> manager approves', async ({ page, browser
   const entryId = created.entry?.id ?? created.entry?.entryId ?? created.entry?.ID ?? created.entry?.Id
   expect(entryId).toBeTruthy()
 
+  // Four-eyes manual create lands as pending_approval — manager must approve before a correction can be requested.
+  const page2 = await browser.newPage()
+  await login(page2, manager)
+  await page2.goto('/apps/arbeitszeitcheck/manager')
+  if ((created.entry?.status || created.status) === 'pending_approval') {
+    const createApproved = await api(page2, 'POST', `/apps/arbeitszeitcheck/api/manager/time-entries/${entryId}/approve-correction`, {
+      data: { comment: 'Approve seed create for correction workflow' },
+    })
+    expect(createApproved.success).toBe(true)
+  }
+
   const requested = await api(page, 'POST', `/apps/arbeitszeitcheck/api/time-entries/${entryId}/request-correction`, {
     data: { justification: 'Need to adjust hours', newHours: 2.0 },
   })
   expect(requested.success).toBe(true)
 
   // Manager: approve correction
-  const page2 = await browser.newPage()
-  await login(page2, manager)
-  await page2.goto('/apps/arbeitszeitcheck/manager')
-
   const approved = await api(page2, 'POST', `/apps/arbeitszeitcheck/api/manager/time-entries/${entryId}/approve-correction`, {
     data: { comment: 'OK' },
   })

@@ -138,6 +138,26 @@ class AdminUserProfileUpdateService
 	}
 
 	/**
+	 * Read-only validation for batch/dry-run callers — no writes.
+	 *
+	 * @param array{
+	 *   workingTimeModel?: array<string, mixed>,
+	 *   vacationPolicy?: array<string, mixed>
+	 * } $payload
+	 */
+	public function validateProfileFields(string $userId, array $payload): void
+	{
+		$workingTimeModel = is_array($payload['workingTimeModel'] ?? null) ? $payload['workingTimeModel'] : [];
+		$vacationPolicy = is_array($payload['vacationPolicy'] ?? null) ? $payload['vacationPolicy'] : [];
+		if ($workingTimeModel !== []) {
+			$this->preflightWorkingTimeModel($userId, $workingTimeModel);
+		}
+		if ($vacationPolicy !== []) {
+			$this->preflightVacationPolicy($userId, $vacationPolicy);
+		}
+	}
+
+	/**
 	 * @param array<string, mixed> $params
 	 * @return array<string, mixed>
 	 */
@@ -173,35 +193,36 @@ class AdminUserProfileUpdateService
 		$oldValues = $currentModel ? $this->userWorkingTimeModelToAuditValues($currentModel) : null;
 		$updated = null;
 
+		// Assignment "unchanged" must only skip the model-row update. Region,
+		// labour-law country, and vacation carryover live in the same payload
+		// and must still run (customer bug: carryover alone never persisted).
 		if ($currentModel && $workingTimeModelId !== null && $workingTimeModelId > 0) {
 			if ($this->workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate)) {
-				return [
-					'userWorkingTimeModel' => $this->presentUserModelSummary($currentModel->getSummary()),
-					'unchanged' => true,
-				];
+				$updated = $currentModel;
+			} else {
+				if ($startDate) {
+					$currentModel->setStartDate(new \DateTime((string)$startDate));
+				}
+				if ($endDate !== null) {
+					$currentModel->setEndDate($endDate ? new \DateTime((string)$endDate) : null);
+				}
+				$currentModel->setWorkingTimeModelId($workingTimeModelId);
+				if ($vacationDaysPerYear !== null) {
+					$currentModel->setVacationDaysPerYear($vacationDaysPerYear);
+				}
+				$currentModel->setUpdatedAt(new \DateTime());
+				$this->assertEntityValid($currentModel->validate());
+				$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+				$this->auditLogMapper->logAction(
+					$userId,
+					'user_working_time_model_updated',
+					'user_working_time_model',
+					$updated->getId(),
+					$oldValues,
+					$this->userWorkingTimeModelToAuditValues($updated),
+					$performedBy
+				);
 			}
-			if ($startDate) {
-				$currentModel->setStartDate(new \DateTime((string)$startDate));
-			}
-			if ($endDate !== null) {
-				$currentModel->setEndDate($endDate ? new \DateTime((string)$endDate) : null);
-			}
-			$currentModel->setWorkingTimeModelId($workingTimeModelId);
-			if ($vacationDaysPerYear !== null) {
-				$currentModel->setVacationDaysPerYear($vacationDaysPerYear);
-			}
-			$currentModel->setUpdatedAt(new \DateTime());
-			$this->assertEntityValid($currentModel->validate());
-			$updated = $this->userWorkingTimeModelMapper->update($currentModel);
-			$this->auditLogMapper->logAction(
-				$userId,
-				'user_working_time_model_updated',
-				'user_working_time_model',
-				$updated->getId(),
-				$oldValues,
-				$this->userWorkingTimeModelToAuditValues($updated),
-				$performedBy
-			);
 		} elseif ($workingTimeModelId !== null && $workingTimeModelId > 0) {
 			$newModel = new UserWorkingTimeModel();
 			$newModel->setUserId($userId);
@@ -324,6 +345,13 @@ class AdminUserProfileUpdateService
 			} else {
 				$writeCarryover();
 			}
+			return [
+				'userWorkingTimeModel' => $updated !== null ? $this->presentUserModelSummary($updated->getSummary()) : null,
+				'vacationCarryoverDays' => $this->storedAmountToAdminDays(
+					(float)$this->vacationYearBalanceMapper->getCarryoverDays($userId, $carryoverYear)
+				),
+				'vacationCarryoverYear' => $carryoverYear,
+			];
 		}
 
 		return [
@@ -403,6 +431,7 @@ class AdminUserProfileUpdateService
 		}
 
 		$openingBalance = $params['openingBalance'] ?? null;
+		$balanceYear = (int)date('Y');
 		if (is_array($openingBalance) && isset($openingBalance['year'], $openingBalance['hours'])) {
 			[$year, $yearErr] = OpeningBalanceYearValidator::parse($openingBalance['year']);
 			if ($yearErr !== null) {
@@ -417,14 +446,13 @@ class AdminUserProfileUpdateService
 				throw new AdminUserProfileUpdateException($this->l10n->t('Opening balance hours must be between -9999 and 9999'));
 			}
 			$this->userOvertimeSettingsService->setOpeningBalance($userId, $year, $hours, $performedBy);
+			$balanceYear = $year;
 		}
-
-		$currentYear = (int)date('Y');
 
 		return [
 			'overtimeTrackingFrom' => $this->userOvertimeSettingsService->getTrackingFrom($userId)?->format('Y-m-d'),
-			'overtimeOpeningBalanceHours' => $this->userOvertimeSettingsService->getOpeningBalanceHours($userId, $currentYear),
-			'overtimeOpeningBalanceYear' => $currentYear,
+			'overtimeOpeningBalanceHours' => $this->userOvertimeSettingsService->getOpeningBalanceHours($userId, $balanceYear),
+			'overtimeOpeningBalanceYear' => $balanceYear,
 		];
 	}
 

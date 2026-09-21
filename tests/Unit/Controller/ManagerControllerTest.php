@@ -590,6 +590,42 @@ class ManagerControllerTest extends TestCase
 	}
 
 	/**
+	 * Test approveAbsence returns 409 already_decided when absence is no longer pending
+	 */
+	public function testApproveAbsenceReturnsConflictWhenAlreadyDecided(): void
+	{
+		$managerId = 'manager1';
+		$employeeId = 'employee1';
+		$absenceId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-01-01'));
+		$absence->setEndDate(new \DateTime('2024-01-02'));
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setCreatedAt(new \DateTime());
+		$absence->setUpdatedAt(new \DateTime());
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->absenceService->expects($this->never())->method('approveAbsence');
+
+		$response = $this->controller->approveAbsence($absenceId, 'Approved');
+		$this->assertEquals(Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('already_decided', $data['error_code']);
+	}
+
+	/**
 	 * Test approveAbsence approves absence when employee is in manager's team
 	 */
 	public function testApproveAbsenceApprovesAbsence(): void

@@ -21,7 +21,7 @@ test.describe('Desktop table width (#12)', () => {
 		await expect(page.locator('#app-content-wrapper')).toHaveClass(/azc-shell--wide/)
 		assertDesktopTableMetrics(expect, await collectDesktopTableMetrics(page, '#users-table'))
 
-		const lastActionInRow = page.locator('#users-table tbody tr').first().locator('.azc-table-actions .btn').last()
+		const lastActionInRow = page.locator('#users-table tbody tr').first().locator('.azc-table-actions .azc-btn, .azc-table-actions .btn').last()
 		await expect(lastActionInRow).toBeVisible()
 		await expect(lastActionInRow).toBeEnabled()
 	})

@@ -123,6 +123,9 @@ class AdminControllerTest extends TestCase
 	/** @var HolidayMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayMapper;
 
+	/** @var \OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $vacationYearBalanceMapper;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -157,7 +160,7 @@ class AdminControllerTest extends TestCase
 		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 		$holidayAdminService = $this->createMock(HolidayAdminService::class);
 
-		$vacationYearBalanceMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$this->vacationYearBalanceMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 		$vacationAllocationService = $this->createMock(\OCA\ArbeitszeitCheck\Service\VacationAllocationService::class);
 		$vacationAllocationService->method('applyCapToOpeningBalance')->willReturnCallback(fn (float $d) => $d);
 		$this->tariffRuleSetMapper = $this->createMock(TariffRuleSetMapper::class);
@@ -226,7 +229,7 @@ class AdminControllerTest extends TestCase
 			$this->workingTimeModelMapper,
 			$this->auditLogMapper,
 			$userSettingsMapper,
-			$vacationYearBalanceMapper,
+			$this->vacationYearBalanceMapper,
 			$vacationAllocationService,
 			$this->tariffRuleSetMapper,
 			$this->userVacationPolicyAssignmentMapper,
@@ -268,7 +271,7 @@ class AdminControllerTest extends TestCase
 			$holidayMapper,
 			$this->holidayCalendarService,
 			$holidayAdminService,
-			$vacationYearBalanceMapper,
+			$this->vacationYearBalanceMapper,
 			$vacationAllocationService,
 			$this->tariffRuleSetMapper,
 			$tariffRuleModuleMapper,
@@ -1715,6 +1718,82 @@ class AdminControllerTest extends TestCase
 		$this->assertArrayHasKey('user', $data);
 		$this->assertEquals($userId, $data['user']['userId']);
 		$this->assertArrayHasKey('availableWorkingTimeModels', $data['user']);
+	}
+
+	public function testGetUserLoadsCarryoverForRequestedYear(): void
+	{
+		$userId = 'user1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$user->method('getDisplayName')->willReturn('User One');
+		$user->method('getEMailAddress')->willReturn('user1@example.com');
+		$user->method('isEnabled')->willReturn(true);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findAll')->willReturn([]);
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $key) => $key === 'carryoverYear' ? '2024' : null
+		);
+		$this->vacationYearBalanceMapper->expects($this->once())
+			->method('getCarryoverDays')
+			->with($userId, 2024)
+			->willReturn(7.5);
+
+		$response = $this->controller->getUser($userId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame(2024, $data['user']['vacationCarryoverYear']);
+		$this->assertSame(7.5, $data['user']['vacationCarryoverDays']);
+	}
+
+	public function testGetUserRejectsInvalidCarryoverYear(): void
+	{
+		$userId = 'user1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$user->method('getDisplayName')->willReturn('User One');
+		$user->method('getEMailAddress')->willReturn('user1@example.com');
+		$user->method('isEnabled')->willReturn(true);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $key) => $key === 'carryoverYear' ? '1999' : null
+		);
+		$this->vacationYearBalanceMapper->expects($this->never())->method('getCarryoverDays');
+
+		$response = $this->controller->getUser($userId);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testGetUserLoadsOvertimeOpeningForRequestedYear(): void
+	{
+		$userId = 'user1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$user->method('getDisplayName')->willReturn('User One');
+		$user->method('getEMailAddress')->willReturn('user1@example.com');
+		$user->method('isEnabled')->willReturn(true);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findAll')->willReturn([]);
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $key) => $key === 'overtimeOpeningBalanceYear' ? '2023' : null
+		);
+		$this->userOvertimeSettingsService->expects($this->once())
+			->method('getOpeningBalanceHours')
+			->with($userId, 2023)
+			->willReturn(-4.0);
+
+		$response = $this->controller->getUser($userId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame(2023, $data['user']['overtimeOpeningBalanceYear']);
+		$this->assertSame(-4.0, $data['user']['overtimeOpeningBalanceHours']);
 	}
 
 	/**

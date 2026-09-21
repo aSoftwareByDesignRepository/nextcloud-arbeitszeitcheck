@@ -118,24 +118,68 @@ test.describe('Compliance gate smoke (Docker dev)', () => {
 		expect(box.height).toBeLessThanOrEqual(24)
 	})
 
-	test('API blocks 7h completed entry without mandatory break', async ({ page }) => {
-		// Requires oc_at_settings.auto_break_calculation = 0 for NC_EMPLOYEE_USER (auto-break would otherwise satisfy §4).
-		await page.goto('/apps/arbeitszeitcheck/time-entries')
-		await assertArbeitszeitcheckLoaded(page)
-		await getRequestToken(page)
-
-		const blocked = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
+	test('API blocks 7h completed entry without mandatory break', async ({ page, browser }) => {
+		// Pending four-eyes creates skip completed-entry compliance — turn approval off for this probe.
+		const adminPage = await browser.newPage()
+		await login(adminPage, credsFromEnv('ADMIN'))
+		const before = await apiAllowFailure(adminPage, 'GET', '/apps/arbeitszeitcheck/api/admin/settings')
+		const restoreApproval = before.json?.settings?.manualTimeEntriesRequireApproval === true
+		await apiAllowFailure(adminPage, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
 			data: {
-				date: '2026-05-28',
-				startTime: '08:00',
-				endTime: '15:00',
+				settings_section: 'time-approvals',
+				manualTimeEntriesRequireApproval: false,
 			},
 		})
 
-		expect(blocked.status).toBe(400)
-		expect(blocked.json?.success).toBe(false)
-		expect(blocked.json?.error_code).toBe('compliance_blocked')
-		expect(String(blocked.json?.error || '')).toMatch(/30.minute|30 Minuten|Pflichtpause/i)
+		try {
+			// Auto-break would insert the §4 break and allow the entry — turn it off for this probe.
+			await page.goto('/apps/arbeitszeitcheck/settings/breaks')
+			await assertArbeitszeitcheckLoaded(page)
+			await getRequestToken(page)
+			await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/settings', {
+				data: { auto_break_calculation: false },
+			})
+
+			await page.goto('/apps/arbeitszeitcheck/time-entries')
+			await assertArbeitszeitcheckLoaded(page)
+			await getRequestToken(page)
+
+			// Shared Docker DB retains prior seed rows — pick a free day in a rare window.
+			const stamp = Date.now()
+			const base = `2099-03-${String(1 + (stamp % 20)).padStart(2, '0')}`
+			let blocked = { status: 0, json: {} }
+			for (let i = 0; i < 25; i++) {
+				const d = new Date(`${base}T00:00:00Z`)
+				d.setUTCDate(d.getUTCDate() + i)
+				const date = d.toISOString().slice(0, 10)
+				blocked = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
+					data: {
+						date,
+						startTime: '08:00',
+						endTime: '15:00',
+					},
+				})
+				const err = String(blocked.json?.error || '').toLowerCase()
+				if (blocked.json?.error_code === 'compliance_blocked' || !err.includes('overlap')) {
+					break
+				}
+			}
+
+			expect(blocked.status).toBe(400)
+			expect(blocked.json?.success).toBe(false)
+			expect(blocked.json?.error_code).toBe('compliance_blocked')
+			expect(String(blocked.json?.error || '')).toMatch(/30.minute|30 Minuten|Pflichtpause/i)
+		} finally {
+			if (restoreApproval) {
+				await apiAllowFailure(adminPage, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
+					data: {
+						settings_section: 'time-approvals',
+						manualTimeEntriesRequireApproval: true,
+					},
+				})
+			}
+			await adminPage.close()
+		}
 	})
 
 	test('API allows exactly six hours without a break (ArbZG §4 mehr als sechs Stunden)', async ({ page }) => {
@@ -148,6 +192,7 @@ test.describe('Compliance gate smoke (Docker dev)', () => {
 				date: '2026-06-05',
 				startTime: '08:00',
 				endTime: '14:00',
+				justification: 'Compliance gate smoke justification for 6h entry.',
 			},
 		})
 

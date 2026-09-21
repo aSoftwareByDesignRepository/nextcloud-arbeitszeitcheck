@@ -9,8 +9,10 @@ test.describe('Admin employees — atomic profile save', () => {
 		await login(page, credsFromEnv('ADMIN'))
 
 		const userId = 'e2e_employee'
-		const user = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
-		expect(user.success).toBe(true)
+		const body = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(body.success).toBe(true)
+		const user = body.user
+		expect(user).toBeTruthy()
 
 		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || '2025-03-27'
 		const policy = user.vacationPolicy || {}
@@ -27,7 +29,7 @@ test.describe('Admin employees — atomic profile save', () => {
 
 		const payload = {
 			workingTimeModel: {
-				workingTimeModelId: user.workingTimeModelId ?? user.userWorkingTimeModel?.workingTimeModelId ?? 1,
+				workingTimeModelId: user.workingTimeModel?.id ?? user.userWorkingTimeModel?.workingTimeModelId ?? 1,
 				vacationDaysPerYear: user.vacationDaysPerYear ?? 28,
 				vacationCarryoverDays: user.vacationCarryoverDays ?? 0,
 				vacationCarryoverYear: user.vacationCarryoverYear ?? new Date().getFullYear(),
@@ -66,5 +68,92 @@ test.describe('Admin employees — atomic profile save', () => {
 		})
 		expect(result.success).toBe(true)
 		expect(result.userWorkingTimeModel !== undefined || result.policyId !== undefined).toBeTruthy()
+	})
+
+	test('carryover-only profile update persists without model change', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+
+		const userId = 'e2e_employee'
+		const body = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(body.success).toBe(true)
+		const user = body.user
+		expect(user).toBeTruthy()
+
+		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || '2025-03-27'
+		const year = user.vacationCarryoverYear ?? new Date().getFullYear()
+		const marker = 3.25
+
+		const payload = {
+			workingTimeModel: {
+				workingTimeModelId: user.workingTimeModel?.id ?? user.userWorkingTimeModel?.workingTimeModelId ?? 1,
+				vacationDaysPerYear: user.vacationDaysPerYear ?? 28,
+				vacationCarryoverDays: marker,
+				vacationCarryoverYear: year,
+				startDate,
+				endDate: user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null,
+				germanState: user.germanState || 'NW',
+			},
+			vacationPolicy: {
+				policyId: user.vacationPolicy?.id ?? null,
+				vacationMode: user.vacationPolicy?.vacationMode || 'inherit',
+				inheritLowerLayers: true,
+				manualDays: null,
+				effectiveFrom: startDate,
+				effectiveTo: null,
+			},
+			timeCapture: {
+				clockStampingEnabled: true,
+				manualTimeEntryEnabled: true,
+			},
+			overtime: {
+				trackingFrom: user.overtimeTrackingFrom || null,
+				openingBalance: {
+					year,
+					hours: String(user.overtimeOpeningBalanceHours ?? 0),
+				},
+			},
+		}
+
+		const put = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${userId}/profile`, {
+			data: payload,
+		})
+		expect(put.success).toBe(true)
+
+		const reloaded = await api(
+			page,
+			'GET',
+			`/apps/arbeitszeitcheck/api/admin/users/${userId}?carryoverYear=${year}`,
+		)
+		expect(reloaded.success).toBe(true)
+		expect(Number(reloaded.user.vacationCarryoverDays)).toBe(marker)
+		expect(Number(reloaded.user.vacationCarryoverYear)).toBe(year)
+
+		const otYear = year - 1
+		const otMarker = 6.5
+		const otPut = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${userId}/profile`, {
+			data: {
+				...payload,
+				workingTimeModel: {
+					...payload.workingTimeModel,
+					vacationCarryoverDays: marker,
+				},
+				overtime: {
+					trackingFrom: user.overtimeTrackingFrom || null,
+					openingBalance: { year: otYear, hours: String(otMarker) },
+				},
+			},
+		})
+		expect(otPut.success).toBe(true)
+		expect(Number(otPut.overtimeOpeningBalanceYear)).toBe(otYear)
+		expect(Number(otPut.overtimeOpeningBalanceHours)).toBe(otMarker)
+
+		const otReloaded = await api(
+			page,
+			'GET',
+			`/apps/arbeitszeitcheck/api/admin/users/${userId}?overtimeOpeningBalanceYear=${otYear}`,
+		)
+		expect(otReloaded.success).toBe(true)
+		expect(Number(otReloaded.user.overtimeOpeningBalanceYear)).toBe(otYear)
+		expect(Number(otReloaded.user.overtimeOpeningBalanceHours)).toBe(otMarker)
 	})
 })

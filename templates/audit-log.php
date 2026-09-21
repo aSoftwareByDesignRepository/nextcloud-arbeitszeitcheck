@@ -169,6 +169,18 @@ $rangeEnd = min($total, $offset + $shownCount);
 									</select>
 								</div>
 							</div>
+
+							<div class="audit-log-filter__field audit-log-filter__field--offline">
+								<span class="audit-log-filter__label" id="offline-sync-filter-label"><?php p($l->t('Offline sync')); ?></span>
+								<div class="audit-log-filter__control">
+									<label class="audit-log-filter__checkbox">
+										<input type="checkbox" id="offline-sync-filter" name="offlineSync" value="1"
+											aria-describedby="offline-sync-filter-hint">
+										<span><?php p($l->t('Only offline-synced punches')); ?></span>
+									</label>
+									<p id="offline-sync-filter-hint" class="form-help"><?php p($l->t('Show stamps that were recorded offline and synced later.')); ?></p>
+								</div>
+							</div>
 						</div>
 
 						<div id="audit-log-filter-error" class="azc-callout azc-callout--danger audit-log-page__toolbar-feedback" role="alert" hidden>
@@ -223,7 +235,15 @@ $rangeEnd = min($total, $offset + $shownCount);
 							<?php else: ?>
 								<?php foreach ($logs as $log): ?>
 								<tr>
-									<td data-label="<?php p($l->t('Date and time')); ?>"><?php p($log['createdAt'] ?? '-'); ?></td>
+									<td data-label="<?php p($l->t('Date and time')); ?>">
+										<?php p($log['createdAt'] ?? '-'); ?>
+										<?php if (!empty($log['isOfflineSync'])): ?>
+											<span class="azc-badge azc-badge--info audit-log-offline-badge"><?php p($l->t('Offline sync')); ?></span>
+											<?php if (!empty($log['clientOccurredAtIso'])): ?>
+												<span class="audit-log-offline-occurred"><?php p($l->t('Occurred: %s', [$log['clientOccurredAtIso']])); ?></span>
+											<?php endif; ?>
+										<?php endif; ?>
+									</td>
 									<td data-label="<?php p($l->t('Employee')); ?>"><?php p($log['userDisplayName'] ?? $log['userId']); ?></td>
 									<td data-label="<?php p($l->t('Action')); ?>"><?php p($log['action']); ?></td>
 									<td data-label="<?php p($l->t('What was changed')); ?>"><?php p($log['entityType']); ?></td>
@@ -274,6 +294,9 @@ $auditLogViewerL10n = \OCA\ArbeitszeitCheck\Util\TemplateL10n::mapFromMessageIds
 	'Please enter valid dates in dd.mm.yyyy format.',
 	'Date range must not exceed %d days. Please narrow the range.',
 	'User filter is too long.',
+	'Offline sync',
+	'Occurred: %s',
+	'Synced: %s',
 ]);
 ?>
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

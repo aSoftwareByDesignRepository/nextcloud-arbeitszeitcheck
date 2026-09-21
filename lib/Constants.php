@@ -44,6 +44,12 @@ final class Constants
 	public const MAX_LIST_LIMIT = 500;
 
 	/**
+	 * Hard cap for admin bulk userId lists (seats, teams, profile, vacation).
+	 * Oversized payloads must be rejected with HTTP 400 — never silently truncated.
+	 */
+	public const MAX_BATCH_USERS = 100;
+
+	/**
 	 * Maximum NC accounts scanned when resolving admin employee list access filters.
 	 */
 	public const ADMIN_EMPLOYEE_FILTER_MAX_SCAN = 10000;
@@ -106,6 +112,12 @@ final class Constants
 	public const AUDIT_ENTITY_ORG_VACATION_DEFAULT = 'org_vacation_default';
 	public const AUDIT_ENTITY_MODEL_VACATION_DEFAULT = 'model_vacation_default';
 	public const AUDIT_ENTITY_TEAM_VACATION_POLICY = 'team_vacation_policy';
+
+	/**
+	 * Audit capture_source for punches applied from offline stamp replay
+	 * (mobile / kiosk). Stored in new_values JSON and indexed column.
+	 */
+	public const AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC = 'offline_sync';
 
 	public const TARIFF_RULE_SET_STATUS_DRAFT = 'draft';
 	public const TARIFF_RULE_SET_STATUS_ACTIVE = 'active';

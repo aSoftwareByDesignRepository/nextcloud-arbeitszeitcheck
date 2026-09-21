@@ -120,7 +120,7 @@ test.describe('Bachus: manager time-entries + absences filters', () => {
 		await expect(emptyOrTable.first()).toBeVisible();
 		const emptyTitle = page.locator('#employee-time-entries-empty .azc-empty-state__title');
 		if (await emptyTitle.isVisible().catch(() => false)) {
-			await expect(emptyTitle).toContainText(/No entries|Select filters|Keine|Wählen/i);
+			await expect(emptyTitle).toContainText(/No entries|No matching|Select filters|Keine|Wählen|keine Treffer/i);
 		}
 	});
 

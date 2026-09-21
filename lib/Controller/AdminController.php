@@ -71,6 +71,7 @@ use OCP\AppFramework\Db\TTransactional;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\NotFoundResponse;
@@ -153,6 +154,7 @@ class AdminController extends Controller
 	private ?\OCP\IConfig $config;
 	private ?\OCP\Lock\ILockingProvider $lockingProvider;
 	private ?\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService $vacationUnitMigrationService;
+	private ?\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService $adminBatchMutationService;
 
 	private const AUDIT_LOG_PAGE_SIZE = 50;
 
@@ -200,6 +202,7 @@ class AdminController extends Controller
 		?\OCP\IConfig $config = null,
 		?\OCP\Lock\ILockingProvider $lockingProvider = null,
 		?\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService $vacationUnitMigrationService = null,
+		?\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService $adminBatchMutationService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -242,7 +245,16 @@ class AdminController extends Controller
 		$this->config = $config;
 		$this->lockingProvider = $lockingProvider;
 		$this->vacationUnitMigrationService = $vacationUnitMigrationService;
+		$this->adminBatchMutationService = $adminBatchMutationService;
 		$this->setCspService($cspService);
+	}
+
+	private function batchMutationService(): \OCA\ArbeitszeitCheck\Service\AdminBatchMutationService
+	{
+		if ($this->adminBatchMutationService === null) {
+			$this->adminBatchMutationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService::class);
+		}
+		return $this->adminBatchMutationService;
 	}
 
 	/**
@@ -613,6 +625,7 @@ class AdminController extends Controller
 	 * policy, time capture, overtime) in a single DB transaction.
 	 */
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
 	public function updateUserProfile(string $userId): JSONResponse
 	{
 		try {
@@ -1148,6 +1161,31 @@ class AdminController extends Controller
 		}
 
 		return $this->vacationUnitService()->storedAmountToAdminDays($stored);
+	}
+
+	/**
+	 * Optional YYYY query param for admin balance fields (carryover / overtime).
+	 * Empty → current calendar year. Invalid → null (caller returns 400).
+	 */
+	private function resolveAdminBalanceYearParam(string $paramName): ?int
+	{
+		$raw = $this->request->getParam($paramName);
+		if ($raw === null || $raw === '') {
+			return (int)date('Y');
+		}
+		if (!is_scalar($raw)) {
+			return null;
+		}
+		$trimmed = trim((string)$raw);
+		if (!preg_match('/^\d{4}$/', $trimmed)) {
+			return null;
+		}
+		$year = (int)$trimmed;
+		if ($year < 2000 || $year > 2100) {
+			return null;
+		}
+
+		return $year;
 	}
 
 	/**
@@ -2202,6 +2240,16 @@ class AdminController extends Controller
 			$filters['entity_type'] = $entityType;
 		}
 
+		$offlineSyncRaw = $params['offlineSync'] ?? $params['offline_sync'] ?? $params['captureSource'] ?? $params['capture_source'] ?? null;
+		if ($offlineSyncRaw !== null && $offlineSyncRaw !== '') {
+			$offlineFlag = is_bool($offlineSyncRaw)
+				? $offlineSyncRaw
+				: in_array(strtolower(trim((string)$offlineSyncRaw)), ['1', 'true', 'yes', 'offline_sync'], true);
+			if ($offlineFlag || strtolower(trim((string)$offlineSyncRaw)) === 'offline_sync') {
+				$filters['offline_sync'] = true;
+			}
+		}
+
 		return $filters;
 	}
 
@@ -2212,6 +2260,7 @@ class AdminController extends Controller
 	{
 		$user = $this->userManager->get($log->getUserId());
 		$performedByUser = $log->getPerformedBy() ? $this->userManager->get($log->getPerformedBy()) : null;
+		$offlineMeta = $this->resolveOfflineSyncAuditMeta($log);
 
 		return [
 			'id' => $log->getId(),
@@ -2226,6 +2275,60 @@ class AdminController extends Controller
 			'performedByDisplayName' => $this->auditLogPresenter->formatActor($log->getPerformedBy() ?? $log->getUserId(), $performedByUser ?: null),
 			'createdAt' => $this->auditLogPresenter->formatCreatedAt($log->getCreatedAt()),
 			'createdAtIso' => ($createdAt = $log->getCreatedAt()) ? $createdAt->format('c') : null,
+			'captureSource' => $offlineMeta['captureSource'],
+			'clientOccurredAtIso' => $offlineMeta['clientOccurredAtIso'],
+			'isOfflineSync' => $offlineMeta['isOfflineSync'],
+		];
+	}
+
+	/**
+	 * Prefer indexed capture_source column; fall back to newValues JSON for display of client_occurred_at.
+	 *
+	 * @return array{captureSource: ?string, clientOccurredAtIso: ?string, isOfflineSync: bool}
+	 */
+	private function resolveOfflineSyncAuditMeta(AuditLog $log): array
+	{
+		$fromJson = $this->parseOfflineSyncAuditMeta($log->getNewValues());
+		$col = $log->getCaptureSource();
+		if (is_string($col) && trim($col) === Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
+			return [
+				'captureSource' => Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
+				'clientOccurredAtIso' => $fromJson['clientOccurredAtIso'],
+				'isOfflineSync' => true,
+			];
+		}
+
+		return $fromJson;
+	}
+
+	/**
+	 * Present existing offline_sync meta from audit newValues — do not invent action keys.
+	 *
+	 * @return array{captureSource: ?string, clientOccurredAtIso: ?string, isOfflineSync: bool}
+	 */
+	private function parseOfflineSyncAuditMeta(?string $newValuesJson): array
+	{
+		$empty = [
+			'captureSource' => null,
+			'clientOccurredAtIso' => null,
+			'isOfflineSync' => false,
+		];
+		if ($newValuesJson === null || $newValuesJson === '') {
+			return $empty;
+		}
+		$decoded = json_decode($newValuesJson, true);
+		if (!is_array($decoded)) {
+			return $empty;
+		}
+		$source = isset($decoded['capture_source']) ? trim((string)$decoded['capture_source']) : '';
+		if ($source !== Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
+			return $empty;
+		}
+		$occurred = isset($decoded['client_occurred_at']) ? trim((string)$decoded['client_occurred_at']) : '';
+		return [
+			'captureSource' => Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
+			'clientOccurredAtIso' => $occurred !== '' ? $occurred : null,
+			'isOfflineSync' => true,
 		];
 	}
 
@@ -4393,6 +4496,20 @@ class AdminController extends Controller
 			$startDate = $currentModel ? $currentModel->getStartDate() : null;
 			$endDate = $currentModel ? $currentModel->getEndDate() : null;
 			$currentYear = (int)date('Y');
+			$carryoverYear = $this->resolveAdminBalanceYearParam('carryoverYear');
+			$overtimeOpeningYear = $this->resolveAdminBalanceYearParam('overtimeOpeningBalanceYear');
+			if ($carryoverYear === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid year for vacation carryover'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($overtimeOpeningYear === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Opening balance year must be between 2000 and 2100'),
+				], Http::STATUS_BAD_REQUEST);
+			}
 			$policy = $this->findVacationPolicyForAdminEdit($userId, $startDate);
 			$entitlementPreview = $this->vacationEntitlementEngine->computeForDate($userId, new \DateTimeImmutable('today'));
 			$entitlementFullDays = round((float)$entitlementPreview['days'], 2);
@@ -4406,12 +4523,12 @@ class AdminController extends Controller
 					'email' => $user->getEMailAddress(),
 					'enabled' => $user->isEnabled(),
 					'vacationCarryoverDays' => $this->presentAdminVacationDays(
-						(float)$this->vacationYearBalanceMapper->getCarryoverDays($userId, $currentYear)
+						(float)$this->vacationYearBalanceMapper->getCarryoverDays($userId, $carryoverYear)
 					),
-					'vacationCarryoverYear' => $currentYear,
+					'vacationCarryoverYear' => $carryoverYear,
 					'overtimeTrackingFrom' => $this->userOvertimeSettingsService->getTrackingFrom($userId)?->format('Y-m-d'),
-					'overtimeOpeningBalanceHours' => $this->userOvertimeSettingsService->getOpeningBalanceHours($userId, $currentYear),
-					'overtimeOpeningBalanceYear' => $currentYear,
+					'overtimeOpeningBalanceHours' => $this->userOvertimeSettingsService->getOpeningBalanceHours($userId, $overtimeOpeningYear),
+					'overtimeOpeningBalanceYear' => $overtimeOpeningYear,
 					'employmentStart' => $this->userEmploymentSettingsService->getEmploymentStart($userId)?->format('Y-m-d'),
 					'employmentEnd' => $this->userEmploymentSettingsService->getEmploymentEnd($userId)?->format('Y-m-d'),
 					'datevPersonalnummer' => $this->config !== null
@@ -6343,6 +6460,12 @@ class AdminController extends Controller
 					'user_agent' => $log->getUserAgent(),
 					'created_at' => $entry['createdAtIso'],
 					'created_at_display' => $entry['createdAt'],
+					'capture_source' => $entry['captureSource'],
+					'client_occurred_at' => $entry['clientOccurredAtIso'],
+					'is_offline_sync' => $entry['isOfflineSync'],
+					'captureSource' => $entry['captureSource'],
+					'clientOccurredAtIso' => $entry['clientOccurredAtIso'],
+					'isOfflineSync' => $entry['isOfflineSync'],
 				];
 			}, $paginatedLogs);
 
@@ -6443,6 +6566,9 @@ class AdminController extends Controller
 					'user_agent' => $log->getUserAgent() ?? '',
 					'old_values' => $log->getOldValues() ?? '',
 					'new_values' => $log->getNewValues() ?? '',
+					'capture_source' => $entry['captureSource'] ?? '',
+					'client_occurred_at' => $entry['clientOccurredAtIso'] ?? '',
+					'is_offline_sync' => !empty($entry['isOfflineSync']) ? '1' : '0',
 				];
 			}
 
@@ -6861,6 +6987,98 @@ class AdminController extends Controller
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Team not found')], Http::STATUS_NOT_FOUND);
 		}
+	}
+
+	#[NoAdminRequired]
+	public function addTeamMembersBatch(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$result = $this->batchMutationService()->addTeamMembersBatch(
+			$id,
+			$params['userIds'] ?? null,
+			$this->getPerformedBy()
+		);
+		return $this->batchMutationJsonResponse($result, 'members');
+	}
+
+	#[NoAdminRequired]
+	public function addTeamManagersBatch(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$result = $this->batchMutationService()->addTeamManagersBatch(
+			$id,
+			$params['userIds'] ?? null,
+			$this->getPerformedBy()
+		);
+		return $this->batchMutationJsonResponse($result, 'managers');
+	}
+
+	#[NoAdminRequired]
+	public function batchUpdateUserProfiles(): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$fields = is_array($params['fields'] ?? null) ? $params['fields'] : [];
+		$dryRun = !empty($params['dryRun']) || !empty($params['dry_run']);
+		$result = $this->batchMutationService()->batchProfile(
+			$params['userIds'] ?? null,
+			$fields,
+			$this->getPerformedBy(),
+			$dryRun
+		);
+		return $this->batchMutationJsonResponse($result);
+	}
+
+	#[NoAdminRequired]
+	public function batchAssignVacationPolicy(): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$policy = is_array($params['vacationPolicy'] ?? null) ? $params['vacationPolicy'] : [];
+		$dryRun = !empty($params['dryRun']) || !empty($params['dry_run']);
+		$result = $this->batchMutationService()->batchVacationPolicy(
+			$params['userIds'] ?? null,
+			$policy,
+			$this->getPerformedBy(),
+			$dryRun
+		);
+		return $this->batchMutationJsonResponse($result);
+	}
+
+	/**
+	 * @param array<string, mixed> $result
+	 */
+	private function batchMutationJsonResponse(array $result, ?string $listKey = null): JSONResponse
+	{
+		if (empty($result['ok'])) {
+			$error = (string)($result['error'] ?? 'unknown');
+			$status = (int)($result['httpStatus'] ?? Http::STATUS_BAD_REQUEST);
+			$message = match ($error) {
+				'user_ids_required' => $this->l10n->t('Select at least one person.'),
+				'batch_too_large' => $this->l10n->t('Too many people selected (maximum %s).', [(string)Constants::MAX_BATCH_USERS]),
+				'team_not_found' => $this->l10n->t('Team not found'),
+				'fields_required' => $this->l10n->t('Choose a work schedule and/or holiday region to apply.'),
+				'vacation_policy_required' => $this->l10n->t('Vacation policy is required.'),
+				'validation_failed' => (string)($result['message'] ?? $this->l10n->t('Validation failed.')),
+				default => $this->l10n->t('Could not complete the bulk action.'),
+			};
+			return new JSONResponse([
+				'success' => false,
+				'error' => $error,
+				'message' => $message,
+			], $status);
+		}
+
+		$payload = [
+			'success' => true,
+			'summary' => $result['summary'] ?? [],
+			'results' => $result['results'] ?? [],
+		];
+		if (isset($result['dryRun'])) {
+			$payload['dryRun'] = $result['dryRun'];
+		}
+		if ($listKey !== null && isset($result[$listKey])) {
+			$payload[$listKey] = $result[$listKey];
+		}
+		return new JSONResponse($payload);
 	}
 
 	#[NoAdminRequired]

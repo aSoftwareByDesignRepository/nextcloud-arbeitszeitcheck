@@ -512,7 +512,9 @@ $mutations = [
 				throw new \\Exception($this->l10n->t(\'Absence not found\'));
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				throw new \\Exception($this->l10n->t(\'Absence is not pending approval\'));
+				throw new ConcurrentDecisionException(
+					$this->l10n->t(\'This absence was already decided by another manager.\')
+				);
 			}
 			$this->assertAbsenceMutable($absence);
 
@@ -532,7 +534,9 @@ $mutations = [
 				throw new \\Exception($this->l10n->t(\'Absence not found\'));
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				throw new \\Exception($this->l10n->t(\'Absence is not pending approval\'));
+				throw new ConcurrentDecisionException(
+					$this->l10n->t(\'This absence was already decided by another manager.\')
+				);
 			}
 			$this->assertAbsenceMutable($absence);
 

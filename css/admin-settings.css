@@ -1171,7 +1171,8 @@
 	font-size: var(--azc-fs-md, 1rem);
 }
 
-#outlook-ical-subscription .user-picker__clear {
+#outlook-ical-subscription .user-picker__clear,
+#outlook-ical-subscription #outlookIcalTeamClear {
 	min-width: 44px;
 	min-height: 44px;
 	align-self: stretch;
@@ -1258,9 +1259,10 @@
 
 /* 1024px — desktop: restore compact clear control + legacy feed textarea height. */
 @media (min-width: 1024px) {
-	#outlook-ical-subscription .user-picker__clear {
-		min-width: 2.25rem;
-		min-height: 2.25rem;
+	#outlook-ical-subscription .user-picker__clear,
+	#outlook-ical-subscription #outlookIcalTeamClear {
+		min-width: 2.75rem;
+		min-height: 2.75rem;
 		align-self: center;
 	}
 

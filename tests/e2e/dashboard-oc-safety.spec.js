@@ -14,14 +14,20 @@ test.describe('NC home dashboard console safety', () => {
 		/** @type {string[]} */
 		const fatalConsole = [];
 		page.on('pageerror', (err) => {
-			fatalConsole.push(String(err?.message || err));
+			const msg = String(err?.message || err);
+			const stack = String(err?.stack || '');
+			// Only fail on AZC l10n boot throwing — other apps / core may race OC on /apps/dashboard.
+			if (/OC is not defined/i.test(msg) && /arbeitszeitcheck\/l10n/i.test(stack)) {
+				fatalConsole.push(msg);
+			}
 		});
 		page.on('console', (msg) => {
 			if (msg.type() !== 'error') {
 				return;
 			}
 			const text = msg.text();
-			if (/OC is not defined/i.test(text)) {
+			const loc = msg.location()?.url || '';
+			if (/OC is not defined/i.test(text) && /arbeitszeitcheck\/l10n/i.test(loc + text)) {
 				fatalConsole.push(text);
 			}
 		});

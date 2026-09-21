@@ -891,6 +891,203 @@
         if (addManagerBtn) addManagerBtn.addEventListener('click', function() {
             if (selectedTeamId) openAddManagerModal(selectedTeamId);
         });
+        var addMembersBulkBtn = document.getElementById('team-add-members-bulk');
+        if (addMembersBulkBtn) addMembersBulkBtn.addEventListener('click', function() {
+            if (selectedTeamId) openBulkAddTeamPeopleModal(selectedTeamId, 'member');
+        });
+        var addManagersBulkBtn = document.getElementById('team-add-managers-bulk');
+        if (addManagersBulkBtn) addManagersBulkBtn.addEventListener('click', function() {
+            if (selectedTeamId) openBulkAddTeamPeopleModal(selectedTeamId, 'manager');
+        });
+    }
+
+    /**
+     * Multi-select add for members or managers (F5).
+     * @param {number} teamId
+     * @param {'member'|'manager'} role
+     */
+    function openBulkAddTeamPeopleModal(teamId, role) {
+        const isMember = role === 'member';
+        const listUrl = baseUrl + '/api/admin/teams/' + teamId + (isMember ? '/members' : '/managers');
+        const batchUrl = listUrl + '/batch';
+        const modalId = isMember ? 'modal-bulk-add-members' : 'modal-bulk-add-managers';
+        const formId = isMember ? 'form-bulk-add-members' : 'form-bulk-add-managers';
+        const prefix = isMember ? 'bulk-member' : 'bulk-manager';
+        const title = isMember
+            ? t('Add several people…', 'Add several people…')
+            : t('Add several managers…', 'Add several managers…');
+        const teamName = (document.getElementById('admin-team-detail-name') || {}).textContent || '';
+
+        Utils.ajax(listUrl, {
+            method: 'GET',
+            onSuccess: function(listData) {
+                const listKey = isMember ? 'members' : 'managers';
+                const rows = (listData.success && listData[listKey]) ? listData[listKey] : [];
+                const excludeIds = rows.map(function(row) { return row.userId; });
+                const esc = Utils.escapeHtml ? Utils.escapeHtml.bind(Utils) : function(s) { return String(s); };
+
+                const content = '<form id="' + formId + '" class="form team-person-form team-person-form--bulk" novalidate>'
+                    + '<p class="form-help">' + esc(t('Search and tick people, then confirm to add them to this team.', 'Search and tick people, then confirm.')) + '</p>'
+                    + (teamName ? '<p class="form-help"><strong>' + esc(teamName) + '</strong></p>' : '')
+                    + '<div class="form-group">'
+                    + '<label for="' + prefix + '-search" class="form-label">' + esc(t('Find people', 'Find people')) + '</label>'
+                    + '<input type="search" id="' + prefix + '-search" class="form-input" autocomplete="off"'
+                    + ' placeholder="' + esc(t('Search by name or login…', 'Search by name or login…')) + '">'
+                    + '<div id="' + prefix + '-results" class="team-bulk-results" role="group" aria-label="' + esc(t('Matching users', 'Matching users')) + '"></div>'
+                    + '<p id="' + prefix + '-status" class="azc-sr-only" role="status" aria-live="polite"></p>'
+                    + '</div>'
+                    + '<div id="' + prefix + '-result-callout" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></div>'
+                    + '<div class="form-actions">'
+                    + '<button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('Cancel', 'Cancel')) + '</button>'
+                    + '<button type="submit" class="btn btn--primary" id="' + prefix + '-submit" disabled>' + esc(t('Add selected', 'Add selected')) + '</button>'
+                    + '</div></form>';
+
+                const modal = Components.createModal({
+                    id: modalId,
+                    title: title,
+                    content: content,
+                    size: 'md',
+                    closable: true,
+                    onClose: function() {
+                        const m = document.getElementById(modalId);
+                        if (m && m.parentNode) {
+                            m.parentNode.removeChild(m);
+                        }
+                    },
+                });
+                Components.openModal(modalId);
+
+                const selected = new Map();
+                const resultsEl = document.getElementById(prefix + '-results');
+                const searchEl = document.getElementById(prefix + '-search');
+                const submitBtn = document.getElementById(prefix + '-submit');
+                const statusEl = document.getElementById(prefix + '-status');
+                const calloutEl = document.getElementById(prefix + '-result-callout');
+                let searchTimer = null;
+
+                function refreshSubmit() {
+                    if (submitBtn) {
+                        submitBtn.disabled = selected.size === 0;
+                        submitBtn.textContent = selected.size === 0
+                            ? t('Add selected', 'Add selected')
+                            : t('Add selected (%n)', 'Add selected (%n)').replace('%n', String(selected.size));
+                    }
+                    if (statusEl) {
+                        statusEl.textContent = selected.size === 0
+                            ? ''
+                            : t('%n selected', '%n selected').replace('%n', String(selected.size));
+                    }
+                }
+
+                function renderHits(users) {
+                    if (!resultsEl) return;
+                    resultsEl.innerHTML = '';
+                    users.forEach(function(u) {
+                        const uid = u.id || u.userId;
+                        if (!uid || excludeIds.indexOf(uid) !== -1) return;
+                        const label = document.createElement('label');
+                        label.className = 'team-bulk-results__item';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.checked = selected.has(uid);
+                        cb.addEventListener('change', function() {
+                            if (cb.checked) {
+                                selected.set(uid, u.displayName || uid);
+                            } else {
+                                selected.delete(uid);
+                            }
+                            refreshSubmit();
+                        });
+                        const span = document.createElement('span');
+                        span.textContent = (u.displayName || uid) + ' (' + uid + ')';
+                        label.appendChild(cb);
+                        label.appendChild(span);
+                        resultsEl.appendChild(label);
+                    });
+                    if (!resultsEl.children.length) {
+                        resultsEl.textContent = t('No matching users found', 'No matching users found');
+                    }
+                }
+
+                if (searchEl) {
+                    searchEl.addEventListener('input', function() {
+                        clearTimeout(searchTimer);
+                        const q = searchEl.value.trim();
+                        if (q.length < 2) {
+                            if (resultsEl) resultsEl.innerHTML = '';
+                            return;
+                        }
+                        searchTimer = setTimeout(function() {
+                            Utils.ajax(getAdminUserSearchUrl() + '?q=' + encodeURIComponent(q) + '&picker=1&limit=25', {
+                                method: 'GET',
+                                onSuccess: function(data) {
+                                    const users = (data && data.users) ? data.users : (data && data.data) ? data.data : [];
+                                    renderHits(Array.isArray(users) ? users : []);
+                                },
+                                onError: function() {
+                                    if (resultsEl) resultsEl.textContent = t('Failed to load users', 'Failed to load users');
+                                }
+                            });
+                        }, 250);
+                    });
+                    setTimeout(function() { searchEl.focus(); }, 80);
+                }
+
+                const form = document.getElementById(formId);
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const userIds = Array.from(selected.keys());
+                        if (!userIds.length) {
+                            Messaging && Messaging.showError && Messaging.showError(t('Select at least one person.', 'Select at least one person.'));
+                            return;
+                        }
+                        const confirmMsg = t('Add %1$d people to team “%2$s”?', 'Add %1$d people to this team?')
+                            .replace('%1$d', String(userIds.length))
+                            .replace('%2$s', teamName || '');
+                        if (!window.confirm(confirmMsg)) {
+                            return;
+                        }
+                        Utils.ajax(batchUrl, {
+                            method: 'POST',
+                            data: { userIds: userIds },
+                            onSuccess: function(res) {
+                                if (res.success) {
+                                    const s = res.summary || {};
+                                    const msg = t('Added %1$d, skipped %2$d, failed %3$d.', 'Added %1$d, skipped %2$d, failed %3$d.')
+                                        .replace('%1$d', String(s.added ?? 0))
+                                        .replace('%2$d', String(s.skipped ?? 0))
+                                        .replace('%3$d', String(s.failed ?? 0));
+                                    if (calloutEl) {
+                                        calloutEl.hidden = false;
+                                        calloutEl.textContent = msg;
+                                    }
+                                    Messaging && Messaging.showSuccess && Messaging.showSuccess(msg);
+                                    announceStatus(msg);
+                                    if (isMember) {
+                                        loadTeamMembers(teamId);
+                                    } else {
+                                        loadTeamManagers(teamId);
+                                    }
+                                    selected.clear();
+                                    refreshSubmit();
+                                    if (resultsEl) resultsEl.innerHTML = '';
+                                    if (searchEl) searchEl.value = '';
+                                } else {
+                                    Messaging && Messaging.showError && Messaging.showError(res.message || res.error || t('Failed to add member', 'Failed'));
+                                }
+                            },
+                            onError: function(err) {
+                                Messaging && Messaging.showError && Messaging.showError((err && (err.message || err.error)) || t('Failed to add member', 'Failed'));
+                            }
+                        });
+                    });
+                }
+            },
+            onError: function() {
+                Messaging && Messaging.showError && Messaging.showError(t(isMember ? 'Failed to load members' : 'Failed to load managers', 'Failed to load'));
+            }
+        });
     }
 
     function init() {

@@ -174,6 +174,7 @@
 			userId: ($('#user-filter') && $('#user-filter').value.trim()) || '',
 			actionCategory: ($('#action-category-filter') && $('#action-category-filter').value) || '',
 			entityType: ($('#entity-type-filter') && $('#entity-type-filter').value) || '',
+			offlineSync: !!( $('#offline-sync-filter') && $('#offline-sync-filter').checked ),
 		};
 	}
 
@@ -220,6 +221,9 @@
 		}
 		if (filters.entityType) {
 			params.append('entity_type', filters.entityType);
+		}
+		if (filters.offlineSync) {
+			params.append('offlineSync', '1');
 		}
 		if (includePaging) {
 			params.append('limit', String(state.limit));
@@ -285,12 +289,22 @@
 			const performed = log.performed_by_display_name || log.performedByDisplayName || log.performed_by || log.performedBy || '-';
 			const entity = log.entity_type || log.entityType || '-';
 			const action = log.action || '-';
+			const isOffline = !!(log.is_offline_sync || log.isOfflineSync);
+			const occurred = log.client_occurred_at || log.clientOccurredAtIso || '';
 			const td = Utils.responsiveTd
 				? function (label, html) { return Utils.responsiveTd(label, html); }
 				: function (_label, html) { return '<td>' + html + '</td>'; };
 
+			let whenHtml = escapeHtml(String(created));
+			if (isOffline) {
+				whenHtml += ' <span class="azc-badge azc-badge--info audit-log-offline-badge">' + escapeHtml(alT('Offline sync')) + '</span>';
+				if (occurred) {
+					whenHtml += ' <span class="audit-log-offline-occurred">' + escapeHtml(alT('Occurred: %s', [occurred])) + '</span>';
+				}
+			}
+
 			return '<tr>' +
-				td(alT('Date and time'), escapeHtml(String(created))) +
+				td(alT('Date and time'), whenHtml) +
 				td(alT('Employee'), escapeHtml(String(user))) +
 				td(alT('Action'), escapeHtml(String(action))) +
 				td(alT('What was changed'), escapeHtml(String(entity))) +
@@ -440,6 +454,10 @@
 		}
 		if (entityEl) {
 			entityEl.value = '';
+		}
+		const offlineEl = $('#offline-sync-filter');
+		if (offlineEl) {
+			offlineEl.checked = false;
 		}
 		state.offset = 0;
 		setError('');

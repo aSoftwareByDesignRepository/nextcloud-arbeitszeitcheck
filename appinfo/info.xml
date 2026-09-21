@@ -318,7 +318,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL eller PostgreSQL
 	]]></description>
-	<version>1.7.9</version>
+	<version>1.7.10</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="info@software-by-design.de" homepage="http://nextcloud.software-by-design.de">Software by Design GbR</author>
 

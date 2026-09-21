@@ -148,6 +148,10 @@ $filterIntro = $isAccessRestricted
                     <table class="table table--hover azc-table--responsive" id="users-table" role="table" aria-label="<?php p($l->t('Employee list')); ?>">
                         <thead>
                             <tr>
+                                <th scope="col" class="admin-users-select-col">
+                                    <label class="azc-sr-only" for="users-select-all"><?php p($l->t('Select all on this page')); ?></label>
+                                    <input type="checkbox" id="users-select-all" aria-label="<?php p($l->t('Select all on this page')); ?>">
+                                </th>
                                 <th scope="col"><?php p($l->t('Name')); ?></th>
                                 <th scope="col"><?php p($l->t('Email')); ?></th>
                                 <th scope="col"><?php p($l->t('Working Time Model')); ?></th>
@@ -161,7 +165,7 @@ $filterIntro = $isAccessRestricted
                         <tbody id="users-tbody">
                             <?php if (empty($users)): ?>
                                 <tr id="users-empty-row">
-                                    <td colspan="8" class="text-center admin-users-empty-cell">
+                                    <td colspan="9" class="text-center admin-users-empty-cell">
                                         <?php if ($isAccessRestricted && $accessFilter === AdminEmployeeDirectoryService::FILTER_APP_ACCESS): ?>
                                             <p class="admin-users-empty-message"><?php p($l->t('No one with app access yet. Add people under Access control, or show all Nextcloud accounts.')); ?></p>
                                             <div class="admin-users-empty-actions">
@@ -196,6 +200,10 @@ $filterIntro = $isAccessRestricted
                                     $stichtag = $user['overtimeTrackingFrom'] ?? null;
                                     ?>
                                     <tr data-user-id="<?php p($user['userId']); ?>">
+                                        <td data-label="<?php p($l->t('Select')); ?>" class="admin-users-select-col">
+                                            <input type="checkbox" class="admin-users-row-select" value="<?php p($user['userId']); ?>"
+                                                aria-label="<?php p($l->t('Select %s', [$user['displayName'] ?? $user['userId']])); ?>">
+                                        </td>
                                         <td data-label="<?php p($l->t('Name')); ?>"><?php p($user['displayName']); ?></td>
                                         <td data-label="<?php p($l->t('Email')); ?>"><?php p($user['email'] ?? '-'); ?></td>
                                         <td data-label="<?php p($l->t('Working Time Model')); ?>">
@@ -277,6 +285,17 @@ $filterIntro = $isAccessRestricted
                 <p id="export-status" class="sr-only" aria-live="polite"></p>
             </div><!-- /.azc-card__body -->
         </section><!-- /.azc-card -->
+
+		<div id="admin-users-bulk-bar" class="admin-users-bulk-bar" hidden role="region" aria-label="<?php p($l->t('Bulk actions for selected employees')); ?>">
+			<p class="admin-users-bulk-bar__count" id="admin-users-bulk-count" aria-live="polite"></p>
+			<button type="button" id="admin-users-bulk-apply" class="azc-btn azc-btn--primary">
+				<?php p($l->t('Apply to selected…')); ?>
+			</button>
+			<button type="button" id="admin-users-bulk-clear" class="azc-btn azc-btn--secondary">
+				<?php p($l->t('Clear selection')); ?>
+			</button>
+			<div id="admin-users-bulk-result" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></div>
+		</div>
 <?php $urlGenerator = $_['urlGenerator'] ?? $urlGenerator ?? null; ?>
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 <?php include __DIR__ . '/partials/admin-user-edit-l10n.php'; ?>
@@ -296,6 +315,9 @@ $filterIntro = $isAccessRestricted
         'userDetailUrlTemplate' => ($urlGenerator
             ? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => '__USER_ID__'])
             : '/apps/arbeitszeitcheck/admin/users/__USER_ID__'),
+        'adminTeamsUrl' => ($urlGenerator
+            ? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams')
+            : '/apps/arbeitszeitcheck/admin/teams'),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 

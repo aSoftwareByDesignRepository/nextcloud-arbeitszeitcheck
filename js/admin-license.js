@@ -18,6 +18,7 @@
 	const apiLicense = page.dataset.apiLicense || '';
 	const apiClearLicense = page.dataset.apiClearLicense || '';
 	const apiSeats = page.dataset.apiSeats || '';
+	const apiSeatsBatch = page.dataset.apiSeatsBatch || '';
 	const apiRemoveSeat = page.dataset.apiRemoveSeat || '';
 	const apiSearchUsers = page.dataset.apiSearchUsers || '';
 	const requestToken = page.dataset.requesttoken || '';
@@ -33,6 +34,11 @@
 		return i18n[key] || fallback || key;
 	}
 
+	function tn(key, singular, plural, count) {
+		const template = i18n[key] || (count === 1 ? singular : plural);
+		return String(template).replace(/%n/g, String(count));
+	}
+
 	const liveRegion = document.getElementById('azc-license-live');
 	const alertRegion = document.getElementById('azc-license-alert');
 	const feedback = document.getElementById('azc-license-feedback');
@@ -46,6 +52,8 @@
 	const seatsFullHint = document.getElementById('azc-seats-full-hint');
 	const userSearch = document.getElementById('azc-seat-user-search');
 	const searchResults = document.getElementById('azc-seat-search-results');
+	const assignSelectedBtn = document.getElementById('azc-seat-assign-selected');
+	const batchResultEl = document.getElementById('azc-seat-batch-result');
 	const clearBackdrop = document.getElementById('azc-license-clear-backdrop');
 	const clearModal = document.getElementById('azc-license-clear-modal');
 	const clearCancel = document.getElementById('azc-license-clear-cancel');
@@ -55,6 +63,35 @@
 	let searchAbort = null;
 	let searchActiveIndex = -1;
 	let modalReturnFocus = null;
+	let lastSeatUsed = 0;
+	let lastSeatLimit = 0;
+	/** @type {Map<string, {id: string, displayName: string}>} */
+	const pendingSeatSelection = new Map();
+
+	function updateAssignSelectedButton() {
+		if (!assignSelectedBtn) {
+			return;
+		}
+		const n = pendingSeatSelection.size;
+		if (n === 0) {
+			assignSelectedBtn.hidden = true;
+			assignSelectedBtn.disabled = true;
+			assignSelectedBtn.textContent = t('assignSelected', 'Assign selected');
+			return;
+		}
+		assignSelectedBtn.hidden = false;
+		assignSelectedBtn.disabled = false;
+		assignSelectedBtn.textContent = tn('assignSelected', 'Assign selected (%n)', 'Assign selected (%n)', n);
+	}
+
+	function togglePendingSeat(user, checked) {
+		if (checked) {
+			pendingSeatSelection.set(user.id, { id: user.id, displayName: user.displayName || user.id });
+		} else {
+			pendingSeatSelection.delete(user.id);
+		}
+		updateAssignSelectedButton();
+	}
 
 	function announce(el, message) {
 		if (el) {
@@ -192,6 +229,8 @@
 		if (!Number.isFinite(used) || !Number.isFinite(limit)) {
 			return;
 		}
+		lastSeatUsed = used;
+		lastSeatLimit = limit;
 		updateMeter(
 			document.getElementById('azc-license-mobile-used'),
 			document.getElementById('azc-license-mobile-limit'),
@@ -548,20 +587,103 @@
 			users.forEach((u, index) => {
 				const li = document.createElement('li');
 				li.setAttribute('role', 'option');
-				li.setAttribute('aria-selected', 'false');
+				li.setAttribute('aria-selected', pendingSeatSelection.has(u.id) ? 'true' : 'false');
 				li.id = 'azc-seat-option-' + index;
 				li.dataset.userId = u.id;
-				li.textContent = u.displayName + ' (' + u.id + ')';
+				li.className = 'azc-seat-search-results__option';
+
+				const label = document.createElement('label');
+				label.className = 'azc-seat-search-results__label';
+				const cb = document.createElement('input');
+				cb.type = 'checkbox';
+				cb.className = 'azc-seat-search-results__check';
+				cb.checked = pendingSeatSelection.has(u.id);
+				cb.setAttribute('aria-label', (u.displayName || u.id) + ' (' + u.id + ')');
+				cb.addEventListener('change', () => {
+					togglePendingSeat(u, cb.checked);
+					li.setAttribute('aria-selected', cb.checked ? 'true' : 'false');
+				});
+				const text = document.createElement('span');
+				text.textContent = u.displayName + ' (' + u.id + ')';
+				label.appendChild(cb);
+				label.appendChild(text);
+				li.appendChild(label);
 				li.addEventListener('mousedown', (e) => {
-					// mousedown (not click) so the input never loses focus.
-					e.preventDefault();
-					assignSeat(u.id);
+					// Keep focus in the search input; toggle via checkbox/label.
+					if (e.target !== cb) {
+						e.preventDefault();
+					}
 				});
 				searchResults.appendChild(li);
 			});
 		}
 		searchResults.hidden = false;
 		userSearch.setAttribute('aria-expanded', 'true');
+		updateAssignSelectedButton();
+	}
+
+	async function assignSelectedSeats() {
+		const userIds = Array.from(pendingSeatSelection.keys());
+		if (userIds.length === 0) {
+			showFeedback(t('selectPeopleFirst', 'Select at least one person.'), 'error');
+			return;
+		}
+		const remaining = Math.max(0, lastSeatLimit - lastSeatUsed);
+		let confirmMsg = t('confirmAssignSeats', 'Assign mobile seats to %1$d people? %2$d seats remaining.')
+			.replace('%1$d', String(userIds.length))
+			.replace('%2$d', String(remaining));
+		if (userIds.length > remaining) {
+			confirmMsg = t('confirmAssignSeatsOver', 'You selected %1$d people but only %2$d seats remain. Only free seats will be assigned.')
+				.replace('%1$d', String(userIds.length))
+				.replace('%2$d', String(remaining));
+		}
+		if (!window.confirm(confirmMsg)) {
+			return;
+		}
+		hideFeedback();
+		if (assignSelectedBtn) {
+			assignSelectedBtn.disabled = true;
+		}
+		try {
+			const { data } = await apiFetch(apiSeatsBatch || apiSeats, {
+				method: 'POST',
+				headers: headers(),
+				body: JSON.stringify({ userIds }),
+			});
+			if (data.ok) {
+				renderSeatRows(data.seats);
+				updateSeatCounts(data.mobileSeatsUsed ?? 0, data.mobileSeatsLimit ?? 0);
+				const summary = data.summary || {};
+				const msg = t('seatsAssigned', 'Assigned %1$d, skipped %2$d, failed %3$d.')
+					.replace('%1$d', String(summary.assigned ?? 0))
+					.replace('%2$d', String(summary.skipped ?? 0))
+					.replace('%3$d', String(summary.failed ?? 0));
+				showFeedback(msg, 'success');
+				if (batchResultEl) {
+					batchResultEl.hidden = false;
+					batchResultEl.textContent = msg;
+				}
+				pendingSeatSelection.clear();
+				closeSearchResults();
+				if (userSearch) {
+					userSearch.value = '';
+					userSearch.focus();
+				}
+				updateAssignSelectedButton();
+			} else {
+				showFeedback(data.message || t('assignFailed', 'Could not assign seat.'), 'error');
+			}
+		} catch {
+			showFeedback(t('networkError', 'Network error. Please try again.'), 'error');
+		} finally {
+			updateAssignSelectedButton();
+		}
+	}
+
+	if (assignSelectedBtn) {
+		assignSelectedBtn.addEventListener('click', function () {
+			assignSelectedSeats();
+		});
 	}
 
 	if (userSearch && searchResults) {
@@ -626,9 +748,11 @@
 				highlightSearchOption(searchActiveIndex);
 			} else if (e.key === 'Enter' && searchActiveIndex >= 0) {
 				e.preventDefault();
-				const uid = options[searchActiveIndex].dataset.userId;
-				if (uid) {
-					assignSeat(uid);
+				const opt = options[searchActiveIndex];
+				const cb = opt && opt.querySelector('input[type="checkbox"]');
+				if (cb) {
+					cb.checked = !cb.checked;
+					cb.dispatchEvent(new Event('change', { bubbles: true }));
 				}
 			} else if (e.key === 'Escape') {
 				e.preventDefault();
@@ -650,5 +774,12 @@
 				closeSearchResults();
 			}
 		});
+	}
+
+	const usedEl = document.getElementById('azc-license-mobile-used');
+	const limitEl = document.getElementById('azc-license-mobile-limit');
+	if (usedEl && limitEl) {
+		lastSeatUsed = parseInt(usedEl.textContent, 10) || 0;
+		lastSeatLimit = parseInt(limitEl.textContent, 10) || 0;
 	}
 })();

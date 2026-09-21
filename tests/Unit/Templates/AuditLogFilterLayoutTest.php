@@ -24,6 +24,7 @@ class AuditLogFilterLayoutTest extends TestCase
 			'id="audit-user-picker"',
 			'id="action-category-filter"',
 			'id="entity-type-filter"',
+			'id="offline-sync-filter"',
 			'id="apply-filters"',
 			'id="reset-filters"',
 			'id="export-logs"',

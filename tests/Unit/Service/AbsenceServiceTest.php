@@ -1084,8 +1084,52 @@ class AbsenceServiceTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('Absence is not pending approval');
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class);
+		$this->expectExceptionMessage('This absence was already decided by another manager.');
+
+		$this->service->approveAbsence($absenceId, $approverId);
+	}
+
+	public function testApproveAbsenceMapsLockedExceptionToConcurrentDecision(): void
+	{
+		$approverId = 'manager';
+		$absenceId = 124;
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId('employee');
+		$absence->setStatus(Absence::STATUS_PENDING);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+
+		$lockingProvider = $this->createMock(ILockingProvider::class);
+		$lockingProvider->method('acquireLock')
+			->willThrowException(new \OCP\Lock\LockedException('azc/ab/test'));
+		$this->service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$lockingProvider,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class);
+		$this->expectExceptionMessage('This absence was already decided by another manager.');
 
 		$this->service->approveAbsence($absenceId, $approverId);
 	}

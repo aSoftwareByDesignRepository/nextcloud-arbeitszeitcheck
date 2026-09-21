@@ -84,7 +84,11 @@
         return {};
     }
 
-    /** Maps API absence type codes to l10n keys (same strings as absences form). */
+    /**
+     * Maps API absence type codes → Nextcloud l10n message IDs (English source strings).
+     * Never render map values directly — always pass through t() so locale packs apply.
+     * Keep in sync with AbsenceTypeLabel + manager-dashboard.php injected l10n keys.
+     */
     var ABSENCE_TYPE_TO_L10N_KEY = {
         vacation: 'Vacation',
         sick_leave: 'Sick leave',
@@ -119,8 +123,10 @@
     }
 
     function absenceTitleTypeDisplay(s, typeCode) {
-        if (s.typeLabel != null && String(s.typeLabel).trim() !== '') {
-            return String(s.typeLabel).trim();
+        // Prefer server-localized typeLabel from pending-approvals API (same IL10N as UI language).
+        const serverLabel = s.typeLabel != null ? String(s.typeLabel).trim() : '';
+        if (serverLabel !== '' && !/^(vacation|sick_leave|personal_leave|parental_leave|special_leave|unpaid_leave|home_office|business_trip)$/i.test(serverLabel)) {
+            return serverLabel;
         }
         return absenceTypeDisplay(typeCode);
     }
@@ -135,32 +141,55 @@
     }
 
     // ===== TABS =====
-    function setupTabs() {
+    function selectPendingTab(which) {
         const tabAbsences = document.getElementById('tab-absences');
         const tabTimeEntries = document.getElementById('tab-time-entries');
         const panelAbsences = document.getElementById('pending-absences-panel');
         const panelTimeEntries = document.getElementById('pending-time-entries-panel');
         if (!tabAbsences || !tabTimeEntries || !panelAbsences || !panelTimeEntries) return;
 
+        const showTimeEntries = which === 'time-entries';
+        tabTimeEntries.classList.toggle('pending-approvals-tab--active', showTimeEntries);
+        tabTimeEntries.setAttribute('aria-selected', showTimeEntries ? 'true' : 'false');
+        tabAbsences.classList.toggle('pending-approvals-tab--active', !showTimeEntries);
+        tabAbsences.setAttribute('aria-selected', showTimeEntries ? 'false' : 'true');
+        panelTimeEntries.classList.toggle('pending-approvals-panel--hidden', !showTimeEntries);
+        panelTimeEntries.setAttribute('aria-hidden', showTimeEntries ? 'false' : 'true');
+        panelAbsences.classList.toggle('pending-approvals-panel--hidden', showTimeEntries);
+        panelAbsences.setAttribute('aria-hidden', showTimeEntries ? 'true' : 'false');
+
+        const focusTarget = showTimeEntries ? panelTimeEntries : panelAbsences;
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            if (!focusTarget.hasAttribute('tabindex')) {
+                focusTarget.setAttribute('tabindex', '-1');
+            }
+            try {
+                focusTarget.focus({ preventScroll: false });
+            } catch (e) {
+                focusTarget.focus();
+            }
+        }
+    }
+
+    function setupTabs() {
+        const tabAbsences = document.getElementById('tab-absences');
+        const tabTimeEntries = document.getElementById('tab-time-entries');
+        if (!tabAbsences || !tabTimeEntries) return;
+
         tabAbsences.addEventListener('click', function() {
-            tabAbsences.classList.add('pending-approvals-tab--active');
-            tabAbsences.setAttribute('aria-selected', 'true');
-            tabTimeEntries.classList.remove('pending-approvals-tab--active');
-            tabTimeEntries.setAttribute('aria-selected', 'false');
-            panelAbsences.classList.remove('pending-approvals-panel--hidden');
-            panelAbsences.setAttribute('aria-hidden', 'false');
-            panelTimeEntries.classList.add('pending-approvals-panel--hidden');
-            panelTimeEntries.setAttribute('aria-hidden', 'true');
+            selectPendingTab('absences');
         });
         tabTimeEntries.addEventListener('click', function() {
-            tabTimeEntries.classList.add('pending-approvals-tab--active');
-            tabTimeEntries.setAttribute('aria-selected', 'true');
-            tabAbsences.classList.remove('pending-approvals-tab--active');
-            tabAbsences.setAttribute('aria-selected', 'false');
-            panelTimeEntries.classList.remove('pending-approvals-panel--hidden');
-            panelTimeEntries.setAttribute('aria-hidden', 'false');
-            panelAbsences.classList.add('pending-approvals-panel--hidden');
-            panelAbsences.setAttribute('aria-hidden', 'true');
+            selectPendingTab('time-entries');
+        });
+
+        document.querySelectorAll('[data-manager-pending-tab]').forEach(function(tile) {
+            tile.addEventListener('click', function(ev) {
+                const which = tile.getAttribute('data-manager-pending-tab');
+                if (which === 'time-entries' || which === 'absences') {
+                    selectPendingTab(which);
+                }
+            });
         });
     }
 

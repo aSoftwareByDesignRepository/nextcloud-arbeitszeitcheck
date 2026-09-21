@@ -12,6 +12,7 @@ use OCA\ArbeitszeitCheck\Service\MobileSeatService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
 use OCA\ArbeitszeitCheck\Support\UserDirectorySearch;
+use OCA\ArbeitszeitCheck\Util\TemplateL10n;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -116,39 +117,45 @@ class LicenseAdminController extends Controller
 				'apiLicenseUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.applyLicense'),
 				'apiClearLicenseUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.clearLicense'),
 				'apiSeatsUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.assignSeat'),
+				'apiSeatsBatchUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.assignSeatsBatch'),
 				'apiRemoveSeatUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.removeSeat'),
 				'apiSearchUsersUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.license_admin.searchUsers'),
 				'requesttoken' => Util::callRegister(),
 				'i18n' => [
-					'saveSuccess' => $this->l10n->t('License saved successfully.'),
-					'saveFailed' => $this->l10n->t('Could not save license.'),
-					'emptyKey' => $this->l10n->t('Please paste a license key.'),
-					'networkError' => $this->l10n->t('Network error. Please try again.'),
-					'seatAssigned' => $this->l10n->t('Seat assigned.'),
-					'seatRemoved' => $this->l10n->t('Seat removed.'),
-					'assignFailed' => $this->l10n->t('Could not assign seat.'),
-					'removeFailed' => $this->l10n->t('Could not remove seat.'),
-					'removeSeat' => $this->l10n->t('Remove'),
-					'removeSeatConfirm' => $this->l10n->t('Remove mobile seat for this employee?'),
-					'clearConfirm' => $this->l10n->t('Remove the organisation license and revoke all mobile seats and kiosk terminals? This cannot be undone.'),
-					'clearSuccess' => $this->l10n->t('License removed.'),
-					'clearFailed' => $this->l10n->t('Could not remove license.'),
-					'clearLicense' => $this->l10n->t('Remove license'),
-					'cancel' => $this->l10n->t('Cancel'),
-					'confirm' => $this->l10n->t('Confirm'),
-					'activeLabel' => $this->l10n->t('Active'),
-					'inactiveLabel' => $this->l10n->t('Expired or invalid'),
-					'signatureInvalidLabel' => $this->l10n->t('Signature mismatch'),
-					'noLicenseTitle' => $this->l10n->t('No license yet'),
-					'noLicenseText' => $this->l10n->t('Paste your AZC2 license key below to unlock the Mobile and Terminal apps. The web app stays free.'),
-					'seatsFull' => $this->l10n->t('All seats are assigned'),
-					'seatsFullHint' => $this->l10n->t('All mobile seats are assigned. Remove a user or upgrade your license.'),
-					'searchNoResults' => $this->l10n->t('No matching employees found.'),
-					'saving' => $this->l10n->t('Saving…'),
-					'colEmployee' => $this->l10n->t('Employee'),
-					'colUserId' => $this->l10n->t('User ID'),
-					'colAssigned' => $this->l10n->t('Assigned'),
-					'colActions' => $this->l10n->t('Actions'),
+					'saveSuccess' => TemplateL10n::translate($this->l10n, 'License saved successfully.'),
+					'saveFailed' => TemplateL10n::translate($this->l10n, 'Could not save license.'),
+					'emptyKey' => TemplateL10n::translate($this->l10n, 'Please paste a license key.'),
+					'networkError' => TemplateL10n::translate($this->l10n, 'Network error. Please try again.'),
+					'seatAssigned' => TemplateL10n::translate($this->l10n, 'Seat assigned.'),
+					'seatsAssigned' => TemplateL10n::translate($this->l10n, 'Assigned %1$d, skipped %2$d, failed %3$d.'),
+					'assignSelected' => TemplateL10n::translate($this->l10n, 'Assign selected (%n)'),
+					'confirmAssignSeats' => TemplateL10n::translate($this->l10n, 'Assign mobile seats to %1$d people? %2$d seats remaining.'),
+					'confirmAssignSeatsOver' => TemplateL10n::translate($this->l10n, 'You selected %1$d people but only %2$d seats remain. Only free seats will be assigned.'),
+					'selectPeopleFirst' => TemplateL10n::translate($this->l10n, 'Select at least one person.'),
+					'seatRemoved' => TemplateL10n::translate($this->l10n, 'Seat removed.'),
+					'assignFailed' => TemplateL10n::translate($this->l10n, 'Could not assign seat.'),
+					'removeFailed' => TemplateL10n::translate($this->l10n, 'Could not remove seat.'),
+					'removeSeat' => TemplateL10n::translate($this->l10n, 'Remove'),
+					'removeSeatConfirm' => TemplateL10n::translate($this->l10n, 'Remove mobile seat for this employee?'),
+					'clearConfirm' => TemplateL10n::translate($this->l10n, 'Remove the organisation license and revoke all mobile seats and kiosk terminals? This cannot be undone.'),
+					'clearSuccess' => TemplateL10n::translate($this->l10n, 'License removed.'),
+					'clearFailed' => TemplateL10n::translate($this->l10n, 'Could not remove license.'),
+					'clearLicense' => TemplateL10n::translate($this->l10n, 'Remove license'),
+					'cancel' => TemplateL10n::translate($this->l10n, 'Cancel'),
+					'confirm' => TemplateL10n::translate($this->l10n, 'Confirm'),
+					'activeLabel' => TemplateL10n::translate($this->l10n, 'Active'),
+					'inactiveLabel' => TemplateL10n::translate($this->l10n, 'Expired or invalid'),
+					'signatureInvalidLabel' => TemplateL10n::translate($this->l10n, 'Signature mismatch'),
+					'noLicenseTitle' => TemplateL10n::translate($this->l10n, 'No license yet'),
+					'noLicenseText' => TemplateL10n::translate($this->l10n, 'Paste your AZC2 license key below to unlock the Mobile and Terminal apps. The web app stays free.'),
+					'seatsFull' => TemplateL10n::translate($this->l10n, 'All seats are assigned'),
+					'seatsFullHint' => TemplateL10n::translate($this->l10n, 'All mobile seats are assigned. Remove a user or upgrade your license.'),
+					'searchNoResults' => TemplateL10n::translate($this->l10n, 'No matching employees found.'),
+					'saving' => TemplateL10n::translate($this->l10n, 'Saving…'),
+					'colEmployee' => TemplateL10n::translate($this->l10n, 'Employee'),
+					'colUserId' => TemplateL10n::translate($this->l10n, 'User ID'),
+					'colAssigned' => TemplateL10n::translate($this->l10n, 'Assigned'),
+					'colActions' => TemplateL10n::translate($this->l10n, 'Actions'),
 				],
 				'urlGenerator' => $this->urlGenerator,
 			],
@@ -246,6 +253,52 @@ class LicenseAdminController extends Controller
 			'seats' => $this->mobileSeatService->listSeats(),
 			'mobileSeatsUsed' => $this->mobileSeatService->getAssignedCount(),
 			'mobileSeatsLimit' => $this->licenseService->getMobileSeatLimit(),
+		]);
+	}
+
+	#[NoAdminRequired]
+	public function assignSeatsBatch(): JSONResponse
+	{
+		$body = file_get_contents('php://input');
+		$data = is_string($body) ? json_decode($body, true) : null;
+		if (!is_array($data)) {
+			$data = $this->request->getParams();
+		}
+		$rawIds = $data['userIds'] ?? null;
+		$normalized = \OCA\ArbeitszeitCheck\Support\AdminBatchUserIds::normalize($rawIds);
+		if (!$normalized['ok']) {
+			$message = match ($normalized['error']) {
+				'batch_too_large' => $this->l10n->t('Too many people selected (maximum %s).', [(string)\OCA\ArbeitszeitCheck\Constants::MAX_BATCH_USERS]),
+				default => $this->l10n->t('Select at least one person.'),
+			};
+			return new JSONResponse([
+				'ok' => false,
+				'error' => $normalized['error'],
+				'message' => $message,
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		$actor = $this->userSession->getUser()?->getUID() ?? '';
+		$result = $this->mobileSeatService->assignSeatsBatch($normalized['userIds'], $actor);
+		if (!$result['ok']) {
+			$message = match ($result['error'] ?? '') {
+				'no_mobile_plan' => $this->l10n->t('No mobile plan in the current license.'),
+				default => $this->l10n->t('Could not assign seats.'),
+			};
+			return new JSONResponse([
+				'ok' => false,
+				'error' => $result['error'] ?? 'unknown',
+				'message' => $message,
+			], Http::STATUS_UNPROCESSABLE_ENTITY);
+		}
+
+		return new JSONResponse([
+			'ok' => true,
+			'summary' => $result['summary'],
+			'results' => $result['results'],
+			'seats' => $result['seats'],
+			'mobileSeatsUsed' => $result['mobileSeatsUsed'],
+			'mobileSeatsLimit' => $result['mobileSeatsLimit'],
 		]);
 	}
 

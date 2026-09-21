@@ -276,6 +276,27 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
+	 * Count pending absences for the full team (not a preview slice).
+	 *
+	 * @param list<string> $userIds
+	 */
+	public function countPendingForUsers(array $userIds): int
+	{
+		$userIds = QueryInChunker::normalizeValues($userIds);
+		if ($userIds === []) {
+			return 0;
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'pending_count')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('status', $qb->createNamedParameter(Absence::STATUS_PENDING)))
+			->andWhere(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY));
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Find absences where the given user is substitute and approval is pending
 	 *
 	 * @param string $substituteUserId User ID of the substitute

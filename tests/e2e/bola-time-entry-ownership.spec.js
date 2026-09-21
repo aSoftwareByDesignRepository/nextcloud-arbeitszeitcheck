@@ -1,5 +1,14 @@
 /**
  * Live BOLA: attacker must not read/update/delete another user's time entry via API.
+ *
+ * Seed / env contract (SEC-R4-04):
+ * - NC_BOLA_ATTACKER_USER (default azc_bola_b) must be a normal employee.
+ * - The attacker must NOT be in the Nextcloud `admin` group and must NOT hold
+ *   ArbeitszeitCheck app-admin rights. Admin privilege collapses object-level
+ *   ownership checks and turns this suite into a false green.
+ * - Create with: `occ user:add azc_bola_b` then set password; do not
+ *   `occ group:adduser admin azc_bola_b`.
+ * - This spec asserts admin API access is denied before the IDOR probes.
  */
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv, hasCreds } from './helpers/auth.js'
@@ -40,7 +49,13 @@ test.describe('BOLA time-entry ownership (live)', () => {
 		let created = { ok: false, json: {} }
 		for (const [startTime, endTime] of slots) {
 			created = await apiAllowFailure(victim, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
-				data: { date, startTime, endTime },
+				data: {
+					date,
+					startTime,
+					endTime,
+					// Four-eyes / manual approval is on in this env — seed must satisfy the same gate as UI.
+					justification: 'Atlas BOLA seed justification for ownership check.',
+				},
 			})
 			if (created.ok) {
 				break
@@ -58,6 +73,20 @@ test.describe('BOLA time-entry ownership (live)', () => {
 			await attacker.goto('/apps/arbeitszeitcheck/dashboard')
 			await assertArbeitszeitcheckLoaded(attacker)
 			await getRequestToken(attacker)
+
+			// SEC-R4-04: keep attacker out of admin — otherwise BOLA probes are meaningless.
+			const adminProbe = await apiAllowFailure(
+				attacker,
+				'GET',
+				'/apps/arbeitszeitcheck/api/admin/settings',
+			)
+			expect(
+				adminProbe.status,
+				`BOLA attacker ${ATTACKER.username} must not be admin (got ${adminProbe.status}). ` +
+					'Remove from Nextcloud admin group: occ group:removeuser admin ' +
+					ATTACKER.username,
+			).toBeGreaterThanOrEqual(400)
+			expect(adminProbe.json?.success).toBeFalsy()
 
 			const show = await apiAllowFailure(
 				attacker,

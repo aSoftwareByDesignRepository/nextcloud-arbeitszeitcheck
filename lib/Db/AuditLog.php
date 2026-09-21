@@ -38,6 +38,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setPerformedBy(string|null $performedBy)
  * @method \DateTime getCreatedAt()
  * @method void setCreatedAt(\DateTime $createdAt)
+ * @method string|null getCaptureSource()
+ * @method void setCaptureSource(string|null $captureSource)
  */
 class AuditLog extends Entity
 {
@@ -71,6 +73,9 @@ class AuditLog extends Entity
 	/** @var \DateTime */
 	protected $createdAt;
 
+	/** @var string|null Indexed Offline-Sync (and future) capture channel */
+	protected $captureSource;
+
 	/**
 	 * AuditLog constructor
 	 */
@@ -86,6 +91,7 @@ class AuditLog extends Entity
 		$this->addType('userAgent', 'string');
 		$this->addType('performedBy', 'string');
 		$this->addType('createdAt', 'datetime');
+		$this->addType('captureSource', 'string');
 	}
 
 	/**

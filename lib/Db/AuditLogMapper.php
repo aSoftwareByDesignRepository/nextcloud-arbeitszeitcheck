@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Constants;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -58,6 +59,7 @@ class AuditLogMapper extends QBMapper
 		$log->setEntityId($entityId);
 		$log->setOldValues($oldValues ? json_encode($oldValues) : null);
 		$log->setNewValues($newValues ? json_encode($newValues) : null);
+		$log->setCaptureSource($this->extractCaptureSource($newValues));
 		$log->setPerformedBy($performedBy);
 		$log->setCreatedAt(new \DateTime());
 
@@ -71,6 +73,24 @@ class AuditLogMapper extends QBMapper
 		}
 
 		return $this->insert($log);
+	}
+
+	/**
+	 * Promote known capture_source values from newValues onto the indexed column.
+	 *
+	 * @param array<string, mixed>|null $newValues
+	 */
+	private function extractCaptureSource(?array $newValues): ?string
+	{
+		if ($newValues === null || !isset($newValues['capture_source'])) {
+			return null;
+		}
+		$raw = trim((string)$newValues['capture_source']);
+		if ($raw === Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
+			return Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC;
+		}
+
+		return null;
 	}
 
 	/**
@@ -263,6 +283,14 @@ class AuditLogMapper extends QBMapper
 		$entityType = isset($filters['entity_type']) ? trim((string)$filters['entity_type']) : '';
 		if ($entityType !== '') {
 			$qb->andWhere($qb->expr()->eq('entity_type', $qb->createNamedParameter($entityType)));
+		}
+
+		// Indexed Offline-Sync filter (Version1046+); column is set on write + backfill.
+		if (!empty($filters['offline_sync'])) {
+			$qb->andWhere($qb->expr()->eq(
+				'capture_source',
+				$qb->createNamedParameter(Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC)
+			));
 		}
 
 		return $qb;

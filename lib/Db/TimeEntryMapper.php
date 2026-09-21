@@ -735,6 +735,27 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Count pending-approval time entries for the full team (not a preview slice).
+	 *
+	 * @param list<string> $userIds
+	 */
+	public function countPendingApprovalForUsers(array $userIds): int
+	{
+		$userIds = QueryInChunker::normalizeValues($userIds);
+		if ($userIds === []) {
+			return 0;
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'pending_count')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('status', $qb->createNamedParameter(TimeEntry::STATUS_PENDING_APPROVAL)))
+			->andWhere(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY));
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Find entries for a set of users in a date range (start inclusive, end exclusive).
 	 *
 	 * @param list<string> $userIds

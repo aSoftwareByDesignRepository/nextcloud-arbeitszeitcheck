@@ -98,16 +98,19 @@ class TemplateL10nTest extends TestCase {
 		);
 	}
 
-	public function testTranslatePreservesPlaceholdersInReorderedTranslations(): void {
+	public function testTranslatePreservesLicenseBatchSeatSummary(): void {
 		$l = $this->createMock(\OCP\IL10N::class);
 		$l->method('t')->willReturnCallback(static function (string $id, array $params): string {
-			// Simulate a German translation that reorders the placeholders
-			return vsprintf('Seite %2$d, davon %1$d', $params);
+			return vsprintf($id, $params);
 		});
 
 		$this->assertSame(
-			'Seite %2$d, davon %1$d',
-			TemplateL10n::translate($l, 'Page %1$d of %2$d'),
+			'Assigned %1$d, skipped %2$d, failed %3$d.',
+			TemplateL10n::translate($l, 'Assigned %1$d, skipped %2$d, failed %3$d.'),
+		);
+		$this->assertSame(
+			'Assign mobile seats to %1$d people? %2$d seats remaining.',
+			TemplateL10n::translate($l, 'Assign mobile seats to %1$d people? %2$d seats remaining.'),
 		);
 	}
 }

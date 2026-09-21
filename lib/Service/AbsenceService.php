@@ -25,6 +25,7 @@ use OCP\IL10N;
 use OCP\Lock\ILockingProvider;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Util\AbsenceNotificationPayload;
 use OCP\IUserManager;
 
@@ -860,7 +861,13 @@ class AbsenceService
 	public function approveAbsence(int $id, string $approverId, ?string $comment = null): Absence
 	{
 		$lockAbsence = $this->absenceMapper->find($id);
-		$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
+		try {
+			$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new ConcurrentDecisionException(
+				$this->l10n->t('This absence was already decided by another manager.')
+			);
+		}
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
@@ -872,7 +879,9 @@ class AbsenceService
 				throw new \Exception($this->l10n->t('Absence not found'));
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				throw new \Exception($this->l10n->t('Absence is not pending approval'));
+				throw new ConcurrentDecisionException(
+					$this->l10n->t('This absence was already decided by another manager.')
+				);
 			}
 			$this->assertAbsenceMutable($absence);
 
@@ -958,7 +967,13 @@ class AbsenceService
 	public function rejectAbsence(int $id, string $approverId, ?string $comment = null): Absence
 	{
 		$lockAbsence = $this->absenceMapper->find($id);
-		$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
+		try {
+			$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new ConcurrentDecisionException(
+				$this->l10n->t('This absence was already decided by another manager.')
+			);
+		}
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
@@ -970,7 +985,9 @@ class AbsenceService
 				throw new \Exception($this->l10n->t('Absence not found'));
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				throw new \Exception($this->l10n->t('Absence is not pending approval'));
+				throw new ConcurrentDecisionException(
+					$this->l10n->t('This absence was already decided by another manager.')
+				);
 			}
 			$this->assertAbsenceMutable($absence);
 

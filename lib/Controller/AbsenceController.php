@@ -26,6 +26,7 @@ use OCA\ArbeitszeitCheck\Service\VacationHoursDebitService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -1358,6 +1359,13 @@ class AbsenceController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$absence = $this->absenceMapper->find($id);
+			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'approve_absence', 'absence', (string) $id);
 				return new JSONResponse([
@@ -1365,7 +1373,17 @@ class AbsenceController extends Controller
 					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
 			}
-			$absence = $this->absenceService->approveAbsence($id, $userId, $comment);
+			try {
+				$absence = $this->absenceService->approveAbsence($id, $userId, $comment);
+			} catch (ConcurrentDecisionException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (\OCP\Lock\LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -1399,6 +1417,13 @@ class AbsenceController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$absence = $this->absenceMapper->find($id);
+			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'reject_absence', 'absence', (string) $id);
 				return new JSONResponse([
@@ -1406,7 +1431,17 @@ class AbsenceController extends Controller
 					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
 			}
-			$absence = $this->absenceService->rejectAbsence($id, $userId, $comment);
+			try {
+				$absence = $this->absenceService->rejectAbsence($id, $userId, $comment);
+			} catch (ConcurrentDecisionException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (\OCP\Lock\LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
+			}
 
 			return new JSONResponse([
 				'success' => true,

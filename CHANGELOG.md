@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.10 - 2026-09-21
+
+### Added
+- **Admin multi-select / bulk assign:** Working time model + holiday region (`batch-profile`), mobile seats (`mobile-seats/batch`), team members and managers (`…/members/batch`, `…/managers/batch`), and advanced L3 vacation policy (`batch-vacation-policy`). Partial success per user; no team-inherited work models.
+- **Manager dashboard:** Pending time-entry tile with jump to the approval list; pending absence/time-entry counts use full-team SQL (fixes under-count after the first 10 members).
+- **Audit Offline-Sync:** Badge, original stamp time beside sync time, and Offline-Sync-only filter; indexed `at_audit.capture_source` (Version1046 + backfill from legacy `new_values` JSON).
+
+### Changed
+- **Audit Offline-Sync filter:** Prefer equality on `capture_source` instead of `LIKE` on JSON text. Write path promotes `capture_source=offline_sync` onto the column; list/export still surface `client_occurred_at` from newValues.
+
+### Fixed
+- **l10n parity:** Kraft bulk / Offline-Sync UI strings present in all 11 ship locales (were missing outside en/de).
+
+### Tests
+- Unit/migration/integration: Kraft batch routes/services, `Version1046AuditCaptureSourceTest`, `AuditLogCaptureSourceTest`, `AuditCaptureSourceIntegrationTest`, pending-count contracts; E2E Kraft manager tile + Offline-Sync a11y.
+- Atlas: `scripts/atlas-concurrent-seat-race.php` (two-process seat capacity race).
+
 ## 1.7.9 - 2026-09-18
 
 ### Fixed

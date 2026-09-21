@@ -359,80 +359,36 @@ def _apply_subs(text: str, subs: list[tuple[str, str]]) -> str:
 
 
 def formalize_da(text: str) -> str:
-    return _apply_subs(
-        text,
-        [
-            (r"\bEr du sikker\b", "Er handlingen korrekt"),
-            (r"\bpå dine vegne\b", "på vegne af modtageren"),
-            (r"\bfor dig\b", "for modtageren"),
-            (r"\btil dig\b", "til modtageren"),
-            (r"\bmot dig\b", "mod modtageren"),
-            (r"\bHvis du\b", "Hvis der"),
-            (r"\bhvis du\b", "hvis der"),
-            (r"\bNår du\b", "Når"),
-            (r"\bnår du\b", "når"),
-            (r"\bDu kan\b", "Det er muligt at"),
-            (r"\bdu kan\b", "der kan"),
-            (r"\bDu skal\b", "Der skal"),
-            (r"\bdu skal\b", "der skal"),
-            (r"\bDu er\b", "Der er"),
-            (r"\bdu er\b", "der er"),
-            (r"\bDu har\b", "Der er"),
-            (r"\bdu har\b", "der er"),
-            (r"\bdin\b", "den aktuelle"),
-            (r"\bdit\b", "det aktuelle"),
-            (r"\bdine\b", "de relevante"),
-            (r"\bdig\b", ""),
-            (r"\bdu\b", ""),
-        ],
-    )
+	# Keep second-person pronouns. Prior rules rewrote din→den aktuelle / stripped du
+	# and produced ungrammatical copy (Atlas I18N-R4-02 / Round 6 native pass).
+	return _apply_subs(
+		text,
+		[
+			(r"\bEr du sikker\b", "Er du sikker"),
+			(r"\bpå dine vegne\b", "på dine vegne"),
+		],
+	)
 
 
 def formalize_sv(text: str) -> str:
-    return _apply_subs(
-        text,
-        [
-            (r"\bÄr du säker\b", "Är åtgärden korrekt"),
-            (r"\bför dig\b", "för mottagaren"),
-            (r"\btill dig\b", "till mottagaren"),
-            (r"\bmot dig\b", "mot mottagaren"),
-            (r"\bDu kan\b", "Det går att"),
-            (r"\bdu kan\b", "det går att"),
-            (r"\bDu ska\b", "Det går att"),
-            (r"\bdu ska\b", "det går att"),
-            (r"\bdin\b", "aktuella"),
-            (r"\bditt\b", "aktuella"),
-            (r"\bdina\b", "de relevanta"),
-            (r"\bdig\b", ""),
-            (r"\bdu\b", ""),
-        ],
-    )
+	# Keep din/ditt/dina/du. Prior rules rewrote din→aktuella and stripped du,
+	# yielding broken Swedish such as "Kontakta aktuella administratör".
+	return _apply_subs(
+		text,
+		[
+			(r"\bÄr du säker\b", "Är du säker"),
+		],
+	)
 
 
 def formalize_nb(text: str) -> str:
-    return _apply_subs(
-        text,
-        [
-            (r"\bEr du sikker\b", "Er handlingen korrekt"),
-            (r"\bfor deg\b", "for mottakeren"),
-            (r"\btil deg\b", "til mottakeren"),
-            (r"\bmot deg\b", "mot mottakeren"),
-            (r"\bDu kan\b", "Det er mulig å"),
-            (r"\bdu kan\b", "det er mulig å"),
-            (r"\bDu er\b", "Det er"),
-            (r"\bdu er\b", "det er"),
-            (r"\bDu har\b", "Det er"),
-            (r"\bdu har\b", "det er"),
-            (r"\bdine tidsregistreringer\b", "tidsregistreringene"),
-            (r"\bdine teammedlemmer\b", "teammedlemmene"),
-            (r"\bdine\b", "de relevante"),
-            (r"\bdin\b", "gjeldende"),
-            (r"\bditt\b", "gjeldende"),
-            (r"\bdeg selv\b", "egen bruker"),
-            (r"\bdeg\b", ""),
-            (r"\bdu\b", ""),
-        ],
-    )
+	# Keep din/ditt/dine/du. Prior rules rewrote din→gjeldende and stripped du.
+	return _apply_subs(
+		text,
+		[
+			(r"\bEr du sikker\b", "Er du sikker"),
+		],
+	)
 
 
 def formalize_it(text: str) -> str:

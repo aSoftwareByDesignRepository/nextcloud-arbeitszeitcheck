@@ -228,7 +228,8 @@
 
 #app-content.azc-app .azc-callout__hint,
 .modal-backdrop .azc-callout__hint {
-	color: var(--color-text-maxcontrast, var(--color-main-text));
+	/* Keep readable on tinted callout surfaces (info/warning backgrounds). */
+	color: var(--color-main-text);
 }
 
 /* ── Responsive: stack icon + body on narrow viewports ── */

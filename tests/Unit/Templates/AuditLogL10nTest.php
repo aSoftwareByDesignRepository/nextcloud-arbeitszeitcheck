@@ -32,6 +32,9 @@ class AuditLogL10nTest extends TestCase {
 			'Please enter valid dates in dd.mm.yyyy format.' => 'Please enter valid dates in dd.mm.yyyy format.',
 			'Date range must not exceed %d days. Please narrow the range.' => 'Date range must not exceed %d days. Please narrow the range.',
 			'User filter is too long.' => 'User filter is too long.',
+			'Offline sync' => 'Offline sync',
+			'Occurred: %s' => 'Occurred: %s',
+			'Synced: %s' => 'Synced: %s',
 		];
 	}
 

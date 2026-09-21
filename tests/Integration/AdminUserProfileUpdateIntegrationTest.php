@@ -77,6 +77,10 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		foreach ($this->wtmMapper->findByUser(self::TEST_USER) as $row) {
 			$this->wtmMapper->delete($row);
 		}
+		$balanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$balanceMapper->deleteByUserId(self::TEST_USER);
+		$otBalanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper::class);
+		$otBalanceMapper->deleteByUserId(self::TEST_USER);
 	}
 
 	/**
@@ -234,6 +238,56 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		$result = $this->service->updateProfile(self::TEST_USER, $payload, 'integration_test');
 		$this->assertTrue($result['success']);
 		$this->assertSame('2025-06-01', $result['overtimeTrackingFrom']);
+	}
+
+	/**
+	 * Regression: after a model is already assigned, saving only carryover must
+	 * persist (complimant: early-return on unchanged assignment skipped upsert).
+	 */
+	public function testCarryoverPersistsWhenAssignmentUnchanged(): void
+	{
+		$start = (new \DateTimeImmutable('first day of last month'))->format('Y-m-d');
+		$year = (int)date('Y');
+
+		$seed = new UserWorkingTimeModel();
+		$seed->setUserId(self::TEST_USER);
+		$seed->setWorkingTimeModelId($this->modelId);
+		$seed->setVacationDaysPerYear(28);
+		$seed->setStartDate(new \DateTime($start));
+		$seed->setCreatedAt(new \DateTime());
+		$seed->setUpdatedAt(new \DateTime());
+		$this->wtmMapper->insert($seed);
+
+		$balanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$this->assertSame(0.0, $balanceMapper->getCarryoverDays(self::TEST_USER, $year));
+
+		$result = $this->service->applyWorkingTimeModel(self::TEST_USER, [
+			'workingTimeModelId' => $this->modelId,
+			'vacationDaysPerYear' => 28,
+			'startDate' => $start,
+			'vacationCarryoverDays' => '4.5',
+			'vacationCarryoverYear' => $year,
+		], 'integration_test');
+
+		$this->assertArrayHasKey('userWorkingTimeModel', $result);
+		$this->assertSame(4.5, $balanceMapper->getCarryoverDays(self::TEST_USER, $year));
+		$this->assertSame(4.5, $result['vacationCarryoverDays']);
+		$this->assertSame($year, $result['vacationCarryoverYear']);
+		$this->assertCount(1, $this->wtmMapper->findByUser(self::TEST_USER));
+	}
+
+	public function testOvertimeOpeningBalancePersistsForNonCurrentYear(): void
+	{
+		$targetYear = (int)date('Y') - 1;
+		$overtime = \OC::$server->get(\OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::class);
+
+		$result = $this->service->applyOvertimeSettings(self::TEST_USER, [
+			'openingBalance' => ['year' => $targetYear, 'hours' => '7.25'],
+		], 'integration_test');
+
+		$this->assertSame($targetYear, $result['overtimeOpeningBalanceYear']);
+		$this->assertSame(7.25, $result['overtimeOpeningBalanceHours']);
+		$this->assertSame(7.25, $overtime->getOpeningBalanceHours(self::TEST_USER, $targetYear));
 	}
 
 	/**

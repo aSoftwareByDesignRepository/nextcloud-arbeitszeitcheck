@@ -817,7 +817,7 @@
             return;
         }
         bar.hidden = false;
-        countEl.textContent = auMsg('nSelectedApply', '%n selected — Apply…').replace('%n', String(n));
+        countEl.textContent = auMsg('nSelectedApply', '%n selected — Apply…').replace('%s', String(n));
     }
 
     function bindBulkSelection() {
@@ -956,7 +956,7 @@
                             Messaging && Messaging.showError && Messaging.showError(auMsg('chooseField', 'Choose a work schedule and/or holiday region.'));
                             return;
                         }
-                        if (!window.confirm(auMsg('confirmBulk', 'Apply these settings to %n people?').replace('%n', String(userIds.length)))) {
+                        if (!window.confirm(auMsg('confirmBulk', 'Apply these settings to %n people?').replace('%s', String(userIds.length)))) {
                             return;
                         }
 

@@ -9,6 +9,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Migration\Version1046Date20260921120000;
 use OCP\DB\ISchemaWrapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
+use OCP\DB\Schema\ITable;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use Test\TestCase;
@@ -124,7 +125,8 @@ class AuditCaptureSourceIntegrationTest extends TestCase
 
 	private function schemaWithCaptureSource(): ISchemaWrapper
 	{
-		$table = $this->createMock(\Doctrine\DBAL\Schema\Table::class);
+		// NC35: ISchemaWrapper::getTable() returns OCP\DB\Schema\ITable (not Doctrine Table).
+		$table = $this->createMock(ITable::class);
 		$table->method('hasColumn')->with('capture_source')->willReturn(true);
 
 		$schema = $this->createMock(ISchemaWrapper::class);

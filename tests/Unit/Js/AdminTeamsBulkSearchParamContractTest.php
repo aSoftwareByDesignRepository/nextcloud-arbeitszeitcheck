@@ -21,6 +21,23 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 		$this->assertStringContainsString('u.userId || u.uid || u.id', $src);
 	}
 
+	public function testBulkConfirmUsesTeamDetailNameElement(): void
+	{
+		$src = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
+		$tpl = (string)file_get_contents(__DIR__ . '/../../../templates/admin-teams.php');
+		$this->assertStringContainsString('id="team-detail-name"', $tpl);
+		$this->assertStringContainsString("getElementById('team-detail-name')", $src);
+		$this->assertStringNotContainsString("getElementById('admin-team-detail-name')", $src);
+	}
+
+	public function testBulkSelectionSyncsFromDom(): void
+	{
+		$src = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
+		$this->assertStringContainsString('function syncSelectionFromDom', $src);
+		$this->assertStringContainsString("setAttribute('data-user-id'", $src);
+		$this->assertStringContainsString('syncSelectionFromDom()', $src);
+	}
+
 	public function testInModalPickerCssKeepsListInFlow(): void
 	{
 		$css = (string)file_get_contents(__DIR__ . '/../../../css/common/user-picker.css');
@@ -44,8 +61,8 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 			'Add several people…',
 			'Add several managers…',
 			'Add selected',
-			'Add selected (%n)',
-			'%n selected',
+			'Add selected (%s)',
+			'%s selected',
 			'Select at least one person.',
 			'Added %1$d, skipped %2$d, failed %3$d.',
 		] as $needle) {

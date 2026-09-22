@@ -113,4 +113,35 @@ class TemplateL10nTest extends TestCase {
 			TemplateL10n::translate($l, 'Assign mobile seats to %1$d people? %2$d seats remaining.'),
 		);
 	}
+
+	public function testPlaceholderArgumentsForPercentNUsesCountOneDummy(): void {
+		$arguments = TemplateL10n::placeholderArguments('legacy %n only');
+		$this->assertSame([1], $arguments);
+	}
+
+	public function testTranslateDocumentsPercentNIsExpandedByCore(): void {
+		// Nextcloud L10NString replaces %n with count (default 1) inside t().
+		// Client templates must use %s — this test locks that core behavior so we
+		// do not reintroduce %n into teamsL10n / picker maps.
+		$l = $this->createMock(\OCP\IL10N::class);
+		$l->method('t')->willReturnCallback(static function (string $id, array $params = []): string {
+			$out = $id;
+			if (str_contains($out, '%n')) {
+				$out = str_replace('%n', '1', $out);
+			}
+			if ($params !== [] && !str_contains($id, '%n')) {
+				$out = vsprintf($id, $params);
+			}
+			return $out;
+		});
+
+		$this->assertSame(
+			'Add selected (1)',
+			TemplateL10n::translate($l, 'Add selected (%n)'),
+		);
+		$this->assertSame(
+			'Add selected (%s)',
+			TemplateL10n::translate($l, 'Add selected (%s)'),
+		);
+	}
 }

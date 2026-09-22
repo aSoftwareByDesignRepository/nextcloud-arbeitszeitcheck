@@ -132,4 +132,25 @@ if [[ $code -eq 0 ]]; then
 fi
 echo "killed in-modal absolute list"
 
+echo "== mutation: bulk confirm uses wrong team-detail id =="
+cp "$TEAMS_JS" "$BAK_DIR/admin-teams.js.people-search.bak"
+python3 - "$TEAMS_JS" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+text = p.read_text()
+assert "getElementById('team-detail-name')" in text
+p.write_text(text.replace("getElementById('team-detail-name')", "getElementById('admin-team-detail-name')", 1))
+PY
+set +e
+run_phpunit
+code=$?
+set -e
+restore
+if [[ $code -eq 0 ]]; then
+	echo "MUTATION SURVIVED: wrong team-detail-name id" >&2
+	exit 1
+fi
+echo "killed wrong team-detail-name id"
+
 echo "All people-search / auMsg / in-modal mutations killed."

@@ -30,7 +30,7 @@ $sharedMessageIds = [
 	'Type at least 2 characters to search.',
 	'Employee search failed.',
 	'No matching employees found.',
-	'%n results',
+	'%s results',
 	'Selected: %s',
 	'Search by name or login…',
 	'Invalid date range. Please use valid dates in YYYY-MM-DD format.',
@@ -79,7 +79,7 @@ $managerEmployeeListL10n['pickerMinSearchHint'] = $managerEmployeeListL10n['pick
 $managerEmployeeListL10n['pickerLoading'] = TemplateL10n::translate($l, 'Loading...');
 $managerEmployeeListL10n['pickerSearchError'] = TemplateL10n::translate($l, 'Employee search failed.');
 $managerEmployeeListL10n['pickerNoUsersFound'] = TemplateL10n::translate($l, 'No matching employees found.');
-$managerEmployeeListL10n['pickerResultsCount'] = TemplateL10n::translate($l, '%n results');
+$managerEmployeeListL10n['pickerResultsCount'] = TemplateL10n::translate($l, '%s results');
 $managerEmployeeListL10n['pickerEmployeeSelected'] = TemplateL10n::translate($l, 'Selected: %s');
 $managerEmployeeListL10n['allInMyScope'] = TemplateL10n::translate($l, 'All in my scope');
 $managerEmployeeListL10n['pickerIncompleteSelection'] = TemplateL10n::translate(

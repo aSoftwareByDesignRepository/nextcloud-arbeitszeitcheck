@@ -20,6 +20,21 @@ describe('admin-teams bulk people search', () => {
 	it('normalizes user id aliases when rendering hits', () => {
 		expect(src).toContain('u.userId || u.uid || u.id')
 	})
+
+	it('reads team name from #team-detail-name for bulk confirm copy', () => {
+		expect(src).toContain("getElementById('team-detail-name')")
+		expect(src).not.toContain("getElementById('admin-team-detail-name')")
+	})
+
+	it('syncs bulk selection from DOM data-user-id checkboxes', () => {
+		expect(src).toContain('syncSelectionFromDom')
+		expect(src).toContain("data-user-id")
+	})
+
+	it('wires bulk Cancel to Components.closeModal', () => {
+		expect(src).toContain("querySelector('[data-action=\"close-modal\"]')")
+		expect(src).toContain('Components.closeModal')
+	})
 })
 
 describe('in-modal user picker CSS', () => {
@@ -50,6 +65,6 @@ describe('teams-l10n bulk keys', () => {
 		expect(src).toContain("'Find people'")
 		expect(src).toContain("'Find a person'")
 		expect(src).toContain("'Add several people…'")
-		expect(src).toContain("'Add selected (%n)'")
+		expect(src).toContain("'Add selected (%s)'")
 	})
 })

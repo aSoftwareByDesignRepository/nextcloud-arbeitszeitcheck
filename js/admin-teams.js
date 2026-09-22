@@ -654,8 +654,8 @@
             noUsersFound: t('No matching users found', 'No matching users found'),
             typeToSearch: t('Type at least 2 characters to search for a person.', 'Type at least 2 characters to search.'),
             employeeSelected: t('Selected: %s', 'Selected: %s'),
-            resultsCount: t('%n results', '%n results'),
-            moreResults: t('Showing the first %n matches. Keep typing to narrow it down.', 'Showing the first %n matches. Keep typing to narrow it down.'),
+            resultsCount: t('%s results', '%s results'),
+            moreResults: t('Showing the first %s matches. Keep typing to narrow it down.', 'Showing the first %s matches. Keep typing to narrow it down.'),
             allExcluded: t('Everyone matching your search is already assigned to this unit.', 'No one available to add.'),
         };
     }
@@ -917,7 +917,9 @@
         const title = isMember
             ? t('Add several people…', 'Add several people…')
             : t('Add several managers…', 'Add several managers…');
-        const teamName = (document.getElementById('admin-team-detail-name') || {}).textContent || '';
+        // Same id as selectTeam() / templates/admin-teams.php (#team-detail-name).
+        // Wrong id left confirm copy without the unit name (Atlas UX-R8-03 class).
+        const teamName = (document.getElementById('team-detail-name') || {}).textContent || '';
 
         Utils.ajax(listUrl, {
             method: 'GET',
@@ -951,6 +953,9 @@
                     size: 'md',
                     closable: true,
                     onClose: function() {
+                        if (typeof window !== 'undefined') {
+                            delete window.__azcBulkPeopleSelection;
+                        }
                         const m = document.getElementById(modalId);
                         if (m && m.parentNode) {
                             m.parentNode.removeChild(m);
@@ -958,6 +963,14 @@
                     },
                 });
                 Components.openModal(modalId);
+                const cancelBtn = (modal && modal.querySelector)
+                    ? modal.querySelector('[data-action="close-modal"]')
+                    : document.querySelector('#' + modalId + ' [data-action="close-modal"]');
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function() {
+                        Components.closeModal(document.getElementById(modalId) || modal);
+                    });
+                }
 
                 const selected = new Map();
                 const resultsEl = document.getElementById(prefix + '-results');
@@ -968,17 +981,39 @@
                 let searchTimer = null;
 
                 function refreshSubmit() {
+                    syncSelectionFromDom();
                     if (submitBtn) {
                         submitBtn.disabled = selected.size === 0;
                         submitBtn.textContent = selected.size === 0
                             ? t('Add selected', 'Add selected')
-                            : t('Add selected (%n)', 'Add selected (%n)').replace('%n', String(selected.size));
+                            : t('Add selected (%s)', 'Add selected (%s)').replace('%s', String(selected.size));
                     }
                     if (statusEl) {
                         statusEl.textContent = selected.size === 0
                             ? ''
-                            : t('%n selected', '%n selected').replace('%n', String(selected.size));
+                            : t('%s selected', '%s selected').replace('%s', String(selected.size));
                     }
+                }
+
+                /**
+                 * Keep Map ↔ visible checkboxes aligned. Playwright/automation and
+                 * label clicks can desync DOM `checked` from the change-handler Map
+                 * (Atlas live: two ticks, "Add selected (1)").
+                 */
+                function syncSelectionFromDom() {
+                    if (!resultsEl) return;
+                    resultsEl.querySelectorAll('input[type="checkbox"][data-user-id]').forEach(function(cb) {
+                        const uid = String(cb.getAttribute('data-user-id') || '').trim();
+                        if (!uid) return;
+                        if (cb.checked) {
+                            if (!selected.has(uid)) {
+                                const span = cb.parentElement && cb.parentElement.querySelector('span');
+                                selected.set(uid, (span && span.textContent) || uid);
+                            }
+                        } else if (selected.has(uid)) {
+                            selected.delete(uid);
+                        }
+                    });
                 }
 
                 function renderHits(users) {
@@ -991,6 +1026,7 @@
                         label.className = 'team-bulk-results__item';
                         const cb = document.createElement('input');
                         cb.type = 'checkbox';
+                        cb.setAttribute('data-user-id', uid);
                         cb.checked = selected.has(uid);
                         cb.addEventListener('change', function() {
                             if (cb.checked) {
@@ -999,6 +1035,10 @@
                                 selected.delete(uid);
                             }
                             refreshSubmit();
+                        });
+                        // click fires even when automation sets checked without a reliable change event
+                        cb.addEventListener('click', function() {
+                            setTimeout(refreshSubmit, 0);
                         });
                         const span = document.createElement('span');
                         span.textContent = (u.displayName || uid) + ' (' + uid + ')';
@@ -1009,6 +1049,16 @@
                     if (!resultsEl.children.length) {
                         resultsEl.textContent = t('No matching users found', 'No matching users found');
                     }
+                    refreshSubmit();
+                }
+
+                if (typeof window !== 'undefined') {
+                    window.__azcBulkPeopleSelection = {
+                        sync: syncSelectionFromDom,
+                        refresh: refreshSubmit,
+                        size: function() { return selected.size; },
+                        ids: function() { return Array.from(selected.keys()); },
+                    };
                 }
 
                 if (searchEl) {
@@ -1048,6 +1098,7 @@
                 if (form) {
                     form.addEventListener('submit', function(e) {
                         e.preventDefault();
+                        syncSelectionFromDom();
                         const userIds = Array.from(selected.keys());
                         if (!userIds.length) {
                             Messaging && Messaging.showError && Messaging.showError(t('Select at least one person.', 'Select at least one person.'));

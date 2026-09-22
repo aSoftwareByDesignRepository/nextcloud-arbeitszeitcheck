@@ -31,7 +31,7 @@
 			loading: t('pickerLoading', 'Loading…'),
 			searchError: t('pickerSearchError', 'Employee search failed.'),
 			noUsersFound: t('pickerNoUsersFound', 'No matching employees found.'),
-			resultsCount: t('pickerResultsCount', '%n results'),
+			resultsCount: t('pickerResultsCount', '%s results'),
 			employeeSelected: t('pickerEmployeeSelected', 'Selected: %s'),
 			allEmployees: allowAll ? t('allInMyScope', 'All in my scope') : '',
 		};

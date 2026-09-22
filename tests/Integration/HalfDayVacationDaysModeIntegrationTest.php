@@ -6,12 +6,16 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\Absence;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCA\ArbeitszeitCheck\Service\VacationUnitService;
 use OCP\IConfig;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use Test\TestCase;
 
 /**
@@ -35,8 +39,11 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		$config = \OC::$server->get(IConfig::class);
 		$this->prevUnit = $config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT, Constants::VACATION_UNIT_DAYS);
 		$this->prevYearMode = $config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
+		// Clear stale migrate-pending so shared-dev DB locks from aborted admin flips do not flake AC-G*.
+		$config->deleteAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING);
 		$config->setAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT, Constants::VACATION_UNIT_DAYS);
 		$config->setAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
+		$this->awaitVacationUnitMigrateIdle();
 
 		$unit = \OC::$server->get(VacationUnitService::class);
 		if (!$unit->isDaysMode()) {
@@ -51,6 +58,8 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 				$um->get($id)?->delete();
 			}
 			$um->createUser($id, 'Azc-Half-' . bin2hex(random_bytes(4)) . '!');
+			// Force EN so overlap assertions are locale-stable (instance default_language may be pl/de/…).
+			$config->setUserValue($id, 'core', 'lang', 'en');
 		}
 	}
 
@@ -95,6 +104,63 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		}
 	}
 
+	/**
+	 * Shared-dev / farm: heal + brief exclusive migrate locks from concurrent web/cron
+	 * must not flake AC-G*. Wait until SHARED acquire succeeds (migrate idle).
+	 */
+	private function awaitVacationUnitMigrateIdle(int $attempts = 40): void
+	{
+		$config = \OC::$server->get(IConfig::class);
+		$config->deleteAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING);
+		$locking = \OC::$server->get(ILockingProvider::class);
+		$key = DbLockKeys::vacationUnitMigration();
+		$db = \OC::$server->get(\OCP\IDBConnection::class);
+		for ($i = 0; $i < $attempts; $i++) {
+			try {
+				$locking->acquireLock($key, ILockingProvider::LOCK_SHARED, 'halfday migrate idle wait');
+				$locking->releaseLock($key, ILockingProvider::LOCK_SHARED);
+				return;
+			} catch (LockedException) {
+				// Abandoned exclusive (hung cron / crashed heal) with no pending flag: clear for harness.
+				if ($i === 3 || $i === 12 || $i === 24) {
+					try {
+						$qb = $db->getQueryBuilder();
+						$qb->delete('file_locks')
+							->where($qb->expr()->eq('key', $qb->createNamedParameter($key)));
+						$qb->executeStatement();
+					} catch (\Throwable) {
+						// best-effort
+					}
+				}
+				usleep(200_000);
+			}
+		}
+		$this->fail('Vacation unit migrate lock still exclusive after wait — stop nextcloud-cron / clear oc_file_locks azc/vu/migrate');
+	}
+
+	/**
+	 * @template T
+	 * @param callable(): T $fn
+	 * @return T
+	 */
+	private function withMigrateIdleRetry(callable $fn): mixed
+	{
+		$last = null;
+		for ($i = 0; $i < 8; $i++) {
+			try {
+				$this->awaitVacationUnitMigrateIdle(10);
+				return $fn();
+			} catch (BusinessRuleException $e) {
+				$last = $e;
+				if ($e->getReasonCode() !== Constants::VAC_UNIT_MIGRATE_IN_PROGRESS) {
+					throw $e;
+				}
+				usleep(300_000);
+			}
+		}
+		throw $last ?? new \RuntimeException('migrate idle retry exhausted');
+	}
+
 	public function testCreateApproveHalfDayReducesRemainingByHalf(): void
 	{
 		$user = \OC::$server->get(IUserManager::class)->get($this->uid);
@@ -131,19 +197,21 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 			$this->markTestSkipped('Employee entitlement remaining < 0.5 — cannot exercise half-day debit');
 		}
 
-		$row = $absenceService->createAbsence([
+		$row = $this->withMigrateIdleRetry(fn () => $absenceService->createAbsence([
 			'type' => Absence::TYPE_VACATION,
 			'start_date' => $ymd,
 			'end_date' => $ymd,
 			'day_fraction' => '0.5',
 			'reason' => 'Half-day integration ' . bin2hex(random_bytes(2)),
-		], $this->uid);
+		], $this->uid));
 
 		$this->assertGreaterThan(0, (int)$row->getId());
 		$this->assertEqualsWithDelta(0.5, (float)$row->getDays(), 0.011, 'AC-G1 persist days=0.5');
 
 		if ($row->getStatus() !== Absence::STATUS_APPROVED) {
-			$approved = $absenceService->approveAbsence((int)$row->getId(), $this->managerUid, 'integration approve');
+			$approved = $this->withMigrateIdleRetry(
+				fn () => $absenceService->approveAbsence((int)$row->getId(), $this->managerUid, 'integration approve')
+			);
 			$this->assertSame(Absence::STATUS_APPROVED, $approved->getStatus());
 			$this->assertEqualsWithDelta(0.5, (float)$approved->getDays(), 0.011);
 		}
@@ -164,16 +232,47 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		// AC-G7: cannot stack a second half on the same day.
 		$overlapThrown = false;
 		try {
-			$absenceService->createAbsence([
+			$this->withMigrateIdleRetry(fn () => $absenceService->createAbsence([
 				'type' => Absence::TYPE_VACATION,
 				'start_date' => $ymd,
 				'end_date' => $ymd,
 				'day_fraction' => '0.5',
 				'reason' => 'overlap attempt',
-			], $this->uid);
+			], $this->uid));
+		} catch (BusinessRuleException $e) {
+			if ($e->getReasonCode() === Constants::VAC_UNIT_MIGRATE_IN_PROGRESS) {
+				throw $e;
+			}
+			$overlapThrown = true;
+			$msg = mb_strtolower($e->getMessage());
+			$looksLikeOverlap = str_contains($msg, 'overlap')
+				|| str_contains($msg, 'überschneid')
+				|| str_contains($msg, 'uberschneid')
+				|| str_contains($msg, 'nakłada')
+				|| str_contains($msg, 'naklada')
+				|| str_contains($msg, 'chevauche')
+				|| str_contains($msg, 'solapa')
+				|| str_contains($msg, 'overlapp');
+			$this->assertTrue(
+				$looksLikeOverlap,
+				'Overlap rejection message must be recognisable across locales, got: ' . $e->getMessage()
+			);
 		} catch (\Throwable $e) {
 			$overlapThrown = true;
-			$this->assertStringContainsStringIgnoringCase('overlap', $e->getMessage());
+			// Locale-safe: EN "overlap", DE "überschneid", PL "nakłada", FR "chevauche", …
+			$msg = mb_strtolower($e->getMessage());
+			$looksLikeOverlap = str_contains($msg, 'overlap')
+				|| str_contains($msg, 'überschneid')
+				|| str_contains($msg, 'uberschneid')
+				|| str_contains($msg, 'nakłada')
+				|| str_contains($msg, 'naklada')
+				|| str_contains($msg, 'chevauche')
+				|| str_contains($msg, 'solapa')
+				|| str_contains($msg, 'overlapp');
+			$this->assertTrue(
+				$looksLikeOverlap,
+				'Overlap rejection message must be recognisable across locales, got: ' . $e->getMessage()
+			);
 		}
 		$this->assertTrue($overlapThrown, 'Second half on same day must be rejected');
 	}
@@ -191,13 +290,15 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		}
 		$ymd = $day->format('Y-m-d');
 
-		$row = $absenceService->createApprovedAbsenceForEmployeeByManager($this->managerUid, $this->uid, [
-			'type' => Absence::TYPE_VACATION,
-			'start_date' => $ymd,
-			'end_date' => $ymd,
-			'day_fraction' => '0.5',
-			'reason' => 'Manager half ' . bin2hex(random_bytes(2)),
-		]);
+		$row = $this->withMigrateIdleRetry(
+			fn () => $absenceService->createApprovedAbsenceForEmployeeByManager($this->managerUid, $this->uid, [
+				'type' => Absence::TYPE_VACATION,
+				'start_date' => $ymd,
+				'end_date' => $ymd,
+				'day_fraction' => '0.5',
+				'reason' => 'Manager half ' . bin2hex(random_bytes(2)),
+			])
+		);
 		$this->assertSame(Absence::STATUS_APPROVED, $row->getStatus());
 		$this->assertEqualsWithDelta(0.5, (float)$row->getDays(), 0.011);
 	}

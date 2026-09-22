@@ -81,8 +81,11 @@ final class TemplateL10n {
 		foreach ($matches as $match) {
 			$spec = $match[0];
 			if ($spec === '%n') {
-				// vsprintf ignores %n; pass a dummy so IL10N always receives args.
-				$argumentsByPosition[$sequential++] = '%n';
+				// OC\L10N\L10NString always expands %n to count=1 inside $l->t().
+				// Client-side count templates must use %s (see teams bulk "Add selected (%s)").
+				// Passing a dummy here only satisfies vsprintf arity for mixed strings; the
+				// expanded "1" cannot be restored — callers must not rely on %n round-trip.
+				$argumentsByPosition[$sequential++] = 1;
 				continue;
 			}
 			// PHP's argument pointer is only advanced by non-positional specs

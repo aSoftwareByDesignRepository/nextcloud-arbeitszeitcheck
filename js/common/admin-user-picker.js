@@ -268,8 +268,8 @@
 
 		function truncationHint(count) {
 			const tpl = l10n.moreResults
-				|| 'Showing the first %n matches. Keep typing to narrow it down.';
-			return tpl.replace('%n', String(count));
+				|| 'Showing the first %s matches. Keep typing to narrow it down.';
+			return tpl.replace('%s', String(count));
 		}
 
 		function renderUsers(users, truncated) {
@@ -302,8 +302,8 @@
 			openList();
 			activeIndex = -1;
 
-			const countTpl = l10n.resultsCount || '%n results';
-			let countMsg = countTpl.replace('%n', String(users.length));
+			const countTpl = l10n.resultsCount || '%s results';
+			let countMsg = countTpl.replace('%s', String(users.length));
 			if (truncated) {
 				countMsg += '. ' + truncationHint(users.length);
 			}

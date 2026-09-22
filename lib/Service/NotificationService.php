@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Util\AbsenceWorkingDaysResolver;
+use OCA\ArbeitszeitCheck\Constants;
 use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IUserManager;
@@ -34,6 +35,8 @@ class NotificationService
 	private IConfig $config;
 	private AbsenceWorkingDaysResolver $workingDaysResolver;
 	private TimeCaptureMethodService $timeCaptureMethodService;
+	private ?TeamResolverService $teamResolver;
+	private ?ManagerPendingApprovalMailService $managerPendingMail;
 
 	public function __construct(
 		INotificationManager $notificationManager,
@@ -43,6 +46,8 @@ class NotificationService
 		IConfig $config,
 		AbsenceWorkingDaysResolver $workingDaysResolver,
 		TimeCaptureMethodService $timeCaptureMethodService,
+		?TeamResolverService $teamResolver = null,
+		?ManagerPendingApprovalMailService $managerPendingMail = null,
 	) {
 		$this->notificationManager = $notificationManager;
 		$this->l10n = $l10n;
@@ -51,6 +56,8 @@ class NotificationService
 		$this->config = $config;
 		$this->workingDaysResolver = $workingDaysResolver;
 		$this->timeCaptureMethodService = $timeCaptureMethodService;
+		$this->teamResolver = $teamResolver;
+		$this->managerPendingMail = $managerPendingMail;
 	}
 
 	/**
@@ -451,39 +458,64 @@ class NotificationService
 	}
 
 	/**
-	 * Send a notification about time entry correction request
-	 * Notifies the user's manager about the correction request
+	 * Notify managers about a pending time-entry approval (manual create or correction).
+	 * Prefer app-team managers; fall back to legacy per-user manager_id.
 	 *
-	 * @param string $userId User ID who requested correction
-	 * @param array $timeEntryData Time entry data
-	 * @param string $justification Justification for correction
-	 * @return void
+	 * @param string $userId Employee who requested
+	 * @param array $timeEntryData Time entry summary
+	 * @param string $justification Justification text
+	 * @param string $kind {@see Constants::MANAGER_PENDING_KIND_MANUAL} or CORRECTION
 	 */
-	public function notifyTimeEntryCorrectionRequested(string $userId, array $timeEntryData, string $justification): void
-	{
-		// Get manager for this user (simplified - in production, use proper manager lookup)
-		$managerId = $this->getManagerId($userId);
-		if (!$managerId) {
-			return; // No manager to notify
+	public function notifyTimeEntryCorrectionRequested(
+		string $userId,
+		array $timeEntryData,
+		string $justification,
+		string $kind = Constants::MANAGER_PENDING_KIND_CORRECTION,
+	): void {
+		$managerIds = $this->resolveManagerIds($userId);
+		if ($managerIds === []) {
+			return;
 		}
 
-		$notification = $this->notificationManager->createNotification();
-		$notification->setApp('arbeitszeitcheck')
-			->setUser($managerId)
-			->setDateTime(new \DateTime())
-			->setObject('time_entry_correction', (string)($timeEntryData['id'] ?? ''))
-			->setSubject('time_entry_correction_requested', [
-				'entry_id' => $timeEntryData['id'] ?? null,
-				'user_id' => $userId,
-				'date' => $timeEntryData['date'] ?? null
-			])
-			->setMessage('time_entry_correction_requested', [
-				'user_id' => $userId,
-				'date' => $timeEntryData['date'] ?? null,
-				'justification' => $justification
-			]);
+		foreach ($managerIds as $managerId) {
+			$notification = $this->notificationManager->createNotification();
+			$notification->setApp('arbeitszeitcheck')
+				->setUser($managerId)
+				->setDateTime(new \DateTime())
+				->setObject('time_entry_correction', (string)($timeEntryData['id'] ?? ''))
+				->setSubject('time_entry_correction_requested', [
+					'entry_id' => $timeEntryData['id'] ?? null,
+					'user_id' => $userId,
+					'date' => $timeEntryData['date'] ?? null
+				])
+				->setMessage('time_entry_correction_requested', [
+					'user_id' => $userId,
+					'date' => $timeEntryData['date'] ?? null,
+					'justification' => $justification
+				]);
 
-		$this->notificationManager->notify($notification);
+			$this->notificationManager->notify($notification);
+		}
+
+		$this->managerPendingMail?->notifyManagersOfPending($kind, $userId, [
+			'justification' => $justification,
+			'date' => $timeEntryData['date'] ?? null,
+		]);
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	private function resolveManagerIds(string $userId): array
+	{
+		if ($this->teamResolver !== null) {
+			$fromTeams = $this->teamResolver->getManagerIdsForEmployee($userId);
+			if ($fromTeams !== []) {
+				return $fromTeams;
+			}
+		}
+		$legacy = $this->getManagerId($userId);
+		return $legacy !== null ? [$legacy] : [];
 	}
 
 	/**
@@ -547,31 +579,33 @@ class NotificationService
 	 */
 	public function notifyManagerWorkingTimeWarning(string $userId, string $warningType, array $warningData): void
 	{
-		$managerId = $this->getManagerId($userId);
-		if (!$managerId) {
-			return; // No manager to notify
+		$managerIds = $this->resolveManagerIds($userId);
+		if ($managerIds === []) {
+			return;
 		}
 
-		$notification = $this->notificationManager->createNotification();
-		$notification->setApp('arbeitszeitcheck')
-			->setUser($managerId)
-			->setDateTime(new \DateTime())
-			->setObject('working_time_warning', $userId . '_' . $warningType . '_' . date('Y-m-d'))
-			->setSubject('working_time_warning', [
-				'user_id' => $userId,
-				'warning_type' => $warningType,
-				'date' => $warningData['date'] ?? date('Y-m-d')
-			])
-			->setMessage('working_time_warning', [
-				'user_id' => $userId,
-				'warning_type' => $warningType,
-				'message' => $warningData['message'] ?? '',
-				'current_value' => $warningData['current_value'] ?? 0,
-				'limit' => $warningData['limit'] ?? 0,
-				'date' => $warningData['date'] ?? date('Y-m-d')
-			]);
+		foreach ($managerIds as $managerId) {
+			$notification = $this->notificationManager->createNotification();
+			$notification->setApp('arbeitszeitcheck')
+				->setUser($managerId)
+				->setDateTime(new \DateTime())
+				->setObject('working_time_warning', $userId . '_' . $warningType . '_' . date('Y-m-d'))
+				->setSubject('working_time_warning', [
+					'user_id' => $userId,
+					'warning_type' => $warningType,
+					'date' => $warningData['date'] ?? date('Y-m-d')
+				])
+				->setMessage('working_time_warning', [
+					'user_id' => $userId,
+					'warning_type' => $warningType,
+					'message' => $warningData['message'] ?? '',
+					'current_value' => $warningData['current_value'] ?? 0,
+					'limit' => $warningData['limit'] ?? 0,
+					'date' => $warningData['date'] ?? date('Y-m-d')
+				]);
 
-		$this->notificationManager->notify($notification);
+			$this->notificationManager->notify($notification);
+		}
 	}
 
 	/**

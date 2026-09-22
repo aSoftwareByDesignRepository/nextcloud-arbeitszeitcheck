@@ -29,9 +29,11 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Migration;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Schema\Schema;
-use Doctrine\DBAL\Schema\Table;
+use Doctrine\DBAL\Schema\Table as DBALTable;
 use OCA\ArbeitszeitCheck\Migration\Version1014Date20260409120000;
+use OC\DB\Schema\Table as NcTable;
 use OCP\DB\ISchemaWrapper;
+use OCP\DB\Schema\ITable;
 use OCP\Migration\IOutput;
 use PHPUnit\Framework\TestCase;
 
@@ -117,9 +119,9 @@ final class PrefixedSchemaWrapperFake implements ISchemaWrapper
 	) {
 	}
 
-	public function getTable($tableName): Table
+	public function getTable($tableName): ITable
 	{
-		return $this->schema->getTable($this->prefix . $tableName);
+		return new NcTable($this->schema->getTable($this->prefix . $tableName));
 	}
 
 	public function hasTable($tableName): bool
@@ -127,19 +129,23 @@ final class PrefixedSchemaWrapperFake implements ISchemaWrapper
 		return $this->schema->hasTable($this->prefix . $tableName);
 	}
 
-	public function createTable($tableName): Table
+	public function createTable($tableName): ITable
 	{
-		return $this->schema->createTable($this->prefix . $tableName);
+		return new NcTable($this->schema->createTable($this->prefix . $tableName));
 	}
 
-	public function dropTable($tableName): Schema
+	public function dropTable($tableName): self
 	{
-		return $this->schema->dropTable($this->prefix . $tableName);
+		$this->schema->dropTable($this->prefix . $tableName);
+		return $this;
 	}
 
 	public function getTables(): array
 	{
-		return $this->schema->getTables();
+		return array_values(array_map(
+			static fn (DBALTable $table): ITable => new NcTable($table),
+			$this->schema->getTables(),
+		));
 	}
 
 	public function getTableNames(): array

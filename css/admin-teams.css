@@ -242,6 +242,27 @@
 	margin-bottom: var(--azc-space-4, 1rem);
 }
 
+/* Bulk add members/managers (F5) — lives on teams page, not admin-users.css */
+#app-content.azc-app--admin-teams .team-bulk-results {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	max-height: 14rem;
+	overflow: auto;
+	margin-top: 0.5rem;
+	padding: 0.35rem;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+}
+
+#app-content.azc-app--admin-teams .team-bulk-results__item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 44px;
+	cursor: pointer;
+}
+
 @media (max-width: 768px) {
 	#app-content.azc-app--admin-teams .teams-tree__item {
 		flex-wrap: wrap;

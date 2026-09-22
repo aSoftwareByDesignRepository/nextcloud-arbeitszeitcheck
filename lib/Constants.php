@@ -549,6 +549,31 @@ final class Constants
 	public const CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT_DEFAULT = '0';
 
 	/**
+	 * Manager emails for pending approvals (Kraft): absences / vacation requests.
+	 * Requires app teams with managers. Default on.
+	 */
+	public const CONFIG_MANAGER_PENDING_EMAIL_ABSENCES = 'manager_pending_email_absences';
+
+	/** Manager emails for pending four-eyes manual time entries. Default on. */
+	public const CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES = 'manager_pending_email_manual_entries';
+
+	/** Manager emails for pending time-entry corrections. Default on. */
+	public const CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS = 'manager_pending_email_corrections';
+
+	/**
+	 * Delivery mode for manager pending emails: `immediate` or `digest`.
+	 * Digest is sent once per day by ManagerPendingApprovalDigestJob.
+	 */
+	public const CONFIG_MANAGER_PENDING_EMAIL_MODE = 'manager_pending_email_mode';
+
+	public const MANAGER_PENDING_EMAIL_MODE_IMMEDIATE = 'immediate';
+	public const MANAGER_PENDING_EMAIL_MODE_DIGEST = 'digest';
+
+	public const MANAGER_PENDING_KIND_ABSENCE = 'absence';
+	public const MANAGER_PENDING_KIND_MANUAL = 'manual_entry';
+	public const MANAGER_PENDING_KIND_CORRECTION = 'correction';
+
+	/**
 	 * Compliance score weights (critical, warning, info).
 	 */
 	public const COMPLIANCE_SCORE_CRITICAL_WEIGHT = 25;

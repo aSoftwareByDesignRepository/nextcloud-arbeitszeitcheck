@@ -41,6 +41,7 @@ use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Support\PeopleSearchQuery;
 use OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder;
 use OCA\ArbeitszeitCheck\Support\UserDirectorySearch;
 use OCP\AppFramework\Controller;
@@ -748,17 +749,14 @@ class ManagerController extends Controller
 		}
 
 		// HTTP GET passes query params via IRequest; method args may be unset depending on routing.
-		$reqSearch = $this->request->getParam('search');
-		if ($search === null && is_string($reqSearch)) {
-			$search = $reqSearch;
-		}
+		$search = PeopleSearchQuery::fromRequest($this->request, $search);
 		$reqLimit = $this->request->getParam('limit');
 		if ($limit === null && $reqLimit !== null && $reqLimit !== '') {
 			$limit = (int)$reqLimit;
 		}
 
 		$limit = $this->normalizeLimit($limit);
-		$query = $search !== null ? trim($search) : '';
+		$query = $search;
 
 		try {
 			if ($this->permissionService->isAdmin($actor)) {
@@ -1049,12 +1047,10 @@ class ManagerController extends Controller
 				return $accessResponse;
 			}
 
-			$searchTerm = $search !== null
-				? trim($search)
-				: trim((string)($this->request->getParam('search') ?? ''));
-			if (mb_strlen($searchTerm) > 200) {
-				$searchTerm = mb_substr($searchTerm, 0, 200);
-			}
+			$searchTerm = PeopleSearchQuery::clamp(
+				PeopleSearchQuery::fromRequest($this->request, $search),
+				200
+			);
 
 			$requestLimit = $this->request->getParam('limit');
 			$normalizedLimit = max(1, min((int)($requestLimit ?? $limit ?? 20), Constants::PICKER_MAX_RESULTS));

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Migration;
 
-use Doctrine\DBAL\Schema\Table;
 use OCA\ArbeitszeitCheck\Migration\Version1046Date20260921120000;
 use OCP\DB\ISchemaWrapper;
+use OCP\DB\Schema\ITable;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +40,7 @@ class Version1046AuditCaptureSourceTest extends TestCase
 
 	public function testChangeSchemaAddsColumnAndIndexWhenMissing(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->method('hasColumn')->with('capture_source')->willReturn(false);
 		$table->method('hasIndex')->with('at_audit_csrc_idx')->willReturn(false);
 		$table->expects($this->once())->method('addColumn')->with('capture_source', $this->anything(), $this->anything());
@@ -61,7 +61,7 @@ class Version1046AuditCaptureSourceTest extends TestCase
 
 	public function testChangeSchemaIdempotentWhenPresent(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->method('hasColumn')->with('capture_source')->willReturn(true);
 		$table->method('hasIndex')->with('at_audit_csrc_idx')->willReturn(true);
 		$table->expects($this->never())->method('addColumn');

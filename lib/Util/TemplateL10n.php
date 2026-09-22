@@ -70,7 +70,8 @@ final class TemplateL10n {
 	 * @return array{0: list<int|string>, 1: array<string, string>}
 	 */
 	private static function placeholderPreservingArguments(string $id): array {
-		if (preg_match_all('/%(?:(\d+)\$)?[sd]/', $id, $matches, PREG_SET_ORDER) === false || $matches === []) {
+		// %n is a client-side plural token (not vsprintf); preserve it like %s.
+		if (preg_match_all('/%(?:(\d+)\$)?[sd]|%n/', $id, $matches, PREG_SET_ORDER) === false || $matches === []) {
 			return [[], []];
 		}
 
@@ -79,6 +80,11 @@ final class TemplateL10n {
 		$sequential = 0;
 		foreach ($matches as $match) {
 			$spec = $match[0];
+			if ($spec === '%n') {
+				// vsprintf ignores %n; pass a dummy so IL10N always receives args.
+				$argumentsByPosition[$sequential++] = '%n';
+				continue;
+			}
 			// PHP's argument pointer is only advanced by non-positional specs
 			$position = ($match[1] ?? '') !== '' ? ((int)$match[1]) - 1 : $sequential++;
 

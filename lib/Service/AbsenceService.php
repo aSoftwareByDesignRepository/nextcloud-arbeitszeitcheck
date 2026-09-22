@@ -55,6 +55,7 @@ class AbsenceService
 	private VacationYearWindowResolver $vacationYearWindowResolver;
 	private ?VacationUnitService $vacationUnitService;
 	private ?VacationHoursDebitService $vacationHoursDebitService;
+	private ?ManagerPendingApprovalMailService $managerPendingApprovalMailService;
 	/** Shared migrate-idle lock held for the duration of a vacation mutation (anti-TOCTOU). */
 	private ?string $heldVacationUnitMigrateSharedLock = null;
 	/** Shared year-mode lock — blocks exclusive mode flip mid-mutation (lock order: year → migrate). */
@@ -82,6 +83,7 @@ class AbsenceService
 		?VacationYearWindowResolver $vacationYearWindowResolver = null,
 		?VacationUnitService $vacationUnitService = null,
 		?VacationHoursDebitService $vacationHoursDebitService = null,
+		?ManagerPendingApprovalMailService $managerPendingApprovalMailService = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -106,6 +108,7 @@ class AbsenceService
 			?? new VacationYearWindowResolver($config, new UserEmploymentSettingsService($userSettingsMapper, $auditLogMapper));
 		$this->vacationUnitService = $vacationUnitService;
 		$this->vacationHoursDebitService = $vacationHoursDebitService;
+		$this->managerPendingApprovalMailService = $managerPendingApprovalMailService;
 	}
 
 	/** Calendar "today" at 00:00 in organisation storage TZ. */
@@ -275,8 +278,14 @@ class AbsenceService
 				$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($savedAbsence);
 				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
 			}
-		} elseif ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
+		} else {
+			if ($this->absenceNotificationMailService) {
+				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
+			}
+			// Direct manager approval (no substitute): email team managers when enabled.
+			if ($savedAbsence->getStatus() === Absence::STATUS_PENDING) {
+				$this->managerPendingApprovalMailService?->notifyPendingAbsence($savedAbsence);
+			}
 		}
 
 			return $savedAbsence;

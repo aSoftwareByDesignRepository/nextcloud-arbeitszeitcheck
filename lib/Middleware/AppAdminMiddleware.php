@@ -11,6 +11,7 @@ use OCA\ArbeitszeitCheck\Controller\LicenseAdminController;
 use OCA\ArbeitszeitCheck\Controller\OvertimePayoutController;
 use OCA\ArbeitszeitCheck\Exception\NotAppAdminException;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Support\SafeHomeUrl;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
@@ -126,7 +127,7 @@ final class AppAdminMiddleware extends Middleware
 		$response = new TemplateResponse(Application::APP_ID, 'access-denied', [
 			'message' => $message,
 			'hint' => $hint,
-			'homeUrl' => $this->urlGenerator->linkToDefaultPageUrl(),
+			'homeUrl' => SafeHomeUrl::resolve($this->urlGenerator),
 			'l' => $l,
 		]);
 		$response->setStatus(Http::STATUS_FORBIDDEN);

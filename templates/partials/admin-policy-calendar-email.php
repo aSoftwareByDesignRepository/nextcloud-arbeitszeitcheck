@@ -95,5 +95,56 @@ declare(strict_types=1);
 							</div>
 						</div>
 					</div>
+
+					<div class="azc-settings-subsection" role="group" aria-labelledby="manager-pending-email-heading">
+						<h3 id="manager-pending-email-heading" class="admin-settings-subsection__title"><?php p($l->t('Email managers about open approvals')); ?></h3>
+						<p class="form-help form-help--block">
+							<?php p($l->t('Team managers can receive email when employees submit absences, manual time entries, or corrections that need approval. Requires app teams with managers assigned.')); ?>
+						</p>
+						<div class="form-group">
+							<div class="form-checkbox">
+								<input type="checkbox" id="managerPendingEmailAbsences" name="managerPendingEmailAbsences" value="1"
+									<?php echo ($settings['managerPendingEmailAbsences'] ?? true) ? 'checked' : ''; ?>
+									aria-describedby="manager-pending-email-heading">
+								<label for="managerPendingEmailAbsences" class="form-label">
+									<?php p($l->t('Absences / vacation requests')); ?>
+								</label>
+							</div>
+						</div>
+						<div class="form-group">
+							<div class="form-checkbox">
+								<input type="checkbox" id="managerPendingEmailManualEntries" name="managerPendingEmailManualEntries" value="1"
+									<?php echo ($settings['managerPendingEmailManualEntries'] ?? true) ? 'checked' : ''; ?>
+									aria-describedby="manager-pending-email-heading">
+								<label for="managerPendingEmailManualEntries" class="form-label">
+									<?php p($l->t('Manual time entries awaiting approval')); ?>
+								</label>
+							</div>
+						</div>
+						<div class="form-group">
+							<div class="form-checkbox">
+								<input type="checkbox" id="managerPendingEmailCorrections" name="managerPendingEmailCorrections" value="1"
+									<?php echo ($settings['managerPendingEmailCorrections'] ?? true) ? 'checked' : ''; ?>
+									aria-describedby="manager-pending-email-heading">
+								<label for="managerPendingEmailCorrections" class="form-label">
+									<?php p($l->t('Time entry corrections')); ?>
+								</label>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="managerPendingEmailMode" class="form-label"><?php p($l->t('Delivery')); ?></label>
+							<select id="managerPendingEmailMode" name="managerPendingEmailMode" class="form-select" aria-describedby="manager-pending-email-mode-help">
+								<option value="immediate" <?php echo (($settings['managerPendingEmailMode'] ?? 'immediate') === 'immediate') ? 'selected' : ''; ?>>
+									<?php p($l->t('Immediate email for each request')); ?>
+								</option>
+								<option value="digest" <?php echo (($settings['managerPendingEmailMode'] ?? '') === 'digest') ? 'selected' : ''; ?>>
+									<?php p($l->t('Daily summary of open approvals')); ?>
+								</option>
+							</select>
+							<p id="manager-pending-email-mode-help" class="form-help">
+								<?php p($l->t('Daily summary is sent once per day and only when something is still waiting. Immediate emails are best when volume is low.')); ?>
+							</p>
+						</div>
+					</div>
                     </div>
 				</section>

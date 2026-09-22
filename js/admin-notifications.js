@@ -599,6 +599,11 @@
 				payload.sendEmailSubstitutionRequest = isChecked(formData.get('sendEmailSubstitutionRequest'));
 				payload.sendEmailSubstituteApprovedToEmployee = isChecked(formData.get('sendEmailSubstituteApprovedToEmployee'));
 				payload.sendEmailSubstituteApprovedToManager = isChecked(formData.get('sendEmailSubstituteApprovedToManager'));
+				payload.managerPendingEmailAbsences = domChecked('#managerPendingEmailAbsences');
+				payload.managerPendingEmailManualEntries = domChecked('#managerPendingEmailManualEntries');
+				payload.managerPendingEmailCorrections = domChecked('#managerPendingEmailCorrections');
+				const pendingModeEl = form.querySelector('#managerPendingEmailMode');
+				payload.managerPendingEmailMode = pendingModeEl && pendingModeEl.value === 'digest' ? 'digest' : 'immediate';
 			}
 
 			if (hasVacation) {

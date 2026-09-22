@@ -16,9 +16,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Migration;
 
-use Doctrine\DBAL\Schema\Table;
 use OCA\ArbeitszeitCheck\Migration\Version1035Date20260724130000;
 use OCP\DB\ISchemaWrapper;
+use OCP\DB\Schema\ITable;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +36,7 @@ class Version1035UniqueIndexTest extends TestCase
 	/**
 	 * @param array<string,bool> $indexes name => exists
 	 */
-	private function schemaWithIndexes(array $indexes, Table $table): ISchemaWrapper
+	private function schemaWithIndexes(array $indexes, ITable $table): ISchemaWrapper
 	{
 		$table->method('hasIndex')
 			->willReturnCallback(static fn (string $name): bool => $indexes[$name] ?? false);
@@ -75,7 +75,7 @@ class Version1035UniqueIndexTest extends TestCase
 	 */
 	public function testChangeSchemaAddsCanonicalIndexWhenMissing(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->expects($this->once())
 			->method('addUniqueIndex')
 			->with(['state', 'date', 'scope'], self::CANONICAL);
@@ -91,7 +91,7 @@ class Version1035UniqueIndexTest extends TestCase
 	 */
 	public function testChangeSchemaDropsRedundantPreReleaseIndex(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->expects($this->never())->method('addUniqueIndex');
 		$table->expects($this->once())->method('dropIndex')->with(self::REDUNDANT);
 
@@ -104,7 +104,7 @@ class Version1035UniqueIndexTest extends TestCase
 	 */
 	public function testChangeSchemaIsANoOpWhenAlreadyCanonical(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->expects($this->never())->method('addUniqueIndex');
 		$table->expects($this->never())->method('dropIndex');
 
@@ -118,7 +118,7 @@ class Version1035UniqueIndexTest extends TestCase
 	 */
 	public function testChangeSchemaReplacesRedundantWithCanonical(): void
 	{
-		$table = $this->createMock(Table::class);
+		$table = $this->createMock(ITable::class);
 		$table->expects($this->once())
 			->method('addUniqueIndex')
 			->with(['state', 'date', 'scope'], self::CANONICAL);

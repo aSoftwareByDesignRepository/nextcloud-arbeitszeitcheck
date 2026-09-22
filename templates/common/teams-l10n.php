@@ -5,11 +5,16 @@ declare(strict_types=1);
 /**
  * Server-translated strings for js/admin-teams.js (window.t may be unavailable).
  *
+ * Uses {@see TemplateL10n} so printf placeholders (%n, %1$d, …) stay safe for
+ * client-side substitution. Message ids stay as map keys for JS lookup.
+ *
  * @var \OCP\IL10N $l
  */
+use OCA\ArbeitszeitCheck\Util\TemplateL10n;
+
 $l = $l ?? ($_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck'));
 
-$teamsUiKeys = [
+$teamsMessageIds = [
 	'Setting saved',
 	'Use app teams setting saved',
 	'Failed to save setting',
@@ -70,32 +75,32 @@ $teamsUiKeys = [
 	'Manager added',
 	'Failed to add manager',
 	'Remove "%s" from this team?',
-	'Remove member',
 	'Member removed',
 	'Failed to remove member',
 	'Remove "%s" as manager?',
-	'Remove manager',
 	'Manager removed',
 	'Failed to remove manager',
+	// Bulk add (F5 / Kraft multi-assign)
+	'Add several people…',
+	'Add several managers…',
+	'Find people',
+	'Search and tick people, then confirm to add them to this team.',
+	'Add selected',
+	'Add selected (%n)',
+	'%n selected',
+	'Select at least one person.',
+	'Add %1$d people to team “%2$s”?',
+	'Added %1$d, skipped %2$d, failed %3$d.',
 ];
 
-$teamsL10n = [];
-foreach ($teamsUiKeys as $msgid) {
-	// Strings with %s must receive arguments; pass literal "%s" so JS can still .replace('%s', …).
-	$placeholderCount = substr_count($msgid, '%s');
-	if ($placeholderCount > 0) {
-		$teamsL10n[$msgid] = $l->t($msgid, array_fill(0, $placeholderCount, '%s'));
-	} else {
-		$teamsL10n[$msgid] = $l->t($msgid);
-	}
-}
+$teamsL10n = TemplateL10n::mapFromMessageIds($l, $teamsMessageIds);
 
 $adminUserSearchUrl = (string)($_['adminUserSearchUrl'] ?? '');
 ?>
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
-window.ArbeitszeitCheck.teamsL10n = <?php echo json_encode($teamsL10n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+window.ArbeitszeitCheck.teamsL10n = <?php echo json_encode($teamsL10n, TemplateL10n::JSON_ENCODE_FLAGS); ?>;
 window.ArbeitszeitCheck.teamsConfig = <?php echo json_encode([
 	'adminUserSearchUrl' => $adminUserSearchUrl,
-], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+], TemplateL10n::JSON_ENCODE_FLAGS); ?>;
 </script>

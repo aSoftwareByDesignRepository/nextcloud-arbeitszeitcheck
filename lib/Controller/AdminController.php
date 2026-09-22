@@ -59,6 +59,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OCA\ArbeitszeitCheck\Support\HolidayCatalogResolver;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\OpeningBalanceYearValidator;
+use OCA\ArbeitszeitCheck\Support\PeopleSearchQuery;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCA\ArbeitszeitCheck\Support\SchemaHealth;
 use OCA\ArbeitszeitCheck\Support\StrictYmdDates;
@@ -938,6 +939,12 @@ class AdminController extends Controller
 			'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
 			'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
 			'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
+			'managerPendingEmailAbsences' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES, '1') === '1',
+			'managerPendingEmailManualEntries' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES, '1') === '1',
+			'managerPendingEmailCorrections' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS, '1') === '1',
+			'managerPendingEmailMode' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE, Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE) === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE,
 			'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', $this->getProfileMaxDailyHoursDefault()),
 			'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', $this->getProfileMinRestHoursDefault()),
 			'timePickerMinuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize(
@@ -2369,6 +2376,12 @@ class AdminController extends Controller
 				'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
 				'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
 				'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
+				'managerPendingEmailAbsences' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES, '1') === '1',
+				'managerPendingEmailManualEntries' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES, '1') === '1',
+				'managerPendingEmailCorrections' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS, '1') === '1',
+				'managerPendingEmailMode' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE, Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE) === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+					? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+					: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE,
 				'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', $this->getProfileMaxDailyHoursDefault()),
 				'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', $this->getProfileMinRestHoursDefault()),
 				'timePickerMinuteStep' => \OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize(
@@ -2490,6 +2503,10 @@ class AdminController extends Controller
 				'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
 				'sendEmailSubstituteApprovedToEmployee' => 'send_email_substitute_approved_to_employee',
 				'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
+				'managerPendingEmailAbsences' => Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
+				'managerPendingEmailManualEntries' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
+				'managerPendingEmailCorrections' => Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
+				'managerPendingEmailMode' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
 				'maxDailyHours' => 'max_daily_hours',
 				'minRestPeriod' => 'min_rest_period',
 				'timePickerMinuteStep' => Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
@@ -2530,6 +2547,7 @@ class AdminController extends Controller
 						'exportMidnightSplitEnabled', 'monthClosureEnabled',
 						'sendIcalApprovedAbsences', 'sendIcalToSubstitute', 'sendIcalToManagers',
 						'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee', 'sendEmailSubstituteApprovedToManager',
+						'managerPendingEmailAbsences', 'managerPendingEmailManualEntries', 'managerPendingEmailCorrections',
 						'statutoryAutoReseed',
 						'vacationRolloverEnabled', 'vacationRolloverIncludeUnusedAnnual',
 						'timeEntryChangesRequireApproval', 'manualTimeEntriesRequireApproval',
@@ -2542,6 +2560,10 @@ class AdminController extends Controller
 								'error' => $this->l10n->t('Enable the ProjectCheck app before turning on this connection.'),
 							], Http::STATUS_BAD_REQUEST);
 						}
+					} elseif ($paramKey === 'managerPendingEmailMode') {
+						$value = ((string)$value === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST)
+							? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+							: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE;
 					} elseif ($paramKey === 'maxDailyHours' || $paramKey === 'minRestPeriod' || $paramKey === 'defaultWorkingHours') {
 						$value = (string)max(0, (float)$value);
 						// Validate ranges
@@ -3309,6 +3331,10 @@ class AdminController extends Controller
 				'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
 				'sendEmailSubstituteApprovedToEmployee' => 'send_email_substitute_approved_to_employee',
 				'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
+				'managerPendingEmailAbsences' => Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
+				'managerPendingEmailManualEntries' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
+				'managerPendingEmailCorrections' => Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
+				'managerPendingEmailMode' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
 				'vacationCarryoverExpiryMonth' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
 				'vacationCarryoverExpiryDay' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
 				'vacationCarryoverMaxDays' => Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
@@ -3351,11 +3377,18 @@ class AdminController extends Controller
 					'sendEmailSubstitutionRequest',
 					'sendEmailSubstituteApprovedToEmployee',
 					'sendEmailSubstituteApprovedToManager',
+					'managerPendingEmailAbsences',
+					'managerPendingEmailManualEntries',
+					'managerPendingEmailCorrections',
 					'vacationRolloverEnabled',
 					'vacationRolloverIncludeUnusedAnnual',
 					'premiumSurchargesEnabled',
 				], true)) {
 					$value = ($value === true || $value === 'true' || $value === '1') ? '1' : '0';
+				} elseif ($paramKey === 'managerPendingEmailMode') {
+					$value = ((string)$value === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST)
+						? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+						: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE;
 				} elseif ($paramKey === 'vacationProrationMethod') {
 					// Whitelist to the two known methods; anything else falls
 					// back to the safe default (full-month Zwölftelung).
@@ -3762,6 +3795,12 @@ class AdminController extends Controller
 			'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
 			'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
 			'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
+			'managerPendingEmailAbsences' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES, '1') === '1',
+			'managerPendingEmailManualEntries' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES, '1') === '1',
+			'managerPendingEmailCorrections' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS, '1') === '1',
+			'managerPendingEmailMode' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE, Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE) === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE,
 			'overtimeTrafficLightEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_TRAFFIC_LIGHT_ENABLED, '0') === '1',
 			'overtimeRecipients' => implode(', ', $overtimeRecipients),
 			'overtimeMatrix' => $this->normalizeOvertimeNotificationMatrix($overtimeDecoded),
@@ -4364,10 +4403,11 @@ class AdminController extends Controller
 	 */
 	private function getUsersForPicker(?string $search, ?int $limit): JSONResponse
 	{
-		$searchTerm = $search !== null ? trim($search) : trim((string)($this->request->getParam('search') ?? ''));
-		if (mb_strlen($searchTerm) > self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH) {
-			$searchTerm = mb_substr($searchTerm, 0, self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH);
-		}
+		// Prefer explicit method arg, then `search`, then legacy `q` (license/kiosk-style clients).
+		$searchTerm = PeopleSearchQuery::clamp(
+			PeopleSearchQuery::fromRequest($this->request, $search),
+			self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH
+		);
 
 		$requestLimit = $this->request->getParam('limit');
 		$normalizedLimit = max(1, min((int)($requestLimit ?? $limit ?? 20), Constants::PICKER_MAX_RESULTS));
@@ -5976,7 +6016,7 @@ class AdminController extends Controller
 	public function searchVacationLayersUsers(): JSONResponse
 	{
 		try {
-			$search = trim((string)($this->request->getParam('search') ?? ''));
+			$search = PeopleSearchQuery::fromRequest($this->request);
 			$limit = (int)($this->request->getParam('limit') ?? 10);
 
 			return $this->getUsersForPicker($search, $limit);

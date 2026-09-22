@@ -899,7 +899,7 @@ class ManagerControllerTest extends TestCase
 	}
 
 	/**
-	 * Test approveTimeEntryCorrection returns error when not pending
+	 * Test approveTimeEntryCorrection returns 409 when not pending (already decided).
 	 */
 	public function testApproveTimeEntryCorrectionReturnsErrorWhenNotPending(): void
 	{
@@ -922,10 +922,10 @@ class ManagerControllerTest extends TestCase
 
 		$response = $this->controller->approveTimeEntryCorrection($entryId);
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_CONFLICT, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('not pending approval', $data['error']);
+		$this->assertSame('already_decided', $data['error_code'] ?? null);
 	}
 
 	/**

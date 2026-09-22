@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Service\Kiosk\KioskTerminalService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
+use OCA\ArbeitszeitCheck\Support\PeopleSearchQuery;
 use OCA\ArbeitszeitCheck\Support\UserDirectorySearch;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -441,7 +442,7 @@ class KioskAdminController extends Controller
 	#[NoAdminRequired]
 	public function searchUsers(): JSONResponse
 	{
-		$query = trim((string)$this->request->getParam('q', ''));
+		$query = PeopleSearchQuery::fromRequest($this->request);
 		$result = UserDirectorySearch::searchByIdOrName($this->userManager, $query, 25);
 		$users = [];
 		$seen = [];

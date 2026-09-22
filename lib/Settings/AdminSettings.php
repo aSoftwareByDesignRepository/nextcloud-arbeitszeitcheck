@@ -103,6 +103,12 @@ class AdminSettings implements ISettings
 			'sendEmailSubstitutionRequest' => $this->appConfig->getAppValueString('send_email_substitution_request', '1') === '1',
 			'sendEmailSubstituteApprovedToEmployee' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_employee', '1') === '1',
 			'sendEmailSubstituteApprovedToManager' => $this->appConfig->getAppValueString('send_email_substitute_approved_to_manager', '1') === '1',
+			'managerPendingEmailAbsences' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES, '1') === '1',
+			'managerPendingEmailManualEntries' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES, '1') === '1',
+			'managerPendingEmailCorrections' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS, '1') === '1',
+			'managerPendingEmailMode' => $this->appConfig->getAppValueString(Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE, Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE) === Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				? Constants::MANAGER_PENDING_EMAIL_MODE_DIGEST
+				: Constants::MANAGER_PENDING_EMAIL_MODE_IMMEDIATE,
 			'maxDailyHours' => (float)$this->appConfig->getAppValueString('max_daily_hours', $this->profileMaxDailyHoursDefault()),
 			'minRestPeriod' => (float)$this->appConfig->getAppValueString('min_rest_period', $this->profileMinRestHoursDefault()),
 			'country' => $country,

@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Middleware;
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Exception\AppAccessDeniedException;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Support\SafeHomeUrl;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\JSONResponse;
@@ -110,7 +111,7 @@ class AppAccessMiddleware extends Middleware
 		$response = new TemplateResponse(Application::APP_ID, 'access-denied', [
 			'message' => $message,
 			'hint' => $hint,
-			'homeUrl' => $this->urlGenerator->linkToDefaultPageUrl(),
+			'homeUrl' => SafeHomeUrl::resolve($this->urlGenerator),
 			'l' => $l,
 		]);
 		$response->setStatus(Http::STATUS_FORBIDDEN);

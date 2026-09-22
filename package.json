@@ -1,6 +1,6 @@
 {
   "name": "arbeitszeitcheck",
-  "version": "1.7.10",
+  "version": "1.7.11",
   "description": "DACH labour-law compliant time tracking (ArbZG / AZG / ArG) for Nextcloud",
   "type": "module",
   "scripts": {

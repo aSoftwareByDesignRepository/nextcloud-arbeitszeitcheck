@@ -36,6 +36,9 @@ class Version1046Date20260921120000 extends SimpleMigrationStep
 
 	private const BACKFILL_CHUNK = 500;
 
+	/** Soft wall-clock budget so web UI app upgrades do not stall in maintenance. */
+	private const BACKFILL_MAX_SECONDS = 15;
+
 	public function __construct(
 		private IDBConnection $db,
 	) {
@@ -83,7 +86,13 @@ class Version1046Date20260921120000 extends SimpleMigrationStep
 		}
 
 		$updated = 0;
+		$started = microtime(true);
+		$deferred = false;
 		do {
+			if ((microtime(true) - $started) >= self::BACKFILL_MAX_SECONDS) {
+				$deferred = true;
+				break;
+			}
 			$select = $this->db->getQueryBuilder();
 			$select->select('id')
 				->from('at_audit')
@@ -121,6 +130,12 @@ class Version1046Date20260921120000 extends SimpleMigrationStep
 				'arbeitszeitcheck: backfilled capture_source on %d audit row(s).',
 				$updated
 			));
+		}
+		if ($deferred) {
+			// Schema is already applied; remaining rows are finished by
+			// BackfillAuditCaptureSourceJob (and Offline-Sync filter still works
+			// for new writes that set the column directly).
+			$output->info('arbeitszeitcheck: capture_source backfill deferred (time budget); background job continues.');
 		}
 	}
 }

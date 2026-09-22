@@ -257,6 +257,35 @@ class AppAdminMiddlewareTest extends TestCase
 		$this->assertSame('admin_required', $data['error']['code']);
 	}
 
+	public function testAfterExceptionReturnsHtml403WhenDefaultPageUrlThrows(): void
+	{
+		$userSession = $this->createMock(IUserSession::class);
+		$permissionService = $this->createMock(PermissionService::class);
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $msg, array $args = []): string => $msg);
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToDefaultPageUrl')->willThrowException(
+			new \InvalidArgumentException('Default navigation entry is missing href: files')
+		);
+		$urlGenerator->method('getAbsoluteURL')->willReturn('/');
+		$l10nFactory = $this->createMock(IFactory::class);
+		$l10nFactory->method('get')->willReturn($l10n);
+
+		$middleware = new AppAdminMiddleware(
+			$userSession,
+			$permissionService,
+			$l10n,
+			$this->makeRequest('/apps/arbeitszeitcheck/admin', 'GET', ['Accept' => 'text/html']),
+			$urlGenerator,
+			$l10nFactory,
+		);
+		$response = $middleware->afterException(new \stdClass(), 'dashboard', new NotAppAdminException('Access denied'));
+
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame('access-denied', $response->getTemplateName());
+	}
+
 	public function testAfterExceptionRethrowsUnknownException(): void
 	{
 		$userSession = $this->createMock(IUserSession::class);

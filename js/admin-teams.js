@@ -686,7 +686,8 @@
             onSuccess: function(listData) {
                 const listKey = isMember ? 'members' : 'managers';
                 const rows = (listData.success && listData[listKey]) ? listData[listKey] : [];
-                const excludeIds = rows.map(function(row) { return row.userId; });
+                const excludeIds = rows.map(function(row) { return String(row.userId || '').trim(); })
+                    .filter(function(id) { return id !== ''; });
 
                 const esc = Utils.escapeHtml ? Utils.escapeHtml.bind(Utils) : function(s) { return String(s); };
                 const content = '<form id="' + formId + '" class="form team-person-form" novalidate>'
@@ -923,7 +924,8 @@
             onSuccess: function(listData) {
                 const listKey = isMember ? 'members' : 'managers';
                 const rows = (listData.success && listData[listKey]) ? listData[listKey] : [];
-                const excludeIds = rows.map(function(row) { return row.userId; });
+                const excludeIds = rows.map(function(row) { return String(row.userId || '').trim(); })
+                    .filter(function(id) { return id !== ''; });
                 const esc = Utils.escapeHtml ? Utils.escapeHtml.bind(Utils) : function(s) { return String(s); };
 
                 const content = '<form id="' + formId + '" class="form team-person-form team-person-form--bulk" novalidate>'
@@ -983,7 +985,7 @@
                     if (!resultsEl) return;
                     resultsEl.innerHTML = '';
                     users.forEach(function(u) {
-                        const uid = u.id || u.userId;
+                        const uid = String(u.userId || u.uid || u.id || '').trim();
                         if (!uid || excludeIds.indexOf(uid) !== -1) return;
                         const label = document.createElement('label');
                         label.className = 'team-bulk-results__item';
@@ -1018,11 +1020,20 @@
                             return;
                         }
                         searchTimer = setTimeout(function() {
-                            Utils.ajax(getAdminUserSearchUrl() + '?q=' + encodeURIComponent(q) + '&picker=1&limit=25', {
+                            // Must use `search=` (same contract as initAdminUserPicker).
+                            // `q=` was ignored by getUsersForPicker → empty suggestions (Kraft 1.7.10).
+                            const params = new URLSearchParams({
+                                picker: '1',
+                                search: q,
+                                limit: '25',
+                            });
+                            Utils.ajax(getAdminUserSearchUrl() + '?' + params.toString(), {
                                 method: 'GET',
                                 onSuccess: function(data) {
-                                    const users = (data && data.users) ? data.users : (data && data.data) ? data.data : [];
-                                    renderHits(Array.isArray(users) ? users : []);
+                                    const users = (data && data.success && Array.isArray(data.users))
+                                        ? data.users
+                                        : (data && Array.isArray(data.users)) ? data.users : [];
+                                    renderHits(users);
                                 },
                                 onError: function() {
                                     if (resultsEl) resultsEl.textContent = t('Failed to load users', 'Failed to load users');

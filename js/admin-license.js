@@ -85,10 +85,14 @@
 	}
 
 	function togglePendingSeat(user, checked) {
+		const uid = String(user.userId || user.uid || user.id || '').trim();
+		if (!uid) {
+			return;
+		}
 		if (checked) {
-			pendingSeatSelection.set(user.id, { id: user.id, displayName: user.displayName || user.id });
+			pendingSeatSelection.set(uid, { id: uid, displayName: user.displayName || uid });
 		} else {
-			pendingSeatSelection.delete(user.id);
+			pendingSeatSelection.delete(uid);
 		}
 		updateAssignSelectedButton();
 	}
@@ -585,11 +589,13 @@
 			searchResults.appendChild(li);
 		} else {
 			users.forEach((u, index) => {
+				const uid = String(u.userId || u.uid || u.id || '').trim();
+				const display = String(u.displayName || uid);
 				const li = document.createElement('li');
 				li.setAttribute('role', 'option');
-				li.setAttribute('aria-selected', pendingSeatSelection.has(u.id) ? 'true' : 'false');
+				li.setAttribute('aria-selected', pendingSeatSelection.has(uid) ? 'true' : 'false');
 				li.id = 'azc-seat-option-' + index;
-				li.dataset.userId = u.id;
+				li.dataset.userId = uid;
 				li.className = 'azc-seat-search-results__option';
 
 				const label = document.createElement('label');
@@ -597,14 +603,14 @@
 				const cb = document.createElement('input');
 				cb.type = 'checkbox';
 				cb.className = 'azc-seat-search-results__check';
-				cb.checked = pendingSeatSelection.has(u.id);
-				cb.setAttribute('aria-label', (u.displayName || u.id) + ' (' + u.id + ')');
+				cb.checked = pendingSeatSelection.has(uid);
+				cb.setAttribute('aria-label', display + ' (' + uid + ')');
 				cb.addEventListener('change', () => {
-					togglePendingSeat(u, cb.checked);
+					togglePendingSeat({ id: uid, userId: uid, displayName: display }, cb.checked);
 					li.setAttribute('aria-selected', cb.checked ? 'true' : 'false');
 				});
 				const text = document.createElement('span');
-				text.textContent = u.displayName + ' (' + u.id + ')';
+				text.textContent = display + ' (' + uid + ')';
 				label.appendChild(cb);
 				label.appendChild(text);
 				li.appendChild(label);

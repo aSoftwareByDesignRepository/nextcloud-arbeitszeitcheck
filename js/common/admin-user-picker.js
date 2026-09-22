@@ -186,7 +186,7 @@
 				}
 				const raw = data.users;
 				const filtered = raw.filter(function (u) {
-					const uid = String(u.userId || u.uid || '').trim();
+					const uid = String(u.userId || u.uid || u.id || '').trim();
 					return uid !== '' && !excludeLookup[uid];
 				});
 				if (filtered.length === 0 && raw.length > 0) {
@@ -282,7 +282,7 @@
 			}
 
 			let html = users.map(function (u, index) {
-				const uid = u.userId || u.uid || '';
+				const uid = u.userId || u.uid || u.id || '';
 				const name = (u.displayName && String(u.displayName).trim()) ? String(u.displayName) : uid;
 				const optId = idPrefix + '-opt-' + index;
 				const minBreak = Number(u.minBreakMinutes);

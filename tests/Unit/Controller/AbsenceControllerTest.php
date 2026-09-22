@@ -529,6 +529,7 @@ class AbsenceControllerTest extends TestCase
 		$absence = new Absence();
 		$absence->setId($absenceId);
 		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_PENDING);
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')
@@ -564,6 +565,7 @@ class AbsenceControllerTest extends TestCase
 		$absence = new Absence();
 		$absence->setId($absenceId);
 		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_PENDING);
 
 		$this->absenceMapper->expects($this->once())
 			->method('find')

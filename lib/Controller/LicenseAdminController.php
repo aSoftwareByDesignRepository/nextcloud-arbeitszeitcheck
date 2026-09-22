@@ -11,6 +11,7 @@ use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\MobileSeatService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
+use OCA\ArbeitszeitCheck\Support\PeopleSearchQuery;
 use OCA\ArbeitszeitCheck\Support\UserDirectorySearch;
 use OCA\ArbeitszeitCheck\Util\TemplateL10n;
 use OCP\AppFramework\Controller;
@@ -324,7 +325,7 @@ class LicenseAdminController extends Controller
 	#[NoAdminRequired]
 	public function searchUsers(): JSONResponse
 	{
-		$query = trim((string)$this->request->getParam('q', ''));
+		$query = PeopleSearchQuery::fromRequest($this->request);
 		$limit = min(25, max(1, (int)$this->request->getParam('limit', 15)));
 		$result = UserDirectorySearch::searchByIdOrName($this->userManager, $query, $limit);
 		$assigned = array_column($this->mobileSeatService->listSeats(), 'userId');
@@ -333,6 +334,7 @@ class LicenseAdminController extends Controller
 			$uid = $user->getUID();
 			$users[] = [
 				'id' => $uid,
+				'userId' => $uid,
 				'displayName' => $user->getDisplayName(),
 				'hasSeat' => in_array($uid, $assigned, true),
 			];

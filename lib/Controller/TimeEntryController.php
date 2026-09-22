@@ -1150,7 +1150,8 @@ class TimeEntryController extends Controller
 							$this->notificationService->notifyTimeEntryCorrectionRequested(
 								$userId,
 								$savedEntry->getSummary(),
-								$justificationText
+								$justificationText,
+								\OCA\ArbeitszeitCheck\Constants::MANAGER_PENDING_KIND_MANUAL
 							);
 						} catch (\Throwable $e) {
 							\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send manual entry approval notification', ['exception' => $e]);
@@ -2801,7 +2802,8 @@ class TimeEntryController extends Controller
 							$this->notificationService->notifyTimeEntryCorrectionRequested(
 								$userId,
 								$savedEntry->getSummary(),
-								$justificationText
+								$justificationText,
+								\OCA\ArbeitszeitCheck\Constants::MANAGER_PENDING_KIND_MANUAL
 							);
 						} catch (\Throwable $e) {
 							\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send manual entry approval notification', ['exception' => $e]);

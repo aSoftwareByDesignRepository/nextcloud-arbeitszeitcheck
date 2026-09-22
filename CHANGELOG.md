@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.11 - 2026-09-22
+
+### Added
+- **Manager email for open approvals:** Admin → Notifications can enable emails to team managers for absences/vacation, manual time entries, and corrections separately, with immediate delivery or a daily summary (`ManagerPendingApprovalDigestJob`).
+- **Offline-Sync backfill continuation:** `BackfillAuditCaptureSourceJob` finishes `capture_source` rows if the Version1046 upgrade hit its time budget.
+
+### Fixed
+- **Teams multi-add people search empty:** Bulk “Find people” used query param `q=` while the API only read `search=` — suggestions stayed empty (Kraft). Single picker also accepts `q` as an alias.
+- **“Find a person” suggestions clipped in modals:** In-modal user-picker lists are in document flow so `.modal { overflow: hidden }` no longer hides matches.
+- **German UI for bulk apply dialog:** Holiday region / Confirm apply / vacation L2–L3 copy now go through injected l10n (no English leftovers on DE).
+- **German teams multi-add / “Find a person” copy:** Missing catalog keys for teams picker + bulk-add strings; now extractable via `$l->t` literals and translated for DE.
+- **People-search param asymmetry:** Admin/manager/license/kiosk search endpoints accept both `search` and `q`; shared pickers accept `userId`/`uid`/`id`.
+- **Web app upgrade stuck in maintenance:** Version1046 audit backfill is time-budgeted so schema upgrade can finish; remaining rows backfill in the background. If an upload still leaves `maintenance: true` / `needsDbUpgrade: true`, run `occ upgrade` then `occ maintenance:mode --off`.
+
+### Changed
+- In-app correction/manual-approval notifications target **all app-team managers** (not only a legacy per-user `manager_id`).
+
 ## 1.7.10 - 2026-09-21
 
 ### Added

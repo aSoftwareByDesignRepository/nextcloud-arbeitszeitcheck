@@ -46,6 +46,7 @@ use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCA\ArbeitszeitCheck\Service\AbsenceIcalMailService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
+use OCA\ArbeitszeitCheck\Service\ManagerPendingApprovalMailService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
@@ -556,6 +557,21 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(ManagerPendingApprovalMailService::class, function ($c) {
+			return new ManagerPendingApprovalMailService(
+				$c->query(\OCP\Mail\IMailer::class),
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IL10N::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\IURLGenerator::class),
+				$c->query(TeamResolverService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\TeamManagerMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+
 		$context->registerService(AbsenceService::class, function($c) {
 			return new AbsenceService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
@@ -579,6 +595,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationYearWindowResolver::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class),
+				$c->query(ManagerPendingApprovalMailService::class),
 			);
 		});
 
@@ -799,6 +816,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCA\ArbeitszeitCheck\Util\AbsenceWorkingDaysResolver::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService::class),
+				$c->query(TeamResolverService::class),
+				$c->query(ManagerPendingApprovalMailService::class),
 			);
 		});
 

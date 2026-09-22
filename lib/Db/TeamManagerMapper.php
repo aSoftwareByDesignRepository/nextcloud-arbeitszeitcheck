@@ -120,4 +120,27 @@ class TeamManagerMapper extends QBMapper
 			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId, IQueryBuilder::PARAM_INT)));
 		$qb->executeStatement();
 	}
+
+	/**
+	 * Distinct manager user IDs across all teams (digest fan-out).
+	 *
+	 * @return list<string>
+	 */
+	public function findDistinctManagerUserIds(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('user_id')
+			->from($this->getTableName())
+			->orderBy('user_id', 'ASC');
+		$result = $qb->executeQuery();
+		$ids = [];
+		while ($row = $result->fetch()) {
+			$uid = trim((string)($row['user_id'] ?? ''));
+			if ($uid !== '') {
+				$ids[] = $uid;
+			}
+		}
+		$result->closeCursor();
+		return $ids;
+	}
 }

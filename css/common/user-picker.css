@@ -60,9 +60,20 @@
 	box-shadow: var(--azc-shadow-md);
 }
 
+/*
+ * In-modal pickers: keep the list in document flow. Absolute dropdowns are
+ * clipped by `.modal { overflow: hidden }` / `.modal-body { overflow-y: auto }`,
+ * which made "Find a person" look empty after typing (Kraft 1.7.10).
+ */
 #app-content-wrapper .user-picker--in-modal .user-picker__list,
-#app-content.azc-app .user-picker--in-modal .user-picker__list {
-	z-index: 10050;
+#app-content.azc-app .user-picker--in-modal .user-picker__list,
+.modal .user-picker--in-modal .user-picker__list,
+.azc-dialog .user-picker--in-modal .user-picker__list {
+	position: static;
+	z-index: auto;
+	max-height: min(12rem, 35vh);
+	margin-top: var(--space-2, 0.5rem);
+	box-shadow: none;
 }
 
 #app-content-wrapper .user-picker__item,

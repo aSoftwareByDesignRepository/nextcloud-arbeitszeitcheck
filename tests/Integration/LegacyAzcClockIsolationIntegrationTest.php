@@ -34,11 +34,11 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 		if (!class_exists(\OC::class) || !isset(\OC::$server)) {
 			$this->markTestSkipped('Nextcloud runtime required');
 		}
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$this->prevYearMode = $config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
 		$config->setAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
 		$this->uid = 'azc_legacy_' . bin2hex(random_bytes(3));
-		$um = \OC::$server->get(IUserManager::class);
+		$um = \OCP\Server::get(IUserManager::class);
 		if ($um->userExists($this->uid)) {
 			$um->get($this->uid)?->delete();
 		}
@@ -51,12 +51,12 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 			return;
 		}
 		try {
-			$tracking = \OC::$server->get(TimeTrackingService::class);
+			$tracking = \OCP\Server::get(TimeTrackingService::class);
 			$tracking->clockOut($this->uid);
 		} catch (\Throwable) {
 		}
-		\OC::$server->get(IUserSession::class)->setUser(null);
-		$apps = \OC::$server->get(IAppManager::class);
+		\OCP\Server::get(IUserSession::class)->setUser(null);
+		$apps = \OCP\Server::get(IAppManager::class);
 		foreach ($this->wasEnabled as $appId => $enabled) {
 			try {
 				if ($enabled) {
@@ -68,7 +68,7 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 		$this->wasEnabled = [];
 		if ($this->prevYearMode !== null) {
 			try {
-				\OC::$server->get(IConfig::class)->setAppValue(
+				\OCP\Server::get(IConfig::class)->setAppValue(
 					'arbeitszeitcheck',
 					Constants::CONFIG_VACATION_YEAR_MODE,
 					$this->prevYearMode
@@ -77,14 +77,14 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 			}
 		}
 		try {
-			\OC::$server->get(IUserManager::class)->get($this->uid)?->delete();
+			\OCP\Server::get(IUserManager::class)->get($this->uid)?->delete();
 		} catch (\Throwable) {
 		}
 	}
 
 	public function testClockInOutAndAbsenceWithSuiteHubsDisabled(): void
 	{
-		$apps = \OC::$server->get(IAppManager::class);
+		$apps = \OCP\Server::get(IAppManager::class);
 		foreach (['invoicecheck', 'customercheck', 'projectcheck'] as $appId) {
 			$this->wasEnabled[$appId] = $apps->isEnabledForUser($appId);
 			if ($this->wasEnabled[$appId]) {
@@ -92,11 +92,11 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 			}
 		}
 
-		$user = \OC::$server->get(IUserManager::class)->get($this->uid);
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		$this->assertNotNull($user);
-		\OC::$server->get(IUserSession::class)->setUser($user);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
 
-		$tracking = \OC::$server->get(TimeTrackingService::class);
+		$tracking = \OCP\Server::get(TimeTrackingService::class);
 		$in = $tracking->clockIn($this->uid, null, 'LEGACY AZC clock');
 		$this->assertNotNull($in->getId());
 		$this->assertSame('active', strtolower((string)$in->getStatus()));
@@ -105,7 +105,7 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 		$this->assertSame('completed', strtolower((string)$out->getStatus()));
 		$this->assertNotNull($out->getEndTime());
 
-		$absence = \OC::$server->get(AbsenceService::class);
+		$absence = \OCP\Server::get(AbsenceService::class);
 		$suffix = bin2hex(random_bytes(2));
 		$from = (new \DateTimeImmutable('tomorrow'))->format('Y-m-d');
 		$row = $absence->createAbsence([

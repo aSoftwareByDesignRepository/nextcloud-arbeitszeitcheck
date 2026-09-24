@@ -13,7 +13,7 @@ final class BackupBeforeUpdateIntegrationTest extends TestCase
 	public function testPreMigrationRepairStepRunsInContainer(): void
 	{
 		/** @var BackupBeforeUpdate $step */
-		$step = \OC::$server->get(BackupBeforeUpdate::class);
+		$step = \OCP\Server::get(BackupBeforeUpdate::class);
 		$output = $this->createMock(IOutput::class);
 		$output->expects(self::atLeastOnce())->method('info');
 

@@ -47,11 +47,11 @@ final class AppAccessGateIntegrationTest extends TestCase
 		}
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$this->prevAppRestriction = $appManager->getAppRestriction(Application::APP_ID);
 
 		/** @var IConfig $config */
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$this->prevRestrictionEnabled = $config->getAppValue(
 			Application::APP_ID,
 			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
@@ -69,7 +69,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 		);
 
 		/** @var IUserManager $userManager */
-		$userManager = \OC::$server->get(IUserManager::class);
+		$userManager = \OCP\Server::get(IUserManager::class);
 		foreach ([self::ALLOWED, self::DENIED] as $uid) {
 			if ($userManager->userExists($uid)) {
 				$userManager->get($uid)?->delete();
@@ -84,7 +84,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 		}
 
 		/** @var IConfig $config */
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$config->setAppValue(
 			Application::APP_ID,
 			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
@@ -102,7 +102,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 		);
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		// Empty group list for enableAppForGroups means "enabled for nobody".
 		// Restore unrestricted installs with enableApp(), not enableAppForGroups([]).
 		if ($this->prevAppRestriction === []) {
@@ -112,7 +112,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 		}
 
 		/** @var IUserManager $canaryUsers */
-		$canaryUsers = \OC::$server->get(IUserManager::class);
+		$canaryUsers = \OCP\Server::get(IUserManager::class);
 		$canary = $canaryUsers->get('admin') ?? $canaryUsers->get('e2e_employee');
 		if ($canary !== null) {
 			$this->assertTrue(
@@ -122,13 +122,13 @@ final class AppAccessGateIntegrationTest extends TestCase
 		}
 
 		/** @var IGroupManager $groupManager */
-		$groupManager = \OC::$server->get(IGroupManager::class);
+		$groupManager = \OCP\Server::get(IGroupManager::class);
 		if ($groupManager->groupExists(self::GATE_GROUP)) {
 			$groupManager->get(self::GATE_GROUP)?->delete();
 		}
 
 		/** @var IUserManager $userManager */
-		$userManager = \OC::$server->get(IUserManager::class);
+		$userManager = \OCP\Server::get(IUserManager::class);
 		foreach ([self::ALLOWED, self::DENIED] as $uid) {
 			if ($userManager->userExists($uid)) {
 				$userManager->get($uid)?->delete();
@@ -136,7 +136,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 		}
 
 		/** @var IUserSession $session */
-		$session = \OC::$server->get(IUserSession::class);
+		$session = \OCP\Server::get(IUserSession::class);
 		$session->setUser(null);
 	}
 
@@ -145,23 +145,23 @@ final class AppAccessGateIntegrationTest extends TestCase
 		$this->enableRestrictedDoor([self::GATE_GROUP]);
 
 		/** @var IUserManager $userManager */
-		$userManager = \OC::$server->get(IUserManager::class);
+		$userManager = \OCP\Server::get(IUserManager::class);
 		$userManager->createUser(self::ALLOWED, self::PASSWORD);
 		$userManager->createUser(self::DENIED, self::PASSWORD);
 
 		/** @var IGroupManager $groupManager */
-		$groupManager = \OC::$server->get(IGroupManager::class);
+		$groupManager = \OCP\Server::get(IGroupManager::class);
 		if (!$groupManager->groupExists(self::GATE_GROUP)) {
 			$groupManager->createGroup(self::GATE_GROUP);
 		}
 		$groupManager->get(self::GATE_GROUP)?->addUser($userManager->get(self::ALLOWED));
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$appManager->enableAppForGroups(Application::APP_ID, [self::GATE_GROUP]);
 
 		/** @var IUserSession $session */
-		$session = \OC::$server->get(IUserSession::class);
+		$session = \OCP\Server::get(IUserSession::class);
 		$session->setUser($userManager->get(self::DENIED));
 
 		$controller = new FakeControllerForMiddlewareTest();
@@ -184,22 +184,22 @@ final class AppAccessGateIntegrationTest extends TestCase
 		$this->enableRestrictedDoor([self::GATE_GROUP]);
 
 		/** @var IUserManager $userManager */
-		$userManager = \OC::$server->get(IUserManager::class);
+		$userManager = \OCP\Server::get(IUserManager::class);
 		$userManager->createUser(self::ALLOWED, self::PASSWORD);
 
 		/** @var IGroupManager $groupManager */
-		$groupManager = \OC::$server->get(IGroupManager::class);
+		$groupManager = \OCP\Server::get(IGroupManager::class);
 		if (!$groupManager->groupExists(self::GATE_GROUP)) {
 			$groupManager->createGroup(self::GATE_GROUP);
 		}
 		$groupManager->get(self::GATE_GROUP)?->addUser($userManager->get(self::ALLOWED));
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$appManager->enableAppForGroups(Application::APP_ID, [self::GATE_GROUP]);
 
 		/** @var IUserSession $session */
-		$session = \OC::$server->get(IUserSession::class);
+		$session = \OCP\Server::get(IUserSession::class);
 		$session->setUser($userManager->get(self::ALLOWED));
 
 		$controller = new FakeControllerForMiddlewareTest();
@@ -213,7 +213,7 @@ final class AppAccessGateIntegrationTest extends TestCase
 	private function enableRestrictedDoor(array $groupIds): void
 	{
 		/** @var IConfig $config */
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$config->setAppValue(
 			Application::APP_ID,
 			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
@@ -244,13 +244,13 @@ final class AppAccessGateIntegrationTest extends TestCase
 		);
 
 		return new AppAccessMiddleware(
-			\OC::$server->get(IUserSession::class),
-			\OC::$server->get(PermissionService::class),
+			\OCP\Server::get(IUserSession::class),
+			\OCP\Server::get(PermissionService::class),
 			$request,
-			\OC::$server->get(\OCP\IURLGenerator::class),
-			\OC::$server->get(\OCP\L10N\IFactory::class),
-			\OC::$server->get(\Psr\Log\LoggerInterface::class),
-			\OC::$server->get(\OCP\AppFramework\Utility\IControllerMethodReflector::class),
+			\OCP\Server::get(\OCP\IURLGenerator::class),
+			\OCP\Server::get(\OCP\L10N\IFactory::class),
+			\OCP\Server::get(\Psr\Log\LoggerInterface::class),
+			\OCP\Server::get(\OCP\AppFramework\Utility\IControllerMethodReflector::class),
 		);
 	}
 }

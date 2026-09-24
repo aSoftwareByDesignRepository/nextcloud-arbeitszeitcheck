@@ -31,7 +31,7 @@ class UpgradeRepairIntegrationTest extends TestCase
 			UninstallDropTables::class,
 			BackupBeforeUpdate::class,
 		] as $class) {
-			$step = \OC::$server->get($class);
+			$step = \OCP\Server::get($class);
 			$this->assertInstanceOf($class, $step);
 		}
 	}
@@ -39,7 +39,7 @@ class UpgradeRepairIntegrationTest extends TestCase
 	public function testEnsureArbeitszeitCheckSchemaRunsWithoutFatal(): void
 	{
 		/** @var EnsureArbeitszeitCheckSchema $step */
-		$step = \OC::$server->get(EnsureArbeitszeitCheckSchema::class);
+		$step = \OCP\Server::get(EnsureArbeitszeitCheckSchema::class);
 		$output = $this->createMock(IOutput::class);
 		$output->method('info');
 
@@ -50,7 +50,7 @@ class UpgradeRepairIntegrationTest extends TestCase
 	public function testBackfillAbsenceDaysRunsWithoutFatal(): void
 	{
 		/** @var BackfillAbsenceDays $step */
-		$step = \OC::$server->get(BackfillAbsenceDays::class);
+		$step = \OCP\Server::get(BackfillAbsenceDays::class);
 		$output = $this->createMock(IOutput::class);
 		$output->method('info');
 		$output->method('startProgress');
@@ -63,10 +63,10 @@ class UpgradeRepairIntegrationTest extends TestCase
 
 	public function testAbsenceServiceReceivesWorkingHolidayService(): void
 	{
-		$holidayService = \OC::$server->get(HolidayService::class);
+		$holidayService = \OCP\Server::get(HolidayService::class);
 		$this->assertInstanceOf(HolidayService::class, $holidayService);
 
-		$absenceService = \OC::$server->get(AbsenceService::class);
+		$absenceService = \OCP\Server::get(AbsenceService::class);
 		$this->assertInstanceOf(AbsenceService::class, $absenceService);
 	}
 }

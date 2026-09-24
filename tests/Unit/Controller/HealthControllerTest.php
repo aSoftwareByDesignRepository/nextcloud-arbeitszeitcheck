@@ -5,8 +5,7 @@ declare(strict_types=1);
 /**
  * Unit tests for HealthController
  *
- * Note: HealthController uses \OC::$server directly, making it difficult to unit test.
- * This controller is better tested via integration tests (see tests/integration/ApiTest.php).
+ * This controller is tested via integration tests (see tests/Integration/ApiTest.php).
  * 
  * @copyright Copyright (c) 2024, Nextcloud GmbH
  * @license AGPL-3.0-or-later
@@ -19,8 +18,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Class HealthControllerTest
  * 
- * HealthController is tested via integration tests due to its dependency on \OC::$server.
- * See tests/integration/ApiTest.php for comprehensive health check tests.
+ * See tests/Integration/ApiTest.php for comprehensive health check tests.
  */
 class HealthControllerTest extends TestCase
 {

@@ -24,8 +24,8 @@ class TimeCaptureSettingsIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->userSettingsMapper = \OC::$server->get(UserSettingsMapper::class);
-		$this->timeCaptureMethodService = \OC::$server->get(TimeCaptureMethodService::class);
+		$this->userSettingsMapper = \OCP\Server::get(UserSettingsMapper::class);
+		$this->timeCaptureMethodService = \OCP\Server::get(TimeCaptureMethodService::class);
 		$this->clearTestUserSettings();
 	}
 
@@ -190,7 +190,7 @@ class TimeCaptureSettingsIntegrationTest extends TestCase
 		], 'integration_test');
 
 		try {
-			$adminSettings = \OC::$server->get(\OCA\ArbeitszeitCheck\Settings\AdminSettings::class);
+			$adminSettings = \OCP\Server::get(\OCA\ArbeitszeitCheck\Settings\AdminSettings::class);
 			$params = $adminSettings->getForm()->getParams();
 
 			$this->assertArrayHasKey('settings', $params);

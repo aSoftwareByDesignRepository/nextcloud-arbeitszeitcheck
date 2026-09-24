@@ -24,7 +24,7 @@ class ApiTest extends TestCase {
 	 */
 	public function testHealthCheck(): void {
 		// Get the health controller from DI container
-		$healthController = \OC::$server->query(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
+		$healthController = \OCP\Server::get(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
 		$this->assertInstanceOf(\OCA\ArbeitszeitCheck\Controller\HealthController::class, $healthController);
 
 		// Call the actual check method
@@ -69,7 +69,7 @@ class ApiTest extends TestCase {
 	 * Test that health check returns proper HTTP status codes
 	 */
 	public function testHealthCheckHttpStatus(): void {
-		$healthController = \OC::$server->query(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
+		$healthController = \OCP\Server::get(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
 		$response = $healthController->check();
 
 		// When healthy, should return 200 OK
@@ -85,7 +85,7 @@ class ApiTest extends TestCase {
 	 * Test that health check response includes timestamp
 	 */
 	public function testHealthCheckTimestamp(): void {
-		$healthController = \OC::$server->query(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
+		$healthController = \OCP\Server::get(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
 		$response = $healthController->check();
 		$data = $response->getData();
 
@@ -103,7 +103,7 @@ class ApiTest extends TestCase {
 	 * Test that health check response excludes version fingerprinting
 	 */
 	public function testHealthCheckVersionFingerprintRemoved(): void {
-		$healthController = \OC::$server->query(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
+		$healthController = \OCP\Server::get(\OCA\ArbeitszeitCheck\Controller\HealthController::class);
 		$response = $healthController->check();
 		$data = $response->getData();
 

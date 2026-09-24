@@ -20,9 +20,9 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 		parent::setUp();
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		if (!$appManager->isEnabledForUser(UninstallDropTables::APP_ID)) {
-			$installer = \OC::$server->get(\OC\Installer::class);
+			$installer = \OCP\Server::get(\OC\Installer::class);
 			$installer->installApp(UninstallDropTables::APP_ID);
 			$appManager->enableApp(UninstallDropTables::APP_ID);
 		}
@@ -31,12 +31,12 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 	public function testDisableThenReEnablePreservesCoreTable(): void
 	{
 		/** @var IDBConnection $db */
-		$db = \OC::$server->get(IDBConnection::class);
+		$db = \OCP\Server::get(IDBConnection::class);
 		$coreTable = $this->resolveExistingTable($db);
 		self::assertTrue($db->tableExists($coreTable), 'fixture: core table must exist before disable');
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$appManager->disableApp(UninstallDropTables::APP_ID);
 
 		self::assertTrue(
@@ -44,7 +44,7 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 			'disable must not drop app tables (auto-disable / manual disable)',
 		);
 
-		$installer = \OC::$server->get(\OC\Installer::class);
+		$installer = \OCP\Server::get(\OC\Installer::class);
 		$installer->installApp(UninstallDropTables::APP_ID);
 		$appManager->enableApp(UninstallDropTables::APP_ID);
 
@@ -57,19 +57,19 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 	public function testAutoDisablePreservesTables(): void
 	{
 		/** @var IDBConnection $db */
-		$db = \OC::$server->get(IDBConnection::class);
+		$db = \OCP\Server::get(IDBConnection::class);
 		$coreTable = $this->resolveExistingTable($db);
 		self::assertTrue($db->tableExists($coreTable), 'fixture: core table must exist before auto-disable');
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$appManager->disableApp(UninstallDropTables::APP_ID, true);
 		self::assertTrue(
 			$db->tableExists($coreTable),
 			'auto-disable during server upgrade must preserve tables',
 		);
 
-		$installer = \OC::$server->get(\OC\Installer::class);
+		$installer = \OCP\Server::get(\OC\Installer::class);
 		$installer->installApp(UninstallDropTables::APP_ID);
 		$appManager->enableApp(UninstallDropTables::APP_ID);
 	}
@@ -77,12 +77,12 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 	public function testDoubleDisablePreservesTables(): void
 	{
 		/** @var IDBConnection $db */
-		$db = \OC::$server->get(IDBConnection::class);
+		$db = \OCP\Server::get(IDBConnection::class);
 		$coreTable = $this->resolveExistingTable($db);
 		self::assertTrue($db->tableExists($coreTable), 'fixture: core table must exist before double disable');
 
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		$appManager->disableApp(UninstallDropTables::APP_ID);
 		self::assertTrue($db->tableExists($coreTable), 'first disable must preserve tables');
 
@@ -93,7 +93,7 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 			'second disable must not drop tables (upgrade / repeated disable scenario)',
 		);
 
-		$installer = \OC::$server->get(\OC\Installer::class);
+		$installer = \OCP\Server::get(\OC\Installer::class);
 		$installer->installApp(UninstallDropTables::APP_ID);
 		$appManager->enableApp(UninstallDropTables::APP_ID);
 	}
@@ -101,7 +101,7 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 	public function testUninstallRepairStepResolvesFromContainer(): void
 	{
 		/** @var UninstallDropTables $step */
-		$step = \OC::$server->get(UninstallDropTables::class);
+		$step = \OCP\Server::get(UninstallDropTables::class);
 		self::assertInstanceOf(UninstallDropTables::class, $step);
 
 		$output = $this->createMock(IOutput::class);
@@ -113,9 +113,9 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 	protected function tearDown(): void
 	{
 		/** @var IAppManager $appManager */
-		$appManager = \OC::$server->get(IAppManager::class);
+		$appManager = \OCP\Server::get(IAppManager::class);
 		if (!$appManager->isEnabledForUser(UninstallDropTables::APP_ID)) {
-			$installer = \OC::$server->get(\OC\Installer::class);
+			$installer = \OCP\Server::get(\OC\Installer::class);
 			$installer->installApp(UninstallDropTables::APP_ID);
 			$appManager->enableApp(UninstallDropTables::APP_ID);
 		}

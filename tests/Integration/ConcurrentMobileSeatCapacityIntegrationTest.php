@@ -35,9 +35,9 @@ class ConcurrentMobileSeatCapacityIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->seats = \OC::$server->get(MobileSeatService::class);
-		$this->users = \OC::$server->get(IUserManager::class);
-		$this->locking = \OC::$server->get(ILockingProvider::class);
+		$this->seats = \OCP\Server::get(MobileSeatService::class);
+		$this->users = \OCP\Server::get(IUserManager::class);
+		$this->locking = \OCP\Server::get(ILockingProvider::class);
 	}
 
 	protected function tearDown(): void

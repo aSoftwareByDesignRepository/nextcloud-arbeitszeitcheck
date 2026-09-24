@@ -15,8 +15,8 @@ class AppAdminAuthorizationIntegrationTest extends TestCase
 {
 	public function testMiddlewareAndAdminControllerAreResolvableFromContainer(): void
 	{
-		$middleware = \OC::$server->query(AppAdminMiddleware::class);
-		$controller = \OC::$server->query(AdminController::class);
+		$middleware = \OCP\Server::get(AppAdminMiddleware::class);
+		$controller = \OCP\Server::get(AdminController::class);
 
 		$this->assertInstanceOf(AppAdminMiddleware::class, $middleware);
 		$this->assertInstanceOf(AdminController::class, $controller);
@@ -24,8 +24,8 @@ class AppAdminAuthorizationIntegrationTest extends TestCase
 
 	public function testMiddlewareDeniesAdminControllerWhenNoAuthorizedSession(): void
 	{
-		$middleware = \OC::$server->query(AppAdminMiddleware::class);
-		$controller = \OC::$server->query(AdminController::class);
+		$middleware = \OCP\Server::get(AppAdminMiddleware::class);
+		$controller = \OCP\Server::get(AdminController::class);
 
 		$this->expectException(NotAppAdminException::class);
 		$middleware->beforeController($controller, 'settings');
@@ -33,7 +33,7 @@ class AppAdminAuthorizationIntegrationTest extends TestCase
 
 	public function testMiddlewareConvertsAuthorizationExceptionTo403Response(): void
 	{
-		$middleware = \OC::$server->query(AppAdminMiddleware::class);
+		$middleware = \OCP\Server::get(AppAdminMiddleware::class);
 		$response = $middleware->afterException(
 			new \stdClass(),
 			'settings',

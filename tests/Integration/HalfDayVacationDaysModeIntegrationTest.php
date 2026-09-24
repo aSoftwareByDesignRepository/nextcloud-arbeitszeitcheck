@@ -36,7 +36,7 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 			$this->markTestSkipped('Nextcloud runtime required');
 		}
 
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$this->prevUnit = $config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT, Constants::VACATION_UNIT_DAYS);
 		$this->prevYearMode = $config->getAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
 		// Clear stale migrate-pending so shared-dev DB locks from aborted admin flips do not flake AC-G*.
@@ -45,12 +45,12 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		$config->setAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_YEAR_MODE, Constants::VACATION_YEAR_MODE_CALENDAR);
 		$this->awaitVacationUnitMigrateIdle();
 
-		$unit = \OC::$server->get(VacationUnitService::class);
+		$unit = \OCP\Server::get(VacationUnitService::class);
 		if (!$unit->isDaysMode()) {
 			$this->markTestSkipped('Could not force vacation_unit=days for integration run');
 		}
 
-		$um = \OC::$server->get(IUserManager::class);
+		$um = \OCP\Server::get(IUserManager::class);
 		$this->uid = 'azc_half_' . bin2hex(random_bytes(3));
 		$this->managerUid = 'azc_mgr_' . bin2hex(random_bytes(3));
 		foreach ([$this->uid, $this->managerUid] as $id) {
@@ -69,10 +69,10 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 			return;
 		}
 		try {
-			\OC::$server->get(IUserSession::class)->setUser(null);
+			\OCP\Server::get(IUserSession::class)->setUser(null);
 		} catch (\Throwable) {
 		}
-		$um = \OC::$server->get(IUserManager::class);
+		$um = \OCP\Server::get(IUserManager::class);
 		foreach ([$this->uid, $this->managerUid] as $id) {
 			if ($id === '') {
 				continue;
@@ -84,7 +84,7 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		}
 		if ($this->prevUnit !== null) {
 			try {
-				\OC::$server->get(IConfig::class)->setAppValue(
+				\OCP\Server::get(IConfig::class)->setAppValue(
 					'arbeitszeitcheck',
 					Constants::CONFIG_VACATION_UNIT,
 					$this->prevUnit
@@ -94,7 +94,7 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 		}
 		if ($this->prevYearMode !== null) {
 			try {
-				\OC::$server->get(IConfig::class)->setAppValue(
+				\OCP\Server::get(IConfig::class)->setAppValue(
 					'arbeitszeitcheck',
 					Constants::CONFIG_VACATION_YEAR_MODE,
 					$this->prevYearMode
@@ -110,11 +110,11 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 	 */
 	private function awaitVacationUnitMigrateIdle(int $attempts = 40): void
 	{
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$config->deleteAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING);
-		$locking = \OC::$server->get(ILockingProvider::class);
+		$locking = \OCP\Server::get(ILockingProvider::class);
 		$key = DbLockKeys::vacationUnitMigration();
-		$db = \OC::$server->get(\OCP\IDBConnection::class);
+		$db = \OCP\Server::get(\OCP\IDBConnection::class);
 		for ($i = 0; $i < $attempts; $i++) {
 			try {
 				$locking->acquireLock($key, ILockingProvider::LOCK_SHARED, 'halfday migrate idle wait');
@@ -163,12 +163,12 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 
 	public function testCreateApproveHalfDayReducesRemainingByHalf(): void
 	{
-		$user = \OC::$server->get(IUserManager::class)->get($this->uid);
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		$this->assertNotNull($user);
-		\OC::$server->get(IUserSession::class)->setUser($user);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
 
-		$absenceService = \OC::$server->get(AbsenceService::class);
-		$alloc = \OC::$server->get(VacationAllocationService::class);
+		$absenceService = \OCP\Server::get(AbsenceService::class);
+		$alloc = \OCP\Server::get(VacationAllocationService::class);
 
 		// Pick a weekday at least 14 days ahead to avoid month-closure / past edges.
 		$day = new \DateTimeImmutable('tomorrow');
@@ -279,7 +279,7 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 
 	public function testManagerRecordedHalfDayApproved(): void
 	{
-		$absenceService = \OC::$server->get(AbsenceService::class);
+		$absenceService = \OCP\Server::get(AbsenceService::class);
 		$day = new \DateTimeImmutable('tomorrow');
 		while ((int)$day->format('N') > 5) {
 			$day = $day->modify('+1 day');
@@ -305,7 +305,7 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 
 	public function testHalfDayRangeForbiddenAgainstLiveService(): void
 	{
-		$absenceService = \OC::$server->get(AbsenceService::class);
+		$absenceService = \OCP\Server::get(AbsenceService::class);
 		$start = (new \DateTimeImmutable('monday next week'))->modify('+28 days');
 		$end = $start->modify('+2 days');
 		$this->expectException(\Throwable::class);

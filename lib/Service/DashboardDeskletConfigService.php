@@ -66,10 +66,10 @@ class DashboardDeskletConfigService
 	 */
 	private function ensureAppRoutesRegistered(): void
 	{
-		if (!\OC_App::isAppLoaded(Application::APP_ID)) {
-			\OC_App::loadApp(Application::APP_ID);
+		if (!$this->appManager->isAppLoaded(Application::APP_ID)) {
+			$this->appManager->loadApp(Application::APP_ID);
 		}
-		\OC::$server->get(\OCP\Route\IRouter::class)->loadRoutes(Application::APP_ID);
+		\OCP\Server::get(\OCP\Route\IRouter::class)->loadRoutes(Application::APP_ID);
 	}
 
 	/**

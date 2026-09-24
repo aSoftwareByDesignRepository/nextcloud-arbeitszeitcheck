@@ -22,7 +22,7 @@ class HolidayPolicyIntegrationTest extends TestCase
 
 	private function setAppConfigValue(string $key, string $value): void
 	{
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 		$config->deleteAppValue('arbeitszeitcheck', $key);
 		$config->setAppValue('arbeitszeitcheck', $key, $value);
 	}
@@ -31,8 +31,8 @@ class HolidayPolicyIntegrationTest extends TestCase
 	{
 		$this->setAppConfigValue('statutory_auto_reseed', '1');
 
-		$mapper = \OC::$server->get(HolidayMapper::class);
-		$suppressionMapper = \OC::$server->get(HolidaySuppressionMapper::class);
+		$mapper = \OCP\Server::get(HolidayMapper::class);
+		$suppressionMapper = \OCP\Server::get(HolidaySuppressionMapper::class);
 		foreach ($mapper->findByStateAndYear(self::TEST_STATE, self::TEST_YEAR) as $h) {
 			if ($h->getId() !== null) {
 				$mapper->deleteById((int)$h->getId());
@@ -51,11 +51,11 @@ class HolidayPolicyIntegrationTest extends TestCase
 		$this->setAppConfigValue('statutory_auto_reseed', '0');
 
 		/** @var HolidayService $holidayService */
-		$holidayService = \OC::$server->get(HolidayService::class);
+		$holidayService = \OCP\Server::get(HolidayService::class);
 		/** @var HolidayAdminService $adminService */
-		$adminService = \OC::$server->get(HolidayAdminService::class);
+		$adminService = \OCP\Server::get(HolidayAdminService::class);
 		/** @var HolidayMapper $holidayMapper */
-		$holidayMapper = \OC::$server->get(HolidayMapper::class);
+		$holidayMapper = \OCP\Server::get(HolidayMapper::class);
 
 		$holidayService->clearCacheForStateYear(self::TEST_STATE, self::TEST_YEAR);
 
@@ -102,9 +102,9 @@ class HolidayPolicyIntegrationTest extends TestCase
 		$this->setAppConfigValue('statutory_auto_reseed', '0');
 
 		/** @var HolidayService $holidayService */
-		$holidayService = \OC::$server->get(HolidayService::class);
+		$holidayService = \OCP\Server::get(HolidayService::class);
 		/** @var HolidayAdminService $adminService */
-		$adminService = \OC::$server->get(HolidayAdminService::class);
+		$adminService = \OCP\Server::get(HolidayAdminService::class);
 
 		$holidayService->clearCacheForStateYear(self::TEST_STATE, self::TEST_YEAR);
 

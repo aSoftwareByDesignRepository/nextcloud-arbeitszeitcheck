@@ -6,6 +6,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Service\DashboardDeskletConfigService;
+use OCP\App\IAppManager;
 use Test\TestCase;
 
 /**
@@ -13,12 +14,12 @@ use Test\TestCase;
  */
 class DashboardDeskletConfigIntegrationTest extends TestCase {
 	public function testBuildForUserResolvesDeskletApiUrls(): void {
-		$service = \OC::$server->get(DashboardDeskletConfigService::class);
+		$service = \OCP\Server::get(DashboardDeskletConfigService::class);
 		$config = $service->buildForUser('admin');
 
 		$this->assertStringContainsString('/api/dashboard-widget/employee', (string)$config['employeeDataUrl']);
 		$this->assertStringContainsString('/api/dashboard-widget/clock/in', (string)$config['clockInUrl']);
 		$this->assertStringContainsString('/dashboard', (string)$config['dashboardUrl']);
-		$this->assertTrue(\OC_App::isAppLoaded(Application::APP_ID));
+		$this->assertTrue(\OCP\Server::get(IAppManager::class)->isAppLoaded(Application::APP_ID));
 	}
 }

@@ -22,7 +22,7 @@ class ConcurrentPendingTimeEntryDecisionIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->mapper = \OC::$server->get(TimeEntryMapper::class);
+		$this->mapper = \OCP\Server::get(TimeEntryMapper::class);
 		$this->cleanup();
 	}
 
@@ -78,7 +78,7 @@ class ConcurrentPendingTimeEntryDecisionIntegrationTest extends TestCase
 
 	private function cleanup(): void
 	{
-		$db = \OC::$server->get(\OCP\IDBConnection::class);
+		$db = \OCP\Server::get(\OCP\IDBConnection::class);
 		if ($this->entryId !== null) {
 			$qb = $db->getQueryBuilder();
 			$qb->delete('at_entries')

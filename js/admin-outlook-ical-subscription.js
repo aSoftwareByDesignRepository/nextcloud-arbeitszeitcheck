@@ -367,11 +367,11 @@
 	}
 
 	const OUTLOOK_API_PATHS = {
-		teams: '/apps/arbeitszeitcheck/api/admin/outlook-ical/teams',
-		create: '/apps/arbeitszeitcheck/api/admin/outlook-ical/create',
-		rotate: '/apps/arbeitszeitcheck/api/admin/outlook-ical/rotate',
-		activeSubscriptions: '/apps/arbeitszeitcheck/api/admin/outlook-ical/active-subscriptions',
-		webcalLocalAccess: '/apps/arbeitszeitcheck/api/admin/outlook-ical/webcal-local-access',
+		teams: Utils.buildAppUrl('/apps/arbeitszeitcheck/api/admin/outlook-ical/teams'),
+		create: Utils.buildAppUrl('/apps/arbeitszeitcheck/api/admin/outlook-ical/create'),
+		rotate: Utils.buildAppUrl('/apps/arbeitszeitcheck/api/admin/outlook-ical/rotate'),
+		activeSubscriptions: Utils.buildAppUrl('/apps/arbeitszeitcheck/api/admin/outlook-ical/active-subscriptions'),
+		webcalLocalAccess: Utils.buildAppUrl('/apps/arbeitszeitcheck/api/admin/outlook-ical/webcal-local-access'),
 	}
 
 	function resolveOutlookApiUrl(path) {

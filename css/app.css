@@ -285,7 +285,7 @@
 	font-size: var(--azc-fs-sm);
 	font-weight: 600;
 	color: var(--azc-text);
-	min-height: 2.75rem;
+	min-height: var(--azc-touch, 44px);
 	display: inline-flex;
 	align-items: center;
 	gap: var(--azc-space-1);
@@ -320,7 +320,7 @@
 	font-size: var(--azc-fs-sm);
 	font-weight: 600;
 	color: var(--azc-muted);
-	min-height: 2rem;
+	min-height: var(--azc-touch, 44px);
 	display: inline-flex;
 	align-items: center;
 }
@@ -366,7 +366,7 @@
 .azc-collapsed-callout > summary {
 	cursor: pointer;
 	font-weight: 600;
-	min-height: 2.75rem;
+	min-height: var(--azc-touch, 44px);
 	display: flex;
 	align-items: center;
 	gap: var(--azc-space-2);
@@ -426,8 +426,8 @@
 	align-items: center;
 	justify-content: center;
 	gap: var(--azc-space-2);
-	min-height: 2.75rem;
-	min-width: 2.75rem;
+	min-height: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
 	padding: 0.625rem 1.15rem;
 	border-radius: var(--azc-radius-md, 12px);
 	font-size: var(--azc-fs-md);
@@ -564,7 +564,7 @@
 	#app-content-wrapper .azc-btn--small,
 	.azc-nc-admin-settings .azc-btn--small,
 	.azc-nc-settings-panel .azc-btn--small {
-		min-height: 2.25rem;
+		min-height: var(--azc-touch, 44px);
 		min-width: 0;
 	}
 }
@@ -912,7 +912,7 @@
 .azc-nc-admin-settings .azc-jump-nav__link {
 	display: flex;
 	align-items: center;
-	min-height: 2.75rem;
+	min-height: var(--azc-touch, 44px);
 	padding: var(--azc-space-2) var(--azc-space-3);
 	border: 1px solid transparent;
 	border-radius: var(--azc-radius-sm);
@@ -1080,7 +1080,7 @@
 
 	#app-content.azc-app .azc-jump-nav__link,
 	.azc-nc-admin-settings .azc-jump-nav__link {
-		min-height: 2.5rem;
+		min-height: var(--azc-touch, 44px);
 	}
 }
 
@@ -1182,7 +1182,7 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 .azc-denied__card .azc-btn {
-	min-height: 2.75rem;
+	min-height: var(--azc-touch, 44px);
 	padding-inline: var(--azc-space-5);
 }
 .azc-denied__icon {
@@ -1479,7 +1479,6 @@ dialog.entitlement-explain-dialog::backdrop {
 	padding: 0;
 	margin: -1px;
 	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
 	clip-path: inset(50%);
 	white-space: nowrap;
 	border: 0;

@@ -10,6 +10,7 @@ module.exports = {
   },
   globals: {
     OC: 'readonly',
+    t: 'readonly',
   },
   plugins: ['arbeitszeitcheck'],
   extends: ['eslint:recommended'],
@@ -19,6 +20,12 @@ module.exports = {
   },
   ignorePatterns: ['node_modules/', 'vendor/'],
   overrides: [
+    {
+      files: ['js/common/desklet-actions.js', 'js/common/keep-focused-visible.js'],
+      env: {
+        node: true,
+      },
+    },
     {
       files: ['js/**/*.test.js', 'tests/e2e/**/*.js'],
       rules: {

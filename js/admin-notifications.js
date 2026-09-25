@@ -10,14 +10,6 @@
 	const Utils = window.ArbeitszeitCheckUtils || {};
 	const Messaging = window.ArbeitszeitCheckMessaging || {};
 
-	function $(selector, context) {
-		if (Utils.$) {
-			return Utils.$(selector, context);
-		}
-		const root = context || document;
-		return root.querySelector(selector);
-	}
-
 	function normalizeRecipients(raw) {
 		const parts = String(raw || '')
 			.split(',')
@@ -767,9 +759,7 @@
 			return;
 		}
 		const migrateUrl = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.apiUrl && window.ArbeitszeitCheck.apiUrl.migrateVacationUnit)
-			|| (typeof OC !== 'undefined' && OC.generateUrl
-				? OC.generateUrl('/apps/arbeitszeitcheck/api/admin/vacation-unit/migrate')
-				: '/apps/arbeitszeitcheck/api/admin/vacation-unit/migrate');
+			|| OC.generateUrl('/apps/arbeitszeitcheck/api/admin/vacation-unit/migrate');
 
 		function setMigrateError(msg) {
 			if (!errorEl) {

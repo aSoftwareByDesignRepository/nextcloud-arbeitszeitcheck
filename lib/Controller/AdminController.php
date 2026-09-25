@@ -985,6 +985,8 @@ class AdminController extends Controller
 
 		$projectCheckAvailable = $this->isProjectCheckInstalledOnInstance();
 
+		$extraTemplateData = [];
+
 		$shell = $this->buildAdminShellParams(
 			'admin-settings',
 			$catalog->label($this->l10n, $section),
@@ -1022,6 +1024,7 @@ class AdminController extends Controller
 				'requesttoken' => Util::callRegister(),
 				'useAppTeams' => $this->appConfig->getAppValueString('use_app_teams', '0') === '1',
 			],
+			$extraTemplateData,
 		));
 		return $this->configureCSP($response, 'admin');
 	}
@@ -1094,6 +1097,17 @@ class AdminController extends Controller
 	{
 		$this->registerFrontEndAssets('admin-notifications', 'admin-notifications', ['admin-settings']);
 
+		// Calculate premium night preset for the template
+		$settings = $this->buildNotificationSettingsPayload();
+		$premiumNightPreset = 'at';
+		$pp = is_array($settings['premiumPolicy'] ?? null) ? $settings['premiumPolicy'] : [];
+		foreach ((array)($pp['categories'] ?? []) as $pc) {
+			if (is_array($pc) && ($pc['id'] ?? '') === 'night' && ($pc['window_start'] ?? '') === '23:00') {
+				$premiumNightPreset = 'de';
+				break;
+			}
+		}
+
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-overtime-settings', array_merge(
 			$this->buildAdminShellParams(
 				'admin-overtime-settings',
@@ -1101,10 +1115,11 @@ class AdminController extends Controller
 				$this->l10n->t('Overtime bank and hour premiums for reports.'),
 			),
 			[
-				'settings' => $this->buildNotificationSettingsPayload(),
+				'settings' => $settings,
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 				'requesttoken' => Util::callRegister(),
+				'premiumNightPreset' => $premiumNightPreset,
 			],
 		));
 

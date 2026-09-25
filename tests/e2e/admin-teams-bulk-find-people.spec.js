@@ -289,4 +289,44 @@ test.describe('Admin teams bulk Find people (Kraft live)', () => {
 		).toBeVisible({ timeout: 15_000 })
 		await page.locator('#modal-bulk-add-managers [data-action="close-modal"]').click()
 	})
+
+	test('counter persists when search is cleared and new person selected (Kraft regression)', async ({ page }) => {
+		// Clean up any existing memberships to ensure clean test state
+		await apiAllowFailure(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/teams/${teamId}/members/${encodeURIComponent(SUBSTITUTE_UID)}`)
+		await apiAllowFailure(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/teams/${teamId}/members/${encodeURIComponent(MANAGER_UID)}`)
+
+		await openBulkMembersModal(page)
+
+		// Step 1: Search for and select person 1
+		await typeBulkSearch(page, SUBSTITUTE_UID)
+		const subHit = page.locator('#bulk-member-results .team-bulk-results__item', { hasText: SUBSTITUTE_UID })
+		await expect(subHit).toBeVisible({ timeout: 15_000 })
+		await subHit.click()
+		await expect(subHit.locator('input[type="checkbox"]')).toBeChecked()
+		await expect(page.locator('#bulk-member-submit')).toBeEnabled()
+		await expect(page.locator('#bulk-member-submit')).toContainText(/1/)
+		await expect(page.locator('#bulk-member-status')).toContainText(/1/)
+
+		// Step 2: Clear the search - counter should still show 1
+		await page.locator('#bulk-member-search').fill('')
+		await expect(page.locator('#bulk-member-results')).toBeEmpty()
+		// The critical fix: counter should persist at 1 even after clearing search
+		await expect(page.locator('#bulk-member-submit')).toContainText(/1/)
+		await expect(page.locator('#bulk-member-status')).toContainText(/1/)
+
+		// Step 3: Search for and select person 2
+		await typeBulkSearch(page, MANAGER_UID)
+		const mgrHit = page.locator('#bulk-member-results .team-bulk-results__item', { hasText: MANAGER_UID })
+		await expect(mgrHit).toBeVisible({ timeout: 15_000 })
+		await mgrHit.click()
+		await expect(mgrHit.locator('input[type="checkbox"]')).toBeChecked()
+
+		// Step 4: Counter should now show 2 (the bug was it stayed at 1)
+		await expect(page.locator('#bulk-member-submit')).toContainText(/2/, { timeout: 5_000 })
+		await expect(page.locator('#bulk-member-status')).toContainText(/2/)
+
+		// Clean up - close modal without submitting
+		await page.locator('#modal-bulk-add-members [data-action="close-modal"]').click()
+		await expect(page.locator('#modal-bulk-add-members')).toHaveCount(0, { timeout: 10_000 })
+	})
 })

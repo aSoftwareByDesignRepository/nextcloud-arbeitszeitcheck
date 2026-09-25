@@ -1359,19 +1359,21 @@ class AbsenceController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$absence = $this->absenceMapper->find($id);
-			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('This absence was already decided by another manager.'),
-					'error_code' => 'already_decided',
-				], Http::STATUS_CONFLICT);
-			}
+			// Scope check BEFORE the pending-status check: an out-of-scope caller must
+			// not learn whether the absence exists or was decided (BOLA oracle).
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'approve_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
+			}
+			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
 			}
 			try {
 				$absence = $this->absenceService->approveAbsence($id, $userId, $comment);
@@ -1417,19 +1419,20 @@ class AbsenceController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$absence = $this->absenceMapper->find($id);
-			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('This absence was already decided by another manager.'),
-					'error_code' => 'already_decided',
-				], Http::STATUS_CONFLICT);
-			}
+			// Scope check BEFORE the pending-status check (BOLA oracle — see approve()).
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'reject_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
+			}
+			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
 			}
 			try {
 				$absence = $this->absenceService->rejectAbsence($id, $userId, $comment);

@@ -533,7 +533,6 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   accent-color: var(--color-primary-element);
   color-scheme: inherit;
   appearance: auto;
-  -webkit-appearance: auto;
 }
 .form-radio input[type="radio"] {
   border-radius: 50%;

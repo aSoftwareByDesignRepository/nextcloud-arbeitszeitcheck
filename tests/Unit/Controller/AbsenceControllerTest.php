@@ -946,4 +946,77 @@ class AbsenceControllerTest extends TestCase
 		$this->assertFalse($response->getData()['success']);
 		$this->assertSame('Absence not found', $response->getData()['error']);
 	}
+
+	/**
+	 * BOLA oracle regression (Atlas web_api 2026-09-23): the scope check must run
+	 * BEFORE the pending-status check. Otherwise an out-of-scope caller learns
+	 * "exists and decided" (409) vs "exists and pending" (403) vs "absent" (404).
+	 */
+	public function testApproveDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$userId = 'otheruser';
+		$absenceId = 1;
+		$employeeId = 'employee1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canManageEmployee')
+			->with($userId, $employeeId)
+			->willReturn(false);
+		$this->absenceService->expects($this->never())->method('approveAbsence');
+
+		$response = $this->controller->approve($absenceId, 'Approved');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
+	}
+
+	public function testRejectDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$userId = 'otheruser';
+		$absenceId = 1;
+		$employeeId = 'employee1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canManageEmployee')
+			->with($userId, $employeeId)
+			->willReturn(false);
+		$this->absenceService->expects($this->never())->method('rejectAbsence');
+
+		$response = $this->controller->reject($absenceId, 'Rejected');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
+	}
 }

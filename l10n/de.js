@@ -5016,11 +5016,11 @@
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "„Feed-URL generieren“ erstellt den ersten Link für einen Bereich. „Widerrufen & rotieren“ ersetzt einen bestehenden Link — die alte URL funktioniert sofort nicht mehr.",
 		"%1$s of %2$s hours" : "%1$s of %2$s hours",
 		"%s h over" : "%s h over",
-		"%s h under" : "%s h under",
+		"%s h under" : "%s h unter Soll",
 		"Add a time entry" : "Add a time entry",
 		"Add hours below, then check overtime and vacation." : "Add hours below, then check overtime and vacation.",
-		"Add working time" : "Add working time",
-		"Add working time or absence" : "Add working time or absence",
+		"Add working time" : "Arbeitszeit hinzufügen",
+		"Add working time or absence" : "Arbeitszeit oder Abwesenheit hinzufügen",
 		"Apply adjustment" : "Apply adjustment",
 		"Ask your administrator if you need to record hours yourself." : "Ask your administrator if you need to record hours yourself.",
 		"Balance (after adjustments)" : "Balance (after adjustments)",
@@ -5042,7 +5042,7 @@
 		"Invalid offline sync reference." : "Invalid offline sync reference.",
 		"Loading current balance…" : "Loading current balance…",
 		"Manual payout booking" : "Manual payout booking",
-		"Month and year" : "Month and year",
+		"Month and year" : "Monat und Jahr",
 		"No adjustments recorded this year." : "No adjustments recorded this year.",
 		"Note (optional)" : "Note (optional)",
 		"Offline sync requires a client reference id." : "Offline sync requires a client reference id.",
@@ -5065,7 +5065,7 @@
 		"This year" : "This year",
 		"Time recording is managed for you" : "Time recording is managed for you",
 		"Undertime waiver (minus → 0)" : "Undertime waiver (minus → 0)",
-		"Worked \/ target. Overtime Saldo is in the next card." : "Worked \/ target. Overtime Saldo is in the next card.",
+		"Worked \/ target. Overtime Saldo is in the next card." : "Ist \/ Soll. Das Überstunden-Saldo steht in der nächsten Karte.",
 		"Your hours, overtime, and vacation." : "Your hours, overtime, and vacation.",
 		"Explain why this time was not stamped automatically — for example a forgotten clock-out or work outside the office." : "Erklären Sie, warum diese Zeit nicht automatisch gestempelt wurde — zum Beispiel vergessenes Ausstempeln oder Arbeit außer Haus.",
 		"Reason for manager" : "Begründung für die Führungskraft",
@@ -5149,7 +5149,9 @@
 		"…" : "…",
 		"Unsaved changes" : "Ungespeicherte Änderungen",
 		"Leave without saving" : "Ohne Speichern verlassen",
-		"Stay on page" : "Auf der Seite bleiben"
+		"Stay on page" : "Auf der Seite bleiben",
+		"%n pending correction" : "%n ausstehende Korrektur",
+		"%n pending corrections" : "%n ausstehende Korrekturen"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

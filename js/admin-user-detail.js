@@ -385,10 +385,10 @@
 
             const seq = ++inFlight;
             valueEl.setAttribute('aria-busy', 'true');
-            const path = '/apps/arbeitszeitcheck/api/admin/users/'
+            const path = buildApiUrl('/apps/arbeitszeitcheck/api/admin/users/'
                 + encodeURIComponent(userId)
-                + '?' + encodeURIComponent(opts.queryParam) + '=' + encodeURIComponent(raw);
-            Utils.ajax(buildApiUrl(path), {
+                + '?' + encodeURIComponent(opts.queryParam) + '=' + encodeURIComponent(raw));
+            Utils.ajax(path, {
                 method: 'GET',
                 onSuccess: function (data) {
                     if (seq !== inFlight) {
@@ -454,7 +454,7 @@
             return;
         }
 
-        const base = '/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/overtime-adjustments';
+        const base = buildApiUrl('/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/overtime-adjustments');
 
         function renderHistory(payload) {
             const bal = payload && typeof payload.effective_balance === 'number'
@@ -585,7 +585,7 @@
     const detailCfg = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.adminUserDetailConfig) || {};
     let formDirty = false;
     let saveInFlight = false;
-    let loadedUserSnapshot = null;
+    
 
     function setStatus(message, isError) {
         const el = document.getElementById('admin-user-detail-status');
@@ -654,14 +654,13 @@
             params.set('overtimeOpeningBalanceYear', overtimeYear);
         }
         const qs = params.toString();
-        const path = '/apps/arbeitszeitcheck/api/admin/users/'
+        const path = buildApiUrl('/apps/arbeitszeitcheck/api/admin/users/'
             + encodeURIComponent(userId)
-            + (qs ? ('?' + qs) : '');
-        Utils.ajax(buildApiUrl(path), {
+            + (qs ? ('?' + qs) : ''));
+        Utils.ajax(path, {
             method: 'GET',
             onSuccess: function(data) {
                 if (data.success && data.user) {
-                    loadedUserSnapshot = data.user;
                     mountEditForm(data.user);
                 } else {
                     setStatus(auMsg('failedToLoadUserDetails', 'Failed to load user details'), true);

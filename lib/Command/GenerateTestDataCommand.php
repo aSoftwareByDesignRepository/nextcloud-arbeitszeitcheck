@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IGroupManager;
@@ -41,6 +42,7 @@ class GenerateTestDataCommand extends Command
 
 	public function __construct(
 		private IConfig $config,
+		private IAppConfig $appConfig,
 		private IDBConnection $db,
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
@@ -513,12 +515,15 @@ class GenerateTestDataCommand extends Command
 
 	private function enableAppTeams(SymfonyStyle $io): void
 	{
-		$current = $this->config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0');
+		// Typed string API required: AdminController writes use_app_teams via
+		// setAppValueString(); an untyped IConfig::setAppValue() write throws
+		// AppConfigTypeConflictException once the key exists as VALUE_STRING.
+		$current = $this->appConfig->getValueString('arbeitszeitcheck', 'use_app_teams', '0');
 		if ($current === '1') {
 			$io->note('App-owned teams already enabled.');
 			return;
 		}
-		$this->config->setAppValue('arbeitszeitcheck', 'use_app_teams', '1');
+		$this->appConfig->setValueString('arbeitszeitcheck', 'use_app_teams', '1');
 		$io->note('Enabled app-owned teams (use_app_teams=1).');
 	}
 

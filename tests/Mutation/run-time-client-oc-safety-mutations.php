@@ -69,8 +69,12 @@ $enBare = preg_replace('/\n\t\}\);\n\}\);\n?\z/', "\n", $enBare) ?? $enBare;
 // Simpler unwrap: strip wrapper markers if present
 if (str_contains($enOriginal, '__azcBootL10n')) {
 	$unwrapped = $enOriginal;
-	$unwrapped = (string)preg_replace('/^\(function \(\) \{\n\t\'use strict\';\n[\s\S]*?__azcBootL10n\(function \(OC\) \{\n/', '', $unwrapped);
-	$unwrapped = (string)preg_replace('/\n\t\}\);\n\}\);\s*$/', "\n", $unwrapped);
+	$unwrapped = (string)preg_replace('/^\(function \(\) \{\n\t\'use strict\';\n[\s\S]*?__azcBootL10n\(function \(OC\) \{\s*/', '', $unwrapped);
+	$unwrapped = (string)preg_replace('/\n\t\}\);\n\}\)\(\);\s*$/', "\n", $unwrapped);
+	if ($unwrapped === $enOriginal) {
+		fwrite(STDERR, "en_js_unwrap mutation did not change l10n/en.js — anchor drifted\n");
+		exit(1);
+	}
 	file_put_contents($enJs, $unwrapped);
 	$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($phpunit)
 		. ' -c ' . escapeshellarg($config)

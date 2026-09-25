@@ -184,7 +184,7 @@
         });
 
         document.querySelectorAll('[data-manager-pending-tab]').forEach(function(tile) {
-            tile.addEventListener('click', function(ev) {
+            tile.addEventListener('click', function() {
                 const which = tile.getAttribute('data-manager-pending-tab');
                 if (which === 'time-entries' || which === 'absences') {
                     selectPendingTab(which);

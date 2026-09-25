@@ -1067,6 +1067,7 @@
                         const q = searchEl.value.trim();
                         if (q.length < 2) {
                             if (resultsEl) resultsEl.innerHTML = '';
+                            refreshSubmit();
                             return;
                         }
                         searchTimer = setTimeout(function() {

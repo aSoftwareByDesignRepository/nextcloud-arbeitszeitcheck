@@ -145,7 +145,6 @@
 	border-radius: 3px;
 	color-scheme: inherit;
 	appearance: auto;
-	-webkit-appearance: auto;
 }
 
 #app-content.azc-app--settings .settings-form__checkbox input[type='checkbox']:focus-visible {

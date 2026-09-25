@@ -96,7 +96,13 @@ test.describe('Admin calendar subscription UI', () => {
 	let previousUseAppTeams = null
 
 	test.beforeAll(() => {
-		previousUseAppTeams = occ(['config:app:get', 'arbeitszeitcheck', 'use_app_teams']).trim()
+		// `occ` stdout can carry PHP startup noise (e.g. JIT/opcache warnings).
+		// The config value is always the last non-empty line.
+		previousUseAppTeams = occ(['config:app:get', 'arbeitszeitcheck', 'use_app_teams'])
+			.split('\n')
+			.map((l) => l.trim())
+			.filter((l) => l !== '')
+			.pop() ?? ''
 	})
 
 	test.beforeEach(() => {

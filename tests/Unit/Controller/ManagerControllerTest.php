@@ -616,6 +616,12 @@ class ManagerControllerTest extends TestCase
 			->method('find')
 			->with($absenceId)
 			->willReturn($absence);
+		// Scope check runs BEFORE the status check — the manager is in scope here,
+		// so the already-decided 409 is still reachable (BOLA oracle fix).
+		$this->permissionService->expects($this->once())
+			->method('canManageEmployee')
+			->with($managerId, $employeeId)
+			->willReturn(true);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
 
 		$response = $this->controller->approveAbsence($absenceId, 'Approved');
@@ -919,6 +925,8 @@ class ManagerControllerTest extends TestCase
 		$entry->setUpdatedAt(new \DateTime());
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
+		// Scope check runs BEFORE the status check — in scope → 409 still reachable.
+		$this->permissionService->method('canManageEmployee')->with($managerId, $managerId)->willReturn(true);
 
 		$response = $this->controller->approveTimeEntryCorrection($entryId);
 
@@ -1972,6 +1980,139 @@ class ManagerControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 		$this->assertStringContainsString('Access denied', $response->getData()['error']);
+	}
+
+	/**
+	 * BOLA oracle regression (Atlas web_api 2026-09-23): the scope check must run
+	 * BEFORE the pending-status check. Previously an out-of-scope caller could
+	 * distinguish exists+decided (409) from exists+pending (403) from absent (404).
+	 */
+	public function testApproveAbsenceDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$managerId = 'manager1';
+		$employeeId = 'otheruser';
+		$absenceId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canManageEmployee')
+			->with($managerId, $employeeId)
+			->willReturn(false);
+		$this->absenceService->expects($this->never())->method('approveAbsence');
+
+		$response = $this->controller->approveAbsence($absenceId, 'Approved');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
+	}
+
+	public function testRejectAbsenceDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$managerId = 'manager1';
+		$employeeId = 'otheruser';
+		$absenceId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($employeeId);
+		$absence->setStatus(Absence::STATUS_REJECTED);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canManageEmployee')
+			->with($managerId, $employeeId)
+			->willReturn(false);
+		$this->absenceService->expects($this->never())->method('rejectAbsence');
+
+		$response = $this->controller->rejectAbsence($absenceId, 'Nope');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
+	}
+
+	public function testApproveTimeEntryCorrectionDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$managerId = 'manager1';
+		$otherUserId = 'otheruser';
+		$entryId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($otherUserId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+
+		$response = $this->controller->approveTimeEntryCorrection($entryId);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
+	}
+
+	public function testRejectTimeEntryCorrectionDeniesBeforeConflictForOutOfScopeDecided(): void
+	{
+		$managerId = 'manager1';
+		$otherUserId = 'otheruser';
+		$entryId = 12;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($otherUserId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+
+		$response = $this->controller->rejectTimeEntryCorrection($entryId, 'Nope');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
 }

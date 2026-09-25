@@ -346,7 +346,6 @@
         if (!fieldset) {
             return null;
         }
-        const prefix = fieldset.getAttribute('data-schedule-prefix') || 'wtm';
         const days = {};
         let any = false;
         fieldset.querySelectorAll('tr[data-day]').forEach((tr) => {

@@ -128,6 +128,9 @@ test.describe('Bachus: half-day days-mode live create', () => {
 		test.skip(hoursMode === '1', 'Hours mode hides the day-fraction cards.');
 
 		await page.locator('#absence-day-fraction-half + .absence-day-fraction__face').click();
+		// The face has a 150ms border-color transition — computed style would read a
+		// mid-blend interpolation and flake. Freeze transitions for this token check.
+		await page.addStyleTag({ content: '.absence-day-fraction__face { transition: none !important; }' });
 		const readFace = () => page.locator('#absence-day-fraction-half + .absence-day-fraction__face').evaluate((node) => {
 			const style = getComputedStyle(node);
 			return {

@@ -28,6 +28,29 @@ if (existsSync(envFile)) {
 
 const baseURL = process.env.NC_BASE_URL || 'http://localhost:8081'
 
+// Specs that persist shared server state — per-user prefs (theme/language),
+// global app settings (approval, clock stamping, country/holidays), or shared
+// entities (teams config, the shared employee profile). All specs share one
+// Nextcloud instance and the same test users, so a mutation mid-run bleeds
+// into unrelated parallel tests (e.g. approval flag flipped while another
+// spec asserts the create form). These run serialized via project deps below.
+const STATEFUL_SPECS = [
+  /bachus-theme-responsive\.spec\.js/,
+  /feedback-companion-theme-a11y\.spec\.js/,
+  /paid-absence-theme-responsive\.spec\.js/,
+  /theme-responsive-a11y\.spec\.js/,
+  /locale-rendering-overflow-rawkey\.spec\.js/,
+  /admin-dach-country-region\.spec\.js/,
+  /admin-holidays-auto-restore\.spec\.js/,
+  /admin-time-capture-org\.spec\.js/,
+  /compliance-gate-smoke\.spec\.js/,
+  /concurrent-pending-decision\.spec\.js/,
+  /manual-create-pending-approval\.spec\.js/,
+  /manual-entry-justification\.spec\.js/,
+  /admin-teams-bulk-find-people\.spec\.js/,
+  /admin-users-profile\.spec\.js/,
+]
+
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
@@ -39,7 +62,22 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Specs that persist per-user server state (theme/language) must not
+    // interleave with the parallel pool or with each other — they share the
+    // same test users. Each runs as its own project chained via
+    // `dependencies`, which serializes them after the parallel suite.
+    // For targeted local runs use `npx playwright test --no-deps`.
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: STATEFUL_SPECS,
+    },
+    ...STATEFUL_SPECS.map((match, i) => ({
+      name: `stateful-${i}`,
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: match,
+      dependencies: [i === 0 ? 'chromium' : `stateful-${i - 1}`],
+    })),
   ],
 })
 

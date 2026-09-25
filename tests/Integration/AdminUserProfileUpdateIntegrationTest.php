@@ -12,7 +12,12 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\AdminUserProfileUpdateService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
+use OCP\IConfig;
+use OCP\IDBConnection;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use Test\TestCase;
 
 /**
@@ -27,6 +32,7 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 
 	private IUserManager $userManager;
 	private AdminUserProfileUpdateService $service;
+	private bool $migrateSharedLockHeld = false;
 	private UserWorkingTimeModelMapper $wtmMapper;
 	private UserVacationPolicyAssignmentMapper $policyMapper;
 	private WorkingTimeModelMapper $modelMapper;
@@ -60,10 +66,61 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		}
 
 		$this->cleanUp();
+		$this->acquireVacationUnitMigrateIdleLock();
+	}
+
+	/**
+	 * Carryover writes go through VacationUnitMigrationService::withIdleShared();
+	 * an abandoned exclusive azc/vu/migrate lock or a stale pending flag (crashed
+	 * migration / aborted suite run) must not flake this suite. A probe alone is
+	 * racy — an exclusive can be taken between setUp and the service call — so the
+	 * test HOLDS a shared lock for its duration (shared locks coexist; an
+	 * exclusive migrate cannot be acquired while it is held). Released in
+	 * tearDown(). Mirrors HalfDayVacationDaysModeIntegrationTest::awaitVacationUnitMigrateIdle().
+	 */
+	private function acquireVacationUnitMigrateIdleLock(int $attempts = 20): void
+	{
+		$config = \OC::$server->get(IConfig::class);
+		$config->deleteAppValue('arbeitszeitcheck', Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING);
+		$locking = \OC::$server->get(ILockingProvider::class);
+		$key = DbLockKeys::vacationUnitMigration();
+		$db = \OC::$server->get(IDBConnection::class);
+		for ($i = 0; $i < $attempts; $i++) {
+			try {
+				$locking->acquireLock($key, ILockingProvider::LOCK_SHARED, 'profile update migrate idle guard');
+				$this->migrateSharedLockHeld = true;
+				return;
+			} catch (LockedException) {
+				// Abandoned exclusive (hung cron / crashed heal) with no pending flag: clear for harness.
+				if ($i === 3 || $i === 10) {
+					try {
+						$qb = $db->getQueryBuilder();
+						$qb->delete('file_locks')
+							->where($qb->expr()->eq('key', $qb->createNamedParameter($key)));
+						$qb->executeStatement();
+					} catch (\Throwable) {
+						// best-effort
+					}
+				}
+				usleep(200_000);
+			}
+		}
+		$this->fail('Vacation unit migrate lock still exclusive after wait — clear oc_file_locks azc/vu/migrate');
 	}
 
 	protected function tearDown(): void
 	{
+		if ($this->migrateSharedLockHeld) {
+			try {
+				\OC::$server->get(ILockingProvider::class)->releaseLock(
+					DbLockKeys::vacationUnitMigration(),
+					ILockingProvider::LOCK_SHARED
+				);
+			} catch (\Throwable) {
+				// best-effort
+			}
+			$this->migrateSharedLockHeld = false;
+		}
 		$this->cleanUp();
 		if ($this->userManager->userExists(self::TEST_USER)) {
 			$this->userManager->get(self::TEST_USER)?->delete();

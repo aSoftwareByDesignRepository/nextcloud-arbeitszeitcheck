@@ -389,15 +389,13 @@
 			});
 			if (projectSelectEl) {
 				projectSelectEl.disabled = locked
-					|| !Boolean(
-						(deskletActions
-							? deskletActions.getEffectiveButtonStates(
-								lastKnown.status,
-								lastKnown.clockStampingEnabled !== false,
-								Boolean(lastKnown.atDailyMaximum),
-							)
-							: { 'dz-clock-in': true })['dz-clock-in'],
-					);
+					|| !(deskletActions
+						? deskletActions.getEffectiveButtonStates(
+							lastKnown.status,
+							lastKnown.clockStampingEnabled !== false,
+							Boolean(lastKnown.atDailyMaximum),
+						)
+						: { 'dz-clock-in': true })['dz-clock-in'];
 			}
 		};
 

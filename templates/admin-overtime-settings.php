@@ -15,14 +15,8 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 $settings = is_array($_['settings'] ?? null) ? $_['settings'] : [];
 $policyPages = is_array($_['policyPages'] ?? null) ? $_['policyPages'] : [];
 
-$premiumNightPreset = 'at';
-$pp = is_array($settings['premiumPolicy'] ?? null) ? $settings['premiumPolicy'] : [];
-foreach ((array)($pp['categories'] ?? []) as $pc) {
-	if (is_array($pc) && ($pc['id'] ?? '') === 'night' && ($pc['window_start'] ?? '') === '23:00') {
-		$premiumNightPreset = 'de';
-		break;
-	}
-}
+// Premium night preset is passed from controller
+$premiumNightPreset = $_['premiumNightPreset'] ?? 'at';
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>

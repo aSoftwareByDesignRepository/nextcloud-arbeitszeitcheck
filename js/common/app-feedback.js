@@ -56,7 +56,10 @@
 		if (!url || url.length > 500) {
 			return '';
 		}
-		if (/[\x00-\x1F\x7F]/.test(url)) {
+		if (Array.from(url).some(function (character) {
+			const code = character.charCodeAt(0);
+			return code <= 31 || code === 127;
+		})) {
 			return '';
 		}
 		var lower = url.toLowerCase();

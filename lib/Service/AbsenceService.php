@@ -1126,13 +1126,15 @@ class AbsenceService
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
-		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
-			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));
-		}
-
+		// Designated-substitute check BEFORE the status check: a non-designated
+		// caller must not learn whether the absence is awaiting substitute approval
+		// (BOLA oracle — same class as the manager approve/reject ordering fix).
 		$actualSubstitute = $absence->getSubstituteUserId();
 		if ($actualSubstitute === null || $actualSubstitute !== $substituteUserId) {
 			throw new \Exception($this->l10n->t('You are not the designated substitute for this absence'));
+		}
+		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
+			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));
 		}
 		$this->assertAbsenceMutable($absence);
 
@@ -1243,13 +1245,15 @@ class AbsenceService
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
-		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
-			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));
-		}
-
+		// Designated-substitute check BEFORE the status check: a non-designated
+		// caller must not learn whether the absence is awaiting substitute approval
+		// (BOLA oracle — same class as the manager approve/reject ordering fix).
 		$actualSubstitute = $absence->getSubstituteUserId();
 		if ($actualSubstitute === null || $actualSubstitute !== $substituteUserId) {
 			throw new \Exception($this->l10n->t('You are not the designated substitute for this absence'));
+		}
+		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
+			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));
 		}
 		$this->assertAbsenceMutable($absence);
 

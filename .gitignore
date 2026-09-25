@@ -56,5 +56,11 @@ release/*.b64
 
 # Local dev scripts (e.g. signing helper, not for public repo)
 scripts/*
-!scripts/check-l10n-placeholders.phpl10n/_pl_translate_cache.json
+!scripts/check-l10n-placeholders.php
+!scripts/eslint/
+!scripts/eslint/arbeitszeitcheck-plugin.cjs
+!scripts/eslint/eslint-plugin-arbeitszeitcheck/
+!scripts/eslint/eslint-plugin-arbeitszeitcheck/index.cjs
+!scripts/eslint/eslint-plugin-arbeitszeitcheck/package.json
+l10n/_pl_translate_cache.json
 tests/Mutation/.originals/

@@ -45,7 +45,6 @@
 	const keyInput = document.getElementById('azc-license-key-input');
 	const saveBtn = document.getElementById('azc-license-save');
 	const clearBtn = document.getElementById('azc-license-clear');
-	const statusPanel = document.getElementById('azc-license-status');
 	const seatListBody = document.getElementById('azc-seat-list-body');
 	const seatEmpty = document.getElementById('azc-seat-empty');
 	const seatCount = document.getElementById('azc-seat-count');
@@ -256,48 +255,6 @@
 		if (seatsFullHint) {
 			seatsFullHint.hidden = !full;
 		}
-	}
-
-	/**
-	 * Refresh the license overview after a full license response
-	 * (apply license). Requires data.license to be present.
-	 */
-	function updateStatus(data) {
-		if (!data || !data.license) {
-			return;
-		}
-		const lic = data.license;
-		if (statusPanel) {
-			statusPanel.hidden = false;
-		}
-		const set = (id, val) => {
-			const el = document.getElementById(id);
-			if (el) {
-				el.textContent = val;
-			}
-		};
-		set('azc-license-customer', lic.customerId || '');
-		set('azc-license-valid-until', lic.validUntil || '—');
-		const badge = document.getElementById('azc-license-active-badge');
-		if (badge) {
-			const active = !!lic.active;
-			const signatureInvalid = !!lic.dateValid && !lic.cryptographicallyValid;
-			badge.textContent = active
-				? (badge.dataset.activeLabel || t('activeLabel', 'Active'))
-				: signatureInvalid
-					? (badge.dataset.signatureInvalidLabel || t('signatureInvalidLabel', 'Signature mismatch'))
-					: (badge.dataset.inactiveLabel || t('inactiveLabel', 'Expired or invalid'));
-			badge.classList.toggle('azc-badge--success', active);
-			badge.classList.toggle('azc-badge--warning', !active);
-		}
-		updateSeatCounts(data.mobileSeatsUsed ?? 0, data.mobileSeatsLimit ?? lic.mobileSeats ?? 0);
-		updateMeter(
-			document.getElementById('azc-license-terminal-used'),
-			document.getElementById('azc-license-terminal-limit'),
-			document.getElementById('azc-license-terminal-meter'),
-			data.terminalDevicesUsed ?? 0,
-			data.terminalDevicesLimit ?? lic.terminalDevices ?? 0,
-		);
 	}
 
 	function renderSeatRows(seats) {
@@ -517,30 +474,6 @@
 
 	/* ── Seat assignment (searchable combobox) ───────────────── */
 
-	async function assignSeat(userId) {
-		closeSearchResults();
-		hideFeedback();
-		try {
-			const { data } = await apiFetch(apiSeats, {
-				method: 'POST',
-				headers: headers(),
-				body: JSON.stringify({ userId }),
-			});
-			if (data.ok) {
-				renderSeatRows(data.seats);
-				updateSeatCounts(data.mobileSeatsUsed ?? 0, data.mobileSeatsLimit ?? 0);
-				if (userSearch) {
-					userSearch.value = '';
-					userSearch.focus();
-				}
-				showFeedback(t('seatAssigned', 'Seat assigned.'), 'success');
-			} else {
-				showFeedback(data.message || t('assignFailed', 'Could not assign seat.'), 'error');
-			}
-		} catch {
-			showFeedback(t('networkError', 'Network error. Please try again.'), 'error');
-		}
-	}
 
 	function closeSearchResults() {
 		if (!searchResults || !userSearch) {

@@ -2413,6 +2413,15 @@ class ManagerController extends Controller
 		try {
 			$managerId = $this->getUserId();
 			$absence = $this->absenceMapper->find($absenceId);
+			// Scope check BEFORE the pending-status check: an out-of-scope caller must
+			// not learn whether the absence exists or was decided (BOLA oracle).
+			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
+				$this->permissionService->logPermissionDenied($managerId, 'approve_absence', 'absence', (string) $absenceId);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
+				], Http::STATUS_FORBIDDEN);
+			}
 			// Already decided → 409 so clients uniformly refresh (same envelope as time-entry races).
 			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
 				return new JSONResponse([
@@ -2420,13 +2429,6 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('This absence was already decided by another manager.'),
 					'error_code' => 'already_decided',
 				], Http::STATUS_CONFLICT);
-			}
-			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
-				$this->permissionService->logPermissionDenied($managerId, 'approve_absence', 'absence', (string) $absenceId);
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
-				], Http::STATUS_FORBIDDEN);
 			}
 			try {
 				$absence = $this->absenceService->approveAbsence($absenceId, $managerId, $comment);
@@ -2476,19 +2478,20 @@ class ManagerController extends Controller
 		try {
 			$managerId = $this->getUserId();
 			$absence = $this->absenceMapper->find($absenceId);
-			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('This absence was already decided by another manager.'),
-					'error_code' => 'already_decided',
-				], Http::STATUS_CONFLICT);
-			}
+			// Scope check BEFORE the pending-status check (BOLA oracle — see approveAbsence()).
 			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'reject_absence', 'absence', (string) $absenceId);
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
 				], Http::STATUS_FORBIDDEN);
+			}
+			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This absence was already decided by another manager.'),
+					'error_code' => 'already_decided',
+				], Http::STATUS_CONFLICT);
 			}
 			try {
 				$absence = $this->absenceService->rejectAbsence($absenceId, $managerId, $comment);
@@ -2539,6 +2542,17 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($timeEntryId);
 
+			// Verify manager may manage this employee (admin or team) BEFORE the
+			// pending-status check: an out-of-scope caller must not learn whether
+			// the entry exists or was decided (BOLA oracle).
+			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
+				$this->permissionService->logPermissionDenied($managerId, 'approve_time_entry_correction', 'time_entry', (string) $timeEntryId);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied. You can only approve time entries for members of your team.')
+				], Http::STATUS_FORBIDDEN);
+			}
+
 			// Verify entry is pending approval — already decided → 409 so clients
 			// uniformly refresh (same envelope as ConcurrentDecisionException).
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
@@ -2547,15 +2561,6 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('This time entry was already decided by another manager.'),
 					'error_code' => 'already_decided',
 				], Http::STATUS_CONFLICT);
-			}
-
-			// Verify manager may manage this employee (admin or team)
-			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
-				$this->permissionService->logPermissionDenied($managerId, 'approve_time_entry_correction', 'time_entry', (string) $timeEntryId);
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only approve time entries for members of your team.')
-				], Http::STATUS_FORBIDDEN);
 			}
 
 			try {
@@ -2651,6 +2656,16 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($timeEntryId);
 
+			// Verify manager may manage this employee (admin or team) BEFORE the
+			// pending-status check (BOLA oracle — see approveTimeEntryCorrection()).
+			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
+				$this->permissionService->logPermissionDenied($managerId, 'reject_time_entry_correction', 'time_entry', (string) $timeEntryId);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied. You can only reject time entries for members of your team.')
+				], Http::STATUS_FORBIDDEN);
+			}
+
 			// Verify entry is pending approval — already decided → 409 so clients
 			// uniformly refresh (same envelope as ConcurrentDecisionException).
 			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL) {
@@ -2659,15 +2674,6 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('This time entry was already decided by another manager.'),
 					'error_code' => 'already_decided',
 				], Http::STATUS_CONFLICT);
-			}
-
-			// Verify manager may manage this employee (admin or team)
-			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
-				$this->permissionService->logPermissionDenied($managerId, 'reject_time_entry_correction', 'time_entry', (string) $timeEntryId);
-				return new JSONResponse([
-					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only reject time entries for members of your team.')
-				], Http::STATUS_FORBIDDEN);
 			}
 
 			$oldValues = $entry->getSummary();

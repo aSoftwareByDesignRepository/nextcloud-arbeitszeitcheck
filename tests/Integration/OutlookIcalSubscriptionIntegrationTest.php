@@ -12,6 +12,7 @@ use OCA\ArbeitszeitCheck\Db\TeamMapper;
 use OCA\ArbeitszeitCheck\Exception\OutlookIcalSubscriptionAuthException;
 use OCA\ArbeitszeitCheck\Exception\OutlookIcalSubscriptionBadRequestException;
 use OCA\ArbeitszeitCheck\Service\OutlookIcalSubscriptionService;
+use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IUserManager;
 use Test\TestCase;
@@ -35,9 +36,12 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 			$this->markTestSkipped('Nextcloud runtime required');
 		}
 
-		$config = \OC::$server->get(IConfig::class);
-		$this->prevUseAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0');
-		$config->setAppValue('arbeitszeitcheck', 'use_app_teams', '1');
+		// Typed string API: use_app_teams is written typed by AdminController; an
+		// untyped IConfig::setAppValue() write crashes with
+		// AppConfigTypeConflictException once the key exists as VALUE_STRING.
+		$appConfig = \OC::$server->get(IAppConfig::class);
+		$this->prevUseAppTeams = $appConfig->getValueString('arbeitszeitcheck', 'use_app_teams', '0');
+		$appConfig->setValueString('arbeitszeitcheck', 'use_app_teams', '1');
 
 		$um = \OC::$server->get(IUserManager::class);
 		$this->managerUid = 'azc_oical_mgr_' . bin2hex(random_bytes(3));
@@ -104,7 +108,7 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 
 		if ($this->prevUseAppTeams !== null) {
 			try {
-				\OC::$server->get(IConfig::class)->setAppValue('arbeitszeitcheck', 'use_app_teams', $this->prevUseAppTeams);
+				\OC::$server->get(IAppConfig::class)->setValueString('arbeitszeitcheck', 'use_app_teams', $this->prevUseAppTeams);
 			} catch (\Throwable) {
 			}
 		}

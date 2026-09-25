@@ -1182,6 +1182,13 @@
     color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
 }
 
+/* Dark themes: the default primary (#00679e) on the soft dark card (#1f1f1f) drops
+ * below WCAG AA 3:1 for the large hero value. Use the readable text-on-light-primary colour. */
+body[data-theme-dark] #app-content.azc-app--dashboard .dashboard-vacation-card__value--hero,
+body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-vacation-card__value--hero {
+    color: var(--color-primary-element-light-text, var(--color-primary-element-text, var(--color-main-text)));
+}
+
 #app-content.azc-app--dashboard .dashboard-vacation-card__row--hero {
     flex-direction: column;
     align-items: flex-start;

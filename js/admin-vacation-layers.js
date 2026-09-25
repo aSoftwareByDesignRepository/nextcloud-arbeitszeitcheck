@@ -53,7 +53,6 @@
   const HOURS_PER_DAY = Math.max(0.25, Number(bootstrap.vacationHoursPerDay) || 8);
   const PER_YEAR_LABEL = (bootstrap.amountPerYearLabel && String(bootstrap.amountPerYearLabel))
     || 'days per year';
-  const HOURS_MODE_HINT = (bootstrap.hoursModeHint && String(bootstrap.hoursModeHint)) || '';
 
   // -----------------------------------------------------------------------
   // i18n helper — falls back to the provided English string when the
@@ -1915,13 +1914,13 @@
     return chips.join(' ');
   }
 
-  function renderSimResult(data, opts) {
+  function renderSimResult(data) {
     if (!simResult) return;
     if (!data || data.success !== true) {
       simResult.innerHTML = `<p class="layer-card__placeholder" role="alert">${escape(t('Could not run simulation', 'Could not run simulation'))}</p>`;
       return;
     }
-    const options = opts || {};
+
     const trace = data.calculationTrace || {};
     const layers = Array.isArray(trace.layers_evaluated) ? trace.layers_evaluated : [];
     const matchedLayer = (trace.matched_layer || data.matchedLayer) || '—';

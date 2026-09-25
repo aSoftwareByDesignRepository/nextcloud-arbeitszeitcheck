@@ -600,7 +600,7 @@ describe('dlg-web admin-license seat remove (product listener)', () => {
 					<span id="azc-seat-count"></span>
 				</div>
 			</main>`
-		const fetchMock = vi.fn(async (url, init) => {
+		const fetchMock = vi.fn(async (url, _init) => {
 			if (String(url).includes('remove-seat')) {
 				return { ok: true, json: async () => ({ ok: true }) }
 			}

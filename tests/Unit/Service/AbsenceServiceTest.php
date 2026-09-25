@@ -1530,6 +1530,61 @@ class AbsenceServiceTest extends TestCase
 	}
 
 	/**
+	 * BOLA oracle regression (Atlas web_api 2026-09-23): the designated-substitute
+	 * check must run BEFORE the substitute-pending status check, otherwise a
+	 * non-designated caller can distinguish exists+awaiting-substitute
+	 * ("not the designated substitute") from exists+other-status
+	 * ("not awaiting substitute approval") from absent ("Absence not found").
+	 */
+	public function testApproveBySubstituteDeniesBeforeStatusCheck(): void
+	{
+		$absenceId = 123;
+		$wrongSubstituteId = 'wrong_substitute';
+
+		$absence = $this->getMockBuilder(Absence::class)
+			->addMethods(['getStatus', 'getSubstituteUserId', 'getUserId'])
+			->getMock();
+		// Already decided — must still report "not the designated substitute",
+		// never reveal the real status to a non-designated caller.
+		$absence->method('getStatus')->willReturn(Absence::STATUS_APPROVED);
+		$absence->method('getSubstituteUserId')->willReturn('designated_substitute');
+		$absence->method('getUserId')->willReturn('employee1');
+
+		$this->absenceMapper->expects($this->exactly(2))
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+
+		$this->service->approveBySubstitute($absenceId, $wrongSubstituteId);
+	}
+
+	public function testDeclineBySubstituteDeniesBeforeStatusCheck(): void
+	{
+		$absenceId = 123;
+		$wrongSubstituteId = 'wrong_substitute';
+
+		$absence = $this->getMockBuilder(Absence::class)
+			->addMethods(['getStatus', 'getSubstituteUserId', 'getUserId'])
+			->getMock();
+		$absence->method('getStatus')->willReturn(Absence::STATUS_CANCELLED);
+		$absence->method('getSubstituteUserId')->willReturn('designated_substitute');
+		$absence->method('getUserId')->willReturn('employee1');
+
+		$this->absenceMapper->expects($this->exactly(2))
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+
+		$this->service->declineBySubstitute($absenceId, $wrongSubstituteId, 'comment');
+	}
+
+	/**
 	 * When no assignable manager exists, requests without substitute are auto-approved at creation.
 	 */
 	public function testCreateAbsenceAutoApprovesWhenNoAssignableManager(): void

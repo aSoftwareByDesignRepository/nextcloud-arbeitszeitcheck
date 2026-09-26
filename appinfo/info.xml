@@ -318,6 +318,24 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL eller PostgreSQL
 	]]></description>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png
+	</screenshot>
+	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-06.png">
+		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-06.png
+	</screenshot>
 	<version>1.7.11</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="info@software-by-design.de" homepage="http://nextcloud.software-by-design.de">Software by Design GbR</author>
@@ -363,22 +381,6 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<command>OCA\ArbeitszeitCheck\Command\EnsureE2eClockReadyCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\VerifyHolidaysCommand</command>
 	</commands>
-
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-01.png
-	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-02.png
-	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-03.png
-	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-04.png
-	</screenshot>
-	<screenshot small-thumbnail="https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png">
-		https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/arbeitszeitcheck-screenshot-05.png
-	</screenshot>
 
 	<navigations>
 		<navigation>

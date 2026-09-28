@@ -69,6 +69,8 @@
 		"%n of your time entries are waiting for manager approval." : "%n of your time entries are waiting for manager approval.",
 		"%n of your time entries is waiting for manager approval." : "%n of your time entries is waiting for manager approval.",
 		"%n pending absence request — jump to approvals" : "%n pending absence request — jump to approvals",
+		"%n pending correction" : "%n pending correction",
+		"%n pending corrections" : "%n pending corrections",
 		"%n pending absence requests — jump to approvals" : "%n pending absence requests — jump to approvals",
 		"%s results" : "%s results",
 		"%n team member" : "%n team member",

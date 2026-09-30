@@ -729,4 +729,58 @@ final class OutlookIcalSubscriptionServiceTest extends TestCase
 		self::assertStringContainsString('SUMMARY:Alice Example (Urlaub)', $feed);
 		self::assertStringNotContainsString('private', $feed);
 	}
+
+	public function testManagerCanAccessScope(): void
+	{
+		$team = new Team();
+		$team->setId(7);
+		$teamMapper = $this->createMock(TeamMapper::class);
+		$teamMapper->method('find')->willReturnCallback(static function (int $id) use ($team) {
+			if ($id === 7) {
+				return $team;
+			}
+			throw new \OCP\AppFramework\Db\DoesNotExistException('nope');
+		});
+		$teamMapper->method('getIdsWithDescendants')->with(5)->willReturn([5, 7]);
+
+		$teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+		$teamManagerMapper->method('getTeamIdsForManager')->willReturnCallback(
+			static fn (string $uid) => $uid === 'mgr' ? [5] : []
+		);
+
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willReturnCallback(fn (string $uid) => match ($uid) {
+			'mgr', 'outsider' => $this->makeEnabledUser($uid),
+			'disabled_mgr' => (function () {
+				$u = $this->createMock(IUser::class);
+				$u->method('isEnabled')->willReturn(false);
+				return $u;
+			})(),
+			default => null,
+		});
+
+		$perm = $this->createMock(PermissionService::class);
+		$perm->method('isAdmin')->willReturn(false);
+		$resolver = $this->createMock(TeamResolverService::class);
+		$resolver->method('useAppTeams')->willReturn(true);
+
+		$svc = $this->makeService(
+			teamMapper: $teamMapper,
+			teamManagerMapper: $teamManagerMapper,
+			teamResolver: $resolver,
+			permissionService: $perm,
+			userManager: $userManager,
+		);
+
+		// manager of team 5 may access descendant team 7
+		$this->assertTrue($svc->managerCanAccessScope('mgr', 7));
+		// unrelated user cannot
+		$this->assertFalse($svc->managerCanAccessScope('outsider', 7));
+		// disabled user cannot even when mapped as manager
+		$this->assertFalse($svc->managerCanAccessScope('disabled_mgr', 7));
+		// unknown user cannot
+		$this->assertFalse($svc->managerCanAccessScope('ghost', 7));
+		// unknown team cannot
+		$this->assertFalse($svc->managerCanAccessScope('mgr', 999));
+	}
 }

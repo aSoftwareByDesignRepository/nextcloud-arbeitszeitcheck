@@ -46,12 +46,16 @@ class PageControllerTest extends TestCase
 	/** @var PageController */
 	private $controller;
 
+	private TimeTrackingService|\PHPUnit\Framework\MockObject\MockObject $timeTrackingService;
+	private TimeCaptureMethodService|\PHPUnit\Framework\MockObject\MockObject $timeCaptureMethodService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
 
 		$request = $this->createMock(IRequest::class);
-		$timeTrackingService = $this->createMock(TimeTrackingService::class);
+		$this->timeTrackingService = $this->createMock(TimeTrackingService::class);
+		$timeTrackingService = $this->timeTrackingService;
 		$overtimeService = $this->createMock(OvertimeService::class);
 		$absenceService = $this->createMock(AbsenceService::class);
 		$timeEntryMapper = $this->createMock(TimeEntryMapper::class);
@@ -113,7 +117,8 @@ class PageControllerTest extends TestCase
 		$projectCheckIntegration->method('isProjectCheckAvailable')->willReturn(false);
 		$projectCheckIntegration->method('getAvailableProjects')->willReturn([]);
 
-		$timeCaptureMethodService = $this->createMock(TimeCaptureMethodService::class);
+		$this->timeCaptureMethodService = $this->createMock(TimeCaptureMethodService::class);
+		$timeCaptureMethodService = $this->timeCaptureMethodService;
 		$timeCaptureMethodService->method('getSettings')->willReturn([
 			'clockStampingEnabled' => true,
 			'manualTimeEntryEnabled' => true,
@@ -269,5 +274,49 @@ class PageControllerTest extends TestCase
 			$response instanceof \OCP\AppFramework\Http\DataDownloadResponse
 			|| $response instanceof \OCP\AppFramework\Http\JSONResponse
 		);
+	}
+
+	public function testSettingsSectionRendersKnownSectionWithComplianceProfile(): void
+	{
+		$profile = \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE');
+		$this->timeTrackingService->method('lawProfile')->willReturn($profile);
+
+		$response = $this->controller->settingsSection('breaks');
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$params = $response->getParams();
+		$this->assertSame('breaks', $params['settingsSection']);
+		$this->assertSame('DE', $params['complianceProfile']['country']);
+		$this->assertNotEmpty($params['complianceProfile']['breakLines']);
+		$this->assertArrayHasKey('maxDailyHours', $params['complianceProfile']);
+	}
+
+	public function testDashboardFallsBackToOrgDefaultsOnTimeCaptureFailure(): void
+	{
+		$this->timeCaptureMethodService->method('getSettings')
+			->willThrowException(new \RuntimeException('store down'));
+		$this->timeCaptureMethodService->method('getOrganizationDefaults')->willReturn([
+			'clockStampingEnabled' => false,
+			'manualTimeEntryEnabled' => true,
+		]);
+		$profile = \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE');
+		$this->timeTrackingService->method('lawProfile')->willReturn($profile);
+
+		$params = $this->controller->dashboard()->getParams();
+		$this->assertFalse($params['timeCapture']['clockStampingEnabled']);
+		$this->assertTrue($params['timeCapture']['manualTimeEntryEnabled']);
+	}
+
+	public function testDashboardFallsBackToDisabledWhenOrgDefaultsAlsoFail(): void
+	{
+		$this->timeCaptureMethodService->method('getSettings')
+			->willThrowException(new \RuntimeException('store down'));
+		$this->timeCaptureMethodService->method('getOrganizationDefaults')
+			->willThrowException(new \RuntimeException('also down'));
+		$profile = \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE');
+		$this->timeTrackingService->method('lawProfile')->willReturn($profile);
+
+		$params = $this->controller->dashboard()->getParams();
+		$this->assertFalse($params['timeCapture']['clockStampingEnabled']);
+		$this->assertFalse($params['timeCapture']['manualTimeEntryEnabled']);
 	}
 }

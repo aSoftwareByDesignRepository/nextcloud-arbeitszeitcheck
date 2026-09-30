@@ -55,6 +55,7 @@ use OCP\IL10N;
  */
 class TimeEntryController extends Controller
 {
+	use \OCP\AppFramework\Db\TTransactional;
 	use CSPTrait;
 	use NavigationFlagsTrait;
 	use PageShellTrait;
@@ -82,6 +83,7 @@ class TimeEntryController extends Controller
 	private ProjectCheckLaborTimeSyncService $projectCheckLaborSync;
 	private TimeCaptureMethodService $timeCaptureMethodService;
 	private TimeEntryDeletionPolicy $deletionPolicy;
+	private \OCP\IDBConnection $db;
 
 	public function __construct(
 		string $appName,
@@ -110,6 +112,7 @@ class TimeEntryController extends Controller
 		ProjectCheckLaborTimeSyncService $projectCheckLaborSync,
 		TimeCaptureMethodService $timeCaptureMethodService,
 		TimeEntryDeletionPolicy $deletionPolicy,
+		?\OCP\IDBConnection $db = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -136,6 +139,7 @@ class TimeEntryController extends Controller
 		$this->projectCheckLaborSync = $projectCheckLaborSync;
 		$this->timeCaptureMethodService = $timeCaptureMethodService;
 		$this->deletionPolicy = $deletionPolicy;
+		$this->db = $db ?? \OCP\Server::get(\OCP\IDBConnection::class);
 	}
 
 	/**
@@ -333,11 +337,18 @@ class TimeEntryController extends Controller
 	 */
 	private function buildTimeEntriesListTemplateParams(array $pageData): array
 	{
-		$userId = $this->getUserId();
-		$navFlags = $this->getNavigationFlags($userId);
-		$navFlags['pendingCorrectionCount'] = \count(
-			$this->timeEntryMapper->findByUserAndStatus($userId, TimeEntry::STATUS_PENDING_APPROVAL)
-		);
+		try {
+			$userId = $this->getUserId();
+			$navFlags = $this->getNavigationFlags($userId);
+			$navFlags['pendingCorrectionCount'] = \count(
+				$this->timeEntryMapper->findByUserAndStatus($userId, TimeEntry::STATUS_PENDING_APPROVAL)
+			);
+		} catch (\Throwable $ignore) {
+			$navFlags = \array_merge(
+				$this->getTimeEntriesSharedTemplateParamsFallback(),
+				['pendingCorrectionCount' => 0]
+			);
+		}
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, [
 			'time-entries',
 			'time-entry-correction',
@@ -1644,36 +1655,40 @@ class TimeEntryController extends Controller
 						return $complianceBlock;
 					}
 
-					$updatedEntry = $this->timeEntryMapper->update($entry);
-					$this->syncProjectCheckBillingAfterSave($updatedEntry, $userId);
+					// Persist + post-persist checks atomically: a strict-mode
+					// compliance throw must roll back the update (see apiStore).
+					return $this->atomic(function () use ($entry, $userId, $id, $oldSummary) {
+						$updatedEntry = $this->timeEntryMapper->update($entry);
+						$this->syncProjectCheckBillingAfterSave($updatedEntry, $userId);
 
-					// Real-time compliance check if entry is now completed
-					// Check if status changed to COMPLETED or if it was already COMPLETED
-					if ($updatedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $updatedEntry->getEndTime() !== null) {
-						$this->performRealTimeComplianceCheck($updatedEntry);
-					}
+						// Real-time compliance check if entry is now completed
+						// Check if status changed to COMPLETED or if it was already COMPLETED
+						if ($updatedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $updatedEntry->getEndTime() !== null) {
+							$this->performRealTimeComplianceCheck($updatedEntry);
+						}
 
-					// Log the action
-					try {
-						$newSummary = $updatedEntry->getSummary();
-						$this->auditLogMapper->logAction(
-							$userId,
-							'time_entry_updated',
-							'time_entry',
-							$id,
-							$oldSummary,
-							$newSummary
-						);
-					} catch (\Throwable $e) {
-						// Log error but don't fail the request
-						\OCP\Log\logger('arbeitszeitcheck')->error('Error creating audit log for time entry update: ' . $e->getMessage(), ['exception' => $e]);
-					}
+						// Log the action
+						try {
+							$newSummary = $updatedEntry->getSummary();
+							$this->auditLogMapper->logAction(
+								$userId,
+								'time_entry_updated',
+								'time_entry',
+								$id,
+								$oldSummary,
+								$newSummary
+							);
+						} catch (\Throwable $e) {
+							// Log error but don't fail the request
+							\OCP\Log\logger('arbeitszeitcheck')->error('Error creating audit log for time entry update: ' . $e->getMessage(), ['exception' => $e]);
+						}
 
-					return new JSONResponse([
-						'success' => true,
-						'entry' => $updatedEntry->getSummary()
-					]);
-				});
+							return new JSONResponse([
+								'success' => true,
+								'entry' => $updatedEntry->getSummary()
+							]);
+						}, $this->db);
+					});
 			} catch (LockedException $e) {
 				return new JSONResponse([
 					'success' => false,
@@ -1915,16 +1930,23 @@ class TimeEntryController extends Controller
 				}
 			} elseif ($startTime && $endTime) {
 				// ISO-8601 instants (legacy clients / API integrations)
-				$proposedStartTime = $this->parseIsoDateTime($startTime, 'start_time');
-				$proposedEndTime = $this->parseIsoDateTime($endTime, 'end_time');
-				$proposedData['startTime'] = $proposedStartTime->format('c');
-				$proposedData['endTime'] = $proposedEndTime->format('c');
+				try {
+					$proposedStartTime = $this->parseIsoDateTime($startTime, 'start_time');
+					$proposedEndTime = $this->parseIsoDateTime($endTime, 'end_time');
+					$proposedData['startTime'] = $proposedStartTime->format('c');
+					$proposedData['endTime'] = $proposedEndTime->format('c');
 
-				if ($breakStartTime && $breakEndTime) {
-					$proposedBreakStartTime = $this->parseIsoDateTime($breakStartTime, 'break_start_time');
-					$proposedBreakEndTime = $this->parseIsoDateTime($breakEndTime, 'break_end_time');
-					$proposedData['breakStartTime'] = $proposedBreakStartTime->format('c');
-					$proposedData['breakEndTime'] = $proposedBreakEndTime->format('c');
+					if ($breakStartTime && $breakEndTime) {
+						$proposedBreakStartTime = $this->parseIsoDateTime($breakStartTime, 'break_start_time');
+						$proposedBreakEndTime = $this->parseIsoDateTime($breakEndTime, 'break_end_time');
+						$proposedData['breakStartTime'] = $proposedBreakStartTime->format('c');
+						$proposedData['breakEndTime'] = $proposedBreakEndTime->format('c');
+					}
+				} catch (\Exception $e) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $e->getMessage(),
+					], Http::STATUS_BAD_REQUEST);
 				}
 				if ($breaks !== null) {
 					$proposedData['breaks'] = $breaks;
@@ -2796,51 +2818,56 @@ class TimeEntryController extends Controller
 					if ($manualRequiresApproval) {
 						$this->correctionService->prepareManualPending($timeEntry, $justificationText);
 					}
-					$savedEntry = $this->timeEntryMapper->insert($timeEntry);
-					if ($manualRequiresApproval) {
+					// Persist + post-persist checks atomically: a strict-mode
+					// compliance throw must roll back the insert, not leave a
+					// committed entry behind a 500 response.
+					return $this->atomic(function () use ($timeEntry, $manualRequiresApproval, $userId, $justificationText) {
+						$savedEntry = $this->timeEntryMapper->insert($timeEntry);
+						if ($manualRequiresApproval) {
+							try {
+								$this->notificationService->notifyTimeEntryCorrectionRequested(
+									$userId,
+									$savedEntry->getSummary(),
+									$justificationText,
+									\OCA\ArbeitszeitCheck\Constants::MANAGER_PENDING_KIND_MANUAL
+								);
+							} catch (\Throwable $e) {
+								\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send manual entry approval notification', ['exception' => $e]);
+							}
+							if (!$this->teamResolver->hasAssignableManagerForEmployee($userId)) {
+								$savedEntry = $this->correctionService->autoApprove($savedEntry);
+								$this->auditLogMapper->logAction($userId, 'time_entry_correction_auto_approved', 'time_entry', $savedEntry->getId(), null, ['approved_by' => 'system'], 'system');
+							} else {
+								$this->auditLogMapper->logAction($userId, 'time_entry_manual_create_requested', 'time_entry', $savedEntry->getId(), null, $savedEntry->getSummary());
+							}
+							return new JSONResponse([
+								'success' => true,
+								'entry' => $savedEntry->getSummary(),
+								'message' => $this->l10n->t('Manual time entry submitted for manager approval.'),
+							], Http::STATUS_CREATED);
+						}
+						$this->syncProjectCheckBillingAfterSave($savedEntry, $userId);
+						if ($savedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $savedEntry->getEndTime() !== null) {
+							$this->performRealTimeComplianceCheck($savedEntry);
+						}
 						try {
-							$this->notificationService->notifyTimeEntryCorrectionRequested(
+							$summary = $savedEntry->getSummary();
+							$this->auditLogMapper->logAction(
 								$userId,
-								$savedEntry->getSummary(),
-								$justificationText,
-								\OCA\ArbeitszeitCheck\Constants::MANAGER_PENDING_KIND_MANUAL
+								'time_entry_created',
+								'time_entry',
+								$savedEntry->getId(),
+								null,
+								$summary
 							);
 						} catch (\Throwable $e) {
-							\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to send manual entry approval notification', ['exception' => $e]);
-						}
-						if (!$this->teamResolver->hasAssignableManagerForEmployee($userId)) {
-							$savedEntry = $this->correctionService->autoApprove($savedEntry);
-							$this->auditLogMapper->logAction($userId, 'time_entry_correction_auto_approved', 'time_entry', $savedEntry->getId(), null, ['approved_by' => 'system'], 'system');
-						} else {
-							$this->auditLogMapper->logAction($userId, 'time_entry_manual_create_requested', 'time_entry', $savedEntry->getId(), null, $savedEntry->getSummary());
+							\OCP\Log\logger('arbeitszeitcheck')->error('Error creating audit log for time entry apiStore: ' . $e->getMessage(), ['exception' => $e]);
 						}
 						return new JSONResponse([
 							'success' => true,
-							'entry' => $savedEntry->getSummary(),
-							'message' => $this->l10n->t('Manual time entry submitted for manager approval.'),
+							'entry' => $savedEntry->getSummary()
 						], Http::STATUS_CREATED);
-					}
-					$this->syncProjectCheckBillingAfterSave($savedEntry, $userId);
-					if ($savedEntry->getStatus() === TimeEntry::STATUS_COMPLETED && $savedEntry->getEndTime() !== null) {
-						$this->performRealTimeComplianceCheck($savedEntry);
-					}
-					try {
-						$summary = $savedEntry->getSummary();
-						$this->auditLogMapper->logAction(
-							$userId,
-							'time_entry_created',
-							'time_entry',
-							$savedEntry->getId(),
-							null,
-							$summary
-						);
-					} catch (\Throwable $e) {
-						\OCP\Log\logger('arbeitszeitcheck')->error('Error creating audit log for time entry apiStore: ' . $e->getMessage(), ['exception' => $e]);
-					}
-					return new JSONResponse([
-						'success' => true,
-						'entry' => $savedEntry->getSummary()
-					], Http::STATUS_CREATED);
+					}, $this->db);
 				});
 			} catch (\Throwable $e) {
 				\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeEntryController::apiStore: ' . $e->getMessage(), ['exception' => $e]);

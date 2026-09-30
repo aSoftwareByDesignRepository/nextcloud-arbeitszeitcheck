@@ -19,11 +19,13 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
+use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
-use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -1018,5 +1020,176 @@ class AbsenceControllerTest extends TestCase
 		$this->assertFalse($data['success']);
 		$this->assertStringContainsString('Access denied', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
+	}
+
+	private function absenceForUser(string $uid, int $id, string $status = Absence::STATUS_PENDING): Absence
+	{
+		$a = new Absence();
+		$a->setId($id);
+		$a->setUserId($uid);
+		$a->setType(Absence::TYPE_VACATION);
+		$a->setStatus($status);
+		$a->setStartDate(new \DateTime('2024-06-01'));
+		$a->setEndDate(new \DateTime('2024-06-05'));
+		$a->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$a->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		return $a;
+	}
+
+	private function signInUser(string $uid): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($uid);
+		$this->userSession->method('getUser')->willReturn($user);
+	}
+
+	public function testIndexRejectsHalfDateRange(): void
+	{
+		$this->signInUser('u1');
+		$r = $this->controller->index(null, null, 25, 0, '2024-01-01', null);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testIndexRejectsInvalidDateFormat(): void
+	{
+		$this->signInUser('u1');
+		$r = $this->controller->index(null, null, 25, 0, 'not-a-date', '2024-01-31');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testIndexRejectsInvertedRange(): void
+	{
+		$this->signInUser('u1');
+		$r = $this->controller->index(null, null, 25, 0, '2024-02-01', '2024-01-01');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testIndexAppliesDateRangeFilter(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceService->expects($this->once())
+			->method('getAbsencesByUser')
+			->with('u1', $this->callback(static function (array $filters) {
+				return isset($filters['date_range'])
+					&& $filters['date_range']['start'] instanceof \DateTime
+					&& $filters['date_range']['end'] instanceof \DateTime;
+			}), 25, 0)
+			->willReturn([]);
+
+		$r = $this->controller->index(null, null, 25, 0, '2024-01-01', '2024-01-31');
+		$this->assertTrue($r->getData()['success']);
+	}
+
+	public function testIndexMergesSubstituteCoverageFilteredByStatusAndType(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceService->method('getAbsencesByUser')->willReturn([]);
+
+		$pending = $this->absenceForUser('owner1', 5, Absence::STATUS_PENDING);
+		$declined = $this->absenceForUser('owner2', 6, Absence::STATUS_REJECTED);
+		$this->absenceMapper->method('findBySubstituteUser')->willReturn([$pending, $declined]);
+		$owner = $this->createMock(IUser::class);
+		$owner->method('getDisplayName')->willReturn('Owner One');
+		$this->userManager->method('get')->willReturn($owner);
+
+		$d = $this->controller->index()->getData();
+		$absences = $d['absences'];
+		$this->assertCount(1, $absences);
+		$this->assertSame('substitute', $absences[0]['role']);
+		$this->assertSame('Owner One', $absences[0]['ownerDisplayName']);
+	}
+
+	public function testDeleteRejectsInvalidId(): void
+	{
+		$r = $this->controller->delete(0);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testDeleteReturnsNotFoundWhenMissing(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceMapper->method('find')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('nope'));
+
+		$r = $this->controller->delete(42);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
+	}
+
+	public function testDeleteReturnsNotFoundForForeignAbsence(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceMapper->method('find')->willReturn($this->absenceForUser('someone-else', 9));
+
+		$r = $this->controller->delete(9);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
+	}
+
+	public function testDeleteReturnsConflictWhenMonthFinalized(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceMapper->method('find')->willReturn($this->absenceForUser('u1', 9));
+		$this->monthClosureService->method('assertDateRangeMutable')
+			->willThrowException(new MonthFinalizedException('sealed'));
+
+		$r = $this->controller->delete(9);
+		$this->assertSame(Http::STATUS_CONFLICT, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testDeleteMapsPendingOnlyViolationToConflict(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceMapper->method('find')->willReturn($this->absenceForUser('u1', 9));
+		$this->absenceService->method('deleteAbsence')
+			->willThrowException(new \Exception('Only pending absences can be deleted'));
+
+		$r = $this->controller->delete(9);
+		$this->assertSame(Http::STATUS_CONFLICT, $r->getStatus());
+	}
+
+	public function testDeleteMapsGenericServiceErrorToBadRequest(): void
+	{
+		$this->signInUser('u1');
+		$this->absenceMapper->method('find')->willReturn($this->absenceForUser('u1', 9));
+		$this->absenceService->method('deleteAbsence')
+			->willThrowException(new \Exception('unknown failure'));
+
+		$r = $this->controller->delete(9);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testStoreInvalidDatesJsonReturns400(): void
+	{
+		$this->signInUser('u1');
+		$this->request->method('getParams')->willReturn([
+			'type' => 'vacation',
+			'start_date' => 'bogus',
+			'end_date' => '01.06.2024',
+		]);
+
+		$r = $this->controller->store();
+		$this->assertInstanceOf(JSONResponse::class, $r);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testStoreInvalidDatesFormRedirects(): void
+	{
+		$this->signInUser('u1');
+		$formRequest = $this->createMock(IRequest::class);
+		$formRequest->method('getHeader')->willReturn('');
+		$formRequest->method('getParams')->willReturn([
+			'type' => 'vacation',
+			'start_date' => 'bogus',
+			'end_date' => '01.06.2024',
+		]);
+		$prop = new \ReflectionProperty(Controller::class, 'request');
+		$prop->setAccessible(true);
+		$prop->setValue($this->controller, $formRequest);
+
+		$r = $this->controller->store();
+		$this->assertInstanceOf(RedirectResponse::class, $r);
+		$this->assertSame(Http::STATUS_SEE_OTHER, $r->getStatus());
 	}
 }

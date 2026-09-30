@@ -96,6 +96,42 @@ class TimeEntryExportTransformerTest extends TestCase
 		$this->assertSame('0:00', $wide[0]['bis_2']);
 	}
 
+	public function testBreaksExportFromJsonAndLegacyFields(): void
+	{
+		$entry = $this->makeEntry(
+			9,
+			new \DateTime('2024-06-10 08:00:00', new \DateTimeZone('Europe/Berlin')),
+			new \DateTime('2024-06-10 17:00:00', new \DateTimeZone('Europe/Berlin'))
+		);
+		$entry->setBreaks(json_encode([
+			['start' => '2024-06-10 12:00:00', 'end' => '2024-06-10 12:30:00'],
+			['start' => 'bogus-date', 'end' => 'still-bogus'],
+			['start' => '2024-06-10 15:00:00'], // missing end -> skipped
+		]));
+		$entry->setBreakStartTime(new \DateTime('2024-06-10 09:30:00', new \DateTimeZone('Europe/Berlin')));
+		$entry->setBreakEndTime(new \DateTime('2024-06-10 09:45:00', new \DateTimeZone('Europe/Berlin')));
+
+		$rows = $this->transformer->entryToExportRows($entry, false);
+		$this->assertCount(1, $rows);
+		// JSON break times are naive (UTC-parsed) -> +2h Europe/Berlin in June
+		$this->assertSame('14:00:00', $rows[0]['break_start']);
+		$this->assertSame('14:30:00', $rows[0]['break_end']);
+	}
+
+	public function testBreaksExportLegacyFieldsOnly(): void
+	{
+		$entry = $this->makeEntry(
+			10,
+			new \DateTime('2024-06-10 08:00:00', new \DateTimeZone('Europe/Berlin')),
+			new \DateTime('2024-06-10 17:00:00', new \DateTimeZone('Europe/Berlin'))
+		);
+		$entry->setBreakStartTime(new \DateTime('2024-06-10 12:15:00', new \DateTimeZone('Europe/Berlin')));
+		$entry->setBreakEndTime(new \DateTime('2024-06-10 12:45:00', new \DateTimeZone('Europe/Berlin')));
+		$rows = $this->transformer->entryToExportRows($entry, false);
+		$this->assertSame('12:15:00', $rows[0]['break_start']);
+		$this->assertSame('12:45:00', $rows[0]['break_end']);
+	}
+
 	private function makeEntry(int $id, \DateTime $start, \DateTime $end): TimeEntry
 	{
 		$e = new TimeEntry();

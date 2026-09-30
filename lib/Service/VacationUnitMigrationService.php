@@ -692,7 +692,11 @@ final class VacationUnitMigrationService
 				if ($raw === '') {
 					continue;
 				}
-				$val = (float)str_replace(',', '.', $raw);
+				$normalized = str_replace(',', '.', $raw);
+				if (!is_numeric($normalized)) {
+					continue;
+				}
+				$val = (float)$normalized;
 				if (!is_finite($val)) {
 					continue;
 				}

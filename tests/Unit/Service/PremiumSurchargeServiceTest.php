@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\PremiumSurchargeService;
 use OCA\ArbeitszeitCheck\Support\PremiumPolicy;
 use OCP\IConfig;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 
 class PremiumSurchargeServiceTest extends TestCase
@@ -253,5 +254,133 @@ class PremiumSurchargeServiceTest extends TestCase
 		$this->assertSame([], $report['users']);
 		$this->assertTrue($report['orthogonal_to_saldo']);
 		$this->assertSame('premium_disabled', $report['note']);
+	}
+
+	public function testGetPolicyArrayOrDefaultFallsBackToStarterPreset(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, $default = '') => (string)$default
+		);
+		// no stored policy -> starter preset array
+		$result = $this->service($config)->getPolicyArrayOrDefault();
+		$this->assertIsArray($result);
+		$this->assertEquals(PremiumPolicy::atStarterPreset(), $result);
+	}
+
+	public function testBuildClosureAuditBlockDisabledAndMonthValidation(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, $default = '') => (string)$default
+		);
+		// disabled -> null without touching the lock provider
+		$locking = $this->createMock(ILockingProvider::class);
+		$locking->expects($this->never())->method('acquireLock');
+		$svc = new PremiumSurchargeService(
+			$config,
+			$this->createMock(TimeEntryMapper::class),
+			$this->createMock(HolidayService::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(WorkingTimeModelMapper::class),
+			new \OCA\ArbeitszeitCheck\Support\PremiumSurchargeClassifier(),
+			$locking,
+		);
+		$this->assertNull($svc->buildClosureAuditBlock('u1', 2026, 8));
+
+		// enabled -> invalid month throws before locking
+		$configOn = $this->createMock(IConfig::class);
+		$configOn->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, $default = '') =>
+				$key === Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED ? '1' : (string)$default
+		);
+		$svcOn = new PremiumSurchargeService(
+			$configOn,
+			$this->createMock(TimeEntryMapper::class),
+			$this->createMock(HolidayService::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(WorkingTimeModelMapper::class),
+			new \OCA\ArbeitszeitCheck\Support\PremiumSurchargeClassifier(),
+			$locking,
+		);
+		$this->expectException(\InvalidArgumentException::class);
+		$svcOn->buildClosureAuditBlock('u1', 2026, 13);
+	}
+
+	public function testBuildClosureAuditBlockAcquiresAndReleasesLock(): void
+	{
+		$policy = PremiumPolicy::atStarterPreset();
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, $default = '') use ($policy) {
+				if ($key === Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED) { return '1'; }
+				if ($key === Constants::CONFIG_PREMIUM_POLICY_JSON) { return json_encode($policy); }
+				if ($key === Constants::CONFIG_PREMIUM_POLICY_VERSION) { return '3'; }
+				return (string)$default;
+			}
+		);
+		$locking = $this->createMock(ILockingProvider::class);
+		$locking->expects($this->once())
+			->method('acquireLock')
+			->with(self::isType('string'), ILockingProvider::LOCK_EXCLUSIVE, 'Premium seal snapshot');
+		$locking->expects($this->once())
+			->method('releaseLock')
+			->with(self::isType('string'), ILockingProvider::LOCK_EXCLUSIVE);
+		$entries = $this->createMock(TimeEntryMapper::class);
+		$entries->method('findByUserAndDateRange')->willReturn([]);
+		$holidays = $this->createMock(HolidayService::class);
+		$holidays->method('getHolidayWeightForUser')->willReturn(0.0);
+		$svc = new PremiumSurchargeService(
+			$config, $entries, $holidays,
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(WorkingTimeModelMapper::class),
+			new \OCA\ArbeitszeitCheck\Support\PremiumSurchargeClassifier(),
+			$locking,
+		);
+		$block = $svc->buildClosureAuditBlock('u1', 2026, 8);
+		$this->assertTrue($block['enabled']);
+		$this->assertSame(3, $block['policy_version']);
+		$this->assertTrue($block['orthogonal_to_saldo']);
+		$this->assertSame('hours_only', $block['currency_mode']);
+		$this->assertIsArray($block['summary']);
+		$this->assertArrayHasKey('buckets', $block['summary']);
+	}
+
+	public function testSummariseForUserUsesModelDailyTarget(): void
+	{
+		// resolveDailyTarget: user model -> model daily hours (exercises private arm)
+		$policy = PremiumPolicy::atStarterPreset();
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, $default = '') use ($policy) {
+				if ($key === Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED) { return '1'; }
+				if ($key === Constants::CONFIG_PREMIUM_POLICY_JSON) { return json_encode($policy); }
+				return (string)$default;
+			}
+		);
+		$tz = new \DateTimeZone('Europe/Vienna');
+		$entry = $this->completedEntry(
+			new \DateTime('2026-08-10 10:00:00', $tz), // Monday
+			new \DateTime('2026-08-10 14:00:00', $tz)
+		);
+		$entries = $this->createMock(TimeEntryMapper::class);
+		$entries->method('findByUserAndDateRange')->willReturn([$entry]);
+		$userModel = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
+		$userModel->setWorkingTimeModelId(5);
+		$uwtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$uwtm->method('findCurrentByUser')->willReturn($userModel);
+		$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
+		$model->setDailyHours('4.0');
+		$wtm = $this->createMock(WorkingTimeModelMapper::class);
+		$wtm->method('find')->willReturn($model);
+		$holidays = $this->createMock(HolidayService::class);
+		$holidays->method('getHolidayWeightForUser')->willReturn(0.0);
+		$svc = new PremiumSurchargeService(
+			$config, $entries, $holidays, $uwtm, $wtm,
+		);
+		$result = $svc->summariseForUser('u1', new \DateTime('2026-08-01'), new \DateTime('2026-08-31'));
+		$this->assertTrue($result['enabled']);
+		$this->assertTrue($result['enabled']);
+		$this->assertIsFloat($result['total_classified_hours']);
 	}
 }

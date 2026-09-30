@@ -298,5 +298,36 @@ class PermissionServiceTest extends TestCase
 		$this->assertTrue($service->canAccessManagerDashboard('other_admin'));
 		$this->assertTrue($service->canResolveViolation('other_admin', 'employee1'));
 	}
-}
 
+	public function testCanViewUserComplianceSelfOrManager(): void
+	{
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($this->createMock(IGroupManager::class), $teamResolver);
+		// self always allowed without team lookup
+		$this->assertTrue($service->canViewUserCompliance('alice', 'alice'));
+	}
+
+	public function testLogPermissionDeniedWritesAuditWarning(): void
+	{
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$logger = $this->createMock(LoggerInterface::class);
+		$logger->expects($this->once())->method('warning')->with(
+			'Permission denied',
+			$this->callback(static fn (array $ctx): bool =>
+				$ctx['actor'] === 'bob'
+				&& $ctx['action'] === 'absence.approve'
+				&& $ctx['resource_type'] === 'absence'
+				&& $ctx['resource_id'] === '42'
+			)
+		);
+		$service = new PermissionService(
+			$this->createMock(IGroupManager::class),
+			$this->createMock(IAppManager::class),
+			$this->createMock(IConfig::class),
+			$this->createMock(IUserManager::class),
+			$teamResolver,
+			$logger
+		);
+		$service->logPermissionDenied('bob', 'absence.approve', 'absence', '42');
+	}
+}

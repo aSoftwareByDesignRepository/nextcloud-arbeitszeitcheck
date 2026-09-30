@@ -402,6 +402,8 @@ class HolidayService
 						$this->holidayMapper->update($existing);
 					}
 				} catch (\Throwable $e) {
+					// best-effort: one stale kind row must not stop reconciling the
+					// rest of the statutory catalog for the year.
 					$this->logger->warning('HolidayService: failed to reconcile statutory kind', [
 						'state' => $state,
 						'date' => $dateStr,
@@ -445,6 +447,8 @@ class HolidayService
 			try {
 				$this->holidayMapper->insert($holiday);
 			} catch (\Throwable $e) {
+				// best-effort: seeding continues past duplicates and single-row
+				// failures; non-duplicate errors are logged for the operator.
 				$msg = (string)$e->getMessage();
 				$isDuplicate = $e instanceof \OCP\DB\Exception
 					&& $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION;

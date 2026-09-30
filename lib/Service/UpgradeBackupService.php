@@ -237,6 +237,8 @@ class UpgradeBackupService
 				$this->db->executeStatement('ALTER SESSION SET CONSTRAINTS = DEFERRED');
 				$oracleConstraintsDeferred = true;
 			} catch (\Throwable $e) {
+				// best-effort: deferrable constraints are an optimization; the
+				// restore falls back to insertion order when Oracle declines.
 				$this->logger->warning('ArbeitszeitCheck: Oracle constraints could not be deferred for restore; relying on restore table order.', [
 					'exception' => $e,
 				]);
@@ -804,6 +806,8 @@ class UpgradeBackupService
 					$folder->delete();
 				}
 			} catch (\Throwable $e) {
+				// best-effort: purge must continue past one unreadable snapshot;
+				// the corrupt folder id is logged for manual cleanup.
 				$this->logger->warning('ArbeitszeitCheck: removing corrupt upgrade backup folder', [
 					'app' => UpgradeBackupCatalog::APP_ID,
 					'folder' => $snapshotId,

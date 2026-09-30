@@ -32,6 +32,7 @@ class PremiumSurchargeService
 		private readonly UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
 		private readonly WorkingTimeModelMapper $workingTimeModelMapper,
 		private readonly PremiumSurchargeClassifier $classifier = new PremiumSurchargeClassifier(),
+		private readonly ?\OCP\Lock\ILockingProvider $lockingProvider = null,
 	) {
 	}
 
@@ -166,7 +167,7 @@ class PremiumSurchargeService
 			throw new \InvalidArgumentException('Month must be between 1 and 12.');
 		}
 
-		$locking = \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
+		$locking = $this->lockingProvider ?? \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
 		$lockKey = DbLockKeys::premiumPolicy();
 		$locking->acquireLock($lockKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Premium seal snapshot');
 		try {

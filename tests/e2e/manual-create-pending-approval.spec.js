@@ -119,7 +119,7 @@ test.describe('Manual create pending approval (manager)', () => {
 			await expect(card.locator('.pending-approval-card__meta')).not.toHaveText(/^$/)
 
 			await card.locator('.btn-reject-time-entry').click()
-			const rejectModal = managerPage.getByRole('dialog', { name: /Reject Request|Ablehnen|Rechazar/i })
+			const rejectModal = managerPage.locator(`#reject-time-entry-modal-${entryId}`)
 			await expect(rejectModal).toBeVisible()
 			await rejectModal.locator('.btn-reject-modal-confirm').click()
 

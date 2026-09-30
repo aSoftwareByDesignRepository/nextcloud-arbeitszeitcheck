@@ -77,6 +77,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 	private function serviceWithUserSettingsMapper(
 		UserSettingsMapper $userSettingsMapper,
 		?LaborLawProfileFactory $laborLawProfileFactory = null,
+		?UserEmploymentSettingsService $employmentSettingsService = null,
 	): AdminUserProfileUpdateService {
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
@@ -92,7 +93,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			$this->createMock(TariffRuleSetMapper::class),
 			$this->vacationPolicyMapper,
 			$this->createMock(UserOvertimeSettingsService::class),
-			$this->createMock(UserEmploymentSettingsService::class),
+			$employmentSettingsService ?? $this->createMock(UserEmploymentSettingsService::class),
 			$this->createMock(TimeCaptureMethodService::class),
 			$l10n,
 			$this->createMock(IDBConnection::class),
@@ -751,5 +752,154 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 
 		$this->expectException(AdminUserProfileUpdateException::class);
 		$this->service->applyDatevSettings('alice', ['personalnummer' => 'abc'], 'admin');
+	}
+
+	public function testValidateProfileFieldsRunsPreflights(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->willReturn($wtModel);
+
+		// empty sections are skipped entirely
+		$this->service->validateProfileFields('alice', []);
+		// a valid model reference passes without exception
+		$this->service->validateProfileFields('alice', [
+			'workingTimeModel' => ['workingTimeModelId' => 1, 'vacationDaysPerYear' => 25],
+		]);
+		$this->addToAssertionCount(1);
+
+		// an invalid vacation-policy date propagates the preflight error
+		$this->expectException(AdminUserProfileUpdateException::class);
+		$this->service->validateProfileFields('alice', [
+			'vacationPolicy' => ['effectiveFrom' => 'not-a-date'],
+		]);
+	}
+
+	public function testApplyEmploymentSettingsEmptyParamsReturnsEarly(): void
+	{
+		$this->userManager->expects($this->never())->method('get');
+		$this->assertSame([], $this->service->applyEmploymentSettings('alice', [], 'admin'));
+	}
+
+	public function testApplyEmploymentSettingsPersistsPeriod(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$employment = $this->createMock(UserEmploymentSettingsService::class);
+		$employment->expects($this->once())->method('setEmploymentPeriod')
+			->with('alice', $this->isInstanceOf(\DateTimeImmutable::class), null, 'admin');
+		$employment->method('getEmploymentStart')->willReturn(new \DateTimeImmutable('2020-06-15'));
+		$employment->method('getEmploymentEnd')->willReturn(null);
+
+		$service = $this->serviceWithUserSettingsMapper(
+			$this->createMock(UserSettingsMapper::class), null, $employment
+		);
+		$out = $service->applyEmploymentSettings('alice', ['start' => '2020-06-15'], 'admin');
+		$this->assertSame('2020-06-15', $out['employmentStart']);
+		$this->assertNull($out['employmentEnd']);
+	}
+
+	public function testApplyEmploymentSettingsRejectsStartAfterEnd(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$service = $this->serviceWithUserSettingsMapper($this->createMock(UserSettingsMapper::class));
+		$this->expectException(AdminUserProfileUpdateException::class);
+		$service->applyEmploymentSettings('alice', ['start' => '2027-01-01', 'end' => '2026-01-01'], 'admin');
+	}
+
+	public function testApplyEmploymentSettingsRejectsInvalidAndNonScalarDates(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$service = $this->serviceWithUserSettingsMapper($this->createMock(UserSettingsMapper::class));
+
+		try {
+			$service->applyEmploymentSettings('alice', ['start' => '31.12.2026'], 'admin');
+			$this->fail('expected exception for bad format');
+		} catch (AdminUserProfileUpdateException) {
+		}
+		try {
+			$service->applyEmploymentSettings('alice', ['start' => ['not', 'scalar']], 'admin');
+			$this->fail('expected exception for non-scalar');
+		} catch (AdminUserProfileUpdateException) {
+		}
+		$this->addToAssertionCount(1);
+	}
+
+	public function testApplyEmploymentSettingsMapsServiceInvalidArgument(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$employment = $this->createMock(UserEmploymentSettingsService::class);
+		$employment->method('setEmploymentPeriod')
+			->willThrowException(new \InvalidArgumentException('bad range'));
+		$service = $this->serviceWithUserSettingsMapper(
+			$this->createMock(UserSettingsMapper::class), null, $employment
+		);
+		$this->expectException(AdminUserProfileUpdateException::class);
+		$service->applyEmploymentSettings('alice', ['start' => '2020-01-01'], 'admin');
+	}
+
+	public function testApplyVacationPolicyClosesOpenPoliciesBeforeInsert(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+
+		// existing open-ended policy starting before the new effective date
+		$open = new UserVacationPolicyAssignment();
+		$open->setId(5);
+		$open->setUserId('alice');
+		$open->setVacationMode(Constants::VACATION_MODE_MANUAL_FIXED);
+		$open->setManualDays(25.0);
+		$open->setEffectiveFrom(new \DateTime('2025-01-01'));
+		$open->setEffectiveTo(null);
+		// a closed policy must not be touched
+		$closed = new UserVacationPolicyAssignment();
+		$closed->setId(6);
+		$closed->setUserId('alice');
+		$closed->setVacationMode(Constants::VACATION_MODE_MANUAL_FIXED);
+		$closed->setEffectiveFrom(new \DateTime('2024-01-01'));
+		$closed->setEffectiveTo(new \DateTime('2024-12-31'));
+
+		$updatedRows = [];
+		$this->vacationPolicyMapper->method('findByUser')->willReturn([$open, $closed]);
+		$this->vacationPolicyMapper->expects($this->once())->method('update')
+			->willReturnCallback(function ($p) use (&$updatedRows) { $updatedRows[] = $p; return $p; });
+		$this->vacationPolicyMapper->expects($this->once())->method('insert')
+			->willReturnCallback(function ($p) { $p->setId(9); return $p; });
+
+		$out = $this->service->applyVacationPolicy('alice', [
+			'vacationMode' => Constants::VACATION_MODE_MANUAL_FIXED,
+			'manualDays' => 30,
+			'effectiveFrom' => '2026-01-01',
+		], 'admin');
+
+		$this->assertSame(9, $out['policyId']);
+		$this->assertTrue($out['created']);
+		$this->assertSame([$open], $updatedRows);
+		$this->assertSame('2025-12-31', $open->getEffectiveTo()->format('Y-m-d'));
+	}
+
+	public function testApplyWorkingTimeModelDefaultsVacationDaysFromLaborLaw(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$wtModel = new WorkingTimeModel();
+		$wtModel->setId(1);
+		$this->workingTimeModelMapper->method('find')->willReturn($wtModel);
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+
+		// no labor-law factory -> falls back to Constants::DEFAULT_VACATION_DAYS_PER_YEAR
+		$captured = null;
+		$this->userWorkingTimeModelMapper->expects($this->once())->method('insert')
+			->willReturnCallback(function (UserWorkingTimeModel $m) use (&$captured) {
+				$captured = $m;
+				$m->setId(3);
+				return $m;
+			});
+
+		$service = $this->serviceWithUserSettingsMapper($this->createMock(UserSettingsMapper::class));
+		$service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 1,
+			'startDate' => '2026-01-01',
+		], 'admin');
+
+		$this->assertSame(Constants::DEFAULT_VACATION_DAYS_PER_YEAR, $captured->getVacationDaysPerYear());
 	}
 }

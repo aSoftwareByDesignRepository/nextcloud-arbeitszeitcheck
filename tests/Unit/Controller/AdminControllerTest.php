@@ -120,6 +120,9 @@ class AdminControllerTest extends TestCase
 	/** @var HolidayService|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayCalendarService;
 
+	/** @var IURLGenerator&\PHPUnit\Framework\MockObject\MockObject */
+	private $urlGenerator;
+
 	/** @var HolidayMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $holidayMapper;
 
@@ -154,7 +157,8 @@ class AdminControllerTest extends TestCase
 		$cspService->method('applyPolicyWithNonce')->willReturnArgument(0);
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
-		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$this->urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator = $this->urlGenerator;
 		$holidayMapper = $this->createMock(HolidayMapper::class);
 		$this->holidayMapper = $holidayMapper;
 		$this->holidayCalendarService = $this->createMock(HolidayService::class);
@@ -429,6 +433,9 @@ class AdminControllerTest extends TestCase
 			->willReturnCallback(fn (string $key, string $default = '') => $default);
 		$response = $this->controller->settingsSection('access');
 		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$params = $response->getParams();
+		$this->assertTrue($params['showAdminNav']);
+		$this->assertTrue($params['showManagerLink']);
 	}
 
 	public function testSettingsSectionUnknownReturnsNotFound(): void
@@ -3865,5 +3872,146 @@ class AdminControllerTest extends TestCase
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->migrateVacationUnit());
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->getUserAssignmentHistory('bob'));
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->updateUserProfile('bob'));
+	}
+
+	public function testGetCompanyHolidaysNormalizesItems(): void
+	{
+		$this->appConfig->method('getAppValueString')
+			->willReturn(json_encode([
+				['date' => '2026-05-01', 'name' => 'Labour Day', 'scope' => 'all', 'kind' => 'full'],
+				['date' => '2026-12-24', 'name' => 'Heiligabend', 'kind' => 'half'],
+				['date' => '', 'name' => 'broken-row'],
+				'not-an-array',
+				['date' => '2026-01-06', 'name' => 'Epiphany'],
+			]));
+
+		$r = $this->controller->getCompanyHolidays();
+		$d = $r->getData();
+		$this->assertTrue($d['success']);
+		$this->assertCount(3, $d['holidays']);
+		$this->assertSame('full', $d['holidays'][0]['kind']);
+		$this->assertSame('half', $d['holidays'][1]['kind']);
+		$this->assertSame('', $d['holidays'][2]['scope']); // defaults
+		$this->assertSame('full', $d['holidays'][2]['kind']);
+	}
+
+	public function testGetCompanyHolidaysCorruptJsonReturnsEmpty(): void
+	{
+		$this->appConfig->method('getAppValueString')->willReturn('{broken');
+		$r = $this->controller->getCompanyHolidays();
+		$d = $r->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame([], $d['holidays']);
+	}
+
+	public function testGetTeamsBuildsNestedTree(): void
+	{
+		$parent = new \OCA\ArbeitszeitCheck\Db\Team();
+		$parent->setId(1);
+		$parent->setName('HQ');
+		$parent->setParentId(null);
+		$parent->setSortOrder(0);
+		$parent->setCreatedAt(new \DateTime());
+
+		$child = new \OCA\ArbeitszeitCheck\Db\Team();
+		$child->setId(2);
+		$child->setName('Sub');
+		$child->setParentId(1);
+		$child->setSortOrder(0);
+		$child->setCreatedAt(new \DateTime());
+
+		$orphanLevel = new \OCA\ArbeitszeitCheck\Db\Team();
+		$orphanLevel->setId(3);
+		$orphanLevel->setName('Other');
+		$orphanLevel->setParentId(null);
+		$orphanLevel->setSortOrder(1);
+		$orphanLevel->setCreatedAt(new \DateTime());
+
+		$rp = new \ReflectionProperty($this->controller, 'teamMapper');
+		$rp->setAccessible(true);
+		$teamMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMapper::class);
+		$teamMapper->method('findAll')->willReturn([$parent, $child, $orphanLevel]);
+		$rp->setValue($this->controller, $teamMapper);
+
+		$r = $this->controller->getTeams();
+		$d = $r->getData();
+		$this->assertTrue($d['success']);
+		$this->assertCount(2, $d['teams']);
+		$this->assertSame('HQ', $d['teams'][0]['name']);
+		$this->assertCount(1, $d['teams'][0]['children']);
+		$this->assertSame('Sub', $d['teams'][0]['children'][0]['name']);
+		$this->assertSame('Other', $d['teams'][1]['name']);
+	}
+
+	public function testBatchMutationResponseErrorArms(): void
+	{
+		$batch = $this->createMock(\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService::class);
+		$batch->method('addTeamMembersBatch')->willReturn([
+			'ok' => false, 'error' => 'team_not_found', 'httpStatus' => 404,
+		]);
+		$rp = new \ReflectionProperty($this->controller, 'adminBatchMutationService');
+		$rp->setAccessible(true);
+		$rp->setValue($this->controller, $batch);
+
+		$this->request->method('getParams')->willReturn(['userIds' => ['alice']]);
+		$r = $this->controller->addTeamMembersBatch(99);
+		$d = $r->getData();
+		$this->assertSame(404, $r->getStatus());
+		$this->assertFalse($d['success']);
+		$this->assertSame('team_not_found', $d['error']);
+		$this->assertSame('Team not found', $d['message']);
+	}
+
+	public function testBatchMutationResponseSuccessCarriesListKey(): void
+	{
+		$batch = $this->createMock(\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService::class);
+		$batch->method('batchProfile')->willReturn([
+			'ok' => true,
+			'summary' => ['updated' => 2],
+			'results' => [['user_id' => 'alice', 'ok' => true]],
+			'dryRun' => false,
+		]);
+		$rp = new \ReflectionProperty($this->controller, 'adminBatchMutationService');
+		$rp->setAccessible(true);
+		$rp->setValue($this->controller, $batch);
+
+		$this->request->method('getParams')->willReturn([
+			'userIds' => ['alice', 'bob'],
+			'fields' => ['region' => 'DE-BY'],
+		]);
+		$r = $this->controller->batchUpdateUserProfiles();
+		$d = $r->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame(['updated' => 2], $d['summary']);
+		$this->assertFalse($d['dryRun']);
+	}
+
+	public function testSettingsSectionExposesProjectCheckAppsUrl(): void
+	{
+		$this->urlGenerator->method('linkToRoute')->willReturnCallback(
+			static fn (string $route): string => str_contains($route, 'settings.AppSettings')
+				? '/settings/apps'
+				: '/apps/arbeitszeitcheck/' . $route
+		);
+		$r = $this->controller->settingsSection('projectcheck');
+		$params = method_exists($r, 'getParams') ? $r->getParams() : [];
+		$this->assertSame('/settings/apps', $params['projectCheckAppsUrl'] ?? null);
+	}
+
+	public function testSettingsSectionProjectCheckAppsUrlEmptyWhenRouteThrows(): void
+	{
+		$this->appConfig->method('getAppValueString')
+			->willReturnCallback(fn (string $key, string $default = '') => $default);
+		$this->projectCheckInstalled = true;
+		$this->urlGenerator->method('linkToRoute')->willReturnCallback(static function (string $route) {
+			if ($route === 'settings.AppSettings.viewApps') {
+				throw new \RuntimeException('route gone');
+			}
+			return '/apps/x';
+		});
+
+		$response = $this->controller->settingsSection('projectcheck');
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$this->assertSame('', $response->getParams()['projectCheckAppsUrl']);
 	}
 }

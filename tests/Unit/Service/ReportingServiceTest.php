@@ -358,6 +358,81 @@ class ReportingServiceTest extends TestCase
 		$this->assertEquals(160.0, $report['total_hours']);
 	}
 
+	public function testGenerateMonthlyReportPeriodOverridesAndMissingUser(): void
+	{
+		// period overrides take precedence over the month window
+		$report = $this->service->generateMonthlyReport(
+			new \DateTime('2024-01-15'),
+			'ghost',
+			new \DateTime('2024-02-10'),
+			new \DateTime('2024-02-14'),
+		);
+		$this->assertSame('2024-02-10', $report['period']['start']);
+		$this->assertSame('2024-02-14', $report['period']['end']);
+		// ghost user not found -> single-user arm skipped, defaults stay
+		$this->assertSame(0, $report['total_users']);
+		$this->assertSame(0, $report['active_users']);
+	}
+
+	public function testGenerateMonthlyReportAggregatesAllEnabledUsers(): void
+	{
+		$u1 = $this->createMock(IUser::class);
+		$u1->method('getUID')->willReturn('alice');
+		$u1->method('isEnabled')->willReturn(true);
+		$u1->method('getDisplayName')->willReturn('Alice');
+		$u2 = $this->createMock(IUser::class);
+		$u2->method('getUID')->willReturn('bob');
+		$u2->method('isEnabled')->willReturn(true);
+		$u2->method('getDisplayName')->willReturn('Bob');
+		$u3 = $this->createMock(IUser::class);
+		$u3->method('isEnabled')->willReturn(false); // disabled -> skipped
+
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($u1, $u2, $u3): void {
+				foreach ([$u1, $u2, $u3] as $u) {
+					$cb($u);
+				}
+			}
+		);
+		$this->userManager->method('get')->willReturnMap([
+			['alice', $u1],
+			['bob', $u2],
+		]);
+
+		$this->overtimeService->method('calculateOvertime')
+			->willReturnCallback(static fn (string $uid) => [
+				'total_hours_worked' => $uid === 'alice' ? 100.0 : 0.0,
+				'required_hours' => 160.0,
+				'overtime_hours' => $uid === 'alice' ? 4.0 : 0.0,
+			]);
+
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-02 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 17:00:00'));
+		$entry->setBreaks(json_encode([['start' => '2024-01-02T12:00:00+00:00', 'end' => '2024-01-02T13:00:00+00:00']]));
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturnCallback(static fn (string $uid) => $uid === 'alice' ? [$entry] : []);
+		$this->violationMapper->method('findByDateRange')
+			->willReturnCallback(static fn ($s, $e, string $uid) => $uid === 'alice' ? [new \OCA\ArbeitszeitCheck\Db\ComplianceViolation()] : []);
+
+		$report = $this->service->generateMonthlyReport(new \DateTime('2024-01-15'));
+
+		$this->assertSame(2, $report['total_users']);
+		$this->assertSame(1, $report['active_users']);   // only alice has entries
+		$this->assertSame(100.0, $report['total_hours']);
+		$this->assertSame(4.0, $report['total_overtime']);
+		$this->assertSame(1, $report['violations_count']);
+		$this->assertSame(1.0, $report['total_break_hours']);
+		$this->assertSame(100.0, $report['average_hours_per_user']);
+		$this->assertCount(1, $report['users']);
+		$this->assertSame('alice', $report['users'][0]['user_id']);
+		$this->assertSame('Alice', $report['users'][0]['display_name']);
+	}
+
 	/**
 	 * Test generating overtime report
 	 */

@@ -313,6 +313,8 @@ class TimeTrackingService
 				]));
 			}
 		} catch (\Throwable $e) {
+			// best-effort: the repair runs opportunistically on the request path;
+			// a failure must never break clock-in for the user — logged for triage.
 			\OCP\Log\logger('arbeitszeitcheck')->warning(
 				'repairStalePausedAutomaticEntries skipped: ' . $e->getMessage(),
 				['exception' => $e, 'user_id' => $userId]
@@ -1016,76 +1018,6 @@ class TimeTrackingService
 		return $status;
 	}
 
-	/**
-	 * Calculate non-overlapping working hours from a list of time entries
-	 * This merges overlapping time periods and calculates the actual worked hours
-	 *
-	 * @param TimeEntry[]|array[] $entries Array of TimeEntry objects or arrays with 'start', 'end', 'breakHours'
-	 * @return float Total working hours without double-counting overlaps
-	 */
-	private function calculateNonOverlappingHours(array $entries): float
-	{
-		// Normalize entries to arrays with start, end, breakHours
-		$validEntries = [];
-		foreach ($entries as $entry) {
-			if (is_array($entry)) {
-				// Already in array format
-				if (isset($entry['start']) && isset($entry['end'])) {
-					$validEntries[] = [
-						'start' => $entry['start'],
-						'end' => $entry['end'],
-						'breakHours' => $entry['breakHours'] ?? 0.0
-					];
-				}
-			} elseif ($entry instanceof TimeEntry && $entry->getStartTime() && $entry->getEndTime()) {
-				// TimeEntry object - convert to array
-				$validEntries[] = [
-					'start' => $entry->getStartTime()->getTimestamp(),
-					'end' => $entry->getEndTime()->getTimestamp(),
-					'breakHours' => $entry->getBreakDurationHours() ?? 0.0
-				];
-			}
-		}
-
-		if (empty($validEntries)) {
-			return 0.0;
-		}
-
-		// Sort by start time
-		usort($validEntries, function($a, $b) {
-			return $a['start'] <=> $b['start'];
-		});
-
-		// Merge overlapping periods
-		$mergedPeriods = [];
-		$currentPeriod = $validEntries[0];
-
-		for ($i = 1; $i < count($validEntries); $i++) {
-			$nextPeriod = $validEntries[$i];
-
-			// If periods overlap or are adjacent, merge them
-			if ($nextPeriod['start'] <= $currentPeriod['end']) {
-				// Merge: extend end time if needed, add break hours
-				$currentPeriod['end'] = max($currentPeriod['end'], $nextPeriod['end']);
-				$currentPeriod['breakHours'] += $nextPeriod['breakHours'];
-			} else {
-				// No overlap: save current period and start a new one
-				$mergedPeriods[] = $currentPeriod;
-				$currentPeriod = $nextPeriod;
-			}
-		}
-		$mergedPeriods[] = $currentPeriod;
-
-		// Calculate total working hours from merged periods (subtract breaks)
-		$totalHours = 0.0;
-		foreach ($mergedPeriods as $period) {
-			$durationHours = ($period['end'] - $period['start']) / 3600;
-			$workingHours = max(0, $durationHours - $period['breakHours']);
-			$totalHours += $workingHours;
-		}
-
-		return $totalHours;
-	}
 
 	/**
 	 * Get hours worked today by a user

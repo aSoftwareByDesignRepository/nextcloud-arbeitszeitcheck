@@ -41,6 +41,9 @@ use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignment;
 use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignmentMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\TariffRuleModule;
+use OCA\ArbeitszeitCheck\Db\TariffRuleSet;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\VacationEntitlementEngine;
 use OCP\IConfig;
@@ -891,5 +894,66 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 		foreach ($redacted['layers_evaluated'] as $row) {
 			$this->assertArrayNotHasKey('degraded_org_default_collision', $row);
 		}
+	}
+
+	public function testL0ModelBasedSimpleModeResolvesViaSimpleModel(): void
+	{
+		[$engine, $mocks] = $this->makeEngine();
+		$o = new OrgVacationDefault();
+		$o->setId(1);
+		$o->setVacationMode(Constants::VACATION_MODE_MODEL_BASED_SIMPLE);
+		$o->setEffectiveFrom(new \DateTime('2025-01-01'));
+		$mocks['org']->method('findActiveByDate')->willReturn($o);
+
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setUserId('u1');
+		$assignment->setWorkingTimeModelId(7);
+		$mocks['userModel']->method('findByUserAndDate')->willReturn($assignment);
+		$model = new WorkingTimeModel();
+		$model->setWorkDaysPerWeek(3.0);
+		$mocks['workingTimeModel']->method('find')->willReturn($model);
+
+		$result = $engine->computeForDate('u1', new \DateTimeImmutable('2026-06-01'));
+		// 30 reference days * (3/5) = 18
+		$this->assertSame(18.0, $result['days']);
+		$this->assertSame('L0', $result['matchedLayer']);
+	}
+
+	public function testL0TariffRuleBasedModeResolvesViaRuleSet(): void
+	{
+		[$engine, $mocks] = $this->makeEngine();
+		$o = new OrgVacationDefault();
+		$o->setId(1);
+		$o->setVacationMode(Constants::VACATION_MODE_TARIFF_RULE_BASED);
+		$o->setTariffRuleSetId(42);
+		$o->setEffectiveFrom(new \DateTime('2025-01-01'));
+		$mocks['org']->method('findActiveByDate')->willReturn($o);
+
+		$mocks['ruleSet']->method('find')->with(42)->willReturn(new TariffRuleSet());
+		$mod = new TariffRuleModule();
+		$mod->setModuleType('additional_entitlements');
+		$mod->setConfig(['days' => 5.0]);
+		$mocks['module']->method('findByRuleSetId')->with(42)->willReturn([$mod]);
+
+		$result = $engine->computeForDate('u1', new \DateTimeImmutable('2026-06-01'));
+		// base 30 (5/5) + 5 additional = 35
+		$this->assertSame(35.0, $result['days']);
+		$this->assertSame('L0', $result['matchedLayer']);
+	}
+
+	public function testL0UnknownVacationModeDegradesToZero(): void
+	{
+		[$engine, $mocks] = $this->makeEngine();
+		$o = new OrgVacationDefault();
+		$o->setId(1);
+		$o->setVacationMode('bogus_mode');
+		$o->setEffectiveFrom(new \DateTime('2025-01-01'));
+		$mocks['org']->method('findActiveByDate')->willReturn($o);
+
+		$result = $engine->computeForDate('u1', new \DateTimeImmutable('2026-06-01'));
+		$this->assertSame(0.0, $result['days']);
+		$this->assertSame('L0', $result['matchedLayer']);
+		$layerTrace = json_encode($result['trace']);
+		$this->assertStringContainsString('unknown_mode', $layerTrace);
 	}
 }

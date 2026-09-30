@@ -234,6 +234,43 @@ class ComplianceControllerTest extends TestCase
 		);
 	}
 
+	public function testDashboardRendersViolationRows(): void
+	{
+		$this->mockAuthenticatedUser();
+		$this->complianceService->method('getComplianceStatus')->willReturn([
+			'compliant' => false,
+			'score' => 60,
+			'has_data' => true,
+		]);
+		$violation = new \OCA\ArbeitszeitCheck\Db\ComplianceViolation();
+		$violation->setViolationType('daily_maximum');
+		$violation->setSeverity('high');
+		$violation->setDate(new \DateTime('2026-03-15'));
+		$violation->setResolved(false);
+		$violation->setDescription('Exceeded daily maximum');
+		$this->violationMapper->method('findByUser')->willReturn([$violation]);
+
+		$params = $this->controller->dashboard()->getParams();
+		$this->assertCount(1, $params['recentViolations']);
+		$row = $params['recentViolations'][0];
+		$this->assertNull($row['id']);
+		$this->assertSame('15.03.2026', $row['date']);
+		$this->assertSame('2026-03-15', $row['dateIso']);
+	}
+
+	public function testDashboardFallsBackToErrorPayloadOnFailure(): void
+	{
+		$this->mockAuthenticatedUser();
+		$this->complianceService->method('getComplianceStatus')
+			->willThrowException(new \RuntimeException('db down'));
+
+		$params = $this->controller->dashboard()->getParams();
+		$this->assertFalse($params['complianceStatus']['compliant']);
+		$this->assertTrue($params['complianceStatus']['load_error']);
+		$this->assertSame([], $params['recentViolations']);
+		$this->assertArrayHasKey('error', $params);
+	}
+
 	/**
 	 * Test violations page returns template
 	 */

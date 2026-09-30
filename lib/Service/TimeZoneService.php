@@ -235,17 +235,11 @@ final class TimeZoneService
 	 */
 	public function formatForNaiveSql(\DateTimeInterface $dt): string
 	{
-		$tz = $this->storageTimeZone();
-		if ($dt instanceof \DateTimeImmutable) {
-			return $dt->setTimezone($tz)->format('Y-m-d H:i:s');
-		}
-		if ($dt instanceof \DateTime) {
-			$clone = clone $dt;
-			$clone->setTimezone($tz);
-			return $clone->format('Y-m-d H:i:s');
-		}
-		// Foreign DateTimeInterface implementation – go through epoch + storage TZ.
-		return (new \DateTimeImmutable('@' . $dt->getTimestamp()))->setTimezone($tz)->format('Y-m-d H:i:s');
+		// Epoch re-anchor is correct for every implementor (mutable and
+		// immutable alike) — the wall clock is expressed in storage TZ.
+		return (new \DateTimeImmutable('@' . $dt->getTimestamp()))
+			->setTimezone($this->storageTimeZone())
+			->format('Y-m-d H:i:s');
 	}
 
 	// ------------------------------------------------------------------ //
@@ -379,16 +373,9 @@ final class TimeZoneService
 	 */
 	public function dayKeyInStorage(\DateTimeInterface $instant): string
 	{
-		$tz = $this->storageTimeZone();
-		if ($instant instanceof \DateTimeImmutable) {
-			return $instant->setTimezone($tz)->format('Y-m-d');
-		}
-		if ($instant instanceof \DateTime) {
-			$clone = clone $instant;
-			$clone->setTimezone($tz);
-			return $clone->format('Y-m-d');
-		}
-		return (new \DateTimeImmutable('@' . $instant->getTimestamp()))->setTimezone($tz)->format('Y-m-d');
+		return (new \DateTimeImmutable('@' . $instant->getTimestamp()))
+			->setTimezone($this->storageTimeZone())
+			->format('Y-m-d');
 	}
 
 	// ------------------------------------------------------------------ //

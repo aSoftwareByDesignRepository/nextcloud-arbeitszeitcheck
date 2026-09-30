@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Service\VacationEntitlementEngine;
 use OCA\ArbeitszeitCheck\Service\VacationProrationService;
 use OCA\ArbeitszeitCheck\Service\VacationYearWindowResolver;
 use OCA\ArbeitszeitCheck\Service\UserEmploymentSettingsService;
+use OCA\ArbeitszeitCheck\Support\VacationYearWindow;
 use OCP\IConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -537,5 +538,152 @@ class VacationAllocationServiceTest extends TestCase
 		$this->assertSame(Constants::VAC_YEAR_MISSING_START, $r['vacation_year_error']);
 		$this->assertEqualsWithDelta(0.0, $r['entitlement'], 0.001);
 		$this->assertFalse($r['allocation_valid']);
+	}
+
+	public function testIsCarryoverUsableForNewRequestsCalendarBoundaries(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+		);
+
+		// expiry for 2025 = 2025-03-31
+		$this->assertTrue($s->isCarryoverUsableForNewRequests(2025, new \DateTime('2025-03-31')));
+		$this->assertFalse($s->isCarryoverUsableForNewRequests(2025, new \DateTime('2025-04-01')));
+	}
+
+	public function testIsCarryoverUsableForNewRequestsAnniversaryUsesWindowExpiry(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+		$modeConfig = $this->createMock(IConfig::class);
+		$modeConfig->method('getAppValue')->willReturn(Constants::VACATION_YEAR_MODE_ANNIVERSARY);
+		$employment = $this->createMock(UserEmploymentSettingsService::class);
+		// hired 2020-06-15 → balance year containing 2025-06-15..2026-06-14
+		$employment->method('getEmploymentStart')->willReturn(new \DateTimeImmutable('2020-06-15'));
+		$resolver = new VacationYearWindowResolver($modeConfig, $employment);
+
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+			null, null, null, $resolver,
+		);
+
+		$this->assertTrue($s->isAnniversaryMode());
+		// window expiry = anniversary start + 3 months (Mar 31 config ignored in
+		// anniversary mode -> window-based expiry). Exact date aside, a date far
+		// in the future is not usable and a date inside the grace period is.
+		$window = $s->resolveWindowForUserYear('u1', 2025, new \DateTime('2026-01-15'));
+		$this->assertFalse($window->missingEmploymentStart);
+		$expiry = $s->getCarryoverExpiryDateForWindow($window);
+		$this->assertTrue($s->isCarryoverUsableForNewRequests(2025, $expiry, 'u1'));
+		$this->assertFalse($s->isCarryoverUsableForNewRequests(
+			2025, $expiry->modify('+1 day'), 'u1'
+		));
+	}
+
+	public function testGetAnnualEntitlementDaysFallsBackWhenEngineThrows(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturn('3');
+		$engine = $this->createMock(VacationEntitlementEngine::class);
+		$engine->method('computeForDate')->willThrowException(new \RuntimeException('db gone'));
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+			$engine,
+		);
+		$this->assertSame(
+			round((float)Constants::DEFAULT_VACATION_DAYS_PER_YEAR, 2),
+			$s->getAnnualEntitlementDays('u1')
+		);
+	}
+
+	public function testGetAnnualEntitlementDaysClampsOutOfRangeEngineResult(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturn('3');
+		$engine = $this->createMock(VacationEntitlementEngine::class);
+		$engine->method('computeForDate')->willReturn(['days' => 999.0]);
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+			$engine,
+		);
+		$this->assertSame(366.0, $s->getAnnualEntitlementDays('u1'));
+	}
+
+	public function testResolveWindowForUserYearCalendarModeReturnsCalendarYear(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturn('3');
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+		);
+		$w = $s->resolveWindowForUserYear('u1', 2025);
+		$this->assertSame(VacationYearWindow::MODE_CALENDAR, $w->mode);
+		$this->assertSame(2025, $w->balanceYearKey);
+		$this->assertSame('2025-01-01', $w->startInclusive->format('Y-m-d'));
+		$this->assertSame('2026-01-01', $w->endExclusive->format('Y-m-d'));
+	}
+
+	public function testResolveWindowForUserYearAnniversaryMatchesAndMismatches(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturn('3');
+		$modeConfig = $this->createMock(IConfig::class);
+		$modeConfig->method('getAppValue')->willReturn(Constants::VACATION_YEAR_MODE_ANNIVERSARY);
+		$employment = $this->createMock(UserEmploymentSettingsService::class);
+		$employment->method('getEmploymentStart')->willReturn(new \DateTimeImmutable('2020-06-15'));
+		$resolver = new VacationYearWindowResolver($modeConfig, $employment);
+		$s = $this->makeService(
+			$config,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(HolidayService::class),
+			null, null, null, $resolver,
+		);
+
+		// asOf inside the balance-year window -> same window object arm
+		$asOf = new \DateTime('2025-08-01'); // inside 2025-06-15..2026-06-14 window
+		$w = $s->resolveWindowForUserYear('u1', $resolver->resolveForUser('u1', $asOf)->balanceYearKey, $asOf);
+		$this->assertSame(VacationYearWindow::MODE_ANNIVERSARY, $w->mode);
+		$this->assertSame('2025-06-15', $w->startInclusive->format('Y-m-d'));
+
+		// different balance year -> resolveAnniversaryForUserBalanceYear arm
+		$w2 = $s->resolveWindowForUserYear('u1', 2023, $asOf);
+		$this->assertSame(VacationYearWindow::MODE_ANNIVERSARY, $w2->mode);
+		$this->assertSame(2023, $w2->balanceYearKey);
 	}
 }

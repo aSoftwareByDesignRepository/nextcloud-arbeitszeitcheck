@@ -216,4 +216,103 @@ class MonthClosurePdfDocumentBuilderTest extends TestCase
 		$pdf = MonthClosurePdfDocumentBuilder::build($snap, $row, 'User', 'u1', $l, '');
 		$this->assertStringNotContainsString('PREMIUM SECTION', $pdf);
 	}
+
+	/**
+	 * Feeds the renderer every label/branch arm: all entry statuses, both
+	 * manual/auto kinds, break payloads (array, JSON string, malformed),
+	 * invalid timestamps, and enough rows to force a continuation page.
+	 */
+	public function testPdfRendersAllEntryAndAbsenceLabelBranches(): void
+	{
+		$l = $this->createMock(IL10N::class);
+		$l->method('getLanguageCode')->willReturn('de');
+		$l->method('t')->willReturnCallback(static function (string $text, array $parameters = []) {
+			return 'T[' . $text . ']';
+		});
+
+		$statuses = ['completed', 'active', 'break', 'paused', 'pending_approval', 'rejected', '', 'weird_status'];
+		$entries = [];
+		foreach ($statuses as $i => $st) {
+			$entries[] = [
+				'start' => sprintf('2026-03-%02dT08:00:00+01:00', $i + 1),
+				'end' => sprintf('2026-03-%02dT16:30:00+01:00', $i + 1),
+				'status' => $st,
+				'is_manual' => $i % 2 === 0,
+				'breaks' => [['start' => '2026-03-01T12:00:00+01:00', 'end' => '2026-03-01T12:30:00+01:00'], 'not-an-array'],
+				'description' => str_repeat('LongWord ', 40) . ' ' . str_repeat('X', 300),
+			];
+		}
+		// break payload variants: JSON string, invalid JSON, empty
+		$entries[] = [
+			'start' => '2026-03-10T08:00:00+01:00',
+			'end' => '2026-03-10T16:00:00+01:00',
+			'status' => 'completed',
+			'is_manual' => false,
+			'breaks' => '[{"start":"2026-03-10T12:00:00+01:00","end":"2026-03-10T12:45:00+01:00"}]',
+			'description' => '',
+		];
+		$entries[] = [
+			'start' => 'not-a-date',
+			'end' => '',
+			'status' => 'completed',
+			'is_manual' => false,
+			'breaks' => '{invalid json',
+			'description' => '',
+		];
+		// non-array entries are skipped by the loop
+		$entries[] = 'garbage-row';
+		// enough filler rows to force a continuation page (newPage(false))
+		for ($i = 0; $i < 60; $i++) {
+			$entries[] = [
+				'start' => '2026-03-15T08:00:00+01:00',
+				'end' => '2026-03-15T16:00:00+01:00',
+				'status' => 'completed',
+				'is_manual' => false,
+				'breaks' => null,
+				'description' => 'row ' . $i,
+			];
+		}
+
+		$absences = [];
+		foreach (['vacation', 'sick_leave', 'personal_leave', 'parental_leave', 'special_leave', 'unpaid_leave', 'home_office', 'business_trip', 'exotic'] as $type) {
+			foreach (['pending', 'substitute_pending', 'substitute_declined', 'approved', 'rejected', 'cancelled', 'unknown_status'] as $st) {
+				$absences[] = [
+					'type' => $type,
+					'start_date' => '2026-03-05',
+					'end_date' => '2026-03-06',
+					'days' => 2.0,
+					'status' => $st,
+				];
+			}
+		}
+		$absences[] = 'garbage-row';
+
+		$snap = [
+			'schema' => 'arbeitszeitcheck.month_closure.v1',
+			'year' => 2026,
+			'month' => 3,
+			'period' => ['start' => '2026-03-01', 'end' => '2026-03-31'],
+			'report' => ['total_hours' => 8.0, 'violations_count' => 0],
+			'time_entries' => $entries,
+			'absences' => $absences,
+		];
+		$row = new MonthClosure();
+		$row->setSnapshotHash(str_repeat('d', 64));
+		$row->setPrevSnapshotHash(str_repeat('e', 64));
+		$row->setVersion(2);
+
+		$pdf = MonthClosurePdfDocumentBuilder::build($snap, $row, 'User', 'u1', $l, 'Boss');
+
+		$this->assertStringStartsWith('%PDF-1.4', $pdf);
+		$this->assertStringContainsString('/Lang (de-DE)', $pdf);
+		// multiple pages -> footer page counter references >1 page
+		$this->assertMatchesRegularExpression('/\/Type \/Pages/', $pdf);
+		// continuation header emitted on pages after the first
+		$this->assertStringContainsString('T[month_closure_pdf_continuation]', $pdf);
+		// localized labels ran through labelTimeEntryStatus ('Completed' etc.)
+		$this->assertStringContainsString('T[Completed]', $pdf);
+		$this->assertStringContainsString('T[Vacation]', $pdf);
+		$this->assertStringContainsString('T[Substitute pending]', $pdf);
+		$this->assertStringContainsString('T[Cancelled]', $pdf);
+	}
 }

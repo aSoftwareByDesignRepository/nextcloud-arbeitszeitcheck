@@ -116,6 +116,38 @@ class UserEmploymentSettingsServiceTest extends TestCase
 		$this->service->setEmploymentEnd('alice', new \DateTimeImmutable('2026-01-01'), 'admin');
 	}
 
+	public function testSetEmploymentEndPersistsAndClears(): void
+	{
+		$this->store[Constants::SETTING_EMPLOYMENT_START] = '2026-05-01';
+
+		$this->settings->expects($this->once())
+			->method('setSetting')
+			->with('alice', Constants::SETTING_EMPLOYMENT_END, '2026-12-31')
+			->willReturnCallback(function () {
+				$this->store[Constants::SETTING_EMPLOYMENT_END] = '2026-12-31';
+				$row = new \OCA\ArbeitszeitCheck\Db\UserSetting();
+				$row->setUserId('alice');
+				$row->setSettingKey(Constants::SETTING_EMPLOYMENT_END);
+				$row->setSettingValue('2026-12-31');
+				return $row;
+			});
+		$this->settings->expects($this->once())
+			->method('deleteSetting')
+			->with('alice', Constants::SETTING_EMPLOYMENT_END)
+			->willReturnCallback(function () {
+				unset($this->store[Constants::SETTING_EMPLOYMENT_END]);
+			});
+		$this->audit->expects($this->exactly(2))->method('logAction')
+			->with('alice', 'user_employment_end_updated', 'user');
+
+		$this->service->setEmploymentEnd('alice', new \DateTimeImmutable('2026-12-31'), 'admin');
+		$this->assertSame('2026-12-31', $this->service->getEmploymentEnd('alice')?->format('Y-m-d'));
+
+		// null clears the stored end date
+		$this->service->setEmploymentEnd('alice', null, 'admin');
+		$this->assertNull($this->service->getEmploymentEnd('alice'));
+	}
+
 	public function testSetEmploymentPeriodRejectsInvertedRange(): void
 	{
 		$this->settings->expects($this->never())->method('setSetting');

@@ -51,7 +51,20 @@ final class AzcBtnCascadeContractTest extends TestCase {
 			$css,
 			'Secondary fill must use !important against link demotion'
 		);
-		self::assertStringContainsString('min-height: 2.75rem', $css);
+		// Base buttons must keep the 44px WCAG touch floor — expressed via the
+		// --azc-touch design token (falls back to 44px when tokens.css is not
+		// loaded, e.g. inside the dashboard desklet context).
+		self::assertMatchesRegularExpression(
+			'/\.azc-btn,[\s\S]*?\{[\s\S]*?min-height:\s*var\(--azc-touch,\s*44px\)/',
+			$css,
+			'Base .azc-btn must consume the 44px --azc-touch floor'
+		);
+		$tokens = (string)file_get_contents(dirname(__DIR__, 2) . '/css/common/tokens.css');
+		self::assertMatchesRegularExpression(
+			'/--azc-touch:\s*44px\s*;/',
+			$tokens,
+			'--azc-touch token must resolve to the 44px WCAG touch floor'
+		);
 	}
 
 	public function testNcPersonalSettingsPanelIsHardenedLikeAppShell(): void {
@@ -115,10 +128,15 @@ final class AzcBtnCascadeContractTest extends TestCase {
 	public function testSmallAliasMirrorsSmSizing(): void {
 		$css = (string)file_get_contents(dirname(__DIR__, 2) . '/css/app.css');
 		self::assertStringContainsString('.azc-btn--small', $css);
-		self::assertMatchesRegularExpression(
-			'/\.azc-btn--small[\s\S]*?min-height:\s*2\.25rem/',
-			$css
-		);
+		// --small is a deliberate alias of --sm (kiosk/license): both keep the
+		// 44px --azc-touch floor and identical compact chrome.
+		foreach (['--sm', '--small'] as $variant) {
+			self::assertMatchesRegularExpression(
+				'/\.azc-btn' . $variant . '\s*\{[\s\S]*?min-height:\s*var\(--azc-touch,\s*44px\)[\s\S]*?min-width:\s*var\(--azc-touch,\s*44px\)/',
+				$css,
+				'.azc-btn' . $variant . ' must keep the 44px touch floor like --sm'
+			);
+		}
 	}
 
 	public function testPrintStylesDoNotUnderlineButtonAnchors(): void {

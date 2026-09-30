@@ -99,4 +99,114 @@ final class UninstallDropTablesBehaviorTest extends TestCase
 		$method->setAccessible(true);
 		$method->invoke($step, $this->output);
 	}
+
+	public function testDropRemovesUpgradeBackupSnapshotsFromAppData(): void
+	{
+		$this->connection->method('getDatabaseProvider')->willReturn(IDBConnection::PLATFORM_SQLITE);
+		$this->connection->method('tableExists')->willReturn(false);
+
+		$qb = $this->createMock(\OCP\DB\QueryBuilder\IQueryBuilder::class);
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$qb->method('delete')->willReturnSelf();
+		$qb->method('where')->willReturnSelf();
+		$qb->method('expr')->willReturn($expr);
+		$expr->method('eq')->willReturn('app = :app');
+		$qb->method('createNamedParameter')->willReturn(UninstallDropTables::APP_ID);
+		$qb->method('executeStatement')->willReturn(0);
+		$this->connection->method('getQueryBuilder')->willReturn($qb);
+
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static fn (string $key, mixed $default = ''): mixed => $key === 'instanceid' ? 'inst42' : $default,
+		);
+
+		$folder = $this->createMock(\OCP\Files\Folder::class);
+		$folder->expects(self::once())->method('delete');
+		$this->rootFolder->expects(self::once())->method('get')
+			->with('appdata_inst42/' . UninstallDropTables::APP_ID . '/upgrade-backups')
+			->willReturn($folder);
+		$this->output->expects(self::atLeastOnce())->method('info');
+
+		$step = new UninstallDropTables($this->connection, $this->config, $this->rootFolder);
+		$method = (new ReflectionClass(UninstallDropTables::class))->getMethod('dropAllTablesAndMetadata');
+		$method->setAccessible(true);
+		$method->invoke($step, $this->output);
+	}
+
+	public function testDropSkipsSnapshotPurgeWhenFolderMissing(): void
+	{
+		$this->connection->method('getDatabaseProvider')->willReturn(IDBConnection::PLATFORM_SQLITE);
+		$this->connection->method('tableExists')->willReturn(false);
+
+		$qb = $this->createMock(\OCP\DB\QueryBuilder\IQueryBuilder::class);
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$qb->method('delete')->willReturnSelf();
+		$qb->method('where')->willReturnSelf();
+		$qb->method('expr')->willReturn($expr);
+		$expr->method('eq')->willReturn('app = :app');
+		$qb->method('createNamedParameter')->willReturn(UninstallDropTables::APP_ID);
+		$qb->method('executeStatement')->willReturn(0);
+		$this->connection->method('getQueryBuilder')->willReturn($qb);
+
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static fn (string $key, mixed $default = ''): mixed => $key === 'instanceid' ? 'inst42' : $default,
+		);
+		$this->rootFolder->method('get')
+			->willThrowException(new \OCP\Files\NotFoundException('gone'));
+		$this->output->expects(self::atLeastOnce())->method('info'); // drop ran to completion anyway
+
+		$step = new UninstallDropTables($this->connection, $this->config, $this->rootFolder);
+		$method = (new ReflectionClass(UninstallDropTables::class))->getMethod('dropAllTablesAndMetadata');
+		$method->setAccessible(true);
+		$method->invoke($step, $this->output);
+	}
+
+	/**
+	 * dropLogicalTableIfExists has a provider-specific DROP arm per DB
+	 * (MySQL backticks / Postgres CASCADE / Oracle CASCADE CONSTRAINTS /
+	 * SQLite quoted IF EXISTS) plus the MySQL FK-check toggle around it.
+	 * @dataProvider dropProviders
+	 */
+	public function testDropAllTablesExecutesProviderSql(string $provider): void
+	{
+		$connection = $this->createMock(IDBConnection::class);
+		$config = $this->createMock(IConfig::class);
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$output = $this->createMock(IOutput::class);
+
+		$connection->method('getDatabaseProvider')->willReturn($provider);
+		$connection->method('tableExists')->willReturn(true);
+
+		$qb = $this->createMock(\OCP\DB\QueryBuilder\IQueryBuilder::class);
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$qb->method('delete')->willReturnSelf();
+		$qb->method('where')->willReturnSelf();
+		$qb->method('expr')->willReturn($expr);
+		$expr->method('eq')->willReturn('app = :app');
+		$qb->method('createNamedParameter')->willReturn(UninstallDropTables::APP_ID);
+		$qb->method('executeStatement')->willReturn(0);
+		$connection->method('getQueryBuilder')->willReturn($qb);
+
+		$config->method('getSystemValue')->willReturnCallback(
+			static fn (string $key, mixed $default = ''): mixed => $default,
+		);
+		$config->method('getAppValue')->willReturn('0');
+		$rootFolder->method('get')->willThrowException(new \OCP\Files\NotFoundException('gone'));
+
+		// every provider arm emits at least one DROP per table row
+		$connection->expects(self::atLeastOnce())->method('executeStatement');
+
+		$step = new UninstallDropTables($connection, $config, $rootFolder);
+		$method = (new ReflectionClass(UninstallDropTables::class))->getMethod('dropAllTablesAndMetadata');
+		$method->setAccessible(true);
+		$method->invoke($step, $output);
+	}
+
+	/** @return iterable<string, array{string}> */
+	public static function dropProviders(): iterable
+	{
+		yield 'mysql' => [IDBConnection::PLATFORM_MYSQL];
+		yield 'pgsql' => [IDBConnection::PLATFORM_POSTGRES];
+		yield 'oracle' => [IDBConnection::PLATFORM_ORACLE];
+		yield 'sqlite' => [IDBConnection::PLATFORM_SQLITE];
+	}
 }

@@ -42,6 +42,25 @@ class TimeClientBootstrapListenerTest extends TestCase {
 		return new TimeClientBootstrap($timeZoneService, $dateTimeZone, $initialState);
 	}
 
+	public function testUserDisplayTimeZoneReturnsUserZone(): void {
+		$tcb = $this->createBootstrap($this->createMock(IInitialState::class));
+		$this->assertSame('Europe/Berlin', $tcb->userDisplayTimeZone()->getName());
+	}
+
+	public function testUserDisplayTimeZoneFallsBackToStorageZoneOnError(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(fn ($app, $key, $default) => $default);
+		$dateTimeZone = $this->createMock(IDateTimeZone::class);
+		$dateTimeZone->method('getTimeZone')->willThrowException(new \RuntimeException('tz gone'));
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn(null);
+		$timeZoneService = new TimeZoneService($config, $dateTimeZone, $userSession, new NullLogger());
+		$tcb = new TimeClientBootstrap($timeZoneService, $dateTimeZone, $this->createMock(IInitialState::class));
+
+		// storage fallback must not propagate the user-tz failure
+		$this->assertInstanceOf(\DateTimeZone::class, $tcb->userDisplayTimeZone());
+	}
+
 	public function testRegistersConfigOnArbeitszeitCheckPage(): void {
 		$initialState = $this->createMock(IInitialState::class);
 		$initialState->expects($this->once())->method('provideInitialState')->with('time', $this->isType('array'));

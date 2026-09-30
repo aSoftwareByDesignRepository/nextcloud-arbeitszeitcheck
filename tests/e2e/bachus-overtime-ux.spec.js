@@ -32,7 +32,8 @@ test.describe('Bachus: overtime discoverability (employee)', () => {
 
 		const balance = page.locator('#dashboard-overtime-balance-value');
 		await expect(balance).toBeVisible();
-		await expect(balance).toContainText(/h/i);
+		// hours unit — 'h' (en) or 'Std.'/'Stunden' (de)
+		await expect(balance).toContainText(/h|std/i);
 	});
 
 	test('J-E3: axe clean on overtime card region', async ({ page }) => {

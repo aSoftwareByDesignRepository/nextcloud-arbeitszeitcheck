@@ -381,4 +381,39 @@ class SubstituteControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
+
+	public function testGetPendingEnrichesSummaryWithDisplayNameAndTypeLabel(): void
+	{
+		$this->mockAuthenticatedUser('substitute1');
+
+		$absence = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$absence->setUserId('employee1');
+		$absence->setType('sick_leave');
+		$this->absenceMapper->method('findSubstitutePendingForUser')->willReturn([$absence]);
+
+		$colleague = $this->createMock(IUser::class);
+		$colleague->method('getDisplayName')->willReturn('Ada Employee');
+		$this->userManager->method('get')->with('employee1')->willReturn($colleague);
+
+		$d = $this->controller->getPending()->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame('Ada Employee', $d['requests'][0]['displayName']);
+		$this->assertSame('Sick Leave', $d['requests'][0]['typeLabel']);
+	}
+
+	public function testGetPendingFallsBackToUserIdAndRawType(): void
+	{
+		$this->mockAuthenticatedUser('substitute1');
+
+		$absence = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$absence->setUserId('ghost');
+		$absence->setType('exotic_type');
+		$this->absenceMapper->method('findSubstitutePendingForUser')->willReturn([$absence]);
+		$this->userManager->method('get')->willReturn(null);
+
+		$d = $this->controller->getPending()->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame('ghost', $d['requests'][0]['displayName']);
+		$this->assertSame('exotic_type', $d['requests'][0]['typeLabel']);
+	}
 }

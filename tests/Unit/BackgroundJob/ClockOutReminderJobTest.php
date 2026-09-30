@@ -126,4 +126,63 @@ class ClockOutReminderJobTest extends TestCase
 			date_default_timezone_set($previousTz);
 		}
 	}
+
+	public function testRunSendsReminderForStaleActiveEntry(): void
+	{
+		[$tz] = $this->pickTimezone(true);
+		$previousTz = date_default_timezone_get();
+		date_default_timezone_set($tz);
+		try {
+			$user = $this->createMock(\OCP\IUser::class);
+			$user->method('getUID')->willReturn('u1');
+			$user->method('isEnabled')->willReturn(true);
+
+			$userManager = $this->createMock(IUserManager::class);
+			$userManager->method('callForAllUsers')
+				->willReturnCallback(static function (callable $cb) use ($user): void {
+					$cb($user);
+				});
+
+			$permission = $this->createMock(PermissionService::class);
+			$permission->method('isUserAllowedByAccessGroups')->willReturn(true);
+
+			$settings = $this->createMock(UserSettingsMapper::class);
+			$settings->method('getBooleanSetting')->willReturn(true);
+
+			$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+			$entry->setId(5);
+			$entry->setUserId('u1');
+			$entry->setStartTime(new \DateTime('-9 hours'));
+
+			$entries = $this->createMock(TimeEntryMapper::class);
+			$entries->method('findActiveByUser')->willReturn($entry);
+
+			$config = $this->createMock(IConfig::class);
+			$config->method('getUserValue')->willReturn('0');
+			$config->expects($this->once())->method('setUserValue')
+				->with('u1', 'arbeitszeitcheck', 'last_clock_out_reminder_5', self::anything());
+
+			$notifications = $this->createMock(NotificationService::class);
+			$notifications->expects($this->once())->method('notifyClockOutReminder')
+				->with('u1', self::callback(static fn (array $p): bool => $p['id'] === 5));
+
+			$job = new ClockOutReminderJob(
+				$this->createMock(ITimeFactory::class),
+				$entries,
+				$settings,
+				$notifications,
+				$userManager,
+				$config,
+				new NullLogger(),
+				$permission,
+				$this->timeZoneService(),
+			);
+
+			$method = (new ReflectionClass($job))->getMethod('run');
+			$method->setAccessible(true);
+			$method->invoke($job, null);
+		} finally {
+			date_default_timezone_set($previousTz);
+		}
+	}
 }

@@ -70,7 +70,7 @@ class EmployeeStatusWidget implements IAPIWidgetV2, IButtonWidget, IIconWidget, 
 	public function load(): void {
 		// Desklet needs time formatting only — not the full utils bundle (avoids
 		// duplicate script execution when NC injects widget assets repeatedly).
-		$this->timeClientBootstrap->register(false);
+		$this->registerTimeClientForWidget($this->timeClientBootstrap, false);
 		$this->registerDeskletStylesForWidget();
 		DashboardWidgetAssetBootstrap::registerDeskletAssets();
 
@@ -240,15 +240,6 @@ class EmployeeStatusWidget implements IAPIWidgetV2, IButtonWidget, IIconWidget, 
 		return $this->urlGenerator->getAbsoluteURL(
 			$this->urlGenerator->linkToRoute('arbeitszeitcheck.page.dashboard') . '#dashboard-status-heading'
 		);
-	}
-
-	private function nextActionLabel(string $status): string {
-		return match ($status) {
-			'active' => $this->l10n->t('Pause'),
-			'break' => $this->l10n->t('Continue'),
-			'paused' => $this->l10n->t('Continue'),
-			default => $this->l10n->t('Clock In'),
-		};
 	}
 
 	private function primaryActionLabel(string $status, bool $clockStampingEnabled): string {

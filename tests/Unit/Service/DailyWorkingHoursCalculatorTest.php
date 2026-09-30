@@ -320,4 +320,33 @@ class DailyWorkingHoursCalculatorTest extends TestCase
 
 		$this->assertSame([30], $portions, '10-minute morning break is below the DE floor; afternoon 30 minutes counts.');
 	}
+
+	public function testGetLiveSessionSecondsOnCalendarDay(): void
+	{
+		// active session started 2h ago -> ~7200s
+		$now = new \DateTime('2026-03-11 10:00:00', new \DateTimeZone('UTC'));
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setStartTime((clone $now)->modify('-2 hours'));
+		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE);
+		$this->assertSame(7200, $this->calculator->getLiveSessionSecondsOnCalendarDay($entry, $now));
+
+		// completed entry with future end is clipped to the reference instant
+		$done = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$done->setStartTime((clone $now)->modify('-1 hour'));
+		$done->setEndTime((clone $now)->modify('+2 hours'));
+		$done->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$this->assertSame(3600, $this->calculator->getLiveSessionSecondsOnCalendarDay($done, $now));
+
+		// entry on another day -> 0
+		$other = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$other->setStartTime(new \DateTime('2026-03-10 08:00:00', new \DateTimeZone('UTC')));
+		$other->setEndTime(new \DateTime('2026-03-10 09:00:00', new \DateTimeZone('UTC')));
+		$other->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$this->assertSame(0, $this->calculator->getLiveSessionSecondsOnCalendarDay($other, $now));
+
+		// entry without start -> 0
+		$broken = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$broken->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$this->assertSame(0, $this->calculator->getLiveSessionSecondsOnCalendarDay($broken, $now));
+	}
 }

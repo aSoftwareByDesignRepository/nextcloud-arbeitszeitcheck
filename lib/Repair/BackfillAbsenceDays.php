@@ -65,6 +65,8 @@ class BackfillAbsenceDays implements IRepairStep
 				$this->absenceMapper->update($absence);
 				$updated++;
 			} catch (\Throwable $e) {
+				// best-effort: a repair must continue past a bad row; each failure
+				// is logged with the absence id for manual follow-up or re-run.
 				\OCP\Log\logger('arbeitszeitcheck')->error(
 					'BackfillAbsenceDays: failed for absence ' . $absence->getId(),
 					['exception' => $e]

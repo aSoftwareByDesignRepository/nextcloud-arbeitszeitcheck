@@ -302,4 +302,40 @@ final class AdminPolicyPagesCatalogContractTest extends TestCase
 		self::assertStringNotContainsString('admin-policy-hour-premiums.php', $src);
 		self::assertStringNotContainsString('admin-policy-vacation.php', $src);
 	}
+
+	public function testLegacyRedirectTargetResolvesAnchorOrNull(): void
+	{
+		$catalog = new AdminPolicyPagesCatalog();
+		$urls = $this->createMock(\OCP\IURLGenerator::class);
+		$urls->method('linkToRoute')->willReturnCallback(
+			static fn (string $route): string => '/apps/x/' . $route
+		);
+
+		// unknown anchor -> null (no redirect)
+		$this->assertNull($catalog->legacyRedirectTarget($urls, 'bogus-anchor'));
+
+		// anchor on a fragment-keeping section -> base + #anchor
+		$withFrag = $catalog->legacyRedirectTarget(
+			$urls,
+			array_key_first(array_filter(
+				AdminPolicyPagesCatalog::LEGACY_ANCHORS,
+				static fn (string $s): bool => $s === AdminPolicyPagesCatalog::SECTION_NOTIFICATIONS
+			))
+		);
+		$this->assertSame('/apps/x/arbeitszeitcheck.admin.notifications#' . 'block-clock-reminders-heading', $withFrag);
+
+		// anchor on a non-fragment section -> bare base
+		$bareAnchor = array_key_first(array_filter(
+			AdminPolicyPagesCatalog::LEGACY_ANCHORS,
+			static fn (string $s): bool => !in_array($s, [
+				AdminPolicyPagesCatalog::SECTION_NOTIFICATIONS,
+				AdminPolicyPagesCatalog::SECTION_OVERTIME,
+				AdminPolicyPagesCatalog::SECTION_VACATION,
+				AdminPolicyPagesCatalog::SECTION_VACATION_ENTITLEMENT,
+			], true)
+		));
+		if ($bareAnchor !== null) {
+			$this->assertStringNotContainsString('#', $catalog->legacyRedirectTarget($urls, $bareAnchor));
+		}
+	}
 }

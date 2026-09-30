@@ -286,6 +286,145 @@ class LicenseServiceTest extends TestCase
 		$this->assertTrue($service->applyLicenseKey($wireKey));
 	}
 
+	public function testGetLastApplyErrorMessageMapsCodes(): void
+	{
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$service = $this->makeService($mapper);
+
+		// clean state -> empty message
+		$this->assertSame('', $service->getLastApplyErrorMessage());
+
+		$service->applyLicenseKey('AZC2.notavalidpayload.notasig');
+		$this->assertNotSame('', $service->getLastApplyErrorMessage());
+
+		$parts = explode('.', (string)$this->fixture['wireKey']);
+		$parts[2] = str_repeat('A', strlen($parts[2] ?? ''));
+		$service->applyLicenseKey(implode('.', $parts));
+		$this->assertSame('Signatur ungültig.', $service->getLastApplyErrorMessage());
+	}
+
+	public function testGetInstanceIdForBindingReturnsConfiguredId(): void
+	{
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$service = new LicenseService(
+			$mapper,
+			$this->makeTimeFactory(),
+			$this->createMock(LoggerInterface::class),
+			$this->makeInstanceId('srv-42'),
+		);
+		$this->assertSame('srv-42', $service->getInstanceIdForBinding());
+	}
+
+	public function testGetTerminalDeviceLimitReflectsValidState(): void
+	{
+		// no stored license -> 0
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$mapper->method('findCurrent')->willReturn(null);
+		$this->assertSame(0, $this->makeService($mapper)->getTerminalDeviceLimit());
+
+		// signed state with terminal devices -> limit
+		$payload = $this->fixture['payload'];
+		$payload['terminalDevices'] = 3;
+		$wire = Azc2TestSigning::signPayload($payload);
+		[, $payloadB64, $sigB64] = explode('.', $wire);
+
+		$state = new LicenseState();
+		$state->setValidUntil(new \DateTime('2027-12-31'));
+		$state->setTerminalDevices(3);
+		$state->setPayloadB64($payloadB64);
+		$state->setSignatureB64($sigB64);
+		$mapper2 = $this->createMock(LicenseStateMapper::class);
+		$mapper2->method('findCurrent')->willReturn($state);
+		$this->assertSame(3, $this->makeService($mapper2)->getTerminalDeviceLimit());
+
+		// expired -> 0 even though seats exist
+		$state->setValidUntil(new \DateTime('2020-01-01'));
+		$this->assertSame(0, $this->makeService($mapper2)->getTerminalDeviceLimit());
+	}
+
+	public function testGetValidUntilAndCustomerId(): void
+	{
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$mapper->method('findCurrent')->willReturn(null);
+		$service = $this->makeService($mapper);
+		$this->assertNull($service->getValidUntil());
+		$this->assertNull($service->getCustomerId());
+		$this->assertFalse($service->hasStoredLicense());
+
+		$state = new LicenseState();
+		$state->setValidUntil(new \DateTime('2027-12-31'));
+		$state->setCustomerId('acme-corp');
+		$mapper2 = $this->createMock(LicenseStateMapper::class);
+		$mapper2->method('findCurrent')->willReturn($state);
+		$service2 = $this->makeService($mapper2);
+		$this->assertSame('2027-12-31', $service2->getValidUntil()?->format('Y-m-d'));
+		$this->assertSame('acme-corp', $service2->getCustomerId());
+		$this->assertTrue($service2->hasStoredLicense());
+	}
+
+	public function testIsStoredLicenseExpired(): void
+	{
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$mapper->method('findCurrent')->willReturn(null);
+		$this->assertFalse($this->makeService($mapper)->isStoredLicenseExpired());
+
+		$state = new LicenseState();
+		$state->setValidUntil(new \DateTime('2020-01-01')); // past relative to 2026-06-10
+		$mapper2 = $this->createMock(LicenseStateMapper::class);
+		$mapper2->method('findCurrent')->willReturn($state);
+		$this->assertTrue($this->makeService($mapper2)->isStoredLicenseExpired());
+	}
+
+	public function testGetLicenseSummaryShape(): void
+	{
+		$this->assertNull($this->makeService($this->createMock(LicenseStateMapper::class))->getLicenseSummary());
+
+		$state = new LicenseState();
+		$state->setCustomerId('acme');
+		$state->setValidUntil(new \DateTime('2027-12-31'));
+		$state->setMobileSeats(5);
+		$state->setTerminalDevices(2);
+		$state->setBundle(1);
+		$state->setKeyAppliedAt(new \DateTime('2026-06-01 10:00:00'));
+		$state->setPayloadB64((string)$this->fixture['payloadB64']);
+		$state->setSignatureB64((string)$this->fixture['signatureB64']);
+		$state->setBoundInstanceId('srv-1');
+
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$mapper->method('findCurrent')->willReturn($state);
+		$summary = $this->makeService($mapper)->getLicenseSummary();
+
+		$this->assertSame('acme', $summary['customerId']);
+		$this->assertSame('2027-12-31', $summary['validUntil']);
+		$this->assertSame(5, $summary['mobileSeats']);
+		$this->assertSame(2, $summary['terminalDevices']);
+		$this->assertTrue($summary['bundle']);
+		$this->assertTrue($summary['active']);
+		$this->assertTrue($summary['dateValid']);
+		$this->assertTrue($summary['cryptographicallyValid']);
+		$this->assertTrue($summary['instanceBound']);
+		$this->assertSame('srv-1', $summary['boundInstanceId']);
+	}
+
+	public function testGetLicenseSummaryFlagsInvalidSignature(): void
+	{
+		$state = new LicenseState();
+		$state->setCustomerId('acme');
+		$state->setValidUntil(new \DateTime('2027-12-31'));
+		$state->setPayloadB64((string)$this->fixture['payloadB64']);
+		$state->setSignatureB64('forged');
+		$state->setBoundInstanceId('');
+
+		$mapper = $this->createMock(LicenseStateMapper::class);
+		$mapper->method('findCurrent')->willReturn($state);
+		$summary = $this->makeService($mapper)->getLicenseSummary();
+
+		$this->assertTrue($summary['dateValid']);
+		$this->assertFalse($summary['cryptographicallyValid']);
+		$this->assertFalse($summary['active']);
+		$this->assertFalse($summary['instanceBound']);
+	}
+
 	private function makeService(LicenseStateMapper $mapper): LicenseService
 	{
 		return new LicenseService(

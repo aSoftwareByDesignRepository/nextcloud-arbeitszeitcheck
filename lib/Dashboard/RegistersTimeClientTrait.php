@@ -23,8 +23,8 @@ use OCP\Util;
  * not execute before window.OC on `/apps/dashboard`.
  */
 trait RegistersTimeClientTrait {
-	private function registerTimeClientForWidget(TimeClientBootstrap $timeClientBootstrap): void {
-		$timeClientBootstrap->register();
+	private function registerTimeClientForWidget(TimeClientBootstrap $timeClientBootstrap, bool $withUtils = true): void {
+		$timeClientBootstrap->register($withUtils);
 	}
 
 	private function registerDeskletStylesForWidget(): void {

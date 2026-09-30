@@ -67,6 +67,9 @@ class ComplianceServiceTest extends TestCase
 	/** @var PermissionService|\PHPUnit\Framework\MockObject\MockObject */
 	private $permissionService;
 
+	/** @var callable|null */
+	private $accessGroupsHook = null;
+
 	private TimeZoneService $timeZoneService;
 
 	private function buildTimeZoneService(IConfig $config): TimeZoneService
@@ -93,7 +96,10 @@ class ComplianceServiceTest extends TestCase
 		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 		$this->config = $this->createMock(IConfig::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
-		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
+		$this->accessGroupsHook = null;
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturnCallback(
+			fn (string $uid): bool => $this->accessGroupsHook === null ? true : ($this->accessGroupsHook)($uid)
+		);
 		$this->config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = ''): string {
 			return $default;
 		});
@@ -127,6 +133,91 @@ class ComplianceServiceTest extends TestCase
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
 		);
+	}
+
+	public function testRunDailyComplianceCheckIteratesAndRecordsViolations(): void
+	{
+		[$todayStart] = $this->timeZoneService->todayWindowInStorage();
+		$yStart = (clone $todayStart)->modify('-1 day')->setTime(8, 0);
+		$yEnd = (clone $todayStart)->modify('-1 day')->setTime(17, 0);
+
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('u1');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime($yStart);
+		$entry->setEndTime($yEnd); // 9h, no break -> ArbZG §4 violation
+
+		$u1 = $this->createMock(\OCP\IUser::class);
+		$u1->method('getUID')->willReturn('u1');
+		$u2 = $this->createMock(\OCP\IUser::class);
+		$u2->method('getUID')->willReturn('u2');
+
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($u1, $u2): void {
+				$cb($u1);
+				$cb($u2);
+			}
+		);
+		$this->accessGroupsHook = static fn (string $uid): bool => $uid === 'u1';
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturnCallback(static fn (string $uid) => $uid === 'u1' ? [$entry] : []);
+
+		$created = [];
+		$this->violationMapper->method('createViolation')
+			->willReturnCallback(static function () use (&$created) {
+				$created[] = func_get_args();
+				return new \OCA\ArbeitszeitCheck\Db\ComplianceViolation();
+			});
+
+		$stats = $this->service->runDailyComplianceCheck();
+
+		$this->assertSame(1, $stats['users_checked']); // u2 filtered by access groups
+		$this->assertNotEmpty($created); // missing-break violation recorded
+	}
+
+	public function testRunDailyComplianceCheckSkipsEntriesWithExistingViolation(): void
+	{
+		[$todayStart] = $this->timeZoneService->todayWindowInStorage();
+		$yStart = (clone $todayStart)->modify('-1 day')->setTime(8, 0);
+		$yEnd = (clone $todayStart)->modify('-1 day')->setTime(17, 0);
+
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('u1');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime($yStart);
+		$entry->setEndTime($yEnd);
+
+		$existing = new \OCA\ArbeitszeitCheck\Db\ComplianceViolation();
+		$existing->setTimeEntryId(7);
+
+		$u1 = $this->createMock(\OCP\IUser::class);
+		$u1->method('getUID')->willReturn('u1');
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($u1): void {
+				$cb($u1);
+			}
+		);
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
+		$this->violationMapper->method('findByDateRange')->willReturn([$existing]);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([$entry]);
+
+		// entry-level checks skipped (existing violation) — only weekly-path
+		// violations may be created; assert no entry-linked one is added
+		$linked = [];
+		$this->violationMapper->method('createViolation')
+			->willReturnCallback(static function () use (&$linked) {
+				$args = func_get_args();
+				if (($args[4] ?? null) !== null) {
+					$linked[] = $args;
+				}
+				return new \OCA\ArbeitszeitCheck\Db\ComplianceViolation();
+			});
+
+		$this->service->runDailyComplianceCheck();
+		$this->assertSame([], $linked);
 	}
 
 	/**
@@ -1831,5 +1922,62 @@ class ComplianceServiceTest extends TestCase
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkSixMonthAverageAndWeeklyHours');
 		$method->setAccessible(true);
 		$method->invoke($this->service, $entry);
+	}
+
+	public function testCheckComplianceForCompletedEntryReturnsViolations(): void
+	{
+		// non-completed entries short-circuit
+		$draft = new TimeEntry();
+		$draft->setStatus('active');
+		$this->assertSame([], $this->service->checkComplianceForCompletedEntry($draft));
+
+		// 9h shift with no break -> mandatory-break violation (ArbZG section 4)
+		$entry = new TimeEntry();
+		$entry->setUserId('user1');
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setBreaks(null);
+
+		$violations = $this->service->checkComplianceForCompletedEntry($entry, false, false);
+		$this->assertNotEmpty($violations);
+
+		// strict mode throws on the first critical violation
+		$this->expectException(\Exception::class);
+		$this->service->checkComplianceForCompletedEntry($entry, true, false);
+	}
+
+	public function testRunDailyComplianceCheckCountsUsersAndHonoursAccessGate(): void
+	{
+		$allowed = $this->createMock(\OCP\IUser::class);
+		$allowed->method('getUID')->willReturn('in-scope');
+		$denied = $this->createMock(\OCP\IUser::class);
+		$denied->method('getUID')->willReturn('out-of-scope');
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($allowed, $denied): void {
+				$cb($allowed);
+				$cb($denied);
+			}
+		);
+		$perm = $this->createMock(PermissionService::class);
+		$perm->method('isUserAllowedByAccessGroups')
+			->willReturnCallback(static fn (string $uid) => $uid === 'in-scope');
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$dailyHoursCalculator = new \OCA\ArbeitszeitCheck\Service\DailyWorkingHoursCalculator(
+			$this->timeEntryMapper, $this->timeZoneService,
+		);
+		$service = new ComplianceService(
+			$this->timeEntryMapper, $this->violationMapper, $this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper, $this->userManager, $this->l10n,
+			$this->notificationService, $this->holidayCalendarService, $this->config,
+			$perm, $this->timeZoneService, $dailyHoursCalculator,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+		);
+		$stats = $service->runDailyComplianceCheck();
+		$this->assertSame(1, $stats['users_checked']);
+		$this->assertSame(0, $stats['violations_found']);
+		$this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $stats['check_date']);
 	}
 }

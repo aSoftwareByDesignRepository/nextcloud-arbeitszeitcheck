@@ -430,4 +430,44 @@ class SettingsControllerTest extends TestCase
 		$this->assertTrue($response->getData()['success']);
 		$this->assertArrayHasKey('settings', $response->getData());
 	}
+
+	public function testIndexApiReturnsEmptySettingsWhenTableMissing(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->userSettingsMapper->method('getUserSettings')
+			->willThrowException(new \RuntimeException("Table 'oc_arbeitszeitcheck_user_settings' doesn't exist"));
+
+		$d = $this->controller->index_api()->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame([], $d['settings']);
+	}
+
+	public function testIndexApiSurvivesNonDbException(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->userSettingsMapper->method('getUserSettings')
+			->willThrowException(new \RuntimeException('connection reset by peer'));
+
+		$d = $this->controller->index_api()->getData();
+		$this->assertTrue($d['success']);
+		$this->assertSame([], $d['settings']);
+	}
+
+	public function testIndexApiSerializesSettingRows(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$setting = new UserSetting();
+		$setting->setSettingKey('theme');
+		$setting->setSettingValue('dark');
+		$this->userSettingsMapper->method('getUserSettings')->willReturn([$setting]);
+
+		$d = $this->controller->index_api()->getData();
+		$this->assertSame(['theme' => 'dark'], $d['settings']);
+	}
 }

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+- **Entitlement snapshots never persisted:** `EntitlementSnapshotService::store()` passed `DateTimeImmutable` to a `datetime`-typed entity setter (Nextcloud expects mutable `DateTime`), so every call fataled and the audit trail silently stayed empty.
+- **Vacation-unit migration silently zeroed malformed amounts:** a stored value like `abc,5` cast through `(float)` became `0.0`, passed the `is_finite` guard, and overwrote the real entitlement with zero. Non-numeric input is now rejected before the cast.
+- **Schema repair blind to stamp-idempotency tables:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` were missing from the schema-health catalog, so `EnsureArbeitszeitCheckSchema` could not detect or recreate them. Catalog synchronized; drop → detect → migrate → recreate is covered by an integration test.
+- **Time-entries error fallback could 500 without a session:** the safe fallback path called `getUserId()` unconditionally; it now renders unauthenticated. Strict-mode compliance checks after entry writes now run inside the same transaction, so a violation genuinely prevents the save instead of persisting the row and returning 500.
+- **Enabled app broke the Nextcloud Dashboard:** The dashboard desklet rendered its workspace partial through `\OCP\Template` with a truthy renderAs, which wraps the partial in a `TemplateLayout` mid-request (inside the Dashboard controller). That layout consumes the request's script registry: apps registered so far are marked visited and their resolved files are appended to the shared resource list, so the final page emitted app `l10n`/`dashboard` scripts **before** `core-main.js` — `window.OC`/`window.OCA` missing → dead Dashboard and no "Customize" button. The renderer now uses `TemplateResponse::RENDER_AS_BLANK`, returning only the partial markup without touching the page asset pipeline. Guarded by source/integration tests, a strengthened `dashboard-oc-safety` E2E spec (script-order invariant + functional Customize check), and a dedicated mutation harness.
+
 ## 1.7.11 - 2026-09-22
 
 ### Added

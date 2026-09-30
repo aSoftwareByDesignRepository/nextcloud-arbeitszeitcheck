@@ -191,6 +191,89 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$service->autoApprove($entry);
 	}
 
+	public function testAutoApproveAppliesProposalAndSetsSystemApproval(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode([
+			'justification' => 'Forgot to clock out.',
+			'proposed' => [
+				'startTime' => '2026-01-15T09:00:00+00:00',
+				'endTime' => '2026-01-15T12:00:00+00:00',
+			],
+		]));
+
+		$this->complianceService->method('checkRestPeriodForStartTime')->willReturn(['valid' => true]);
+
+		$result = $this->service->autoApprove($entry);
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		$this->assertSame('2026-01-15T12:00:00+0000', $result->getEndTime()->format('Y-m-d\TH:i:sO'));
+		$json = json_decode($result->getJustification(), true);
+		$this->assertSame('system', $json['approved_by']);
+		$this->assertArrayHasKey('approval_comment', $json);
+	}
+
+	public function testAutoApproveSurvivesComplianceAdjustmentFailure(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode([
+			'justification' => 'x',
+			'proposed' => [
+				'startTime' => '2026-01-15T09:00:00+00:00',
+				'endTime' => '2026-01-15T12:00:00+00:00',
+			],
+		]));
+
+		$this->complianceService->method('checkRestPeriodForStartTime')->willReturn(['valid' => true]);
+		// applyComplianceAdjustments catch arm: helper succeeds during
+		// validateProposal but throws during the post-proposal apply -> warning
+		// logged, approve still proceeds.
+		$breakCalls = 0;
+		$this->timeTrackingService->method('calculateAndSetAutomaticBreak')
+			->willReturnCallback(static function () use (&$breakCalls): bool {
+				$breakCalls++;
+				if ($breakCalls > 1) {
+					throw new \RuntimeException('break calc exploded');
+				}
+				return true;
+			});
+
+		$result = $this->service->autoApprove($entry);
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+	}
+
+	public function testApplyComplianceAdjustmentsSkipsTimelessEntry(): void
+	{
+		// Null-times guard is unreachable via approve()/autoApprove() (the
+		// proposal validator rejects start-less candidates) — pinned directly
+		// so the defensive arm stays provable.
+		$entry = $this->buildEntry();
+		$entry->setStartTime(null);
+		$entry->setEndTime(null);
+
+		$this->timeTrackingService->expects($this->never())
+			->method('calculateAndSetAutomaticBreak');
+		$this->timeTrackingService->expects($this->never())
+			->method('adjustEndTimeForDailyMaximum');
+
+		$m = new \ReflectionMethod(TimeEntryCorrectionService::class, 'applyComplianceAdjustments');
+		$m->invoke($this->service, $entry);
+		$this->addToAssertionCount(1);
+	}
+
+	public function testAutoApproveWithInvalidJsonJustificationStillCompletes(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification('not-json{');
+
+		$result = $this->service->autoApprove($entry);
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		// invalid JSON -> no annotation written (justification kept verbatim)
+		$this->assertSame('not-json{', $result->getJustification());
+	}
+
 	public function testRejectRestoresOriginalIncludingBreaksJson(): void
 	{
 		$entry = $this->buildEntry();
@@ -646,5 +729,134 @@ class TimeEntryCorrectionServiceTest extends TestCase
 
 		$this->expectException(\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class);
 		$service->reject($entry, 'manager2', 'too late');
+	}
+
+	private function serviceWithProjectCheck(
+		\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService $integration,
+		\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService $sync,
+		?IConfig $config = null,
+		?ComplianceService $compliance = null,
+	): TimeEntryCorrectionService {
+		return new TimeEntryCorrectionService(
+			$this->timeEntryMapper,
+			$this->monthClosureGuard,
+			$compliance ?? $this->complianceService,
+			$this->timeTrackingService,
+			$this->notificationService,
+			$this->auditLogMapper,
+			$config ?? $this->config,
+			$this->l10n,
+			$integration,
+			$sync,
+		);
+	}
+
+	public function testPrepareManualPendingSetsStatusAndJustification(): void
+	{
+		$entry = $this->buildEntry();
+		$this->service->prepareManualPending($entry, 'forgot to clock in');
+
+		$this->assertSame(TimeEntry::STATUS_PENDING_APPROVAL, $entry->getStatus());
+		$just = json_decode($entry->getJustification(), true);
+		$this->assertSame('manual_create', $just['type']);
+		$this->assertSame('forgot to clock in', $just['justification']);
+		$this->assertSame('original work', $just['proposed']['description']);
+		$this->assertNotEmpty($just['proposed']['startTime']);
+	}
+
+	public function testSyncProjectCheckBillingUnavailableReturnsNull(): void
+	{
+		$integration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$integration->method('isProjectCheckAvailable')->willReturn(false);
+		$sync = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class);
+		$sync->expects($this->never())->method('syncFromTimeEntry');
+
+		$service = $this->serviceWithProjectCheck($integration, $sync);
+		$this->assertNull($service->syncProjectCheckBilling($this->buildEntry(), 'alice'));
+	}
+
+	public function testSyncProjectCheckBillingFailureReturnsWarning(): void
+	{
+		$integration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$integration->method('isProjectCheckAvailable')->willReturn(true);
+		$sync = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class);
+		$sync->method('syncFromTimeEntry')->willReturn(['success' => false]);
+
+		$service = $this->serviceWithProjectCheck($integration, $sync);
+		$this->assertStringContainsString('ProjectCheck', $service->syncProjectCheckBilling($this->buildEntry(), 'alice'));
+	}
+
+	public function testSyncProjectCheckBillingSuccessReturnsNull(): void
+	{
+		$integration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$integration->method('isProjectCheckAvailable')->willReturn(true);
+		$sync = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class);
+		$sync->method('syncFromTimeEntry')->willReturn(['success' => true]);
+
+		$service = $this->serviceWithProjectCheck($integration, $sync);
+		$this->assertNull($service->syncProjectCheckBilling($this->buildEntry(), 'alice'));
+	}
+
+	public function testApplyProposalHandlesDateHoursBreakAndProjectFields(): void
+	{
+		$entry = $this->buildEntry();
+		$this->service->applyProposal($entry, [
+			'date' => '2026-02-10 08:00:00',
+			'hours' => 4.5,
+			'breakStartTime' => '2026-02-10 12:00:00',
+			'breakEndTime' => '2026-02-10 12:30:00',
+			'description' => 'updated desc',
+			'projectCheckProjectId' => 'proj-9',
+		]);
+		$this->assertSame('2026-02-10 08:00:00', $entry->getStartTime()->format('Y-m-d H:i:s'));
+		// 4.5h after start
+		$this->assertSame('2026-02-10 12:30:00', $entry->getEndTime()->format('Y-m-d H:i:s'));
+		$this->assertSame('2026-02-10 12:00:00', $entry->getBreakStartTime()->format('Y-m-d H:i:s'));
+		$this->assertSame('2026-02-10 12:30:00', $entry->getBreakEndTime()->format('Y-m-d H:i:s'));
+		$this->assertSame('updated desc', $entry->getDescription());
+		$this->assertSame('proj-9', $entry->getProjectCheckProjectId());
+		// truthy breakStartTime clears the breaks collection
+		$this->assertNull($entry->getBreaks());
+
+		// clearing arm: empty project id removes both ids; hours without date recomputes end
+		$this->service->applyProposal($entry, [
+			'projectCheckProjectId' => '',
+			'breakStartTime' => null,
+			'hours' => 2.0,
+		]);
+		$this->assertNull($entry->getProjectCheckProjectId());
+		$this->assertNull($entry->getProjectCheckTimeEntryId());
+		$this->assertNull($entry->getBreakStartTime());
+		$this->assertSame('2026-02-10 10:00:00', $entry->getEndTime()->format('Y-m-d H:i:s'));
+	}
+
+	public function testApproveRunsRealtimeComplianceWhenEnabled(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default = '') => match ($key) {
+				'app_timezone' => 'UTC',
+				'realtime_compliance_check' => '1',
+				'compliance_strict_mode' => '1',
+				default => $default,
+			}
+		);
+		$compliance = $this->createMock(ComplianceService::class);
+		$compliance->method('checkRestPeriodForStartTime')->willReturn(['valid' => true]);
+		$compliance->method('blockingIssuesForCompletedEntry')->willReturn([]);
+		$compliance->expects($this->once())->method('checkComplianceForCompletedEntry')
+			->with($this->anything(), true);
+
+		$service = $this->serviceWithProjectCheck(
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+			$config,
+			$compliance,
+		);
+
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode(['proposed' => ['description' => 'x']]));
+		$service->approve($entry, 'boss', 'ok');
 	}
 }

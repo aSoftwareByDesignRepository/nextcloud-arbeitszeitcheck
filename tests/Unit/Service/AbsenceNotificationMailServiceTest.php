@@ -190,4 +190,112 @@ class AbsenceNotificationMailServiceTest extends TestCase
 
 		$service->sendHrOfficeNotification($absence, 'request_created');
 	}
+
+	private function substituteFixture(array $configFlags = [], array $users = []): array
+	{
+		$mailer = $this->createMock(IMailer::class);
+		$mailer->method('validateMailAddress')->willReturnCallback(
+			static fn (string $e) => filter_var($e, FILTER_VALIDATE_EMAIL) !== false
+		);
+		$message = $this->createMock(IMessage::class);
+		$mailer->method('createMessage')->willReturn($message);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default = '') => $configFlags[$key] ?? $default
+		);
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(
+			static fn (string $t, array $p = []) => $p === [] ? $t : vsprintf($t, $p)
+		);
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willReturnCallback(
+			static fn (string $uid) => $users[$uid] ?? null
+		);
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRouteAbsolute')->willReturn('https://x.test/l');
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = new AbsenceNotificationMailService(
+			$mailer, $config, $l10n, $userManager, $urlGenerator, $teamResolver
+		);
+		return [$service, $mailer, $teamResolver];
+	}
+
+	private function mkUser(string $email = 'u@x.de', bool $enabled = true): \OCP\IUser
+	{
+		$u = $this->createMock(IUser::class);
+		$u->method('getEMailAddress')->willReturn($email);
+		$u->method('isEnabled')->willReturn($enabled);
+		$u->method('getDisplayName')->willReturn('Some User');
+		return $u;
+	}
+
+	private function mkAbsenceWithSubstitute(): Absence
+	{
+		$absence = new Absence();
+		$absence->setUserId('employee1');
+		$absence->setSubstituteUserId('sub1');
+		$absence->setType('vacation');
+		$absence->setStartDate(new \DateTime('2026-05-01'));
+		$absence->setEndDate(new \DateTime('2026-05-03'));
+		$absence->setDays(3.0);
+		return $absence;
+	}
+
+	public function testSendSubstitutionRequestToSubstituteSendsMail(): void
+	{
+		[$service, $mailer] = $this->substituteFixture(
+			['send_email_substitution_request' => '1'],
+			['sub1' => $this->mkUser('sub@x.de'), 'employee1' => $this->mkUser('e@x.de')]
+		);
+		$mailer->expects($this->once())->method('send');
+		$service->sendSubstitutionRequestToSubstitute($this->mkAbsenceWithSubstitute());
+	}
+
+	public function testSendSubstitutionRequestSkipsWhenDisabledOrNoValidMail(): void
+	{
+		// disabled flag -> no send
+		[$svcOff, $mailerOff] = $this->substituteFixture(
+			['send_email_substitution_request' => '0'],
+			['sub1' => $this->mkUser()]
+		);
+		$mailerOff->expects($this->never())->method('send');
+		$svcOff->sendSubstitutionRequestToSubstitute($this->mkAbsenceWithSubstitute());
+
+		// substitute has no usable email -> no send
+		[$svcNoMail, $mailerNoMail] = $this->substituteFixture(
+			['send_email_substitution_request' => '1'],
+			['sub1' => $this->mkUser(''), 'employee1' => $this->mkUser()]
+		);
+		$mailerNoMail->expects($this->never())->method('send');
+		$svcNoMail->sendSubstitutionRequestToSubstitute($this->mkAbsenceWithSubstitute());
+	}
+
+	public function testSendSubstituteApprovedToEmployeeSendsMail(): void
+	{
+		[$service, $mailer] = $this->substituteFixture(
+			['send_email_substitute_approved_to_employee' => '1'],
+			['employee1' => $this->mkUser('e@x.de'), 'sub1' => $this->mkUser('s@x.de')]
+		);
+		$mailer->expects($this->once())->method('send');
+		$service->sendSubstituteApprovedToEmployee($this->mkAbsenceWithSubstitute());
+	}
+
+	public function testSendSubstituteApprovedToManagersSkipsInactiveAndDuplicates(): void
+	{
+		[$service, $mailer, $teamResolver] = $this->substituteFixture(
+			['send_email_substitute_approved_to_manager' => '1'],
+			[
+				'employee1' => $this->mkUser('e@x.de'),
+				'sub1' => $this->mkUser('s@x.de'),
+				'mgr1' => $this->mkUser('m1@x.de'),
+				'mgr-gone' => null, // filtered via get() returning null
+				'mgr-disabled' => $this->mkUser('d@x.de', false),
+			]
+		);
+		$teamResolver->method('getManagerIdsForEmployee')
+			->willReturn(['mgr1', 'mgr1', 'mgr-disabled', 'mgr-gone']);
+		// only mgr1 is enabled + valid -> exactly one mail
+		$mailer->expects($this->once())->method('send');
+		$service->sendSubstituteApprovedToManagers($this->mkAbsenceWithSubstitute());
+	}
 }

@@ -179,6 +179,39 @@ class DashboardWidgetDataServiceTest extends TestCase {
 		$this->assertSame(0.0, $data['absenceCreditHoursYtd']);
 	}
 
+	public function testEmployeeWidgetDataPremiumSummaryEnabledArm(): void {
+		// buildPremiumSummaryForWidget resolves the real PremiumSurchargeService
+		// from the server container -> the enabled arm needs a real config flip.
+		$realConfig = \OC::$server->get(\OCP\IConfig::class);
+		$realConfig->setAppValue('arbeitszeitcheck', \OCA\ArbeitszeitCheck\Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '1');
+		try {
+			$timeTrackingService = $this->createMock(TimeTrackingService::class);
+			$timeTrackingService->method('lawProfile')->willReturn(
+				\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE')
+			);
+			$timeTrackingService->method('getStatus')->willReturn([
+				'status' => 'active',
+				'working_today_hours' => 1.0,
+				'current_session_duration' => 60,
+				'current_entry' => null,
+			]);
+			$timeTrackingService->method('getBreakStatus')->willReturn([]);
+			$timeTrackingService->method('isAutoBreakCalculationEnabled')->willReturn(true);
+
+			$service = $this->createService(
+				$timeTrackingService,
+				$this->createMock(PermissionService::class),
+				$this->createMock(IUserManager::class),
+			);
+
+			$data = $service->getEmployeeWidgetData('u1');
+			$this->assertIsArray($data['premiumSummary']);
+			$this->assertTrue($data['premiumSummary']['enabled']);
+		} finally {
+			$realConfig->deleteAppValue('arbeitszeitcheck', \OCA\ArbeitszeitCheck\Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED);
+		}
+	}
+
 	public function testEmployeeWidgetDataIncludesAssignableProjectCheckProjects(): void {
 		$timeTrackingService = $this->createMock(TimeTrackingService::class);
 		$timeTrackingService->method('lawProfile')->willReturn(

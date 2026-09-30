@@ -2115,4 +2115,139 @@ class ManagerControllerTest extends TestCase
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
+
+	public function testGetManagedTeamsReturnsDtosAndSkipsBrokenTeams(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('mgr');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->isAdminAccess = false;
+		$this->canAccessManagerDashboard = true;
+		$this->teamResolver->method('useAppTeams')->willReturn(true);
+		$this->teamManagerMapper->method('getTeamIdsForManager')->with('mgr')->willReturn([10, 11]);
+
+		$team = new \OCA\ArbeitszeitCheck\Db\Team();
+		$team->setId(10);
+		$team->setName('Engineering');
+		$this->teamMapper->method('find')->willReturnCallback(static function (int $id) use ($team) {
+			if ($id === 10) {
+				return $team;
+			}
+			throw new \OCP\AppFramework\Db\DoesNotExistException('gone');
+		});
+
+		$d = $this->controller->getManagedTeams()->getData();
+		$this->assertTrue($d['success']);
+		$this->assertCount(1, $d['teams']);
+		$this->assertSame(10, $d['teams'][0]['id']);
+		$this->assertSame('Engineering', $d['teams'][0]['name']);
+	}
+
+	public function testMonthClosuresPageRedirectsWhenFeatureDisabled(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+		$response = $this->controller->monthClosuresPage();
+		$this->assertInstanceOf(\OCP\AppFramework\Http\RedirectResponse::class, $response);
+	}
+
+	public function testMonthClosuresPageRendersForManager(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('mgr');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->config->method('getAppValue')->willReturnCallback(static function ($app, $key, $default = '') {
+			return $key === \OCA\ArbeitszeitCheck\Constants::CONFIG_MONTH_CLOSURE_ENABLED ? '1' : $default;
+		});
+		$this->isAdminAccess = false;
+		$this->canAccessManagerDashboard = true;
+
+		$response = $this->controller->monthClosuresPage();
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$params = $response->getParams();
+		$this->assertTrue($params['monthClosureEnabled']);
+		$this->assertFalse($params['isAdmin']);
+	}
+
+	public function testMonthClosuresPageRedirectsForPlainEmployee(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('emp');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->config->method('getAppValue')->willReturnCallback(static function ($app, $key, $default = '') {
+			return $key === \OCA\ArbeitszeitCheck\Constants::CONFIG_MONTH_CLOSURE_ENABLED ? '1' : $default;
+		});
+		$this->isAdminAccess = false;
+		$this->canAccessManagerDashboard = false;
+
+		$response = $this->controller->monthClosuresPage();
+		$this->assertInstanceOf(\OCP\AppFramework\Http\RedirectResponse::class, $response);
+	}
+
+	public function testCreateEmployeeTimeEntryNormalizesProjectCheckId(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('mgr');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+		$this->permissionService->method('canManageEmployee')->with('mgr', 'emp1')->willReturn(true);
+		$target = $this->createMock(IUser::class);
+		$target->method('isEnabled')->willReturn(true);
+		$this->userManager->method('get')->with('emp1')->willReturn($target);
+
+		$this->request->method('getParams')->willReturn([
+			'userId' => 'emp1',
+			'reason' => 'Retroactive entry after shift.',
+			'startTime' => '2026-03-10T08:00:00',
+			'endTime' => '2026-03-10T12:00:00',
+			'projectCheckProjectId' => '42',
+		]);
+
+		$this->correctionService->expects($this->once())
+			->method('createManagerRecordedEntry')
+			->with(
+				$this->isInstanceOf(TimeEntry::class),
+				$this->callback(static function (array $proposal) {
+					return ($proposal['projectCheckProjectId'] ?? null) === '42';
+				}),
+				'mgr',
+				'Retroactive entry after shift.'
+			)
+			->willReturn(new TimeEntry());
+
+		$d = $this->controller->createEmployeeTimeEntry()->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testCreateEmployeeTimeEntryDropsInvalidProjectCheckId(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('mgr');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$target = $this->createMock(IUser::class);
+		$target->method('isEnabled')->willReturn(true);
+		$this->userManager->method('get')->willReturn($target);
+
+		$this->request->method('getParams')->willReturn([
+			'userId' => 'emp1',
+			'reason' => 'Retroactive entry after shift.',
+			'startTime' => '2026-03-10T08:00:00',
+			'endTime' => '2026-03-10T12:00:00',
+			'projectCheckProjectId' => 'abc',
+		]);
+
+		$this->correctionService->expects($this->once())
+			->method('createManagerRecordedEntry')
+			->with(
+				$this->isInstanceOf(TimeEntry::class),
+				$this->callback(static function (array $proposal) {
+					return !array_key_exists('projectCheckProjectId', $proposal);
+				})
+			)
+			->willReturn(new TimeEntry());
+
+		$d = $this->controller->createEmployeeTimeEntry()->getData();
+		$this->assertTrue($d['success']);
+	}
 }

@@ -73,6 +73,12 @@ class TimeZoneServiceTest extends TestCase
 		// a winter instant so the assertion stays stable regardless of DST.
 		$utc = new \DateTimeImmutable('2026-01-15T09:00:00+00:00');
 		$this->assertSame('2026-01-15 10:00:00', $service->formatForNaiveSql($utc));
+		// mutable DateTime arm: same instant, same naive output
+		$mut = new \DateTime('2026-01-15 09:00:00', new \DateTimeZone('UTC'));
+		$this->assertSame('2026-01-15 10:00:00', $service->formatForNaiveSql($mut));
+		// naive input is interpreted as the instant it names
+		$naive = \DateTime::createFromFormat('Y-m-d H:i:s', '2026-01-15 10:00:00', new \DateTimeZone('UTC'));
+		$this->assertSame('2026-01-15 11:00:00', $service->formatForNaiveSql($naive));
 	}
 
 	public function testHydrateNaiveReinterpretsPhpDefaultZoneAsStorageZone(): void
@@ -130,6 +136,9 @@ class TimeZoneServiceTest extends TestCase
 		// before midnight).
 		$instant2 = new \DateTimeImmutable('2026-01-15T22:30:00+00:00');
 		$this->assertSame('2026-01-15', $service->dayKeyInStorage($instant2));
+		// mutable DateTime arm
+		$mut = new \DateTime('2026-01-16 00:30:00', new \DateTimeZone('UTC'));
+		$this->assertSame('2026-01-16', $service->dayKeyInStorage($mut));
 	}
 
 	public function testParseStrictDateRejectsOverflow(): void
@@ -181,4 +190,31 @@ class TimeZoneServiceTest extends TestCase
 		$this->expectException(\InvalidArgumentException::class);
 		$this->buildService()->fromIso('   ');
 	}
+
+	public function testCurrentInstantMatchesNowTimestamp(): void
+	{
+		$service = $this->buildService('Europe/Berlin');
+		$before = time();
+		$instant = $service->currentInstant();
+		$this->assertGreaterThanOrEqual($before, $instant);
+		$this->assertLessThanOrEqual(time() + 1, $instant);
+	}
+
+	public function testHydrateNaiveAnyRebindsMutableAndImmutable(): void
+	{
+		$service = $this->buildService('Europe/Berlin');
+		// mutable input -> mutable output, wall clock re-anchored to storage TZ
+		$mutable = new \DateTime('2026-03-15 10:30:00', new \DateTimeZone('UTC'));
+		$rebound = $service->hydrateNaiveAny($mutable);
+		$this->assertInstanceOf(\DateTime::class, $rebound);
+		$this->assertSame('2026-03-15 10:30:00', $rebound->format('Y-m-d H:i:s'));
+		$this->assertSame('Europe/Berlin', $rebound->getTimezone()->getName());
+
+		// immutable input -> immutable output
+		$immutable = new \DateTimeImmutable('2026-03-15 10:30:00', new \DateTimeZone('UTC'));
+		$reboundImmutable = $service->hydrateNaiveAny($immutable);
+		$this->assertInstanceOf(\DateTimeImmutable::class, $reboundImmutable);
+		$this->assertSame('Europe/Berlin', $reboundImmutable->getTimezone()->getName());
+	}
+
 }

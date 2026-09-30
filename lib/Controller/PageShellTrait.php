@@ -141,31 +141,6 @@ trait PageShellTrait
 		FrontEndAssetService::registerPage($pageScript, $pageStyle, $extraStyles, $extraScripts);
 	}
 
-	/**
-	 * Merge shell params with page-specific data for TemplateResponse.
-	 *
-	 * @param array<string, mixed> $navFlags
-	 * @param array<string, mixed> $pageData
-	 * @return array<string, mixed>
-	 */
-	protected function mergeShellPageParams(
-		string $pageId,
-		string $pageTitle,
-		string $pageHelp,
-		array $navFlags,
-		array $pageData = [],
-		?string $breadcrumbSection = null,
-		string $shellWidth = 'standard',
-	): array {
-		return $this->buildShellParams(
-			$pageId,
-			$pageTitle,
-			$pageHelp,
-			$navFlags,
-			$breadcrumbSection,
-			$shellWidth,
-		) + $pageData;
-	}
 
 	/**
 	 * @return array<string, string>

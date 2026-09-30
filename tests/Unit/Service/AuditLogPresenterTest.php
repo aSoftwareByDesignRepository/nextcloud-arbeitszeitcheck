@@ -65,4 +65,23 @@ class AuditLogPresenterTest extends TestCase
 		$this->assertContains('compliance_violation_resolved', $actions);
 		$this->assertContains('time_entry_correction_requested', $actions);
 	}
+
+	public function testFormatActorWithIdAppendsUidWhenNameDiffers(): void
+	{
+		$this->l10n->method('t')->willReturnArgument(0);
+		$user = $this->createMock(\OCP\IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$user->method('getDisplayName')->willReturn('Alice A.');
+		$this->assertSame('Alice A. (alice)', $this->presenter->formatActorWithId('alice', $user));
+
+		// display name == uid -> plain formatActor (no redundant suffix)
+		$user2 = $this->createMock(\OCP\IUser::class);
+		$user2->method('getUID')->willReturn('bob');
+		$user2->method('getDisplayName')->willReturn('bob');
+		$this->assertSame('bob', $this->presenter->formatActorWithId('bob', $user2));
+
+		// empty id / no user -> "Unknown"
+		$this->assertSame('Unknown', $this->presenter->formatActorWithId(''));
+		$this->assertSame('Unknown', $this->presenter->formatActorWithId(null, null));
+	}
 }

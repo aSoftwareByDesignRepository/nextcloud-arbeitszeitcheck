@@ -109,4 +109,122 @@ final class ProjectCheckLaborTimeSyncServiceTest extends TestCase
 		$result = $service->syncFromTimeEntry($entry, 'cron');
 		$this->assertTrue($result['success']);
 	}
+
+	private function completedBillingEntry(int $id = 9, ?int $pcId = null, string $pid = '6'): TimeEntry
+	{
+		// real entity: getId/getWorkingDurationHours are derived from real state
+		$e = new TimeEntry();
+		$e->setId($id);
+		$e->setUserId('alice');
+		$e->setStatus(TimeEntry::STATUS_COMPLETED);
+		$e->setStartTime(new \DateTime('2026-03-05 09:00'));
+		$e->setEndTime(new \DateTime('2026-03-05 17:00'));   // 8h span
+		$e->setBreaks(json_encode([[
+			'start' => '2026-03-05T12:00:00+00:00',
+			'end' => '2026-03-05T12:30:00+00:00',
+			'duration_minutes' => 30,
+		]]));                                                  // -> 7.5h working
+		$e->setProjectCheckProjectId($pid);
+		$e->setProjectCheckTimeEntryId($pcId);
+		$e->setDescription('work');
+		return $e;
+	}
+
+	public function testSyncUpsertsAndStoresReturnedPcId(): void
+	{
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('isInstalled')->willReturn(true);
+
+		$svc = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['upsertFromArbeitszeitCheckBilling', 'deleteFromArbeitszeitCheckBilling'])
+			->getMock();
+		$svc->expects($this->once())->method('upsertFromArbeitszeitCheckBilling')
+			->with('cron', 'alice', null, 6, $this->isInstanceOf(\DateTimeImmutable::class), 7.5, 'work')
+			->willReturn(88);
+
+		$entry = $this->completedBillingEntry();
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->expects($this->once())->method('update')->with($entry);
+
+		$service = new ProjectCheckLaborTimeSyncService(
+			$appManager, $mapper, $this->timeZoneService(),
+			$this->createMock(IConfig::class), $this->createMock(LoggerInterface::class), $svc,
+		);
+
+		$r = $service->syncFromTimeEntry($entry, 'cron');
+		$this->assertTrue($r['success']);
+		$this->assertSame(88, $r['projectCheckTimeEntryId']);
+		$this->assertSame(88, $entry->getProjectCheckTimeEntryId());
+	}
+
+	public function testSyncDeletesLinkedRowWhenEntryNoLongerBillable(): void
+	{
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('isInstalled')->willReturn(true);
+
+		$svc = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['upsertFromArbeitszeitCheckBilling', 'deleteFromArbeitszeitCheckBilling'])
+			->getMock();
+		$svc->expects($this->once())->method('deleteFromArbeitszeitCheckBilling')
+			->with('admin', 'alice', 55);
+
+		// entry without project link but with existing pc id -> unlink path
+		$entry = $this->completedBillingEntry(9, 55, '');
+
+		// deleteLinkedRow re-fetches and updates the entry
+		$fresh = $this->completedBillingEntry(9, 55, '');
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('find')->with(9)->willReturn($fresh);
+		$mapper->expects($this->once())->method('update')->with($fresh);
+
+		$service = new ProjectCheckLaborTimeSyncService(
+			$appManager, $mapper, $this->timeZoneService(),
+			$this->createMock(IConfig::class), $this->createMock(LoggerInterface::class), $svc,
+		);
+
+		$r = $service->syncFromTimeEntry($entry, 'admin');
+		$this->assertTrue($r['success']);
+		$this->assertNull($r['projectCheckTimeEntryId']);
+		$this->assertNull($fresh->getProjectCheckTimeEntryId());
+	}
+
+	public function testOnTimeEntryDeletedForwardsLinkedPcId(): void
+	{
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('isInstalled')->willReturn(true);
+
+		$svc = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['deleteFromArbeitszeitCheckBilling'])
+			->getMock();
+		$svc->expects($this->once())->method('deleteFromArbeitszeitCheckBilling')
+			->with('admin', 'alice', 77);
+
+		$service = new ProjectCheckLaborTimeSyncService(
+			$appManager, $this->createMock(TimeEntryMapper::class), $this->timeZoneService(),
+			$this->createMock(IConfig::class), $this->createMock(LoggerInterface::class), $svc,
+		);
+
+		$service->onTimeEntryDeleted(
+			['projectCheckTimeEntryId' => 77, 'userId' => 'alice'],
+			'admin'
+		);
+	}
+
+	public function testOnTimeEntryDeletedSkipsWhenNoLink(): void
+	{
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('isInstalled')->willReturn(true);
+		$svc = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['deleteFromArbeitszeitCheckBilling'])
+			->getMock();
+		$svc->expects($this->never())->method('deleteFromArbeitszeitCheckBilling');
+
+		$service = new ProjectCheckLaborTimeSyncService(
+			$appManager, $this->createMock(TimeEntryMapper::class), $this->timeZoneService(),
+			$this->createMock(IConfig::class), $this->createMock(LoggerInterface::class), $svc,
+		);
+		// no pc id / missing user -> early return
+		$service->onTimeEntryDeleted(['userId' => 'alice'], 'admin');
+		$service->onTimeEntryDeleted(['projectCheckTimeEntryId' => 5], 'admin');
+	}
 }

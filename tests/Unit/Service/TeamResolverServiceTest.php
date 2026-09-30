@@ -236,5 +236,20 @@ class TeamResolverServiceTest extends TestCase
 
 		$this->assertFalse($this->service->hasAssignableManagerForEmployee('solo'));
 	}
-}
 
+	public function testCanUserManageEmployee(): void
+	{
+		// self-management is never allowed
+		$this->assertFalse($this->service->canUserManageEmployee('manager1', 'manager1'));
+
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->teamManagerMapper->method('getTeamIdsForManager')->with('manager1')->willReturn([10]);
+		$this->teamMapper->method('getIdsWithDescendants')->willReturnCallback(
+			static fn (int $tid): array => [$tid]
+		);
+		$this->teamMemberMapper->method('getMemberUserIdsByTeamIds')->willReturn(['employee1']);
+
+		$this->assertTrue($this->service->canUserManageEmployee('manager1', 'employee1'));
+		$this->assertFalse($this->service->canUserManageEmployee('manager1', 'outsider'));
+	}
+}

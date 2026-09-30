@@ -101,4 +101,40 @@ class VacationYearWindowResolverTest extends TestCase
 		$this->assertSame('2026-07-01', $windows[0]->startInclusive->format('Y-m-d'));
 		$this->assertSame('2027-07-01', $windows[1]->startInclusive->format('Y-m-d'));
 	}
+
+	public function testResolveAnniversaryBalanceYear(): void
+	{
+		$resolver = $this->resolver('anniversary');
+		$hire = new \DateTimeImmutable('2024-03-15');
+		// balance year 2025 = second anniversary year (n=1)
+		$w = $resolver->resolveAnniversaryBalanceYear($hire, 2025);
+		$this->assertNotNull($w);
+		$this->assertSame('2025-03-15', $w->startInclusive->format('Y-m-d'));
+		$this->assertSame('2026-03-15', $w->endExclusive->format('Y-m-d'));
+		$this->assertFalse($w->missingEmploymentStart);
+
+		// out-of-range balance years -> null
+		$this->assertNull($resolver->resolveAnniversaryBalanceYear($hire, 2023));
+		$this->assertNull($resolver->resolveAnniversaryBalanceYear($hire, 2145));
+	}
+
+	public function testResolveAnniversaryForUserBalanceYearSentinels(): void
+	{
+		// missing employment start -> calendar-shaped sentinel flagged as missing
+		$resolverNoHire = $this->resolver('anniversary', null);
+		$w = $resolverNoHire->resolveAnniversaryForUserBalanceYear('alice', 2026);
+		$this->assertTrue($w->missingEmploymentStart);
+		$this->assertSame('2026-01-01', $w->startInclusive->format('Y-m-d'));
+
+		// known hire -> real anniversary window
+		$resolver = $this->resolver('anniversary', new \DateTimeImmutable('2024-03-15'));
+		$w2 = $resolver->resolveAnniversaryForUserBalanceYear('alice', 2025);
+		$this->assertFalse($w2->missingEmploymentStart);
+		$this->assertSame('2025-03-15', $w2->startInclusive->format('Y-m-d'));
+
+		// out-of-range balance year -> mid-year probe fallback window
+		$w3 = $resolver->resolveAnniversaryForUserBalanceYear('alice', 2300);
+		$this->assertFalse($w3->missingEmploymentStart);
+		$this->assertNotNull($w3);
+	}
 }

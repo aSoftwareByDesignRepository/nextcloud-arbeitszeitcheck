@@ -39,6 +39,15 @@ class DashboardDeskletWorkspaceRendererIntegrationTest extends TestCase
 		$this->assertStringContainsString('id="dz-daily-max-notice"', $html);
 		$this->assertStringNotContainsString('btn-primary', $html);
 		$this->assertStringNotContainsString('dz-clock-in-project', $html);
+
+		// Rendering through a page layout would wrap the partial in a document
+		// shell and, worse, resolve the request's script registry mid-request —
+		// which leaks app scripts ahead of core/js/main on host pages (Dashboard).
+		$this->assertStringNotContainsString('<!DOCTYPE', $html);
+		$this->assertStringNotContainsString('<html', $html);
+		$this->assertDoesNotMatchRegularExpression('/<head[\s>]/', $html);
+		$this->assertDoesNotMatchRegularExpression('/<body[\s>]/', $html);
+		$this->assertStringNotContainsString('<script src=', $html);
 	}
 
 	public function testRenderIncludesProjectPickerWhenProjectsPresent(): void

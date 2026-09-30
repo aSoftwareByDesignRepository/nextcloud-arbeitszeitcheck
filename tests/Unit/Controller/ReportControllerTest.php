@@ -58,6 +58,15 @@ class ReportControllerTest extends TestCase
 	/** @var TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
 	private $teamResolver;
 
+	/** @var array<string, mixed> */
+	private array $paramOverrides = [];
+
+	/** @var callable */
+	private $canViewUserReportHook;
+
+	/** @var callable */
+	private $isAdminHook;
+
 	/** @var TeamMemberMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $teamMemberMapper;
 
@@ -83,19 +92,27 @@ class ReportControllerTest extends TestCase
 	{
 		parent::setUp();
 
+		$this->canViewUserReportHook = static fn ($cur, $uid) => true;
+		$this->isAdminHook = static fn ($uid) => false;
+
 		$this->reportingService = $this->createMock(ReportingService::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(fn ($s) => $s);
 		$this->request = $this->createMock(IRequest::class);
-		$this->request->method('getParam')->willReturnCallback(static function (string $name, $default = null) {
+		$this->request->method('getParam')->willReturnCallback(function (string $name, $default = null) {
+			if (array_key_exists($name, $this->paramOverrides)) {
+				return $this->paramOverrides[$name];
+			}
 			return $default ?? '';
 		});
 
 		// Default to allowing self-report access unless a test overrides it.
-		$this->permissionService->method('canViewUserReport')->willReturn(true);
-		$this->permissionService->method('isAdmin')->willReturn(false);
+		$this->permissionService->method('canViewUserReport')
+			->willReturnCallback(fn ($cur, $uid) => ($this->canViewUserReportHook)($cur, $uid));
+		$this->permissionService->method('isAdmin')
+			->willReturnCallback(fn ($uid) => ($this->isAdminHook)($uid));
 		$this->permissionService->method('logPermissionDenied');
 
 		$this->teamResolver = $this->createMock(TeamResolverService::class);
@@ -206,7 +223,7 @@ class ReportControllerTest extends TestCase
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canViewUserReport')->with($userId, $targetUserId)->willReturn(true);
+		$this->canViewUserReportHook = static fn ($cur, $uid) => $cur === $userId && $uid === $targetUserId;
 
 		$reportData = [
 			'date' => '2024-01-15',
@@ -702,7 +719,7 @@ class ReportControllerTest extends TestCase
 		$user->method('getUID')->willReturn($userId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('isAdmin')->with($userId)->willReturn(false);
+
 		$this->permissionService->method('canAccessManagerDashboard')->with($userId)->willReturn(true);
 		$this->teamManagerMapper->expects($this->once())
 			->method('getTeamIdsForManager')
@@ -733,7 +750,7 @@ class ReportControllerTest extends TestCase
 		$memberB->setUserId('userB');
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('isAdmin')->with($userId)->willReturn(false);
+
 		$this->permissionService->method('canAccessManagerDashboard')->with($userId)->willReturn(true);
 		$this->teamManagerMapper->expects($this->once())
 			->method('getTeamIdsForManager')
@@ -779,7 +796,7 @@ class ReportControllerTest extends TestCase
 			->method('getTeamMemberIds')
 			->with($userId)
 			->willReturn(['userA']);
-		$this->permissionService->method('canViewUserReport')->with($userId, 'userA')->willReturn(true);
+		$this->canViewUserReportHook = static fn ($cur, $uid) => $uid === 'userA' || $cur === $uid;
 
 		$request = $this->createMock(IRequest::class);
 		$request->method('getParam')->willReturnCallback(static function (string $name, $default = null) {
@@ -881,7 +898,7 @@ class ReportControllerTest extends TestCase
 		$this->userSession->method('getUser')->willReturn($user);
 		$this->permissionService->method('canAccessManagerDashboard')->with($userId)->willReturn(true);
 		$this->teamResolver->method('getTeamMemberIds')->with($userId)->willReturn(['userA']);
-		$this->permissionService->method('canViewUserReport')->willReturn(true);
+
 
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
@@ -1129,5 +1146,115 @@ class ReportControllerTest extends TestCase
 		$body = (string)$response->render();
 		$this->assertStringContainsString("'=CMD", $body);
 		$this->assertDoesNotMatchRegularExpression('/(^|[\n;])=CMD/', $body);
+	}
+
+	private function primePremiumEnabled(): void
+	{
+		$this->premiumSurchargeService->method('isEnabled')->willReturn(true);
+		$this->premiumSurchargeService->method('buildPeriodReport')->willReturn([
+			'type' => 'premium',
+			'enabled' => true,
+			'users' => [],
+		]);
+	}
+
+	public function testPremiumReportTeamIdResolvesManagedTeamMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->primePremiumEnabled();
+		$this->paramOverrides = ['teamId' => '11'];
+		$this->permissionService->method('canAccessManagerDashboard')->willReturn(true);
+		$this->teamManagerMapper->method('getTeamIdsForManager')->with('manager1')->willReturn([10, 11]);
+		$memberA = new TeamMember();
+		$memberA->setUserId('userA');
+		$memberB = new TeamMember();
+		$memberB->setUserId('userB');
+		$this->teamMemberMapper->method('findByTeamId')->with(11)->willReturn([$memberA, $memberB]);
+
+		$this->premiumSurchargeService->expects($this->once())
+			->method('buildPeriodReport')
+			->with(['userA', 'userB'])
+			->willReturn(['type' => 'premium', 'users' => []]);
+
+		$d = $this->controller->premium('2026-08-01', '2026-08-31')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testPremiumReportTeamIdRejectsUnmanagedTeam(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->primePremiumEnabled();
+		$this->paramOverrides = ['teamId' => '99'];
+		$this->permissionService->method('canAccessManagerDashboard')->willReturn(true);
+		$this->teamManagerMapper->method('getTeamIdsForManager')->willReturn([10]);
+
+		$r = $this->controller->premium('2026-08-01', '2026-08-31');
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testPremiumReportInvalidTeamIdRejected(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->primePremiumEnabled();
+		$this->paramOverrides = ['teamId' => 'abc'];
+
+		$r = $this->controller->premium('2026-08-01', '2026-08-31');
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testPremiumReportManagerScopeCollectsPermittedMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->primePremiumEnabled();
+		$this->paramOverrides = ['managerScope' => '1'];
+		$this->permissionService->method('canAccessManagerDashboard')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['a', 'b']);
+		// 'b' is not visible -> filtered out
+		$this->canViewUserReportHook = static fn ($cur, $uid) => $uid === 'a';
+
+		$this->premiumSurchargeService->expects($this->once())
+			->method('buildPeriodReport')
+			->with(['a'])
+			->willReturn(['type' => 'premium', 'users' => []]);
+
+		$d = $this->controller->premium('2026-08-01', '2026-08-31')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testPremiumReportEmptyUserIdRequiresAdminAndCollectsAllUsers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->primePremiumEnabled();
+		$this->isAdminHook = static fn ($uid) => $uid === 'admin1';
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
+
+		$enabled = $this->createMock(IUser::class);
+		$enabled->method('isEnabled')->willReturn(true);
+		$enabled->method('getUID')->willReturn('u-active');
+		$disabled = $this->createMock(IUser::class);
+		$disabled->method('isEnabled')->willReturn(false);
+		$this->userManager->method('callForAllUsers')
+			->willReturnCallback(static function ($cb) use ($enabled, $disabled) {
+				$cb($enabled);
+				$cb($disabled);
+			});
+
+		$this->premiumSurchargeService->expects($this->once())
+			->method('buildPeriodReport')
+			->with(['u-active'])
+			->willReturn(['type' => 'premium', 'users' => []]);
+
+		$d = $this->controller->premium('2026-08-01', '2026-08-31', '')->getData();
+		$this->assertTrue($d['success']);
 	}
 }

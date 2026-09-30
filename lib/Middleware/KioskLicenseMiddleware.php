@@ -145,6 +145,7 @@ class KioskLicenseMiddleware extends Middleware
 					'success' => false,
 					'error' => $code,
 					'message' => $this->kioskErrorMessages->message($code),
+					'code' => $code,
 				], KioskHttp::statusForCode($code));
 			}
 
@@ -156,6 +157,7 @@ class KioskLicenseMiddleware extends Middleware
 				'success' => false,
 				'error' => $code,
 				'message' => $this->kioskErrorMessages->message($code),
+				'code' => $code,
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 

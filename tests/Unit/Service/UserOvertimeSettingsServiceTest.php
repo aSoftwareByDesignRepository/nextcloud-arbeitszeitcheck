@@ -79,4 +79,49 @@ class UserOvertimeSettingsServiceTest extends TestCase
 
 		$service->setOpeningBalance('alice', 2026, 12.5, 'admin');
 	}
+
+	public function testResolveEffectiveYearStartClampsToTrackingFrom(): void
+	{
+		$userSettings = $this->createMock(UserSettingsMapper::class);
+		$userSettings->method('getStringSetting')->willReturnCallback(
+			static fn ($u, $k, $d = '') => '2025-06-15'
+		);
+		$service = new UserOvertimeSettingsService(
+			$userSettings,
+			$this->createMock(UserOvertimeYearBalanceMapper::class),
+			$this->createMock(AuditLogMapper::class),
+		);
+		// tracking start mid-year -> effective start is the tracking date
+		$this->assertSame('2025-06-15', $service->resolveEffectiveYearStart('alice', 2025)->format('Y-m-d'));
+		// later year -> plain Jan 1
+		$this->assertSame('2026-01-01', $service->resolveEffectiveYearStart('alice', 2026)->format('Y-m-d'));
+
+		// no tracking date -> year start
+		$userSettings2 = $this->createMock(UserSettingsMapper::class);
+		$userSettings2->method('getStringSetting')->willReturn('');
+		$service2 = new UserOvertimeSettingsService(
+			$userSettings2,
+			$this->createMock(UserOvertimeYearBalanceMapper::class),
+			$this->createMock(AuditLogMapper::class),
+		);
+		$this->assertSame('2025-01-01', $service2->resolveEffectiveYearStart('alice', 2025)->format('Y-m-d'));
+		$this->assertFalse($service2->hasTrackingFrom('alice'));
+		$this->assertTrue($service->hasTrackingFrom('alice'));
+	}
+
+	public function testCountAndListUsersWithTrackingFromDelegate(): void
+	{
+		$userSettings = $this->createMock(UserSettingsMapper::class);
+		$userSettings->method('countDistinctUsersWithNonEmptySetting')
+			->with(Constants::SETTING_OVERTIME_TRACKING_FROM)->willReturn(7);
+		$userSettings->method('findUserIdsWithNonEmptySetting')
+			->with(Constants::SETTING_OVERTIME_TRACKING_FROM)->willReturn(['alice', 'bob']);
+		$service = new UserOvertimeSettingsService(
+			$userSettings,
+			$this->createMock(UserOvertimeYearBalanceMapper::class),
+			$this->createMock(AuditLogMapper::class),
+		);
+		$this->assertSame(7, $service->countUsersWithTrackingFrom());
+		$this->assertSame(['alice', 'bob'], $service->listUserIdsWithTrackingFrom());
+	}
 }

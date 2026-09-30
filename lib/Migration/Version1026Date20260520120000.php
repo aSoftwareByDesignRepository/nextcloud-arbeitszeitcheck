@@ -148,6 +148,8 @@ class Version1026Date20260520120000 extends SimpleMigrationStep
 			));
 			$output->info('ArbeitszeitCheck (PostgreSQL): renamed sequence ' . $oldSeq . ' to ' . $newSeq . '.');
 		} catch (\Throwable $e) {
+			// best-effort: installs predating the sequence skip this rename; the
+			// warning is surfaced in occ output instead of aborting the upgrade.
 			$output->warning('ArbeitszeitCheck (PostgreSQL): could not rename sequence: ' . $e->getMessage());
 		}
 	}

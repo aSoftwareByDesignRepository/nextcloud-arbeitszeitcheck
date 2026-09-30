@@ -134,4 +134,24 @@ class MobileStampReplayServiceTest extends TestCase
 			(new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-5 minutes')->format(\DateTimeInterface::ATOM),
 		);
 	}
+
+	public function testSafeSummaryFallsBackWhenGetSummaryThrows(): void
+	{
+		// id/status are magic entity accessors — use a real entry, override getSummary
+		$entry = new class extends TimeEntry {
+			public function getSummary(): array
+			{
+				throw new \RuntimeException('corrupt');
+			}
+		};
+		$entry->setId(42);
+		$entry->setStatus('active');
+		$this->timeTracking->method('clockIn')->willReturn($entry);
+
+		$payload = $this->service->clockIn('ada', null, null, null, null);
+		$this->assertTrue($payload['success']);
+		$this->assertSame(42, $payload['timeEntry']['id']);
+		$this->assertSame('ada', $payload['timeEntry']['userId']);
+		$this->assertSame('active', $payload['timeEntry']['status']);
+	}
 }

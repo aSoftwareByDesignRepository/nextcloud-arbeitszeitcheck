@@ -121,4 +121,29 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('SECTION_DATA_PRIVACY', $tpl);
 		$this->assertStringContainsString('DEFAULT_SECTION', $tpl);
 	}
+
+	public function testDefaultSectionIsBreaks(): void
+	{
+		$catalog = new EmployeeSettingsSectionCatalog();
+		$this->assertSame(EmployeeSettingsSectionCatalog::DEFAULT_SECTION, $catalog->defaultSection());
+		$this->assertTrue($catalog->isSection($catalog->defaultSection()));
+	}
+
+	public function testLegacyRedirectTargetMapsAnchorsAndRejectsUnknown(): void
+	{
+		$urlGenerator = $this->createMock(\OCP\IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')->willReturnCallback(
+			static fn (string $route, array $params): string => '/settings/' . $params['section']
+		);
+		$catalog = new EmployeeSettingsSectionCatalog();
+		$this->assertSame(
+			'/settings/breaks#auto-break-calculation',
+			$catalog->legacyRedirectTarget($urlGenerator, 'auto-break-calculation')
+		);
+		$this->assertSame(
+			'/settings/about#settings-version-heading',
+			$catalog->legacyRedirectTarget($urlGenerator, 'settings-version-heading')
+		);
+		$this->assertNull($catalog->legacyRedirectTarget($urlGenerator, 'never-an-anchor'));
+	}
 }

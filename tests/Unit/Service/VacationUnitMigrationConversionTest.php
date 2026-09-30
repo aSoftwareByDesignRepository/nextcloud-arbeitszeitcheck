@@ -226,4 +226,124 @@ class VacationUnitMigrationConversionTest extends TestCase
 		$this->assertSame(0, $r['converted_absences']);
 		$this->assertSame('7.5', $stored[Constants::CONFIG_VACATION_HOURS_PER_DAY]);
 	}
+
+	private function qbHarness(array $rows, ?array &$updates = null): \OCP\IDBConnection
+	{
+		$result = $this->createMock(\OCP\DB\IResult::class);
+		$fetchQueue = array_merge($rows, [false]);
+		$result->method('fetch')->willReturnCallback(static function () use (&$fetchQueue) {
+			return array_shift($fetchQueue);
+		});
+		$result->method('closeCursor');
+
+		$expr = $this->createMock(\OCP\DB\QueryBuilder\IExpressionBuilder::class);
+		$expr->method('eq')->willReturn('eq');
+		$expr->method('isNotNull')->willReturn('nn');
+
+		$updates = [];
+		$qb = $this->createMock(\OCP\DB\QueryBuilder\IQueryBuilder::class);
+		foreach (['select', 'from', 'where', 'update', 'set'] as $m) {
+			$qb->method($m)->willReturnSelf();
+		}
+		$qb->method('expr')->willReturn($expr);
+		$qb->method('createNamedParameter')->willReturnArgument(0);
+		$qb->method('executeQuery')->willReturn($result);
+		$qb->method('executeStatement')->willReturnCallback(static function () use (&$updates) {
+			$updates[] = true;
+			return 1;
+		});
+		$db = $this->createMock(IDBConnection::class);
+		$db->method('getQueryBuilder')->willReturn($qb);
+		return $db;
+	}
+
+	private function migrationServiceWith(IDBConnection $db, ?\OCP\IConfig $config = null, ?\OCP\Lock\ILockingProvider $locking = null): VacationUnitMigrationService
+	{
+		return new VacationUnitMigrationService(
+			$config ?? $this->createMock(\OCP\IConfig::class),
+			$db,
+			new VacationUnitService($config ?? $this->createMock(\OCP\IConfig::class)),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			null,
+			null,
+			$locking,
+		);
+	}
+
+	public function testAssertIdleThrowsWhenPendingFlagSet(): void
+	{
+		$config = $this->createMock(\OCP\IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default = '') =>
+				$key === Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING ? '{"target":"hours"}' : $default
+		);
+		$svc = $this->migrationServiceWith($this->createMock(IDBConnection::class), $config);
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage(Constants::VAC_UNIT_MIGRATE_IN_PROGRESS);
+		$svc->assertIdle();
+	}
+
+	public function testAssertIdleThrowsOnLockedMigration(): void
+	{
+		$config = $this->createMock(\OCP\IConfig::class);
+		$config->method('getAppValue')->willReturn('');
+		$locking = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$locking->method('acquireLock')->willThrowException(
+			new \OCP\Lock\LockedException('held')
+		);
+		$svc = $this->migrationServiceWith($this->createMock(IDBConnection::class), $config, $locking);
+		try {
+			$svc->assertIdle();
+			$this->fail('expected RuntimeException');
+		} catch (\RuntimeException $e) {
+			$this->assertSame(Constants::VAC_UNIT_MIGRATE_IN_PROGRESS, $e->getMessage());
+		}
+	}
+
+	public function testAssertIdlePassesWhenClean(): void
+	{
+		$config = $this->createMock(\OCP\IConfig::class);
+		$config->method('getAppValue')->willReturn('');
+		$locking = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$locking->expects($this->once())->method('acquireLock');
+		$locking->expects($this->once())->method('releaseLock');
+		$svc = $this->migrationServiceWith($this->createMock(IDBConnection::class), $config, $locking);
+		$svc->assertIdle(); // no throw
+		$this->addToAssertionCount(1);
+	}
+
+	public function testRescaleUserSettingsVacationDaysMultipliesToHours(): void
+	{
+		$updates = [];
+		$db = $this->qbHarness([
+			['id' => 1, 'setting_value' => '30'],
+			['id' => 2, 'setting_value' => ''],
+			['id' => 3, 'setting_value' => 'abc,5'],
+		], $updates);
+		$svc = $this->migrationServiceWith($db);
+		$m = new \ReflectionMethod(VacationUnitMigrationService::class, 'rescaleUserSettingsVacationDays');
+		$m->setAccessible(true);
+		$m->invoke($svc, 8.0, true);
+		// only the valid non-empty numeric row produced an UPDATE (garbage skipped, not zeroed)
+		$this->assertCount(1, $updates);
+	}
+
+	public function testRescaleTariffRuleModuleDayAmounts(): void
+	{
+		$updates = [];
+		$db = $this->qbHarness([
+			['id' => 1, 'module_type' => 'base_formula', 'config_json' => '{"reference_days":30}'],
+			['id' => 2, 'module_type' => 'additional_entitlements', 'config_json' => '{"days":2}'],
+			['id' => 3, 'module_type' => 'unknown_type', 'config_json' => '{"days":9}'],
+			['id' => 4, 'module_type' => 'deductions', 'config_json' => 'not-json'],
+		], $updates);
+		$svc = $this->migrationServiceWith($db);
+		$m = new \ReflectionMethod(VacationUnitMigrationService::class, 'rescaleTariffRuleModuleDayAmounts');
+		$m->setAccessible(true);
+		$m->invoke($svc, 8.0, true);
+		// base_formula + additional_entitlements updated; unknown type + bad JSON skipped
+		$this->assertCount(2, $updates);
+	}
 }

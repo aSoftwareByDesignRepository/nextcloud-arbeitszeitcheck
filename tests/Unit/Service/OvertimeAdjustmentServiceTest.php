@@ -113,4 +113,39 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$this->expectException(\InvalidArgumentException::class);
 		$svc->createAdjustment('alice', 0.0, OvertimeAdjustment::REASON_CUSTOM, null, 'admin');
 	}
+
+	public function testListForUserReturnsItemsAndBalance(): void
+	{
+		$mapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class);
+		$bank = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class);
+		$audit = $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
+		$users = $this->createMock(\OCP\IUserManager::class);
+
+		$row = new \OCA\ArbeitszeitCheck\Db\OvertimeAdjustment();
+		$row->setId(7);
+		$row->setUserId('alice');
+		$row->setCalendarYear(2026);
+		$row->setEffectiveOn(new \DateTime('2026-03-01'));
+		$row->setHoursDelta(2.5);
+		$row->setReasonCode('correction');
+		$row->setNote('fix');
+		$row->setProcessedBy('admin');
+		$row->setCreatedAt(new \DateTime('2026-03-02'));
+
+		$mapper->method('findByUserAndYear')->with('alice', 2026, 50, 0)->willReturn([$row]);
+		$mapper->method('countByUserAndYear')->with('alice', 2026)->willReturn(1);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 12.5]);
+
+		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users);
+		$r = $svc->listForUser('alice', 2026);
+
+		$this->assertSame(1, $r['total']);
+		$this->assertSame(2026, $r['year']);
+		$this->assertSame(12.5, $r['effective_balance']);
+		$this->assertCount(1, $r['items']);
+		$this->assertSame(7, $r['items'][0]['id']);
+		$this->assertSame(2.5, $r['items'][0]['hours_delta']);
+		$this->assertSame('2026-03-01', $r['items'][0]['effective_on']);
+	}
+
 }

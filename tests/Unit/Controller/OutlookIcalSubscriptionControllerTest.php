@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Controller;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Controller\OutlookIcalSubscriptionController;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
+use OCA\ArbeitszeitCheck\Db\OutlookIcalSubscriptionToken;
 use OCA\ArbeitszeitCheck\Db\OutlookIcalSubscriptionTokenMapper;
 use OCA\ArbeitszeitCheck\Db\Team;
 use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
@@ -463,6 +464,65 @@ final class OutlookIcalSubscriptionControllerTest extends TestCase
 		self::assertNotSame('', $data['windowEnd']);
 	}
 
+	public function testAdminCreateTokenWebcalUrlCoversHttpAndOpaqueSchemes(): void
+	{
+		foreach (['http://lan.example.test', 'custom://feed.example.test'] as $base) {
+			$permissionService = $this->createMock(PermissionService::class);
+			$permissionService->method('isAdmin')->with('admin')->willReturn(true);
+			$tokenMapper = $this->createMock(OutlookIcalSubscriptionTokenMapper::class);
+			$tokenMapper->method('insert')->willReturnArgument(0);
+			$absenceMapper = $this->createMock(AbsenceMapper::class);
+			$teamMapper = $this->createMock(TeamMapper::class);
+			$teamMemberMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
+			$teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+			$teamResolver = $this->createMock(TeamResolverService::class);
+			$userManager = $this->createMock(IUserManager::class);
+			$config = $this->createMock(IConfig::class);
+			$db = $this->createMock(IDBConnection::class);
+
+			$team = new Team();
+			$team->setId(12);
+			$team->setName('Support');
+			$teamMapper->method('find')->willReturn($team);
+			$teamMapper->method('getIdsWithDescendants')->willReturn([12]);
+			$teamMemberMapper->method('getMemberUserIdsByTeamIds')->willReturn(['alice']);
+			$teamManagerMapper->method('getTeamIdsForManager')->willReturn([12]);
+			$teamResolver->method('useAppTeams')->willReturn(true);
+			$userManager->method('get')->willReturnCallback(function (string $uid) {
+				$user = $this->createMock(IUser::class);
+				$user->method('isEnabled')->willReturn(true);
+				return $user;
+			});
+			$config->method('getSystemValue')->with('instanceid', '')->willReturn('tenant123');
+			$service = $this->makeService(
+				$tokenMapper, $absenceMapper, $teamMapper, $teamMemberMapper,
+				$teamManagerMapper, $teamResolver, $permissionService, $userManager,
+				$config, $db,
+			);
+
+			$urlGenerator = $this->createMock(IURLGenerator::class);
+			$urlGenerator->method('linkToRoute')->willReturn('/feed.ics');
+			$urlGenerator->method('getAbsoluteURL')
+				->willReturnCallback(static fn (string $p): string => $base . $p);
+			$controller = $this->makeController(
+				userSession: $this->sessionUser('admin'),
+				service: $service,
+				permissionService: $permissionService,
+				urlGenerator: $urlGenerator,
+			);
+
+			$data = $controller->adminCreateToken(12, null, 'de')->getData();
+			$this->assertTrue($data['success'], $base . ': ' . json_encode($data));
+			if ($base === 'http://lan.example.test') {
+				$this->assertStringStartsWith('webcal://', $data['feedWebcalUrl']);
+				$this->assertStringContainsString('lan.example.test', $data['feedWebcalUrl']);
+			} else {
+				// non-http scheme passes through unchanged
+				$this->assertStringStartsWith('custom://feed.example.test', $data['feedWebcalUrl']);
+			}
+		}
+	}
+
 	public function testAdminCreateTokenOrgWideScopeUsesTeamIdZero(): void
 	{
 		$tokenMapper = $this->createMock(OutlookIcalSubscriptionTokenMapper::class);
@@ -682,5 +742,170 @@ final class OutlookIcalSubscriptionControllerTest extends TestCase
 		self::assertInstanceOf(JSONResponse::class, $rotate);
 		$legacy = $controller->tokenizedFeedLegacy('bad-token');
 		self::assertInstanceOf(DataDisplayResponse::class, $legacy);
+	}
+
+	private function adminSession(): IUserSession
+	{
+		return $this->sessionUser('admin1');
+	}
+
+	private function adminPermission(): PermissionService
+	{
+		$p = $this->createMock(PermissionService::class);
+		$p->method('isAdmin')->with('admin1')->willReturn(true);
+		return $p;
+	}
+
+	public function testAdminIssueTokenRejectsMissingScope(): void
+	{
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+		);
+		$r = $c->adminCreateToken(null, null, 'de');
+		$this->assertSame(400, $r->getStatus());
+		$this->assertSame('MISSING_PARAMETERS', $r->getData()['code']);
+	}
+
+	public function testAdminIssueTokenRejectsMissingLanguage(): void
+	{
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+		);
+		$r = $c->adminCreateToken(3, null, null);
+		$this->assertSame(400, $r->getStatus());
+		$this->assertSame('MISSING_PARAMETERS', $r->getData()['code']);
+	}
+
+	public function testAdminIssueTokenRejectsUnsupportedLanguage(): void
+	{
+		$service = $this->makeService(
+			config: $this->configWithInstanceId(),
+		);
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+			service: $service,
+		);
+		$r = $c->adminCreateToken(3, null, 'klingon');
+		$this->assertSame(400, $r->getStatus());
+		$this->assertSame('INVALID_FEED_LANGUAGE', $r->getData()['code']);
+		$this->assertStringContainsString('language', strtolower((string)$r->getData()['error']));
+	}
+
+	public function testAdminIssueTokenConflictWhenSubscriptionExists(): void
+	{
+		$existing = new OutlookIcalSubscriptionToken();
+		$tokenMapper = $this->createMock(OutlookIcalSubscriptionTokenMapper::class);
+		$tokenMapper->method('findForScopeLanguage')->willReturn($existing);
+		$service = $this->makeService(tokenMapper: $tokenMapper, config: $this->configWithInstanceId());
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+			service: $service,
+		);
+		$r = $c->adminCreateToken(3, null, 'de');
+		$this->assertSame(409, $r->getStatus());
+		$this->assertSame('SUBSCRIPTION_ALREADY_EXISTS', $r->getData()['code']);
+	}
+
+	public function testAdminRotateTokenNotFoundWhenNoSubscription(): void
+	{
+		$tokenMapper = $this->createMock(OutlookIcalSubscriptionTokenMapper::class);
+		$tokenMapper->method('findForScopeLanguage')->willReturn(null);
+		$service = $this->makeService(tokenMapper: $tokenMapper, config: $this->configWithInstanceId());
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+			service: $service,
+		);
+		$r = $c->adminRotateToken(3, null, 'de');
+		$this->assertSame(404, $r->getStatus());
+		$this->assertSame('SUBSCRIPTION_NOT_FOUND', $r->getData()['code']);
+	}
+
+	public function testAdminIssueTokenForbiddenTenant(): void
+	{
+		// empty instanceid -> service throws AuthException -> 400
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValue')->willReturn('');
+		$service = $this->makeService(config: $config);
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+			service: $service,
+		);
+		$r = $c->adminCreateToken(3, null, 'de');
+		$this->assertSame(400, $r->getStatus());
+		$this->assertSame('FORBIDDEN', $r->getData()['code']);
+	}
+
+	public function testBuildWebcalFeedUrlViaHappyPath(): void
+	{
+		// rotate on existing subscription yields webcal URL derived from https feed URL
+		$existing = new OutlookIcalSubscriptionToken();
+		$existing->setId(7);
+		$existing->setTokenEncrypted('enc:t0k');
+
+		$tokenMapper = $this->createMock(OutlookIcalSubscriptionTokenMapper::class);
+		$tokenMapper->method('findForScopeLanguage')->willReturn($existing);
+		$tokenMapper->method('update')->willReturnArgument(0);
+
+		$teamMapper = $this->createMock(TeamMapper::class);
+		$teamMapper->method('find')->willReturn(new Team());
+		$userManager = $this->createMock(IUserManager::class);
+		$admin = $this->createMock(\OCP\IUser::class);
+		$admin->method('isEnabled')->willReturn(true);
+		$userManager->method('get')->willReturn($admin);
+		$servicePerms = $this->createMock(PermissionService::class);
+		$servicePerms->method('isAdmin')->willReturn(true);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
+		$teamMapper->method('getIdsWithDescendants')->willReturn([3]);
+		$teamMemberMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
+		$teamMemberMapper->method('getMemberUserIdsByTeamIds')->willReturn(['bob']);
+		$teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+		$teamManagerMapper->method('getManagerUserIdsByTeamIds')->willReturn(['admin1']);
+
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')->willReturn('/apps/arbeitszeitcheck/api/outlook/feed.ics');
+		$urlGenerator->method('getAbsoluteURL')->willReturnCallback(
+			static fn (string $u): string => 'https://cloud.example.test' . $u
+		);
+
+		$service = $this->makeService(
+			tokenMapper: $tokenMapper,
+			teamMapper: $teamMapper,
+			teamMemberMapper: $teamMemberMapper,
+			teamManagerMapper: $teamManagerMapper,
+			teamResolver: $teamResolver,
+			userManager: $userManager,
+			permissionService: $servicePerms,
+			config: $this->configWithInstanceId(),
+		);
+		$c = $this->makeController(
+			userSession: $this->adminSession(),
+			permissionService: $this->adminPermission(),
+			service: $service,
+			urlGenerator: $urlGenerator,
+		);
+		$r = $c->adminRotateToken(3, null, 'de');
+		$d = $r->getData();
+		$this->assertTrue($d['success'], json_encode($d));
+		$this->assertStringStartsWith('webcal://', (string)$d['feedWebcalUrl']);
+		$this->assertStringContainsString('cloud.example.test', (string)$d['feedWebcalUrl']);
+	}
+
+	private function configWithInstanceId(): IConfig
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValue')->willReturnCallback(
+			static fn (string $key, string $default = '') => $key === 'instanceid' ? 'inst-1' : $default
+		);
+		$config->method('getAppValue')->willReturnMap([
+			['dav', 'webcalAllowLocalAccess', 'no', 'yes'],
+		]);
+		return $config;
 	}
 }

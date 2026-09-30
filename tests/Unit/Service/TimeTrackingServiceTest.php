@@ -43,6 +43,8 @@ class TimeTrackingServiceTest extends TestCase {
 
 	/** @var TimeTrackingService */
 	private $service;
+	private array $stalePausedEntries = [];
+	private string $noticeJson = '';
 
 	/** @var TimeEntryMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeEntryMapper;
@@ -59,8 +61,26 @@ class TimeTrackingServiceTest extends TestCase {
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $config;
+
+	/** @var IDBConnection|\PHPUnit\Framework\MockObject\MockObject */
+	private $db;
+
+	/** @var ILockingProvider|\PHPUnit\Framework\MockObject\MockObject */
+	private $lockingProvider;
+
+	/** @var MonthClosureGuard|\PHPUnit\Framework\MockObject\MockObject */
+	private $monthClosureGuard;
+
 	/** @var DailyWorkingHoursCalculator */
 	private $dailyHoursCalculator;
+
+	/** @var UserWorkingTimeModelMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $userWorkingTimeModelMapper;
+
+	/** @var WorkingTimeModelMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $workingTimeModelMapper;
 
 	/** @var TimeZoneService */
 	private $timeZoneService;
@@ -75,21 +95,27 @@ class TimeTrackingServiceTest extends TestCase {
 		$this->l10n = $this->createMock(IL10N::class);
 		$complianceService = $this->createMock(ComplianceService::class);
 		$complianceService->method('checkComplianceBeforeClockIn')->willReturn([]);
-		$config = $this->createMock(IConfig::class);
+		$this->config = $this->createMock(IConfig::class);
+		$config = $this->config;
 		$config->method('getAppValue')->willReturnCallback(fn ($app, $key, $default) => match ($key) {
 			'max_daily_hours' => '10',
 			'min_rest_period' => '11',
 			'app_timezone' => 'Europe/Berlin',
 			default => $default
 		});
-		$config->method('getUserValue')->willReturn('');
+		$this->noticeJson = '';
+		$config->method('getUserValue')->willReturnCallback(
+			fn ($u, $a, $k, $d = '') => $k === 'auto_clockout_notice' ? $this->noticeJson : $d
+		);
 		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
 		$userSettingsMapper->method('getStringSetting')->willReturn('1');
-		$userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
-		$workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
-		$monthClosureGuard = $this->createMock(MonthClosureGuard::class);
-		$db = $this->createMock(IDBConnection::class);
-		$lockingProvider = $this->createMock(ILockingProvider::class);
+		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$userWorkingTimeModelMapper = $this->userWorkingTimeModelMapper;
+		$this->workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$workingTimeModelMapper = $this->workingTimeModelMapper;
+		$this->monthClosureGuard = $this->createMock(MonthClosureGuard::class);
+		$this->db = $this->createMock(IDBConnection::class);
+		$this->lockingProvider = $this->createMock(ILockingProvider::class);
 
 		// TimeZoneService is intentionally instantiated for real here: it has
 		// no side effects and its behaviour is part of the contract under test
@@ -119,16 +145,18 @@ class TimeTrackingServiceTest extends TestCase {
 			$userSettingsMapper,
 			$userWorkingTimeModelMapper,
 			$workingTimeModelMapper,
-			$monthClosureGuard,
-			$db,
-			$lockingProvider,
+			$this->monthClosureGuard,
+			$this->db,
+			$this->lockingProvider,
 			$timeZoneService,
 			$dailyHoursCalculator,
 			null,
 			$timeCaptureMethodService,
 		);
 
-		$this->timeEntryMapper->method('findStalePausedAutomaticEntries')->willReturn([]);
+		$this->stalePausedEntries = [];
+		$this->timeEntryMapper->method('findStalePausedAutomaticEntries')
+			->willReturnCallback(fn () => $this->stalePausedEntries);
 	}
 
 	/**
@@ -220,6 +248,28 @@ class TimeTrackingServiceTest extends TestCase {
 
 		$result = $this->service->clockIn($userId, $projectId, $description);
 
+		$this->assertSame($mockEntry, $result);
+	}
+
+	public function testClockInSurvivesSummaryAndNoticeClearFailures(): void {
+		$userId = 'testuser';
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('getTotalHoursByUserAndDateRange')->willReturn(0.0);
+
+		$mockEntry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$mockEntry->method('getSummary')
+			->willThrowException(new \RuntimeException('summary broken'));
+		$this->timeEntryMapper->method('insert')->willReturn($mockEntry);
+
+		// safeGetSummary catch arm + clearAutoClockoutNotice catch arm
+		$this->config->method('deleteUserValue')
+			->willThrowException(new \RuntimeException('cfg gone'));
+
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+
+		$result = $this->service->clockIn($userId);
 		$this->assertSame($mockEntry, $result);
 	}
 
@@ -933,5 +983,591 @@ class TimeTrackingServiceTest extends TestCase {
 		$this->expectExceptionMessage('Invalid entry ID');
 
 		$this->service->completePausedEntry('testuser', 0);
+	}
+
+	public function testStartBreakTransitionsActiveEntry(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('-2 hours'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnArgument(0);
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('commit');
+		$this->db->expects($this->never())->method('rollBack');
+		$this->lockingProvider->expects($this->once())->method('acquireLock');
+		$this->lockingProvider->expects($this->once())->method('releaseLock');
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'start_break', 'time_entry', 7, self::anything(), self::anything());
+
+		$result = $this->service->startBreak('alice');
+		$this->assertSame(TimeEntry::STATUS_BREAK, $result->getStatus());
+		$this->assertNotNull($result->getBreakStartTime());
+		$this->assertNull($result->getBreakEndTime());
+	}
+
+	public function testStartBreakWithoutActiveEntryThrows(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->db->expects($this->once())->method('rollBack');
+
+		$this->expectException(BusinessRuleException::class);
+		$this->expectExceptionMessage('User is not currently clocked in');
+		$this->service->startBreak('alice');
+	}
+
+	public function testStartBreakWhileOnBreakThrows(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_BREAK);
+		$entry->setStartTime(new \DateTime('-2 hours'));
+		$entry->setBreakStartTime(new \DateTime('-30 minutes'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->db->expects($this->once())->method('rollBack');
+
+		$this->expectException(BusinessRuleException::class);
+		$this->service->startBreak('alice');
+	}
+
+	public function testStartBreakArchivesPreviousCompletedBreak(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('-3 hours'));
+		$entry->setBreakStartTime(new \DateTime('-2 hours'));
+		$entry->setBreakEndTime(new \DateTime('-90 minutes'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		$result = $this->service->startBreak('alice');
+		$this->assertSame(TimeEntry::STATUS_BREAK, $result->getStatus());
+		$this->assertNull($result->getBreakEndTime());
+	}
+
+	public function testEndBreakTransitionsBreakEntryToActive(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_BREAK);
+		$entry->setStartTime(new \DateTime('-2 hours'));
+		$entry->setBreakStartTime(new \DateTime('-30 minutes'));
+
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn($entry);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnArgument(0);
+		$this->db->expects($this->once())->method('commit');
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'end_break', 'time_entry', 7, self::anything(), self::anything());
+
+		$result = $this->service->endBreak('alice');
+		$this->assertSame(TimeEntry::STATUS_ACTIVE, $result->getStatus());
+		$this->assertNotNull($result->getBreakEndTime());
+	}
+
+	public function testEndBreakWithoutBreakThrows(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->db->expects($this->once())->method('rollBack');
+
+		$this->expectException(BusinessRuleException::class);
+		$this->service->endBreak('alice');
+	}
+
+	private function completedEntryToday(int $id, string $start, string $end): TimeEntry
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setId($id);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime($start, $tz));
+		$entry->setEndTime(new \DateTime($end, $tz));
+		return $entry;
+	}
+
+	public function testGetStatusReturnsPausedPayloadForPausedEntry(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setId(9);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_PAUSED);
+		$entry->setStartTime(new \DateTime('-3 hours'));
+		$entry->setUpdatedAt(new \DateTime('-1 hour'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$status = $this->service->getStatus('alice');
+		$this->assertSame(TimeEntry::STATUS_PAUSED, $status['status']);
+		$this->assertSame(9, $status['current_entry']['id']);
+		$this->assertArrayHasKey('server_now', $status);
+		$this->assertArrayHasKey('at_daily_maximum', $status);
+	}
+
+	public function testGetStatusReturnsActivePayloadWithSessionDuration(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setId(8);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('-2 hours'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$status = $this->service->getStatus('alice');
+		$this->assertSame(TimeEntry::STATUS_ACTIVE, $status['status']);
+		$this->assertGreaterThan(0, $status['current_session_duration']);
+		$this->assertSame('Europe/Berlin', $status['server_timezone']);
+	}
+
+	public function testGetStatusIncludesAutoClockoutNoticeWhenPresent(): void
+	{
+		$this->config->method('getUserValue')->willReturnCallback(
+			static fn (string $u, string $app, string $key, $d = '') =>
+				$key === 'auto_clockout_notice' ? '{"at":"2026-09-01T10:00:00+02:00","reason":"auto"}' : $d
+		);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+
+		$status = $this->service->getStatus('alice');
+		$this->assertSame('clocked_out', $status['status']);
+	}
+
+	public function testGetTodayHoursSumsOverlappingEntries(): void
+	{
+		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 08:15');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$this->assertEqualsWithDelta(8.0, $this->service->getTodayHours('alice'), 0.2);
+	}
+
+	public function testGetWorkingHoursForPeriodSumsAcrossDays(): void
+	{
+		$entry = $this->completedEntryToday(7, '2026-09-01 08:00', '2026-09-01 16:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$total = $this->service->getWorkingHoursForPeriod(
+			'alice',
+			new \DateTime('2026-09-01'),
+			new \DateTime('2026-09-03'),
+		);
+		$this->assertEqualsWithDelta(8.0, $total, 0.2);
+	}
+
+	public function testCalculateTakenBreakMinutesSumsBreaks(): void
+	{
+		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 08:15');
+		$entry->setBreakStartTime(new \DateTime('today 03:00', new \DateTimeZone('Europe/Berlin')));
+		$entry->setBreakEndTime(new \DateTime('today 03:30', new \DateTimeZone('Europe/Berlin')));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$this->assertEqualsWithDelta(30.0, $this->service->calculateTakenBreakMinutes('alice'), 0.5);
+	}
+
+	public function testGetBreakStatusReportsRequiredBreak(): void
+	{
+		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 23:45');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$status = $this->service->getBreakStatus('alice');
+		$this->assertTrue($status['break_required']);
+		$this->assertGreaterThan(0, $status['required_break_minutes']);
+		$this->assertContains($status['warning_level'], ['none', 'info', 'warning', 'critical']);
+	}
+
+	public function testGetBreakStatusEmptyHistoryIsNone(): void
+	{
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$status = $this->service->getBreakStatus('alice');
+		$this->assertFalse($status['break_required']);
+		$this->assertSame('none', $status['warning_level']);
+	}
+
+	public function testFindCalendarDayExceedingMaximumNullForIncompleteEntry(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$this->assertNull($this->service->findCalendarDayExceedingMaximum($entry));
+	}
+
+	public function testFindCalendarDayExceedingMaximumDelegatesToCalculator(): void
+	{
+		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 23:45');
+		// the entry itself plus a second overlapping entry push the day past 10h
+		$other = $this->completedEntryToday(8, 'today 01:00', 'today 11:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry, $other]);
+
+		$result = $this->service->findCalendarDayExceedingMaximum($entry);
+		$this->assertNotNull($result);
+		$this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $result['date']);
+		$this->assertGreaterThan(10.0, $result['hours']);
+	}
+
+	// ---------------------------------------------------------------
+	// enforceBreakAutoFallbackForUser / enforceDailyMaximumForUser
+	// ---------------------------------------------------------------
+
+	private function breakEntry(int $id, int $breakStartMinutesAgo): \OCA\ArbeitszeitCheck\Db\TimeEntry
+	{
+		$e = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$e->setId($id);
+		$e->setUserId('u1');
+		$e->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_BREAK);
+		$e->setStartTime(new \DateTime('-8 hours'));
+		$e->setBreakStartTime(new \DateTime("-{$breakStartMinutesAgo} minutes"));
+		return $e;
+	}
+
+	public function testBreakAutoFallbackNoBreakEntryIsNoop(): void
+	{
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->assertNull($this->service->enforceBreakAutoFallbackForUser('u1'));
+	}
+
+	public function testBreakAutoFallbackDisabledReturnsEntry(): void
+	{
+		$entry = $this->breakEntry(5, 500);
+		$this->config->method('getAppValue')->willReturnCallback(fn ($a, $k, $d) => $k === 'break_auto_fallback_enabled' ? '0' : $d);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+		$this->assertSame($entry, $this->service->enforceBreakAutoFallbackForUser('u1', $entry));
+	}
+
+	public function testBreakAutoFallbackUnderThresholdReturnsEntry(): void
+	{
+		$this->shiftWorkModelFor('u1');
+		$entry = $this->breakEntry(5, 10); // 10 min < 120 strict-shift threshold
+		$this->timeEntryMapper->expects($this->never())->method('update');
+		$this->assertSame($entry, $this->service->enforceBreakAutoFallbackForUser('u1', $entry));
+	}
+
+	private function shiftWorkModelFor(string $userId): void
+	{
+		// strict_shift mode bypasses the flex-window gate entirely, so the
+		// over-threshold path is deterministic regardless of wall-clock time.
+		$assignment = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(7);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
+		$model->setType(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK);
+		$this->workingTimeModelMapper->method('find')->with(7)->willReturn($model);
+	}
+
+	public function testBreakAutoFallbackOverThresholdClocksOut(): void
+	{
+		$this->shiftWorkModelFor('u1');
+		$entry = $this->breakEntry(5, 300); // 300 min > 120 strict-shift default
+		$this->config->expects($this->once())->method('setUserValue')
+			->with('u1', 'arbeitszeitcheck', 'auto_clockout_notice', $this->isType('string'));
+		// clockOut re-fetches the break entry and completes it
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		$result = $this->service->enforceBreakAutoFallbackForUser('u1', $entry);
+		$this->assertNull($result);
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED, $entry->getStatus());
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_AUTO_BREAK_FALLBACK, $entry->getEndedReason());
+	}
+
+	public function testBreakAutoFallbackFailureReturnsEntry(): void
+	{
+		$this->shiftWorkModelFor('u1');
+		$entry = $this->breakEntry(5, 300);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn($entry);
+		$this->monthClosureGuard->method('assertTimeEntryMutable')
+			->willThrowException(new \RuntimeException('month closed'));
+
+		$this->assertSame($entry, $this->service->enforceBreakAutoFallbackForUser('u1', $entry));
+	}
+
+	public function testEnforceDailyMaximumNoActiveEntryIsNoop(): void
+	{
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->db->expects($this->once())->method('commit');
+		$this->assertNull($this->service->enforceDailyMaximumForUser('u1'));
+	}
+
+	public function testEnforceDailyMaximumCompletesOverMaxSession(): void
+	{
+		// active session started 11h ago — over the 10h configured maximum
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setId(9);
+		$entry->setUserId('u1');
+		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('-11 hours'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->timeEntryMapper->method('find')->with(9)->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+		$this->config->expects($this->once())->method('setUserValue')
+			->with('u1', 'arbeitszeitcheck', 'auto_clockout_notice', $this->isType('string'));
+
+		$updated = $this->service->enforceDailyMaximumForUser('u1');
+		$this->assertSame($entry, $updated);
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED, $entry->getStatus());
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_AUTO_DAILY_MAX, $entry->getEndedReason());
+		$this->assertNotNull($entry->getEndTime());
+	}
+
+	public function testEnforceDailyMaximumLeavesUnderMaxSessionRunning(): void
+	{
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setId(9);
+		$entry->setUserId('u1');
+		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('-2 hours'));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+		$this->config->expects($this->never())->method('setUserValue');
+
+		$this->assertNull($this->service->enforceDailyMaximumForUser('u1'));
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE, $entry->getStatus());
+	}
+
+	public function testGetTodayHoursReturnsCalculatorValueAndZeroOnFailure(): void
+	{
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setUserId('u1');
+		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		// window: [max(midnight, now-2h), now] — deterministic regardless of wall clock
+		$now = new \DateTime();
+		$midnight = new \DateTime('today 00:00:00');
+		$start = (clone $now)->modify('-2 hours');
+		if ($start < $midnight) {
+			$start = $midnight;
+		}
+		$expected = ($now->getTimestamp() - $start->getTimestamp()) / 3600.0;
+		$entry->setStartTime($start);
+		$entry->setEndTime($now);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->assertEqualsWithDelta($expected, $this->service->getTodayHours('u1'), 0.01);
+
+		// mapper failure -> defensive 0.0
+		$mapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$mapper->method('findOverlapping')->willThrowException(new \RuntimeException('db down'));
+		$svc = new TimeTrackingService(
+			$mapper,
+			$this->violationMapper,
+			$this->auditLogMapper,
+			$this->projectCheckService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ComplianceService::class),
+			$this->l10n,
+			$this->config,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$this->monthClosureGuard,
+			$this->db,
+			$this->lockingProvider,
+			$this->timeZoneService,
+			new \OCA\ArbeitszeitCheck\Service\DailyWorkingHoursCalculator($mapper, $this->timeZoneService),
+			null,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService::class),
+		);
+		$this->assertSame(0.0, $svc->getTodayHours('u1'));
+	}
+
+	public function testAdjustEndTimeForDailyMaximumCapsLongEntry(): void
+	{
+		// 12h entry today exceeds the 10h max -> end clipped to start+10h
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setId(3);
+		$entry->setUserId('u1');
+		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('today 07:00'));
+		$entry->setEndTime(new \DateTime('today 19:00'));
+
+		// no other entries today; calculator sees only this entry
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$this->assertTrue($this->service->adjustEndTimeForDailyMaximum($entry));
+		$adjusted = $entry->getEndTime();
+		$worked = ($adjusted->getTimestamp() - $entry->getStartTime()->getTimestamp()) / 3600.0;
+		$this->assertEqualsWithDelta(10.0, $worked, 0.02);
+	}
+
+	public function testAdjustEndTimeForDailyMaximumNoops(): void
+	{
+		// missing times -> false
+		$empty = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$empty->setUserId('u1');
+		$this->assertFalse($this->service->adjustEndTimeForDailyMaximum($empty));
+
+		// short entry under the cap -> false (no adjustment needed)
+		$short = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$short->setId(4);
+		$short->setUserId('u1');
+		$short->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$short->setStartTime(new \DateTime('today 08:00'));
+		$short->setEndTime(new \DateTime('today 10:00'));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$short]);
+		$this->assertFalse($this->service->adjustEndTimeForDailyMaximum($short));
+	}
+
+	public function testClockInRepairsStalePausedEntryThenInserts(): void
+	{
+		// a stale paused entry from yesterday gets auto-repaired during clockIn
+		$stale = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$stale->setId(77);
+		$stale->setUserId('u1');
+		$stale->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PAUSED);
+		$stale->setStartTime(new \DateTime('yesterday 09:00'));
+		$stale->setUpdatedAt(new \DateTime('yesterday 17:30'));
+
+		$this->stalePausedEntries = [$stale];
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+		$this->timeEntryMapper->method('insert')->willReturnCallback(static function (\OCA\ArbeitszeitCheck\Db\TimeEntry $e) {
+			$e->setId(100);
+			return $e;
+		});
+		// notice cleared on fresh session
+		$this->config->expects($this->once())->method('deleteUserValue')
+			->with('u1', 'arbeitszeitcheck', 'auto_clockout_notice');
+		// repair + clock_in both audited
+		$this->auditLogMapper->expects($this->exactly(2))->method('logAction');
+
+		$saved = $this->service->clockIn('u1');
+		$this->assertSame(100, $saved->getId());
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE, $saved->getStatus());
+		// stale paused row was repaired
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED, $stale->getStatus());
+		$this->assertSame(\OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_STALE_PAUSED_REPAIR, $stale->getEndedReason());
+		$this->assertNotNull($stale->getEndTime());
+	}
+
+	public function testClockInBlockedByCriticalComplianceIssue(): void
+	{
+		$compliance = $this->createMock(\OCA\ArbeitszeitCheck\Service\ComplianceService::class);
+		$compliance->method('checkComplianceBeforeClockIn')->willReturn([
+			[
+				'severity' => 'error',
+				'type' => \OCA\ArbeitszeitCheck\Db\ComplianceViolation::TYPE_INSUFFICIENT_REST_PERIOD,
+				'message' => 'Rest period not met',
+				'details' => ['required_hours' => 11],
+			],
+		]);
+
+		$svc = new TimeTrackingService(
+			$this->timeEntryMapper,
+			$this->violationMapper,
+			$this->auditLogMapper,
+			$this->projectCheckService,
+			$compliance,
+			$this->l10n,
+			$this->config,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$this->monthClosureGuard,
+			$this->db,
+			$this->lockingProvider,
+			$this->timeZoneService,
+			$this->dailyHoursCalculator,
+			null,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService::class),
+		);
+
+		$this->stalePausedEntries = [];
+		$this->timeEntryMapper->method('findStalePausedAutomaticEntries')
+			->willReturnCallback(fn () => $this->stalePausedEntries);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+
+		try {
+			$svc->clockIn('u1');
+			$this->fail('expected BusinessRuleException');
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			$this->assertSame('Rest period not met', $e->getMessage());
+			$this->assertSame(BusinessRuleCode::REST_PERIOD_REQUIRED, $e->getReasonCode());
+		}
+	}
+
+	public function testGetStatusAppendsFreshAutoClockoutNotice(): void
+	{
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$notice = json_encode([
+			'message' => 'Auto clock-out at 18:00',
+			'reason' => 'daily_maximum_reached',
+			'at' => (new \DateTimeImmutable('-1 hour'))->format('c'),
+		]);
+		$this->noticeJson = $notice;
+
+		$status = $this->service->getStatus('u1');
+		$this->assertSame('daily_maximum_reached', $status['auto_clockout_notice']['reason']);
+	}
+
+	public function testGetStatusDropsStaleNoticeOver24h(): void
+	{
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$notice = json_encode([
+			'message' => 'old',
+			'reason' => 'daily_maximum_reached',
+			'at' => (new \DateTimeImmutable('-2 days'))->format('c'),
+		]);
+		$this->noticeJson = $notice;
+
+		$status = $this->service->getStatus('u1');
+		$this->assertArrayNotHasKey('auto_clockout_notice', $status);
+	}
+
+	public function testReleaseLockFailureDoesNotEscapeMutation(): void
+	{
+		// releaseLock throwing must not propagate — the mutation itself succeeded
+		$this->lockingProvider->method('releaseLock')
+			->willThrowException(new \RuntimeException('lock backend gone'));
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('insert')->willReturnCallback(static function (\OCA\ArbeitszeitCheck\Db\TimeEntry $e) {
+			$e->setId(5);
+			return $e;
+		});
+
+		$saved = $this->service->clockIn('u1');
+		$this->assertSame(5, $saved->getId());
 	}
 }

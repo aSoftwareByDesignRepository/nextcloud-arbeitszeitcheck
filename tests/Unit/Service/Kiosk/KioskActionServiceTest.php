@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Service\Kiosk;
 
+use OCA\ArbeitszeitCheck\BusinessRuleCode;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Db\KioskSession;
 use OCA\ArbeitszeitCheck\Db\KioskSessionMapper;
 use OCA\ArbeitszeitCheck\Db\KioskTerminal;
@@ -296,5 +299,99 @@ final class KioskActionServiceTest extends TestCase
 		} catch (KioskException $e) {
 			self::assertSame('KIOSK_CLOCK_STAMPING_DISABLED', $e->getErrorCode());
 		}
+	}
+
+	private function claimedSessionFixture(): array
+	{
+		$terminal = new KioskTerminal();
+		$terminal->setTerminalId('tid-1');
+		$session = new KioskSession();
+		$session->setId(9);
+		$session->setUserId('alice');
+		$auth = $this->createMock(KioskAuthService::class);
+		$auth->method('validateSession')->willReturn($session);
+		$auth->method('assertUserEligibleForAction');
+		$now = new \DateTime('2026-06-10 12:00:00');
+		$timeFactory = $this->createMock(ITimeFactory::class);
+		$timeFactory->method('getDateTime')->willReturn($now);
+		$sessionMapper = $this->createMock(KioskSessionMapper::class);
+		$sessionMapper->method('claimUnused')->willReturn(true);
+		return [$terminal, $session, $auth, $sessionMapper, $timeFactory, $now];
+	}
+
+	public function testPerformActionBreakAndClockOutArms(): void
+	{
+		foreach ([
+			'clock_out' => ['clockOut', 'off'],
+			'break_start' => ['startBreak', 'on_break'],
+			'break_end' => ['endBreak', 'working'],
+		] as $action => [$method, $status]) {
+			[$terminal, , $auth, $sessionMapper, $timeFactory] = $this->claimedSessionFixture();
+			$tracking = $this->createMock(TimeTrackingService::class);
+			$tracking->expects(self::once())->method($method)->with('alice');
+			$service = $this->createService($auth, $sessionMapper, $tracking, null, $timeFactory);
+			self::assertSame($status, $service->performAction($terminal, 'tok', $action)['newStatus']);
+		}
+	}
+
+	public function testPerformActionInvalidActionKeepsClaim(): void
+	{
+		[$terminal, , $auth, $sessionMapper, $timeFactory] = $this->claimedSessionFixture();
+		// client bug/replay: claim must NOT be released
+		$sessionMapper->expects(self::never())->method('releaseClaim');
+		$service = $this->createService($auth, $sessionMapper, $this->createMock(TimeTrackingService::class), null, $timeFactory);
+		try {
+			$service->performAction($terminal, 'tok', 'bogus');
+			self::fail('expected KioskException');
+		} catch (KioskException $e) {
+			self::assertSame('KIOSK_ACTION_INVALID', $e->getErrorCode());
+		}
+	}
+
+	public function testPerformActionReleasesClaimOnMonthFinalized(): void
+	{
+		[$terminal, $session, $auth, $sessionMapper, $timeFactory, $now] = $this->claimedSessionFixture();
+		$sessionMapper->expects(self::once())->method('releaseClaim')->with($session, $now);
+		$tracking = $this->createMock(TimeTrackingService::class);
+		$tracking->method('clockIn')->willThrowException(new MonthFinalizedException('sealed'));
+		$service = $this->createService($auth, $sessionMapper, $tracking, null, $timeFactory);
+		try {
+			$service->performAction($terminal, 'tok', 'clock_in');
+			self::fail('expected KioskException');
+		} catch (KioskException $e) {
+			self::assertSame('MONTH_FINALIZED', $e->getErrorCode());
+		}
+	}
+
+	public function testPerformActionReleasesClaimOnBusinessRule(): void
+	{
+		[$terminal, $session, $auth, $sessionMapper, $timeFactory, $now] = $this->claimedSessionFixture();
+		$sessionMapper->expects(self::once())->method('releaseClaim')->with($session, $now);
+		$tracking = $this->createMock(TimeTrackingService::class);
+		$tracking->method('clockIn')->willThrowException(new BusinessRuleException('rest needed', BusinessRuleCode::REST_PERIOD_REQUIRED));
+		$service = $this->createService($auth, $sessionMapper, $tracking, null, $timeFactory);
+		try {
+			$service->performAction($terminal, 'tok', 'clock_in');
+			self::fail('expected KioskException');
+		} catch (KioskException $e) {
+			self::assertSame('KIOSK_REST_PERIOD_REQUIRED', $e->getErrorCode());
+		}
+	}
+
+	public function testActionMessageForReturnsTranslatedCopy(): void
+	{
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnArgument(0);
+		$service = $this->createService(
+			$this->createMock(KioskAuthService::class),
+			$this->createMock(KioskSessionMapper::class),
+			$this->createMock(TimeTrackingService::class),
+			$l10n,
+		);
+		self::assertSame('Clocked in', $service->actionMessageFor('clock_in'));
+		self::assertSame('Clocked out', $service->actionMessageFor('clock_out'));
+		self::assertSame('Break started', $service->actionMessageFor('break_start'));
+		self::assertSame('Break ended', $service->actionMessageFor('break_end'));
+		self::assertSame('Action completed', $service->actionMessageFor('anything_else'));
 	}
 }

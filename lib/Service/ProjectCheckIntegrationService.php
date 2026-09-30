@@ -486,6 +486,8 @@ class ProjectCheckIntegrationService
 						$synced++;
 					}
 				} catch (\Throwable $e) {
+					// best-effort: per-entry sync failure must not abort the batch;
+					// the error count is returned to the caller for surfacing.
 					$this->logger->warning('Failed to sync time entry to ProjectCheck: ' . $e->getMessage());
 					$errors++;
 				}

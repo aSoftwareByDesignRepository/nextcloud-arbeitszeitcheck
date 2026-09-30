@@ -1202,4 +1202,157 @@ class ProjectCheckIntegrationServiceTest extends TestCase
 
 		$this->assertTrue($service->userMayAttachProjectCheckProjectToOwnTime('user1', '42'));
 	}
+
+	public function testUserMayAttachReadStringGetterArms(): void
+	{
+		$this->appManager->method('isInstalled')->willReturn(true);
+		$this->configureAppConfigIntegration('1');
+
+		// arm: getCostRateMode missing entirely -> '' -> falls through to canUserAccessProject
+		$projNoMode = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['allowsTimeTracking'])
+			->getMock();
+		$projNoMode->method('allowsTimeTracking')->willReturn(true);
+		$svcA = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['getProject', 'canUserAccessProject'])
+			->getMock();
+		$svcA->method('getProject')->willReturn($projNoMode);
+		$svcA->method('canUserAccessProject')->willReturn(true);
+		$this->assertTrue(
+			$this->serviceWithFacade($svcA)->userMayAttachProjectCheckProjectToOwnTime('user1', '42')
+		);
+
+		// arm: getCostRateMode throws -> '' (debug-logged) -> canUserAccessProject
+		$projThrowing = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['allowsTimeTracking', 'getCostRateMode'])
+			->getMock();
+		$projThrowing->method('allowsTimeTracking')->willReturn(true);
+		$projThrowing->method('getCostRateMode')
+			->willThrowException(new \RuntimeException('getter broken'));
+		$svcB = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['getProject', 'canUserAccessProject'])
+			->getMock();
+		$svcB->method('getProject')->willReturn($projThrowing);
+		$svcB->method('canUserAccessProject')->willReturn(true);
+		$this->assertTrue(
+			$this->serviceWithFacade($svcB)->userMayAttachProjectCheckProjectToOwnTime('user1', '42')
+		);
+
+		// arm: getCostRateMode returns null -> ''
+		$projNull = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['allowsTimeTracking', 'getCostRateMode'])
+			->getMock();
+		$projNull->method('allowsTimeTracking')->willReturn(true);
+		$projNull->method('getCostRateMode')->willReturn(null);
+		$svcC = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['getProject', 'canUserAccessProject'])
+			->getMock();
+		$svcC->method('getProject')->willReturn($projNull);
+		$svcC->method('canUserAccessProject')->willReturn(false);
+		$this->assertFalse(
+			$this->serviceWithFacade($svcC)->userMayAttachProjectCheckProjectToOwnTime('user1', '42')
+		);
+	}
+
+	private function serviceWithFacade(object $projectService): ProjectCheckIntegrationService
+	{
+		return new ProjectCheckIntegrationService(
+			$this->appManager,
+			$this->appConfig,
+			$this->db,
+			$this->l10n,
+			$this->logger,
+			$projectService,
+			null,
+		);
+	}
+
+	public function testManagerMayAttachDelegatesToFacade(): void
+	{
+		$this->appManager->method('isInstalled')->willReturn(true);
+		$this->configureAppConfigIntegration('1');
+
+		$projectService = $this->mockProjectCheckProjectService();
+		$projectService->expects($this->exactly(2))
+			->method('mayBillArbeitszeitCheckTimeForUser')
+			->willReturnCallback(static fn (string $mgr, string $emp, int $pid) => $pid === 6);
+
+		$service = $this->serviceWithFacade($projectService);
+		$this->assertTrue($service->managerMayAttachProjectCheckProjectForEmployee('mgr1', 'emp1', '6'));
+		$this->assertFalse($service->managerMayAttachProjectCheckProjectForEmployee('mgr1', 'emp1', '9'));
+		$this->assertFalse($service->managerMayAttachProjectCheckProjectForEmployee('mgr1', 'emp1', 'abc'));
+	}
+
+	public function testManagerMayAttachFailsClosedOnFacadeException(): void
+	{
+		$this->appManager->method('isInstalled')->willReturn(true);
+		$this->configureAppConfigIntegration('1');
+
+		$projectService = $this->mockProjectCheckProjectService();
+		$projectService->method('mayBillArbeitszeitCheckTimeForUser')
+			->willThrowException(new \RuntimeException('facade down'));
+
+		$service = $this->serviceWithFacade($projectService);
+		$this->assertFalse($service->managerMayAttachProjectCheckProjectForEmployee('mgr1', 'emp1', '6'));
+	}
+
+	public function testGetAssignableProjectsFiltersByManagerBillingRight(): void
+	{
+		$this->appManager->method('isInstalled')->willReturn(true);
+		$this->configureAppConfigIntegration('1');
+
+		$mkProject = function (int $id, string $name, bool $tracking = true): object {
+			$p = $this->getMockBuilder(\stdClass::class)
+				->addMethods(['getId', 'getName', 'allowsTimeTracking', 'getCostRateMode', 'getCustomerName'])
+				->getMock();
+			$p->method('getId')->willReturn($id);
+			$p->method('getName')->willReturn($name);
+			$p->method('allowsTimeTracking')->willReturn($tracking);
+			$p->method('getCostRateMode')->willReturn('project');
+			$p->method('getCustomerName')->willReturn('ACME');
+			return $p;
+		};
+
+		$projectService = $this->mockProjectCheckProjectService();
+		$projectService->method('getProjectsForUserTimeEntry')->willReturn([
+			$mkProject(1, 'Alpha'),
+			$mkProject(2, 'Beta'),
+			$mkProject(3, 'NoTime', false),      // tracking disabled -> dropped
+			'garbage',                          // non-object -> dropped
+		]);
+		// manager may bill on project 2 only
+		$projectService->method('mayBillArbeitszeitCheckTimeForUser')
+			->willReturnCallback(static fn (string $m, string $e, int $pid) => $pid === 2);
+
+		$service = $this->serviceWithFacade($projectService);
+		$rows = $service->getAssignableProjectsForManagerOnBehalfOfEmployee('mgr1', 'emp1');
+		$this->assertCount(1, $rows);
+		$this->assertSame(2, (int)$rows[0]['id']);
+	}
+
+	public function testUserMayAttachFallsBackToProjectInspection(): void
+	{
+		$this->appManager->method('isInstalled')->willReturn(true);
+		$this->configureAppConfigIntegration('1');
+
+		// facade WITHOUT canUserAddTimeEntryForProject -> getProject path
+		$projectService = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['getProject', 'isActiveTeamMember', 'canUserAccessProject'])
+			->getMock();
+
+		$memberModeProject = $this->getMockBuilder(\stdClass::class)
+			->addMethods(['allowsTimeTracking', 'getCostRateMode'])
+			->getMock();
+		$memberModeProject->method('allowsTimeTracking')->willReturn(true);
+		$memberModeProject->method('getCostRateMode')
+			->willReturn('project_member');
+
+		$projectService->method('getProject')->willReturn($memberModeProject);
+		$projectService->method('isActiveTeamMember')
+			->willReturnCallback(static fn (int $pid, string $uid) => $uid === 'member1');
+
+		$service = $this->serviceWithFacade($projectService);
+		$this->assertTrue($service->userMayAttachProjectCheckProjectToOwnTime('member1', '6'));
+		$this->assertFalse($service->userMayAttachProjectCheckProjectToOwnTime('outsider', '6'));
+	}
 }

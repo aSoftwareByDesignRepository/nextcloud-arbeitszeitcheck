@@ -45,7 +45,7 @@ class EntitlementSnapshotService {
 			// contract (e.g. background jobs that hand-constructed traces).
 			$trace = $this->ensureTraceEnvelope($trace, $asOfDateOnly, $source, $ruleSetId, $effectiveDays);
 			$snapshot->setCalculationTrace($trace);
-			$snapshot->setComputedAt(new \DateTimeImmutable('now'));
+			$snapshot->setComputedAt(new \DateTime('now'));
 			$snapshot->setComputedBy($computedBy);
 			$snapshot->setPolicyFingerprint($policyFingerprint);
 			return $this->snapshotMapper->upsertSnapshot($snapshot);

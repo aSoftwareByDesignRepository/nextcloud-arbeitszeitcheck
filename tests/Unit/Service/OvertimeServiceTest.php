@@ -730,4 +730,68 @@ class OvertimeServiceTest extends TestCase
 			0.001
 		);
 	}
+
+	public function testCalculateMonthlyAndYearlyOvertimeDelegate(): void
+	{
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
+
+		$monthly = $this->service->calculateMonthlyOvertime('alice');
+		$this->assertArrayHasKey('overtime_hours', $monthly);
+		$yearly = $this->service->calculateYearlyOvertime('alice');
+		$this->assertArrayHasKey('overtime_hours', $yearly);
+	}
+
+	public function testGetCumulativeOvertimeBalanceUsesTrackingFrom(): void
+	{
+		$this->overtimeSettingsService->method('resolveEffectiveYearStart')
+			->willReturn(new \DateTime('2026-03-01'));
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
+
+		$balance = $this->service->getCumulativeOvertimeBalance('alice', new \DateTime('2026-06-15'));
+		$this->assertIsFloat($balance);
+	}
+
+	public function testGetCumulativeOvertimeBalanceZeroWhenRangeEmpty(): void
+	{
+		// setUp resolves effective start to Jan-1 -> beforeDate Jan-1 gives an empty range
+		$this->timeEntryMapper->expects($this->never())->method('findByUserAndDateRange');
+		$balance = $this->service->getCumulativeOvertimeBalance('alice', new \DateTime('2026-01-01'));
+		$this->assertSame(0.0, $balance);
+	}
+
+	public function testRotationRequiredHoursOverridesContract(): void
+	{
+		// duty-rotation provider supplies the Soll — contract path bypassed
+		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('requiredHoursForDateRange')->willReturn(12.5);
+
+		$overtimeSettings = $this->createMock(UserOvertimeSettingsService::class);
+		$overtimeSettings->method('getTrackingFrom')->willReturn(null);
+		$overtimeSettings->method('getOpeningBalanceHours')->willReturn(0.0);
+		$overtimeSettings->method('resolveEffectiveYearStart')->willReturnCallback(
+			static fn (string $u, int $y): \DateTime => new \DateTime("$y-01-01")
+		);
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('getHolidayWeightForUser')->willReturn(0.0);
+		$holiday->method('computeWorkingDaysForUser')->willReturn(0.0);
+
+		$service = new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$holiday,
+			$overtimeSettings,
+			$rotation,
+			null,
+		);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+		$result = $service->calculateOvertime('alice', new \DateTime('2026-06-01'), new \DateTime('2026-06-02'));
+		$this->assertSame(-12.5, $result['overtime_hours']);
+	}
 }

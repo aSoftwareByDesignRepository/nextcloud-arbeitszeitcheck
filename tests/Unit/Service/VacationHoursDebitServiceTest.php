@@ -325,4 +325,89 @@ class VacationHoursDebitServiceTest extends TestCase
 		$this->assertSame('org_hours_per_day', $est['basis']);
 		$this->assertSame(0.0, $est['hours']);
 	}
+
+	public function testRotationEstimateUsedWhenRotationEnabled(): void
+	{
+		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
+		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
+		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		// Mon..Fri, 7h each
+		$rotation->method('dayNetHoursForUser')->willReturn(7.0);
+		$rotation->method('getWeekTargetBasis')->willReturn('published_roster');
+
+		$svc = new VacationHoursDebitService(
+			$userMap,
+			$modelMap,
+			$this->holidayNone(),
+			$this->unitService(8.0),
+			$rotation,
+		);
+
+		$est = $svc->estimateForUserRange(
+			'alice',
+			new \DateTime('2026-08-03'),
+			new \DateTime('2026-08-07')
+		);
+		$this->assertSame('published_roster', $est['basis']);
+		$this->assertSame(35.0, $est['hours']);
+		$this->assertSame(7.0, $est['average_daily']);
+		$this->assertNull($est['weekday_nets']);
+		$this->assertSame(7.0, $est['one_day_hours']);
+	}
+
+	public function testRotationEstimateAbortsOnUnresolvableDay(): void
+	{
+		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
+		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
+		// no model assignment -> falls through to workingDays path
+		$userMap->method('findCurrentByUser')->willReturn(null);
+		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willReturnCallback(
+			static fn (string $u, \DateTime $d) => $d->format('N') === '3' ? null : 8.0
+		);
+		$rotation->method('getWeekTargetBasis')->willReturn('rotation_pattern');
+
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('computeWorkingDaysForUser')->willReturn(3.0);
+
+		$svc = new VacationHoursDebitService(
+			$userMap, $modelMap, $holiday, $this->unitService(8.0), $rotation,
+		);
+
+		// Wed day returns null -> rotation aborts -> model/org fallback
+		$est = $svc->estimateForUserRange(
+			'alice',
+			new \DateTime('2026-08-03'),
+			new \DateTime('2026-08-07')
+		);
+		$this->assertSame('org_hours_per_day', $est['basis']);
+		$this->assertSame(24.0, $est['hours']); // 3 working days * 8h org
+	}
+
+	public function testRotationEstimateSwallowsProviderFailure(): void
+	{
+		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
+		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
+		$userMap->method('findCurrentByUser')->willReturn(null);
+		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willThrowException(new \RuntimeException('rotation API down'));
+
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('computeWorkingDaysForUser')->willReturn(5.0);
+
+		$svc = new VacationHoursDebitService(
+			$userMap, $modelMap, $holiday, $this->unitService(8.0), $rotation,
+		);
+
+		$est = $svc->estimateForUserRange(
+			'alice',
+			new \DateTime('2026-08-03'),
+			new \DateTime('2026-08-07')
+		);
+		$this->assertSame('org_hours_per_day', $est['basis']);
+		$this->assertSame(40.0, $est['hours']);
+	}
 }

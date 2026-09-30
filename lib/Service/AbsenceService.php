@@ -2416,22 +2416,4 @@ class AbsenceService
 		);
 	}
 
-	/**
-	 * Build a map of additional holiday weights (full/half Firmenfeiertage)
-	 * for the given date range and user.
-	 *
-	 * NOTE:
-	 * - Aktuell sind Firmenfeiertage organisationsweit konfiguriert
-	 *   (ohne Bundeslandspezifik). Pro-User-Bundesland wirkt sich daher
-	 *   nur auf spätere, state-spezifische Erweiterungen aus.
-	 *
-	 * @return array<string,float> date (Y-m-d) => weight
-	 */
-	private function buildExtraHolidayWeights(\DateTime $start, \DateTime $end, string $userId): array
-	{
-		// Legacy helper is kept for backward compatibility with Absence::calculateWorkingDays()
-		// and will internally delegate to HolidayService in future iterations if needed.
-		unset($start, $end, $userId);
-		return [];
-	}
 }

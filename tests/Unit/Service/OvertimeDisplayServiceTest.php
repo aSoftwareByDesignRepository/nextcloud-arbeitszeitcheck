@@ -81,4 +81,30 @@ class OvertimeDisplayServiceTest extends TestCase
 		$this->assertTrue($snapshot['needs_attention']);
 		$this->assertContains('payout_eligible', $snapshot['attention_reasons']);
 	}
+
+	public function testBuildManagerTeamAlertsFiltersSortsAndLimits(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, $default) {
+			return in_array($key, ['overtime_traffic_light_enabled', 'overtime_bank_enabled'], true) ? '1' : $default;
+		});
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('isEnabled')->willReturn(true);
+		$bank->method('getBankStatus')->willReturnCallback(static fn (string $uid) => match ($uid) {
+			'clean' => ['enabled' => true, 'effective_balance' => 0.0, 'bank_state' => 'bank_green', 'bank_fill_percent' => 0.0, 'payout_eligible_hours' => 0.0],
+			default => ['enabled' => true, 'effective_balance' => 50.0, 'bank_state' => 'payout_eligible', 'bank_fill_percent' => 80.0, 'payout_eligible_hours' => 10.0],
+		});
+
+		$overtime = $this->createMock(OvertimeService::class);
+		$traffic = new OvertimeTrafficLightService($config);
+		$service = new OvertimeDisplayService($overtime, $bank, $traffic);
+
+		$alerts = $service->buildManagerTeamAlerts(['clean', 'b-user', 'a-user']);
+		$this->assertCount(2, $alerts);
+		$this->assertSame(['a-user', 'b-user'], array_column($alerts, 'user_id'));
+		$this->assertSame('payout_eligible', $alerts[0]['bank_state']);
+
+		$this->assertCount(1, $service->buildManagerTeamAlerts(['clean', 'b-user', 'a-user'], 1));
+	}
 }

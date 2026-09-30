@@ -11,204 +11,330 @@ use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
+use OCA\ArbeitszeitCheck\Service\VacationUnitService;
+use OCA\ArbeitszeitCheck\Support\VacationYearWindow;
 use OCP\IConfig;
+use OCP\IUser;
 use OCP\IUserManager;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-class VacationRolloverServiceTest extends TestCase
+/**
+ * Covers the rollover engine: eligible-year selection (calendar + anniversary),
+ * amount computation, per-user processing guards and the sweep stats.
+ */
+final class VacationRolloverServiceTest extends TestCase
 {
-	public function testProcessSkipsWhenTargetYearAlreadyHasBalance(): void
+	private IConfig&MockObject $config;
+	private VacationAllocationService&MockObject $allocation;
+	private VacationYearBalanceMapper&MockObject $balanceMapper;
+	private VacationRolloverLogMapper&MockObject $logMapper;
+	private IUserManager&MockObject $userManager;
+	private AuditLogMapper&MockObject $auditLogMapper;
+	private PermissionService&MockObject $permissionService;
+	private VacationUnitService $unitService;
+	private VacationRolloverService $service;
+
+	/** @var array<string,string> */
+	private array $appValues = [];
+	private bool $anniversaryMode = false;
+	private bool $logExists = false;
+	private float $carryoverRemaining = 4.0;
+	private float $annualRemaining = 0.0;
+	private float $existingCarryover = 0.0;
+	private float $capResult = 0.0;
+	private bool $allowed = true;
+	private ?\DateTimeImmutable $expiryOverride = null;
+	private ?VacationYearWindow $windowOverride = null;
+
+	protected function setUp(): void
 	{
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnMap([
-			['arbeitszeitcheck', Constants::CONFIG_VACATION_ROLLOVER_ENABLED, '1', '1'],
-			['arbeitszeitcheck', Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0', '0'],
-		]);
+		parent::setUp();
+		$this->config = $this->createMock(IConfig::class);
+		$this->allocation = $this->createMock(VacationAllocationService::class);
+		$this->balanceMapper = $this->createMock(VacationYearBalanceMapper::class);
+		$this->logMapper = $this->createMock(VacationRolloverLogMapper::class);
+		$this->userManager = $this->createMock(IUserManager::class);
+		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
+		$this->permissionService = $this->createMock(PermissionService::class);
+		$this->unitService = new VacationUnitService($this->config);
 
-		$alloc = $this->createMock(VacationAllocationService::class);
-		$alloc->method('getCarryoverExpiryDateForYear')->willReturnCallback(function (int $y) {
-			return new \DateTimeImmutable($y . '-03-31');
-		});
-		$alloc->method('computeYearAllocation')->willReturn([
-			'carryover_remaining_after_approved' => 2.0,
-			'annual_remaining_after_approved' => 0.0,
-		]);
-		$alloc->method('applyCapToOpeningBalance')->willReturnCallback(fn (float $d) => $d);
-
-		$balance = $this->createMock(VacationYearBalanceMapper::class);
-		$balance->method('getCarryoverDays')->willReturnCallback(function (string $uid, int $year) {
-			return $year === 2027 ? 3.0 : 0.0;
-		});
-
-		$log = $this->createMock(VacationRolloverLogMapper::class);
-		$log->method('existsForUserAndYears')->willReturn(false);
-
-		$users = $this->createMock(IUserManager::class);
-		$audit = $this->createMock(AuditLogMapper::class);
-		$permissionService = $this->createMock(PermissionService::class);
-		$permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
-
-		$s = new VacationRolloverService(
-			$config,
-			$alloc,
-			$balance,
-			$log,
-			$users,
-			$audit,
-			$permissionService
+		$this->appValues = [
+			Constants::CONFIG_VACATION_ROLLOVER_ENABLED => '1',
+			Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL => '0',
+		];
+		$this->config->method('getAppValue')->willReturnCallback(
+			fn ($app, $key, $default = '') => $this->appValues[$key] ?? $default
 		);
 
-		$r = $s->processUserForFromYear('u1', 2026, false, false, true);
-		$this->assertSame('skipped_target_balance', $r['action']);
-	}
-
-	public function testAnniversaryModeDoesNotDisableAutomaticRolloverFlag(): void
-	{
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnMap([
-			['arbeitszeitcheck', Constants::CONFIG_VACATION_ROLLOVER_ENABLED, '1', '1'],
-			['arbeitszeitcheck', Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL, '0', '0'],
-		]);
-
-		$alloc = $this->createMock(VacationAllocationService::class);
-		$alloc->method('isAnniversaryMode')->willReturn(true);
-
-		$s = new VacationRolloverService(
-			$config,
-			$alloc,
-			$this->createMock(VacationYearBalanceMapper::class),
-			$this->createMock(VacationRolloverLogMapper::class),
-			$this->createMock(IUserManager::class),
-			$this->createMock(AuditLogMapper::class),
-			$this->createMock(PermissionService::class)
+		$this->allocation->method('isAnniversaryMode')->willReturnCallback(fn () => $this->anniversaryMode);
+		// calendar mode: every year's carryover expiry is May 31 of that year
+		$this->allocation->method('getCarryoverExpiryDateForYear')->willReturnCallback(
+			fn (int $y) => $this->expiryOverride ?? new \DateTimeImmutable("$y-05-31")
+		);
+		$this->allocation->method('getCarryoverExpiryDateForWindow')->willReturnCallback(
+			static fn ($w) => new \DateTimeImmutable('2025-05-31')
+		);
+		$this->allocation->method('resolveWindowForUserYear')->willReturnCallback(
+			fn () => $this->windowOverride ?? new VacationYearWindow(
+				mode: VacationYearWindow::MODE_ANNIVERSARY,
+				balanceYearKey: 2025,
+				startInclusive: new \DateTimeImmutable('2025-01-01'),
+				endExclusive: new \DateTimeImmutable('2026-01-01'),
+				label: 'test',
+			)
+		);
+		$this->allocation->method('computeYearAllocation')->willReturnCallback(
+			fn () => [
+				'carryover_remaining_after_approved' => $this->carryoverRemaining,
+				'annual_remaining_after_approved' => $this->annualRemaining,
+			]
+		);
+		$this->allocation->method('applyCapToOpeningBalance')->willReturnCallback(
+			fn (float $v) => $this->capResult > 0 ? min($v, $this->capResult) : $v
 		);
 
-		$this->assertTrue($s->isAutomaticRolloverEnabled());
+		$this->logMapper->method('existsForUserAndYears')->willReturnCallback(fn () => $this->logExists);
+		$this->balanceMapper->method('getCarryoverDays')->willReturnCallback(fn () => $this->existingCarryover);
+		$this->balanceMapper->method('getCarryoverAmount')->willReturnCallback(fn () => $this->existingCarryover);
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturnCallback(fn () => $this->allowed);
+		$this->userManager->method('get')->willReturnCallback(function ($uid) {
+			$u = $this->createMock(IUser::class);
+			$u->method('isEnabled')->willReturn(true);
+			$u->method('getUID')->willReturn($uid);
+			return $u;
+		});
+
+		$this->service = new VacationRolloverService(
+			$this->config,
+			$this->allocation,
+			$this->balanceMapper,
+			$this->logMapper,
+			$this->userManager,
+			$this->auditLogMapper,
+			$this->permissionService,
+			$this->unitService,
+		);
 	}
 
-	public function testHoursModeUpsertWritesCarryoverHoursAndDoesNotClearDaysColumnAsDaysMode(): void
+	// ---------------------------------------------------------------
+	// eligible-year selection
+	// ---------------------------------------------------------------
+
+	public function testGetEligibleFromYearsCalendarMode(): void
 	{
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnCallback(
-			static function (string $app, string $key, $default = '') {
-				$map = [
-					Constants::CONFIG_VACATION_ROLLOVER_ENABLED => '1',
-					Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL => '0',
-					Constants::CONFIG_VACATION_UNIT => Constants::VACATION_UNIT_HOURS,
-					Constants::CONFIG_VACATION_HOURS_PER_DAY => '7.7',
-					Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING => '',
-				];
-				return $map[$key] ?? $default;
+		// expiry = May 31 of each year; today = 2026-09-01 -> every scanned
+		// year including the current one has a past deadline.
+		$years = $this->service->getEligibleFromYears(new \DateTime('2026-09-01'));
+		$this->assertContains(2026, $years);
+		$this->assertContains(2025, $years);
+		$this->assertNotContains(2005, $years); // beyond the 20-year lookback
+
+		// early in the year only the previous year is past its deadline
+		$years2 = $this->service->getEligibleFromYears(new \DateTime('2026-02-01'));
+		$this->assertContains(2025, $years2);
+		$this->assertNotContains(2026, $years2);
+	}
+
+	public function testGetEligibleFromYearsForUserAnniversarySkipsMissingStart(): void
+	{
+		$this->anniversaryMode = true;
+		$this->windowOverride = new VacationYearWindow(
+			mode: VacationYearWindow::MODE_ANNIVERSARY,
+			balanceYearKey: 2025,
+			startInclusive: new \DateTimeImmutable('2025-01-01'),
+			endExclusive: new \DateTimeImmutable('2026-01-01'),
+			label: 'test',
+			missingEmploymentStart: true,
+		);
+		$years = $this->service->getEligibleFromYearsForUser('alice', new \DateTime('2026-09-01'));
+		$this->assertSame([], $years);
+	}
+
+	public function testGetAllocationAsOfAfterDeadlineIsDayAfterExpiry(): void
+	{
+		$asOf = $this->service->getAllocationAsOfAfterDeadline(2024);
+		$this->assertSame('2024-06-01', $asOf->format('Y-m-d'));
+	}
+
+	// ---------------------------------------------------------------
+	// computeRolloverAmountParts
+	// ---------------------------------------------------------------
+
+	public function testComputeRolloverAmountPartsCarryoverOnly(): void
+	{
+		$parts = $this->service->computeRolloverAmountParts('alice', 2024);
+		$this->assertSame(4.0, $parts['carryover_part']);
+		$this->assertSame(0.0, $parts['annual_part']);
+		$this->assertSame(4.0, $parts['total']);
+	}
+
+	public function testComputeRolloverAmountPartsIncludesAnnualWhenEnabled(): void
+	{
+		$this->appValues[Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL] = '1';
+		$this->annualRemaining = 6.5;
+		$parts = $this->service->computeRolloverAmountParts('alice', 2024);
+		$this->assertSame(10.5, $parts['total']);
+	}
+
+	public function testComputeRolloverAmountPartsAppliesCap(): void
+	{
+		$this->capResult = 2.5;
+		$parts = $this->service->computeRolloverAmountParts('alice', 2024);
+		$this->assertSame(2.5, $parts['total']);
+	}
+
+	// ---------------------------------------------------------------
+	// processUserForFromYear
+	// ---------------------------------------------------------------
+
+	public function testProcessUserForFromYearSkippedWhenDisabled(): void
+	{
+		$this->appValues[Constants::CONFIG_VACATION_ROLLOVER_ENABLED] = '0';
+		$this->assertSame('skipped_disabled', $this->service->processUserForFromYear('alice', 2024, false, false, false)['action']);
+	}
+
+	public function testProcessUserForFromYearSkippedWhenAlreadyLogged(): void
+	{
+		$this->logExists = true;
+		$this->assertSame('skipped_already_logged', $this->service->processUserForFromYear('alice', 2024, false, false, false)['action']);
+	}
+
+	public function testProcessUserForFromYearSkippedWhenTargetHasBalance(): void
+	{
+		$this->existingCarryover = 3.0;
+		$this->assertSame('skipped_target_balance', $this->service->processUserForFromYear('alice', 2024, false, false, false)['action']);
+	}
+
+	public function testProcessUserForFromYearSkippedWhenZero(): void
+	{
+		$this->carryoverRemaining = 0.0;
+		$this->assertSame('skipped_zero', $this->service->processUserForFromYear('alice', 2024, false, false, false)['action']);
+	}
+
+	public function testProcessUserForFromYearDryRunReportsWouldApply(): void
+	{
+		$out = $this->service->processUserForFromYear('alice', 2024, true, false, false);
+		$this->assertSame('would_apply', $out['action']);
+		$this->assertSame(4.0, $out['amount']);
+		$this->assertSame(2025, $out['to_year']);
+	}
+
+	public function testProcessUserForFromYearAppliesWritePath(): void
+	{
+		$this->balanceMapper->expects($this->once())->method('upsert')
+			->with('alice', 2025, 4.0, null, true);
+		$this->logMapper->expects($this->once())->method('insertLog')
+			->with('alice', 2024, 2025, 4.0);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'vacation_rollover', 'vacation_year_balance');
+
+		$out = $this->service->processUserForFromYear('alice', 2024, false, false, false);
+		$this->assertSame('applied', $out['action']);
+		$this->assertSame(4.0, $out['amount']);
+	}
+
+	public function testProcessUserForFromYearForceDeletesLogAndRewrites(): void
+	{
+		$this->logExists = true;
+		$this->logMapper->expects($this->once())->method('deleteByUserAndYears')->with('alice', 2024, 2025);
+		$out = $this->service->processUserForFromYear('alice', 2024, false, true, false);
+		$this->assertSame('applied', $out['action']);
+	}
+
+	// ---------------------------------------------------------------
+	// sweeps
+	// ---------------------------------------------------------------
+
+	public function testRunForAllUsersReturnsZerosWhenDisabledAndNotForced(): void
+	{
+		$this->appValues[Constants::CONFIG_VACATION_ROLLOVER_ENABLED] = '0';
+		$this->userManager->expects($this->never())->method('callForAllUsers');
+		$this->assertSame(
+			['applied' => 0, 'skipped' => 0, 'errors' => 0],
+			$this->service->runForAllUsers(null, false, false, false)
+		);
+	}
+
+	public function testRunForAllUsersAppliesAndCountsErrors(): void
+	{
+		$good = $this->createMock(IUser::class);
+		$good->method('isEnabled')->willReturn(true);
+		$good->method('getUID')->willReturn('alice');
+		$bad = $this->createMock(IUser::class);
+		$bad->method('isEnabled')->willReturn(true);
+		$bad->method('getUID')->willReturn('broken');
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($good, $bad): void {
+				$cb($good);
+				$cb($bad);
 			}
 		);
-
-		$alloc = $this->createMock(VacationAllocationService::class);
-		$alloc->method('getCarryoverExpiryDateForYear')->willReturnCallback(
-			static fn (int $y) => new \DateTimeImmutable($y . '-03-31')
-		);
-		$alloc->method('computeYearAllocation')->willReturn([
-			'carryover_remaining_after_approved' => 15.4,
-			'annual_remaining_after_approved' => 0.0,
-		]);
-		$alloc->method('applyCapToOpeningBalance')->willReturnCallback(static fn (float $d) => $d);
-		$alloc->method('isAnniversaryMode')->willReturn(false);
-
-		$balance = $this->createMock(VacationYearBalanceMapper::class);
-		$balance->method('getCarryoverAmount')->with('u1', 2027, true)->willReturn(0.0);
-		$balance->expects($this->once())
-			->method('upsert')
-			->with('u1', 2027, 15.4, 15.4, false);
-
-		$log = $this->createMock(VacationRolloverLogMapper::class);
-		$log->method('existsForUserAndYears')->willReturn(false);
-		$log->expects($this->once())->method('insertLog');
-
-		$unit = new \OCA\ArbeitszeitCheck\Service\VacationUnitService($config);
-		$locking = $this->createMock(\OCP\Lock\ILockingProvider::class);
-		$locking->method('acquireLock');
-		$locking->method('releaseLock');
-		$migrate = new \OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService(
-			$config,
-			$this->createMock(\OCP\IDBConnection::class),
-			$unit,
-			$this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
-			$balance,
-			$this->createMock(AuditLogMapper::class),
-			null,
-			null,
-			$locking,
-		);
-
-		$permissionService = $this->createMock(PermissionService::class);
-		$permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
-
-		$s = new VacationRolloverService(
-			$config,
-			$alloc,
-			$balance,
-			$log,
-			$this->createMock(IUserManager::class),
-			$this->createMock(AuditLogMapper::class),
-			$permissionService,
-			$unit,
-			$migrate
-		);
-
-		$r = $s->processUserForFromYear('u1', 2026, false, false, true);
-		$this->assertSame('applied', $r['action']);
-		$this->assertSame(15.4, $r['amount']);
-	}
-
-	public function testProcessBlocksWhenVacationUnitMigrationInProgress(): void
-	{
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnCallback(
-			static function (string $app, string $key, $default = '') {
-				if ($key === Constants::CONFIG_VACATION_UNIT_MIGRATE_PENDING) {
-					return '{"target":"hours"}';
+		// 'broken' throws inside computeYearAllocation -> errors bucket
+		$this->allocation->method('computeYearAllocation')->willReturnCallback(
+			function ($uid) {
+				if ($uid === 'broken') {
+					throw new \RuntimeException('allocation exploded');
 				}
-				return '1';
+				return ['carryover_remaining_after_approved' => $this->carryoverRemaining, 'annual_remaining_after_approved' => 0];
 			}
 		);
-		$alloc = $this->createMock(VacationAllocationService::class);
-		$alloc->method('getCarryoverExpiryDateForYear')->willReturn(new \DateTimeImmutable('2026-03-31'));
-		$alloc->method('computeYearAllocation')->willReturn([
-			'carryover_remaining_after_approved' => 2.0,
-			'annual_remaining_after_approved' => 0.0,
-		]);
-		$alloc->method('applyCapToOpeningBalance')->willReturnCallback(static fn (float $d) => $d);
 
-		$balance = $this->createMock(VacationYearBalanceMapper::class);
-		$balance->method('getCarryoverDays')->willReturn(0.0);
-		$balance->expects($this->never())->method('upsert');
+		$stats = $this->service->runForAllUsers(2024, false, false, false);
+		$this->assertSame(1, $stats['applied']);
+		$this->assertSame(1, $stats['errors']);
+	}
 
-		$log = $this->createMock(VacationRolloverLogMapper::class);
-		$log->method('existsForUserAndYears')->willReturn(false);
-
-		$unit = new \OCA\ArbeitszeitCheck\Service\VacationUnitService($config);
-		$migrate = new \OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService(
-			$config,
-			$this->createMock(\OCP\IDBConnection::class),
-			$unit,
-			$this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
-			$balance,
-			$this->createMock(AuditLogMapper::class),
+	public function testRunForAllUsersSkipsDisallowedAndDisabled(): void
+	{
+		$disallowed = $this->createMock(IUser::class);
+		$disallowed->method('isEnabled')->willReturn(true);
+		$disallowed->method('getUID')->willReturn('mallory');
+		$disabled = $this->createMock(IUser::class);
+		$disabled->method('isEnabled')->willReturn(false);
+		$this->userManager->method('callForAllUsers')->willReturnCallback(
+			static function (callable $cb) use ($disallowed, $disabled): void {
+				$cb($disallowed);
+				$cb($disabled);
+			}
 		);
+		$this->allowed = false;
 
-		$s = new VacationRolloverService(
-			$config,
-			$alloc,
-			$balance,
-			$log,
-			$this->createMock(IUserManager::class),
-			$this->createMock(AuditLogMapper::class),
-			$this->createMock(PermissionService::class),
-			$unit,
-			$migrate
+		$stats = $this->service->runForAllUsers(2024, false, false, false);
+		$this->assertSame(0, $stats['applied']);
+		$this->assertSame(0, $stats['errors']);
+	}
+
+	public function testRunForSingleUserRejectsUnknownUser(): void
+	{
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willReturn(null);
+		$service = new VacationRolloverService(
+			$this->config, $this->allocation, $this->balanceMapper, $this->logMapper,
+			$userManager, $this->auditLogMapper, $this->permissionService, $this->unitService
 		);
+		$this->assertSame(
+			['applied' => 0, 'skipped' => 0, 'errors' => 0],
+			$service->runForSingleUser('ghost', 2024, false, false, false)
+		);
+	}
 
-		$this->expectException(\RuntimeException::class);
-		$this->expectExceptionMessage(Constants::VAC_UNIT_MIGRATE_IN_PROGRESS);
-		$s->processUserForFromYear('u1', 2026, false, false, true);
+	public function testRunForSingleUserSkipsWhenYearNotPastDeadline(): void
+	{
+		// onlyFromYear=2024, expiry 2024-05-31, today is real now (past) ->
+		// eligible; to exercise the "not past" arm use a year whose expiry is
+		// in the future relative to today.
+		$this->expiryOverride = (new \DateTimeImmutable('today'))->modify('+30 days');
+		$stats = $this->service->runForSingleUser('alice', 2024, false, false, false);
+		$this->assertSame(0, $stats['applied']);
+		$this->assertSame(0, $stats['errors']);
+	}
+
+	public function testRunForSingleUserAutoDiscoversEligibleYears(): void
+	{
+		$this->carryoverRemaining = 2.0;
+		$stats = $this->service->runForSingleUser('alice', null, true, false, false);
+		// many eligible past years -> dry-run applies to each
+		$this->assertGreaterThan(10, $stats['applied']);
 	}
 }

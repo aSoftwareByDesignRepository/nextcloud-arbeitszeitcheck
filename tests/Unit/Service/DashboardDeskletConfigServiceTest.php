@@ -94,4 +94,45 @@ class DashboardDeskletConfigServiceTest extends TestCase {
 		$this->assertCount(1, $config['projectCheck']['projects']);
 		$this->assertSame('42', $config['projectCheck']['projects'][0]['id']);
 	}
+
+	public function testBuildForUserFallsBackToWebPathWhenRoutesNotRegistered(): void {
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnArgument(0);
+
+		// router has no routes -> linkToRoute returns "" -> fallback must use appWebPathPrefix
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')->willReturn('');
+
+		$permissions = $this->createMock(PermissionService::class);
+		$permissions->method('canAccessManagerDashboard')->willReturn(false);
+		$permissions->method('isAdmin')->willReturn(false);
+
+		$projectCheck = $this->createMock(ProjectCheckIntegrationService::class);
+		$projectCheck->method('isLinkingEnabledForUser')->willReturn(false);
+		$projectCheck->method('isProjectCheckAvailable')->willReturn(false);
+
+		// case 1: appManager returns a path WITHOUT leading slash -> normalized
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppWebPath')->willReturn('custom_apps/arbeitszeitcheck');
+		$service = new DashboardDeskletConfigService($urlGenerator, $permissions, $l10n, $appManager, $projectCheck);
+		$config = $service->buildForUser('alice');
+		$this->assertSame(
+			'/index.php/custom_apps/arbeitszeitcheck/api/dashboard-widget/employee',
+			$config['employeeDataUrl']
+		);
+		$this->assertSame(
+			'/index.php/custom_apps/arbeitszeitcheck/dashboard',
+			$config['dashboardUrl']
+		);
+
+		// case 2: appManager returns empty -> default '/apps/<appid>' prefix
+		$appManagerEmpty = $this->createMock(IAppManager::class);
+		$appManagerEmpty->method('getAppWebPath')->willReturn('');
+		$service2 = new DashboardDeskletConfigService($urlGenerator, $permissions, $l10n, $appManagerEmpty, $projectCheck);
+		$config2 = $service2->buildForUser('alice');
+		$this->assertSame(
+			'/index.php/apps/arbeitszeitcheck/time-entries',
+			$config2['timeEntriesUrl']
+		);
+	}
 }

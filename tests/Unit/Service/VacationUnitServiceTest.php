@@ -76,6 +76,16 @@ class VacationUnitServiceTest extends TestCase
 		$this->assertSame(25.0, $s->storedAmountToAdminDays(25.0));
 	}
 
+	public function testGetStatusExposesMigratedAt(): void
+	{
+		$s = $this->make([Constants::CONFIG_VACATION_UNIT_MIGRATED_AT => '2026-09-01T12:00:00Z']);
+		$status = $s->getStatus();
+		$this->assertSame('2026-09-01T12:00:00Z', $status['migrated_at']);
+		$this->assertSame(Constants::VACATION_UNIT_DAYS, $status['unit']);
+
+		$this->assertNull($this->make()->getStatus()['migrated_at']);
+	}
+
 	public function testClientConfirmedFlag(): void
 	{
 		$off = $this->make();
@@ -88,5 +98,11 @@ class VacationUnitServiceTest extends TestCase
 	{
 		$s = $this->make([Constants::CONFIG_VACATION_HOURS_PER_DAY => '99']);
 		$this->assertSame(Constants::DEFAULT_VACATION_HOURS_PER_DAY, $s->getHoursPerDay());
+	}
+
+	public function testStoredAmountCeilingDependsOnUnit(): void
+	{
+		$this->assertSame(366.0, $this->make()->storedAmountCeiling());
+		$this->assertSame(4000.0, $this->make([Constants::CONFIG_VACATION_UNIT => Constants::VACATION_UNIT_HOURS])->storedAmountCeiling());
 	}
 }

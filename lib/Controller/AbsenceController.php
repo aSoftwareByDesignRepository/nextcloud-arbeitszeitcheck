@@ -178,10 +178,10 @@ class AbsenceController extends Controller
 	/**
 	 * Render the user-friendly error/redirect for invalid dates submitted via the form.
 	 */
-	private function invalidDatesResponse(): JSONResponse|RedirectResponse
+	private function invalidDatesResponse(bool $json): JSONResponse|RedirectResponse
 	{
 		$msg = $this->l10n->t('Please enter dates in the format dd.mm.yyyy.');
-		if (!$this->wantsJson()) {
+		if (!$json) {
 			$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
 			return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 		}
@@ -393,7 +393,7 @@ class AbsenceController extends Controller
 	#[NoCSRFRequired]
 	public function apiStore(): JSONResponse
 	{
-		return $this->store();
+		return $this->storeInternal(true);
 	}
 
 	/**
@@ -442,7 +442,7 @@ class AbsenceController extends Controller
 		$sub = $params['substitute_user_id'] ?? null;
 		$dayFraction = array_key_exists('day_fraction', $params) ? $params['day_fraction'] : null;
 		$durationHours = array_key_exists('duration_hours', $params) ? $params['duration_hours'] : null;
-		return $this->update(
+		return $this->updateInternal(
 			$id,
 			isset($params['start_date']) ? (is_array($params['start_date']) ? (string)reset($params['start_date']) : (string)$params['start_date']) : null,
 			isset($params['end_date']) ? (is_array($params['end_date']) ? (string)reset($params['end_date']) : (string)$params['end_date']) : null,
@@ -451,7 +451,8 @@ class AbsenceController extends Controller
 				: null,
 			$sub !== null ? (string)$sub : null,
 			$dayFraction !== null ? (is_array($dayFraction) ? (string)reset($dayFraction) : (string)$dayFraction) : null,
-			$durationHours !== null ? (is_array($durationHours) ? (string)reset($durationHours) : (string)$durationHours) : null
+			$durationHours !== null ? (is_array($durationHours) ? (string)reset($durationHours) : (string)$durationHours) : null,
+			true
 		);
 	}
 
@@ -1000,6 +1001,15 @@ class AbsenceController extends Controller
 	#[NoAdminRequired]
 	public function store(): JSONResponse|RedirectResponse
 	{
+		return $this->storeInternal($this->wantsJson());
+	}
+
+	/**
+	 * Shared absence-create flow. `$json === true` forces JSON envelopes — the
+	 * api* routes must never emit RedirectResponse (declared JSONResponse).
+	 */
+	private function storeInternal(bool $json): JSONResponse|RedirectResponse
+	{
 		try {
 			$userId = $this->getUserId();
 			
@@ -1039,7 +1049,7 @@ class AbsenceController extends Controller
 
 			if (empty($data['type']) || empty($data['start_date']) || empty($data['end_date'])) {
 				$msg = $this->l10n->t('Please choose a type and fill in start and end date.');
-				if (!$this->wantsJson()) {
+				if (!$json) {
 					$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
 					return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 				}
@@ -1053,12 +1063,12 @@ class AbsenceController extends Controller
 				$ds = $this->parseFormDate($data['start_date']);
 				$de = $this->parseFormDate($data['end_date']);
 			} catch (\InvalidArgumentException $e) {
-				return $this->invalidDatesResponse();
+				return $this->invalidDatesResponse($json);
 			}
 
 			if ($ds > $de) {
 				$msg = $this->l10n->t('End date cannot be before start date.');
-				if (!$this->wantsJson()) {
+				if (!$json) {
 					$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
 					return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 				}
@@ -1070,7 +1080,7 @@ class AbsenceController extends Controller
 				$this->monthClosureService->assertDateRangeMutable($userId, $ds, $de);
 			} catch (MonthFinalizedException $e) {
 				$msg = $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.');
-				if (!$this->wantsJson()) {
+				if (!$json) {
 					$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
 					return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 				}
@@ -1086,7 +1096,7 @@ class AbsenceController extends Controller
 
 			$absence = $this->absenceService->createAbsence($data, $userId);
 
-			if (!$this->wantsJson()) {
+			if (!$json) {
 				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?created=1';
 				$days = $absence->getDays();
 				if ($days !== null && abs((float)$days - 0.5) < 0.011) {
@@ -1101,7 +1111,7 @@ class AbsenceController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::store: ' . $e->getMessage(), ['exception' => $e]);
 			$msg = $this->getSafeErrorMessage($e);
-			if (!$this->wantsJson()) {
+			if (!$json) {
 				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
 				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 			}
@@ -1171,6 +1181,24 @@ class AbsenceController extends Controller
 		?string $duration_hours = null,
 	): JSONResponse|RedirectResponse
 	{
+		return $this->updateInternal($id, $start_date, $end_date, $reason, $substitute_user_id, $day_fraction, $duration_hours, $this->wantsJson());
+	}
+
+	/**
+	 * Shared absence-update flow; `$json === true` forces JSON envelopes for
+	 * the api* routes (never RedirectResponse).
+	 */
+	private function updateInternal(
+		int $id,
+		?string $start_date,
+		?string $end_date,
+		?string $reason,
+		?string $substitute_user_id,
+		?string $day_fraction,
+		?string $duration_hours,
+		bool $json,
+	): JSONResponse|RedirectResponse
+	{
 		try {
 			$userId = $this->getUserId();
 			$data = [];
@@ -1208,11 +1236,11 @@ class AbsenceController extends Controller
 					$nStart = isset($data['start_date']) ? $this->parseFormDate((string)$data['start_date']) : $existing->getStartDate();
 					$nEnd = isset($data['end_date']) ? $this->parseFormDate((string)$data['end_date']) : $existing->getEndDate();
 				} catch (\InvalidArgumentException $e) {
-					return $this->invalidDatesResponse();
+					return $this->invalidDatesResponse($json);
 				}
 				if ($nStart > $nEnd) {
 					$msg = $this->l10n->t('End date cannot be before start date.');
-					if (!$this->wantsJson()) {
+					if (!$json) {
 						$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.edit', ['id' => $id]) . '?error=' . rawurlencode($msg);
 						return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 					}
@@ -1237,7 +1265,7 @@ class AbsenceController extends Controller
 
 			$absence = $this->absenceService->updateAbsence($id, $data, $userId);
 
-			if (!$this->wantsJson()) {
+			if (!$json) {
 				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?updated=1';
 				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 			}

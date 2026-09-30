@@ -25,6 +25,23 @@ class DashboardDeskletRenderServiceTest extends TestCase
 		$this->assertStringContainsString('new \\OCP\\Template', $source);
 	}
 
+	public function testWorkspaceRendererRendersPartialWithoutPageLayout(): void
+	{
+		$source = file_get_contents(
+			dirname(__DIR__, 3) . '/lib/Service/DashboardDeskletWorkspaceRenderer.php',
+		);
+		$this->assertIsString($source);
+		$this->assertStringContainsString('TemplateResponse::RENDER_AS_BLANK', $source);
+
+		foreach (["'blank'", "'user'", "'guest'", "'base'", "'error'", "'public'"] as $renderAs) {
+			$this->assertStringNotContainsString(
+				$renderAs,
+				$source,
+				'Truthy renderAs wraps the partial in TemplateLayout and breaks page script order',
+			);
+		}
+	}
+
 	public function testRenderForUserReturnsConfigAndHtml(): void
 	{
 		$config = ['status' => 'clocked_out', 'l10n' => []];

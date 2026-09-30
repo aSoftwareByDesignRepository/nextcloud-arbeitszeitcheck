@@ -110,6 +110,9 @@ class TimeEntryControllerTest extends TestCase
 
 	private bool $hasAssignableManager = false;
 
+	/** @var array<int, TimeEntry> */
+	private array $overlappingEntries = [];
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -153,7 +156,9 @@ class TimeEntryControllerTest extends TestCase
 		$this->permissionService->method('canAccessManagerDashboard')->willReturn(false);
 		$this->permissionService->method('isAdmin')->willReturn(false);
 
-		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('findOverlapping')->willReturnCallback(
+			fn () => $this->overlappingEntries
+		);
 
 		$tzConfig = $this->createMock(IConfig::class);
 		$tzConfig->method('getAppValue')->willReturnCallback(static fn ($app, $key, $default) => match ($key) {
@@ -164,24 +169,28 @@ class TimeEntryControllerTest extends TestCase
 		$tzDateTimeZone->method('getTimeZone')->willReturn(new \DateTimeZone('Europe/Berlin'));
 		$tzUserSession = $this->createMock(IUserSession::class);
 		$tzUserSession->method('getUser')->willReturn(null);
-		$timeZoneService = new TimeZoneService($tzConfig, $tzDateTimeZone, $tzUserSession, new NullLogger());
+		$this->timeZoneService = new TimeZoneService($tzConfig, $tzDateTimeZone, $tzUserSession, new NullLogger());
+		$timeZoneService = $this->timeZoneService;
 
 		$overtimeBankService = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class);
 		$overtimeBankService->method('isEnabled')->willReturn(false);
 		$overtimeBankService->method('getBankStatus')->willReturn(['enabled' => false]);
 
-		$localeFormat = $this->createMock(LocaleFormatService::class);
-		$localeFormat->method('clientHints')->willReturn([]);
-		$navigationFlags = new NavigationFlagsService(
+		$this->localeFormat = $this->createMock(LocaleFormatService::class);
+		$this->localeFormat->method('clientHints')->willReturn([]);
+		$localeFormat = $this->localeFormat;
+		$this->navigationFlags = new NavigationFlagsService(
 			$this->absenceMapper,
 			$this->permissionService,
 			$this->config
 		);
+		$navigationFlags = $this->navigationFlags;
 
-		$projectCheckIntegration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
-		$projectCheckIntegration->method('isProjectCheckAvailable')->willReturn(false);
-		$projectCheckIntegration->method('getAvailableProjects')->willReturn([]);
-		$projectCheckIntegration->method('userMayAttachProjectCheckProjectToOwnTime')->willReturn(true);
+		$this->projectCheckIntegration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$this->projectCheckIntegration->method('isProjectCheckAvailable')->willReturn(false);
+		$this->projectCheckIntegration->method('getAvailableProjects')->willReturn([]);
+		$this->projectCheckIntegration->method('userMayAttachProjectCheckProjectToOwnTime')->willReturn(true);
+		$projectCheckIntegration = $this->projectCheckIntegration;
 
 		$this->timeCaptureMethodService = $this->createMock(TimeCaptureMethodService::class);
 		$this->timeCaptureMethodService->method('getSettings')->willReturn([
@@ -199,6 +208,8 @@ class TimeEntryControllerTest extends TestCase
 			$this->monthClosureGuard,
 			$this->l10n,
 		);
+
+		$this->db = $this->createMock(\OCP\IDBConnection::class);
 
 		$this->correctionService = $this->createMock(TimeEntryCorrectionService::class);
 		$this->correctionService->method('prepareManualPending')->willReturnCallback(
@@ -244,6 +255,7 @@ class TimeEntryControllerTest extends TestCase
 			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
 			$this->timeCaptureMethodService,
 			$deletionPolicy,
+			$this->db,
 		);
 	}
 
@@ -551,6 +563,255 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertArrayHasKey('entry', $data);
 	}
 
+
+	/**
+	 * Build an owned, editable entry (completed, within the 14-day window).
+	 */
+	private function editableEntry(string $userId = 'testuser', ?string $status = null): TimeEntry
+	{
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setIsManualEntry(true);
+		$entry->setStatus($status ?? TimeEntry::STATUS_COMPLETED);
+		$entry->setJustification('justification');
+		$entry->setStartTime((new \DateTime())->modify('-1 day')->setTime(9, 0, 0));
+		$entry->setEndTime((new \DateTime())->modify('-1 day')->setTime(17, 0, 0));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+		return $entry;
+	}
+
+	private function signIn(string $userId = 'testuser'): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+	}
+
+	public function testUpdateReturnsConflictWhenMonthFinalized(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->monthClosureGuard->method('assertTimeEntryMutable')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\MonthFinalizedException('finalized'));
+
+		$r = $this->controller->update(1, '2026-03-01', 8.0);
+		$this->assertSame(Http::STATUS_CONFLICT, $r->getStatus());
+		$this->assertSame('month_finalized', $r->getData()['error_code']);
+	}
+
+	public function testUpdateRejectedWhenEntryLockedForEmployeeEdit(): void
+	{
+		$this->signIn();
+		$entry = $this->editableEntry();
+		$entry->setApprovedByUserId('manager1');
+		$entry->setApprovedAt(new \DateTime());
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1, '2026-03-01', 8.0);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+		$this->assertStringContainsString('Request Correction', $r->getData()['error']);
+	}
+
+	public function testUpdatePausedEntryWithOnlyEndTimeAllowedWhenApprovalRequired(): void
+	{
+		$this->signIn();
+		$this->appConfigValues[Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL] = '1';
+		$entry = $this->editableEntry('testuser', TimeEntry::STATUS_PAUSED);
+		$entry->setEndTime(null);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		// Completion-only payload: only the allowed keys pass the gate.
+		$this->request->method('getParams')->willReturn([
+			'endTime' => '17:00',
+		]);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (TimeEntry $e) => $e);
+
+		$r = $this->controller->update(1);
+		$data = $r->getData();
+		$this->assertTrue($data['success'], 'Unexpected: ' . json_encode($data));
+		// NOTE: endTime alone is gate-allowed but not written by update()
+		// (the write branch requires startTime+endTime together). The entry
+		// stays paused — one-click finalisation lives in complete().
+		$this->assertSame(TimeEntry::STATUS_PAUSED, $entry->getStatus());
+	}
+
+	public function testUpdatePausedEntryWithDescriptionForbiddenWhenApprovalRequired(): void
+	{
+		$this->signIn();
+		$this->appConfigValues[Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL] = '1';
+		$this->urlGenerator->method('linkToRoute')->willReturn('/apps/arbeitszeitcheck/timeentries');
+		$entry = $this->editableEntry('testuser', TimeEntry::STATUS_PAUSED);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->request->method('getParams')->willReturn([
+			'date' => (new \DateTime())->modify('-1 day')->format('Y-m-d'),
+			'startTime' => '09:00',
+			'endTime' => '17:00',
+			'description' => 'changed', // non-completion field -> not a completion-only update
+		]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $r->getStatus());
+		$this->assertSame('correction_required', $r->getData()['error_code']);
+		$this->assertSame('/apps/arbeitszeitcheck/timeentries', $r->getData()['correction_url']);
+	}
+
+	public function testUpdateRejectsTooLongProjectCheckId(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->request->method('getParams')->willReturn([]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1, null, null, null, str_repeat('x', TimeEntry::PROJECT_CHECK_PROJECT_ID_MAX_LENGTH + 1));
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testUpdateRejectsProjectCheckAttachWhenForbidden(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+
+		// rebuild controller seam: projectCheck denies the attach
+		$pc = (function (): void {
+			$rp = new \ReflectionProperty($this->controller, 'projectCheckIntegration');
+			$rp->setAccessible(true);
+			$mock = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+			$mock->method('userMayAttachProjectCheckProjectToOwnTime')->willReturn(false);
+			$rp->setValue($this->controller, $mock);
+		})();
+		unset($pc);
+		$this->request->method('getParams')->willReturn([
+			'project_check_project_id' => '42',
+		]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1, '2026-03-01', 8.0);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	public function testUpdateRejectsOverlapWithLocalizedClockTimes(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->request->method('getParams')->willReturn([]);
+
+		$other = new TimeEntry();
+		$other->setId(2);
+		$other->setUserId('testuser');
+		$other->setStartTime((new \DateTime())->modify('-1 day')->setTime(10, 0, 0));
+		$other->setEndTime((new \DateTime())->modify('-1 day')->setTime(12, 0, 0));
+		$this->overlappingEntries = [$other];
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1, '2026-03-01', 8.0);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+		$this->assertStringContainsString('overlaps', $r->getData()['error']);
+		// displayClock rendered HH:MM for both ends
+		$this->assertMatchesRegularExpression('/\d{2}:\d{2} - \d{2}:\d{2}/', $r->getData()['error']);
+	}
+
+	public function testUpdateAppliesBreaksJsonAndClearsSingleBreakFields(): void
+	{
+		$this->signIn();
+		$entry = $this->editableEntry();
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$yesterday = (new \DateTime())->modify('-1 day')->format('Y-m-d');
+		$this->request->method('getParams')->willReturn([
+			'date' => $yesterday,
+			'startTime' => '09:00',
+			'endTime' => '17:30',
+			// 30-minute break passes the DE 15-min floor; 5-minute break is dropped
+			'breaks' => json_encode([
+				['start' => '12:00', 'end' => '12:30'],
+				['start' => '15:00', 'end' => '15:05'],
+			]),
+		]);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (TimeEntry $e) => $e);
+
+		$r = $this->controller->update(1);
+		$data = $r->getData();
+		$this->assertTrue($data['success'], 'Unexpected: ' . json_encode($data));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(1, $breaks, 'short break must be filtered by the countable floor');
+		$this->assertNull($entry->getBreakStartTime());
+		$this->assertNull($entry->getBreakEndTime());
+	}
+
+	public function testUpdateOvernightShiftRollsEndToNextDay(): void
+	{
+		$this->signIn();
+		$entry = $this->editableEntry();
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$yesterday = (new \DateTime())->modify('-1 day')->format('Y-m-d');
+		$this->request->method('getParams')->willReturn([
+			'date' => $yesterday,
+			'startTime' => '22:00',
+			'endTime' => '02:00',
+		]);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (TimeEntry $e) => $e);
+
+		$r = $this->controller->update(1);
+		$data = $r->getData();
+		$this->assertTrue($data['success'], 'Unexpected: ' . json_encode($data));
+		$this->assertSame('22:00', $entry->getStartTime()->format('H:i'));
+		$this->assertSame('02:00', $entry->getEndTime()->format('H:i'));
+		$this->assertSame(
+			(new \DateTime())->format('Y-m-d'),
+			$entry->getEndTime()->format('Y-m-d'),
+			'end must roll to the next calendar day for overnight shifts'
+		);
+	}
+
+	public function testUpdateRejectsInvalidLegacyHours(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->request->method('getParams')->willReturn([]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->update(1, '2026-03-01', 25.0);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+	}
+
+	public function testGetOvertimeCustomPeriodUsesExplicitRange(): void
+	{
+		$this->signIn();
+		$this->overtimeService->expects($this->once())
+			->method('calculateOvertime')
+			->with('testuser', $this->callback(
+				static fn ($d) => $d instanceof \DateTimeInterface && $d->format('Y-m-d') === '2026-01-01'
+			), $this->callback(
+				static fn ($d) => $d instanceof \DateTimeInterface && $d->format('Y-m-d') === '2026-02-01'
+			))
+			->willReturn(['total_hours_worked' => 10.0]);
+
+		$r = $this->controller->getOvertime('custom', '2026-01-01', '2026-01-31');
+		$this->assertTrue($r->getData()['success']);
+		$this->assertSame(10.0, $r->getData()['overtime']['total_hours_worked']);
+	}
+
+	public function testGetOvertimeCustomPeriodValidatesRange(): void
+	{
+		$this->signIn();
+		$this->overtimeService->expects($this->never())->method('calculateOvertime');
+
+		// missing dates
+		$r = $this->controller->getOvertime('custom', null, null);
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+
+		// inverted range
+		$r = $this->controller->getOvertime('custom', '2026-02-01', '2026-01-01');
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $r->getStatus());
+	}
+
 	/**
 	 * Test update returns forbidden when user doesn't own entry
 	 */
@@ -668,6 +929,111 @@ class TimeEntryControllerTest extends TestCase
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 		$this->assertStringContainsString('Only entries from the last 2 weeks', $data['error']);
+	}
+
+	public function testRequestCorrectionAcceptsIsoTimesAndBreaks(): void
+	{
+		$this->signIn();
+		$entry = $this->editableEntry();
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->request->method('getParams')->willReturn([
+			'justification' => 'Clock was wrong, correcting times.',
+			'startTime' => '2026-03-01T08:00:00Z',
+			'endTime' => '2026-03-01T16:30:00Z',
+			'breakStartTime' => '2026-03-01T12:00:00Z',
+			'breakEndTime' => '2026-03-01T12:30:00Z',
+			'breaks' => [['start' => '2026-03-01T12:00:00Z', 'end' => '2026-03-01T12:30:00Z']],
+			'description' => 'corrected',
+		]);
+		$this->hasAssignableManager = true; // keep it pending (no auto-approve)
+		$this->correctionService->method('validateProposal')->willReturn(null);
+		$this->timeEntryMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (TimeEntry $e) => $e);
+
+		$r = $this->controller->requestCorrection(1);
+		$data = $r->getData();
+		$this->assertTrue($data['success'], 'Unexpected: ' . json_encode($data));
+		$this->assertSame(TimeEntry::STATUS_PENDING_APPROVAL, $entry->getStatus());
+		$just = json_decode((string)$entry->getJustification(), true);
+		$this->assertSame('2026-03-01T08:00:00+00:00', $just['proposed']['startTime']);
+		$this->assertSame('2026-03-01T12:30:00+00:00', $just['proposed']['breakEndTime']);
+		$this->assertSame('corrected', $just['proposed']['description']);
+	}
+
+	public function testRequestCorrectionRejectsInvalidIsoStartTime(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->request->method('getParams')->willReturn([
+			'justification' => 'Clock was wrong, correcting times.',
+			'startTime' => 'not-a-date',
+			'endTime' => '2026-03-01T16:30:00Z',
+		]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		$r = $this->controller->requestCorrection(1);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $r->getStatus());
+		$this->assertStringContainsString('start_time', $r->getData()['error']);
+	}
+
+	public function testEditRendersFormForOwnedEntry(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')->willReturn($this->editableEntry());
+		$this->urlGenerator->method('linkToRoute')->willReturn('/apps/arbeitszeitcheck/x');
+
+		$r = $this->controller->edit(1);
+		$params = $r->getParams();
+		$this->assertSame('edit', $params['mode']);
+		$this->assertSame(1, $params['entry']->getId());
+		$this->assertTrue($params['timeCapture']['manualTimeEntryEnabled']);
+	}
+
+	public function testEditRendersListWithErrorWhenLocked(): void
+	{
+		$this->signIn();
+		$entry = $this->editableEntry();
+		$entry->setApprovedByUserId('manager1');
+		$entry->setApprovedAt(new \DateTime());
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+
+		$r = $this->controller->edit(1);
+		$params = $r->getParams();
+		$this->assertSame('list', $params['mode']);
+		$this->assertStringContainsString('Request Correction', $params['error']);
+	}
+
+	public function testEditFallsBackToSafeParamsWhenLookupThrows(): void
+	{
+		$this->signIn();
+		$this->timeEntryMapper->method('find')
+			->willThrowException(new \RuntimeException('db gone'));
+
+		$r = $this->controller->edit(1);
+		$params = $r->getParams();
+		$this->assertSame('list', $params['mode']);
+		// fallback params shape (user context unavailable)
+		$this->assertFalse($params['monthClosureEnabled']);
+		$this->assertFalse($params['showAdminNav']);
+		$this->assertArrayHasKey('error', $params);
+	}
+
+	public function testEditUsesSharedFallbackParamsWhenUserLookupAlsoFails(): void
+	{
+		// find() throws AND getUserId() inside the catch also throws ->
+		// only getTimeEntriesSharedTemplateParamsFallback() output survives.
+		$this->userSession->method('getUser')->willReturn(null);
+		$this->timeEntryMapper->method('find')
+			->willThrowException(new \RuntimeException('db gone'));
+
+		$r = $this->controller->edit(1);
+		$params = $r->getParams();
+		$this->assertSame('list', $params['mode']);
+		$this->assertFalse($params['monthClosureEnabled']);
+		$this->assertFalse($params['showSubstitutionLink']);
+		$this->assertFalse($params['showManagerLink']);
+		$this->assertFalse($params['showReportsLink']);
+		$this->assertFalse($params['showAdminNav']);
 	}
 
 	/**
@@ -1086,6 +1452,167 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertFalse($data['success']);
 		$this->assertSame('compliance_blocked', $data['error_code']);
 		$this->assertStringContainsString('30-minute', $data['error']);
+	}
+
+	public function testGetOvertimeBankHappyAndErrorArms(): void
+	{
+		$bank = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class);
+		$bank->method('isEnabled')->willReturn(true);
+		$bank->method('getBankStatus')->willReturn(['enabled' => true, 'balance' => 4.5]);
+		$ctrl = $this->controllerWithOvertimeBank($bank);
+		$r = $ctrl->getOvertimeBank();
+		$this->assertTrue($r->getData()['success']);
+		$this->assertSame(4.5, $r->getData()['bank']['balance']);
+
+		$bankFail = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class);
+		$bankFail->method('getBankStatus')
+			->willThrowException(new \RuntimeException('db gone'));
+		$ctrlFail = $this->controllerWithOvertimeBank($bankFail);
+		$r = $ctrlFail->getOvertimeBank();
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $r->getStatus());
+		$this->assertFalse($r->getData()['success']);
+	}
+
+	private function controllerWithOvertimeBank(\OCA\ArbeitszeitCheck\Service\OvertimeBankService $bank): TimeEntryController
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		return new TimeEntryController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->timeEntryMapper,
+			$this->userSession,
+			$this->overtimeService,
+			$bank,
+			$this->urlGenerator,
+			$this->l10n,
+			$this->auditLogMapper,
+			$this->config,
+			$this->cspService,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->teamResolver,
+			$this->notificationService,
+			$this->monthClosureGuard,
+			$this->absenceMapper,
+			$this->permissionService,
+			$this->timeZoneService,
+			$this->correctionService,
+			$this->localeFormat,
+			$this->navigationFlags,
+			$this->projectCheckIntegration,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+			$this->timeCaptureMethodService,
+			new TimeEntryDeletionPolicy($this->config, $this->monthClosureGuard, $this->l10n),
+			$this->db,
+		);
+	}
+
+	public function testApiStoreRealTimeComplianceCheckArms(): void
+	{
+		$this->appConfigValues['realtime_compliance_check'] = '1';
+		$this->complianceService->method('blockingIssuesForCompletedEntry')->willReturn([]);
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->request->method('getParams')->willReturn([
+			'date' => '2024-01-15',
+			'startTime' => '09:00',
+			'endTime' => '17:00',
+			'breaks' => [['start' => '12:00', 'end' => '12:30']],
+		]);
+		$savedEntry = new TimeEntry();
+		$savedEntry->setId(1);
+		$savedEntry->setUserId('testuser');
+		$savedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$savedEntry->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$savedEntry->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$this->timeEntryMapper->method('insert')->willReturn($savedEntry);
+
+		// arm: violations found -> info-logged, store still succeeds (warning mode)
+		$this->complianceService->method('checkComplianceForCompletedEntry')
+			->willReturn([['type' => 'rest_period']]);
+		$this->assertSame(Http::STATUS_CREATED, $this->controller->apiStore()->getStatus());
+	}
+
+	public function testApiStoreRealTimeComplianceExceptionRethrowsInStrictMode(): void
+	{
+		$this->appConfigValues['realtime_compliance_check'] = '1';
+		$this->appConfigValues['compliance_strict_mode'] = '1';
+		$this->complianceService->method('blockingIssuesForCompletedEntry')->willReturn([]);
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->request->method('getParams')->willReturn([
+			'date' => '2024-01-15',
+			'startTime' => '09:00',
+			'endTime' => '17:00',
+			'breaks' => [['start' => '12:00', 'end' => '12:30']],
+		]);
+		$savedEntry = new TimeEntry();
+		$savedEntry->setId(1);
+		$savedEntry->setUserId('testuser');
+		$savedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$savedEntry->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$savedEntry->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$this->timeEntryMapper->method('insert')->willReturn($savedEntry);
+
+		// pre-save gate (persist=false) passes; the post-persist check (persist=true)
+		// throws -> strict rethrow inside the atomic block -> rollBack, not commit.
+		$calls = 0;
+		$this->complianceService->method('checkComplianceForCompletedEntry')
+			->willReturnCallback(static function () use (&$calls) {
+				$calls++;
+				if ($calls === 1) {
+					return [];
+				}
+				throw new \RuntimeException('compliance engine down');
+			});
+
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('rollBack');
+		$this->db->expects($this->never())->method('commit');
+
+		$response = $this->controller->apiStore();
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testApiStoreRealTimeComplianceWarningModeLogsAndCommits(): void
+	{
+		$this->appConfigValues['realtime_compliance_check'] = '1';
+		$this->appConfigValues['compliance_strict_mode'] = '0';
+		$this->complianceService->method('blockingIssuesForCompletedEntry')->willReturn([]);
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->request->method('getParams')->willReturn([
+			'date' => '2024-01-15',
+			'startTime' => '09:00',
+			'endTime' => '17:00',
+			'breaks' => [['start' => '12:00', 'end' => '12:30']],
+		]);
+		$savedEntry = new TimeEntry();
+		$savedEntry->setId(1);
+		$savedEntry->setUserId('testuser');
+		$savedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$savedEntry->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$savedEntry->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$this->timeEntryMapper->method('insert')->willReturn($savedEntry);
+
+		$this->complianceService->method('checkComplianceForCompletedEntry')
+			->willThrowException(new \RuntimeException('compliance engine down'));
+
+		// warning mode -> check error is logged, entry stays committed
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('commit');
+		$this->db->expects($this->never())->method('rollBack');
+
+		$this->assertSame(Http::STATUS_CREATED, $this->controller->apiStore()->getStatus());
 	}
 
 	public function testApiStoreAcceptsBreaksArrayPayload(): void

@@ -51,9 +51,12 @@
   font-weight: 600;
   font-size: 1rem;
   line-height: 1.3;
-  text-align: center;
   cursor: pointer;
   user-select: none;
+}
+
+.admin-users-access-filter__option > span {
+  text-align: center;
 }
 
 .admin-users-access-filter__option:has(input:checked) {

@@ -117,8 +117,66 @@ class AtlasAdminCompanionControllersTest extends TestCase
 			$this->l10n(),
 		);
 
-		$this->assertInstanceOf(TemplateResponse::class, $c->index());
+		$kioskIndex = $c->index();
+		$this->assertInstanceOf(TemplateResponse::class, $kioskIndex);
+		$this->assertTrue($kioskIndex->getParams()['showAdminNav']);
+		$this->assertTrue($kioskIndex->getParams()['showManagerLink']);
 		$this->assertTrue($c->listCredentials()->getData()['success']);
+
+		// credentials listing with rows exercises the enrichment loop
+		$cred = new \OCA\ArbeitszeitCheck\Db\KioskCred();
+		$cred->setId(3);
+		$cred->setUserId('emp1');
+		$cred->setType('pin');
+		$cred->setLabel('front door');
+		$cred->setLockedUntil(new \DateTime('2030-01-01T00:00:00Z'));
+		$creds2 = $this->createMock(KioskCredentialService::class);
+		$creds2->method('listCredentials')->willReturn([$cred]);
+		$creds2->method('importCsv')->willReturn(['imported' => 1]);
+		$settings2 = $this->createMock(KioskSettingsService::class);
+		$settings2->method('isUserKioskAllowed')->willReturn(true);
+		$emp = $this->createMock(IUser::class);
+		$emp->method('getDisplayName')->willReturn('Emp One');
+		$um2 = $this->createMock(IUserManager::class);
+		$um2->method('get')->willReturn($emp);
+		$c2k = new KioskAdminController(
+			'arbeitszeitcheck',
+			$request,
+			$terminal,
+			$creds2,
+			$enroll,
+			$settings2,
+			$devices,
+			$errors,
+			$um2,
+			$ps,
+			$this->adminSession(),
+			$this->csp(),
+			$this->url(),
+			$this->locale(),
+			$this->l10n(),
+		);
+		$credData = $c2k->listCredentials()->getData()['data']['credentials'];
+		$this->assertSame('Emp One', $credData[0]['displayName']);
+		$this->assertTrue($credData[0]['hasPin']);
+		$this->assertFalse($credData[0]['hasRfid']);
+		$this->assertTrue($credData[0]['kioskAllowed']);
+		$this->assertNotNull($credData[0]['lockedUntil']);
+
+		// CSV import happy path + KioskException arm
+		$reqProp = new \ReflectionProperty(\OCP\AppFramework\Controller::class, 'request');
+		$reqProp->setAccessible(true);
+		$reqProp->setValue($c2k, $this->requestWithParams(['csv' => "uid,type\nemp1,pin"]));
+		$this->assertTrue($c2k->importCredentials()->getData()['success']);
+		$creds2x = $this->createMock(KioskCredentialService::class);
+		$creds2x->method('importCsv')->willThrowException(new \OCA\ArbeitszeitCheck\Service\Kiosk\KioskException('KIOSK_IMPORT_INVALID'));
+		$c3k = new KioskAdminController(
+			'arbeitszeitcheck', $request, $terminal, $creds2x, $enroll, $settings2,
+			$devices, $errors, $um2, $ps, $this->adminSession(), $this->csp(),
+			$this->url(), $this->locale(), $this->l10n(),
+		);
+		$reqProp->setValue($c3k, $this->requestWithParams(['csv' => 'x']));
+		$this->assertFalse($c3k->importCredentials()->getData()['success']);
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $c->createTerminal()->getStatus());
 
 		$reqEnabled = $this->createMock(IRequest::class);
@@ -248,10 +306,30 @@ class AtlasAdminCompanionControllersTest extends TestCase
 			$this->l10n(),
 		);
 
-		$this->assertInstanceOf(TemplateResponse::class, $c->index());
+		$payoutIndex = $c->index();
+		$this->assertInstanceOf(TemplateResponse::class, $payoutIndex);
+		$this->assertTrue($payoutIndex->getParams()['showAdminNav']);
+		$this->assertTrue($payoutIndex->getParams()['showReportsLink']);
 		$this->assertInstanceOf(TemplateResponse::class, $c->auditIndex());
 		$this->assertTrue($c->listMonth()->getData()['success']);
 		$this->assertTrue($c->listAudit()->getData()['success']);
+
+		// error arms: InvalidArgumentException -> 400, Throwable -> 500
+		$payoutErr = $this->createMock(OvertimePayoutService::class);
+		$payoutErr->method('listMonthOverview')
+			->willThrowException(new \InvalidArgumentException('bad month'));
+		$payoutErr->method('buildPayrollCsv')
+			->willThrowException(new \RuntimeException('db gone'));
+		$cErr = new OvertimePayoutController(
+			'arbeitszeitcheck', $request, $payoutErr, $audit, $bank, $mcs, $ps,
+			$this->adminSession(), $this->csp(), $this->url(), $this->locale(), $this->l10n(),
+		);
+		$rMonth = $cErr->listMonth();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $rMonth->getStatus());
+		$this->assertSame('bad month', $rMonth->getData()['error']);
+		$rCsv = $cErr->exportCsv();
+		$this->assertInstanceOf(JSONResponse::class, $rCsv);
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $rCsv->getStatus());
 		$this->assertTrue($c->myHistory()->getData()['success']);
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $c->processOne()->getStatus());
 		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $c->exportCsv());

@@ -537,4 +537,49 @@ class TimeTrackingControllerTest extends TestCase
 		$response = $this->controller->enforceDailyMaximum();
 		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 	}
+
+	private function signIn(string $uid = 'testuser'): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($uid);
+		$this->userSession->method('getUser')->willReturn($user);
+	}
+
+	public function testClockInMonthFinalizedMapsTo409(): void
+	{
+		$this->signIn();
+		$this->timeTrackingService->method('clockIn')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\MonthFinalizedException('sealed'));
+
+		$r = $this->controller->clockIn();
+		$d = $r->getData();
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $r->getStatus());
+		$this->assertFalse($d['success']);
+		$this->assertSame(\OCA\ArbeitszeitCheck\BusinessRuleCode::MONTH_FINALIZED, $d['error_code']);
+	}
+
+	public function testClockInOutOfBoundsOccurredAtMapsTo422(): void
+	{
+		$this->signIn();
+		$this->timeTrackingService->expects($this->never())->method('clockIn');
+
+		// occurredAt far outside the accepted skew window -> StampReplayException
+		$r = $this->controller->clockIn(null, null, 'req-1', null, '2001-01-01T00:00:00Z');
+		$d = $r->getData();
+		$this->assertSame(422, $r->getStatus());
+		$this->assertFalse($d['success']);
+		$this->assertSame('STAMP_OCCURRED_AT_OUT_OF_BOUNDS', $d['error_code']);
+	}
+
+	public function testClockOutStampReplayErrorMapsTo422(): void
+	{
+		$this->signIn();
+		$this->timeTrackingService->method('clockOut')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\StampReplayException('STAMP_CLIENT_REQUEST_ID_INVALID'));
+
+		$r = $this->controller->clockOut();
+		$d = $r->getData();
+		$this->assertSame(422, $r->getStatus());
+		$this->assertSame('STAMP_CLIENT_REQUEST_ID_INVALID', $d['error_code']);
+	}
 }

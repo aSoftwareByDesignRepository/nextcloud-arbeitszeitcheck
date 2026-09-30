@@ -105,4 +105,60 @@ final class MobileSeatServiceBatchTest extends TestCase
 		$this->assertSame(1, $result['summary']['skipped']);
 		$this->assertSame('already_seated', $result['results'][0]['error']);
 	}
+
+	public function testListSeatsMapsUsersAndFallsBackToUid(): void
+	{
+		$mapper = $this->createMock(MobileSeatMapper::class);
+		$seat1 = new MobileSeat();
+		$seat1->setUserId('alice');
+		$seat1->setAssignedAt(new \DateTime('2026-01-05 10:00:00'));
+		$seat1->setAssignedBy('admin');
+		$seat2 = new MobileSeat();
+		$seat2->setUserId('ghost');
+		$mapper->method('findAllOrdered')->willReturn([$seat1, $seat2]);
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getDisplayName')->willReturn('Alice A.');
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturnCallback(
+			static fn (string $uid) => $uid === 'alice' ? $user : null
+		);
+
+		$service = new MobileSeatService(
+			$mapper,
+			$this->createMock(LicenseService::class),
+			$users,
+			$this->createMock(ITimeFactory::class),
+			$this->createMock(IDBConnection::class),
+			$this->createMock(ILockingProvider::class),
+		);
+
+		$seats = $service->listSeats();
+		$this->assertCount(2, $seats);
+		$this->assertSame('Alice A.', $seats[0]['displayName']);
+		$this->assertSame('admin', $seats[0]['assignedBy']);
+		$this->assertStringContainsString('2026-01-05', $seats[0]['assignedAt']);
+		// deleted user -> uid fallback, empty assignedAt
+		$this->assertSame('ghost', $seats[1]['displayName']);
+		$this->assertSame('', $seats[1]['assignedAt']);
+	}
+
+	public function testRemoveAllSeatsDeletesAndReturnsCount(): void
+	{
+		$mapper = $this->createMock(MobileSeatMapper::class);
+		$seats = [new MobileSeat(), new MobileSeat(), new MobileSeat()];
+		$mapper->method('findAllOrdered')->willReturn($seats);
+		$mapper->expects($this->exactly(3))->method('delete')
+			->withConsecutive([$seats[0]], [$seats[1]], [$seats[2]]);
+
+		$service = new MobileSeatService(
+			$mapper,
+			$this->createMock(LicenseService::class),
+			$this->createMock(IUserManager::class),
+			$this->createMock(ITimeFactory::class),
+			$this->createMock(IDBConnection::class),
+			$this->createMock(ILockingProvider::class),
+		);
+		$this->assertSame(3, $service->removeAllSeats());
+	}
 }

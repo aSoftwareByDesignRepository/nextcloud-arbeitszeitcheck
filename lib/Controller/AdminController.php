@@ -156,6 +156,7 @@ class AdminController extends Controller
 	private ?\OCP\Lock\ILockingProvider $lockingProvider;
 	private ?\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService $vacationUnitMigrationService;
 	private ?\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService $adminBatchMutationService;
+	private ?\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService $overtimeAdjustmentService;
 
 	private const AUDIT_LOG_PAGE_SIZE = 50;
 
@@ -204,6 +205,7 @@ class AdminController extends Controller
 		?\OCP\Lock\ILockingProvider $lockingProvider = null,
 		?\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService $vacationUnitMigrationService = null,
 		?\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService $adminBatchMutationService = null,
+		?\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService $overtimeAdjustmentService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -247,6 +249,7 @@ class AdminController extends Controller
 		$this->lockingProvider = $lockingProvider;
 		$this->vacationUnitMigrationService = $vacationUnitMigrationService;
 		$this->adminBatchMutationService = $adminBatchMutationService;
+		$this->overtimeAdjustmentService = $overtimeAdjustmentService;
 		$this->setCspService($cspService);
 	}
 
@@ -256,6 +259,14 @@ class AdminController extends Controller
 			$this->adminBatchMutationService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService::class);
 		}
 		return $this->adminBatchMutationService;
+	}
+
+	private function overtimeAdjustmentService(): \OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService
+	{
+		if ($this->overtimeAdjustmentService === null) {
+			$this->overtimeAdjustmentService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+		}
+		return $this->overtimeAdjustmentService;
 	}
 
 	/**
@@ -339,20 +350,6 @@ class AdminController extends Controller
 	/**
 	 * Convert UserWorkingTimeModel to JSON-serializable array for audit log.
 	 */
-	private function userWorkingTimeModelToAuditValues(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel $model): array
-	{
-		$start = $model->getStartDate();
-		$end = $model->getEndDate();
-		return [
-			'id' => $model->getId(),
-			'userId' => $model->getUserId(),
-			'workingTimeModelId' => $model->getWorkingTimeModelId(),
-			'vacationDaysPerYear' => $model->getVacationDaysPerYear(),
-			'startDate' => $start ? $start->format('Y-m-d') : null,
-			'endDate' => $end ? $end->format('Y-m-d') : null,
-		];
-	}
-
 	/**
 	 * Convert WorkingTimeModel to JSON-serializable array for audit log.
 	 */
@@ -5607,7 +5604,7 @@ class AdminController extends Controller
 			$year = $yearRaw !== null && $yearRaw !== '' ? (int)$yearRaw : null;
 			$limit = max(1, min(100, (int)($this->request->getParam('limit') ?? 50)));
 			$offset = max(0, (int)($this->request->getParam('offset') ?? 0));
-			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$svc = $this->overtimeAdjustmentService();
 			$data = $svc->listForUser($userId, $year, $limit, $offset);
 			return new JSONResponse(array_merge(['success' => true], $data));
 		} catch (\Throwable $e) {
@@ -5639,7 +5636,7 @@ class AdminController extends Controller
 			}
 			$reason = trim((string)($params['reasonCode'] ?? $params['reason_code'] ?? \OCA\ArbeitszeitCheck\Db\OvertimeAdjustment::REASON_CUSTOM));
 			$note = isset($params['note']) ? (string)$params['note'] : null;
-			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$svc = $this->overtimeAdjustmentService();
 			$result = $svc->createAdjustment(
 				$userId,
 				(float)$hoursRaw,
@@ -5670,7 +5667,7 @@ class AdminController extends Controller
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('User not found')], Http::STATUS_NOT_FOUND);
 			}
 			$note = $this->request->getParam('note');
-			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService::class);
+			$svc = $this->overtimeAdjustmentService();
 			$result = $svc->resetBalanceToZero(
 				$userId,
 				$this->getPerformedBy(),

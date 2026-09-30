@@ -1907,4 +1907,203 @@ class AbsenceServiceTest extends TestCase
 		$this->assertFalse($selfApproved->getSummary()['isManagerRecorded']);
 		$this->assertFalse($pendingNoApprover->getSummary()['isManagerRecorded']);
 	}
+
+	private function makeAbsenceRow(int $id, string $userId, string $status, string $type, string $start, string $end): Absence
+	{
+		$a = new Absence();
+		$a->setId($id);
+		$a->setUserId($userId);
+		$a->setType($type);
+		$a->setStatus($status);
+		$a->setStartDate(new \DateTime($start));
+		$a->setEndDate(new \DateTime($end));
+		$a->setDays(2.0);
+		$a->setCreatedAt(new \DateTime('-30 days'));
+		$a->setUpdatedAt(new \DateTime('-30 days'));
+		return $a;
+	}
+
+	public function testCancelAbsenceCancelsFuturePending(): void
+	{
+		$start = (new \DateTime('+10 days'))->format('Y-m-d');
+		$end = (new \DateTime('+12 days'))->format('Y-m-d');
+		$absence = $this->makeAbsenceRow(11, 'alice', Absence::STATUS_PENDING, Absence::TYPE_PERSONAL_LEAVE, $start, $end);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (Absence $a) => $a);
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('commit');
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_cancelled', 'absence', 11);
+
+		$out = $this->service->cancelAbsence(11, 'alice');
+		$this->assertSame(Absence::STATUS_CANCELLED, $out->getStatus());
+	}
+
+	public function testCancelAbsenceRejectsAlreadyStarted(): void
+	{
+		$absence = $this->makeAbsenceRow(11, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-2 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->never())->method('update');
+		$this->expectException(\Exception::class);
+		$this->service->cancelAbsence(11, 'alice');
+	}
+
+	public function testCancelAbsenceRejectsNotOwnedAndTerminalStatus(): void
+	{
+		// foreign owner -> uniform not-found via getAbsence
+		$absence = $this->makeAbsenceRow(11, 'bob', Absence::STATUS_PENDING, Absence::TYPE_PERSONAL_LEAVE, '+5 days', '+7 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->cancelAbsence(11, 'alice');
+			$this->fail('expected exception');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('not found', $e->getMessage());
+		}
+
+		// rejected status cannot be cancelled even for the owner
+		$absence2 = $this->makeAbsenceRow(12, 'alice', Absence::STATUS_REJECTED, Absence::TYPE_PERSONAL_LEAVE, '+5 days', '+7 days');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($absence2);
+		// rebuild service with the fresh mapper
+		$service = $this->rebuildService($mapper);
+		$this->expectException(\Exception::class);
+		$service->cancelAbsence(12, 'alice');
+	}
+
+	public function testShortenAbsenceRejectsNotStartedAndInvalidNewEnd(): void
+	{
+		$absence = $this->makeAbsenceRow(21, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '+5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->shortenAbsence(21, 'alice', (new \DateTime('+6 days'))->format('Y-m-d'));
+			$this->fail('expected not-started rejection');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('already started', $e->getMessage());
+		}
+
+		// started, but new end must be < original end
+		$absence2 = $this->makeAbsenceRow(22, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-5 days', '+9 days');
+		$service = $this->rebuildService($this->mapperReturning($absence2));
+		try {
+			$service->shortenAbsence(22, 'alice', (new \DateTime('+10 days'))->format('Y-m-d'));
+			$this->fail('expected earlier-than-original rejection');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('earlier than the original', $e->getMessage());
+		}
+	}
+
+	public function testShortenAbsenceSuccess(): void
+	{
+		$absence = $this->makeAbsenceRow(23, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (Absence $a) => $a);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_shortened', 'absence', 23);
+
+		$out = $this->service->shortenAbsence(23, 'alice', (new \DateTime('+3 days'))->format('Y-m-d'));
+		$this->assertSame((new \DateTime('+3 days'))->format('Y-m-d'), $out->getEndDate()->format('Y-m-d'));
+		$this->assertSame(2.0, $out->getDays()); // holiday service stub returns 2.0
+	}
+
+	public function testAutoApprovePendingIfNoAssignableManager(): void
+	{
+		// not found -> false
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willThrowException(new DoesNotExistException('x'));
+		$this->assertFalse($this->rebuildService($mapper)->autoApprovePendingIfNoAssignableManager(5));
+
+		// approved -> false
+		$approved = $this->makeAbsenceRow(6, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '+1 days', '+3 days');
+		$this->assertFalse($this->rebuildService($this->mapperReturning($approved))->autoApprovePendingIfNoAssignableManager(6));
+
+		// pending but manager exists -> false
+		$pending = $this->makeAbsenceRow(7, 'alice', Absence::STATUS_PENDING, Absence::TYPE_PERSONAL_LEAVE, '+1 days', '+3 days');
+		$this->assertFalse($this->rebuildService($this->mapperReturning($pending))->autoApprovePendingIfNoAssignableManager(7));
+
+		// pending, no manager -> auto-approves
+		$this->hasAssignableManagerForTests = false;
+		$pending2 = $this->makeAbsenceRow(8, 'alice', Absence::STATUS_PENDING, Absence::TYPE_PERSONAL_LEAVE, '+1 days', '+3 days');
+		$mapper2 = $this->mapperReturning($pending2);
+		$mapper2->expects($this->once())->method('update')
+			->willReturnCallback(static fn (Absence $a) => $a);
+		$service = $this->rebuildService($mapper2);
+		$this->assertTrue($service->autoApprovePendingIfNoAssignableManager(8));
+		$this->assertSame(Absence::STATUS_APPROVED, $pending2->getStatus());
+	}
+
+	public function testGetWorkingDaysForDisplayPrefersStoredDays(): void
+	{
+		$a = $this->makeAbsenceRow(31, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '+1 days', '+3 days');
+		$a->setDays(3.5);
+		$this->assertSame(3.5, $this->service->getWorkingDaysForDisplay($a));
+
+		$a2 = $this->makeAbsenceRow(32, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '+1 days', '+3 days');
+		$a2->setDays(null);
+		$this->assertSame(2.0, $this->service->getWorkingDaysForDisplay($a2));
+
+		$a3 = new Absence();
+		$a3->setUserId('alice');
+		$this->assertSame(0.0, $this->service->getWorkingDaysForDisplay($a3));
+	}
+
+	private function mapperReturning(Absence $a): AbsenceMapper
+	{
+		$m = $this->createMock(AbsenceMapper::class);
+		$m->method('find')->willReturn($a);
+		return $m;
+	}
+
+	private function rebuildService(AbsenceMapper $mapper): AbsenceService
+	{
+		return new AbsenceService(
+			$mapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$this->lockingProvider,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+	}
+
+	public function testValidateAbsenceTypeRulesEnforcesPerTypeCaps(): void
+	{
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		$d = static fn (int $n): \DateTime => new \DateTime('2026-01-01 +' . ($n - 1) . ' days');
+		$start = new \DateTime('2026-01-01');
+
+		// [type, maxDays, overDays, expectedMessage]
+		$cases = [
+			[Absence::TYPE_VACATION, 30, 31, 'Vacation cannot exceed 30 days'],
+			[Absence::TYPE_SICK_LEAVE, 365, 366, 'Sick leave duration seems unreasonable'],
+			[Absence::TYPE_PERSONAL_LEAVE, 5, 6, 'Personal leave cannot exceed 5 days'],
+			[Absence::TYPE_PARENTAL_LEAVE, 1095, 1096, 'Parental leave cannot exceed 3 years per request'],
+			[Absence::TYPE_SPECIAL_LEAVE, 30, 31, 'Special leave cannot exceed 30 days'],
+			[Absence::TYPE_UNPAID_LEAVE, 365, 366, 'Unpaid leave cannot exceed 365 days'],
+			[Absence::TYPE_HOME_OFFICE, 365, 366, 'Duration cannot exceed 365 days'],
+			[Absence::TYPE_BUSINESS_TRIP, 365, 366, 'Duration cannot exceed 365 days'],
+		];
+		foreach ($cases as [$type, $ok, $over, $msg]) {
+			$m->invoke($this->service, $type, clone $start, $d($ok)); // at cap: no throw
+			try {
+				$m->invoke($this->service, $type, clone $start, $d($over));
+				$this->fail("$type over cap did not throw");
+			} catch (\Throwable $e) {
+				$this->assertStringContainsString($msg, $e->getMessage());
+			}
+		}
+	}
 }

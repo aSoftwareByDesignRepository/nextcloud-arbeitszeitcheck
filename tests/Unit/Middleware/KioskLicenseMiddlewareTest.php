@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Middleware;
 
+use OCA\ArbeitszeitCheck\Middleware\KioskDisabledException;
 use OCA\ArbeitszeitCheck\Middleware\KioskLicenseMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\KioskTerminalLicenseRequiredException;
+use OCA\ArbeitszeitCheck\Middleware\KioskUnauthorizedException;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskErrorMessages;
+use OCA\ArbeitszeitCheck\Service\Kiosk\KioskException;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskSettingsService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskTerminalService;
 use OCA\ArbeitszeitCheck\Service\LicenseService;
@@ -122,5 +125,74 @@ class KioskLicenseMiddlewareTest extends TestCase
 		$this->assertSame('TERMINAL_LICENSE_REQUIRED', $data['code']);
 		$this->assertSame('TERMINAL_LICENSE_REQUIRED', $data['error']);
 		$this->assertSame('ArbeitszeitCheck Terminal is not licensed for this organisation.', $data['message']);
+	}
+
+	private function middlewareFor(IRequest $request, ?LoggerInterface $logger = null): KioskLicenseMiddleware
+	{
+		return new KioskLicenseMiddleware(
+			$request,
+			$this->createMock(KioskSettingsService::class),
+			$this->createMock(LicenseService::class),
+			$this->createMock(KioskTerminalService::class),
+			$this->l10nFactory(),
+			$logger ?? $this->createMock(LoggerInterface::class),
+			$this->errorMessages(),
+		);
+	}
+
+	public function testAfterExceptionMapsKioskDisabledTo404(): void
+	{
+		$response = $this->middlewareFor($this->createMock(IRequest::class))
+			->afterException(new \stdClass(), 'action', new KioskDisabledException());
+
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+		$this->assertSame('KIOSK_DISABLED', $response->getData()['code']);
+	}
+
+	public function testAfterExceptionMapsUnauthorizedTo401(): void
+	{
+		$response = $this->middlewareFor($this->createMock(IRequest::class))
+			->afterException(new \stdClass(), 'action', new KioskUnauthorizedException());
+
+		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
+		$this->assertSame('KIOSK_TERMINAL_UNAUTHORIZED', $response->getData()['code']);
+	}
+
+	public function testAfterExceptionMapsKioskExceptionOnKioskPath(): void
+	{
+		$request = $this->createMock(IRequest::class);
+		$request->method('getPathInfo')->willReturn('/apps/arbeitszeitcheck/api/kiosk/stamp');
+
+		$response = $this->middlewareFor($request)
+			->afterException(new \stdClass(), 'action', new KioskException('KIOSK_ALREADY_CLOCKED_IN'));
+
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('KIOSK_ALREADY_CLOCKED_IN', $response->getData()['error']);
+	}
+
+	public function testAfterExceptionMapsUnhandledKioskExceptionTo500AndLogs(): void
+	{
+		$request = $this->createMock(IRequest::class);
+		$request->method('getPathInfo')->willReturn('/apps/arbeitszeitcheck/api/kiosk/stamp');
+		$logger = $this->createMock(LoggerInterface::class);
+		$logger->expects($this->once())->method('error')
+			->with(self::stringContains('Unhandled kiosk API exception'), self::anything());
+
+		$response = $this->middlewareFor($request, $logger)
+			->afterException(new \stdClass(), 'action', new \RuntimeException('boom'));
+
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$this->assertSame('KIOSK_INTERNAL_ERROR', $response->getData()['error']);
+	}
+
+	public function testAfterExceptionRethrowsForNonKioskPath(): void
+	{
+		$request = $this->createMock(IRequest::class);
+		$request->method('getPathInfo')->willReturn('/apps/arbeitszeitcheck/api/timeentries/1');
+
+		$exception = new \RuntimeException('boom');
+		$this->expectExceptionObject($exception);
+
+		$this->middlewareFor($request)->afterException(new \stdClass(), 'action', $exception);
 	}
 }

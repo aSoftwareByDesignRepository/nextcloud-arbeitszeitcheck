@@ -596,6 +596,13 @@
 
   if (dialog) {
     dialog.addEventListener('close', finishDialogClosed);
+    // Host apps (e.g. core notifications) preventDefault() the Escape keydown
+    // globally, which suppresses the native `cancel` event — close explicitly.
+    dialog.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        closeDialog();
+      }
+    });
     if (dialog.open) {
       try { dialog.close(); } catch (e) { /* noop */ }
     }

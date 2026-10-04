@@ -580,6 +580,13 @@
       loadGeneration += 1;
       abortActiveFetch();
     });
+    // Host apps (e.g. core notifications) preventDefault() the Escape keydown
+    // globally, suppressing the native `cancel` event — close explicitly.
+    dlg.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        requestClose(dlg);
+      }
+    });
   }
 
   function boot() {

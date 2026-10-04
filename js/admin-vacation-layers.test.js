@@ -418,6 +418,16 @@ describe('Layer dialog lifecycle', () => {
     expect(dlg.hasAttribute('open')).toBe(false);
     expect(dlg.open).toBeFalsy();
   });
+
+  it('closes on Escape keydown even when the native cancel event is suppressed', () => {
+    // Regression: NC notifications app preventDefault()s global Escape,
+    // suppressing the dialog `cancel` event — explicit keydown path required.
+    const dlg = document.getElementById('layer-dialog');
+    dlg.showModal();
+    dlg.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(dlg.open).toBeFalsy();
+    expect(dlg.hasAttribute('open')).toBe(false);
+  });
 });
 
 describe('Add buttons disable when prerequisites are missing', () => {

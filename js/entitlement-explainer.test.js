@@ -135,6 +135,17 @@ describe('entitlement-explainer', () => {
     expect(dlg.open).toBe(false)
   })
 
+  it('closes on Escape keydown even when the native cancel event is suppressed', async () => {
+    // Regression: NC notifications app preventDefault()s global Escape,
+    // which suppresses the dialog's native `cancel` event — the dialog
+    // must close via its own keydown path (requestClose → cleanup).
+    const dlg = document.getElementById('entitlement-explain-dialog')
+    dlg.showModal()
+    dlg.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(dlg.open).toBe(false)
+    expect(dlg.hasAttribute('open')).toBe(false)
+  })
+
   it('shows error and retry when API fails', async () => {
     window.ArbeitszeitCheckUtils.ajax.mockRejectedValue(new Error('network'))
     document.getElementById('entitlement-explain').click()

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.7.12 - 2026-10-04
+
+### Fixed
+
+- Dialogs: Vacation-layer editor and entitlement explainer now close on Escape even when another Nextcloud app suppresses the native dialog cancel event.
+- Dashboard: l10n bootstrap ordering fixed so translated strings load on every entry path; e2e pool race hardening.
+- Localization: repaired corrupted catalogs across all locales.
+
+### Changed
+
+- Atlas v3.5.14 verification pass: expanded contract coverage and store screenshot pipeline fixes.
+
 ## Unreleased
 
 ### Fixed

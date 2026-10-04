@@ -49,11 +49,27 @@ const STATEFUL_SPECS = [
   /manual-entry-justification\.spec\.js/,
   /admin-teams-bulk-find-people\.spec\.js/,
   /admin-users-profile\.spec\.js/,
+  // Live-clock mutators share the e2e_employee stamp session — running them in
+  // the parallel pool lets one spec's clock-out / clock-in race another's
+  // (observed: timezone-smoke "not currently clocked in", slice-c rest check
+  // returning ok because a parallel clock-in already held the session).
+  /workflows\.spec\.js/,
+  /timezone-smoke\.spec\.js/,
+  /overnight-daily-maximum\.spec\.js/,
+  /lebenswelt-ux-slice-c-rest\.spec\.js/,
+  /atlas-crud-web\.spec\.js/,
+  // Durable-mutation sweep mutates org settings, clock state, teams, kiosk
+  // config and licenses — must not interleave with the parallel pool.
+  /atlas-api-mutations\.spec\.js/,
 ]
 
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
+  // Durable user-language restore even when a run is interrupted (SIGINT /
+  // crash): locale specs mutate shared users' core/lang via occ. Without this,
+  // a killed run leaves e.g. pt_BR and poisons every sibling spec.
+  globalTeardown: './tests/e2e/global-teardown.js',
   expect: { timeout: 10_000 },
   use: {
     baseURL,

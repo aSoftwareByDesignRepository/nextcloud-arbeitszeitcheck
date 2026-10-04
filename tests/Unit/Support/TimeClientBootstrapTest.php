@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Support;
 
 use OCA\ArbeitszeitCheck\Service\TimeZoneService;
+use OCA\ArbeitszeitCheck\Support\DashboardWidgetAssetBootstrap;
 use OCA\ArbeitszeitCheck\Support\TimeClientBootstrap;
 use OCP\AppFramework\Services\IInitialState;
 use OCP\IConfig;
@@ -21,6 +22,10 @@ class TimeClientBootstrapTest extends TestCase {
 			$prop->setAccessible(true);
 			$prop->setValue(null, false);
 		}
+		$ref = new \ReflectionClass(DashboardWidgetAssetBootstrap::class);
+		$prop = $ref->getProperty('deskletAssetsRegistered');
+		$prop->setAccessible(true);
+		$prop->setValue(null, false);
 		parent::tearDown();
 	}
 
@@ -115,6 +120,36 @@ class TimeClientBootstrapTest extends TestCase {
 			$src
 		);
 		$this->assertStringContainsString("Util::addScript(Application::APP_ID, 'common/time-init')", $src);
+	}
+
+	public function testDashboardPathsLoadL10nBootBeforeLocaleJs(): void {
+		$initialState = $this->createMock(IInitialState::class);
+		$this->createBootstrap($initialState)->registerConfig();
+		DashboardWidgetAssetBootstrap::registerDeskletAssets();
+
+		$ref = new \ReflectionClass(\OCP\Util::class);
+		$scriptsProp = $ref->getProperty('scripts');
+		$scriptsProp->setAccessible(true);
+		/** @var array<string, list<string>> $scripts */
+		$scripts = $scriptsProp->getValue();
+		$azc = $scripts['arbeitszeitcheck'] ?? [];
+
+		$bootIdx = array_search('arbeitszeitcheck/js/common/l10n-boot', $azc, true);
+		$l10nIdx = false;
+		foreach ($azc as $idx => $path) {
+			if (str_contains((string)$path, 'arbeitszeitcheck/l10n/')) {
+				$l10nIdx = $idx;
+				break;
+			}
+		}
+
+		$this->assertNotFalse($bootIdx, 'l10n-boot must register on dashboard script paths');
+		$this->assertNotFalse($l10nIdx, 'locale JS must be injected alongside app scripts');
+		$this->assertLessThan(
+			$l10nIdx,
+			$bootIdx,
+			'l10n-boot must load before the injected l10n/*.js or __azcBootL10n is undefined on /apps/dashboard'
+		);
 	}
 
 	public function testStorageAndDisplayTimeZonesMatchService(): void {

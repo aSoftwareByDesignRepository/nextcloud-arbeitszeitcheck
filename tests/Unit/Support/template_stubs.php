@@ -14,12 +14,3 @@ if (!function_exists('p')) {
 		echo htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	}
 }
-
-if (!function_exists('print_unescaped')) {
-	/**
-	 * @param mixed $text
-	 */
-	function print_unescaped($text): void {
-		echo (string)$text;
-	}
-}

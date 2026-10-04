@@ -58,6 +58,23 @@ class OvertimeAdjustment extends Entity
 	protected $processedBy;
 	protected $createdAt;
 
+	/**
+	 * Columns that are NOT NULL in the schema (Version1044) and carry no DB-side
+	 * default. They must always be written on INSERT — even when the value
+	 * equals the PHP property default.
+	 */
+	private const REQUIRED_INSERT_FIELDS = [
+		'userId',
+		'calendarYear',
+		'effectiveOn',
+		'hoursDelta',
+		'reasonCode',
+		'balanceBefore',
+		'balanceAfter',
+		'processedBy',
+		'createdAt',
+	];
+
 	public function __construct()
 	{
 		$this->addType('userId', 'string');
@@ -70,5 +87,21 @@ class OvertimeAdjustment extends Entity
 		$this->addType('balanceAfter', 'float');
 		$this->addType('processedBy', 'string');
 		$this->addType('createdAt', 'datetime');
+	}
+
+	/**
+	 * Entity::setter() skips marking a field as updated when the new value
+	 * equals the property default. QBMapper::insert() only writes updated
+	 * fields, so writing e.g. reasonCode=self::REASON_CUSTOM or a zero balance
+	 * silently dropped the column from the INSERT and MySQL aborted with
+	 * "Field 'reason_code' doesn't have a default value" (1364). Re-mark the
+	 * required columns once they hold a non-null value.
+	 */
+	protected function setter(string $name, array $args): void
+	{
+		parent::setter($name, $args);
+		if (in_array($name, self::REQUIRED_INSERT_FIELDS, true) && $this->$name !== null) {
+			$this->markFieldUpdated($name);
+		}
 	}
 }

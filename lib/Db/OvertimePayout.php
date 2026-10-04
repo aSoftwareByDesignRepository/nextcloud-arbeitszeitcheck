@@ -32,6 +32,24 @@ use OCP\AppFramework\Db\Entity;
  */
 class OvertimePayout extends Entity
 {
+	/**
+	 * Columns that are NOT NULL in the schema (Version1027) and carry no
+	 * DB-side default. They must always be written on INSERT — even when the
+	 * value equals the PHP property default.
+	 */
+	private const REQUIRED_INSERT_FIELDS = [
+		'userId',
+		'calendarYear',
+		'calendarMonth',
+		'hoursPaid',
+		'effectiveBalanceBefore',
+		'effectiveBalanceAfter',
+		'rawBalanceBefore',
+		'bankMaxHours',
+		'processedBy',
+		'createdAt',
+	];
+
 	protected $userId;
 	protected $calendarYear;
 	protected $calendarMonth;
@@ -55,5 +73,21 @@ class OvertimePayout extends Entity
 		$this->addType('bankMaxHours', 'float');
 		$this->addType('processedBy', 'string');
 		$this->addType('createdAt', 'datetime');
+	}
+
+	/**
+	 * Entity::setter() skips marking a field as updated when the new value
+	 * equals the property default. QBMapper::insert() only writes updated
+	 * fields, so a payout with e.g. bankMaxHours=100.0 or a zero balance would
+	 * silently drop the column from the INSERT and the DB aborts with
+	 * "doesn't have a default value" (SQLSTATE 1364). Re-mark the required
+	 * columns once they hold a non-null value.
+	 */
+	protected function setter(string $name, array $args): void
+	{
+		parent::setter($name, $args);
+		if (in_array($name, self::REQUIRED_INSERT_FIELDS, true) && $this->$name !== null) {
+			$this->markFieldUpdated($name);
+		}
 	}
 }

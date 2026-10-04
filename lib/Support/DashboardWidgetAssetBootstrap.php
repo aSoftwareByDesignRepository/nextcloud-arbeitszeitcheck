@@ -28,6 +28,10 @@ final class DashboardWidgetAssetBootstrap {
 		}
 		self::$deskletAssetsRegistered = true;
 
+		// l10n-boot defines __azcBootL10n and must precede the l10n/<lang>.js the
+		// first non-l10n addScript() injects; its own path contains 'l10n' so it
+		// triggers no injection itself.
+		Util::addScript(Application::APP_ID, 'common/l10n-boot');
 		Util::addScript(Application::APP_ID, 'common/catalog');
 		Util::addScript(Application::APP_ID, 'common/api');
 		Util::addScript(Application::APP_ID, 'common/desklet-actions');

@@ -56,10 +56,7 @@
 		if (!url || url.length > 500) {
 			return '';
 		}
-		if (Array.from(url).some(function (character) {
-			const code = character.charCodeAt(0);
-			return code <= 31 || code === 127;
-		})) {
+		if (/[\x00-\x1F\x7F]/.test(url)) {
 			return '';
 		}
 		var lower = url.toLowerCase();
@@ -160,12 +157,18 @@
 			return;
 		}
 		toast.setAttribute('data-app-feedback-bound', '1');
-		var content = toast.querySelector('.toast-content') || toast;
+		var content = toast.querySelector('.toast-content') || toast.querySelector('span') || toast;
 		var a = document.createElement('a');
 		a.className = PREFIX + '-nav-footer__toast-link';
 		a.href = buildMailto('problem', { errorCode: errorCode });
 		a.textContent = t('Report this problem');
 		content.appendChild(a);
+	}
+
+	// Toast class names differ per app family: legacy '.toast--*' and
+	// prefix-scoped '.{prefix}-toast--*' (e.g. DutyCheck .dc-toast--error).
+	function errorToastSelector() {
+		return '.toast--error, .toast--danger, .toast--critical, .' + PREFIX + '-toast--error';
 	}
 
 	function wrapMethod(obj, name) {
@@ -187,8 +190,8 @@
 					type = name === 'showError' ? 'error' : String(second || '');
 					message = String(first || '');
 				}
-				if (type === 'error' || type === 'danger' || type === 'critical' || name === 'showError') {
-					var toasts = document.querySelectorAll('.toast--error, .toast--danger, .toast--critical');
+				if (type === 'error' || type === 'danger' || type === 'critical' || name === 'showError' || name === 'handleApiError') {
+					var toasts = document.querySelectorAll(errorToastSelector());
 					var last = toasts.length ? toasts[toasts.length - 1] : null;
 					attachReportLink(last, safeErrorCode(code) || (message.length <= 64 ? message : ''));
 				}
@@ -222,7 +225,40 @@
 		for (var i = 0; i < candidates.length; i++) {
 			wrapMethod(candidates[i], 'showToast');
 			wrapMethod(candidates[i], 'showError');
+			wrapMethod(candidates[i], 'announce');
+			wrapMethod(candidates[i], 'toast');
+			wrapMethod(candidates[i], 'handleApiError');
 		}
+	}
+
+	// Method wrapping only sees calls through the exported object — internal
+	// closure calls (e.g. handleApiError → announce) bypass it. Observe toast
+	// insertions directly so every error toast gets the report link.
+	function installToastObserver() {
+		if (typeof global.MutationObserver !== 'function' || !document.body) {
+			return;
+		}
+		var sel = errorToastSelector();
+		var observer = new global.MutationObserver(function (records) {
+			for (var i = 0; i < records.length; i++) {
+				var added = records[i].addedNodes;
+				for (var j = 0; j < added.length; j++) {
+					var node = added[j];
+					if (!node || node.nodeType !== 1) {
+						continue;
+					}
+					if (typeof node.matches === 'function' && node.matches(sel)) {
+						attachReportLink(node, '');
+					} else if (typeof node.querySelectorAll === 'function') {
+						var hits = node.querySelectorAll(sel);
+						for (var k = 0; k < hits.length; k++) {
+							attachReportLink(hits[k], '');
+						}
+					}
+				}
+			}
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
 	}
 
 	function installPopover() {
@@ -286,6 +322,7 @@
 			refreshNavHrefs();
 			installPopover();
 			installToastHooks();
+			installToastObserver();
 		},
 	};
 

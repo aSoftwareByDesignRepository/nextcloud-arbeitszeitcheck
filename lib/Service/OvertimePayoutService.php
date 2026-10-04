@@ -249,6 +249,7 @@ class OvertimePayoutService
 		$entity->setRawBalanceBefore((float)$snapshot['raw_balance']);
 		$entity->setBankMaxHours($bankMax);
 		$entity->setProcessedBy($actorUserId);
+		$entity->setCreatedAt(new \DateTime());
 
 		try {
 			$saved = $this->payoutMapper->insertPayout($entity);

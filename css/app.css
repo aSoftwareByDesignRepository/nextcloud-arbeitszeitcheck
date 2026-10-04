@@ -341,19 +341,16 @@
 }
 .time-summary-card--secondary {
 	margin-top: var(--azc-space-4);
-	order: 2;
 }
 #app-content.azc-app--time-entries .time-entries-page__form-inner {
 	display: flex;
 	flex-direction: column;
 	gap: var(--azc-space-3);
 }
-#app-content.azc-app--time-entries .time-entry-form__primary {
-	order: 1;
-}
-#app-content.azc-app--time-entries .time-summary-card--secondary {
-	order: 2;
-}
+/* No flex `order` on .time-entry-form__primary / .time-summary-card--secondary:
+   #time-entry-form is display:flex, so any non-zero order paints the required
+   "Date and time" fieldset after submit (WCAG 2.4.3). DOM order is correct —
+   visual order must equal it. Guarded by tests/e2e/atlas-rendered-surface.contract.spec.js. */
 .dashboard-overtime-card__actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -1358,7 +1355,10 @@ dialog.entitlement-explain-dialog::backdrop {
 	gap: var(--azc-space-2, 0.5rem);
 }
 
-.azc-nav-footer__trigger {
+/* Scoped under #content: bare .{p}-nav-footer__trigger loses to NC core
+ * `#app-content button` / `#app-navigation button` min-height rules
+ * (var(--default-clickable-area) → 34px) — Atlas touch-target defect. */
+#content .azc-nav-footer__trigger {
 	display: inline-flex;
 	gap: var(--azc-space-3, 0.75rem);
 	min-height: 44px;
@@ -1420,7 +1420,7 @@ dialog.entitlement-explain-dialog::backdrop {
 	display: none;
 }
 
-.azc-nav-footer__menu-item {
+#content .azc-nav-footer__menu-item {
 	display: flex;
 	align-items: center;
 	gap: var(--azc-space-3, 0.75rem);
@@ -1479,12 +1479,13 @@ dialog.entitlement-explain-dialog::backdrop {
 	padding: 0;
 	margin: -1px;
 	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
 	clip-path: inset(50%);
 	white-space: nowrap;
 	border: 0;
 }
 
-.azc-nav-footer__toast-link {
+#content .azc-nav-footer__toast-link {
 	display: inline-flex;
 	align-items: center;
 	min-height: 44px;

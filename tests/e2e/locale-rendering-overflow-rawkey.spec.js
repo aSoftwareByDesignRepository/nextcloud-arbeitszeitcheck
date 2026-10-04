@@ -125,21 +125,28 @@ test.describe('ArbeitszeitCheck locale matrix (employee surfaces)', () => {
 		test(`${locale}: employee pages render without raw keys or overflow`, async ({ page }) => {
 			await login(page, credsFromEnv('EMPLOYEE'))
 			const userId = await getCurrentUserId(page)
-			setUserLanguage(userId, locale)
+			// try/finally: a failed assertion or test timeout must not leak the
+			// mutated locale into the next test / sibling specs (hard interrupts
+			// are covered by playwright globalTeardown in playwright.config.js).
+			try {
+				setUserLanguage(userId, locale)
 
-			for (const route of employeeRoutes) {
-				await page.goto(route.path, { waitUntil: 'domcontentloaded' })
-				await assertArbeitszeitcheckLoaded(page)
-				await expect(page.locator(route.ready)).toBeVisible({ timeout: 30_000 })
+				for (const route of employeeRoutes) {
+					await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+					await assertArbeitszeitcheckLoaded(page)
+					await expect(page.locator(route.ready)).toBeVisible({ timeout: 30_000 })
 
-				const lang = await page.evaluate(() => document.documentElement.lang || '')
-				expect(lang.toLowerCase(), `html lang for ${locale}`).toContain(expectedHtmlLangPrefix(locale))
+					const lang = await page.evaluate(() => document.documentElement.lang || '')
+					expect(lang.toLowerCase(), `html lang for ${locale}`).toContain(expectedHtmlLangPrefix(locale))
 
-				for (const viewport of viewports) {
-					await page.setViewportSize(viewport)
-					await expectNoHorizontalOverflow(page, `${locale}/${route.id}@${viewport.label}`)
+					for (const viewport of viewports) {
+						await page.setViewportSize(viewport)
+						await expectNoHorizontalOverflow(page, `${locale}/${route.id}@${viewport.label}`)
+					}
+					await expectNoRawKeys(page)
 				}
-				await expectNoRawKeys(page)
+			} finally {
+				resetUserLanguage(userId)
 			}
 		})
 	}
@@ -159,21 +166,26 @@ test.describe('ArbeitszeitCheck locale matrix (admin policy surfaces)', () => {
 		test(`${locale}: admin pages render without raw keys or overflow`, async ({ page }) => {
 			await login(page, credsFromEnv('ADMIN'))
 			const userId = await getCurrentUserId(page)
-			setUserLanguage(userId, locale)
+			// Same leak guard as the employee matrix (see above).
+			try {
+				setUserLanguage(userId, locale)
 
-			for (const route of adminRoutes) {
-				await page.goto(route.path, { waitUntil: 'domcontentloaded' })
-				await assertArbeitszeitcheckLoaded(page)
-				await expect(page.locator(route.ready)).toBeVisible({ timeout: 30_000 })
+				for (const route of adminRoutes) {
+					await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+					await assertArbeitszeitcheckLoaded(page)
+					await expect(page.locator(route.ready)).toBeVisible({ timeout: 30_000 })
 
-				const lang = await page.evaluate(() => document.documentElement.lang || '')
-				expect(lang.toLowerCase(), `html lang for ${locale}`).toContain(expectedHtmlLangPrefix(locale))
+					const lang = await page.evaluate(() => document.documentElement.lang || '')
+					expect(lang.toLowerCase(), `html lang for ${locale}`).toContain(expectedHtmlLangPrefix(locale))
 
-				for (const viewport of viewports) {
-					await page.setViewportSize(viewport)
-					await expectNoHorizontalOverflow(page, `${locale}/${route.id}@${viewport.label}`)
+					for (const viewport of viewports) {
+						await page.setViewportSize(viewport)
+						await expectNoHorizontalOverflow(page, `${locale}/${route.id}@${viewport.label}`)
+					}
+					await expectNoRawKeys(page)
 				}
-				await expectNoRawKeys(page)
+			} finally {
+				resetUserLanguage(userId)
 			}
 		})
 	}

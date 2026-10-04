@@ -139,6 +139,41 @@ test.describe('Slice C stamp-path rest (live)', () => {
 			'Overnight seed not completed (approval pending?): ' + String(status)
 		)
 
+		// The rest gate anchors on the LATEST completed end_time, and a same-day
+		// start+end pair qualifies for the intraday split-shift exemption — any
+		// stamp left by an earlier spec/test (incl. this file's own test 1) would
+		// legitimately allow clock-in and make the assertion meaningless. Delete
+		// every completed row ending after the seeded overnight end so the
+		// overnight block becomes the anchor.
+		const overnightEnd =
+			created.json?.data?.endTime ?? created.json?.entry?.endTime ?? null
+		test.skip(!overnightEnd, 'Overnight seed response lacks endTime: ' + JSON.stringify(created.json))
+		const todayList = await api(
+			page,
+			'GET',
+			`/apps/arbeitszeitcheck/api/time-entries?start_date=${parts.date}&end_date=${parts.date}&limit=200`
+		)
+		const rows = todayList.entries || todayList.data || []
+		for (const row of rows) {
+			const rid = Number(row.id)
+			const rowEnd = row.endTime || row.end_time || null
+			if (
+				rid !== Number(overnightId)
+				&& String(row.status).toLowerCase() === 'completed'
+				&& rowEnd
+				&& String(rowEnd) > String(overnightEnd)
+			) {
+				const del = await apiAllowFailure(page, 'DELETE', `/apps/arbeitszeitcheck/api/time-entries/${rid}`)
+				if (!del.ok || del.json?.success === false) {
+					test.skip(
+						true,
+						`Could not remove fresher same-day entry ${rid} (intraday anchor): ` +
+							JSON.stringify(del.json)
+					)
+				}
+			}
+		}
+
 		try {
 			const clockIn = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/clock/in')
 			expect(clockIn.ok).toBe(false)

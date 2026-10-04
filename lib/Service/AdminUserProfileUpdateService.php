@@ -126,12 +126,30 @@ class AdminUserProfileUpdateService
 
 		return $this->atomic(function () use ($userId, $workingTimeModel, $vacationPolicy, $timeCapture, $overtime, $employment, $datev, $performedBy): array {
 			$result = ['success' => true];
-			$result = array_merge($result, $this->applyWorkingTimeModel($userId, $workingTimeModel, $performedBy));
-			$result = array_merge($result, $this->applyVacationPolicy($userId, $vacationPolicy, $performedBy));
-			$result = array_merge($result, $this->applyTimeCaptureSettings($userId, $timeCapture, $performedBy));
-			$result = array_merge($result, $this->applyOvertimeSettings($userId, $overtime, $performedBy));
-			$result = array_merge($result, $this->applyEmploymentSettings($userId, $employment, $performedBy));
-			$result = array_merge($result, $this->applyDatevSettings($userId, $datev, $performedBy));
+			// Empty sections must be skipped: applyVacationPolicy() on an empty
+			// payload would fabricate a manual_fixed policy with null days and
+			// fail entity validation, and applyTimeCaptureSettings() rejects an
+			// empty settings array outright. That made every partial profile
+			// update (e.g. batchProfile, which only sends workingTimeModel)
+			// fail with a generic "Validation failed".
+			if ($workingTimeModel !== []) {
+				$result = array_merge($result, $this->applyWorkingTimeModel($userId, $workingTimeModel, $performedBy));
+			}
+			if ($vacationPolicy !== []) {
+				$result = array_merge($result, $this->applyVacationPolicy($userId, $vacationPolicy, $performedBy));
+			}
+			if ($timeCapture !== []) {
+				$result = array_merge($result, $this->applyTimeCaptureSettings($userId, $timeCapture, $performedBy));
+			}
+			if ($overtime !== []) {
+				$result = array_merge($result, $this->applyOvertimeSettings($userId, $overtime, $performedBy));
+			}
+			if ($employment !== []) {
+				$result = array_merge($result, $this->applyEmploymentSettings($userId, $employment, $performedBy));
+			}
+			if ($datev !== []) {
+				$result = array_merge($result, $this->applyDatevSettings($userId, $datev, $performedBy));
+			}
 
 			return $result;
 		}, $this->db);
@@ -245,9 +263,12 @@ class AdminUserProfileUpdateService
 				$this->userWorkingTimeModelToAuditValues($updated),
 				$performedBy
 			);
-		} elseif ($currentModel) {
+		} elseif ($currentModel && array_key_exists('workingTimeModelId', $params)) {
 			// No model selected ("No Model Assigned"): retire the editable
-			// assignment. A not-yet-started assignment is deleted outright —
+			// assignment. Requires an explicit workingTimeModelId key — a
+			// payload that only carries germanState/vacation fields must not
+			// silently end the current assignment. A not-yet-started
+			// assignment is deleted outright —
 			// ending it with today's date would produce an invalid start > end
 			// range — while an active or past one is closed with an end date.
 			$today = new \DateTime();
@@ -686,6 +707,14 @@ class AdminUserProfileUpdateService
 	 */
 	private function preflightVacationPolicy(string $userId, array $params): void
 	{
+		// Empty section means "no change" (see updateProfile's apply phase and
+		// validateProfileFields): preflighting it would fabricate a
+		// manual_fixed policy with null manualDays and fail entity validation,
+		// which made every partial profile update (e.g. batchProfile sending
+		// only workingTimeModel/holidayRegion) die with "Validation failed".
+		if ($params === []) {
+			return;
+		}
 		$this->assertUserExists($userId);
 
 		$vacationMode = (string)($params['vacationMode'] ?? Constants::VACATION_MODE_MANUAL_FIXED);

@@ -70,6 +70,10 @@ final class TimeClientBootstrap {
 			'serverNow' => $this->timeZoneService->nowInStorage()->format(\DateTimeInterface::ATOM),
 		]);
 
+		// l10n-boot defines __azcBootL10n and must precede the l10n/<lang>.js the
+		// first non-l10n addScript() injects; its own path contains 'l10n' so it
+		// triggers no injection itself.
+		Util::addScript(Application::APP_ID, 'common/l10n-boot');
 		// Regular script (NOT addInitScript): translations load only after OC exists.
 		Util::addScript(Application::APP_ID, 'common/time-init');
 	}

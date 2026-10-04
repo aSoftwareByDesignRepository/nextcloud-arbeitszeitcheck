@@ -49,7 +49,8 @@ test.describe('Manual time entry justification (four-eyes)', () => {
 			const justification = employeePage.locator('#entry-justification')
 			await expect(justification).toBeVisible()
 			await expect(justification).toHaveAttribute('aria-required', 'true')
-			await expect(employeePage.locator('.time-entries-page__workflow-callout')).toContainText(/approval/i)
+			// role="status" selects the approval callout; the finalized-month note is role="note".
+			await expect(employeePage.locator('.time-entries-page__workflow-callout[role="status"]')).toContainText(/approval/i)
 
 			// Client-side gate: save without justification must not leave the page blank of errors.
 			await employeePage.locator('#submit-button').click()

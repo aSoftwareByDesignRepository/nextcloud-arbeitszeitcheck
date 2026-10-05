@@ -17,9 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Atlas v3.5.14 verification pass: expanded contract coverage and store screenshot pipeline fixes.
 
-## Unreleased
+## 1.7.13 - 2026-10-05
 
 ### Fixed
+- **Working-time model rules silently dropped on save:** `setBreakRulesArray()`/`setOvertimeRulesArray()` assigned entity properties directly, bypassing Nextcloud's `markFieldUpdated()`, so `break_rules` and `overtime_rules` — including `weekday_schedule` and `allow_sunday_work` — were never written to the database. A 20h/4-day model therefore fell back to spreading hours over Monday–Friday and mis-calculated required hours around holidays. Both helpers now route through the entity setters; regression-locked by unit tests on `getUpdatedFields()` and a real-database round-trip integration test. Existing rows saved while the bug was active must be re-saved once (the data was never stored).
 - **Entitlement snapshots never persisted:** `EntitlementSnapshotService::store()` passed `DateTimeImmutable` to a `datetime`-typed entity setter (Nextcloud expects mutable `DateTime`), so every call fataled and the audit trail silently stayed empty.
 - **Vacation-unit migration silently zeroed malformed amounts:** a stored value like `abc,5` cast through `(float)` became `0.0`, passed the `is_finite` guard, and overwrote the real entitlement with zero. Non-numeric input is now rejected before the cast.
 - **Schema repair blind to stamp-idempotency tables:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` were missing from the schema-health catalog, so `EnsureArbeitszeitCheckSchema` could not detect or recreate them. Catalog synchronized; drop → detect → migrate → recreate is covered by an integration test.

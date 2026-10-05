@@ -546,6 +546,10 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				// /api/kiosk/stamp — RFID offline-stamp path, idempotent on
 				// clientRequestId. Clock in AND out through the stamp route in
 				// whichever order the current state allows, then restore ambient.
+				// NOTE: stamp responses use kiosk vocabulary (working|off|on_break,
+				// the tablet contract), while /api/clock/status uses the web
+				// vocabulary (active|clocked_out|break) — assert each in its own.
+				const KIOSK_NEW_STATUS = { clock_in: 'working', clock_out: 'off', break_start: 'on_break', break_end: 'working' }
 				const stMid = await api(empPage, 'GET', `${APP}/api/clock/status`)
 				const activeNow = ['active', 'break', 'paused'].includes(stMid.status?.status)
 				const seq = activeNow
@@ -558,13 +562,13 @@ test.describe('ATLAS durable-mutation sweep', () => {
 						data: { method: 'rfid', rfidUid, action, clientRequestId: reqId, occurredAt },
 					})
 					expect(s.ok, `stamp ${action} failed: ${JSON.stringify(s.json)}`).toBe(true)
-					expect(s.json?.data?.newStatus).toBe(wantStatus)
+					expect(s.json?.data?.newStatus).toBe(KIOSK_NEW_STATUS[action])
 					// replay same clientRequestId → cached payload, no 2nd mutation
 					const replay = await kioskApi(page, 'POST', `${APP}/api/kiosk/stamp`, terminal, {
 						data: { method: 'rfid', rfidUid, action, clientRequestId: reqId, occurredAt },
 					})
 					expect(replay.json?.success, `stamp ${action} replay failed: ${JSON.stringify(replay.json)}`).toBe(true)
-					expect(replay.json?.data?.newStatus).toBe(wantStatus)
+					expect(replay.json?.data?.newStatus).toBe(KIOSK_NEW_STATUS[action])
 					const stAfter = await api(empPage, 'GET', `${APP}/api/clock/status`)
 					expect(stAfter.status?.status).toBe(wantStatus)
 				}

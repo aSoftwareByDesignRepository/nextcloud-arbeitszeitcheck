@@ -121,7 +121,7 @@ class WorkingTimeModel extends Entity
      */
     public function setBreakRulesArray(?array $rules): void
     {
-        $this->breakRules = $rules ? json_encode($rules) : null;
+        $this->setBreakRules($rules ? json_encode($rules) : null);
     }
 
     /**
@@ -153,7 +153,7 @@ class WorkingTimeModel extends Entity
      */
     public function setOvertimeRulesArray(?array $rules): void
     {
-        $this->overtimeRules = $rules ? json_encode($rules) : null;
+        $this->setOvertimeRules($rules ? json_encode($rules) : null);
     }
 
     /**

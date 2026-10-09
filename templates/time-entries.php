@@ -825,6 +825,11 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </section>
         <?php else: ?>
+            <?php
+            $filterStartDate = $_['filterStartDate'] ?? '';
+            $filterEndDate = $_['filterEndDate'] ?? '';
+            $filterStatus = $_['filterStatus'] ?? '';
+            ?>
             <section id="filter-section" class="azc-card azc-filter-panel time-entries-page__filter" style="display: none;" aria-labelledby="time-entries-filter-title">
                 <header class="azc-filter-panel__head">
                     <h2 id="time-entries-filter-title"><?php p($l->t('Filter')); ?></h2>
@@ -836,24 +841,24 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <div class="azc-filter-field">
                                 <label for="filter-start-date" class="azc-filter-field__label"><?php p($l->t('Start Date')); ?></label>
                                 <div class="azc-filter-field__control">
-                                    <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                                    <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterStartDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
                                 </div>
                             </div>
                             <div class="azc-filter-field">
                                 <label for="filter-end-date" class="azc-filter-field__label"><?php p($l->t('End Date')); ?></label>
                                 <div class="azc-filter-field__control">
-                                    <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                                    <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterEndDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
                                 </div>
                             </div>
                             <div class="azc-filter-field">
                                 <label for="filter-status" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
                                 <div class="azc-filter-field__control">
                                     <select id="filter-status" name="status" class="form-select">
-                                        <option value=""><?php p($l->t('All')); ?></option>
-                                        <option value="active"><?php p($l->t('Active')); ?></option>
-                                        <option value="completed"><?php p($l->t('Completed')); ?></option>
-                                        <option value="pending_approval"><?php p($l->t('Pending Approval')); ?></option>
-                                        <option value="paused"><?php p($l->t('Paused (needs attention)')); ?></option>
+                                        <option value="" <?php echo $filterStatus === '' ? 'selected' : ''; ?>><?php p($l->t('All')); ?></option>
+                                        <option value="active" <?php echo $filterStatus === 'active' ? 'selected' : ''; ?>><?php p($l->t('Active')); ?></option>
+                                        <option value="completed" <?php echo $filterStatus === 'completed' ? 'selected' : ''; ?>><?php p($l->t('Completed')); ?></option>
+                                        <option value="pending_approval" <?php echo $filterStatus === 'pending_approval' ? 'selected' : ''; ?>><?php p($l->t('Pending Approval')); ?></option>
+                                        <option value="paused" <?php echo $filterStatus === 'paused' ? 'selected' : ''; ?>><?php p($l->t('Paused (needs attention)')); ?></option>
                                     </select>
                                 </div>
                             </div>
@@ -1216,22 +1221,35 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <?php else: ?>
                                 <tr>
                                     <td colspan="9">
+                                        <?php $azcListFiltered = ($filterStartDate ?? '') !== '' || ($filterEndDate ?? '') !== '' || ($filterStatus ?? '') !== ''; ?>
                                         <div class="azc-empty-state">
-                                            <h3 class="azc-empty-state__title"><?php p($l->t('No time entries yet')); ?></h3>
-                                            <p class="azc-empty-state__text">
+                                            <?php if ($azcListFiltered): ?>
+                                                <h3 class="azc-empty-state__title"><?php p($l->t('No entries match this filter')); ?></h3>
+                                                <p class="azc-empty-state__text">
+                                                    <?php p($l->t('Try a wider date range or a different status, or clear the filter to see all entries again.')); ?>
+                                                </p>
+                                                <a id="btn-clear-filter-empty"
+                                                    class="azc-btn azc-btn--secondary"
+                                                    href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>">
+                                                    <?php p($l->t('Clear filter')); ?>
+                                                </a>
+                                            <?php else: ?>
+                                                <h3 class="azc-empty-state__title"><?php p($l->t('No time entries yet')); ?></h3>
+                                                <p class="azc-empty-state__text">
+                                                    <?php if ($manualTimeEntryEnabled): ?>
+                                                        <?php p($l->t('You haven\'t recorded any working time yet. Click the button below to add your first time entry, or use the clock in button on the dashboard to start tracking automatically.')); ?>
+                                                    <?php else: ?>
+                                                        <?php p($l->t('You haven\'t recorded any working time yet. When your administrator allows it, you can add entries here or use clock in on the dashboard.')); ?>
+                                                    <?php endif; ?>
+                                                </p>
                                                 <?php if ($manualTimeEntryEnabled): ?>
-                                                    <?php p($l->t('You haven\'t recorded any working time yet. Click the button below to add your first time entry, or use the clock in button on the dashboard to start tracking automatically.')); ?>
-                                                <?php else: ?>
-                                                    <?php p($l->t('You haven\'t recorded any working time yet. When your administrator allows it, you can add entries here or use clock in on the dashboard.')); ?>
+                                                <button id="btn-add-first-entry"
+                                                    class="azc-btn azc-btn--primary"
+                                                    type="button"
+                                                    aria-label="<?php p($l->t('Add your first time entry')); ?>">
+                                                    <?php p($l->t('Add Your First Entry')); ?>
+                                                </button>
                                                 <?php endif; ?>
-                                            </p>
-                                            <?php if ($manualTimeEntryEnabled): ?>
-                                            <button id="btn-add-first-entry"
-                                                class="azc-btn azc-btn--primary"
-                                                type="button"
-                                                aria-label="<?php p($l->t('Add your first time entry')); ?>">
-                                                <?php p($l->t('Add Your First Entry')); ?>
-                                            </button>
                                             <?php endif; ?>
                                         </div>
                                     </td>

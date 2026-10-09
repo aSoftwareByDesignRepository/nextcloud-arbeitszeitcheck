@@ -381,6 +381,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::migrateVacationUnit' => ['targetUnit' => 'days'],
 		'AdminController::createTariffRuleSet' => ['modules' => [['moduleType' => 'base_formula', 'config' => ['reference_days' => 260, 'reference_week_days' => 5]]]],
 		'AdminController::updateTariffRuleSet' => ['modules' => [['moduleType' => 'base_formula', 'config' => ['reference_days' => 260, 'reference_week_days' => 5]]]],
+		// Required-key guards (missing key must not silently write the toggle).
+		'AdminController::setTeamsUseAppTeams' => ['useAppTeams' => true],
+		'KioskAdminController::setUserAllowed' => ['kioskAllowed' => true],
+		'KioskAdminController::importCredentials' => ['csv' => "uid,type\nbob,pin"],
 		'OutlookIcalSubscriptionController::adminCreateToken' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminCreateSubscriptionLink' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminRotateToken' => ['teamId' => 1, 'languageCode' => 'en'],

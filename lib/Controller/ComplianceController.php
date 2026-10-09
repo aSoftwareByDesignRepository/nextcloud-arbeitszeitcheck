@@ -405,7 +405,7 @@ class ComplianceController extends Controller
 			}
 		}
 
-		throw new \Exception($this->l10n->t(
+		throw new \InvalidArgumentException($this->l10n->t(
 			'Invalid %s format. Use ISO-8601 (e.g. 2024-01-15T09:00:00Z).',
 			[$paramName]
 		));
@@ -794,6 +794,11 @@ class ComplianceController extends Controller
 					? $result['earliestStartTime']->format(\DateTime::ATOM)
 					: null,
 			]);
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage()
+			], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('checkRestPeriod error: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([

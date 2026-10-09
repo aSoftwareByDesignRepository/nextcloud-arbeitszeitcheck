@@ -241,7 +241,11 @@ class PermissionService
 				static fn (string $id): bool => $id !== $userId,
 			));
 			if ($filtered !== $ids) {
-				$this->config->setAppValue(
+				// These keys are also written via the typed string API by
+				// AdminController (setAppValueString) — untyped writes then
+				// throw AppConfigTypeConflictException (NC >= 34); fall back typed.
+				\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(
+					$this->config,
 					Application::APP_ID,
 					$key,
 					json_encode($filtered, JSON_THROW_ON_ERROR),

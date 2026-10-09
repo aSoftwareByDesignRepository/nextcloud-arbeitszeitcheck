@@ -183,6 +183,9 @@ class DashboardWidgetDataServiceTest extends TestCase {
 		// buildPremiumSummaryForWidget resolves the real PremiumSurchargeService
 		// from the server container -> the enabled arm needs a real config flip.
 		$realConfig = \OC::$server->get(\OCP\IConfig::class);
+		// The settings API writes this key as a typed bool; delete first so a
+		// leftover typed value cannot clash with the string arm (AppConfigTypeConflictException).
+		$realConfig->deleteAppValue('arbeitszeitcheck', \OCA\ArbeitszeitCheck\Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED);
 		$realConfig->setAppValue('arbeitszeitcheck', \OCA\ArbeitszeitCheck\Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '1');
 		try {
 			$timeTrackingService = $this->createMock(TimeTrackingService::class);

@@ -624,10 +624,17 @@ class UpgradeBackupService
 
 		/** @var list<array<string, mixed>> $rows */
 		$rows = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+		$generatedColumns = $this->generatedColumnsOf($table);
 		foreach ($rows as $row) {
 			$qb = $this->db->getQueryBuilder();
 			$qb->insert($table);
 			foreach ($row as $column => $value) {
+				// Generated columns (e.g. at_entries.live_user_id) are recomputed
+				// by the engine on insert — writing them explicitly is an SQL
+				// error (MySQL/MariaDB 1906).
+				if (isset($generatedColumns[(string)$column])) {
+					continue;
+				}
 				if (!UpgradeBackupIntegrity::isAllowedColumn((string)$column)) {
 					throw new UpgradeBackupException('Snapshot contains invalid column name: ' . $column);
 				}
@@ -638,6 +645,33 @@ class UpgradeBackupService
 			}
 			$qb->executeStatement();
 		}
+	}
+
+	/**
+	 * Column names declared GENERATED ALWAYS on $table (MySQL/MariaDB report
+	 * them via SHOW COLUMNS Extra containing "GENERATED"; PostgreSQL exposes
+	 * attgenerated='s'). Unknown/unsupported platforms return an empty set —
+	 * worst case the engine raises its own error on insert, as before.
+	 *
+	 * @return array<string, true>
+	 */
+	private function generatedColumnsOf(string $table): array
+	{
+		$physical = $this->config->getSystemValueString('dbtableprefix', 'oc_') . $table;
+		$safe = str_replace('`', '``', $physical);
+		try {
+			$cols = $this->db->executeQuery("SHOW COLUMNS FROM `{$safe}`")->fetchAll();
+		} catch (\Throwable) {
+			return [];
+		}
+		$out = [];
+		foreach ($cols as $col) {
+			$extra = strtoupper((string)($col['Extra'] ?? ''));
+			if (str_contains($extra, 'GENERATED')) {
+				$out[(string)$col['Field']] = true;
+			}
+		}
+		return $out;
 	}
 
 	private function truncateTableIfExists(string $table): void

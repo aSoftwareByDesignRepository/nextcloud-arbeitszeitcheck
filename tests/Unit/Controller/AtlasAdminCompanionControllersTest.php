@@ -96,6 +96,7 @@ class AtlasAdminCompanionControllersTest extends TestCase
 		$errors = new KioskErrorMessages($this->l10n());
 		$terminal = $this->createMock(KioskTerminalService::class);
 		$terminal->method('listTerminals')->willReturn([]);
+		$terminal->method('findByTerminalId')->willReturn(new \OCA\ArbeitszeitCheck\Db\KioskTerminal());
 		$ps = $this->createMock(PermissionService::class);
 		$ps->method('isAdmin')->willReturn(true);
 
@@ -198,6 +199,7 @@ class AtlasAdminCompanionControllersTest extends TestCase
 
 		$prop->setValue($c, $this->requestWithParams(['terminalId' => 't1']));
 		$this->assertTrue($c->enrollmentStatus()->getData()['success']);
+		$prop->setValue($c, $this->requestWithParams(['csv' => "uid,type\nemp1,pin"]));
 		$this->assertTrue($c->importCredentials()->getData()['success']);
 
 		$creds->method('assignRfid')->willThrowException(new \OCA\ArbeitszeitCheck\Service\Kiosk\KioskException('KIOSK_USER_NOT_FOUND'));
@@ -211,10 +213,37 @@ class AtlasAdminCompanionControllersTest extends TestCase
 		$this->assertInstanceOf(JSONResponse::class, $c->generatePin());
 		$this->assertInstanceOf(JSONResponse::class, $c->deleteCredential(9));
 		$this->assertInstanceOf(JSONResponse::class, $c->startEnrollment());
-		$this->assertInstanceOf(JSONResponse::class, $c->cancelEnrollment());
+		// Missing terminalId param → 400 shape error (terminal_id_required),
+		// not a not-found.
+		$cancelMissing = $c->cancelEnrollment();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $cancelMissing->getStatus());
+		$this->assertSame('terminal_id_required', $cancelMissing->getData()['error']);
+		// Nonexistent terminal → uniform 404 via kioskError/statusForCode
+		// (here the service exception path: findByTerminalId stub returns a
+		// terminal, cancel() throws KIOSK_TERMINAL_NOT_FOUND).
+		$prop->setValue($c, $this->requestWithParams(['terminalId' => 'ghost_terminal']));
+		$cancelGhost = $c->cancelEnrollment();
+		$this->assertSame(Http::STATUS_NOT_FOUND, $cancelGhost->getStatus());
+		$this->assertSame('KIOSK_TERMINAL_NOT_FOUND', $cancelGhost->getData()['error']);
+		// Controller-level existence check (same convention as revokeTerminal):
+		// unknown terminal id → 404 before the service is touched.
+		$terminalNull = $this->createMock(KioskTerminalService::class);
+		$terminalNull->method('findByTerminalId')->willReturn(null);
+		$c4k = new KioskAdminController(
+			'arbeitszeitcheck', $request, $terminalNull, $creds, $enroll, $settings,
+			$devices, $errors, $um, $ps, $this->adminSession(), $this->csp(),
+			$this->url(), $this->locale(), $this->l10n(),
+		);
+		$prop->setValue($c4k, $this->requestWithParams(['terminalId' => 'ghost_terminal']));
+		$cancelUnknown = $c4k->cancelEnrollment();
+		$this->assertSame(Http::STATUS_NOT_FOUND, $cancelUnknown->getStatus());
+		$this->assertSame('KIOSK_TERMINAL_NOT_FOUND', $cancelUnknown->getData()['error']);
 
 		$um->method('get')->willReturn(null);
-		$this->assertSame(Http::STATUS_BAD_REQUEST, $c->setUserAllowed('missing')->getStatus());
+		// Ghost employee → uniform 404, never 400 (existence/shape oracle).
+		$ghostAllowed = $c->setUserAllowed('missing');
+		$this->assertSame(Http::STATUS_NOT_FOUND, $ghostAllowed->getStatus());
+		$this->assertSame('KIOSK_USER_NOT_FOUND', $ghostAllowed->getData()['error']);
 	}
 
 	public function testLicenseAdminSurfaces(): void
@@ -232,6 +261,7 @@ class AtlasAdminCompanionControllersTest extends TestCase
 		$seats->method('listSeats')->willReturn([]);
 		$seats->method('getAssignedCount')->willReturn(0);
 		$seats->method('assignSeat')->willReturn(['ok' => false, 'error' => 'user_not_found']);
+		$seats->method('removeSeat')->willReturn(['ok' => true]);
 		$devices = $this->createMock(TerminalDeviceService::class);
 		$devices->method('getActiveCount')->willReturn(0);
 		$um = $this->createMock(IUserManager::class);

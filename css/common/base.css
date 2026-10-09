@@ -546,7 +546,7 @@ select {
   line-height: inherit;
   color: inherit;
   background-color: var(--arbeitszeitcheck-color-background);
-  border: 1px solid var(--arbeitszeitcheck-color-border);
+  border: 1px solid var(--azc-form-border);
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;

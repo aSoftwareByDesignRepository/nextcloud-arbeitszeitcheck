@@ -902,4 +902,47 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 
 		$this->assertSame(Constants::DEFAULT_VACATION_DAYS_PER_YEAR, $captured->getVacationDaysPerYear());
 	}
+
+	/**
+	 * Regression: applyOvertimeSettings must reject nonexistent users before
+	 * any write — the endpoint previously persisted stray user_settings rows
+	 * for ghost uids and still returned success.
+	 */
+	public function testApplyOvertimeSettingsRejectsGhostUserBeforeAnyWrite(): void
+	{
+		$this->userManager->method('get')->with('ghost')->willReturn(null);
+		$overtime = $this->createMock(UserOvertimeSettingsService::class);
+		$overtime->expects($this->never())->method('setTrackingFrom');
+		$overtime->expects($this->never())->method('setOpeningBalance');
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+
+		$service = new AdminUserProfileUpdateService(
+			$this->userManager,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->createMock(AuditLogMapper::class),
+			$this->createMock(UserSettingsMapper::class),
+			$this->createMock(VacationYearBalanceMapper::class),
+			$this->createMock(VacationAllocationService::class),
+			$this->createMock(TariffRuleSetMapper::class),
+			$this->vacationPolicyMapper,
+			$overtime,
+			$this->createMock(UserEmploymentSettingsService::class),
+			$this->createMock(TimeCaptureMethodService::class),
+			$l10n,
+			$this->createMock(IDBConnection::class),
+		);
+
+		try {
+			$service->applyOvertimeSettings('ghost', [
+				'trackingFrom' => '2026-01-01',
+				'openingBalance' => ['year' => 2026, 'hours' => '5'],
+			], 'admin');
+			$this->fail('expected AdminUserProfileUpdateException for nonexistent user');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(404, $e->httpStatus);
+		}
+	}
 }

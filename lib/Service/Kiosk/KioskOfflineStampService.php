@@ -6,6 +6,7 @@ namespace OCA\ArbeitszeitCheck\Service\Kiosk;
 
 use OCA\ArbeitszeitCheck\Db\KioskStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Db\KioskTerminal;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Support\StampClientRequestNormalizer;
@@ -26,6 +27,7 @@ class KioskOfflineStampService
 		private readonly KioskActionService $actionService,
 		private readonly TimeTrackingService $timeTrackingService,
 		private readonly KioskStampIdempotencyMapper $idempotencyMapper,
+		private readonly KioskBusinessRuleMapper $businessRuleMapper,
 		private readonly StampOccurredAtParser $occurredAtParser,
 		private readonly ITimeFactory $timeFactory,
 	) {
@@ -88,6 +90,12 @@ class KioskOfflineStampService
 			return $payload;
 		} catch (\Throwable $e) {
 			$this->idempotencyMapper->deleteByTerminalAndRequestId($terminalId, $clientRequestId);
+			if ($e instanceof BusinessRuleException) {
+				// Business rejections (rest period, already clocked in, …) must keep
+				// their typed kiosk code — an INTERNAL_ERROR 500 would make terminals
+				// and ops indistinguishable from real server faults.
+				throw $this->businessRuleMapper->toKioskException($e);
+			}
 			throw $e;
 		}
 	}

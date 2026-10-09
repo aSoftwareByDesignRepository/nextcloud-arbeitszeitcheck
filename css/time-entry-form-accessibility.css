@@ -238,7 +238,7 @@
   margin: 1.25rem 0;
   padding: 1.125rem 1.125rem 1rem 1.25rem;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--azc-form-border));
   background: linear-gradient(
     165deg,
     color-mix(in srgb, var(--color-primary) 7%, var(--color-main-background)) 0%,

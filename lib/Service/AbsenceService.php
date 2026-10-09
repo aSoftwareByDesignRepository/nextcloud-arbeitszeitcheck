@@ -678,7 +678,7 @@ class AbsenceService
 	{
 		$absence = $this->getAbsence($id, $userId);
 		if (!$absence) {
-			throw new \Exception($this->l10n->t('Absence not found'));
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
@@ -686,7 +686,7 @@ class AbsenceService
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if ($absence->getUserId() !== $userId) {
-				throw new \Exception($this->l10n->t('Absence not found'));
+				throw new DoesNotExistException($this->l10n->t('Absence not found'));
 			}
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
@@ -765,7 +765,7 @@ class AbsenceService
 	{
 		$absence = $this->getAbsence($id, $userId);
 		if (!$absence) {
-			throw new \Exception($this->l10n->t('Absence not found'));
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
@@ -773,7 +773,7 @@ class AbsenceService
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if ($absence->getUserId() !== $userId) {
-				throw new \Exception($this->l10n->t('Absence not found'));
+				throw new DoesNotExistException($this->l10n->t('Absence not found'));
 			}
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
@@ -1127,11 +1127,11 @@ class AbsenceService
 				$this->assertVacationUnitMigrationIdle();
 			}
 		// Designated-substitute check BEFORE the status check: a non-designated
-		// caller must not learn whether the absence is awaiting substitute approval
-		// (BOLA oracle — same class as the manager approve/reject ordering fix).
+		// caller must not learn whether the absence exists at all — collapse to
+		// the same not-found shape as a missing id (existence oracle).
 		$actualSubstitute = $absence->getSubstituteUserId();
 		if ($actualSubstitute === null || $actualSubstitute !== $substituteUserId) {
-			throw new \Exception($this->l10n->t('You are not the designated substitute for this absence'));
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
 		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
 			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));
@@ -1246,11 +1246,11 @@ class AbsenceService
 				$this->assertVacationUnitMigrationIdle();
 			}
 		// Designated-substitute check BEFORE the status check: a non-designated
-		// caller must not learn whether the absence is awaiting substitute approval
-		// (BOLA oracle — same class as the manager approve/reject ordering fix).
+		// caller must not learn whether the absence exists at all — collapse to
+		// the same not-found shape as a missing id (existence oracle).
 		$actualSubstitute = $absence->getSubstituteUserId();
 		if ($actualSubstitute === null || $actualSubstitute !== $substituteUserId) {
-			throw new \Exception($this->l10n->t('You are not the designated substitute for this absence'));
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
 		if ($absence->getStatus() !== Absence::STATUS_SUBSTITUTE_PENDING) {
 			throw new \Exception($this->l10n->t('Absence is not awaiting substitute approval'));

@@ -57,6 +57,9 @@ body {
 	--azc-muted: var(--color-text-maxcontrast);
 	--azc-border: color-mix(in srgb, var(--color-main-text) 12%, transparent);
 	--azc-border-strong: color-mix(in srgb, var(--color-main-text) 24%, transparent);
+	/* Interactive controls need >=3:1 (WCAG 1.4.11): maxcontrast is NC's own
+	   input border; --color-border / --azc-border stay surface-only. */
+	--azc-form-border: var(--color-border-maxcontrast, var(--azc-border-strong));
 
 	/* Mix with main background — not transparent — so callouts stay visible on all NC themes */
 	--azc-tint-success: color-mix(in srgb, var(--color-success-text, var(--color-success)) 18%, var(--color-main-background));
@@ -99,4 +102,21 @@ body[data-theme-dark-highcontrast] {
 	);
 	/* primary-element-text is often black (for light CTAs) — unusable on medium red */
 	--azc-danger-on-fill: var(--color-main-text);
+}
+
+/* Aliases for refs added by sheets ported from other apps — dead names
+   silently fell back to literals. */
+body {
+	--azc-accent: var(--color-primary-element);
+	--azc-bg: var(--azc-bg-card);
+	--azc-surface: var(--azc-bg-card);
+	--azc-surface-2: var(--azc-bg-soft);
+	--azc-surface-muted: var(--azc-bg-soft);
+	--azc-fs-base: var(--azc-fs-md);
+	--azc-radius-base: var(--azc-radius-md);
+	--azc-radius-pill: var(--border-radius-pill, 999px);
+	--arbeitszeitcheck-color-border-dark: var(--color-border-dark);
+	--arbeitszeitcheck-color-gray-50: var(--azc-bg-soft);
+	--arbeitszeitcheck-color-text-default: var(--color-main-text);
+	--arbeitszeitcheck-font-size-md: var(--arbeitszeitcheck-font-size-base);
 }

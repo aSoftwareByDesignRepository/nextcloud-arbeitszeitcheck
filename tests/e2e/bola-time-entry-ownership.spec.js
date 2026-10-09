@@ -88,13 +88,24 @@ test.describe('BOLA time-entry ownership (live)', () => {
 			).toBeGreaterThanOrEqual(400)
 			expect(adminProbe.json?.success).toBeFalsy()
 
+			// SEC oracle guard: a foreign-owned id must serialize identically to a
+			// nonexistent id — 404 "Time entry not found", never a distinct 403.
+			const missingId = 2147483000
+			const missing = await apiAllowFailure(
+				attacker,
+				'GET',
+				`/apps/arbeitszeitcheck/api/time-entries/${missingId}`,
+			)
+			expect(missing.status, JSON.stringify(missing.json)).toBe(404)
+
 			const show = await apiAllowFailure(
 				attacker,
 				'GET',
 				`/apps/arbeitszeitcheck/api/time-entries/${entryId}`,
 			)
-			expect(show.status, JSON.stringify(show.json)).toBe(403)
+			expect(show.status, JSON.stringify(show.json)).toBe(404)
 			expect(show.json?.success).toBeFalsy()
+			expect(show.json?.error).toBe(missing.json?.error)
 
 			const upd = await apiAllowFailure(
 				attacker,
@@ -102,7 +113,7 @@ test.describe('BOLA time-entry ownership (live)', () => {
 				`/apps/arbeitszeitcheck/api/time-entries/${entryId}`,
 				{ data: { date, startTime: '10:00', endTime: '11:00' } },
 			)
-			expect(upd.status, JSON.stringify(upd.json)).toBe(403)
+			expect(upd.status, JSON.stringify(upd.json)).toBe(404)
 			expect(upd.json?.success).toBeFalsy()
 
 			const del = await apiAllowFailure(
@@ -110,7 +121,7 @@ test.describe('BOLA time-entry ownership (live)', () => {
 				'DELETE',
 				`/apps/arbeitszeitcheck/api/time-entries/${entryId}`,
 			)
-			expect(del.status, JSON.stringify(del.json)).toBe(403)
+			expect(del.status, JSON.stringify(del.json)).toBe(404)
 			expect(del.json?.success).toBeFalsy()
 
 			const own = await api(victim, 'GET', `/apps/arbeitszeitcheck/api/time-entries/${entryId}`)

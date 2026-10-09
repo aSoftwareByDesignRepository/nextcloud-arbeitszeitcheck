@@ -1381,8 +1381,8 @@ class AbsenceServiceTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+		$this->expectException(\OCP\AppFramework\Db\DoesNotExistException::class);
+		$this->expectExceptionMessage('Absence not found');
 
 		$this->service->approveBySubstitute($absenceId, $wrongSubstituteId);
 	}
@@ -1523,18 +1523,17 @@ class AbsenceServiceTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+		$this->expectException(\OCP\AppFramework\Db\DoesNotExistException::class);
+		$this->expectExceptionMessage('Absence not found');
 
 		$this->service->declineBySubstitute($absenceId, $wrongSubstituteId, 'comment');
 	}
 
 	/**
 	 * BOLA oracle regression (Atlas web_api 2026-09-23): the designated-substitute
-	 * check must run BEFORE the substitute-pending status check, otherwise a
-	 * non-designated caller can distinguish exists+awaiting-substitute
-	 * ("not the designated substitute") from exists+other-status
-	 * ("not awaiting substitute approval") from absent ("Absence not found").
+	 * check must run BEFORE the substitute-pending status check, and a
+	 * non-designated caller gets the same "Absence not found" as a missing id —
+	 * existence itself must not leak.
 	 */
 	public function testApproveBySubstituteDeniesBeforeStatusCheck(): void
 	{
@@ -1544,8 +1543,8 @@ class AbsenceServiceTest extends TestCase
 		$absence = $this->getMockBuilder(Absence::class)
 			->addMethods(['getStatus', 'getSubstituteUserId', 'getUserId'])
 			->getMock();
-		// Already decided — must still report "not the designated substitute",
-		// never reveal the real status to a non-designated caller.
+		// Already decided — must still report "Absence not found",
+		// never reveal existence or real status to a non-designated caller.
 		$absence->method('getStatus')->willReturn(Absence::STATUS_APPROVED);
 		$absence->method('getSubstituteUserId')->willReturn('designated_substitute');
 		$absence->method('getUserId')->willReturn('employee1');
@@ -1555,8 +1554,8 @@ class AbsenceServiceTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+		$this->expectException(\OCP\AppFramework\Db\DoesNotExistException::class);
+		$this->expectExceptionMessage('Absence not found');
 
 		$this->service->approveBySubstitute($absenceId, $wrongSubstituteId);
 	}
@@ -1578,8 +1577,8 @@ class AbsenceServiceTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 
-		$this->expectException(\Exception::class);
-		$this->expectExceptionMessage('You are not the designated substitute for this absence');
+		$this->expectException(\OCP\AppFramework\Db\DoesNotExistException::class);
+		$this->expectExceptionMessage('Absence not found');
 
 		$this->service->declineBySubstitute($absenceId, $wrongSubstituteId, 'comment');
 	}

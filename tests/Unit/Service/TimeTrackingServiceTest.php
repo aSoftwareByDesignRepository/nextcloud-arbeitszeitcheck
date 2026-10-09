@@ -933,8 +933,8 @@ class TimeTrackingServiceTest extends TestCase {
 
 		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);
 
-		$this->expectException(\OCA\ArbeitszeitCheck\Exception\BusinessRuleException::class);
-		$this->expectExceptionMessage('Access denied');
+		$this->expectException(\OCP\AppFramework\Db\DoesNotExistException::class);
+		$this->expectExceptionMessage('Time entry not found');
 
 		$this->service->completePausedEntry('intruder', 99);
 	}
@@ -1157,10 +1157,19 @@ class TimeTrackingServiceTest extends TestCase {
 
 	public function testGetTodayHoursSumsOverlappingEntries(): void
 	{
-		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 08:15');
+		// Fixed same-day window: 'today 00:15→08:15' is in the future when the
+		// suite runs before 08:15 (midnight flake — entry counted 0h then).
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$now = new \DateTime('now', $tz);
+		$start = (clone $now)->setTime(0, 0, 0);
+		$end = (clone $now)->setTime(0, 30, 0);
+		if ($now <= $end) {
+			$this->markTestSkipped('Fixed same-day window is not yet fully in the past.');
+		}
+		$entry = $this->completedEntryToday(7, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'));
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
 
-		$this->assertEqualsWithDelta(8.0, $this->service->getTodayHours('alice'), 0.2);
+		$this->assertEqualsWithDelta(0.5, $this->service->getTodayHours('alice'), 0.05);
 	}
 
 	public function testGetWorkingHoursForPeriodSumsAcrossDays(): void
@@ -1188,7 +1197,16 @@ class TimeTrackingServiceTest extends TestCase {
 
 	public function testGetBreakStatusReportsRequiredBreak(): void
 	{
-		$entry = $this->completedEntryToday(7, 'today 00:15', 'today 23:45');
+		// Break-required needs >6h completed today — 'today 00:15→23:45' is a
+		// future entry before 23:45 and counts 0h then (midnight flake).
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$now = new \DateTime('now', $tz);
+		$start = (clone $now)->setTime(0, 0, 0);
+		$end = (clone $now)->setTime(6, 30, 0);
+		if ($now <= $end) {
+			$this->markTestSkipped('Cannot express >6h of completed today-work this early in the day.');
+		}
+		$entry = $this->completedEntryToday(7, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'));
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
 
 		$status = $this->service->getBreakStatus('alice');
@@ -1318,7 +1336,16 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setId(9);
 		$entry->setUserId('u1');
 		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE);
-		$entry->setStartTime(new \DateTime('-11 hours'));
+		// Overnight sessions are clipped at midnight — a '-11 hours' start counts
+		// only today's portion, which is under the 10h maximum before ~10:10.
+		// Storage/window math runs in Europe/Berlin — the PHPUnit bootstrap TZ is UTC.
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$now = new \DateTime('now', $tz);
+		$threshold = (clone $now)->setTime(10, 10, 0);
+		if ($now < $threshold) {
+			$this->markTestSkipped('Session cannot exceed the daily maximum this early in the day.');
+		}
+		$entry->setStartTime((clone $now)->setTime(0, 0, 0));
 
 		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
 		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
@@ -1358,16 +1385,19 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
 		$entry->setUserId('u1');
 		$entry->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
-		// window: [max(midnight, now-2h), now] — deterministic regardless of wall clock
-		$now = new \DateTime();
-		$midnight = new \DateTime('today 00:00:00');
-		$start = (clone $now)->modify('-2 hours');
-		if ($start < $midnight) {
-			$start = $midnight;
+		// Fixed same-day window [00:00, 00:30] — a window derived from two separate
+		// "now" reads races across midnight (expected computed before, service
+		// evaluated after) — deterministic regardless of wall clock.
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$now = new \DateTime('now', $tz);
+		$start = new \DateTime('today 00:00:00', $tz);
+		$end = new \DateTime('today 00:30:00', $tz);
+		if ($now <= $end) {
+			$this->markTestSkipped('Fixed same-day window is not yet fully in the past.');
 		}
-		$expected = ($now->getTimestamp() - $start->getTimestamp()) / 3600.0;
+		$expected = 0.5;
 		$entry->setStartTime($start);
-		$entry->setEndTime($now);
+		$entry->setEndTime($end);
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
 		$this->assertEqualsWithDelta($expected, $this->service->getTodayHours('u1'), 0.01);
 

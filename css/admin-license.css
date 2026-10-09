@@ -88,7 +88,7 @@
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: 1.45;
 	padding: var(--azc-space-3, 0.75rem);
-	border: 2px solid var(--color-border);
+	border: 2px solid var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 	border-radius: var(--azc-radius-sm, 8px);
 	background: var(--color-main-background);
 	color: var(--color-main-text);

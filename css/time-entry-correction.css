@@ -305,7 +305,7 @@
 .azc-manager-correction-modal select {
 	color: var(--color-main-text);
 	background: var(--color-main-background);
-	border-color: var(--color-border);
+	border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 }
 
 #time-entry-correction-modal .form-input:focus-visible,

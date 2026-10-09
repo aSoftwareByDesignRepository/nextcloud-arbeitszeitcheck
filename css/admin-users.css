@@ -774,7 +774,7 @@
 .admin-user-detail .form-select {
   background-color: var(--color-main-background);
   color: var(--color-main-text);
-  border-color: var(--color-border);
+  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 }
 
 .admin-user-detail .form-select option {

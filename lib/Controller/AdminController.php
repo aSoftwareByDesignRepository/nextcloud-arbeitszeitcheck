@@ -1902,8 +1902,9 @@ class AdminController extends Controller
 				$oldValues = $this->holidayToAuditValues($existing);
 			} catch (DoesNotExistException $e) {
 				return new JSONResponse([
-					'success' => true,
-				]);
+					'success' => false,
+					'error' => $this->l10n->t('Holiday not found'),
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			$performedBy = $this->getPerformedBy();
@@ -5268,8 +5269,27 @@ class AdminController extends Controller
 			if ($ruleSet->getJurisdiction() === '') {
 				$ruleSet->setJurisdiction(null);
 			}
-			$ruleSet->setValidFrom(new \DateTime((string)($params['validFrom'] ?? date('Y-01-01'))));
-			$ruleSet->setValidTo(!empty($params['validTo']) ? new \DateTime((string)$params['validTo']) : null);
+			// Invalid dates are client errors (400), not server errors (500):
+			// \DateTime throws on garbage input such as "not-a-date".
+			$dateErrors = [];
+			$validFrom = null;
+			if (isset($params['validFrom']) && trim((string)$params['validFrom']) !== '') {
+				try {
+					$validFrom = new \DateTime((string)$params['validFrom']);
+				} catch (\Throwable) {
+					$dateErrors['validFrom'] = 'Valid from must be a valid date';
+				}
+			}
+			$validTo = null;
+			if (isset($params['validTo']) && trim((string)$params['validTo']) !== '') {
+				try {
+					$validTo = new \DateTime((string)$params['validTo']);
+				} catch (\Throwable) {
+					$dateErrors['validTo'] = 'Valid to must be a valid date';
+				}
+			}
+			$ruleSet->setValidFrom($validFrom ?? new \DateTime(date('Y-01-01')));
+			$ruleSet->setValidTo($validTo);
 			$ruleSet->setActivationMode((string)($params['activationMode'] ?? 'immediate'));
 			// New rule sets are always created as drafts. Status transitions are
 			// only allowed through activate/retire so module completeness and
@@ -5281,7 +5301,7 @@ class AdminController extends Controller
 			$errors = $ruleSet->validate();
 			$modules = $this->normalizeTariffModulesPayload(is_array($params['modules'] ?? null) ? $params['modules'] : []);
 			$moduleErrors = TariffRuleModuleValidator::validateList($modules);
-			$errors = array_merge($errors, $moduleErrors);
+			$errors = array_merge($errors, $moduleErrors, $dateErrors);
 			if (!empty($errors)) {
 				$translatedErrors = $this->translateFieldErrors($errors);
 				return new JSONResponse([
@@ -5352,11 +5372,25 @@ class AdminController extends Controller
 			if ($rejected !== null) {
 				return $rejected;
 			}
+			// Invalid dates are client errors (400), not server errors (500).
+			$dateErrors = [];
 			if (isset($params['validFrom'])) {
-				$ruleSet->setValidFrom(new \DateTime((string)$params['validFrom']));
+				try {
+					$ruleSet->setValidFrom(new \DateTime((string)$params['validFrom']));
+				} catch (\Throwable) {
+					$dateErrors['validFrom'] = 'Valid from must be a valid date';
+				}
 			}
 			if (array_key_exists('validTo', $params)) {
-				$ruleSet->setValidTo(!empty($params['validTo']) ? new \DateTime((string)$params['validTo']) : null);
+				if (!empty($params['validTo'])) {
+					try {
+						$ruleSet->setValidTo(new \DateTime((string)$params['validTo']));
+					} catch (\Throwable) {
+						$dateErrors['validTo'] = 'Valid to must be a valid date';
+					}
+				} else {
+					$ruleSet->setValidTo(null);
+				}
 			}
 			if (isset($params['activationMode'])) {
 				$ruleSet->setActivationMode((string)$params['activationMode']);
@@ -5383,6 +5417,7 @@ class AdminController extends Controller
 				$moduleErrors = TariffRuleModuleValidator::validateList($modules);
 				$errors = array_merge($errors, $moduleErrors);
 			}
+			$errors = array_merge($errors, $dateErrors);
 			if (!empty($errors)) {
 				$translatedErrors = $this->translateFieldErrors($errors);
 				return new JSONResponse([
@@ -5507,6 +5542,8 @@ class AdminController extends Controller
 				);
 			}, $this->db);
 			return new JSONResponse(['success' => true]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Tariff rule set not found')], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::activateTariffRuleSet: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to activate tariff rule set')], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -5541,6 +5578,8 @@ class AdminController extends Controller
 				);
 			}, $this->db);
 			return new JSONResponse(['success' => true]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Tariff rule set not found')], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::retireTariffRuleSet: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to retire tariff rule set')], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -6549,11 +6588,17 @@ class AdminController extends Controller
 			$params = $this->request->getParams();
 
 			$filters = [];
-			if (isset($params['start_date']) && $params['start_date']) {
-				$filters['start_date'] = new \DateTime($params['start_date']);
-			}
-			if (isset($params['end_date']) && $params['end_date']) {
-				$filters['end_date'] = new \DateTime($params['end_date']);
+			foreach (['start_date' => 'Invalid start date', 'end_date' => 'Invalid end date'] as $key => $errMsg) {
+				if (isset($params[$key]) && $params[$key]) {
+					try {
+						$filters[$key] = new \DateTime((string)$params[$key]);
+					} catch (\Throwable) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t($errMsg)
+						], Http::STATUS_BAD_REQUEST);
+					}
+				}
 			}
 
 			$stats = $this->auditLogMapper->getStatistics($filters);
@@ -7145,7 +7190,15 @@ class AdminController extends Controller
 	public function setTeamsUseAppTeams(): JSONResponse
 	{
 		$params = $this->request->getParams();
-		$use = !empty($params['useAppTeams']);
+		// Missing key must not silently disable team mode, and the form-encoded
+		// string "false" must never be treated as truthy.
+		if (!array_key_exists('useAppTeams', $params)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Missing required parameter: useAppTeams'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$use = $this->toBool($params['useAppTeams']);
 		$this->appConfig->setAppValueString('use_app_teams', $use ? '1' : '0');
 		return new JSONResponse(['success' => true, 'useAppTeams' => $use]);
 	}

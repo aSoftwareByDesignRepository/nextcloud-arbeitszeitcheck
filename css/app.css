@@ -825,7 +825,7 @@
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary,
 .modal-backdrop .azc-callout__actions .azc-btn--secondary {
 	background: var(--color-main-background);
-	border-color: var(--color-border);
+	border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 	color: var(--color-main-text);
 }
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary:hover,
@@ -1550,3 +1550,24 @@ dialog.entitlement-explain-dialog::backdrop {
 	}
 }
 /* === app-feedback:azc end === */
+
+/*
+ * Control-border baseline (WCAG 1.4.11 >= 3:1 vs background) — DESIGN-SYSTEM §3.6.0.
+ * NC core styles every button/input with the faint `--color-border-dark`, and its
+ * `button:disabled` rule (0,2,1) outranks page-level `.button.secondary` (0,2,0),
+ * so disabled controls silently lose their frame. This rule only re-colours
+ * borders that are already drawn — borderless icon buttons are unaffected —
+ * and state classes keep their semantic borders.
+ */
+#app-content input:not([type='range'], [type='hidden'], [type='color'], [type='file'], [type='image'], [type='submit'], [type='button'], [type='reset'], .form-input--error, .form-input--success, .form-input--warning, .has-error, [aria-invalid='true'], .has-error *),
+#app-content select:not(.form-input--error, .form-input--success, .form-input--warning, [aria-invalid='true'], .has-error *),
+#app-content textarea:not(.form-input--error, .form-input--success, .form-input--warning, [aria-invalid='true'], .has-error *),
+#app-content button:not(.primary, .error, .warning, .success, .danger, .button-vue),
+#app-content .button:not(.primary, .error, .warning, .success, .danger),
+.oc-dialog input:not([type='range'], [type='hidden'], [type='color'], [type='file']),
+.oc-dialog select,
+.oc-dialog textarea,
+.oc-dialog button:not(.primary, .error, .warning, .success, .danger, .button-vue),
+.oc-dialog .button:not(.primary, .error, .warning, .success, .danger) {
+	border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+}

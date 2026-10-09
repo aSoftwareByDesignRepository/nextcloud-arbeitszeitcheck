@@ -10,6 +10,7 @@ use OCA\ArbeitszeitCheck\Service\Kiosk\KioskCredentialService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskEnrollmentService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskErrorMessages;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskException;
+use OCA\ArbeitszeitCheck\Service\Kiosk\KioskHttp;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskSettingsService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskTerminalService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
@@ -234,7 +235,16 @@ class KioskAdminController extends Controller
 	public function setKioskEnabled(): JSONResponse
 	{
 		$data = $this->readJsonBody();
-		$enabled = !empty($data['enabled']);
+		// Missing key must not silently disable kiosk mode, and the
+		// form-encoded string "false" must never enable it.
+		if (!array_key_exists('enabled', $data)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => 'enabled_required',
+				'message' => $this->l10n->t('Missing required parameter: enabled'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$enabled = $this->requestBool($data['enabled']);
 		$this->settingsService->setKioskEnabled($enabled);
 		return new JSONResponse(['success' => true, 'enabled' => $enabled]);
 	}
@@ -279,6 +289,13 @@ class KioskAdminController extends Controller
 	#[NoAdminRequired]
 	public function revokeTerminal(string $terminalId): JSONResponse
 	{
+		if ($this->terminalService->findByTerminalId($terminalId) === null) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => 'KIOSK_TERMINAL_NOT_FOUND',
+				'message' => $this->kioskErrorMessages->message('KIOSK_TERMINAL_NOT_FOUND'),
+			], Http::STATUS_NOT_FOUND);
+		}
 		$this->terminalService->revoke($terminalId);
 		return new JSONResponse(['success' => true]);
 	}
@@ -358,15 +375,22 @@ class KioskAdminController extends Controller
 	public function setUserAllowed(string $userId): JSONResponse
 	{
 		$userId = trim(rawurldecode($userId));
+		// Missing/unknown employee is a uniform 404 via kioskError() →
+		// KioskHttp::statusForCode — never a 400 (existence/shape oracle).
 		if ($userId === '' || $this->userManager->get($userId) === null) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => 'KIOSK_USER_NOT_FOUND',
-				'message' => $this->l10n->t('Employee not found'),
-			], Http::STATUS_BAD_REQUEST);
+			return $this->kioskError(new KioskException('KIOSK_USER_NOT_FOUND'));
 		}
 		$data = $this->readJsonBody();
-		$allowed = !empty($data['kioskAllowed']);
+		// Missing key must not silently revoke kiosk access, and the
+		// form-encoded string "false" must never grant it.
+		if (!array_key_exists('kioskAllowed', $data)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => 'kiosk_allowed_required',
+				'message' => $this->l10n->t('Missing required parameter: kioskAllowed'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$allowed = $this->requestBool($data['kioskAllowed']);
 		$this->settingsService->setUserKioskAllowed($userId, $allowed);
 		return new JSONResponse(['success' => true, 'userId' => $userId, 'kioskAllowed' => $allowed]);
 	}
@@ -386,6 +410,13 @@ class KioskAdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 			$csv = (string)file_get_contents($tmp);
+		}
+		if (trim($csv) === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => 'csv_required',
+				'message' => $this->l10n->t('Provide a CSV payload or upload a credential file.'),
+			], Http::STATUS_BAD_REQUEST);
 		}
 		$actor = $this->userSession->getUser()?->getUID() ?? '';
 		try {
@@ -423,12 +454,18 @@ class KioskAdminController extends Controller
 	{
 		$data = $this->readJsonBody();
 		$terminalId = trim((string)($data['terminalId'] ?? ''));
+		// Missing param is a 400 shape error (csv_required/kiosk_allowed_required
+		// convention); an unknown terminal id is a uniform 404, same as
+		// revokeTerminal — idempotent already_idle only for real terminals.
 		if ($terminalId === '') {
 			return new JSONResponse([
 				'success' => false,
-				'error' => 'KIOSK_TERMINAL_NOT_FOUND',
-				'message' => $this->kioskErrorMessages->message('KIOSK_TERMINAL_NOT_FOUND'),
+				'error' => 'terminal_id_required',
+				'message' => $this->l10n->t('Missing required parameter: terminalId'),
 			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($this->terminalService->findByTerminalId($terminalId) === null) {
+			return $this->kioskError(new KioskException('KIOSK_TERMINAL_NOT_FOUND'));
 		}
 		$actor = $this->userSession->getUser()?->getUID() ?? '';
 		try {
@@ -485,6 +522,12 @@ class KioskAdminController extends Controller
 		return is_array($data) ? $data : $this->request->getParams();
 	}
 
+	/** Strict request bool: form-encoded "false"/"0" must never be truthy. */
+	private function requestBool(mixed $value): bool
+	{
+		return $value === true || $value === 1 || $value === '1' || $value === 'true' || $value === 'on' || $value === 'yes';
+	}
+
 	private function noStore(JSONResponse $response): JSONResponse
 	{
 		$response->addHeader('Cache-Control', 'no-store, private');
@@ -495,12 +538,9 @@ class KioskAdminController extends Controller
 	private function kioskError(KioskException $e): JSONResponse
 	{
 		$code = $e->getErrorCode();
-		$status = match ($code) {
-			'KIOSK_RFID_ALREADY_ASSIGNED' => Http::STATUS_CONFLICT,
-			'KIOSK_BUSY' => Http::STATUS_CONFLICT,
-			'KIOSK_USER_NOT_ALLOWED', 'TERMINAL_DEVICE_LIMIT_REACHED', 'TERMINAL_LICENSE_REQUIRED' => Http::STATUS_FORBIDDEN,
-			default => Http::STATUS_BAD_REQUEST,
-		};
+		// Delegate to the shared status map so *_NOT_FOUND codes serialize as
+		// 404 (uniform not-found) instead of collapsing into generic 400s.
+		$status = KioskHttp::statusForCode($code);
 		return new JSONResponse([
 			'success' => false,
 			'error' => $code,

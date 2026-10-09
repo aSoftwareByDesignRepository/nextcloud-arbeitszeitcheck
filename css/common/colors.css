@@ -120,7 +120,7 @@ body {
 
   /* Form */
   --arbeitszeitcheck-color-form-background: var(--color-main-background);
-  --arbeitszeitcheck-color-form-border: var(--color-border);
+  --arbeitszeitcheck-color-form-border: var(--azc-form-border);
   --arbeitszeitcheck-color-form-border-focus: var(--color-primary-element);
   --arbeitszeitcheck-color-form-border-error: var(--color-error);
   --arbeitszeitcheck-color-form-border-success: var(--color-success);

@@ -1582,6 +1582,14 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('Access denied. You can only record absences for employees you manage.'),
 				], Http::STATUS_FORBIDDEN);
 			}
+			// After the scope check (fails closed for non-admin managers):
+			// reject ghost uids for admin callers too.
+			if ($this->userManager->get($targetUserId) === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The selected user does not exist or is disabled.'),
+				], Http::STATUS_NOT_FOUND);
+			}
 			if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
 				return new JSONResponse([
 					'success' => false,
@@ -1802,6 +1810,16 @@ class ManagerController extends Controller
 					'success' => false,
 					'error' => $this->l10n->t('Access denied. You can only manage employees in your scope.'),
 				], Http::STATUS_FORBIDDEN);
+			}
+
+			// After the scope check (which fails closed for non-admin managers),
+			// reject ghost uids so admin callers cannot write/list against
+			// nonexistent employees.
+			if ($this->userManager->get($employeeId) === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Employee not found'),
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			if (!$this->projectCheckIntegration->isAdminIntegrationEnabled()) {
@@ -2417,10 +2435,11 @@ class ManagerController extends Controller
 			// not learn whether the absence exists or was decided (BOLA oracle).
 			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'approve_absence', 'absence', (string) $absenceId);
+				// Collapse out-of-scope to the same 404 as a missing id (existence oracle).
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Absence not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 			// Already decided → 409 so clients uniformly refresh (same envelope as time-entry races).
 			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
@@ -2483,8 +2502,8 @@ class ManagerController extends Controller
 				$this->permissionService->logPermissionDenied($managerId, 'reject_absence', 'absence', (string) $absenceId);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Absence not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 			if ($absence->getStatus() !== \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING) {
 				return new JSONResponse([
@@ -2549,8 +2568,8 @@ class ManagerController extends Controller
 				$this->permissionService->logPermissionDenied($managerId, 'approve_time_entry_correction', 'time_entry', (string) $timeEntryId);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only approve time entries for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			// Verify entry is pending approval — already decided → 409 so clients
@@ -2662,8 +2681,8 @@ class ManagerController extends Controller
 				$this->permissionService->logPermissionDenied($managerId, 'reject_time_entry_correction', 'time_entry', (string) $timeEntryId);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only reject time entries for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			// Verify entry is pending approval — already decided → 409 so clients
@@ -2762,8 +2781,8 @@ class ManagerController extends Controller
 				$this->permissionService->logPermissionDenied($managerId, 'correct_time_entry', 'time_entry', (string)$timeEntryId);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only correct time entries for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			if ($entry->getStatus() === TimeEntry::STATUS_PENDING_APPROVAL) {

@@ -354,22 +354,23 @@ class SubstituteControllerTest extends TestCase
 	}
 
 	/**
-	 * Object-level AuthZ: wrong substitute cannot decline another user's request.
+	 * Object-level AuthZ: a non-designated substitute must get the same 404
+	 * "Absence not found" as a missing id — no existence oracle.
 	 */
-	public function testDeclineReturns400WhenNotDesignatedSubstitute(): void
+	public function testDeclineReturns404WhenNotDesignatedSubstitute(): void
 	{
 		$this->mockAuthenticatedUser('intruder');
 		$this->absenceService->expects($this->once())
 			->method('declineBySubstitute')
 			->with(42, 'intruder', '')
-			->willThrowException(new \Exception('You are not the designated substitute for this absence'));
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('Absence not found'));
 
 		$response = $this->controller->decline(42);
 
-		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertSame('You are not the designated substitute for this absence', $data['error']);
+		$this->assertSame('Absence not found', $data['error']);
 	}
 
 	public function testDeclineReturnsUnauthorizedWhenNotLoggedIn(): void

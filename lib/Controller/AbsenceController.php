@@ -519,6 +519,16 @@ class AbsenceController extends Controller
 				'success' => true,
 				'absence' => $absence->getSummary()
 			]);
+		} catch (DoesNotExistException $e) {
+			$msg = $this->l10n->t('Absence not found');
+			if (!$this->wantsJson()) {
+				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?error=' . rawurlencode($msg);
+				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
+			}
+			return new JSONResponse([
+				'success' => false,
+				'error' => $msg
+			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			$msg = $this->getSafeErrorMessage($e);
 			if (!$this->wantsJson()) {
@@ -565,6 +575,11 @@ class AbsenceController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.')
 			], Http::STATUS_CONFLICT);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Absence not found')
+			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -1035,11 +1050,13 @@ class AbsenceController extends Controller
 				$dh = $params['duration_hours'];
 				$data['duration_hours'] = is_array($dh) ? (string)reset($dh) : (string)$dh;
 			}
-			if (!empty($params['require_duration_hours'])) {
-				$data['require_duration_hours'] = true;
-			}
-			if (!empty($params['server_may_fill_hours'])) {
-				$data['server_may_fill_hours'] = true;
+			// Form-encoded "false"/"0" are non-empty strings — never truthy here.
+			foreach (['require_duration_hours', 'server_may_fill_hours'] as $flagKey) {
+				$rawFlag = $params[$flagKey] ?? null;
+				$rawFlag = is_array($rawFlag) ? reset($rawFlag) : $rawFlag;
+				if ($rawFlag === true || $rawFlag === 1 || $rawFlag === '1' || $rawFlag === 'true' || $rawFlag === 'on') {
+					$data[$flagKey] = true;
+				}
 			}
 			// day_fraction only (SEC-02): never copy request `days` / `working_days`.
 			if (array_key_exists('day_fraction', $params)) {
@@ -1389,12 +1406,14 @@ class AbsenceController extends Controller
 			$absence = $this->absenceMapper->find($id);
 			// Scope check BEFORE the pending-status check: an out-of-scope caller must
 			// not learn whether the absence exists or was decided (BOLA oracle).
+			// Collapse to the same 404 as a missing id — a 403 here would reveal
+			// that the id exists (existence oracle).
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'approve_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only approve absences for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Absence not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
 				return new JSONResponse([
@@ -1448,12 +1467,13 @@ class AbsenceController extends Controller
 			$userId = $this->getUserId();
 			$absence = $this->absenceMapper->find($id);
 			// Scope check BEFORE the pending-status check (BOLA oracle — see approve()).
+			// Same 404 collapse as approve(): a 403 would reveal that the id exists.
 			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'reject_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied. You can only reject absences for members of your team.')
-				], Http::STATUS_FORBIDDEN);
+					'error' => $this->l10n->t('Absence not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 			if ($absence->getStatus() !== Absence::STATUS_PENDING) {
 				return new JSONResponse([

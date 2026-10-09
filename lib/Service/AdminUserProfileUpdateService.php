@@ -435,6 +435,10 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyOvertimeSettings(string $userId, array $params, string $performedBy): array
 	{
+		// Guard every per-user mutation against ghost uids: writing overtime
+		// settings for a nonexistent user must not persist stray setting rows.
+		$this->assertUserExists($userId);
+
 		$this->preflightOvertime($params);
 
 		if (array_key_exists('trackingFrom', $params)) {

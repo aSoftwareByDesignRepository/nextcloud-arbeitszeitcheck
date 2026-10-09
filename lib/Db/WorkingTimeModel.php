@@ -165,8 +165,8 @@ class WorkingTimeModel extends Entity
     {
         $errors = [];
 
-        // Validate name
-        if (empty($this->name)) {
+        // Validate name (empty or whitespace-only is rejected)
+        if (trim((string)$this->name) === '') {
             $errors['name'] = 'Name is required';
         }
 

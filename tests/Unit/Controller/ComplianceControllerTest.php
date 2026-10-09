@@ -972,4 +972,22 @@ class ComplianceControllerTest extends TestCase
 		$this->assertTrue($response->getData()['success']);
 		$this->assertTrue($response->getData()['valid']);
 	}
+
+	/**
+	 * ATLAS sweep regression: a malformed startTime must be a 400 client
+	 * error, not a 500. Previously the catch-all turned the format
+	 * validation exception into "unexpected error" (500).
+	 */
+	public function testCheckRestPeriodInvalidFormatReturns400(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('u1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->complianceService->expects($this->never())
+			->method('checkRestPeriodForStartTime');
+
+		$response = $this->controller->checkRestPeriod('not-a-datetime');
+		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
 }

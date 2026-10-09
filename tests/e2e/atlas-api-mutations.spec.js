@@ -256,7 +256,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { type: 'special_leave', start_date: start, end_date: end, reason: `atlas-mut form ${UNIQ}` },
 			})
 			expect(upd.ok || upd.status === 303 || upd.status === 302, `form update: ${upd.status} ${JSON.stringify(upd.json)}`).toBe(true)
-			const g1 = await api(emp, 'GET', `${APP}/api/absences`)
+			const g1 = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 			const row1 = (g1.absences ?? g1.items ?? []).find((a) => a.id === absenceId)
 			expect(row1).toBeTruthy()
 			expect(row1.reason ?? '').toContain(`form ${UNIQ}`)
@@ -267,7 +267,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { comment: `atlas approve ${UNIQ}` },
 			})
 			expect(appr.ok, `manager approve failed: ${JSON.stringify(appr.json)}`).toBe(true)
-			const gA = await api(emp, 'GET', `${APP}/api/absences`)
+			const gA = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 			const rowA = (gA.absences ?? gA.items ?? []).find((a) => a.id === absenceId)
 			expect(rowA.status).toBe('approved')
 
@@ -276,7 +276,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { end_date: end1 },
 			})
 			expect(sh.success).toBe(true)
-			const g2 = await api(emp, 'GET', `${APP}/api/absences`)
+			const g2 = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 			const row2 = (g2.absences ?? g2.items ?? []).find((a) => a.id === absenceId)
 			expect((row2.end_date ?? row2.endDate ?? '').slice(0, 10)).toBe(end1)
 
@@ -285,7 +285,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { end_date: start },
 			})
 			expect(shf.ok || [301, 302, 303].includes(shf.status), `form shorten: ${shf.status}`).toBe(true)
-			const g3 = await api(emp, 'GET', `${APP}/api/absences`)
+			const g3 = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 			const row3 = (g3.absences ?? g3.items ?? []).find((a) => a.id === absenceId)
 			expect((row3.end_date ?? row3.endDate ?? '').slice(0, 10)).toBe(start)
 		} finally {
@@ -362,7 +362,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			}
 			expect(ma?.ok, `manager absence create failed: ${JSON.stringify(ma?.json)}`).toBe(true)
 			absenceId = ma.json?.id ?? ma.json?.absence?.id
-			const empAbs = await api(emp, 'GET', `${APP}/api/absences`)
+			const empAbs = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 			const empAbsRow = (empAbs.absences ?? empAbs.items ?? []).find((a) => a.id === absenceId)
 			expect(empAbsRow, 'manager-created absence must appear in employee re-read').toBeTruthy()
 
@@ -555,12 +555,27 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				const seq = activeNow
 					? [['clock_out', 'clocked_out'], ['clock_in', 'active']]
 					: [['clock_in', 'active'], ['clock_out', 'clocked_out']]
+				let restBlocked = false
 				for (const [action, wantStatus] of seq) {
 					const reqId = `${UNIQ}-stamp-${action}`
 					const occurredAt = new Date().toISOString()
 					const s = await kioskApi(page, 'POST', `${APP}/api/kiosk/stamp`, terminal, {
 						data: { method: 'rfid', rfidUid, action, clientRequestId: reqId, occurredAt },
 					})
+					if (!s.ok && s.json?.error === 'KIOSK_REST_PERIOD_REQUIRED' && action === 'clock_in') {
+						// Employee clocked out <12h ago — ArbZG §5 correctly rejects re-clock-in.
+						// The typed code (not KIOSK_INTERNAL_ERROR) IS the evidence here; prove the
+						// idempotency claim was released: replay must re-evaluate to the same
+						// rejection, never IN_FLIGHT and never a cached success.
+						restBlocked = true
+						const replay = await kioskApi(page, 'POST', `${APP}/api/kiosk/stamp`, terminal, {
+							data: { method: 'rfid', rfidUid, action, clientRequestId: reqId, occurredAt },
+						})
+						expect(replay.json?.error, `stamp ${action} replay expected same rejection: ${JSON.stringify(replay.json)}`).toBe('KIOSK_REST_PERIOD_REQUIRED')
+						const stAfter = await api(empPage, 'GET', `${APP}/api/clock/status`)
+						expect(stAfter.status?.status).toBe('clocked_out')
+						break
+					}
 					expect(s.ok, `stamp ${action} failed: ${JSON.stringify(s.json)}`).toBe(true)
 					expect(s.json?.data?.newStatus).toBe(KIOSK_NEW_STATUS[action])
 					// replay same clientRequestId → cached payload, no 2nd mutation
@@ -601,8 +616,9 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			expect(subCreds.filter((c) => c.type === 'rfid' || c.hasRfid).length).toBeGreaterThanOrEqual(1)
 
 			// credentials import — bulk write re-read via credentials list
+			// (endpoint contract: CSV payload `uid,userId,label`, header optional)
 			const imp = await apiAllowFailure(page, 'POST', `${APP}/api/admin/kiosk/credentials/import`, {
-				data: { credentials: [{ userId: SUB, rfidUid: `RFID-IMP-${UNIQ}`.toUpperCase(), label: `imp ${UNIQ}` }] },
+				data: { csv: `uid,userId,label\nRFID-IMP-${UNIQ.toUpperCase()},${SUB},imp ${UNIQ}` },
 			})
 			expect(imp.ok, `credentials import failed: ${JSON.stringify(imp.json)}`).toBe(true)
 			const creds2 = await api(page, 'GET', `${APP}/api/admin/kiosk/credentials?userId=${encodeURIComponent(SUB)}`)
@@ -1139,7 +1155,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			const isActive = (s) => ['active', 'break', 'paused'].includes(s?.status?.status)
 			const getStatus = async () => (await api(emp, 'GET', `${APP}/api/clock/status`)).status?.status
 			const findAbsence = async (id) => {
-				const g = await api(emp, 'GET', `${APP}/api/absences`)
+				const g = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 				return (g.absences ?? g.items ?? []).find((a) => a.id === id)
 			}
 			const findEntry = async (date, id) => {
@@ -1249,7 +1265,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 					data: { type: 'special_leave', start_date: iso, end_date: iso, reason: `atlas-mut webabs ${UNIQ}` },
 				})
 				if (res.ok || [301, 302, 303].includes(res.status)) {
-					const g = await api(emp, 'GET', `${APP}/api/absences`)
+					const g = await api(emp, 'GET', `${APP}/api/absences?limit=500`)
 					const row = (g.absences ?? g.items ?? []).find((a) => (a.reason || '').includes(`webabs ${UNIQ}`))
 					if (row) webAbsId = row.id
 				}

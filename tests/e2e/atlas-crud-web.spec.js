@@ -550,7 +550,7 @@ test.describe('ATLAS durable CRUD (web)', () => {
 		expect(absenceId).toBeTruthy()
 
 		try {
-			const list = await api(page, 'GET', `${APP}/api/absences`)
+			const list = await api(page, 'GET', `${APP}/api/absences?limit=500`)
 			expect(JSON.stringify(list)).toContain(String(absenceId))
 
 			const upd = await apiAllowFailure(page, 'PUT', `${APP}/api/absences/${absenceId}`, {

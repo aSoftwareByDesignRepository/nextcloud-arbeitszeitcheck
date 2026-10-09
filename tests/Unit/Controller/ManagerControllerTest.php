@@ -753,9 +753,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->approveAbsence($absenceId, 'Approved');
 		$data = $response->getData();
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertArrayHasKey('error', $data);
+		$this->assertSame('Absence not found', $data['error']);
 	}
 
 	/**
@@ -794,9 +794,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->rejectAbsence($absenceId, 'Rejected');
 		$data = $response->getData();
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertArrayHasKey('error', $data);
+		$this->assertSame('Absence not found', $data['error']);
 	}
 
 	/**
@@ -962,10 +962,10 @@ class ManagerControllerTest extends TestCase
 
 		$response = $this->controller->approveTimeEntryCorrection($entryId);
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Time entry not found', $data['error']);
 	}
 
 	/**
@@ -1948,9 +1948,9 @@ class ManagerControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
 		$response = $this->controller->rejectTimeEntryCorrection($entryId, 'Nope');
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
-		$this->assertStringContainsString('Access denied', $response->getData()['error']);
+		$this->assertSame('Time entry not found', $response->getData()['error']);
 	}
 
 	public function testCorrectTimeEntryReturnsForbiddenWhenNotInTeam(): void
@@ -1977,9 +1977,9 @@ class ManagerControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
 		$response = $this->controller->correctTimeEntry($entryId);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
-		$this->assertStringContainsString('Access denied', $response->getData()['error']);
+		$this->assertSame('Time entry not found', $response->getData()['error']);
 	}
 
 	/**
@@ -2015,9 +2015,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->approveAbsence($absenceId, 'Approved');
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Absence not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
@@ -2049,9 +2049,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->rejectAbsence($absenceId, 'Nope');
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Absence not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
@@ -2079,9 +2079,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->approveTimeEntryCorrection($entryId);
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Time entry not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
@@ -2109,9 +2109,9 @@ class ManagerControllerTest extends TestCase
 		$response = $this->controller->rejectTimeEntryCorrection($entryId, 'Nope');
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Time entry not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 

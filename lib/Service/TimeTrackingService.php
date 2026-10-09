@@ -1920,8 +1920,10 @@ class TimeTrackingService
 			try {
 				$entry = $this->timeEntryMapper->find($entryId);
 
+				// Collapse "foreign-owned" into "not found" — otherwise the
+				// 403-vs-404 difference is an existence oracle for entry ids.
 				if ($entry->getUserId() !== $userId) {
-					throw new BusinessRuleException($this->l10n->t('Access denied'));
+					throw new DoesNotExistException($this->l10n->t('Time entry not found'));
 				}
 
 				$this->monthClosureGuard->assertTimeEntryMutable($entry);

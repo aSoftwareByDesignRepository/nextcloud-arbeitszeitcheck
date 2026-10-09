@@ -58,6 +58,9 @@ const STATEFUL_SPECS = [
   /overnight-daily-maximum\.spec\.js/,
   /lebenswelt-ux-slice-c-rest\.spec\.js/,
   /atlas-crud-web\.spec\.js/,
+  // ds_chrome craft: flips shared-user themes via OCS + seeds entries — same
+  // race class as the theme-responsive specs.
+  /atlas-craft-web\.spec\.js/,
   // Durable-mutation sweep mutates org settings, clock state, teams, kiosk
   // config and licenses — must not interleave with the parallel pool.
   /atlas-api-mutations\.spec\.js/,

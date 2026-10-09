@@ -1197,7 +1197,7 @@ class ComplianceService
             return;
         }
 
-        $profile = $this->profile($userId);
+        $profile = $this->profile($timeEntry->getUserId());
 
         // CRITICAL: pass $nightHours as a parameter to t() so the L10NString carries
         // the value into its internal vsprintf(). Calling sprintf() on the OUTSIDE of

@@ -114,28 +114,8 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		}
 	}
 
-	public function testFormalizerNoLongerRewritesScandinavianPronouns(): void
-	{
-		$src = (string)file_get_contents($this->appRoot . '/l10n/build_quality_fixes.py');
-		self::assertStringNotContainsString(
-			'(r"\\bdin\\b", "aktuella")',
-			$src,
-			'formalize_sv must not rewrite din→aktuella',
-		);
-		self::assertStringNotContainsString(
-			'(r"\\bdin\\b", "den aktuelle")',
-			$src,
-			'formalize_da must not rewrite din→den aktuelle',
-		);
-		self::assertStringNotContainsString(
-			'(r"\\bdin\\b", "gjeldende")',
-			$src,
-			'formalize_nb must not rewrite din→gjeldende',
-		);
-		self::assertStringContainsString(
-			'Keep din/ditt/dina/du',
-			$src,
-			'formalize_sv must document pronoun preservation',
-		);
-	}
+	// The one-off formalizer script (l10n/build_quality_fixes.py) no longer ships
+	// in the app repo — dev tooling lives in the workspace artifacts tree, which
+	// shipped tests must not depend on. Its pronoun-preservation contract is
+	// enforced where the script lives.
 }

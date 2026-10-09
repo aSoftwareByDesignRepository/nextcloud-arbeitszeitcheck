@@ -68,18 +68,18 @@ textarea:focus-visible {
 
 .btn--secondary {
   background-color: var(--color-background-dark);
-  border-color: var(--color-border);
+  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
   color: var(--color-main-text);
 }
 
 .btn--secondary:hover:not(:disabled) {
   background-color: var(--color-background-hover);
-  border-color: var(--color-border);
+  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 }
 
 .btn--secondary:active:not(:disabled) {
   background-color: var(--color-background-hover);
-  border-color: var(--color-border);
+  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 }
 
 .btn--tertiary {
@@ -226,7 +226,7 @@ textarea:focus-visible {
 .button.secondary,
 .btn-secondary {
   background-color: var(--color-background-dark);
-  border-color: var(--color-border);
+  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
   color: var(--color-main-text);
 }
 

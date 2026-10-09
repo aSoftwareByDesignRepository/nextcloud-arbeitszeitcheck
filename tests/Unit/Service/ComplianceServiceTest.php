@@ -308,6 +308,14 @@ class ComplianceServiceTest extends TestCase
 				$morningStart = (clone $morningEnd)->modify('-3 hours');
 			}
 		}
+		// Near midnight a completed same-day block cannot precede "now" — the
+		// intraday-split precondition is physically unreachable, so skip rather
+		// than assert on a structurally cross-midnight fixture.
+		if ($morningStart->format('Y-m-d') !== $now->format('Y-m-d')
+			|| $morningEnd->format('Y-m-d') !== $now->format('Y-m-d')
+			|| $morningEnd->getTimestamp() >= $now->getTimestamp()) {
+			$this->markTestSkipped('No same-day completed block can precede "now" at this clock time.');
+		}
 
 		$lastEntry = new TimeEntry();
 		$lastEntry->setId(77);

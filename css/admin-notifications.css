@@ -1038,6 +1038,7 @@
 /* Premium categories table — inline % field (Bachus A2 layout contract) */
 #app-content.azc-app--admin-overtime-settings .premium-cat-rate-wrap,
 #app-content.azc-app--admin-notifications .premium-cat-rate-wrap {
+	position: relative; /* containing block for .visually-hidden labels: keeps them inside the clipped td so they cannot leak scroll width to #app-content */
 	display: inline-flex;
 	align-items: center;
 	gap: var(--azc-space-2);

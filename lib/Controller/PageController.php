@@ -536,6 +536,52 @@ class PageController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$entries = $this->timeEntryMapper->findByUser($userId, 100);
+			$allEntries = $entries;
+
+			// Read filter params (query string: start_date, end_date, status).
+			// The list page filter panel navigates with these params — they must
+			// actually narrow the list or the Filter UI is dead chrome.
+			$startDateParam = $this->request->getParam('start_date');
+			$endDateParam = $this->request->getParam('end_date');
+			$statusParam = $this->request->getParam('status');
+			$filterStartDt = null;
+			$filterEndDt = null;
+			if (!empty($startDateParam) && !empty($endDateParam)) {
+				try {
+					$filterStartDt = new \DateTime($startDateParam . ' 00:00:00');
+					$filterEndDt = new \DateTime($endDateParam . ' 23:59:59');
+				} catch (\Throwable $e) {
+					$filterStartDt = null;
+					$filterEndDt = null;
+				}
+			}
+			$allowedStatuses = [
+				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE,
+				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED,
+				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL,
+				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PAUSED,
+			];
+			$filterStatus = (!empty($statusParam) && in_array($statusParam, $allowedStatuses, true))
+				? $statusParam
+				: '';
+			if ($filterStartDt !== null || $filterStatus !== '') {
+				$entries = array_values(array_filter($entries, function ($entry) use ($filterStartDt, $filterEndDt, $filterStatus) {
+					if ($filterStartDt !== null) {
+						$start = $entry->getStartTime();
+						if (!$start || $start < $filterStartDt || $start > $filterEndDt) {
+							return false;
+						}
+					}
+					if ($filterStatus !== '' && $entry->getStatus() !== $filterStatus) {
+						return false;
+					}
+					return true;
+				}));
+			}
+			// Filter form repopulation (European format for date inputs).
+			$filterStartDate = $filterStartDt ? $filterStartDt->format('d.m.Y') : '';
+			$filterEndDate = $filterEndDt ? $filterEndDt->format('d.m.Y') : '';
+
 			$pendingCorrectionCount = count($this->timeEntryMapper->findByUserAndStatus(
 				$userId,
 				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL
@@ -559,12 +605,17 @@ class PageController extends Controller
 				'entries' => $entries,
 				'deletionEligibility' => $deletionEligibility,
 				'mode' => 'list',
+				'filterStartDate' => $filterStartDate,
+				'filterEndDate' => $filterEndDate,
+				'filterStatus' => $filterStatus,
+				// Stats stay global (full list) — filtering must not zero the KPI
+				// cards, which would look like a load failure (dishonest empty).
 				'stats' => [
 					'total_time_entries' => $timeEntryCount,
-					'entries_this_month' => count(array_filter($entries, function($entry) {
+					'entries_this_month' => count(array_filter($allEntries, function($entry) {
 						return $entry->getStartTime() && $entry->getStartTime()->format('Y-m') === date('Y-m');
 					})),
-					'total_hours' => array_reduce($entries, function($sum, $entry) {
+					'total_hours' => array_reduce($allEntries, function($sum, $entry) {
 						return $sum + $entry->getWorkingDurationHours();
 					}, 0)
 				],

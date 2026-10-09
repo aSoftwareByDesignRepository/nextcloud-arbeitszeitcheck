@@ -67,6 +67,10 @@ return [
 
 		// API routes for time entries
 		['name' => 'time_entry#apiAssignableProjectcheckProjects', 'url' => '/api/projectcheck/assignable-projects', 'verb' => 'GET'],
+		// Literal routes must precede the bare {id} routes below — Symfony matches
+		// in registration order, so check-overlap would otherwise be shadowed by
+		// {id} (which has no requirements because URL generation passes __ID__).
+		['name' => 'time_entry#checkOverlap', 'url' => '/api/time-entries/check-overlap', 'verb' => 'GET'],
 		['name' => 'time_entry#apiShow', 'url' => '/api/time-entries/{id}', 'verb' => 'GET'],
 		['name' => 'time_entry#apiStore', 'url' => '/api/time-entries', 'verb' => 'POST'],
 		['name' => 'time_entry#apiUpdate', 'url' => '/api/time-entries/{id}', 'verb' => 'PUT'],
@@ -75,7 +79,6 @@ return [
 		['name' => 'time_entry#requestCorrection', 'url' => '/api/time-entries/{id}/request-correction', 'verb' => 'POST'],
 		['name' => 'time_entry#cancelCorrection', 'url' => '/api/time-entries/{id}/cancel-correction', 'verb' => 'POST'],
 		['name' => 'time_entry#complete', 'url' => '/api/time-entries/{id}/complete', 'verb' => 'POST'],
-		['name' => 'time_entry#checkOverlap', 'url' => '/api/time-entries/check-overlap', 'verb' => 'GET'],
 
 		// Absence management routes
 		['name' => 'absence#index_api', 'url' => '/api/absences-legacy', 'verb' => 'GET'],

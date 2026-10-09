@@ -7,9 +7,12 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service\Kiosk;
 use OCA\ArbeitszeitCheck\Db\KioskStampIdempotency;
 use OCA\ArbeitszeitCheck\Db\KioskStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Db\KioskTerminal;
+use OCA\ArbeitszeitCheck\BusinessRuleCode;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskActionService;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskAuthService;
+use OCA\ArbeitszeitCheck\Service\Kiosk\KioskBusinessRuleMapper;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskException;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskOfflineStampService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -59,6 +62,7 @@ final class KioskOfflineStampServiceTest extends TestCase
 			$this->actionService,
 			$this->timeTrackingService,
 			$this->idempotencyMapper,
+			new KioskBusinessRuleMapper(),
 			$this->occurredAtParser,
 			$this->timeFactory
 		);
@@ -136,6 +140,29 @@ final class KioskOfflineStampServiceTest extends TestCase
 		$this->expectException(KioskException::class);
 		$this->expectExceptionMessage('KIOSK_NO_ACTIVE_SESSION');
 		$this->service->stampRfid($this->terminal, 'A1B2', 'clock_out', 'req-1', $this->occurredAt());
+	}
+
+	public function testStampRfidMapsBusinessRuleRejectionToTypedKioskError(): void
+	{
+		// Regression: a rest-period rejection used to surface as KIOSK_INTERNAL_ERROR
+		// (generic Throwable catch in the controller) — indistinguishable from a 500.
+		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
+		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
+		$this->timeTrackingService->method('clockIn')->willThrowException(
+			new BusinessRuleException('Minimum 12-hour rest period required', BusinessRuleCode::REST_PERIOD_REQUIRED)
+		);
+		// Claim must be released so a replay re-evaluates instead of returning IN_FLIGHT.
+		$this->idempotencyMapper->expects($this->once())
+			->method('deleteByTerminalAndRequestId')->with('term-1', 'req-1');
+		$this->idempotencyMapper->expects($this->never())->method('updateResponseJson');
+
+		try {
+			$this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
+			$this->fail('expected KioskException');
+		} catch (KioskException $e) {
+			$this->assertSame('KIOSK_REST_PERIOD_REQUIRED', $e->getErrorCode());
+			$this->assertSame('Minimum 12-hour rest period required', $e->getMessage());
+		}
 	}
 
 	public function testStampRfidRejectsUnknownAction(): void

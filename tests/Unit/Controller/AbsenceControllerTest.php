@@ -518,7 +518,7 @@ class AbsenceControllerTest extends TestCase
 	/**
 	 * Test approve returns 403 when current user cannot manage the absence owner
 	 */
-	public function testApproveReturns403WhenUserCannotManageEmployee(): void
+	public function testApproveReturns404WhenUserCannotManageEmployee(): void
 	{
 		$userId = 'otheruser';
 		$absenceId = 1;
@@ -546,15 +546,15 @@ class AbsenceControllerTest extends TestCase
 		$response = $this->controller->approve($absenceId, 'Approved');
 		$data = $response->getData();
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertArrayHasKey('error', $data);
+		$this->assertSame('Absence not found', $data['error']);
 	}
 
 	/**
-	 * Test reject returns 403 when current user cannot manage the absence owner
+	 * Test reject returns 404 when current user cannot manage the absence owner
 	 */
-	public function testRejectReturns403WhenUserCannotManageEmployee(): void
+	public function testRejectReturns404WhenUserCannotManageEmployee(): void
 	{
 		$userId = 'otheruser';
 		$absenceId = 1;
@@ -582,9 +582,9 @@ class AbsenceControllerTest extends TestCase
 		$response = $this->controller->reject($absenceId, 'Rejected');
 		$data = $response->getData();
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertArrayHasKey('error', $data);
+		$this->assertSame('Absence not found', $data['error']);
 	}
 
 	/**
@@ -982,9 +982,9 @@ class AbsenceControllerTest extends TestCase
 		$response = $this->controller->approve($absenceId, 'Approved');
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Absence not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 
@@ -1016,9 +1016,9 @@ class AbsenceControllerTest extends TestCase
 		$response = $this->controller->reject($absenceId, 'Rejected');
 		$data = $response->getData();
 
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($data['success']);
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertSame('Absence not found', $data['error']);
 		$this->assertArrayNotHasKey('error_code', $data);
 	}
 

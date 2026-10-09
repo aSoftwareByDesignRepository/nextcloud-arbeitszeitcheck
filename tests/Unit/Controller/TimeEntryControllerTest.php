@@ -435,10 +435,10 @@ class TimeEntryControllerTest extends TestCase
 
 		$response = $this->controller->show($entryId);
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('Access denied', $data['error']);
+		$this->assertEquals('Time entry not found', $data['error']);
 	}
 
 	/**
@@ -839,7 +839,7 @@ class TimeEntryControllerTest extends TestCase
 
 		$response = $this->controller->update($entryId, '2024-01-16');
 
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 	}
@@ -868,9 +868,9 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
 		$response = $this->controller->apiShow($entryId);
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
-		$this->assertEquals('Access denied', $response->getData()['error']);
+		$this->assertEquals('Time entry not found', $response->getData()['error']);
 	}
 
 	public function testApiDeleteReturnsForbiddenWhenNotOwned(): void
@@ -895,7 +895,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->expects($this->never())->method('delete');
 
 		$response = $this->controller->apiDelete($entryId);
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
 
@@ -1910,7 +1910,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
 		$response = $this->controller->getDeletionImpact(9);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 	}
 
 	public function testGetDeletionImpactOwned(): void
@@ -1949,7 +1949,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 
 		$response = $this->controller->cancelCorrection(3);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 	}
 
 	public function testUpdatePostAndApiUpdatePostDelegate(): void
@@ -2045,7 +2045,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->expects($this->never())->method('update');
 
 		$response = $this->controller->apiUpdate(42);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
 
@@ -2072,7 +2072,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->expects($this->never())->method('update');
 
 		$response = $this->controller->apiUpdatePost(42);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
 
@@ -2097,9 +2097,9 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->expects($this->never())->method('update');
 
 		$response = $this->controller->requestCorrection(7);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
-		$this->assertSame('Access denied', $response->getData()['error']);
+		$this->assertSame('Time entry not found', $response->getData()['error']);
 	}
 
 	public function testCompleteReturnsForbiddenWhenNotOwned(): void
@@ -2112,12 +2112,12 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeTrackingService->expects($this->once())
 			->method('completePausedEntry')
 			->with('testuser', 9, null)
-			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\BusinessRuleException('Access denied'));
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('Time entry not found'));
 
 		$response = $this->controller->complete(9);
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
-		$this->assertSame('Access denied', $response->getData()['error']);
+		$this->assertSame('Time entry not found', $response->getData()['error']);
 	}
 
 	public function testApiStoreComplianceStrictModeInvokesStrictCheckAndBlocks(): void

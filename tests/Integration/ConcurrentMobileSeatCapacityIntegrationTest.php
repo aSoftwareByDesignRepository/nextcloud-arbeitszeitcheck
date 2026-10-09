@@ -43,6 +43,9 @@ class ConcurrentMobileSeatCapacityIntegrationTest extends TestCase
 		$this->locking = \OC::$server->get(ILockingProvider::class);
 		$this->licenseService = \OC::$server->get(LicenseService::class);
 		$this->licenseService->clearLicense();
+		// Seat rows outlive license removal; leftovers from E2E/live state would
+		// inflate getAssignedCount() and make the capacity assertions meaningless.
+		$this->seats->removeAllSeats();
 		$this->licenseService->applyLicenseKey($this->generateTestLicense());
 	}
 

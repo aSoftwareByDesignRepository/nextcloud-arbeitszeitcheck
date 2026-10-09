@@ -367,7 +367,7 @@
 .dz-workspace .btn-secondary,
 .dz-workspace .btn--secondary {
 	background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;
-	border-color: var(--color-border-dark, var(--color-border)) !important;
+	border-color: var(--azc-form-border) !important;
 	color: var(--color-main-text) !important;
 }
 
@@ -375,7 +375,7 @@
 .dz-workspace .btn-secondary:hover:not(:disabled),
 .dz-workspace .btn--secondary:hover:not(:disabled) {
 	background-color: color-mix(in srgb, var(--color-main-background) 70%, var(--color-main-text) 30%) !important;
-	border-color: var(--color-primary-element, var(--color-border)) !important;
+	border-color: var(--color-primary-element, var(--azc-form-border)) !important;
 	color: var(--color-main-text) !important;
 }
 
@@ -420,7 +420,7 @@
 @media (prefers-contrast: high) {
 	.dz-button-row .azc-btn:disabled,
 	.dz-button-row .btn:disabled {
-		border: 2px dashed var(--color-border);
+		border: 2px dashed var(--azc-form-border);
 	}
 }
 

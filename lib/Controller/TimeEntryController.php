@@ -830,24 +830,10 @@ class TimeEntryController extends Controller
 			$userId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($id);
 
-			// Check ownership
+			// Check ownership — collapse to "not found": a distinct "access
+			// denied" page would be an existence oracle for foreign entry ids.
 			if ($entry->getUserId() !== $userId) {
-				$maxDailyHours = (float)$this->getConfiguredMaxDailyHours();
-				$complianceStrictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
-				$response = new TemplateResponse(
-					$this->appName,
-					'time-entries',
-					$this->buildTimeEntriesListTemplateParams([
-						'mode' => 'list',
-						'entry' => null,
-						'entries' => [],
-						'stats' => [],
-						'error' => $this->l10n->t('Access denied'),
-						'maxDailyHours' => $maxDailyHours,
-						'complianceStrictMode' => $complianceStrictMode,
-					] + $this->getTimeEntriesSharedTemplateParams($userId))
-				);
-				return $this->configureCSP($response);
+				throw new DoesNotExistException('Time entry not owned by user');
 			}
 
 			// Check if entry can be edited (logic lives in TimeEntry::canEdit to stay DRY)
@@ -915,6 +901,24 @@ class TimeEntryController extends Controller
 				] + $this->getTimeEntriesSharedTemplateParams($userId))
 			);
 			return $this->configureCSP($response);
+		} catch (DoesNotExistException $e) {
+			// Uniform "not found" — thrown for missing AND foreign-owned ids.
+			$maxDailyHours = (float)$this->getConfiguredMaxDailyHours();
+			$complianceStrictMode = $this->config->getAppValue('arbeitszeitcheck', 'compliance_strict_mode', '0') === '1';
+			$response = new TemplateResponse(
+				$this->appName,
+				'time-entries',
+				$this->buildTimeEntriesListTemplateParams([
+					'mode' => 'list',
+					'entry' => null,
+					'entries' => [],
+					'stats' => [],
+					'error' => $this->l10n->t('Time entry not found'),
+					'maxDailyHours' => $maxDailyHours,
+					'complianceStrictMode' => $complianceStrictMode,
+				] + $this->getTimeEntriesSharedTemplateParams($this->getUserId()))
+			);
+			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in edit method: ' . $e->getMessage(), ['exception' => $e]);
 			$shared = $this->getTimeEntriesSharedTemplateParamsFallback();
@@ -962,8 +966,10 @@ class TimeEntryController extends Controller
 			if ($entry->getUserId() !== $userId) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied')
-				], Http::STATUS_FORBIDDEN);
+					// Uniform 404 — a 403 would be an existence oracle
+					// (foreign-owned vs missing must be indistinguishable).
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			return new JSONResponse([
@@ -1258,8 +1264,10 @@ class TimeEntryController extends Controller
 			if ($entry->getUserId() !== $userId) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied')
-				], Http::STATUS_FORBIDDEN);
+					// Uniform 404 — a 403 would be an existence oracle
+					// (foreign-owned vs missing must be indistinguishable).
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			$mc0 = $this->assertGuardTimeEntry($entry);
@@ -1767,8 +1775,10 @@ class TimeEntryController extends Controller
 			if ($entry->getUserId() !== $userId) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied')
-				], Http::STATUS_FORBIDDEN);
+					// Uniform 404 — a 403 would be an existence oracle
+					// (foreign-owned vs missing must be indistinguishable).
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			$eligibility = $this->deletionPolicy->evaluate($entry);
@@ -1827,8 +1837,10 @@ class TimeEntryController extends Controller
 			if ($entry->getUserId() !== $userId) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied')
-				], Http::STATUS_FORBIDDEN);
+					// Uniform 404 — a 403 would be an existence oracle
+					// (foreign-owned vs missing must be indistinguishable).
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			$mcReq = $this->assertGuardTimeEntry($entry);
@@ -2083,7 +2095,7 @@ class TimeEntryController extends Controller
 			$entry = $this->timeEntryMapper->find($id);
 
 			if ($entry->getUserId() !== $userId) {
-				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Access denied')], Http::STATUS_FORBIDDEN);
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Time entry not found')], Http::STATUS_NOT_FOUND);
 			}
 
 			if ($entry->getStatus() !== TimeEntry::STATUS_PENDING_APPROVAL) {
@@ -2143,8 +2155,10 @@ class TimeEntryController extends Controller
 			if ($entry->getUserId() !== $userId) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Access denied')
-				], Http::STATUS_FORBIDDEN);
+					// Uniform 404 — a 403 would be an existence oracle
+					// (foreign-owned vs missing must be indistinguishable).
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
 			}
 
 			$eligibility = $this->deletionPolicy->evaluate($entry);

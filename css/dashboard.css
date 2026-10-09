@@ -1166,7 +1166,7 @@
     padding: var(--azc-space-4, 1rem);
     border-radius: var(--azc-radius-md, 8px);
     background: var(--azc-bg-soft, var(--color-background-hover));
-    border: 1px solid var(--azc-border, var(--color-border));
+    border: 1px solid var(--azc-border, var(--azc-form-border));
 }
 
 #app-content.azc-app--dashboard .dashboard-vacation-card__value {

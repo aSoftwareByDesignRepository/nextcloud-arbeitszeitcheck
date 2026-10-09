@@ -155,6 +155,12 @@ class KioskTerminalService
 		$this->terminalMapper->update($terminal);
 	}
 
+	/** Existence check for callers that must distinguish missing terminals. */
+	public function findByTerminalId(string $terminalId): ?KioskTerminal
+	{
+		return $this->terminalMapper->findByTerminalId($terminalId);
+	}
+
 	public function revoke(string $terminalId): void
 	{
 		$terminal = $this->terminalMapper->findByTerminalId($terminalId);

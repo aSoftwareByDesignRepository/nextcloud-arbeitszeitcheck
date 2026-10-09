@@ -106,4 +106,22 @@ class WorkingTimeModelTest extends TestCase
 		self::assertNull($model->getBreakRulesArray());
 		self::assertNull($model->getOvertimeRulesArray());
 	}
+
+	/**
+	 * ATLAS sweep regression: a whitespace-only name must fail validation.
+	 * empty('   ') is false in PHP, so the old check silently accepted and
+	 * persisted invisible-named models via POST /api/admin/working-time-models.
+	 */
+	public function testWhitespaceOnlyNameFailsValidation(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('   ');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setWorkDaysPerWeek(5.0);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('name', $errors);
+	}
 }

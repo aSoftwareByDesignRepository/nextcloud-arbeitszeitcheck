@@ -312,7 +312,14 @@ class LicenseAdminController extends Controller
 			$data = $this->request->getParams();
 		}
 		$userId = trim((string)($data['userId'] ?? ''));
-		$this->mobileSeatService->removeSeat($userId);
+		$result = $this->mobileSeatService->removeSeat($userId);
+		if (($result['ok'] ?? false) !== true) {
+			return new JSONResponse([
+				'ok' => false,
+				'success' => false,
+				'error' => $this->l10n->t('A valid user id is required.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
 
 		return new JSONResponse([
 			'ok' => true,

@@ -3397,6 +3397,8 @@
         "Settings for ArbeitszeitCheck": "Einstellungen für ArbeitszeitCheck",
         "Settings options": "Einstellungsoptionen",
         "Settings saved successfully": "Einstellungen erfolgreich gespeichert",
+        "Settings saved. %n vacation allocation could not be refreshed — review the affected employees.": "Einstellungen gespeichert. %n Urlaubsanspruch konnte nicht aktualisiert werden — prüfen Sie die betroffenen Mitarbeitenden.",
+        "Settings saved. %n vacation allocations could not be refreshed — review the affected employees.": "Einstellungen gespeichert. %n Urlaubsansprüche konnten nicht aktualisiert werden — prüfen Sie die betroffenen Mitarbeitenden.",
         "Settings topics": "Einstellungsthemen",
         "Settings updated successfully": "Einstellungen erfolgreich aktualisiert",
         "Settings: Change your personal preferences and working time settings": "Einstellungen: Ändern Sie Ihre persönlichen Präferenzen und Arbeitszeiteinstellungen",

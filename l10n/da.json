@@ -3397,6 +3397,8 @@
         "Settings for ArbeitszeitCheck": "Indstillinger for ArbeitszeitCheck",
         "Settings options": "Indstillingsmuligheder",
         "Settings saved successfully": "Indstillinger blev gemt",
+        "Settings saved. %n vacation allocation could not be refreshed — review the affected employees.": "Indstillinger gemt. %n ferietildeling kunne ikke genberegnes — gennemgå de berørte medarbejdere.",
+        "Settings saved. %n vacation allocations could not be refreshed — review the affected employees.": "Indstillinger gemt. %n ferietildelinger kunne ikke genberegnes — gennemgå de berørte medarbejdere.",
         "Settings topics": "Indstillingstemaer",
         "Settings updated successfully": "Indstillingerne blev opdateret",
         "Settings: Change your personal preferences and working time settings": "Indstillinger: Skift dine personlige præferencer og arbejdstidsindstillinger",

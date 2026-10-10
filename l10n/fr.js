@@ -3421,6 +3421,8 @@
 		"Settings for ArbeitszeitCheck" : "Paramètres d'ArbeitszeitCheck",
 		"Settings options" : "Options des paramètres",
 		"Settings saved successfully" : "Paramètres enregistrés avec succès",
+		"Settings saved. %n vacation allocation could not be refreshed — review the affected employees." : "Paramètres enregistrés. %n droit aux congés n'a pas pu être recalculé — vérifiez les employés concernés.",
+		"Settings saved. %n vacation allocations could not be refreshed — review the affected employees." : "Paramètres enregistrés. %n droits aux congés n'ont pas pu être recalculés — vérifiez les employés concernés.",
 		"Settings topics" : "Thèmes des paramètres",
 		"Settings updated successfully" : "Paramètres mis à jour avec succès",
 		"Settings: Change your personal preferences and working time settings" : "Paramètres : modifier vos préférences personnelles et paramètres de temps de travail",

@@ -262,8 +262,16 @@
                         (window.ArbeitszeitCheck?.l10n?.settingsSaved) ||
                         (window.t && window.t('arbeitszeitcheck', 'Settings saved successfully')) ||
                         'Settings saved successfully';
-                    
-                    if (window.ArbeitszeitCheckMessaging) {
+                    const allocationsFailed = Number(result.vacationYearModeFlip?.allocationsFailedCount) || 0;
+                    if (allocationsFailed > 0 && window.ArbeitszeitCheckMessaging?.showWarning) {
+                        const warn = (typeof window.n === 'function')
+                            ? window.n('arbeitszeitcheck',
+                                'Settings saved. %n vacation allocation could not be refreshed — review the affected employees.',
+                                'Settings saved. %n vacation allocations could not be refreshed — review the affected employees.',
+                                allocationsFailed)
+                            : 'Settings saved. ' + allocationsFailed + ' vacation allocations could not be refreshed — review the affected employees.';
+                        window.ArbeitszeitCheckMessaging.showWarning(warn);
+                    } else if (window.ArbeitszeitCheckMessaging) {
                         window.ArbeitszeitCheckMessaging.showSuccess(message);
                     } else if (window.OC && window.OC.Notification) {
                         window.OC.Notification.showTemporary(message);

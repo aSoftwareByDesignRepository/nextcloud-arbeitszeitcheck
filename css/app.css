@@ -1381,7 +1381,7 @@ dialog.entitlement-explain-dialog::backdrop {
 }
 
 .azc-nav-footer__trigger:focus-visible {
-	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
+	outline: 3px solid var(--color-primary-element);
 	outline-offset: 2px;
 }
 
@@ -1441,7 +1441,7 @@ dialog.entitlement-explain-dialog::backdrop {
 }
 
 .azc-nav-footer__menu-item:focus-visible {
-	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
+	outline: 3px solid var(--color-primary-element);
 	outline-offset: -2px;
 }
 

@@ -3421,6 +3421,8 @@
 		"Settings for ArbeitszeitCheck" : "Impostazioni di ArbeitszeitCheck",
 		"Settings options" : "Opzioni delle impostazioni",
 		"Settings saved successfully" : "Impostazioni salvate con successo",
+		"Settings saved. %n vacation allocation could not be refreshed — review the affected employees." : "Impostazioni salvate. %n assegnazione ferie non è stata aggiornata — verifica i dipendenti interessati.",
+		"Settings saved. %n vacation allocations could not be refreshed — review the affected employees." : "Impostazioni salvate. %n assegnazioni ferie non sono state aggiornate — verifica i dipendenti interessati.",
 		"Settings topics" : "Argomenti impostazioni",
 		"Settings updated successfully" : "Impostazioni aggiornate con successo",
 		"Settings: Change your personal preferences and working time settings" : "Impostazioni: modificate preferenze personali e impostazioni di orario di lavoro",

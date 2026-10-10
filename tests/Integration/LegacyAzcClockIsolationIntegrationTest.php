@@ -107,14 +107,23 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 
 		$absence = \OC::$server->get(AbsenceService::class);
 		$suffix = bin2hex(random_bytes(2));
-		$from = (new \DateTimeImmutable('tomorrow'))->format('Y-m-d');
-		$row = $absence->createAbsence([
-			'type' => 'vacation',
-			'start_date' => $from,
-			'end_date' => $from,
-			'reason' => 'LEGACY isolation ' . $suffix,
-			'server_may_fill_hours' => true,
-		], $this->uid);
+		$row = null;
+		$cursor = new \DateTimeImmutable('tomorrow');
+		for ($i = 0; $i < 14 && $row === null; $i++, $cursor = $cursor->modify('+1 day')) {
+			$from = $cursor->format('Y-m-d');
+			try {
+				$row = $absence->createAbsence([
+					'type' => 'vacation',
+					'start_date' => $from,
+					'end_date' => $from,
+					'reason' => 'LEGACY isolation ' . $suffix,
+					'server_may_fill_hours' => true,
+				], $this->uid);
+			} catch (\Exception $e) {
+				$this->assertStringContainsString('working day', $e->getMessage());
+			}
+		}
+		$this->assertNotNull($row, 'no working day found in the next 14 days');
 		$this->assertGreaterThan(0, (int)$row->getId());
 	}
 }

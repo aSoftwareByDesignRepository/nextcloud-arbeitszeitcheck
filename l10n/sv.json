@@ -3397,6 +3397,8 @@
         "Settings for ArbeitszeitCheck": "Inställningar för ArbeitszeitCheck",
         "Settings options": "Inställningsalternativ",
         "Settings saved successfully": "Inställningarna sparades",
+        "Settings saved. %n vacation allocation could not be refreshed — review the affected employees.": "Inställningar sparade. %n semestertilldelning kunde inte uppdateras — granska de berörda anställda.",
+        "Settings saved. %n vacation allocations could not be refreshed — review the affected employees.": "Inställningar sparade. %n semestertilldelningar kunde inte uppdateras — granska de berörda anställda.",
         "Settings topics": "Inställningsämnen",
         "Settings updated successfully": "Inställningarna uppdaterades",
         "Settings: Change your personal preferences and working time settings": "Inställningar: Ändra dina personliga inställningar och arbetstidsinställningar",

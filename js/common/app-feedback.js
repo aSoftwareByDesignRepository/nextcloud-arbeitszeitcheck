@@ -156,6 +156,11 @@
 		if (!toast || toast.getAttribute('data-app-feedback-bound') === '1') {
 			return;
 		}
+		// App-owned toasts (common/toasts.js) already carry their own report
+		// link; only fill the gap for legacy/external error toasts.
+		if (toast.querySelector('.' + PREFIX + '-toast__feedback, .toast__feedback')) {
+			return;
+		}
 		toast.setAttribute('data-app-feedback-bound', '1');
 		var content = toast.querySelector('.toast-content') || toast.querySelector('span') || toast;
 		var a = document.createElement('a');

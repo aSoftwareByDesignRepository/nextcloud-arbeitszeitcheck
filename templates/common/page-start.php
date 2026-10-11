@@ -20,7 +20,6 @@ $pageTitle = (string)($_['pageTitle'] ?? '');
 $pageHelp = (string)($_['pageHelp'] ?? '');
 $breadcrumbSection = (string)($_['breadcrumbSection'] ?? '');
 $breadcrumbParent = is_array($_['breadcrumbParent'] ?? null) ? $_['breadcrumbParent'] : null;
-$roleLabel = (string)($_['roleLabel'] ?? $l->t('Employee'));
 $urls = $_['urls'] ?? [];
 $clientHints = $_['clientHints'] ?? ['locale' => 'en-US', 'htmlLang' => 'en-US', 'timezone' => 'UTC'];
 $azcHtmlLang = (string)($clientHints['htmlLang'] ?? $clientHints['locale'] ?? 'en-US');
@@ -155,24 +154,18 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 				</div>
 				<div id="azc-page-actions" class="azc-page-header__actions" aria-live="polite"></div>
 			</div>
-			<div class="azc-scope-strip" aria-label="<?php p($l->t('Active session context')); ?>">
-				<span class="azc-scope-strip__label"><?php p($l->t('Role')); ?></span>
-				<span class="azc-badge azc-badge--neutral azc-scope-strip__badge"><?php p($roleLabel); ?></span>
-				<span class="azc-scope-strip__sep" aria-hidden="true">·</span>
-				<span class="azc-scope-strip__label"><?php p($l->t('Timezone')); ?></span>
-				<span class="azc-scope-strip__value"><?php p($timezone); ?></span>
-				<?php if ($pendingCorrectionCount > 0): ?>
-					<span class="azc-scope-strip__sep" aria-hidden="true">·</span>
-					<a class="azc-scope-strip__chip azc-badge azc-badge--warning"
-						href="<?php p((string)($urls['timeEntries'] ?? '#')); ?>">
-						<?php p($l->n(
-							'%n pending correction',
-							'%n pending corrections',
-							$pendingCorrectionCount
-						)); ?>
-					</a>
-				<?php endif; ?>
+			<?php if ($pendingCorrectionCount > 0): ?>
+			<div class="azc-scope-strip" aria-label="<?php p($l->t('Pending corrections')); ?>">
+				<a class="azc-scope-strip__chip azc-badge azc-badge--warning"
+					href="<?php p((string)($urls['timeEntries'] ?? '#')); ?>">
+					<?php p($l->n(
+						'%n pending correction',
+						'%n pending corrections',
+						$pendingCorrectionCount
+					)); ?>
+				</a>
 			</div>
+			<?php endif; ?>
 		</header>
 		<?php include __DIR__ . '/schema-upgrade-callout.php'; ?>
 		<main id="azc-main-content" class="azc-main" tabindex="-1" aria-labelledby="azc-page-title">

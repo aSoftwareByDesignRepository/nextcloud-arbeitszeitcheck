@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Afventer godkendelse",
 		"Pending Requests" : "Afventende anmodninger",
 		"Pending approvals" : "Afventer godkendelser",
+		"Pending corrections" : "Afventende rettelser",
 		"Pending pairing" : "Afventende parring",
 		"Pending requests" : "Afventende anmodninger",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Afventende rækker kan udbetales enkeltvis. Udbetalte rækker er låst til revision.",

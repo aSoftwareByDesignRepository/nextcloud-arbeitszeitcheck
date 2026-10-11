@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Genehmigung ausstehend",
 		"Pending Requests" : "Ausstehende Anfragen",
 		"Pending approvals" : "Ausstehende Genehmigungen",
+		"Pending corrections" : "Ausstehende Korrekturen",
 		"Pending pairing" : "Ausstehende Kopplung",
 		"Pending requests" : "Ausstehende Anfragen",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Ausstehende Zeilen können einzeln ausgezahlt werden. Ausgezahlte Zeilen sind aus Audit-Gründen gesperrt.",

@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Goedkeuring in afwachting",
 		"Pending Requests" : "Aanvragen in afwachting",
 		"Pending approvals" : "Goedkeuringen in afwachting",
+		"Pending corrections" : "Openstaande correcties",
 		"Pending pairing" : "Koppeling in behandeling",
 		"Pending requests" : "Aanvragen in afwachting",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Openstaande rijen kunnen afzonderlijk worden uitbetaald. Uitbetaalde rijen zijn vergrendeld voor audit.",

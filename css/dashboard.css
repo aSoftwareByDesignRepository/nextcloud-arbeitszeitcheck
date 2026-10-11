@@ -314,7 +314,7 @@
         grid-template-areas:
             "punch punch punch punch punch punch punch punch punch punch punch punch"
             "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics"
-            "overtime overtime overtime overtime overtime overtime vacation vacation vacation vacation vacation vacation";
+            "overtime overtime overtime overtime vacation vacation vacation vacation sick sick sick sick";
         gap: var(--azc-space-5, 1.25rem);
         align-items: stretch;
     }
@@ -335,12 +335,16 @@
         grid-area: vacation;
     }
 
-    /* When overtime card is hidden, vacation spans the full row */
+    #app-content.azc-app--dashboard .azc-dashboard-sick {
+        grid-area: sick;
+    }
+
+    /* When overtime card is hidden, vacation + sick split the row evenly */
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid:not(:has(.azc-dashboard-overtime)) {
         grid-template-areas:
             "punch punch punch punch punch punch punch punch punch punch punch punch"
             "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics"
-            "vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation";
+            "vacation vacation vacation vacation vacation vacation sick sick sick sick sick sick";
     }
 }
 
@@ -348,14 +352,14 @@
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid {
         grid-template-areas:
             "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics"
-            "overtime overtime overtime overtime overtime overtime vacation vacation vacation vacation vacation vacation";
+            "overtime overtime overtime overtime vacation vacation vacation vacation sick sick sick sick";
         gap: var(--azc-space-6, 1.5rem);
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid:not(:has(.azc-dashboard-overtime)) {
         grid-template-areas:
             "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics"
-            "vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation vacation";
+            "vacation vacation vacation vacation vacation vacation sick sick sick sick sick sick";
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-metrics {
@@ -373,7 +377,7 @@
 
 /* Primary actions: 2px focus ring for keyboard users (WCAG 2.4.7) */
 .arbeitszeitcheck-dashboard__grid .btn:focus-visible,
-.dashboard-vacation-card__actions .btn:focus-visible {
+.dashboard-stat-card__actions .btn:focus-visible {
     outline: 2px solid var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
     outline-offset: 2px;
 }
@@ -765,6 +769,17 @@
     padding-bottom: var(--azc-space-3, 0.75rem);
     font-size: var(--azc-fs-lg, 1.125rem);
     font-weight: 600;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-punch__secondary {
+    display: flex;
+    margin-top: var(--azc-space-3, 0.75rem);
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-punch__secondary .azc-btn {
+    flex: 1 1 10rem;
+    min-height: 2.75rem;
+    justify-content: center;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-punch__tz {
@@ -1162,19 +1177,19 @@
 }
 
 /* Vacation summary card (dashboard overview) */
-#app-content.azc-app--dashboard .dashboard-vacation-card__row {
+#app-content.azc-app--dashboard .dashboard-stat-card__row {
     padding: var(--azc-space-4, 1rem);
     border-radius: var(--azc-radius-md, 8px);
     background: var(--azc-bg-soft, var(--color-background-hover));
     border: 1px solid var(--azc-border, var(--azc-form-border));
 }
 
-#app-content.azc-app--dashboard .dashboard-vacation-card__value {
+#app-content.azc-app--dashboard .dashboard-stat-card__value {
     font-size: clamp(1.5rem, 4vw, 2rem);
     font-variant-numeric: tabular-nums;
 }
 
-#app-content.azc-app--dashboard .dashboard-vacation-card__value--hero {
+#app-content.azc-app--dashboard .dashboard-stat-card__value--hero {
     font-size: clamp(2rem, 5vw, 2.75rem);
     font-weight: 700;
     line-height: 1.1;
@@ -1184,37 +1199,37 @@
 
 /* Dark themes: the default primary (#00679e) on the soft dark card (#1f1f1f) drops
  * below WCAG AA 3:1 for the large hero value. Use the readable text-on-light-primary colour. */
-body[data-theme-dark] #app-content.azc-app--dashboard .dashboard-vacation-card__value--hero,
-body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-vacation-card__value--hero {
+body[data-theme-dark] #app-content.azc-app--dashboard .dashboard-stat-card__value--hero,
+body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-stat-card__value--hero {
     color: var(--color-primary-element-light-text, var(--color-primary-element-text, var(--color-main-text)));
 }
 
-#app-content.azc-app--dashboard .dashboard-vacation-card__row--hero {
+#app-content.azc-app--dashboard .dashboard-stat-card__row--hero {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
     margin-bottom: var(--azc-space-3, 0.75rem);
 }
 
-#app-content.azc-app--dashboard .dashboard-vacation-card__unit {
+#app-content.azc-app--dashboard .dashboard-stat-card__unit {
     font-size: 1rem;
     font-weight: 600;
     color: var(--arbeitszeitcheck-color-text-secondary, var(--color-text-maxcontrast));
 }
 
-#app-content.azc-app--dashboard .dashboard-vacation-card__actions {
+#app-content.azc-app--dashboard .dashboard-stat-card__actions {
     margin-top: auto;
     padding-top: var(--azc-space-3, 0.75rem);
 }
 
 /* Responsive - Clear layout on small screens (100% width, no overflow) */
-.dashboard-vacation-card .card-body {
+.dashboard-stat-card .card-body {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
 }
 
-.dashboard-vacation-card__row {
+.dashboard-stat-card__row {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -1222,24 +1237,24 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-va
     gap: var(--space-2);
 }
 
-.dashboard-vacation-card__label {
+.dashboard-stat-card__label {
     font-size: var(--arbeitszeitcheck-font-size-base);
     color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
-.dashboard-vacation-card__value {
+.dashboard-stat-card__value {
     font-size: var(--arbeitszeitcheck-font-size-2xl);
     font-weight: var(--arbeitszeitcheck-font-weight-bold);
     color: var(--arbeitszeitcheck-color-text);
 }
 
-.dashboard-vacation-card__hint {
+.dashboard-stat-card__hint {
     margin: 0;
     max-width: 42rem;
     line-height: 1.55;
 }
 
-.dashboard-vacation-card__hint--locked {
+.dashboard-stat-card__hint--locked {
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg, 10px);
     border: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
@@ -1247,11 +1262,11 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-va
     color: var(--arbeitszeitcheck-color-text);
 }
 
-.dashboard-vacation-card__actions {
+.dashboard-stat-card__actions {
     margin-top: var(--space-2);
 }
 
-.dashboard-vacation-card__breakdown {
+.dashboard-stat-card__breakdown {
     margin: var(--space-4) 0 0;
     padding: var(--space-4);
     border-radius: var(--radius-lg, 10px);
@@ -1261,7 +1276,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-va
     gap: var(--space-3);
 }
 
-.dashboard-vacation-card__breakdown-row {
+.dashboard-stat-card__breakdown-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
@@ -1269,14 +1284,14 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-va
     flex-wrap: wrap;
 }
 
-.dashboard-vacation-card__breakdown dt {
+.dashboard-stat-card__breakdown dt {
     margin: 0;
     font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
     font-weight: 600;
     color: var(--arbeitszeitcheck-color-text-secondary);
 }
 
-.dashboard-vacation-card__breakdown dd {
+.dashboard-stat-card__breakdown dd {
     margin: 0;
     font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
     font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
@@ -1364,18 +1379,18 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-va
         padding: var(--space-3) 0;
     }
 
-    .dashboard-vacation-card__breakdown {
+    .dashboard-stat-card__breakdown {
         padding: var(--space-3);
         gap: var(--space-2);
     }
 
-    .dashboard-vacation-card__breakdown-row {
+    .dashboard-stat-card__breakdown-row {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-1);
     }
 
-    .dashboard-vacation-card__breakdown dt {
+    .dashboard-stat-card__breakdown dt {
         width: auto;
         min-width: 0;
         white-space: normal;

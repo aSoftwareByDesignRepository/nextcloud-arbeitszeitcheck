@@ -52,37 +52,6 @@ require __DIR__ . '/common/user-display-timezone.php';
             </div>
         <?php endif; ?>
         <?php if ($mode === 'list'): ?>
-            <?php
-            $tzMismatchList = $appTimezone !== $arbeitszeitCheckUserDisplayTz->getName();
-            ?>
-            <?php if ($tzMismatchList): ?>
-            <details class="azc-callout azc-callout--info arbeitszeit-check-tz-context azc-collapsed-callout">
-                <summary class="azc-callout__title"><?php p($l->t('Time zones')); ?></summary>
-                <div class="arbeitszeit-check-tz-context__body">
-                    <p class="azc-callout__text arbeitszeit-check-tz-context__text" id="arbeitszeit-tz-context-desc">
-                        <?php p($l->t('Start and end times are shown in your personal timezone (%2$s). Values are stored using the organization timezone (%1$s) so daylight saving time is handled consistently.', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?>
-                    </p>
-                    <div class="arbeitszeit-check-tz-context__badges" role="list" aria-label="<?php p($l->t('Time zone summary')); ?>">
-                        <div class="timezone-badge timezone-badge--inline" role="listitem" title="<?php p($l->t('Organization reference timezone for stored work times')); ?>">
-                            <span class="timezone-badge__label"><?php p($l->t('Organization')); ?>: <?php p($appTimezone); ?></span>
-                        </div>
-                        <div class="timezone-badge timezone-badge--inline" role="listitem" title="<?php p($l->t('Your Nextcloud account timezone for display')); ?>">
-                            <span class="timezone-badge__label"><?php p($l->t('Your display')); ?>: <?php p($arbeitszeitCheckUserDisplayTz->getName()); ?></span>
-                        </div>
-                    </div>
-                </div>
-            </details>
-            <?php endif; ?>
-
-            <details class="azc-callout azc-callout--info time-entries-page__deletion-guide azc-collapsed-callout">
-                <summary id="time-entries-deletion-guide-title" class="azc-callout__title time-entries-page__deletion-guide-title">
-                    <?php p($l->t('Changing or removing time entries')); ?>
-                </summary>
-                <p class="azc-callout__text">
-                    <?php p($l->t('For clocked entries less than %d days old: use Edit to change times, or Delete to remove the entry entirely. Older clocked entries: use Request correction. Entries in a finalized month or approved by your manager cannot be deleted here.', [$editWindowDays])); ?>
-                </p>
-            </details>
-
             <div class="header-actions azc-page-actions-source">
                 <?php if ($manualTimeEntryEnabled): ?>
                 <button id="btn-add-entry"
@@ -124,109 +93,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </div>
             <?php endif; ?>
-            <?php
-            // B-2: server-rendered dismissible hint — no layout jump on load.
-            $azcDismissedHints = is_array($_['dismissedHints'] ?? null) ? $_['dismissedHints'] : [];
-            $azcExportHintDismissed = in_array('time-entries-export-hint', $azcDismissedHints, true);
-            ?>
-            <?php /* Full dismissed set for the JS merge — hints not rendered on this page must survive a save. */ ?>
-            <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
-            <div class="azc-hint" data-hint="time-entries-export-hint">
-                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
-                    <span class="azc-callout__text">
-                        <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
-                        <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
-                    </span>
-                    <button type="button"
-                        class="azc-hint__dismiss"
-                        data-hint-dismiss="time-entries-export-hint"
-                        aria-expanded="true"
-                        aria-controls="time-entries-export-hint"
-                        title="<?php p($l->t('Hide this help text permanently')); ?>">
-                        <?php p($l->t('Hide')); ?>
-                    </button>
-                </p>
-                <button type="button"
-                    class="azc-hint__show azc-btn azc-btn--tertiary azc-btn--small"
-                    data-hint-show="time-entries-export-hint"
-                    aria-expanded="false"
-                    aria-controls="time-entries-export-hint"
-                    <?php echo $azcExportHintDismissed ? '' : 'hidden'; ?>>
-                    <?php p($l->t('Show hint')); ?>
-                </button>
-            </div>
         <?php endif; ?>
-
-            <?php if ($mode === 'list' && !empty($stats)): ?>
-                <section class="azc-card time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
-                    <div class="azc-card__body">
-                        <div class="stats-grid time-entries-page__stats-grid">
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
-                                <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('This Month')); ?></span>
-                                <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
-                                <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-                <?php if ($monthClosureEnabled): ?>
-                <section class="azc-card month-closure-section" aria-labelledby="month-closure-heading">
-                    <header class="azc-card__header">
-                        <div class="azc-card__header-text">
-                            <h2 id="month-closure-heading" class="azc-card__title"><?php p($l->t('Monthly record (revision-safe)')); ?></h2>
-                            <p class="azc-card__lead month-closure-lead" id="month-closure-intro"><?php p($l->t('Finalize a full calendar month after it has ended, when your times are complete. The app stores a cryptographic snapshot and a PDF you can archive.')); ?></p>
-                        </div>
-                    </header>
-                    <div class="azc-card__body">
-                        <div class="month-closure-layout">
-                            <div class="month-closure-block month-closure-block--period">
-                                <div class="month-closure-field">
-                                    <label for="month-closure-period" class="month-closure-field__label" id="month-closure-period-label"><?php p($l->t('Calendar month to finalize')); ?></label>
-                                    <p id="month-closure-field-hint" class="form-help month-closure-field__hint"><?php p($l->t('The seal applies to one full calendar month. Only calendar months that have ended and contain at least one time entry are listed.')); ?></p>
-                                    <div class="month-closure-toolbar">
-                                        <select id="month-closure-period"
-                                            class="form-input form-input--inline month-closure-period-select"
-                                            aria-busy="true"
-                                            aria-labelledby="month-closure-period-label"
-                                            aria-describedby="month-closure-intro month-closure-field-hint month-closure-deadline month-closure-blocked"></select>
-                                        <span id="month-closure-status" class="month-closure-badge" role="status" aria-live="polite"></span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="month-closure-block month-closure-block--outcome">
-                                <p id="month-closure-blocked" class="month-closure-blocked form-help" role="status" aria-live="polite" hidden></p>
-                                <p id="month-closure-deadline" class="month-closure-deadline form-help form-help--note" hidden></p>
-                                <div class="month-closure-actions">
-                                    <button type="button"
-                                        id="month-closure-finalize"
-                                        class="azc-btn azc-btn--primary"
-                                        disabled
-                                        data-confirm-finalize="<?php p($l->t('Really finalize this month? You will not be able to change time entries afterward unless an administrator reopens the month.')); ?>"><?php p($l->t('Finalize month')); ?></button>
-                                    <a id="month-closure-pdf" class="azc-btn azc-btn--secondary month-closure-pdf-link" href="#" style="display:none"><?php p($l->t('Download PDF')); ?></a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="month-closure-finalized-notice" class="month-closure-finalized-notice" hidden>
-                            <?php
-                            $_['message'] = $l->t('This calendar month is finalized. Contact an administrator if a correction must be made.');
-                            $_['id'] = 'month-closure-lock-notice';
-                            include __DIR__ . '/common/month-closure-lock.php';
-                            ?>
-                        </div>
-                        <p id="month-closure-feedback" class="month-closure-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
-                    </div>
-                </section>
-                <?php endif; ?>
-            <?php endif; ?>
 
         <?php if ($mode === 'create' || $mode === 'edit'): ?>
             <?php
@@ -246,19 +113,6 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </details>
             <?php endif; ?>
-            <?php if ($mode === 'create' && $manualTimeEntriesRequireApproval): ?>
-            <div class="azc-callout azc-callout--info time-entries-page__workflow-callout" role="status">
-                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('user-check', 'azc-callout__icon-svg')); ?></span>
-                <p class="azc-callout__text"><?php p($l->t('New manual entries need manager approval before they count toward your hours and overtime.')); ?></p>
-            </div>
-            <?php endif; ?>
-            <?php if ($monthClosureEnabled): ?>
-            <div class="azc-callout azc-callout--neutral time-entries-page__workflow-callout" role="note">
-                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lock', 'azc-callout__icon-svg')); ?></span>
-                <p class="azc-callout__text"><?php p($l->t('Entries in a finalized calendar month cannot be changed unless an administrator reopens that month.')); ?></p>
-            </div>
-            <?php endif; ?>
-
             <section class="azc-card time-entries-page__form<?php echo $mode === 'create' ? ' time-entries-page__form--create' : ''; ?>"
                      aria-labelledby="<?php echo $mode === 'create' ? 'azc-page-title' : 'time-entry-form-heading'; ?>">
                 <?php if ($mode === 'edit'): ?>
@@ -808,6 +662,10 @@ require __DIR__ . '/common/user-display-timezone.php';
                         </fieldset>
 
                         <?php if ($mode === 'create' && $manualTimeEntriesRequireApproval): ?>
+                        <div class="azc-callout azc-callout--info time-entries-page__workflow-callout" role="status">
+                            <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('user-check', 'azc-callout__icon-svg')); ?></span>
+                            <p class="azc-callout__text"><?php p($l->t('New manual entries need manager approval before they count toward your hours and overtime.')); ?></p>
+                        </div>
                         <fieldset class="time-entry-form-fieldset time-entry-form-fieldset--justification" aria-labelledby="entry-justification-heading">
                             <legend id="entry-justification-heading" class="time-entry-form-fieldset__legend">
                                 <?php p($l->t('Reason for manager')); ?>
@@ -853,6 +711,13 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 </div>
                             </div>
                         </div>
+
+                        <?php if ($monthClosureEnabled): ?>
+                        <div class="azc-callout azc-callout--neutral time-entries-page__workflow-callout" role="note">
+                            <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lock', 'azc-callout__icon-svg')); ?></span>
+                            <p class="azc-callout__text"><?php p($l->t('Entries in a finalized calendar month cannot be changed unless an administrator reopens that month.')); ?></p>
+                        </div>
+                        <?php endif; ?>
 
                         <div class="form-actions time-entry-form__actions" role="group" aria-label="<?php p($l->t('Form actions')); ?>">
                             <button type="submit"
@@ -1320,6 +1185,142 @@ require __DIR__ . '/common/user-display-timezone.php';
                 <?php endif; ?>
                 </div>
             </section>
+
+            <?php /* Overview + help material below the list (LWS request: primary content first). */ ?>
+            <?php if (!empty($stats)): ?>
+                <section class="azc-card time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
+                    <div class="azc-card__body">
+                        <div class="stats-grid time-entries-page__stats-grid">
+                            <div class="stat-card">
+                                <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
+                                <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label"><?php p($l->t('This Month')); ?></span>
+                                <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
+                                <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($monthClosureEnabled): ?>
+                <section class="azc-card month-closure-section" aria-labelledby="month-closure-heading">
+                    <header class="azc-card__header">
+                        <div class="azc-card__header-text">
+                            <h2 id="month-closure-heading" class="azc-card__title"><?php p($l->t('Monthly record (revision-safe)')); ?></h2>
+                            <p class="azc-card__lead month-closure-lead" id="month-closure-intro"><?php p($l->t('Finalize a full calendar month after it has ended, when your times are complete. The app stores a cryptographic snapshot and a PDF you can archive.')); ?></p>
+                        </div>
+                    </header>
+                    <div class="azc-card__body">
+                        <div class="month-closure-layout">
+                            <div class="month-closure-block month-closure-block--period">
+                                <div class="month-closure-field">
+                                    <label for="month-closure-period" class="month-closure-field__label" id="month-closure-period-label"><?php p($l->t('Calendar month to finalize')); ?></label>
+                                    <p id="month-closure-field-hint" class="form-help month-closure-field__hint"><?php p($l->t('The seal applies to one full calendar month. Only calendar months that have ended and contain at least one time entry are listed.')); ?></p>
+                                    <div class="month-closure-toolbar">
+                                        <select id="month-closure-period"
+                                            class="form-input form-input--inline month-closure-period-select"
+                                            aria-busy="true"
+                                            aria-labelledby="month-closure-period-label"
+                                            aria-describedby="month-closure-intro month-closure-field-hint month-closure-deadline month-closure-blocked"></select>
+                                        <span id="month-closure-status" class="month-closure-badge" role="status" aria-live="polite"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="month-closure-block month-closure-block--outcome">
+                                <p id="month-closure-blocked" class="month-closure-blocked form-help" role="status" aria-live="polite" hidden></p>
+                                <p id="month-closure-deadline" class="month-closure-deadline form-help form-help--note" hidden></p>
+                                <div class="month-closure-actions">
+                                    <button type="button"
+                                        id="month-closure-finalize"
+                                        class="azc-btn azc-btn--primary"
+                                        disabled
+                                        data-confirm-finalize="<?php p($l->t('Really finalize this month? You will not be able to change time entries afterward unless an administrator reopens the month.')); ?>"><?php p($l->t('Finalize month')); ?></button>
+                                    <a id="month-closure-pdf" class="azc-btn azc-btn--secondary month-closure-pdf-link" href="#" style="display:none"><?php p($l->t('Download PDF')); ?></a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="month-closure-finalized-notice" class="month-closure-finalized-notice" hidden>
+                            <?php
+                            $_['message'] = $l->t('This calendar month is finalized. Contact an administrator if a correction must be made.');
+                            $_['id'] = 'month-closure-lock-notice';
+                            include __DIR__ . '/common/month-closure-lock.php';
+                            ?>
+                        </div>
+                        <p id="month-closure-feedback" class="month-closure-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+                    </div>
+                </section>
+            <?php endif; ?>
+
+            <?php
+            $tzMismatchList = $appTimezone !== $arbeitszeitCheckUserDisplayTz->getName();
+            ?>
+            <?php if ($tzMismatchList): ?>
+            <details class="azc-callout azc-callout--info arbeitszeit-check-tz-context azc-collapsed-callout">
+                <summary class="azc-callout__title"><?php p($l->t('Time zones')); ?></summary>
+                <div class="arbeitszeit-check-tz-context__body">
+                    <p class="azc-callout__text arbeitszeit-check-tz-context__text" id="arbeitszeit-tz-context-desc">
+                        <?php p($l->t('Start and end times are shown in your personal timezone (%2$s). Values are stored using the organization timezone (%1$s) so daylight saving time is handled consistently.', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?>
+                    </p>
+                    <div class="arbeitszeit-check-tz-context__badges" role="list" aria-label="<?php p($l->t('Time zone summary')); ?>">
+                        <div class="timezone-badge timezone-badge--inline" role="listitem" title="<?php p($l->t('Organization reference timezone for stored work times')); ?>">
+                            <span class="timezone-badge__label"><?php p($l->t('Organization')); ?>: <?php p($appTimezone); ?></span>
+                        </div>
+                        <div class="timezone-badge timezone-badge--inline" role="listitem" title="<?php p($l->t('Your Nextcloud account timezone for display')); ?>">
+                            <span class="timezone-badge__label"><?php p($l->t('Your display')); ?>: <?php p($arbeitszeitCheckUserDisplayTz->getName()); ?></span>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            <?php endif; ?>
+
+            <details class="azc-callout azc-callout--info time-entries-page__deletion-guide azc-collapsed-callout">
+                <summary id="time-entries-deletion-guide-title" class="azc-callout__title time-entries-page__deletion-guide-title">
+                    <?php p($l->t('Changing or removing time entries')); ?>
+                </summary>
+                <p class="azc-callout__text">
+                    <?php p($l->t('For clocked entries less than %d days old: use Edit to change times, or Delete to remove the entry entirely. Older clocked entries: use Request correction. Entries in a finalized month or approved by your manager cannot be deleted here.', [$editWindowDays])); ?>
+                </p>
+            </details>
+
+            <?php
+            // B-2: server-rendered dismissible hint — no layout jump on load.
+            $azcDismissedHints = is_array($_['dismissedHints'] ?? null) ? $_['dismissedHints'] : [];
+            $azcExportHintDismissed = in_array('time-entries-export-hint', $azcDismissedHints, true);
+            ?>
+            <?php /* Full dismissed set for the JS merge — hints not rendered on this page must survive a save. */ ?>
+            <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
+            <div class="azc-hint" data-hint="time-entries-export-hint">
+                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
+                    <span class="azc-callout__text">
+                        <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
+                        <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
+                    </span>
+                    <button type="button"
+                        class="azc-hint__dismiss"
+                        data-hint-dismiss="time-entries-export-hint"
+                        aria-expanded="true"
+                        aria-controls="time-entries-export-hint"
+                        title="<?php p($l->t('Hide this help text permanently')); ?>">
+                        <?php p($l->t('Hide')); ?>
+                    </button>
+                </p>
+                <button type="button"
+                    class="azc-hint__show azc-btn azc-btn--tertiary azc-btn--small"
+                    data-hint-show="time-entries-export-hint"
+                    aria-expanded="false"
+                    aria-controls="time-entries-export-hint"
+                    <?php echo $azcExportHintDismissed ? '' : 'hidden'; ?>>
+                    <?php p($l->t('Show hint')); ?>
+                </button>
+            </div>
 
             <?php /* Correction dialog — cloned into modal on first open (time-entry-correction.js). */ ?>
             <div id="time-entry-correction-source" class="visually-hidden" aria-hidden="true" data-datepicker-defer>

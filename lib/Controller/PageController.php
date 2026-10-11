@@ -458,6 +458,10 @@ class PageController extends Controller
 					'vacation_hours_per_day' => (float)($vacationStats['vacation_hours_per_day'] ?? Constants::DEFAULT_VACATION_HOURS_PER_DAY),
 					// B-5: sick days shown separately — never merged into vacation.
 					'sick_days_this_year' => (float)($vacationStats['sick_days'] ?? 0),
+					// Sick days are counted over the calendar year, not the
+					// (possibly anniversary-based) vacation year — keep the
+					// label honest when the two differ.
+					'sick_year' => $currentYear,
 				],
 			];
 

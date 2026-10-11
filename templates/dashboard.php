@@ -458,6 +458,17 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         </div>
                         <?php endif; ?>
 
+                        <?php if ($manualTimeEntryEnabled): ?>
+                        <div class="azc-dashboard-punch__secondary">
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.create')); ?>"
+                               id="dashboard-add-entry"
+                               class="azc-btn azc-btn--secondary"
+                               title="<?php p($l->t('Click to add a new time entry. You can record when you started and finished work, and any breaks you took.')); ?>">
+                                <?php p($l->t('Add a time entry')); ?>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+
                         <p class="azc-dashboard-punch__tz"
                            aria-label="<?php p($l->t('Times are shown in your timezone (%s).', [$arbeitszeitCheckUserDisplayTz->getName()])); ?>">
                             <?php p($l->t('All times in %s', [$arbeitszeitCheckUserDisplayTz->getName()])); ?>
@@ -814,7 +825,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     ? $l->t('Remaining vacation hours')
                     : $l->t('Remaining vacation days');
                 ?>
-                <article class="azc-card azc-dashboard-vacation dashboard-vacation-card" aria-labelledby="dashboard-vacation-heading" data-vacation-unit="<?php p($dashVacationUnit); ?>">
+                <article class="azc-card azc-dashboard-vacation dashboard-stat-card" aria-labelledby="dashboard-vacation-heading" data-vacation-unit="<?php p($dashVacationUnit); ?>">
                     <header class="azc-card__header">
                         <div class="azc-card__header-text">
                             <h3 id="dashboard-vacation-heading" class="azc-card__title"><?php p($l->t('Vacation')); ?> <?php
@@ -829,28 +840,24 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <?php p($l->t('Your vacation year uses hire anniversary, but no employment start date is set. Ask your admin to set it under Employees.')); ?>
                         </p>
                         <?php } ?>
-                        <div class="dashboard-vacation-card__row dashboard-vacation-card__row--hero">
-                            <span class="dashboard-vacation-card__label" id="dashboard-vacation-remaining-label"><?php p($dashRemainingLabel); ?></span>
-                            <span class="dashboard-vacation-card__value dashboard-vacation-card__value--hero"
+                        <div class="dashboard-stat-card__row dashboard-stat-card__row--hero">
+                            <span class="dashboard-stat-card__label" id="dashboard-vacation-remaining-label"><?php p($dashRemainingLabel); ?></span>
+                            <span class="dashboard-stat-card__value dashboard-stat-card__value--hero"
                                   id="dashboard-vacation-remaining-value"
                                   aria-labelledby="dashboard-vacation-remaining-label"><?php p((string)round((float)($dashStats['vacation_days_remaining'] ?? 0), 1)); ?></span>
-                            <span class="dashboard-vacation-card__unit"><?php p($dashUnitWord); ?></span>
+                            <span class="dashboard-stat-card__unit"><?php p($dashUnitWord); ?></span>
                         </div>
-                        <dl class="dashboard-vacation-card__breakdown" aria-label="<?php p($l->t('Vacation breakdown')); ?>">
-                            <div class="dashboard-vacation-card__breakdown-row">
+                        <dl class="dashboard-stat-card__breakdown" aria-label="<?php p($l->t('Vacation breakdown')); ?>">
+                            <div class="dashboard-stat-card__breakdown-row">
                                 <dt><?php p($l->t('Annual leave left (bookable)')); ?></dt>
                                 <dd><?php p((string)round((float)($dashStats['vacation_annual_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
-                            <div class="dashboard-vacation-card__breakdown-row">
+                            <div class="dashboard-stat-card__breakdown-row">
                                 <dt><?php p($l->t('Carryover pool left')); ?></dt>
                                 <dd><?php p((string)round((float)($dashStats['vacation_carryover_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
-                            <div class="dashboard-vacation-card__breakdown-row">
-                                <dt><?php p($l->t('Sick days this year')); ?></dt>
-                                <dd><?php p((string)round((float)($dashStats['sick_days_this_year'] ?? 0), 1) . ' ' . $l->t('days')); ?></dd>
-                            </div>
                             <?php if (isset($dashStats['vacation_carryover_max_cap']) && $dashStats['vacation_carryover_max_cap'] !== null && $dashStats['vacation_carryover_max_cap'] !== '') { ?>
-                            <div class="dashboard-vacation-card__breakdown-row">
+                            <div class="dashboard-stat-card__breakdown-row">
                                 <dt><?php p($l->t('Max. carryover (admin cap)')); ?></dt>
                                 <dd><?php p((string)round((float)$dashStats['vacation_carryover_max_cap'], 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
@@ -871,7 +878,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         }
                         if ($vcExpFmt !== '' && $vcCoDays > 0.0001) {
                             ?>
-                        <p class="form-help dashboard-vacation-card__hint<?php echo $vcLocked ? ' dashboard-vacation-card__hint--locked' : ''; ?>"
+                        <p class="form-help dashboard-stat-card__hint<?php echo $vcLocked ? ' dashboard-stat-card__hint--locked' : ''; ?>"
                             id="dashboard-vacation-carryover-hint"
                             role="status">
                             <?php if ($vcLocked) {
@@ -883,7 +890,29 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             } ?>
                         </p>
                         <?php } ?>
-                        <div class="dashboard-vacation-card__actions">
+                        <div class="dashboard-stat-card__actions">
+                            <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.absences')); ?>"
+                               class="azc-btn azc-btn--secondary"><?php p($l->t('Open absences')); ?></a>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Sick leave, kept visually separate from vacation (LWS request) -->
+                <article class="azc-card azc-dashboard-sick dashboard-stat-card" aria-labelledby="dashboard-sick-heading">
+                    <header class="azc-card__header">
+                        <div class="azc-card__header-text">
+                            <h3 id="dashboard-sick-heading" class="azc-card__title"><?php p($l->t('Sick leave')); ?> <?php p((string)($dashStats['sick_year'] ?? date('Y'))); ?></h3>
+                        </div>
+                    </header>
+                    <div class="azc-card__body">
+                        <div class="dashboard-stat-card__row dashboard-stat-card__row--hero">
+                            <span class="dashboard-stat-card__label" id="dashboard-sick-days-label"><?php p($l->t('Sick days this year')); ?></span>
+                            <span class="dashboard-stat-card__value dashboard-stat-card__value--hero"
+                                  id="dashboard-sick-days-value"
+                                  aria-labelledby="dashboard-sick-days-label"><?php p((string)round((float)($dashStats['sick_days_this_year'] ?? 0), 1)); ?></span>
+                            <span class="dashboard-stat-card__unit"><?php p($l->t('days')); ?></span>
+                        </div>
+                        <div class="dashboard-stat-card__actions">
                             <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.absences')); ?>"
                                class="azc-btn azc-btn--secondary"><?php p($l->t('Open absences')); ?></a>
                         </div>

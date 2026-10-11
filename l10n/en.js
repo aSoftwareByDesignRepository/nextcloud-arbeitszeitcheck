@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Pending Approval",
 		"Pending Requests" : "Pending Requests",
 		"Pending approvals" : "Pending approvals",
+		"Pending corrections" : "Pending corrections",
 		"Pending pairing" : "Pending pairing",
 		"Pending requests" : "Pending requests",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Pending rows can be paid out individually. Paid rows are locked for audit.",

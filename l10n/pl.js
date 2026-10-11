@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Oczekuje na zatwierdzenie",
 		"Pending Requests" : "Oczekujący Requests",
 		"Pending approvals" : "Oczekujące zatwierdzenia",
+		"Pending corrections" : "Oczekujące korekty",
 		"Pending pairing" : "Oczekujące parowanie",
 		"Pending requests" : "Oczekujący requests",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Oczekujące wiersze można wypłacać pojedynczo. Wypłacone wiersze są zablokowane do audytu.",

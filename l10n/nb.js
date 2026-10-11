@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Venter godkjenning",
 		"Pending Requests" : "Ventende forespørsler",
 		"Pending approvals" : "Venter godkjennelser",
+		"Pending corrections" : "Ventende korrigeringer",
 		"Pending pairing" : "Ventende paring",
 		"Pending requests" : "Ventende forespørsler",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Ventende rader kan utbetales enkeltvis. Utbetalte rader er låst for revisjon.",

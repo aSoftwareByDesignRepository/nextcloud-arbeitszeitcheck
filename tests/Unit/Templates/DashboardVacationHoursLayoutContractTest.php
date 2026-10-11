@@ -15,6 +15,6 @@ class DashboardVacationHoursLayoutContractTest extends TestCase
 		$this->assertStringContainsString('data-vacation-unit=', $src);
 		$this->assertStringContainsString('id="dashboard-vacation-remaining-value"', $src);
 		$this->assertStringContainsString('Remaining vacation hours', $src);
-		$this->assertStringContainsString('dashboard-vacation-card__value--hero', $src);
+		$this->assertStringContainsString('dashboard-stat-card__value--hero', $src);
 	}
 }

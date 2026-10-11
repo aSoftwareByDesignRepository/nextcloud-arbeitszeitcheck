@@ -2826,6 +2826,7 @@
 		"Pending Approval" : "Approvazione in attesa",
 		"Pending Requests" : "Richieste in attesa",
 		"Pending approvals" : "Approvazioni in attesa",
+		"Pending corrections" : "Correzioni in sospeso",
 		"Pending pairing" : "Abbinamento in sospeso",
 		"Pending requests" : "Richieste in attesa",
 		"Pending rows can be paid out individually. Paid rows are locked for audit." : "Le righe in sospeso possono essere liquidate singolarmente. Le righe liquidate sono bloccate per audit.",

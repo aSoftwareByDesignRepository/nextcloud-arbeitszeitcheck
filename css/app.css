@@ -372,6 +372,11 @@
 .azc-collapsed-callout > summary::-webkit-details-marker {
 	display: none;
 }
+/* WCAG 2.5.8 floor for plain <summary> disclosures (absence detail,
+ * vacation stats, admin partials) that carry no dedicated touch style. */
+#app-content.azc-app summary {
+	min-block-size: 24px;
+}
 .azc-page-header__actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -409,6 +414,9 @@
 	min-width: 0;
 	max-width: 100%;
 	overflow-wrap: anywhere;
+	/* WCAG 2.5.8: badge min-height is rem-based (1.5rem ≈ 22.5px under NC's
+	 * root font-size) — pin the interactive chip to a real 24px floor. */
+	min-block-size: 24px;
 }
 
 /* ── Buttons (azc-btn taxonomy) ────────────────────────────────

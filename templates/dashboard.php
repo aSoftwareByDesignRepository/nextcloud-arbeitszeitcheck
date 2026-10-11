@@ -93,7 +93,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
 <?php include __DIR__ . '/common/page-start.php'; ?>
 
         <div class="azc-page-stack">
-        <div class="azc-dashboard-alerts">
+        <div class="azc-dashboard-alerts" aria-live="polite">
         <?php if ($dashboardError !== ''): ?>
             <?php
             $calloutVariant = 'danger';

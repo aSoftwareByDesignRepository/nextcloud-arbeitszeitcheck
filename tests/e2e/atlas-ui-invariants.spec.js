@@ -120,7 +120,32 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 				content: CONTENT,
 				sizeAllow: 'input[type="radio"], input[type="checkbox"]',
 			})
-			expect(findings, `a11y-dom findings on /${label}:\n${findings.join('\n')}`).toEqual([])
+			// The "not announced" heuristic fires on every *callout*/error-class
+			// element, but WCAG 4.1.3 status-message semantics only apply to
+			// dynamically-inserted messages. Static content that is already
+			// properly marked — role="note" callouts, <details> disclosures,
+			// severity .badge pills — is legitimately silent. Verify the mark
+			// exists before filtering: an unmarked new alert still fails.
+			const properlyMarkedStatic = new Set(await page.evaluate(() => {
+				const out = []
+				document
+					.querySelectorAll('#app-content [class*="error"], #app-content [class*="Error"], #app-content [class*="alert"], #app-content [class*="Alert"], #app-content [class*="toast"], #app-content [class*="Toast"], #app-content [class*="callout"], #app-content [class*="Callout"]')
+					.forEach((el) => {
+						const isStaticMarked = el.matches('details')
+							|| el.closest('details')
+							|| el.getAttribute('role') === 'note'
+							|| el.closest('[role="note"]')
+							|| /\bbadge\b|badge--/.test(String(el.className))
+						if (isStaticMarked) out.push(String(el.className).slice(0, 60))
+					})
+				return out
+			}))
+			const real = findings.filter((f) => {
+				const m = f.match(/^error\/toast element not announced \(no role\/aria-live\): (.+)$/)
+				if (!m) return true
+				return !properlyMarkedStatic.has(m[1])
+			})
+			expect(real, `a11y-dom findings on /${label}:\n${real.join('\n')}`).toEqual([])
 		})
 
 		test(`console errors + raw i18n keys /${label}`, async ({ page }) => {
@@ -194,7 +219,13 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 		await form.waitFor({ state: 'visible', timeout: 30_000 })
 		const { date } = slotFor(5)
 		const [dd, mm, yyyy] = date.split('-').reverse()
-		await page.locator('#entry-date').fill(`${dd}.${mm}.${yyyy}`)
+		// #entry-date is readonly (datepicker-managed) — set programmatically.
+		await page.evaluate((d) => {
+			const el = document.getElementById('entry-date')
+			el.value = d
+			el.dispatchEvent(new Event('input', { bubbles: true }))
+			el.dispatchEvent(new Event('change', { bubbles: true }))
+		}, `${dd}.${mm}.${yyyy}`)
 		await page.locator('#entry-start-time-hour').selectOption('22')
 		await page.locator('#entry-start-time-minute').selectOption('30')
 		await page.locator('#entry-end-time-hour').selectOption('23')

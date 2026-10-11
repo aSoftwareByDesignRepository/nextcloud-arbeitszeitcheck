@@ -132,7 +132,7 @@ require __DIR__ . '/common/user-display-timezone.php';
             <?php /* Full dismissed set for the JS merge — hints not rendered on this page must survive a save. */ ?>
             <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
             <div class="azc-hint" data-hint="time-entries-export-hint">
-                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
+                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
                     <span class="azc-callout__text">
                         <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
                         <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>

@@ -158,6 +158,10 @@
 	line-height: var(--azc-line-base, 1.5);
 	color: var(--azc-text, var(--color-main-text));
 	cursor: pointer;
+	/* WCAG 2.5.8: the label IS the checkbox's pointer target — keep a 24px floor. */
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 24px;
 }
 
 #app-content.azc-app--settings .settings-form__help,

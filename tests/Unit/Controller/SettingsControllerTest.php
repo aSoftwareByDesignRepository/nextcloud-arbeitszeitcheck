@@ -78,6 +78,30 @@ class SettingsControllerTest extends TestCase
 				return $text;
 			});
 
+		// Inert resolver bound to this test's own config — without it the
+		// controller's lazy Server::get fallback would bind the live dev
+		// database and let a saved org policy flip auto_break_calculation on.
+		$resolverConfig = $this->createMock(\OCP\IConfig::class);
+		$resolverConfig->method('getAppValue')->willReturnCallback(
+			static fn ($app, $key, $default) => $key === 'country' ? 'DE' : $default
+		);
+		$dateTimeZone = $this->createMock(\OCP\IDateTimeZone::class);
+		$dateTimeZone->method('getTimeZone')->willReturn(new \DateTimeZone('Europe/Berlin'));
+		$userSessionForResolver = $this->createMock(IUserSession::class);
+		$userSessionForResolver->method('getUser')->willReturn(null);
+		$inertResolver = new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+			$resolverConfig,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($resolverConfig, $this->userSettingsMapper),
+			$this->userSettingsMapper,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+			new \OCA\ArbeitszeitCheck\Service\TimeZoneService(
+				$resolverConfig, $dateTimeZone, $userSessionForResolver, new \Psr\Log\NullLogger()
+			),
+			$this->l10n,
+		);
+
 		$this->controller = new SettingsController(
 			'arbeitszeitcheck',
 			$this->request,
@@ -87,7 +111,8 @@ class SettingsControllerTest extends TestCase
 			$this->l10n,
 			$this->cspService,
 			$this->urlGenerator,
-			$this->permissionService
+			$this->permissionService,
+			$inertResolver
 		);
 	}
 
@@ -229,6 +254,170 @@ class SettingsControllerTest extends TestCase
 		$data = $response->getData();
 
 		$this->assertTrue($data['success']);
+	}
+
+	/**
+	 * Org-enforced break policy: an employee POST of auto_break_calculation='0'
+	 * must not reach persistence and must report the effective '1' — a stored
+	 * '0' would make the POST echo contradict index_api's effective value.
+	 */
+	public function testUpdateAutoBreakOptOutLockedByEnforcedPolicy(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->request->method('getParams')
+			->willReturn(['auto_break_calculation' => '0']);
+
+		// Resolver backed by an enforced org policy (same wiring as setUp,
+		// but break_policy_json carries enforced=true).
+		$resolverConfig = $this->createMock(\OCP\IConfig::class);
+		$resolverConfig->method('getAppValue')->willReturnCallback(
+			static fn ($app, $key, $default) => $key === \OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON
+				? json_encode(['enforced' => true, 'tiers' => [['afterHours' => 6, 'breakMinutes' => 45]]])
+				: ($key === 'country' ? 'DE' : $default)
+		);
+		$dateTimeZone = $this->createMock(\OCP\IDateTimeZone::class);
+		$dateTimeZone->method('getTimeZone')->willReturn(new \DateTimeZone('Europe/Berlin'));
+		$userSessionForResolver = $this->createMock(IUserSession::class);
+		$userSessionForResolver->method('getUser')->willReturn(null);
+		$enforcedResolver = new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+			$resolverConfig,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($resolverConfig, $this->userSettingsMapper),
+			$this->userSettingsMapper,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+			new \OCA\ArbeitszeitCheck\Service\TimeZoneService(
+				$resolverConfig, $dateTimeZone, $userSessionForResolver, new \Psr\Log\NullLogger()
+			),
+			$this->l10n,
+		);
+
+		$controller = new SettingsController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->userSession,
+			$this->userSettingsMapper,
+			$this->auditLogMapper,
+			$this->l10n,
+			$this->cspService,
+			$this->urlGenerator,
+			$this->permissionService,
+			$enforcedResolver
+		);
+
+		// The opt-out must never be written.
+		$this->userSettingsMapper->expects($this->never())
+			->method('setSetting')
+			->with($userId, 'auto_break_calculation', '0');
+
+		$response = $controller->update();
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame('1', $data['settings']['auto_break_calculation'],
+			'POST echo must report the enforced effective value, not the rejected opt-out');
+		$this->assertTrue($data['breakPolicy']['enforced']);
+	}
+
+	/**
+	 * B-2: dismissed_hints stores a canonical JSON list — invalid ids are
+	 * dropped, unknown-but-well-formed ids are kept (forward-compat).
+	 */
+	public function testUpdateDismissedHintsStoresCanonicalList(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->request->method('getParams')
+			->willReturn(['dismissed_hints' => ['valid-hint', 'UPPER_BAD', 'ok_2', 42, 'future-hint-9']]);
+
+		$this->userSettingsMapper->method('getSetting')->willReturn(null);
+
+		$this->userSettingsMapper->expects($this->once())
+			->method('setSetting')
+			->with($userId, 'dismissed_hints', '["valid-hint","ok_2","future-hint-9"]');
+
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+
+		$response = $this->controller->update();
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame('["valid-hint","ok_2","future-hint-9"]', $data['settings']['dismissed_hints']);
+	}
+
+	/**
+	 * B-2: the "show all help texts" reset sends an empty list — it must
+	 * persist as an empty set, not be treated as "nothing provided".
+	 */
+	public function testUpdateDismissedHintsEmptyListClearsAll(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->request->method('getParams')
+			->willReturn(['dismissed_hints' => []]);
+
+		$this->userSettingsMapper->method('getSetting')->willReturn(null);
+
+		$this->userSettingsMapper->expects($this->once())
+			->method('setSetting')
+			->with($userId, 'dismissed_hints', '[]');
+
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+
+		$response = $this->controller->update();
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	/**
+	 * B-2: malformed dismissed_hints payloads are skipped entirely — no
+	 * write, no canonicalisation of garbage into storage.
+	 */
+	public function testUpdateDismissedHintsRejectsMalformedPayloads(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		foreach ([
+			'not-json',                       // undecodable string
+			['key' => 'value'],               // assoc — not a list
+			array_fill(0, 65, 'hint'),        // over the 64-entry cap
+			'{"a":1}',                        // decodes to assoc, not list
+		] as $payload) {
+			$request = $this->createMock(IRequest::class);
+			$request->method('getParams')->willReturn(['dismissed_hints' => $payload]);
+
+			$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+			$userSettingsMapper->expects($this->never())->method('setSetting');
+
+			$controller = new SettingsController(
+				'arbeitszeitcheck',
+				$request,
+				$this->userSession,
+				$userSettingsMapper,
+				$this->auditLogMapper,
+				$this->l10n,
+				$this->cspService,
+				$this->urlGenerator,
+				$this->permissionService,
+				null
+			);
+
+			$response = $controller->update();
+			$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus(),
+				'malformed dismissed_hints payload must be rejected: ' . json_encode($payload));
+		}
 	}
 
 	/**

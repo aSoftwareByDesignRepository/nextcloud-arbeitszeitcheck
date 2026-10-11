@@ -785,14 +785,21 @@
                 }
             }
 
-            // Filter button - toggle filter section
+            // Filter button - toggle filter section (ARIA state mirrors the
+            // absences-page toggle so AT sees expanded/collapsed here too)
             const filterBtn = document.getElementById('btn-filter');
             const filterSection = document.getElementById('filter-section');
-            
+
             if (filterBtn && filterSection) {
+                filterBtn.setAttribute('aria-controls', 'filter-section');
+                const applyFilterVisibility = (visible) => {
+                    filterSection.style.display = visible ? 'block' : 'none';
+                    filterSection.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                    filterBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+                };
+                applyFilterVisibility(filterSection.style.display !== 'none');
                 filterBtn.addEventListener('click', () => {
-                    const isVisible = filterSection.style.display !== 'none';
-                    filterSection.style.display = isVisible ? 'none' : 'block';
+                    applyFilterVisibility(filterSection.style.display === 'none');
                 });
             }
 
@@ -828,6 +835,71 @@
                     document.getElementById('filter-status').value = '';
                     // Reload without filters
                     window.location.href = window.location.pathname;
+                });
+            }
+
+            // B-2 dismissible hints — server-persisted via user settings so
+            // the state survives sessions (never localStorage).
+            document.addEventListener('click', (e) => {
+                const dismissBtn = e.target.closest ? e.target.closest('[data-hint-dismiss]') : null;
+                const showBtn = e.target.closest ? e.target.closest('[data-hint-show]') : null;
+                if (!dismissBtn && !showBtn) {
+                    return;
+                }
+                const wrap = (dismissBtn || showBtn).closest('.azc-hint');
+                const hintId = dismissBtn ? dismissBtn.getAttribute('data-hint-dismiss') : showBtn.getAttribute('data-hint-show');
+                if (!wrap || !hintId) {
+                    return;
+                }
+                e.preventDefault();
+                const body = wrap.querySelector('.azc-hint__body');
+                const showEl = wrap.querySelector('[data-hint-show]');
+                const dismissEl = wrap.querySelector('[data-hint-dismiss]');
+                const dismissed = !!dismissBtn;
+                const applyState = (isDismissed) => {
+                    if (body) body.hidden = isDismissed;
+                    if (showEl) showEl.hidden = !isDismissed;
+                    if (dismissEl) dismissEl.setAttribute('aria-expanded', String(!isDismissed));
+                    if (showEl) showEl.setAttribute('aria-expanded', String(!isDismissed));
+                };
+                applyState(dismissed);
+                // Focus stays on a real control: after dismiss, move to the
+                // show-link; after show, to the dismiss button (a11y).
+                const focusTarget = dismissed ? showEl : dismissEl;
+                if (focusTarget && !focusTarget.hidden && typeof focusTarget.focus === 'function') {
+                    focusTarget.focus();
+                }
+                this.persistDismissedHints(hintId, dismissed).then((ok) => {
+                    if (!ok) {
+                        applyState(!dismissed); // roll back on failure
+                    }
+                });
+            });
+
+            // PDF export of the *current* filter view (B-3). The URL params
+            // are already ISO after filter apply — carry them over verbatim.
+            const exportPdfBtn = document.getElementById('btn-export-pdf');
+            if (exportPdfBtn && this.config.apiUrl?.exportPdf) {
+                exportPdfBtn.addEventListener('click', () => {
+                    const Utils = window.ArbeitszeitCheckUtils || {};
+                    let exportUrl = Utils.buildAppUrl
+                        ? Utils.buildAppUrl(this.config.apiUrl.exportPdf)
+                        : (Utils.resolveUrl ? Utils.resolveUrl(this.config.apiUrl.exportPdf) : this.config.apiUrl.exportPdf);
+                    const current = new URLSearchParams(window.location.search);
+                    const params = new URLSearchParams();
+                    ['start_date', 'end_date', 'status'].forEach((k) => {
+                        const v = current.get(k);
+                        if (v) params.append(k, v);
+                    });
+                    const qs = params.toString();
+                    if (qs) exportUrl += (exportUrl.includes('?') ? '&' : '?') + qs;
+                    if (Utils.openDownload && !Utils.openDownload(exportUrl)) {
+                        this.showError?.(this.t?.('Export failed. Please try again.') || 'Export failed. Please try again.');
+                        return;
+                    }
+                    if (!Utils.openDownload) {
+                        window.open(exportUrl, '_blank', 'noopener,noreferrer');
+                    }
                 });
             }
 
@@ -1837,6 +1909,66 @@
                     }
                 }
             });
+        },
+
+        /**
+         * B-2: persist the dismissed-hint set via user settings.
+         *
+         * The server persists the WHOLE set (replace semantics), so this must
+         * send the complete intended state — not just page-local hints. Base
+         * is the server-rendered set in #azc-dismissed-hints-data (covers
+         * hints that live on other pages); page-local hints then reflect the
+         * live DOM state on top of it. Unknown/stale hint ids stay untouched.
+         *
+         * @returns {Promise<boolean>} resolves false when the write failed
+         */
+        persistDismissedHints: function(changedId, nowDismissed) {
+            const dismissed = new Set();
+            const tag = document.getElementById('azc-dismissed-hints-data');
+            if (tag) {
+                try {
+                    const stored = JSON.parse(tag.textContent || '[]');
+                    if (Array.isArray(stored)) {
+                        stored.forEach((id) => {
+                            if (typeof id === 'string' && id !== '') {
+                                dismissed.add(id);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    // Malformed tag — fall back to DOM-only rebuild below.
+                }
+            }
+            document.querySelectorAll('.azc-hint').forEach((wrap) => {
+                const body = wrap.querySelector('.azc-hint__body');
+                const id = wrap.getAttribute('data-hint');
+                if (!id || !body) {
+                    return;
+                }
+                if (body.hidden) {
+                    dismissed.add(id);
+                } else {
+                    dismissed.delete(id);
+                }
+            });
+            // DOM already reflects the new state (applyState ran first), so
+            // `dismissed` is authoritative — no need to patch for changedId.
+            void changedId; void nowDismissed;
+            const apiUrl = this.resolveRequestUrl(
+                (this.config && this.config.apiUrl && this.config.apiUrl.updateSettings)
+                    || '/apps/arbeitszeitcheck/settings'
+            );
+            const token = this.getRequestToken();
+            return fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'requesttoken': token
+                },
+                body: JSON.stringify({ dismissed_hints: [...dismissed] })
+            })
+            .then((r) => r.json().then((j) => !!(r.ok && j && j.success)).catch(() => false))
+            .catch(() => false);
         },
 
         /**

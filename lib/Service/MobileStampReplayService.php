@@ -138,6 +138,7 @@ class MobileStampReplayService
 		$payload = [
 			'success' => true,
 			'timeEntry' => $summary,
+			'break_warning' => $this->breakWarning($timeEntry),
 		];
 
 		if ($clientRequestId !== null) {
@@ -183,6 +184,23 @@ class MobileStampReplayService
 			}
 		}
 		return $this->readCompletedPayload($userId, $clientRequestId);
+	}
+
+	/**
+	 * Organisational break-policy warning for the stored payload. Warnings are
+	 * persisted into the idempotency row so replays stay byte-identical.
+	 */
+	private function breakWarning(TimeEntry $timeEntry): ?array
+	{
+		try {
+			if ($timeEntry->getStatus() !== TimeEntry::STATUS_COMPLETED) {
+				return null;
+			}
+			$compliance = \OCP\Server::get(ComplianceService::class);
+			return $compliance->breakWarningForEntry($timeEntry);
+		} catch (\Throwable) {
+			return null;
+		}
 	}
 
 	/**

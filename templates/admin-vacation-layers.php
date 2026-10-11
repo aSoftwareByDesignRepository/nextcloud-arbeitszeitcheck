@@ -125,7 +125,7 @@ echo json_encode([
 				</div>
 				<details class="layer-card__history">
 					<summary><?php p($l->t('Show full history')); ?></summary>
-					<div class="table-container layer-card__history-scroll" role="region" aria-label="<?php p($l->t('Organisation default history')); ?>">
+					<div class="table-container layer-card__history-scroll" tabindex="0" role="region" aria-label="<?php p($l->t('Organisation default history')); ?>">
 						<table class="table table--hover azc-table--responsive layer-card__history-table">
 							<thead>
 								<tr>
@@ -167,7 +167,7 @@ echo json_encode([
 				</div>
 			</header>
 			<div class="azc-card__body">
-				<div class="table-container layer-card__history-scroll" role="region" aria-label="<?php p($l->t('Working time model defaults')); ?>">
+				<div class="table-container layer-card__history-scroll" tabindex="0" role="region" aria-label="<?php p($l->t('Working time model defaults')); ?>">
 					<table class="table table--hover azc-table--responsive layer-card__history-table">
 						<thead>
 							<tr>
@@ -209,7 +209,7 @@ echo json_encode([
 				</div>
 			</header>
 			<div class="azc-card__body">
-				<div class="table-container layer-card__history-scroll" role="region" aria-label="<?php p($l->t('Team vacation policies')); ?>">
+				<div class="table-container layer-card__history-scroll" tabindex="0" role="region" aria-label="<?php p($l->t('Team vacation policies')); ?>">
 					<table class="table table--hover azc-table--responsive layer-card__history-table">
 						<thead>
 							<tr>

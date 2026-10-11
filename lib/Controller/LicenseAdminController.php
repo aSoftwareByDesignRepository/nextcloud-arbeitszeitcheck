@@ -131,6 +131,8 @@ class LicenseAdminController extends Controller
 					'seatsAssigned' => TemplateL10n::translate($this->l10n, 'Assigned %1$d, skipped %2$d, failed %3$d.'),
 					'assignSelected' => TemplateL10n::translate($this->l10n, 'Assign selected (%n)'),
 					'confirmAssignSeats' => TemplateL10n::translate($this->l10n, 'Assign mobile seats to %1$d people? %2$d seats remaining.'),
+					'assignSeatsTitle' => TemplateL10n::translate($this->l10n, 'Assign mobile seats?'),
+					'assignSeatsConfirm' => TemplateL10n::translate($this->l10n, 'Assign seats'),
 					'confirmAssignSeatsOver' => TemplateL10n::translate($this->l10n, 'You selected %1$d people but only %2$d seats remain. Only free seats will be assigned.'),
 					'selectPeopleFirst' => TemplateL10n::translate($this->l10n, 'Select at least one person.'),
 					'seatRemoved' => TemplateL10n::translate($this->l10n, 'Seat removed.'),

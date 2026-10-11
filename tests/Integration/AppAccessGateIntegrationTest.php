@@ -214,6 +214,16 @@ final class AppAccessGateIntegrationTest extends TestCase
 	{
 		/** @var IConfig $config */
 		$config = \OC::$server->get(IConfig::class);
+		// Delete first: the runtime write path uses IAppConfig::setAppValueString
+		// (string type), while legacy IConfig::setAppValue stores mixed — a stale
+		// row of the other type throws AppConfigTypeConflictException.
+		foreach ([
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS,
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS,
+		] as $key) {
+			$config->deleteAppValue(Application::APP_ID, $key);
+		}
 		$config->setAppValue(
 			Application::APP_ID,
 			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,

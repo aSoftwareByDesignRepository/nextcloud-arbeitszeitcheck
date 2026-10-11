@@ -1097,7 +1097,7 @@
 
                 const form = document.getElementById(formId);
                 if (form) {
-                    form.addEventListener('submit', function(e) {
+                    form.addEventListener('submit', async function(e) {
                         e.preventDefault();
                         syncSelectionFromDom();
                         const userIds = Array.from(selected.keys());
@@ -1108,7 +1108,15 @@
                         const confirmMsg = t('Add %1$d people to team “%2$s”?', 'Add %1$d people to this team?')
                             .replace('%1$d', String(userIds.length))
                             .replace('%2$s', teamName || '');
-                        if (!window.confirm(confirmMsg)) {
+                        // Accessible confirm — never window.confirm; helper fails closed (§7.3).
+                        const confirmResult = await Utils.confirmDestructiveAction({
+                            title: t('Add people to team', 'Add people to team'),
+                            message: confirmMsg,
+                            confirmLabel: t('Add to team', 'Add to team'),
+                            cancelLabel: t('Cancel', 'Cancel'),
+                            variant: 'info',
+                        });
+                        if (confirmResult === null || confirmResult.confirmed !== true) {
                             return;
                         }
                         Utils.ajax(batchUrl, {

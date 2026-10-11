@@ -64,6 +64,9 @@ class AdminControllerTest extends TestCase
 	/** @var AdminController */
 	private $controller;
 
+	/** @var array<string,string>|null live view into wireAppConfigStore()'s store (read by the test resolver's IConfig mock) */
+	private ?array $appConfigStoreRef = null;
+
 	/** @var TimeEntryMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeEntryMapper;
 
@@ -294,6 +297,86 @@ class AdminControllerTest extends TestCase
 			$db,
 			null,
 			$config,
+			null,
+			null,
+			null,
+			null,
+			$this->buildTestBreakPolicyResolver($l10n),
+			$this->buildTestBreakPolicyStore(),
+		);
+	}
+
+	/**
+	 * Read-only view of the wired app-config store so the test
+	 * BreakPolicyStore double sees the same committed state a locked DB
+	 * read would.
+	 */
+	public function appConfigStoreSnapshot(): array
+	{
+		return $this->appConfigStoreRef ?? [];
+	}
+
+	/**
+	 * Test double for the policy persistence seam: lockAndRead() reads the
+	 * wired array store (i.e. the freshest committed state, like a real
+	 * SELECT ... FOR UPDATE), writes go through the appConfig mock.
+	 */
+	private function buildTestBreakPolicyStore(): \OCA\ArbeitszeitCheck\Support\BreakPolicyStore
+	{
+		$db = $this->createMock(IDBConnection::class);
+		return new class($this->appConfig, $db, $this) extends \OCA\ArbeitszeitCheck\Support\BreakPolicyStore {
+			public function __construct(
+				\OCP\AppFramework\Services\IAppConfig $appConfig,
+				\OCP\IDBConnection $db,
+				private AdminControllerTest $testCase,
+			) {
+				parent::__construct($appConfig, $db);
+			}
+
+			public function ensureRowsExist(): void
+			{
+				// The array store has no row concept — nothing to seed.
+			}
+
+			protected function readLocked(string $key): ?string
+			{
+				$store = $this->testCase->appConfigStoreSnapshot();
+				return array_key_exists($key, $store) ? (string)$store[$key] : null;
+			}
+		};
+	}
+
+	/**
+	 * Deterministic resolver for unit tests: reads break_policy_json from the
+	 * same key/value store wireAppConfigStore() exposes, never the live DB
+	 * (lazy Server::get would leak container state between tests).
+	 */
+	private function buildTestBreakPolicyResolver(\OCP\IL10N $l10n): \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver
+	{
+		$resolverConfig = $this->createMock(\OCP\IConfig::class);
+		$resolverConfig->method('getAppValue')->willReturnCallback(
+			function (string $app, string $key, $default = '') {
+				return $this->appConfigStoreRef[$key]
+					?? ($key === 'country' ? 'DE' : $default);
+			}
+		);
+		$userSettingsMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class);
+		$userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
+
+		return new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+			$resolverConfig,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($resolverConfig, $userSettingsMapper),
+			$userSettingsMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->timeEntryMapper,
+			new \OCA\ArbeitszeitCheck\Service\TimeZoneService(
+				$resolverConfig,
+				$this->createMock(\OCP\IDateTimeZone::class),
+				$this->createMock(\OCP\IUserSession::class),
+				new \Psr\Log\NullLogger(),
+			),
+			$l10n,
 		);
 	}
 
@@ -3367,6 +3450,7 @@ class AdminControllerTest extends TestCase
 	private function &wireAppConfigStore(array $initial = []): array
 	{
 		$store = $initial;
+		$this->appConfigStoreRef = &$store;
 		$this->appConfig->method('setAppValueString')
 			->willReturnCallback(function ($key, $value, $lazy = false, $sensitive = false) use (&$store): bool {
 				unset($lazy, $sensitive);
@@ -4013,5 +4097,171 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->settingsSection('projectcheck');
 		$this->assertInstanceOf(TemplateResponse::class, $response);
 		$this->assertSame('', $response->getParams()['projectCheckAppsUrl']);
+	}
+
+	// ------------------------------------------------------------------
+	// Central break policy (DISUS) — save contract
+	// ------------------------------------------------------------------
+
+	public function testBreakPolicySavePersistsJsonVersionAndAudit(): void
+	{
+		$store = &$this->wireAppConfigStore();
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'compliance',
+			'breakPolicyEnforced' => '1',
+			'breakPolicyTiers' => json_encode([['afterHours' => 6, 'breakMinutes' => 45]]),
+		]);
+		$this->auditLogMapper->expects($this->once())
+			->method('logAction')
+			->with('system', 'break_policy_updated', \OCA\ArbeitszeitCheck\Constants::AUDIT_ENTITY_BREAK_POLICY);
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+
+		$json = json_decode($store[\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON] ?? '', true);
+		$this->assertIsArray($json);
+		$this->assertTrue($json['enforced']);
+		$this->assertSame(45, $json['tiers'][0]['breakMinutes']);
+		$this->assertSame('1', $store[\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_VERSION] ?? null);
+		$this->assertArrayHasKey('breakPolicy', $data['settings']);
+	}
+
+	public function testBreakPolicyShadowedRulesRequireConfirm(): void
+	{
+		$store = &$this->wireAppConfigStore();
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'compliance',
+			'breakPolicyEnforced' => '1',
+			// 6h→30 == DE statutory tier — fully shadowed policy.
+			'breakPolicyTiers' => json_encode([['afterHours' => 6, 'breakMinutes' => 30]]),
+		]);
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('CONFIRM_REQUIRED', $data['code']);
+		$this->assertArrayNotHasKey(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON, $store);
+	}
+
+	public function testBreakPolicyShadowedRulesSaveAfterConfirm(): void
+	{
+		$store = &$this->wireAppConfigStore();
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'compliance',
+			'breakPolicyEnforced' => '1',
+			'breakPolicyTiers' => json_encode([['afterHours' => 6, 'breakMinutes' => 30]]),
+			'breakPolicyConfirm' => '1',
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertArrayHasKey(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON, $store);
+	}
+
+	public function testBreakPolicyValidationErrorReturnsFieldMap(): void
+	{
+		$store = &$this->wireAppConfigStore();
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'compliance',
+			'breakPolicyTiers' => '{not-json',
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('VALIDATION', $data['code']);
+		$this->assertSame('VALIDATION_SHAPE', $data['fields']['breakPolicyTiers']);
+		$this->assertArrayNotHasKey(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON, $store);
+	}
+
+	public function testBreakPolicyFieldsIgnoredOutsideComplianceScope(): void
+	{
+		$store = &$this->wireAppConfigStore();
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'access',
+			'breakPolicyEnforced' => '1',
+		]);
+
+		$this->controller->updateAdminSettings();
+		$this->assertArrayNotHasKey(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON, $store);
+	}
+
+	/**
+	 * GET must expose the same policy state POST echoes and the page render
+	 * embeds — otherwise API consumers can write but never read the doc.
+	 */
+	public function testGetAdminSettingsExposesBreakPolicyPayload(): void
+	{
+		$this->wireAppConfigStore([
+			\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON => json_encode([
+				'enforced' => true,
+				'tiers' => [['afterHours' => 6, 'breakMinutes' => 45]],
+			]),
+		]);
+
+		$data = $this->controller->getAdminSettings()->getData();
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('breakPolicy', $data['settings'], 'GET must echo the policy doc the POST contract accepts');
+		$this->assertTrue($data['settings']['breakPolicy']['policy']['enforced']);
+		$this->assertSame(45, $data['settings']['breakPolicy']['policy']['tiers'][0]['breakMinutes']);
+	}
+
+	/**
+	 * Two concurrent admin saves must not silently drop each other's fields.
+	 *
+	 * Interleaving: request B snapshots the org doc (orgConfig() is cached
+	 * per request), request A commits a full save, then B merges over its
+	 * stale snapshot and writes. Without a locked merge base, A's tiers are
+	 * reverted to the pre-A state and the "monotonic" version counter can
+	 * repeat.
+	 */
+	public function testBreakPolicyConcurrentSavesDoNotLoseFields(): void
+	{
+		$store = &$this->wireAppConfigStore();
+
+		// Request B "starts": its resolver snapshots the (still empty) doc,
+		// mimicking the per-request orgConfig()/appConfig caches that hold a
+		// stale copy for the rest of B's request lifecycle.
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
+		$resolverB = $this->buildTestBreakPolicyResolver($l10n);
+		$resolverB->orgConfig();
+
+		$queue = [
+			[ // request A: sets tiers only
+				'settings_section' => 'compliance',
+				'breakPolicyTiers' => json_encode([['afterHours' => 6, 'breakMinutes' => 45]]),
+			],
+			[ // request B: sets windows only
+				'settings_section' => 'compliance',
+				'breakPolicyWindows' => json_encode([['start' => '12:00', 'end' => '12:45', 'mode' => 'placement']]),
+			],
+		];
+		$call = 0;
+		$this->request->method('getParams')->willReturnCallback(
+			function () use (&$call, $queue) {
+				return $queue[$call++];
+			}
+		);
+
+		$respA = $this->controller->updateAdminSettings();
+		$this->assertTrue($respA->getData()['success'], 'A save failed: ' . json_encode($respA->getData()));
+
+		// B's request reaches its write phase with the stale cached base.
+		$rp = new \ReflectionProperty($this->controller, 'breakPolicyResolver');
+		$rp->setValue($this->controller, $resolverB);
+		$respB = $this->controller->updateAdminSettings();
+		$this->assertTrue($respB->getData()['success'], 'B save failed: ' . json_encode($respB->getData()));
+
+		$final = json_decode((string)($store[\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON] ?? ''), true);
+		$this->assertIsArray($final);
+		$this->assertNotEmpty($final['tiers'], 'Lost update: concurrent save reverted request A\'s tiers');
+		$this->assertNotEmpty($final['windows'], 'Request B\'s windows never persisted');
+		$this->assertSame('2', $store[\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_VERSION] ?? null,
+			'Two committed saves must produce version 2 — a repeated version breaks audit diffs');
 	}
 }

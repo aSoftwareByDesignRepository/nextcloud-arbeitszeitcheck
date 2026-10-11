@@ -456,6 +456,8 @@ class PageController extends Controller
 					'vacation_year_error' => $vacationStats['vacation_year_error'] ?? null,
 					'vacation_unit' => (string)($vacationStats['vacation_unit'] ?? 'days'),
 					'vacation_hours_per_day' => (float)($vacationStats['vacation_hours_per_day'] ?? Constants::DEFAULT_VACATION_HOURS_PER_DAY),
+					// B-5: sick days shown separately — never merged into vacation.
+					'sick_days_this_year' => (float)($vacationStats['sick_days'] ?? 0),
 				],
 			];
 
@@ -623,6 +625,7 @@ class PageController extends Controller
 				'complianceStrictMode' => $complianceStrictMode,
 				'monthClosureEnabled' => $this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_MONTH_CLOSURE_ENABLED, '0') === '1',
 				'timeCapture' => $this->timeCaptureMethodService->getSettings($userId),
+				'dismissedHints' => $this->dismissedHintIds($userId),
 			];
 
 			$response = new TemplateResponse('arbeitszeitcheck', 'time-entries', $params);
@@ -1088,6 +1091,7 @@ class PageController extends Controller
 				],
 				'projectCheckAvailable' => $this->projectCheckIntegration->isProjectCheckAvailable(),
 				'complianceProfile' => $this->buildComplianceProfileForSettings(),
+				'dismissedHints' => $this->dismissedHintIds($userId),
 			];
 
 			$response = new TemplateResponse('arbeitszeitcheck', 'settings', $params);
@@ -1135,6 +1139,25 @@ class PageController extends Controller
 	 *   footerBlurb: string
 	 * }
 	 */
+	/**
+	 * B-2: dismissed hint ids for the current user (server-rendered, no layout jump).
+	 *
+	 * @return string[]
+	 */
+	private function dismissedHintIds(string $userId): array
+	{
+		try {
+			$setting = $this->userSettingsMapper->getSetting($userId, 'dismissed_hints');
+			$raw = $setting !== null ? json_decode((string)$setting->getSettingValue(), true) : null;
+			if (!is_array($raw)) {
+				return [];
+			}
+			return array_values(array_filter($raw, static fn ($v) => is_string($v) && $v !== ''));
+		} catch (\Throwable) {
+			return [];
+		}
+	}
+
 	private function buildComplianceProfileForSettings(): array
 	{
 		$user = $this->userSession->getUser();
@@ -1162,6 +1185,7 @@ class PageController extends Controller
 				]
 			);
 		}
+		$breakPolicyBlock = $this->buildBreakPolicyBlockForSettings($userId);
 
 		if ($profile->country === \OCA\ArbeitszeitCheck\Support\RegionRegistry::COUNTRY_AT) {
 			return [
@@ -1171,6 +1195,7 @@ class PageController extends Controller
 				'maxDailyHours' => $maxDaily,
 				'minRestHours' => $minRest,
 				'breakLines' => $breakLines,
+				'breakPolicy' => $breakPolicyBlock,
 				'sundayNote' => $this->l10n->t('Sunday and public-holiday work is generally restricted (ARG §3) with exceptions.'),
 				'footerBlurb' => $this->l10n->t('Working time tracking oriented on Austrian labour law (AZG/ARG) for Nextcloud'),
 			];
@@ -1184,6 +1209,7 @@ class PageController extends Controller
 				'maxDailyHours' => $maxDaily,
 				'minRestHours' => $minRest,
 				'breakLines' => $breakLines,
+				'breakPolicy' => $breakPolicyBlock,
 				'sundayNote' => $this->l10n->t('Sunday and public-holiday work is generally restricted (ArG Art. 18) with exceptions.'),
 				'footerBlurb' => $this->l10n->t('Working time tracking oriented on Swiss labour law (ArG) for Nextcloud'),
 			];
@@ -1196,9 +1222,81 @@ class PageController extends Controller
 			'maxDailyHours' => $maxDaily,
 			'minRestHours' => $minRest,
 			'breakLines' => $breakLines,
+			'breakPolicy' => $breakPolicyBlock,
 			'sundayNote' => $this->l10n->t('Sunday work is generally prohibited with exceptions'),
 			'footerBlurb' => $this->l10n->t('German labor law compliant time tracking for Nextcloud'),
 		];
+	}
+
+	/**
+	 * Effective break-policy view for the employee settings page: merged
+	 * law/org/model tiers, windows and presence rules with source labels.
+	 * Fails open to a non-enforced empty block.
+	 *
+	 * @return array{
+	 *   enforced: bool,
+	 *   ruleLines: list<string>,
+	 *   windowLines: list<string>,
+	 *   presenceLines: list<string>
+	 * }
+	 */
+	private function buildBreakPolicyBlockForSettings(?string $userId): array
+	{
+		$empty = ['enforced' => false, 'ruleLines' => [], 'windowLines' => [], 'presenceLines' => []];
+		try {
+			$resolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+		} catch (\Throwable) {
+			return $empty;
+		}
+
+		try {
+			$ruleLines = [];
+			foreach ($resolver->effectiveTiers($userId) as $tier) {
+				$sourceLabel = match ($tier['source']) {
+					\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_ORG => $this->l10n->t('organisation rule'),
+					\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_MODEL => $this->l10n->t('working time model'),
+					default => null,
+				};
+				$line = $this->l10n->t(
+					'From %1$s hours of work: at least %2$d minutes break',
+					[
+						LaborLawProfile::formatHoursLabel((float)$tier['afterHours']),
+						(int)$tier['breakMinutes'],
+					]
+				);
+				$ruleLines[] = $sourceLabel !== null ? $line . ' (' . $sourceLabel . ')' : $line;
+			}
+
+			$windowLines = [];
+			foreach ($resolver->windows() as $window) {
+				$windowLines[] = $window['mode'] === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::MODE_REQUIRED
+					? $this->l10n->t('Break must overlap %1$s–%2$s', [$window['start'], $window['end']])
+					: $this->l10n->t('Automatic breaks are placed in %1$s–%2$s', [$window['start'], $window['end']]);
+			}
+
+			$weekdayNames = [
+				1 => $this->l10n->t('Monday'), 2 => $this->l10n->t('Tuesday'),
+				3 => $this->l10n->t('Wednesday'), 4 => $this->l10n->t('Thursday'),
+				5 => $this->l10n->t('Friday'), 6 => $this->l10n->t('Saturday'),
+				7 => $this->l10n->t('Sunday'),
+			];
+			$presenceLines = [];
+			foreach ($resolver->modelRulesForUser($userId)['presence_windows'] as $w) {
+				$presenceLines[] = $this->l10n->t(
+					'%1$s %2$s–%3$s (working time model)',
+					[$weekdayNames[$w['weekday']] ?? (string)$w['weekday'], $w['start'], $w['end']]
+				);
+			}
+
+			return [
+				'enforced' => $resolver->isEnforced(),
+				'ruleLines' => $ruleLines,
+				'windowLines' => $windowLines,
+				'presenceLines' => $presenceLines,
+			];
+		} catch (\Throwable) {
+			return $empty;
+		}
 	}
 
 	/**

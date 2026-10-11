@@ -107,6 +107,13 @@ require __DIR__ . '/common/user-display-timezone.php';
                     title="<?php p($l->t('Downloads the last 30 days as CSV (long layout): each row shows start and end times; overnight shifts appear as two rows when your administrator enables midnight split. Use Reports for date range and optional wide layout.')); ?>">
                     <?php p($l->t('Download CSV')); ?>
                 </button>
+                <button id="btn-export-pdf"
+                    class="azc-btn azc-btn--secondary"
+                    type="button"
+                    aria-label="<?php p($l->t('Download your time entries as a PDF file')); ?>"
+                    title="<?php p($l->t('Downloads the currently filtered list as a PDF. Without a filter, the last 30 days are exported.')); ?>">
+                    <?php p($l->t('Download PDF')); ?>
+                </button>
             </div>
             <?php if ($mode === 'list' && !$manualTimeEntryEnabled): ?>
             <div class="azc-callout azc-callout--info time-entries-page__capture-disabled" role="status">
@@ -117,12 +124,37 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </div>
             <?php endif; ?>
-            <p class="azc-callout azc-callout--neutral time-entries-page__export-hint" id="time-entries-export-hint">
-                <span class="azc-callout__text">
-                    <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
-                    <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
-                </span>
-            </p>
+            <?php
+            // B-2: server-rendered dismissible hint — no layout jump on load.
+            $azcDismissedHints = is_array($_['dismissedHints'] ?? null) ? $_['dismissedHints'] : [];
+            $azcExportHintDismissed = in_array('time-entries-export-hint', $azcDismissedHints, true);
+            ?>
+            <?php /* Full dismissed set for the JS merge — hints not rendered on this page must survive a save. */ ?>
+            <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
+            <div class="azc-hint" data-hint="time-entries-export-hint">
+                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
+                    <span class="azc-callout__text">
+                        <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
+                        <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
+                    </span>
+                    <button type="button"
+                        class="azc-hint__dismiss"
+                        data-hint-dismiss="time-entries-export-hint"
+                        aria-expanded="true"
+                        aria-controls="time-entries-export-hint"
+                        title="<?php p($l->t('Hide this help text permanently')); ?>">
+                        <?php p($l->t('Hide')); ?>
+                    </button>
+                </p>
+                <button type="button"
+                    class="azc-hint__show azc-btn azc-btn--tertiary azc-btn--small"
+                    data-hint-show="time-entries-export-hint"
+                    aria-expanded="false"
+                    aria-controls="time-entries-export-hint"
+                    <?php echo $azcExportHintDismissed ? '' : 'hidden'; ?>>
+                    <?php p($l->t('Show hint')); ?>
+                </button>
+            </div>
         <?php endif; ?>
 
             <?php if ($mode === 'list' && !empty($stats)): ?>
@@ -807,6 +839,20 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                         </fieldset>
                         <?php endif; ?>
+
+                        <div id="entry-break-warning" class="azc-callout azc-callout--warning time-entry-form__break-warning" role="alert" hidden>
+                            <div class="azc-callout__body">
+                                <p id="entry-break-warning-text" class="azc-callout__text"></p>
+                                <div class="azc-break-warning__actions">
+                                    <a id="entry-break-warning-edit" class="azc-btn azc-btn--secondary azc-btn--small" href="#">
+                                        <?php p($l->t('Add the missing break to the entry')); ?>
+                                    </a>
+                                    <a id="entry-break-warning-done" class="azc-btn azc-btn--secondary azc-btn--small" href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>">
+                                        <?php p($l->t('Continue to overview')); ?>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="form-actions time-entry-form__actions" role="group" aria-label="<?php p($l->t('Form actions')); ?>">
                             <button type="submit"

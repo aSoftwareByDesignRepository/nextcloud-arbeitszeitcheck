@@ -11,6 +11,11 @@ declare(strict_types=1);
 
 $complianceProfile = is_array($complianceProfile ?? null) ? $complianceProfile : [];
 $showChrome = !empty($azcSettingsShowCardChrome);
+$breakPolicy = is_array($complianceProfile['breakPolicy'] ?? null) ? $complianceProfile['breakPolicy'] : [];
+$breakPolicyEnforced = !empty($breakPolicy['enforced']);
+$breakPolicyRuleLines = is_array($breakPolicy['ruleLines'] ?? null) ? $breakPolicy['ruleLines'] : [];
+$breakPolicyWindowLines = is_array($breakPolicy['windowLines'] ?? null) ? $breakPolicy['windowLines'] : [];
+$breakPolicyPresenceLines = is_array($breakPolicy['presenceLines'] ?? null) ? $breakPolicy['presenceLines'] : [];
 ?>
 <section class="settings-section azc-card" aria-labelledby="settings-sections-heading">
 	<header class="azc-card__header<?php echo $showChrome ? '' : ' azc-card__header--page-title-only'; ?>">
@@ -31,11 +36,18 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 						id="auto-break-calculation"
 						name="auto_break_calculation"
 						checked
-						aria-describedby="auto-break-calculation-help">
+						<?php echo $breakPolicyEnforced ? 'disabled' : ''; ?>
+						aria-describedby="auto-break-calculation-help<?php echo $breakPolicyEnforced ? ' auto-break-calculation-enforced' : ''; ?>">
 					<label for="auto-break-calculation" class="form-label">
 						<?php p($l->t('Calculate breaks automatically')); ?>
 					</label>
 				</div>
+				<?php if ($breakPolicyEnforced): ?>
+				<p id="auto-break-calculation-enforced" class="settings-form__help">
+					<strong><?php p($l->t('Managed by your organisation.')); ?></strong>
+					<?php p($l->t('Automatic break calculation is always on because your organisation applies central break rules.')); ?>
+				</p>
+				<?php endif; ?>
 				<p id="auto-break-calculation-help" class="settings-form__help">
 					<?php
 					$azcAutoBreakHelp = match ($complianceProfile['country'] ?? 'DE') {
@@ -47,6 +59,35 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 					?>
 				</p>
 			</div>
+			<?php if ($breakPolicyEnforced || $breakPolicyRuleLines !== [] || $breakPolicyWindowLines !== [] || $breakPolicyPresenceLines !== []): ?>
+			<div class="azc-callout azc-callout--info azc-break-policy-summary" role="note" aria-labelledby="break-policy-rules-heading">
+				<h3 id="break-policy-rules-heading" class="azc-callout__title"><?php p($l->t('Break rules that apply to you')); ?></h3>
+				<div class="azc-callout__body">
+					<?php if ($breakPolicyRuleLines !== []): ?>
+					<ul class="azc-break-policy-summary__list">
+						<?php foreach ($breakPolicyRuleLines as $line): ?>
+						<li class="azc-callout__text"><?php p($line); ?></li>
+						<?php endforeach; ?>
+					</ul>
+					<?php endif; ?>
+					<?php if ($breakPolicyWindowLines !== []): ?>
+					<ul class="azc-break-policy-summary__list">
+						<?php foreach ($breakPolicyWindowLines as $line): ?>
+						<li class="azc-callout__text"><?php p($line); ?></li>
+						<?php endforeach; ?>
+					</ul>
+					<?php endif; ?>
+					<?php if ($breakPolicyPresenceLines !== []): ?>
+					<p class="azc-callout__text"><strong><?php p($l->t('Binding presence times:')); ?></strong></p>
+					<ul class="azc-break-policy-summary__list">
+						<?php foreach ($breakPolicyPresenceLines as $line): ?>
+						<li class="azc-callout__text"><?php p($line); ?></li>
+						<?php endforeach; ?>
+					</ul>
+					<?php endif; ?>
+				</div>
+			</div>
+			<?php endif; ?>
 			<div class="settings-form__group">
 				<label for="hours-display" class="form-label"><?php p($l->t('Hours display')); ?></label>
 				<select id="hours-display"

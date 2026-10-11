@@ -311,6 +311,32 @@
 		}
 	}
 
+	/**
+	 * Human-readable break-policy warning for the correction dialog —
+	 * the save succeeded; the notice explains what is still missing.
+	 */
+	function formatBreakWarning(warning) {
+		const parts = [];
+		if (warning && warning.window && warning.window.start && warning.window.end) {
+			const w = warning.window;
+			const missing = Math.max(0, (w.required_minutes || 0) - (w.covered_minutes || 0));
+			parts.push(
+				(window.t ? window.t('arbeitszeitcheck', 'The required break window {s}–{e} is missing {m} min.', {s: w.start, e: w.end, m: missing}) : null)
+				|| `The required break window ${w.start}–${w.end} is missing ${missing} min.`
+			);
+		}
+		if (warning && typeof warning.required === 'number' && typeof warning.actual === 'number' && warning.required > warning.actual) {
+			parts.push(
+				(window.t ? window.t('arbeitszeitcheck', 'Required break: {r} min — recorded: {a} min.', {r: warning.required, a: warning.actual}) : null)
+				|| `Required break: ${warning.required} min — recorded: ${warning.actual} min.`
+			);
+		}
+		if (parts.length === 0) {
+			parts.push(t('correctionBreakWarning', 'The saved times do not fully meet the break rules.'));
+		}
+		return parts.join(' ');
+	}
+
 	function parseEntrySummary(btn) {
 		const raw = btn.getAttribute('data-entry-summary');
 		const parsed = Utils.parseAttributeJson ? Utils.parseAttributeJson(raw) : null;
@@ -840,6 +866,23 @@
 				data: body,
 				onSuccess: (data) => {
 					if (data.success) {
+						if (data.break_warning) {
+							// Saved with a policy warning: keep the dialog open,
+							// announce inline (role=status), reload on close so the
+							// list reflects the new state. Never a dead end.
+							correctionReloadOnClose = true;
+							setStatus(statusEl, t('correctionSubmitSuccess') + ' ' + formatBreakWarning(data.break_warning), false);
+							Messaging.showSuccess(t('correctionSubmitSuccess'));
+							if (btnSubmit) {
+								btnSubmit.disabled = true;
+								btnSubmit.removeAttribute('aria-busy');
+							}
+							if (btnCancel) {
+								btnCancel.textContent = t('correctionClose', 'Close');
+								btnCancel.focus();
+							}
+							return;
+						}
 						Components.closeModal(modal);
 						resetWizardState(modal);
 						Messaging.showSuccess(t('correctionSubmitSuccess'));
@@ -871,6 +914,8 @@
 		}
 	}
 
+	let correctionReloadOnClose = false;
+
 	function init() {
 		cacheCorrectionTemplate();
 
@@ -880,6 +925,10 @@
 			}
 			wizardBound = false;
 			wizardState = null;
+			if (correctionReloadOnClose) {
+				correctionReloadOnClose = false;
+				window.location.reload();
+			}
 		});
 
 		document.querySelectorAll('.btn-request-correction').forEach((btn) => {

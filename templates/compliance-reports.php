@@ -52,7 +52,7 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
                         <h3><?php p($l->t('Problems by Type')); ?></h3>
                         <p><?php p($l->t('See what kinds of working time problems occurred')); ?></p>
                     </div>
-                    <div class="table-container" role="region" aria-label="<?php p($l->t('Problems by Type')); ?>">
+                    <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Problems by Type')); ?>">
                         <table class="table table--hover azc-table--responsive" role="table" aria-label="<?php p($l->t('Problems by Type')); ?>">
                             <thead>
                                 <tr>
@@ -73,6 +73,7 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
                                         'night_work' => $l->t('Night work'),
                                         'sunday_work' => $l->t('Sunday work'),
                                         'holiday_work' => $l->t('Holiday work'),
+                                        'missing_presence' => $l->t('Required presence not covered'),
                                         default => $typeKey,
                                     };
                                     ?>
@@ -94,7 +95,7 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
                         <h3><?php p($l->t('Problems by How Serious')); ?></h3>
                         <p><?php p($l->t('See how serious the problems were')); ?></p>
                     </div>
-                    <div class="table-container" role="region" aria-label="<?php p($l->t('Problems by How Serious')); ?>">
+                    <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Problems by How Serious')); ?>">
                         <table class="table table--hover azc-table--responsive" role="table" aria-label="<?php p($l->t('Problems by How Serious')); ?>">
                             <thead>
                                 <tr>

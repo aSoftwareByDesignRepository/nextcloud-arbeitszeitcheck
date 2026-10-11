@@ -55,6 +55,11 @@ class ComplianceViolation extends Entity
 	public const TYPE_NIGHT_WORK = 'night_work';
 	public const TYPE_SUNDAY_WORK = 'sunday_work';
 	public const TYPE_HOLIDAY_WORK = 'holiday_work';
+	/**
+	 * Mandatory presence window (working-time-model `break_rules.presence_windows`)
+	 * not covered by work ∪ approved absence. Warning-only — never a save blocker.
+	 */
+	public const TYPE_MISSING_PRESENCE = 'missing_presence';
 
 	/** @var string */
 	protected $userId;
@@ -127,7 +132,8 @@ class ComplianceViolation extends Entity
 			self::TYPE_EXCESSIVE_WORKING_HOURS,
 			self::TYPE_NIGHT_WORK,
 			self::TYPE_SUNDAY_WORK,
-			self::TYPE_HOLIDAY_WORK
+			self::TYPE_HOLIDAY_WORK,
+			self::TYPE_MISSING_PRESENCE,
 		];
 		if (!in_array($this->violationType, $validTypes)) {
 			$errors['violationType'] = 'Invalid violation type';

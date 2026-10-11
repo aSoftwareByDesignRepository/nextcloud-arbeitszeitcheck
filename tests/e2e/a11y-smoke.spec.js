@@ -3,28 +3,55 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { loginAs, gotoApp } from './helpers/auth.js';
 
+// role: who the page is meant for — the smoke logs in as that user so we
+// scan the real rendered surface, not an access-denied shell.
 const a11yRoutes = [
-	'/apps/arbeitszeitcheck/dashboard',
-	'/apps/arbeitszeitcheck/absences',
-	'/apps/arbeitszeitcheck/absences/create',
-	'/apps/arbeitszeitcheck/settings/breaks',
-	'/apps/arbeitszeitcheck/settings/notifications',
-	'/apps/arbeitszeitcheck/admin/users',
-	'/apps/arbeitszeitcheck/admin/settings/access',
-	'/apps/arbeitszeitcheck/admin/settings/regional',
-	'/apps/arbeitszeitcheck/admin/notifications',
-	'/apps/arbeitszeitcheck/admin/overtime-settings',
-	'/apps/arbeitszeitcheck/admin/vacation-rules',
-	'/apps/arbeitszeitcheck/admin/vacation-layers',
-	'/apps/arbeitszeitcheck/admin/overtime-payouts',
-	'/apps/arbeitszeitcheck/admin/overtime-payout-audit',
+	{ path: '/apps/arbeitszeitcheck/dashboard', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/time-entries', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/time-entries/create', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/absences', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/absences/create', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/reports', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/calendar', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/timeline', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/compliance', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/compliance/violations', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/compliance/reports', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/substitution-requests', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/get-the-app', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/settings', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/settings/breaks', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/settings/notifications', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/manager', role: 'MANAGER' },
+	{ path: '/apps/arbeitszeitcheck/manager/time-entries', role: 'MANAGER' },
+	{ path: '/apps/arbeitszeitcheck/manager/absences', role: 'MANAGER' },
+	{ path: '/apps/arbeitszeitcheck/manager/month-closures', role: 'MANAGER' },
+	{ path: '/apps/arbeitszeitcheck/admin', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/users', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/teams', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/holidays', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/working-time-models', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/tariff-rules', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/audit-log', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/kiosk', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/license', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/support-us', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/notifications', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/overtime-settings', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/vacation-rules', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/vacation-layers', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/overtime-payouts', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/overtime-payout-audit', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/settings', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/settings/access', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/settings/compliance', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/settings/regional', role: 'ADMIN' },
 ];
 
-for (const path of a11yRoutes) {
-	test(`a11y smoke: ${path}`, async ({ page }) => {
-		const needsAdmin = path.includes('/admin/');
-		await loginAs(page, needsAdmin ? 'ADMIN' : 'EMPLOYEE');
-		await gotoApp(page, path);
+for (const route of a11yRoutes) {
+	test(`a11y smoke: ${route.path}`, async ({ page }) => {
+		await loginAs(page, route.role);
+		await gotoApp(page, route.path);
 		await page.waitForSelector('#azc-main-content', { timeout: 30000 });
 		const results = await new AxeBuilder({ page })
 			.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

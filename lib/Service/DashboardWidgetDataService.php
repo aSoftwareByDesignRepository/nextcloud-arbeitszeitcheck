@@ -160,7 +160,10 @@ class DashboardWidgetDataService {
 			// (DE: 'ArbZG §4', AT: 'AZG §11') for widget labels.
 			'lawLabelBreaks'         => $this->timeTrackingService->lawProfile($userId)->lawLabel('breaks'),
 			// Personal setting: server may insert ArbZG §4 breaks when none were recorded.
+			// Reflects the org-enforced floor — true when centrally managed.
 			'autoBreakCalculation'   => $this->timeTrackingService->isAutoBreakCalculationEnabled($userId),
+			// Additive — the org break policy manages breaks; old clients ignore.
+			'breakPolicyEnforced'    => $this->breakPolicyEnforced(),
 			'vacationYear'           => (int)($vacationStats['year'] ?? $vacationYear),
 			'vacationRemaining'      => (float)($vacationStats['remaining'] ?? 0.0),
 			'vacationEntitlement'    => (float)($vacationStats['entitlement'] ?? 0.0),
@@ -239,6 +242,18 @@ class DashboardWidgetDataService {
 	/**
 	 * @return array<string, mixed>|null
 	 */
+	/**
+	 * Org break-policy enforcement flag for companions — fails closed to
+	 * false so a resolver fault never locks clients into a managed UI.
+	 */
+	private function breakPolicyEnforced(): bool {
+		try {
+			return \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class)->isEnforced();
+		} catch (\Throwable) {
+			return false;
+		}
+	}
+
 	private function buildPremiumSummaryForWidget(string $userId): ?array
 	{
 		try {

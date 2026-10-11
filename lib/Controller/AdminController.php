@@ -206,6 +206,8 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService $vacationUnitMigrationService = null,
 		?\OCA\ArbeitszeitCheck\Service\AdminBatchMutationService $adminBatchMutationService = null,
 		?\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService $overtimeAdjustmentService = null,
+		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
+		?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -250,6 +252,8 @@ class AdminController extends Controller
 		$this->vacationUnitMigrationService = $vacationUnitMigrationService;
 		$this->adminBatchMutationService = $adminBatchMutationService;
 		$this->overtimeAdjustmentService = $overtimeAdjustmentService;
+		$this->breakPolicyResolver = $breakPolicyResolver;
+		$this->breakPolicyStore = $breakPolicyStore;
 		$this->setCspService($cspService);
 	}
 
@@ -439,6 +443,36 @@ class AdminController extends Controller
 				'errors' => ['breakRules' => 'SCHEDULE_INVALID'],
 				'code' => 'SCHEDULE_INVALID',
 			], Http::STATUS_BAD_REQUEST);
+		}
+
+		// presence_windows (Feature A-2): strict shape validation at the write
+		// boundary — weekday∈1..7, HH:MM, ≤8, no same-weekday overlap.
+		if (array_key_exists('presence_windows', $breakRules)) {
+			$resolver = $this->breakPolicyResolver();
+			$checked = $resolver !== null
+				? $resolver->validatePresenceWindows($breakRules['presence_windows'])
+				: ['errors' => [], 'normalized' => []];
+			if ($checked['errors'] !== []) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Validation failed'),
+					'errors' => ['breakRules' => reset($checked['errors'])],
+					'fields' => $checked['errors'],
+					'code' => 'VALIDATION',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$breakRules['presence_windows'] = $checked['normalized'];
+		}
+
+		// B-6 ue_label: display-only metadata from the teaching-unit helper.
+		// Keep it a bounded plain string; anything else is dropped, not stored.
+		if (array_key_exists('ue_label', $breakRules)) {
+			$ueLabel = $breakRules['ue_label'];
+			if (is_string($ueLabel) && $ueLabel !== '' && mb_strlen($ueLabel) <= 80) {
+				$breakRules['ue_label'] = $ueLabel;
+			} else {
+				unset($breakRules['ue_label']);
+			}
 		}
 
 		$scheduleRaw = $breakRules[WeekdaySchedule::KEY] ?? null;
@@ -978,6 +1012,7 @@ class AdminController extends Controller
 			'appAdminUserIds' => $this->getConfiguredAppAdminUserIds(),
 			'projectCheckIntegrationEnabled' => $this->isProjectCheckInstalledOnInstance()
 				&& $this->appConfig->getAppValueString(Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED, Constants::CONFIG_PROJECTCHECK_INTEGRATION_DEFAULT) === '1',
+			'breakPolicy' => $this->breakPolicyPayloadForSettings(),
 		];
 
 		$projectCheckAvailable = $this->isProjectCheckInstalledOnInstance();
@@ -2429,6 +2464,9 @@ class AdminController extends Controller
 				'accessAllowedGroups' => $this->getAllowedAccessGroupsFromConfig(),
 				'accessAllowedUserIds' => $this->getConfiguredAccessAllowedUserIds(),
 				'appAdminUserIds' => $this->getConfiguredAppAdminUserIds(),
+				// Same shape the compliance page render embeds — the API must
+				// not be a write-only surface for the org break policy.
+				'breakPolicy' => $this->breakPolicyPayloadForSettings(),
 			];
 
 			return new JSONResponse([
@@ -2494,6 +2532,8 @@ class AdminController extends Controller
 				|| $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ACCESS;
 			$timeCaptureScopeOk = $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL
 				|| $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_TIME_RECORDING;
+			$complianceScopeOk = $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL
+				|| $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_COMPLIANCE;
 
 			// List of allowed admin settings keys
 			$allowedKeys = [
@@ -2857,6 +2897,16 @@ class AdminController extends Controller
 						'success' => false,
 						'error' => $e->getMessage(),
 					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+
+			if ($complianceScopeOk) {
+				$policyResult = $this->persistBreakPolicyFromParams($params);
+				if ($policyResult instanceof JSONResponse) {
+					return $policyResult;
+				}
+				if ($policyResult !== null) {
+					$updatedSettings['breakPolicy'] = $policyResult;
 				}
 			}
 
@@ -3641,6 +3691,248 @@ class AdminController extends Controller
 	private function toBool(mixed $value): bool
 	{
 		return $value === true || $value === 1 || $value === '1' || $value === 'true' || $value === 'on';
+	}
+
+	/**
+	 * Composite org break-policy document save.
+	 *
+	 * Merge semantics per field: absent = unchanged, null/''/'[]' = cleared.
+	 * Returns:
+	 *  - null when no policy field was submitted (no-op, no audit),
+	 *  - JSONResponse on validation / CONFIRM_REQUIRED / overlap errors,
+	 *  - the normalized policy array on success (echoed under `settings.breakPolicy`).
+	 *
+	 * @param array<string,mixed> $params
+	 * @return array<string,mixed>|JSONResponse|null
+	 */
+	private function persistBreakPolicyFromParams(array $params)
+	{
+		$resolver = $this->breakPolicyResolver();
+		if ($resolver === null) {
+			return null;
+		}
+
+		$submitted = false;
+		foreach ([
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_ENFORCED,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_MIN_BREAK,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_TIERS,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_WINDOWS,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_EXEMPTIONS,
+		] as $field) {
+			if (array_key_exists($field, $params)) {
+				$submitted = true;
+				break;
+			}
+		}
+		if (!$submitted) {
+			return null;
+		}
+
+		// Serialise the whole read→merge→validate→write on the stored row:
+		// the per-request appconfig/orgConfig caches can hold a stale merge
+		// base, so a second concurrent admin save must re-read under a row
+		// lock instead of reverting the first save's fields.
+		$store = $this->breakPolicyStore();
+		try {
+			$outcome = $this->atomic(
+				function () use ($params, $resolver, $store) {
+					return $this->persistBreakPolicyLocked($params, $resolver, $store);
+				},
+				$this->db
+			);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Break policy save failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('The break policy could not be saved. Please try again.'),
+				'code' => 'SAVE_FAILED',
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+
+		if ($outcome instanceof JSONResponse) {
+			return $outcome;
+		}
+		if ($outcome['written']) {
+			$resolver->clearCache();
+			$this->clearLaborLawProfileCache();
+		}
+		return $outcome['doc'];
+	}
+
+	/**
+	 * Merge submitted fields over the locked stored document, validate the
+	 * result, and persist document + revision + audit row atomically.
+	 *
+	 * Returns either a JSONResponse (validation / CONFIRM_REQUIRED marker —
+	 * nothing written) or ['doc' => array, 'written' => bool].
+	 */
+	private function persistBreakPolicyLocked(
+		array $params,
+		\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $resolver,
+		\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $store
+	) {
+		$store->ensureRowsExist();
+		[$rawBase, $oldVersion] = $store->lockAndRead();
+		$current = $resolver->policyFromStoredDocument($rawBase);
+
+		$decodeList = function (string $key, array $currentList) use ($params): ?array {
+			if (!array_key_exists($key, $params)) {
+				return $currentList;
+			}
+			$raw = $params[$key];
+			if ($raw === null || $raw === '') {
+				return [];
+			}
+			if (is_string($raw)) {
+				$decoded = json_decode($raw, true);
+				return is_array($decoded) ? $decoded : null; // null ⇒ shape error
+			}
+			return is_array($raw) ? $raw : null;
+		};
+
+		$shapeError = null;
+		$tiers = $decodeList(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_TIERS, $current['tiers']);
+		$windows = $decodeList(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_WINDOWS, $current['windows']);
+		$exemptions = $decodeList(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_EXEMPTIONS, $current['presence_exemptions']);
+
+		$input = [
+			'enforced' => array_key_exists(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_ENFORCED, $params)
+				? $params[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_ENFORCED]
+				: $current['enforced'],
+			'min_break_minutes' => array_key_exists(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_MIN_BREAK, $params)
+				? $params[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_MIN_BREAK]
+				: $current['min_break_minutes'],
+			'tiers' => $tiers ?? [],
+			'windows' => $windows ?? [],
+			'presence_exemptions' => $exemptions ?? [],
+		];
+
+		$errors = [];
+		if ($tiers === null) {
+			$errors[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_TIERS] = 'VALIDATION_SHAPE';
+		}
+		if ($windows === null) {
+			$errors[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_WINDOWS] = 'VALIDATION_SHAPE';
+		}
+		if ($exemptions === null) {
+			$errors[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_EXEMPTIONS] = 'VALIDATION_SHAPE';
+		}
+
+		$validated = $resolver->validatePolicy($input);
+		$errors = array_merge($errors, $validated['errors']);
+		if ($errors !== []) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Please review the break policy fields.'),
+				'code' => 'VALIDATION',
+				'fields' => $errors,
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		$normalized = $validated['normalized'];
+
+		// CONFIRM_REQUIRED gate: a fully statutory-shadowed policy silently
+		// does nothing — require an explicit confirmation the first time.
+		$confirmed = $this->toBool($params['breakPolicyConfirm'] ?? false);
+		if (!$confirmed && $normalized['enforced'] && $resolver->policyIneffectiveEverywhere($normalized)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('The configured break rules never exceed the statutory minimum. They will not change any required break.'),
+				'code' => 'CONFIRM_REQUIRED',
+				'warnings' => $resolver->policyWarnings($normalized),
+				'fields' => [\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_ENFORCED => 'CONFIRM_REQUIRED'],
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		$oldJson = (string)json_encode($current, JSON_UNESCAPED_UNICODE);
+		$newJson = (string)json_encode($normalized, JSON_UNESCAPED_UNICODE);
+		if ($newJson === $oldJson) {
+			return ['doc' => $normalized, 'written' => false];
+		}
+
+		$store->write($newJson, $oldVersion + 1);
+		$performedBy = $this->getPerformedBy();
+		// Inside atomic(): a failing audit insert rolls the policy write
+		// back — a policy change that cannot be audited must not take
+		// effect silently.
+		$this->auditLogMapper->logAction(
+			$performedBy,
+			'break_policy_updated',
+			Constants::AUDIT_ENTITY_BREAK_POLICY,
+			null,
+			['policy' => $current, 'version' => $oldVersion],
+			['policy' => $normalized, 'version' => $oldVersion + 1],
+			$performedBy
+		);
+
+		return ['doc' => $normalized, 'written' => true];
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null;
+	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null;
+
+	private function breakPolicyResolver(): ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver
+	{
+		if ($this->breakPolicyResolver !== null) {
+			return $this->breakPolicyResolver;
+		}
+		try {
+			return $this->breakPolicyResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+		} catch (\Throwable) {
+			return null;
+		}
+	}
+
+	private function breakPolicyStore(): \OCA\ArbeitszeitCheck\Support\BreakPolicyStore
+	{
+		if ($this->breakPolicyStore !== null) {
+			return $this->breakPolicyStore;
+		}
+		return $this->breakPolicyStore = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyStore::class);
+	}
+
+	/**
+	 * Break-policy payload for the admin compliance editor card.
+	 */
+	private function breakPolicyPayloadForSettings(): array
+	{
+		$resolver = $this->breakPolicyResolver();
+		if ($resolver === null) {
+			return [
+				'policy' => [
+					'version' => 1,
+					'enforced' => false,
+					'min_break_minutes' => null,
+					'tiers' => [],
+					'windows' => [],
+					'presence_exemptions' => [],
+				],
+				'warnings' => [],
+				'malformed' => false,
+				'storageTimezone' => 'Europe/Berlin',
+			];
+		}
+		try {
+			return $resolver->adminPayload();
+		} catch (\Throwable) {
+			return [
+				'policy' => [
+					'version' => 1,
+					'enforced' => false,
+					'min_break_minutes' => null,
+					'tiers' => [],
+					'windows' => [],
+					'presence_exemptions' => [],
+				],
+				'warnings' => [],
+				'malformed' => false,
+				'storageTimezone' => 'Europe/Berlin',
+			];
+		}
 	}
 
 	/**

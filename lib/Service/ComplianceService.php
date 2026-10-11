@@ -14,12 +14,15 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Db\Absence;
+use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
+use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
 use OCA\ArbeitszeitCheck\Support\BreakSplitValidator;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfile;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
@@ -46,6 +49,8 @@ class ComplianceService
     private TimeZoneService $timeZoneService;
     private DailyWorkingHoursCalculator $dailyWorkingHoursCalculator;
     private LaborLawProfileFactory $lawProfileFactory;
+    private ?BreakPolicyResolver $breakPolicyResolver;
+    private ?AbsenceMapper $absenceMapper;
 
     public function __construct(
         TimeEntryMapper $timeEntryMapper,
@@ -61,6 +66,8 @@ class ComplianceService
         TimeZoneService $timeZoneService,
         DailyWorkingHoursCalculator $dailyWorkingHoursCalculator,
         LaborLawProfileFactory $lawProfileFactory,
+        ?BreakPolicyResolver $breakPolicyResolver = null,
+        ?AbsenceMapper $absenceMapper = null,
     ) {
         $this->timeEntryMapper = $timeEntryMapper;
         $this->violationMapper = $violationMapper;
@@ -75,6 +82,41 @@ class ComplianceService
         $this->timeZoneService = $timeZoneService;
         $this->dailyWorkingHoursCalculator = $dailyWorkingHoursCalculator;
         $this->lawProfileFactory = $lawProfileFactory;
+        $this->breakPolicyResolver = $breakPolicyResolver;
+        $this->absenceMapper = $absenceMapper;
+    }
+
+    private function breakPolicy(): BreakPolicyResolver
+    {
+        if ($this->breakPolicyResolver === null) {
+            try {
+                $this->breakPolicyResolver = \OCP\Server::get(BreakPolicyResolver::class);
+            } catch (\Throwable) {
+                $this->breakPolicyResolver = new BreakPolicyResolver(
+                    $this->config,
+                    $this->lawProfileFactory,
+                    \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+                    $this->userWorkingTimeModelMapper,
+                    $this->workingTimeModelMapper,
+                    $this->timeEntryMapper,
+                    $this->timeZoneService,
+                    $this->l10n,
+                );
+            }
+        }
+        return $this->breakPolicyResolver;
+    }
+
+    private function absenceMapper(): ?AbsenceMapper
+    {
+        if ($this->absenceMapper === null) {
+            try {
+                $this->absenceMapper = \OCP\Server::get(AbsenceMapper::class);
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+        return $this->absenceMapper;
     }
 
     private function profile(?string $userId = null): LaborLawProfile
@@ -255,6 +297,9 @@ class ComplianceService
             'night_work'                   => fn() => $this->checkNightWork($timeEntry),
             'sunday_and_holiday_work'      => fn() => $this->checkSundayAndHolidayWork($timeEntry),
             'six_month_and_weekly_average' => fn() => $this->checkSixMonthAverageAndWeeklyHours($timeEntry),
+            // Organisational break policy + presence windows — warnings only.
+            'break_policy'                 => fn() => $this->checkPolicyViolationsWithResult($timeEntry),
+            'presence_windows'             => fn() => $this->presenceViolationsForEntryDays($timeEntry, true),
         ];
 
         foreach ($checks as $name => $check) {
@@ -323,6 +368,32 @@ class ComplianceService
         // Check 6-month average and weekly hours (ArbZG §3) - warnings to manager only
         // These are warnings, not blocking violations
         $this->checkSixMonthAverageAndWeeklyHours($timeEntry);
+
+        // Organisational break policy + mandatory presence windows.
+        // WARNING-only path — never added to $criticalViolations so it can
+        // never feed the statutory save-blocking gate (NN-10).
+        try {
+            $policyViolations = $this->checkPolicyViolationsWithResult($timeEntry, $persistViolations);
+            if (!empty($policyViolations)) {
+                $violations = array_merge($violations, $policyViolations);
+            }
+        } catch (\Throwable $e) {
+            \OCP\Log\logger('arbeitszeitcheck')->error(
+                'Break-policy check failed for entry ' . (int)$timeEntry->getId() . ': ' . $e->getMessage(),
+                ['exception' => $e, 'user_id' => $timeEntry->getUserId()]
+            );
+        }
+        try {
+            $presenceViolations = $this->presenceViolationsForEntryDays($timeEntry, $persistViolations);
+            if (!empty($presenceViolations)) {
+                $violations = array_merge($violations, $presenceViolations);
+            }
+        } catch (\Throwable $e) {
+            \OCP\Log\logger('arbeitszeitcheck')->error(
+                'Presence-window check failed for entry ' . (int)$timeEntry->getId() . ': ' . $e->getMessage(),
+                ['exception' => $e, 'user_id' => $timeEntry->getUserId()]
+            );
+        }
 
         // In strict mode, throw exception if critical violations found
         if ($strictMode && !empty($criticalViolations)) {
@@ -499,9 +570,460 @@ class ComplianceService
         ]];
     }
 
+    // ------------------------------------------------------------------ //
+    // Organisational break policy (non-statutory — warn, never block)      //
+    // ------------------------------------------------------------------ //
+
+    /**
+     * Policy break shortfall for the entry's peak day — quantity beyond the
+     * statutory requirement, counted at the effective (policy) floor.
+     *
+     * Returns null when the day meets the effective requirement or no
+     * org/model rule tightens the law.
+     *
+     * @return array{required: int, actual: int, law_required: int, source: string|null}|null
+     */
+    private function policyQuantityShortfall(TimeEntry $timeEntry): ?array
+    {
+        if ($timeEntry->getStartTime() === null || $timeEntry->getEndTime() === null) {
+            return null;
+        }
+        $userId = $timeEntry->getUserId();
+        $resolver = $this->breakPolicy();
+        $profile = $this->profile($userId);
+
+        $peak = $this->dailyWorkingHoursCalculator->describePeakWorkingDay(
+            $userId,
+            $timeEntry,
+            $timeEntry->getEndTime(),
+            $timeEntry->getId(),
+        );
+        $workSeconds = (int)round($peak['hours'] * 3600);
+
+        $detailed = $resolver->requiredBreakDetailed($workSeconds, $userId);
+        $effectiveRequired = $detailed['minutes'];
+        $lawRequired = $profile->requiredBreakMinutes($peak['hours']);
+        if ($effectiveRequired <= $lawRequired || $effectiveRequired <= 0) {
+            return null; // nothing beyond statute → no policy violation
+        }
+
+        // Countability uses the policy floor (a 10-minute portion need not
+        // count toward a 20-minute org rule) — this is deliberately NOT the
+        // statutory TimeEntry::validate() floor, which stays law-only.
+        $portions = $this->dailyWorkingHoursCalculator->countableBreakPortionsOnCalendarDay(
+            $userId,
+            $peak['dayStart'],
+            $peak['dayEnd'],
+            $timeEntry,
+            $resolver->effectiveFloor($userId),
+            $timeEntry->getId(),
+        );
+        $actual = array_sum($portions);
+        if ($actual >= $effectiveRequired) {
+            return null;
+        }
+
+        return [
+            'required' => $effectiveRequired,
+            'actual' => $actual,
+            'law_required' => $lawRequired,
+            'source' => $detailed['source'],
+        ];
+    }
+
+    /**
+     * break_warning payload for save responses — pure dry-run, never persists.
+     * Preserved additive contract: {required, actual, policy, window}.
+     */
+    public function breakWarningForEntry(TimeEntry $timeEntry): ?array
+    {
+        if ($timeEntry->getStatus() !== TimeEntry::STATUS_COMPLETED || $timeEntry->getEndTime() === null) {
+            return null;
+        }
+        $resolver = $this->breakPolicy();
+        if (!$resolver->isPolicyActive($timeEntry->getUserId())) {
+            return null;
+        }
+
+        $quantity = $this->policyQuantityShortfall($timeEntry);
+        $windowShortfalls = $resolver->windowViolations($timeEntry->getUserId(), $timeEntry);
+        if ($quantity === null && $windowShortfalls === []) {
+            return null;
+        }
+
+        $warning = [
+            'required' => $quantity !== null ? $quantity['required'] : null,
+            'actual' => $quantity !== null ? $quantity['actual'] : null,
+            'policy' => $quantity !== null ? ($quantity['source'] ?? 'tier') : 'window',
+            'window' => $windowShortfalls !== [] ? $windowShortfalls[0] : null,
+        ];
+        if ($quantity === null && $windowShortfalls !== []) {
+            $warning['required'] = $windowShortfalls[0]['required_minutes'];
+            $warning['actual'] = $windowShortfalls[0]['covered_minutes'];
+        }
+        return $warning;
+    }
+
+    /**
+     * Policy violations for a completed entry — org/model tier quantity beyond
+     * statute + required-mode break windows. Persisted as SEVERITY_WARNING
+     * rows (never error, never blocking — NN-10 two-gate separation), deduped
+     * by unresolved (timeEntryId, type).
+     *
+     * @return list<array<string, mixed>> violation summaries
+     */
+    public function checkPolicyViolationsWithResult(TimeEntry $timeEntry, bool $persistViolations = true): array
+    {
+        if ($timeEntry->getStatus() !== TimeEntry::STATUS_COMPLETED || $timeEntry->getEndTime() === null) {
+            return [];
+        }
+        $resolver = $this->breakPolicy();
+        $userId = $timeEntry->getUserId();
+        if (!$resolver->isPolicyActive($userId)) {
+            return [];
+        }
+
+        $out = [];
+
+        $quantity = $this->policyQuantityShortfall($timeEntry);
+        if ($quantity !== null) {
+            $sourceLabel = $quantity['source'] === BreakPolicyResolver::SOURCE_MODEL
+                ? $this->l10n->t('working time model rule')
+                : $this->l10n->t('organisational break policy');
+            $message = $this->l10n->t(
+                'Break below organisational rule: %1$d of required %2$d min taken (%3$s)',
+                [$quantity['actual'], $quantity['required'], $sourceLabel]
+            );
+            $out[] = $this->recordPolicyViolation(
+                $timeEntry,
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $message,
+                $persistViolations,
+            );
+        }
+
+        foreach ($resolver->windowViolations($userId, $timeEntry) as $window) {
+            $message = $this->l10n->t(
+                'Required break window %1$s–%2$s on %3$s not met: %4$d of %5$d min taken inside the window',
+                [
+                    $window['start'],
+                    $window['end'],
+                    $this->displayDate(
+                        new \DateTime($window['day'] . ' 12:00:00', $this->timeZoneService->storageTimeZone()),
+                        $userId
+                    ),
+                    $window['covered_minutes'],
+                    $window['required_minutes'],
+                ]
+            );
+            $out[] = $this->recordPolicyViolation(
+                $timeEntry,
+                ComplianceViolation::TYPE_MISSING_BREAK,
+                $message,
+                $persistViolations,
+            );
+        }
+
+        return array_values(array_filter($out));
+    }
+
+    /**
+     * Persist a WARNING-severity policy violation unless an unresolved row of
+     * the same type already exists for the entry (dedup contract).
+     *
+     * @return array<string, mixed>|null summary or null when deduped
+     */
+    private function recordPolicyViolation(
+        TimeEntry $timeEntry,
+        string $type,
+        string $message,
+        bool $persistViolations,
+    ): ?array {
+        $summary = [
+            'type' => $type,
+            'severity' => ComplianceViolation::SEVERITY_WARNING,
+            'message' => $message,
+        ];
+        if (!$persistViolations) {
+            return $summary;
+        }
+
+        $entryId = $timeEntry->getId();
+        if ($entryId !== null) {
+            foreach ($this->violationMapper->findByTimeEntryId($entryId) as $existing) {
+                if ($existing->getViolationType() === $type && !$existing->isResolved()) {
+                    return null; // already flagged — no duplicate row, no re-notify
+                }
+            }
+        }
+
+        $violation = $this->violationMapper->createViolation(
+            $timeEntry->getUserId(),
+            $type,
+            $message,
+            $timeEntry->getEndTime() ?: new \DateTime(),
+            $entryId,
+            ComplianceViolation::SEVERITY_WARNING
+        );
+        $summary['id'] = $violation->getId();
+
+        if ($this->notificationService) {
+            $this->notificationService->notifyComplianceViolation($timeEntry->getUserId(), [
+                'id' => $violation->getId(),
+                'type' => $type,
+                'message' => $message,
+                'date' => ($timeEntry->getEndTime() ?: new \DateTime())->format('Y-m-d'),
+                'severity' => ComplianceViolation::SEVERITY_WARNING,
+            ]);
+        }
+
+        return $summary;
+    }
+
+    // ------------------------------------------------------------------ //
+    // Mandatory presence windows (working-time model)                      //
+    // ------------------------------------------------------------------ //
+
+    /**
+     * Evaluate mandatory presence windows for one user on one calendar day.
+     * Creates `missing_presence` WARNING violations — day-level, never
+     * blocking, deduped per unresolved (day, type).
+     *
+     * Skips: days without any work entry, days without a model assignment or
+     * presence windows, public holidays, and org presence_exemptions ranges.
+     *
+     * @return list<array<string, mixed>> violation summaries
+     */
+    public function evaluatePresenceForDay(string $userId, \DateTime $dayRef, bool $persistViolations = true): array
+    {
+        $resolver = $this->breakPolicy();
+        $tz = $this->timeZoneService->storageTimeZone();
+        [$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($dayRef);
+        $dayKey = $dayStart->format('Y-m-d');
+
+        $model = $resolver->modelForUser($userId);
+        if ($model === null) {
+            return [];
+        }
+        $windows = $resolver->presenceWindows($userId, (int)$dayStart->format('N'));
+        if ($windows === []) {
+            return [];
+        }
+        if ($resolver->presenceExempt($dayKey)) {
+            return [];
+        }
+        try {
+            if ($this->holidayCalendarService->isHolidayForUser($userId, $dayStart)) {
+                return [];
+            }
+        } catch (\Throwable) {
+            // holiday lookup failure must never suppress presence evaluation
+        }
+
+        $workIntervals = $resolver->dayWork($userId, $dayStart, $dayEnd);
+        if ($workIntervals === []) {
+            return []; // no entry → no presence violation
+        }
+
+        $absenceCreditMinutes = $this->approvedAbsenceCreditMinutes($userId, $dayStart, $dayEnd, $model);
+
+        $violations = [];
+        foreach ($windows as $window) {
+            $interval = $resolver->canonicalWindow($dayKey, [
+                'start' => $window['start'],
+                'end' => $window['end'],
+            ]);
+            if ($interval === null) {
+                continue; // DST-nonexistent window — does not apply that day
+            }
+            [$wStart, $wEnd] = $interval;
+            $covered = $this->intervalOverlapSeconds($workIntervals, $wStart, $wEnd);
+            if ($absenceCreditMinutes >= $this->plannedDayMinutes($model, (int)$dayStart->format('N'))) {
+                $covered = $wEnd - $wStart; // full-day approved absence covers the window
+            } elseif ($absenceCreditMinutes > 0) {
+                // Partial absence credits from the window start (documented
+                // approximation — absences carry no time-of-day).
+                $creditEnd = min($wEnd, $wStart + $absenceCreditMinutes * 60);
+                $covered += max(0, $creditEnd - $wStart);
+            }
+            $required = $wEnd - $wStart;
+            if ($covered < $required) {
+                $missing = (int)ceil(($required - $covered) / 60);
+                $message = $this->l10n->t(
+                    'Mandatory presence %1$s–%2$s on %3$s not covered: %4$d min missing',
+                    [
+                        $window['start'],
+                        $window['end'],
+                        $this->displayDate($dayStart, $userId),
+                        $missing,
+                    ]
+                );
+                $violations[] = [
+                    'type' => ComplianceViolation::TYPE_MISSING_PRESENCE,
+                    'severity' => ComplianceViolation::SEVERITY_WARNING,
+                    'message' => $message,
+                    'day' => $dayKey,
+                    'window' => $window,
+                ];
+            }
+        }
+
+        if ($violations === [] || !$persistViolations) {
+            return $violations;
+        }
+
+        // Dedup: one unresolved missing_presence row per day — re-evaluations
+        // never stack (idempotent re-run after corrections).
+        $existing = $this->violationMapper->findByDateRange($dayStart, $dayEnd, $userId, false);
+        $hasUnresolved = false;
+        foreach ($existing as $row) {
+            if ($row->getViolationType() === ComplianceViolation::TYPE_MISSING_PRESENCE) {
+                $hasUnresolved = true;
+                break;
+            }
+        }
+        if ($hasUnresolved) {
+            return $violations;
+        }
+
+        foreach ($violations as &$v) {
+            $row = $this->violationMapper->createViolation(
+                $userId,
+                ComplianceViolation::TYPE_MISSING_PRESENCE,
+                $v['message'],
+                $dayStart,
+                null,
+                ComplianceViolation::SEVERITY_WARNING
+            );
+            $v['id'] = $row->getId();
+            if ($this->notificationService) {
+                $this->notificationService->notifyComplianceViolation($userId, [
+                    'id' => $row->getId(),
+                    'type' => ComplianceViolation::TYPE_MISSING_PRESENCE,
+                    'message' => $v['message'],
+                    'date' => $dayKey,
+                    'severity' => ComplianceViolation::SEVERITY_WARNING,
+                ]);
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Run presence evaluation for every calendar day an entry touches.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function presenceViolationsForEntryDays(TimeEntry $timeEntry, bool $persistViolations): array
+    {
+        $start = $timeEntry->getStartTime();
+        $end = $timeEntry->getEndTime();
+        $userId = $timeEntry->getUserId();
+        if ($start === null || $end === null) {
+            return [];
+        }
+
+        $tz = $this->timeZoneService->storageTimeZone();
+        $cursor = (new \DateTimeImmutable('@' . $start->getTimestamp()))->setTimezone($tz);
+        $last = (new \DateTimeImmutable('@' . ($end->getTimestamp() - 1)))->setTimezone($tz);
+
+        $violations = [];
+        while ($cursor->format('Y-m-d') <= $last->format('Y-m-d')) {
+            $dayViolations = $this->evaluatePresenceForDay(
+                $userId,
+                \DateTime::createFromImmutable($cursor),
+                $persistViolations
+            );
+            $violations = array_merge($violations, $dayViolations);
+            $cursor = $cursor->modify('+1 day');
+        }
+        return $violations;
+    }
+
+    /**
+     * Approved-absence credit (minutes) for the calendar day.
+     * Full-day absence ⇒ ≥ planned-day minutes (covers any window); partial
+     * absence ⇒ proportional credit anchored at each window start.
+     */
+    private function approvedAbsenceCreditMinutes(string $userId, \DateTime $dayStart, \DateTime $dayEnd, \OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model): int
+    {
+        $mapper = $this->absenceMapper();
+        if ($mapper === null) {
+            return 0;
+        }
+        $credited = 0.0;
+        try {
+            $absences = $mapper->findByUserAndDateRange($userId, $dayStart, $dayEnd);
+        } catch (\Throwable) {
+            return 0;
+        }
+        $dayKey = $dayStart->format('Y-m-d');
+        foreach ($absences as $absence) {
+            if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+                continue;
+            }
+            $aStart = $absence->getStartDate();
+            $aEnd = $absence->getEndDate();
+            if ($aStart === null || $aEnd === null) {
+                continue;
+            }
+            if ($aStart->format('Y-m-d') > $dayKey || $aEnd->format('Y-m-d') < $dayKey) {
+                continue;
+            }
+            $spanDays = max(1, (int)$aStart->diff($aEnd)->days + 1);
+            $durationHours = $absence->getDurationHours();
+            if ($durationHours !== null && $durationHours > 0) {
+                $credited += ($durationHours * 60.0) / $spanDays;
+                continue;
+            }
+            $days = $absence->getDays();
+            if ($days !== null && $days > 0) {
+                $planned = $this->plannedDayMinutes($model, (int)$dayStart->format('N'));
+                $credited += ($days / $spanDays) * max(1, $planned);
+            }
+        }
+        return (int)round($credited);
+    }
+
+    /**
+     * Planned net minutes for the model on the ISO weekday (1=Mon … 7=Sun).
+     */
+    private function plannedDayMinutes(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model, int $weekdayIso): int
+    {
+        static $dayNames = [1 => 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        $schedule = $model->getWeekdaySchedule();
+        if ($schedule !== null) {
+            $net = $schedule->netHoursForWeekday($dayNames[$weekdayIso] ?? 'mon');
+            if ($net > 0) {
+                return (int)round($net * 60);
+            }
+        }
+        $daily = (float)$model->getDailyHours();
+        if ($daily > 0) {
+            return (int)round($daily * 60);
+        }
+        $weekly = (float)$model->getWeeklyHours();
+        $days = (float)$model->getWorkDaysPerWeek();
+        if ($weekly > 0 && $days > 0) {
+            return (int)round(($weekly / $days) * 60);
+        }
+        return 8 * 60; // conservative fallback mirrors default working hours
+    }
+
+    /** @param list<array{0:int,1:int}> $intervals */
+    private function intervalOverlapSeconds(array $intervals, int $start, int $end): int
+    {
+        $sum = 0;
+        foreach ($intervals as $iv) {
+            $sum += max(0, min($iv[1], $end) - max($iv[0], $start));
+        }
+        return $sum;
+    }
+
     /**
      * Check excessive working hours and return violations as array
-     * 
+     *
      * @param TimeEntry $timeEntry
      * @return array Array of violation information
      */
@@ -1448,8 +1970,28 @@ class ComplianceService
                         $this->checkExcessiveWorkingHours($entry);
                         $this->checkNightWork($entry);
                         $this->checkSundayAndHolidayWork($entry);
+                        try {
+                            $this->checkPolicyViolationsWithResult($entry);
+                        } catch (\Throwable $e) {
+                            \OCP\Log\logger('arbeitszeitcheck')->error(
+                                'Daily break-policy check failed for entry ' . (int)$entry->getId() . ': ' . $e->getMessage(),
+                                ['exception' => $e, 'user_id' => $userId]
+                            );
+                        }
                     }
                 }
+            }
+
+            // Mandatory presence windows — day-level, deduped, independent of
+            // the per-entry skip above (a resolved statutory flag must not
+            // suppress presence evaluation).
+            try {
+                $this->evaluatePresenceForDay($userId, clone $yesterday);
+            } catch (\Throwable $e) {
+                \OCP\Log\logger('arbeitszeitcheck')->error(
+                    'Daily presence check failed for user ' . $userId . ': ' . $e->getMessage(),
+                    ['exception' => $e]
+                );
             }
 
             // Check for weekly hours limit violations

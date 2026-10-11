@@ -8,8 +8,16 @@ test('Employee can open dashboard and see clock widget', async ({ page }) => {
   await assertArbeitszeitcheckLoaded(page)
 
   // Dashboard should have a page title/heading area and clock actions somewhere.
+  // Scope to real buttons: a page-level text locator can resolve to a hidden
+  // notification ("Don't forget to clock out") before the button in DOM order.
+  // The label also depends on the employee's stamp state (parallel specs can
+  // leave the user active/on break/paused) — accept every possible action.
   await expect(page.locator('#app-content')).toBeVisible()
-  await expect(page.locator('text=/Clock in|Clock out|Start break|End break/i').first()).toBeVisible()
+  await expect(
+    page.locator('#app-content button').filter({
+      hasText: /Clock in|Clock out|Start break|End break|Resume after break|Complete session/i,
+    }).first()
+  ).toBeVisible()
 })
 
 test('Health endpoint returns JSON', async ({ request }) => {

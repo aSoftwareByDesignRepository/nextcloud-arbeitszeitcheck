@@ -55,6 +55,9 @@ $correctionL10n = [
 	'correctionWithdrawError' => $l->t('Could not withdraw correction.'),
 	'correctionJustificationReady' => $l->t('{count} of 10+ characters — you can submit'),
 	'correctionJustificationRemaining' => $l->t('{remaining} more characters needed ({count} of {min})'),
+	'correctionBreakWarning' => $l->t('The saved times do not fully meet the break rules.'),
+	'correctionClose' => $l->t('Close'),
+	'correctionWithdrawTitle' => $l->t('Withdraw correction'),
 ];
 
 ?>

@@ -11,6 +11,8 @@ import AxeBuilder from '@axe-core/playwright'
 import { loginAs, gotoApp } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
 
+test.use({ trace: 'off' }) // extra pages/contexts race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network, upstream #23387) — screenshots/video still retained on failure
+
 test.describe.configure({ mode: 'serial' })
 
 const TEAM_NAME = `E2E Bulk Find ${Date.now()}`
@@ -201,9 +203,9 @@ test.describe('Admin teams bulk Find people (Kraft live)', () => {
 		await expect(page.locator('#bulk-member-submit')).toContainText(/2/, { timeout: 5_000 })
 		await expect(page.locator('#bulk-member-status')).toContainText(/2/)
 
-		// Cancel confirm → no batch
+		// Cancel confirm → no batch (accessible confirmDialog — no native dialog)
 		page.once('dialog', async (dialog) => {
-			expect(dialog.message()).toMatch(new RegExp(TEAM_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+			// Fail closed: native dialogs must not appear (confirmDialog only).
 			await dialog.dismiss()
 		})
 		let batchSeen = false
@@ -213,6 +215,13 @@ test.describe('Admin teams bulk Find people (Kraft live)', () => {
 			}
 		})
 		await page.locator('#bulk-member-submit').click()
+		const confirmDialog = page.locator('.confirm-dialog[role="alertdialog"], .confirm-dialog[role="dialog"]')
+		await expect(confirmDialog).toBeVisible({ timeout: 10_000 })
+		await expect(confirmDialog.locator('.confirm-dialog__message')).toContainText(
+			new RegExp(TEAM_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+		)
+		await confirmDialog.locator('.confirm-dialog__cancel').click()
+		await expect(confirmDialog).toHaveCount(0)
 		await page.waitForTimeout(400)
 		expect(batchSeen).toBe(false)
 		await expect(page.locator('#modal-bulk-add-members')).toBeVisible()
@@ -224,11 +233,9 @@ test.describe('Admin teams bulk Find people (Kraft live)', () => {
 				&& res.url().includes(`/api/admin/teams/${teamId}/members/batch`),
 			{ timeout: 60_000 },
 		)
-		page.once('dialog', async (dialog) => {
-			expect(dialog.message()).toContain(TEAM_NAME)
-			await dialog.accept()
-		})
 		await page.locator('#bulk-member-submit').click()
+		await expect(confirmDialog).toBeVisible({ timeout: 10_000 })
+		await confirmDialog.locator('.confirm-dialog__confirm').click()
 		const batchRes = await batchPromise
 		expect(batchRes.ok()).toBeTruthy()
 		const body = await batchRes.json()

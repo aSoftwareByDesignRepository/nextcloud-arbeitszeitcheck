@@ -91,30 +91,22 @@ function expectedHtmlLangPrefix(locale) {
 	return locale === 'pt_BR' ? 'pt-br' : locale.toLowerCase()
 }
 
-async function resetRoleLanguage(browser, role) {
-	const context = await browser.newContext({ baseURL: process.env.NC_BASE_URL || 'http://localhost:8081' })
-	const page = await context.newPage()
-	try {
-		await login(page, credsFromEnv(role))
-		resetUserLanguage(await getCurrentUserId(page))
-	} finally {
-		await context.close()
-	}
+function resetRoleLanguage(role) {
+	// The env credential IS the uid — no browser round-trip needed, and a bare
+	// context in a hook trips Playwright's trace-chunk ENOENT on close.
+	const u = process.env[`NC_${role}_USER`]
+	if (u) resetUserLanguage(u)
 }
 
-test.beforeAll(async ({ browser }) => {
+test.beforeAll(() => {
 	// Start from a known-language baseline so other specs are not affected.
-	await resetRoleLanguage(browser, 'EMPLOYEE')
-	if (process.env.NC_ADMIN_USER) {
-		await resetRoleLanguage(browser, 'ADMIN')
-	}
+	resetRoleLanguage('EMPLOYEE')
+	resetRoleLanguage('ADMIN')
 })
 
-test.afterAll(async ({ browser }) => {
-	await resetRoleLanguage(browser, 'EMPLOYEE')
-	if (process.env.NC_ADMIN_USER) {
-		await resetRoleLanguage(browser, 'ADMIN')
-	}
+test.afterAll(() => {
+	resetRoleLanguage('EMPLOYEE')
+	resetRoleLanguage('ADMIN')
 })
 
 test.describe('ArbeitszeitCheck locale matrix (employee surfaces)', () => {

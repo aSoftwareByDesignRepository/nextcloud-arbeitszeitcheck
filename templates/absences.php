@@ -1194,10 +1194,10 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
     window.ArbeitszeitCheck.apiUrl = {
         absences: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         create: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.store'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        show: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.show', ['id' => '__ID__']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        edit: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.edit', ['id' => '__ID__']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        update: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.updatePost', ['id' => '__ID__']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        delete: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.delete', ['id' => '__ID__']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        show: <?php echo json_encode($urlGenerator->linkTo('arbeitszeitcheck', 'absences/__ID__'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        edit: <?php echo json_encode($urlGenerator->linkTo('arbeitszeitcheck', 'absences/__ID__/edit'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        update: <?php echo json_encode($urlGenerator->linkTo('arbeitszeitcheck', 'absences/__ID__/update'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        delete: <?php echo json_encode($urlGenerator->linkTo('arbeitszeitcheck', 'absences/__ID__'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };
     
     // Handle form submission for create/edit

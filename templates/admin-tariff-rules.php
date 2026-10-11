@@ -155,7 +155,7 @@ $tariffL10n = [
                     </div>
                 </header>
                 <div class="azc-card__body">
-                    <div class="table-container admin-tariff-rules__table-wrap" role="region" aria-labelledby="admin-tariff-rules-list-heading">
+                    <div class="table-container admin-tariff-rules__table-wrap" tabindex="0" role="region" aria-labelledby="admin-tariff-rules-list-heading">
                         <table class="table table--hover azc-table--responsive grid-table admin-tariff-rules__table" id="tariff-rules-table">
                             <caption class="sr-only"><?php p($l->t('Tariff rule sets')); ?></caption>
                             <thead>

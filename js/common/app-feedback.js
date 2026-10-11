@@ -56,6 +56,7 @@
 		if (!url || url.length > 500) {
 			return '';
 		}
+		// eslint-disable-next-line no-control-regex -- intentional: strip ASCII control chars from report-URL input
 		if (/[\x00-\x1F\x7F]/.test(url)) {
 			return '';
 		}

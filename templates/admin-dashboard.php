@@ -151,7 +151,7 @@ $payoutsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.overtime_payout.index
                             <p class="azc-empty-state__lead"><?php p($l->t('Great! All employees are following the working time rules correctly.')); ?></p>
                         </div>
                     <?php else: ?>
-                        <div class="table-container" role="region" aria-label="<?php p($l->t('Recent compliance violations')); ?>">
+                        <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Recent compliance violations')); ?>">
                             <table class="table table--hover azc-table--responsive" aria-label="<?php p($l->t('Recent compliance violations')); ?>">
                                 <thead>
                                     <tr>

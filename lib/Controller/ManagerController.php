@@ -1790,7 +1790,7 @@ class ManagerController extends Controller
 	 * ProjectCheck projects a manager may link when creating or correcting employee time.
 	 */
 	#[NoAdminRequired]
-	public function getManagerAssignableProjectcheckProjects(string $employeeId): JSONResponse
+	public function getManagerAssignableProjectcheckProjects(string $employeeUid): JSONResponse
 	{
 		try {
 			$managerId = $this->getUserId();
@@ -1799,7 +1799,7 @@ class ManagerController extends Controller
 				return $accessResponse;
 			}
 
-			$employeeId = trim($employeeId);
+			$employeeId = trim($employeeUid);
 			if ($employeeId === '') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Employee is required.')], Http::STATUS_BAD_REQUEST);
 			}
@@ -2155,7 +2155,7 @@ class ManagerController extends Controller
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function exportTeamOvertimeCsv(): DataDownloadResponse|JSONResponse
+	public function exportTeamOvertimeCsv(?int $months = null): DataDownloadResponse|JSONResponse
 	{
 		try {
 			$managerId = $this->getUserId();
@@ -2164,11 +2164,37 @@ class ManagerController extends Controller
 				return $accessResponse;
 			}
 
+			// B-4(b): optional per-month delta columns. One OvertimeService
+			// calculation per window (getCumulativeWorkDelta), never a second
+			// formula. Capped at 24 months.
+			$monthWindows = [];
+			$monthsCount = $months !== null ? min(24, max(0, $months)) : 0;
+			if ($monthsCount > 0) {
+				$cursor = new \DateTime('first day of this month');
+				$cursor->setTime(0, 0, 0);
+				for ($i = 0; $i < $monthsCount; $i++) {
+					$monthStart = clone $cursor;
+					$monthEnd = (clone $cursor)->modify('+1 month');
+					// Current month: only count up to now (a full-month window
+					// would project future required hours into the delta).
+					$now = new \DateTime();
+					if ($i === 0 && $monthEnd > $now) {
+						$monthEnd = $now;
+					}
+					$monthWindows[] = ['label' => $monthStart->format('Y-m'), 'from' => $monthStart, 'to' => $monthEnd];
+					$cursor->modify('-1 month');
+				}
+			}
+
+			$header = 'user_id;display_name;balance_h;balance_type;traffic_light;bank_state;bank_fill_pct;payout_eligible_h;needs_attention';
+			foreach ($monthWindows as $w) {
+				$header .= ';delta_' . $w['label'] . '_h';
+			}
 			$teamUserIds = $this->getTeamMemberIds($managerId);
-			$lines = ["user_id;display_name;balance_h;balance_type;traffic_light;bank_state;bank_fill_pct;payout_eligible_h;needs_attention\n"];
+			$lines = [$header . "\n"];
 			foreach ($teamUserIds as $userId) {
 				$snapshot = $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
-				$lines[] = implode(';', [
+				$row = [
 					$this->csvEscape($userId),
 					$this->csvEscape($this->getDisplayName($userId)),
 					number_format((float)$snapshot['balance'], 2, '.', ''),
@@ -2178,7 +2204,14 @@ class ManagerController extends Controller
 					$snapshot['bank_fill_percent'] !== null ? number_format((float)$snapshot['bank_fill_percent'], 1, '.', '') : '',
 					$snapshot['payout_eligible_hours'] !== null ? number_format((float)$snapshot['payout_eligible_hours'], 2, '.', '') : '',
 					$snapshot['needs_attention'] ? 'yes' : 'no',
-				]) . "\n";
+				];
+				foreach ($monthWindows as $w) {
+					$row[] = number_format(
+						$this->overtimeService->getCumulativeWorkDelta($userId, $w['from'], $w['to']),
+						2, '.', ''
+					);
+				}
+				$lines[] = implode(';', $row) . "\n";
 			}
 
 			$csv = "\xEF\xBB\xBF" . implode('', $lines);
@@ -2196,6 +2229,114 @@ class ManagerController extends Controller
 				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * B-4(a): team absences grouped by type, manager-scoped.
+	 *
+	 * One CSV row per member × absence type inside the period (default:
+	 * current calendar year, approved only). `days` sums the scheduled days
+	 * of the overlapping entries; `entries` counts them.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function exportTeamAbsencesCsv(
+		?string $start_date = null,
+		?string $end_date = null,
+		?string $type = null,
+		?string $status = \OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
+	): DataDownloadResponse|JSONResponse {
+		try {
+			$managerId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($managerId, 'export_team_absences');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+
+			$start = $this->parseReportDate($start_date, new \DateTime('first day of january this year'));
+			$end = $this->parseReportDate($end_date, new \DateTime('last day of december this year'));
+			if ($start === null || $end === null || $start > $end) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date range.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$validTypes = [
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PERSONAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PARENTAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SPECIAL_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_UNPAID_LEAVE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_HOME_OFFICE,
+				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_BUSINESS_TRIP,
+			];
+			if ($type !== null && $type !== '' && !in_array($type, $validTypes, true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid absence type.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$teamUserIds = $this->getTeamMemberIds($managerId);
+			$absences = $this->absenceMapper->findByUsersAndDateRange($teamUserIds, $start, $end, $status, $type);
+
+			// Aggregate per member × type (server-side scope — never a client filter).
+			$agg = [];
+			foreach ($absences as $absence) {
+				$key = $absence->getUserId() . '|' . $absence->getType();
+				if (!isset($agg[$key])) {
+					$agg[$key] = ['user' => $absence->getUserId(), 'type' => $absence->getType(), 'days' => 0.0, 'count' => 0];
+				}
+				$agg[$key]['days'] += (float)($absence->getDays() ?? 0.0);
+				$agg[$key]['count']++;
+			}
+			uasort($agg, static fn ($a, $b) => [$a['user'], $a['type']] <=> [$b['user'], $b['type']]);
+
+			$lines = ["user_id;display_name;type;days;entries\n"];
+			foreach ($agg as $row) {
+				$lines[] = implode(';', [
+					$this->csvEscape($row['user']),
+					$this->csvEscape($this->getDisplayName($row['user'])),
+					$this->csvEscape($row['type']),
+					number_format($row['days'], 2, '.', ''),
+					(string)$row['count'],
+				]) . "\n";
+			}
+
+			$csv = "\xEF\xBB\xBF" . implode('', $lines);
+			$filename = sprintf('team-absences-%s_bis_%s.csv', $start->format('Y-m-d'), $end->format('Y-m-d'));
+			return new DataDownloadResponse($csv, $filename, 'text/csv; charset=UTF-8');
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::exportTeamAbsencesCsv',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Strict ISO `YYYY-MM-DD` for report params; falls back to $default on null.
+	 * Rejects anything else (no silent DateTime parsing surprises).
+	 */
+	private function parseReportDate(?string $raw, \DateTime $default): ?\DateTime
+	{
+		if ($raw === null || trim($raw) === '') {
+			return $default;
+		}
+		$raw = trim($raw);
+		$d = \DateTime::createFromFormat('!Y-m-d', $raw);
+		$errors = \DateTime::getLastErrors();
+		if ($d === false
+			|| ($errors !== false && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))
+			|| $d->format('Y-m-d') !== $raw) {
+			return null;
+		}
+		return $d;
 	}
 
 	private function csvEscape(string $value): string

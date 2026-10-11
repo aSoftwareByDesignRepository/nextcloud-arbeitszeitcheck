@@ -282,7 +282,7 @@ $holidaysUiStrings = [
 				</form>
 
 				<div class="admin-holidays__results" id="holiday-results" aria-live="polite" aria-busy="false">
-					<div class="table-container" role="region" aria-label="<?php p($l->t('List of holidays for the selected region and year')); ?>">
+					<div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('List of holidays for the selected region and year')); ?>">
 						<table class="table table--hover azc-table--responsive" id="holiday-table" aria-label="<?php p($l->t('List of holidays for the selected region and year')); ?>">
 							<caption class="visually-hidden"><?php p($l->t('List of holidays for the selected region and year, with date, name, type and actions')); ?></caption>
 							<thead>

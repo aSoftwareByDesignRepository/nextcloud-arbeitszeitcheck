@@ -8,6 +8,8 @@ use OCA\ArbeitszeitCheck\BusinessRuleCode;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
+use OCA\ArbeitszeitCheck\Db\TimeEntry;
+use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\DashboardWidgetDataService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -32,6 +34,7 @@ class DashboardWidgetController extends Controller {
 		private readonly DashboardWidgetDataService $widgetDataService,
 		private readonly TimeTrackingService $timeTrackingService,
 		private readonly PermissionService $permissionService,
+		private readonly ?ComplianceService $complianceService = null,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -115,6 +118,7 @@ class DashboardWidgetController extends Controller {
 			return new JSONResponse([
 				'success' => true,
 				'timeEntry' => $summary,
+				'break_warning' => $this->breakWarningPayload($entry),
 				'status' => $this->timeTrackingService->getStatus($userId),
 			]);
 		} catch (MonthFinalizedException $e) {
@@ -160,6 +164,21 @@ class DashboardWidgetController extends Controller {
 				'error' => $message,
 				'message' => $message,
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Additive break_warning for stamp responses — policy warnings never block.
+	 */
+	private function breakWarningPayload(TimeEntry $entry): ?array {
+		try {
+			if ($entry->getStatus() !== TimeEntry::STATUS_COMPLETED) {
+				return null;
+			}
+			$service = $this->complianceService ?? \OCP\Server::get(ComplianceService::class);
+			return $service->breakWarningForEntry($entry);
+		} catch (\Throwable) {
+			return null;
 		}
 	}
 

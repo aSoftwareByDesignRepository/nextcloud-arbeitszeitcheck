@@ -389,8 +389,9 @@
 /* Search combobox */
 #app-content.azc-app .azc-kiosk-search {
 	position: relative;
+	/* width:auto already fills the block minus its margin-inline-start;
+	   width:100% would add the margin on top and overflow at tablet widths */
 	max-width: 36rem;
-	width: 100%;
 }
 
 #app-content.azc-app .azc-kiosk-search__input {
@@ -507,7 +508,7 @@
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 1.25rem 1.5rem;
-	width: 100%;
+	/* auto width already fills the block minus margin-inline-start */
 	margin-top: 0.35rem;
 }
 
@@ -869,7 +870,8 @@ body.azc-kiosk-modal-open {
 
 #app-content.azc-app .azc-badge--neutral {
 	background: color-mix(in srgb, var(--color-main-text) 10%, transparent);
-	color: var(--azc-muted, var(--color-text-maxcontrast));
+	/* main-text, not muted: muted on the 10%-tinted fill measured 4.38:1 (< AA 4.5) */
+	color: var(--color-main-text);
 }
 
 #app-content.azc-app .azc-kiosk-cred-tags {

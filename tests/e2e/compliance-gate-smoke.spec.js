@@ -5,6 +5,8 @@ import { login, credsFromEnv } from './helpers/auth.js'
 import { apiAllowFailure, getRequestToken } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
 
+test.use({ trace: 'off' }) // extra pages/contexts race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network, upstream #23387) — screenshots/video still retained on failure
+
 test.describe('Compliance gate smoke (Docker dev)', () => {
 	test.beforeEach(async ({ page }) => {
 		await login(page, credsFromEnv('EMPLOYEE'))

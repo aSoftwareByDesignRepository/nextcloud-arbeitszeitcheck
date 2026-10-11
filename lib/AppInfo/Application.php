@@ -29,6 +29,7 @@ use OCA\ArbeitszeitCheck\Listener\CSPListener;
 use OCA\ArbeitszeitCheck\Listener\TimeClientBootstrapListener;
 use OCA\ArbeitszeitCheck\Listener\LoadUsersSettingsArbeitszeitListener;
 use OCA\ArbeitszeitCheck\Listener\UserDeletedListener;
+use OCA\ArbeitszeitCheck\Middleware\ApiValidationErrorMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\AppAccessMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\AppAdminMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\ClientLicenseMiddleware;
@@ -137,6 +138,13 @@ class Application extends App implements IBootstrap {
 			);
 		});
 		$context->registerMiddleware(SessionCsrfGuardMiddleware::class);
+
+		$context->registerService(ApiValidationErrorMiddleware::class, function ($c): ApiValidationErrorMiddleware {
+			return new ApiValidationErrorMiddleware(
+				$c->query(\OCP\IRequest::class),
+			);
+		});
+		$context->registerMiddleware(ApiValidationErrorMiddleware::class);
 
 		$context->registerService(KioskLicenseMiddleware::class, function ($c): KioskLicenseMiddleware {
 			return new KioskLicenseMiddleware(
@@ -644,6 +652,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
 				$c->query(DailyWorkingHoursCalculator::class),
 				$c->query(\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
 			);
 		});
 

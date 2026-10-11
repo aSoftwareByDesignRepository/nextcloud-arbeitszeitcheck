@@ -14,6 +14,15 @@ import { test, expect } from '@playwright/test'
 import { login, loginAs, credsFromEnv, gotoApp } from './helpers/auth.js'
 import { api, apiAllowFailure, getRequestToken } from './helpers/api.js'
 import { applyLabLicense } from './helpers/license.js'
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// tests/e2e → apps dir; docker compose resolves the project from parents.
+const COMPOSE_CWD = path.resolve(__dirname, '../../..')
+
+test.use({ trace: 'off' }) // extra pages/contexts race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network, upstream #23387) — screenshots/video still retained on failure
 
 test.describe.configure({ mode: 'serial' })
 
@@ -27,6 +36,25 @@ const FUTURE_FROM = '2099-06-01'
 const FUTURE_TO = '2099-06-30'
 
 let shared = { teamId: 0, wtmId: 0 }
+
+/**
+ * Delete ALL of the test employee's time entries for one calendar day. Shared
+ * dev users accumulate entries inside the 14-day edit window — a busy day
+ * trips the daily-hours cap, a finalized month rejects every write — so a
+ * clean slate is the only deterministic create precondition. Test hygiene only.
+ */
+function dbDeleteEmployeeEntriesForDay(day) {
+	const sql = `DELETE FROM oc_at_entries WHERE user_id = '${EMPLOYEE_UID}'
+		AND start_time >= '${day} 00:00:00' AND start_time < '${day} 00:00:00' + INTERVAL 1 DAY`
+	try {
+		execFileSync('docker', [
+			'compose', 'exec', '-T', 'mariadb', 'mariadb',
+			'-u', 'nextcloud', '-pnextcloud_password', 'nextcloud', '-e', sql,
+		], { cwd: COMPOSE_CWD, encoding: 'utf8', timeout: 60_000 })
+	} catch {
+		/* best-effort: dev DB unreachable — the API errors will report honestly */
+	}
+}
 
 test.describe('ATLAS durable CRUD (web)', () => {
 	test.beforeAll(async ({ browser }) => {
@@ -463,16 +491,26 @@ test.describe('ATLAS durable CRUD (web)', () => {
 			await login(emp, credsFromEnv('EMPLOYEE'))
 			await gotoApp(emp, `${APP}/time-entries`)
 
-			// find a free slot inside the 14-day edit window — overlap is
-			// interval-based, so a late-evening slot on a recent day works even
-			// when the employee already clocked that day
+			// Create on a past day inside the 14-day edit window that is not in a
+			// finalized month, DB-cleared of leftovers — overlap and the
+			// daily-hours cap are interval/sum-based, so a clean day is the only
+			// deterministic precondition. Today is skipped: a live clock session
+			// must not be deleted mid-test.
+			const fmRes = await apiAllowFailure(emp, 'GET', `${APP}/api/month-closure/finalized-months`)
+			const finalizedYMs = new Set(
+				(fmRes.json?.months ?? []).map((m) => `${m.year}-${String(m.month).padStart(2, '0')}`)
+			)
 			const SLOTS = [['22:30', '23:15'], ['20:30', '21:15'], ['18:30', '19:15']]
 			let created = null
 			let createdDate = null
-			for (let i = 0; i < 14 && !created; i++) {
+			for (let i = 1; i < 14 && !created; i++) {
 				const d = new Date()
 				d.setUTCDate(d.getUTCDate() - i)
 				const date = d.toISOString().slice(0, 10)
+				if (finalizedYMs.has(date.slice(0, 7))) {
+					continue
+				}
+				dbDeleteEmployeeEntriesForDay(date)
 				for (const [startTime, endTime] of SLOTS) {
 					const res = await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries`, {
 						data: { date, startTime, endTime, description: `atlas crud ${UNIQ}`, justification: `atlas durable-crud ${UNIQ}` },
@@ -483,7 +521,8 @@ test.describe('ATLAS durable CRUD (web)', () => {
 						break
 					}
 					const err = String(res.json?.error || res.json?.message || '')
-					if (!err.toLowerCase().includes('overlap') && !err.toLowerCase().includes('überschneid')) {
+					const retryable = ['overlap', 'überschneid', 'finalisier', 'finalized', 'maximum', 'überschreit']
+					if (!retryable.some((k) => err.toLowerCase().includes(k))) {
 						throw new Error(`time-entry create failed: ${err || res.status}`)
 					}
 				}

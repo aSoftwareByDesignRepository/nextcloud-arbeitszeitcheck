@@ -119,6 +119,7 @@
             night_work: cvT('Night work'),
             sunday_work: cvT('Sunday work'),
             holiday_work: cvT('Holiday work'),
+            missing_presence: cvT('Required presence not covered'),
         };
 
         const severityLabels = {

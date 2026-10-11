@@ -144,7 +144,7 @@ $filterIntro = $isAccessRestricted
             </header>
             <div class="azc-card__body">
                 <p id="users-list-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-                <div class="table-container" role="region" aria-label="<?php p($l->t('Employee list')); ?>" id="users-table-region">
+                <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Employee list')); ?>" id="users-table-region">
                     <table class="table table--hover azc-table--responsive" id="users-table" role="table" aria-label="<?php p($l->t('Employee list')); ?>">
                         <thead>
                             <tr>

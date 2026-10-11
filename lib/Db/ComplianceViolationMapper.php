@@ -134,6 +134,23 @@ class ComplianceViolationMapper extends QBMapper
 	}
 
 	/**
+	 * Find all violations linked to a time entry (dedup anchor for
+	 * per-entry policy checks).
+	 *
+	 * @return ComplianceViolation[]
+	 */
+	public function findByTimeEntryId(int $timeEntryId): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('time_entry_id', $qb->createNamedParameter($timeEntryId, IQueryBuilder::PARAM_INT)))
+			->orderBy('created_at', 'DESC');
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Delete all violations that are linked to a given time entry.
 	 *
 	 * This is used when a manual time entry is deleted so that we do not keep

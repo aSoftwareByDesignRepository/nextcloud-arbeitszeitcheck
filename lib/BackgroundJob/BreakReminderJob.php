@@ -16,6 +16,7 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
@@ -40,6 +41,7 @@ class BreakReminderJob extends TimedJob
 	private PermissionService $permissionService;
 	private TimeTrackingService $timeTrackingService;
 	private LaborLawProfileFactory $lawProfileFactory;
+	private ?BreakPolicyResolver $breakPolicyResolver;
 
 	public function __construct(
 		ITimeFactory $timeFactory,
@@ -52,6 +54,7 @@ class BreakReminderJob extends TimedJob
 		PermissionService $permissionService,
 		TimeTrackingService $timeTrackingService,
 		LaborLawProfileFactory $lawProfileFactory,
+		?BreakPolicyResolver $breakPolicyResolver = null,
 	) {
 		parent::__construct($timeFactory);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -63,6 +66,7 @@ class BreakReminderJob extends TimedJob
 		$this->permissionService = $permissionService;
 		$this->timeTrackingService = $timeTrackingService;
 		$this->lawProfileFactory = $lawProfileFactory;
+		$this->breakPolicyResolver = $breakPolicyResolver;
 
 		// Run every 30 minutes
 		$this->setInterval(30 * 60);
@@ -146,9 +150,10 @@ class BreakReminderJob extends TimedJob
 				// Calendar-day hours (midnight-clipped), same rules as TimeTrackingService::getTodayHours().
 				$totalHoursWorked = $this->timeTrackingService->getTodayHours($userId);
 
-				// Country profile break tiers (DE: 9h→45 then 6h→30; AT: 6h→30).
-				$requiredBreakMinutes = $this->lawProfileFactory->getProfile($userId)
-					->requiredBreakMinutes($totalHoursWorked);
+				// Effective required break = max(law, org policy, model rules)
+				// via the single resolver funnel — reminders must reflect the
+				// same obligation the compliance checks enforce.
+				$requiredBreakMinutes = $this->effectiveRequiredBreakMinutes($userId, $totalHoursWorked);
 				$takenBreakMinutes = (int)round($activeEntry->getBreakDurationHours() * 60);
 				$requiredBreak = $requiredBreakMinutes > $takenBreakMinutes
 					? $requiredBreakMinutes
@@ -204,5 +209,38 @@ class BreakReminderJob extends TimedJob
 				'trace' => $e->getTraceAsString()
 			]);
 		}
+	}
+
+	/**
+	 * Effective required break minutes for a user at a given hours-worked
+	 * level. Prefers the central BreakPolicyResolver (law ∪ org ∪ model);
+	 * falls back to the country labor-law profile when the resolver is not
+	 * available or fails — a reminder must never crash the whole job.
+	 */
+	private function effectiveRequiredBreakMinutes(string $userId, float $totalHoursWorked): int
+	{
+		$resolver = $this->breakPolicyResolver;
+		if ($resolver === null) {
+			try {
+				$resolver = \OCP\Server::get(BreakPolicyResolver::class);
+			} catch (\Throwable) {
+				$resolver = null;
+			}
+		}
+		if ($resolver !== null) {
+			try {
+				return $resolver->requiredBreakMinutes(
+					(int)round($totalHoursWorked * 3600),
+					$userId
+				);
+			} catch (\Throwable $e) {
+				$this->logger->warning(
+					'Break policy resolver failed in reminder job, using law profile: ' . $e->getMessage(),
+					['exception' => $e, 'user_id' => $userId]
+				);
+			}
+		}
+		return $this->lawProfileFactory->getProfile($userId)
+			->requiredBreakMinutes($totalHoursWorked);
 	}
 }

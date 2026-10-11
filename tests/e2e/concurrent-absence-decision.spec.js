@@ -18,6 +18,8 @@ function isWeekend(isoDate) {
 	return dow === 0 || dow === 6
 }
 
+test.use({ trace: 'off' }) // manual browser.newContext() calls race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network) — screenshots/video still retained on failure
+
 test.describe('Concurrent pending absence decision (live)', () => {
 	test.skip(
 		!hasCreds('EMPLOYEE') || !hasCreds('MANAGER'),

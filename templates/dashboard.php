@@ -845,6 +845,10 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                 <dt><?php p($l->t('Carryover pool left')); ?></dt>
                                 <dd><?php p((string)round((float)($dashStats['vacation_carryover_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
+                            <div class="dashboard-vacation-card__breakdown-row">
+                                <dt><?php p($l->t('Sick days this year')); ?></dt>
+                                <dd><?php p((string)round((float)($dashStats['sick_days_this_year'] ?? 0), 1) . ' ' . $l->t('days')); ?></dd>
+                            </div>
                             <?php if (isset($dashStats['vacation_carryover_max_cap']) && $dashStats['vacation_carryover_max_cap'] !== null && $dashStats['vacation_carryover_max_cap'] !== '') { ?>
                             <div class="dashboard-vacation-card__breakdown-row">
                                 <dt><?php p($l->t('Max. carryover (admin cap)')); ?></dt>
@@ -903,7 +907,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
             </header>
 
             <div class="azc-card__body azc-dashboard-recent__body">
-            <div class="azc-table-wrap azc-dashboard-recent__table-wrap" role="region" aria-label="<?php p($l->t('Recent time entries')); ?>">
+            <div class="azc-table-wrap azc-dashboard-recent__table-wrap" tabindex="0" role="region" aria-label="<?php p($l->t('Recent time entries')); ?>">
                 <table class="table table--hover azc-table--responsive azc-dashboard-recent__table" role="table" aria-label="<?php p($l->t('Recent time entries')); ?>">
                     <caption class="sr-only"><?php p($l->t('Recent time entries with date, start, end, duration, break, status and actions')); ?></caption>
                     <thead>

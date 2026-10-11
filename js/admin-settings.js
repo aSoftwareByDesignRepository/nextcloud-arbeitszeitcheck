@@ -75,6 +75,324 @@
         initProjectCheckAdminToggle();
         initOrganizationTimeCapture();
         initCountryRegionPicker();
+        initBreakPolicyEditor();
+    }
+
+    /**
+     * Central break-policy editor (compliance section).
+     *
+     * Dynamic tier/window/exemption rows are un-named inputs collected into
+     * JSON params on submit — serializeForm flattens FormData so named
+     * row inputs would arrive unusable.
+     */
+    function initBreakPolicyEditor() {
+        const editor = document.getElementById('azc-break-policy-editor');
+        const dataEl = document.getElementById('azc-break-policy-data');
+        if (!editor || !dataEl) {
+            return;
+        }
+        let policy = {};
+        try {
+            policy = JSON.parse(dataEl.textContent || '{}') || {};
+        } catch (e) {
+            policy = {};
+        }
+        const t = (key, fallback) => (window.t ? window.t('arbeitszeitcheck', key) : (fallback || key));
+
+        const rowTemplates = {
+            tiers: document.getElementById('azc-bp-tier-row'),
+            windows: document.getElementById('azc-bp-window-row'),
+            exemptions: document.getElementById('azc-bp-exemption-row'),
+        };
+        const listFor = (kind) => editor.querySelector('[data-bp-list="' + kind + '"]');
+        const emptyFor = (kind) => editor.querySelector('[data-bp-empty="' + kind + '"]');
+        const fieldsetFor = (kind) => editor.querySelector('[data-bp-rows="' + kind + '"]');
+
+        function addRow(kind, values) {
+            const tpl = rowTemplates[kind];
+            const list = listFor(kind);
+            const fs = fieldsetFor(kind);
+            if (!tpl || !list || !fs) {
+                return;
+            }
+            if (list.querySelectorAll('.azc-policy-row').length >= parseInt(fs.getAttribute('data-bp-max') || '8', 10)) {
+                return;
+            }
+            const node = tpl.content.firstElementChild.cloneNode(true);
+            node.querySelectorAll('[data-bp-key]').forEach(function(input) {
+                const key = input.getAttribute('data-bp-key');
+                if (values && values[key] !== undefined && values[key] !== null) {
+                    input.value = values[key];
+                }
+                Utils.on(input, 'input', updatePreview);
+                Utils.on(input, 'change', updatePreview);
+            });
+            const removeBtn = node.querySelector('[data-bp-remove]');
+            if (removeBtn) {
+                Utils.on(removeBtn, 'click', function() {
+                    node.remove();
+                    syncEmpty(kind);
+                    updatePreview();
+                });
+            }
+            list.appendChild(node);
+            syncEmpty(kind);
+            updatePreview();
+        }
+
+        function syncEmpty(kind) {
+            const list = listFor(kind);
+            const empty = emptyFor(kind);
+            const fs = fieldsetFor(kind);
+            const count = list ? list.querySelectorAll('.azc-policy-row').length : 0;
+            if (empty) {
+                empty.hidden = count > 0;
+            }
+            const addBtn = fs ? fs.querySelector('[data-bp-add="' + kind + '"]') : null;
+            const max = fs ? parseInt(fs.getAttribute('data-bp-max') || '8', 10) : 8;
+            if (addBtn) {
+                addBtn.disabled = count >= max;
+            }
+        }
+
+        function collectRows(kind) {
+            const list = listFor(kind);
+            if (!list) {
+                return [];
+            }
+            const rows = [];
+            list.querySelectorAll('.azc-policy-row').forEach(function(row) {
+                const item = {};
+                row.querySelectorAll('[data-bp-key]').forEach(function(input) {
+                    const key = input.getAttribute('data-bp-key');
+                    const v = String(input.value || '').trim();
+                    if (v !== '') {
+                        item[key] = v;
+                    }
+                });
+                rows.push(item);
+            });
+            return rows;
+        }
+
+        function updatePreview() {
+            const preview = document.getElementById('azc-policy-preview');
+            if (!preview) {
+                return;
+            }
+            const enforced = !!(document.getElementById('breakPolicyEnforced') || {}).checked;
+            const minBreak = String((document.getElementById('breakPolicyMinBreakMinutes') || {}).value || '').trim();
+            const tiers = collectRows('tiers');
+            const windows = collectRows('windows');
+            const exemptions = collectRows('exemptions');
+            const parts = [];
+            if (enforced) {
+                parts.push(t('Central rules are enforced for everyone.', 'Central rules are enforced for everyone.'));
+            } else {
+                parts.push(t('Statutory minimum breaks apply; central rules are not enforced.', 'Statutory minimum breaks apply; central rules are not enforced.'));
+            }
+            tiers.forEach(function(tier) {
+                if (tier.afterHours && tier.breakMinutes) {
+                    parts.push(
+                        t('More than {h} h → at least {m} min break.', 'More than {h} h → at least {m} min break.')
+                            .replace('{h}', tier.afterHours)
+                            .replace('{m}', tier.breakMinutes)
+                    );
+                }
+            });
+            if (minBreak !== '') {
+                parts.push(t('Only breaks of at least {m} min count.', 'Only breaks of at least {m} min count.').replace('{m}', minBreak));
+            }
+            windows.forEach(function(w) {
+                if (w.start && w.end) {
+                    const label = w.mode === 'required'
+                        ? t('Break must overlap {s}–{e}.', 'Break must overlap {s}–{e}.')
+                        : t('Automatic breaks are placed inside {s}–{e}.', 'Automatic breaks are placed inside {s}–{e}.');
+                    parts.push(label.replace('{s}', w.start).replace('{e}', w.end));
+                }
+            });
+            if (exemptions.length > 0) {
+                parts.push(t('{n} presence exception period(s) configured.', '{n} presence exception period(s) configured.').replace('{n}', String(exemptions.length)));
+            }
+            preview.textContent = parts.join(' ');
+            preview.hidden = parts.length === 0;
+        }
+
+        ['tiers', 'windows', 'exemptions'].forEach(function(kind) {
+            const list = (policy && policy[kind === 'exemptions' ? 'presence_exemptions' : kind]) || [];
+            if (Array.isArray(list)) {
+                list.forEach(function(item) { addRow(kind, item); });
+            }
+            const addBtn = editor.querySelector('[data-bp-add="' + kind + '"]');
+            if (addBtn) {
+                Utils.on(addBtn, 'click', function() {
+                    addRow(kind, null);
+                    const list2 = listFor(kind);
+                    const rows = list2 ? list2.querySelectorAll('.azc-policy-row') : [];
+                    const last = rows[rows.length - 1];
+                    const firstInput = last ? last.querySelector('[data-bp-key]') : null;
+                    if (firstInput) {
+                        firstInput.focus();
+                    }
+                });
+            }
+            syncEmpty(kind);
+        });
+
+        const enforcedEl = document.getElementById('breakPolicyEnforced');
+        if (enforcedEl) {
+            Utils.on(enforcedEl, 'change', updatePreview);
+        }
+        const minBreakEl = document.getElementById('breakPolicyMinBreakMinutes');
+        if (minBreakEl) {
+            Utils.on(minBreakEl, 'input', updatePreview);
+        }
+        updatePreview();
+    }
+
+    /**
+     * Serialize the dynamic policy editor into JSON params. Called from
+     * handleFormSubmit before the ajax call. Returns true when the editor
+     * exists on this page.
+     */
+    function collectBreakPolicyFormData(form, formData) {
+        const editor = form.querySelector('#azc-break-policy-editor');
+        if (!editor) {
+            ['breakPolicyEnforced', 'breakPolicyMinBreakMinutes', 'breakPolicyTiers',
+                'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm'].forEach(function(k) {
+                delete formData[k];
+            });
+            return false;
+        }
+        const collect = function(kind) {
+            const list = editor.querySelector('[data-bp-list="' + kind + '"]');
+            const rows = [];
+            if (!list) {
+                return rows;
+            }
+            list.querySelectorAll('.azc-policy-row').forEach(function(row) {
+                const item = {};
+                row.querySelectorAll('[data-bp-key]').forEach(function(input) {
+                    const v = String(input.value || '').trim();
+                    if (v !== '') {
+                        item[input.getAttribute('data-bp-key')] = v;
+                    }
+                });
+                rows.push(item);
+            });
+            return rows;
+        };
+        formData.breakPolicyEnforced = !!document.getElementById('breakPolicyEnforced')?.checked;
+        const minBreak = String((document.getElementById('breakPolicyMinBreakMinutes') || {}).value || '').trim();
+        formData.breakPolicyMinBreakMinutes = minBreak === '' ? null : minBreak;
+        formData.breakPolicyTiers = JSON.stringify(collect('tiers'));
+        formData.breakPolicyWindows = JSON.stringify(collect('windows'));
+        formData.presenceExemptions = JSON.stringify(collect('exemptions'));
+        const confirmBox = document.getElementById('azc-policy-confirm');
+        const confirmInput = document.getElementById('breakPolicyConfirm');
+        formData.breakPolicyConfirm = !!(confirmBox && !confirmBox.hidden && confirmInput && confirmInput.checked);
+        return true;
+    }
+
+    /**
+     * Show the inline confirm box for a CONFIRM_REQUIRED response and render
+     * the server warnings. Focus moves to the box heading — no modal trap.
+     */
+    function showBreakPolicyConfirm(warnings, lead) {
+        const box = document.getElementById('azc-policy-confirm');
+        const list = document.getElementById('azc-policy-confirm-warnings');
+        const leadEl = document.getElementById('azc-policy-confirm-lead');
+        if (!box || !list) {
+            return false;
+        }
+        list.textContent = '';
+        (Array.isArray(warnings) ? warnings : []).forEach(function(w) {
+            const li = document.createElement('li');
+            li.textContent = String(w);
+            list.appendChild(li);
+        });
+        if (leadEl && lead) {
+            leadEl.textContent = String(lead);
+        }
+        box.hidden = false;
+        const heading = document.getElementById('azc-break-policy-heading');
+        if (heading && !heading.hasAttribute('tabindex')) {
+            heading.setAttribute('tabindex', '-1');
+        }
+        if (heading) {
+            heading.focus();
+        }
+        return true;
+    }
+
+    /**
+     * Render field-level validation errors returned as
+     * { fields: { 'breakPolicyWindows.0': 'VALIDATION_*', … } }.
+     */
+    function renderBreakPolicyFieldErrors(fields) {
+        const editor = document.getElementById('azc-break-policy-editor');
+        const box = document.getElementById('azc-policy-editor-error');
+        if (!editor || !box || !fields) {
+            return;
+        }
+        box.textContent = '';
+        box.hidden = false;
+        const t = (key, fallback) => (window.t ? window.t('arbeitszeitcheck', key) : (fallback || key));
+        const codeLabels = {
+            VALIDATION_BOOLEAN: t('Please choose on or off.', 'Please choose on or off.'),
+            VALIDATION_RANGE: t('Value is outside the allowed range.', 'Value is outside the allowed range.'),
+            VALIDATION_SHAPE: t('This value has an invalid format.', 'This value has an invalid format.'),
+            VALIDATION_TOO_MANY: t('Too many entries — remove some rows.', 'Too many entries — remove some rows.'),
+            VALIDATION_TIER: t('This rule is incomplete — fill both fields.', 'This rule is incomplete — fill both fields.'),
+            VALIDATION_TIME: t('Please use the HH:MM time format.', 'Please use the HH:MM time format.'),
+            VALIDATION_EMPTY_WINDOW: t('Start and end must differ.', 'Start and end must differ.'),
+            VALIDATION_WINDOW_TOO_LONG: t('A break window may span at most 8 hours.', 'A break window may span at most 8 hours.'),
+            VALIDATION_MODE: t('Please choose a valid mode.', 'Please choose a valid mode.'),
+            VALIDATION_MINUTES: t('Please enter the minutes as a whole number.', 'Please enter the minutes as a whole number.'),
+            VALIDATION_MINUTES_EXCEED_WINDOW: t('The required minutes are longer than the window itself.', 'The required minutes are longer than the window itself.'),
+            VALIDATION_OVERLAP: t('These rows overlap — adjust the times.', 'These rows overlap — adjust the times.'),
+        };
+        const fieldLabels = {
+            breakPolicyEnforced: t('Enforce central break rules', 'Enforce central break rules'),
+            breakPolicyMinBreakMinutes: t('Minimum countable break', 'Minimum countable break'),
+            breakPolicyTiers: t('Break rules', 'Break rules'),
+            breakPolicyWindows: t('Break windows', 'Break windows'),
+            presenceExemptions: t('Presence exceptions', 'Presence exceptions'),
+        };
+        const messages = [];
+        Object.keys(fields).forEach(function(name) {
+            const base = name.split('.')[0];
+            const idx = name.indexOf('.') !== -1 ? parseInt(name.split('.')[1], 10) : null;
+            const label = fieldLabels[base] || base;
+            const code = fields[name];
+            const msg = (codeLabels[code] || code);
+            const li = document.createElement('p');
+            li.className = 'form-error';
+            li.textContent = label + ': ' + msg;
+            box.appendChild(li);
+            messages.push(msg);
+            // Mark the affected row inputs when an index is present.
+            if (idx !== null && Number.isInteger(idx)) {
+                const kind = base === 'breakPolicyTiers' ? 'tiers'
+                    : base === 'breakPolicyWindows' ? 'windows'
+                    : base === 'presenceExemptions' ? 'exemptions' : null;
+                const list = kind ? editor.querySelector('[data-bp-list="' + kind + '"]') : null;
+                const row = list ? list.querySelectorAll('.azc-policy-row')[idx] : null;
+                if (row) {
+                    row.querySelectorAll('[data-bp-key]').forEach(function(input) {
+                        input.setAttribute('aria-invalid', 'true');
+                        Utils.on(input, 'input', function() {
+                            input.removeAttribute('aria-invalid');
+                        }, { once: true });
+                    });
+                }
+            } else if (base === 'breakPolicyMinBreakMinutes' || base === 'breakPolicyEnforced') {
+                const input = document.getElementById(base);
+                if (input) {
+                    input.setAttribute('aria-invalid', 'true');
+                }
+            }
+        });
     }
 
     /**
@@ -770,6 +1088,14 @@
             delete formData.weeklyAbsoluteMaxHours;
         }
 
+        // Central break policy: dynamic rows serialize as JSON params.
+        collectBreakPolicyFormData(form, formData);
+        const policyErrorBox = document.getElementById('azc-policy-editor-error');
+        if (policyErrorBox) {
+            policyErrorBox.textContent = '';
+            policyErrorBox.hidden = true;
+        }
+
         const liveRegion = Utils.$('#admin-settings-live');
         const saveButton = Utils.$('#admin-settings-save');
         if (saveButton && (saveButton.disabled || saveButton.getAttribute('aria-busy') === 'true')) {
@@ -832,6 +1158,30 @@
         }
         setLiveMessage(liveRegion, '', null);
 
+        // Shared failure branch: structured {success:false} payloads arrive via
+        // onSuccess (HTTP 200) AND via onError's error.data (HTTP 4xx) —
+        // Utils.ajax throws on !response.ok, so CONFIRM_REQUIRED / field
+        // errors MUST be handled in both paths or the gate never renders.
+        const handleFailurePayload = function(data) {
+            const msg = (data && data.error) || window.ArbeitszeitCheck?.l10n?.failedToSaveSettings || (window.t ? window.t('arbeitszeitcheck', 'Failed to save settings') : 'Failed to save settings');
+            if (data && data.code === 'CONFIRM_REQUIRED' && showBreakPolicyConfirm(data.warnings, data.error)) {
+                setLiveMessage(liveRegion, msg, 'error');
+                return;
+            }
+            if (data && data.fields && typeof data.fields === 'object') {
+                renderBreakPolicyFieldErrors(data.fields);
+            }
+            Messaging.showError(msg);
+            setLiveMessage(liveRegion, msg, 'error');
+        };
+        const unlockSave = function() {
+            adminSettingsSaveInflight = false;
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.removeAttribute('aria-busy');
+            }
+        };
+
         // Submit (use server-generated URL for subpath compatibility)
         Utils.ajax(
             (window.ArbeitszeitCheck && window.ArbeitszeitCheck.adminSettingsApiUrl)
@@ -840,11 +1190,7 @@
             method: 'POST',
             data: formData,
             onSuccess: function(data) {
-                adminSettingsSaveInflight = false;
-                if (saveButton) {
-                    saveButton.disabled = false;
-                    saveButton.removeAttribute('aria-busy');
-                }
+                unlockSave();
                 if (data.success) {
                     const msg = data.message || window.ArbeitszeitCheck?.l10n?.settingsSavedSuccessfully || (window.t ? window.t('arbeitszeitcheck', 'Settings saved successfully') : 'Settings saved successfully');
                     Messaging.showSuccess(msg);
@@ -852,17 +1198,20 @@
                     if (data.settings && data.settings.country) {
                         form.setAttribute('data-initial-country', String(data.settings.country).toUpperCase());
                     }
+                    // Reset the policy inline-confirm after a successful save.
+                    const confirmBox = document.getElementById('azc-policy-confirm');
+                    const confirmInput = document.getElementById('breakPolicyConfirm');
+                    if (confirmBox) { confirmBox.hidden = true; }
+                    if (confirmInput) { confirmInput.checked = false; }
                 } else {
-                    const msg = data.error || window.ArbeitszeitCheck?.l10n?.failedToSaveSettings || (window.t ? window.t('arbeitszeitcheck', 'Failed to save settings') : 'Failed to save settings');
-                    Messaging.showError(msg);
-                    setLiveMessage(liveRegion, msg, 'error');
+                    handleFailurePayload(data);
                 }
             },
-            onError: function(_error) {
-                adminSettingsSaveInflight = false;
-                if (saveButton) {
-                    saveButton.disabled = false;
-                    saveButton.removeAttribute('aria-busy');
+            onError: function(error) {
+                unlockSave();
+                if (error && error.data && typeof error.data === 'object' && error.data.success === false) {
+                    handleFailurePayload(error.data);
+                    return;
                 }
                 const msg = window.ArbeitszeitCheck?.l10n?.errorSavingSettings || (window.t ? window.t('arbeitszeitcheck', 'An error occurred while saving settings') : 'An error occurred while saving settings');
                 Messaging.showError(msg);

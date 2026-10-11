@@ -14,6 +14,8 @@ function isWeekend(isoDate) {
   return day === 0 || day === 6
 }
 
+test.use({ trace: 'off' }) // extra pages race Playwright's trace-chunk flush on close (ENOENT *.trace, upstream #23387) — screenshots/video still retained on failure
+
 test('Clock in -> status active -> clock out -> status paused/clocked_out', async ({ page }) => {
   await login(page, credsFromEnv('EMPLOYEE'))
   await page.goto('/apps/arbeitszeitcheck/dashboard')

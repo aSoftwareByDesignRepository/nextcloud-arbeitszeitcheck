@@ -1,3 +1,4 @@
+/* global process */
 /**
  * ATLAS durable-mutation sweep — covers mutating endpoints that previously had
  * only happy-path/authz proof. Every assertion re-reads persisted state through
@@ -41,6 +42,8 @@ const UNIQ = `am${Date.now().toString(36)}`
 // tests/e2e → apps dir; docker compose resolves the project from parents.
 const COMPOSE_CWD = path.resolve(__dirname, '../../..')
 
+test.use({ trace: 'off' }) // extra pages/contexts race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network, upstream #23387) — screenshots/video still retained on failure
+
 test.describe.configure({ mode: 'serial' })
 
 /**
@@ -51,7 +54,13 @@ test.describe.configure({ mode: 'serial' })
  * hygiene only — all assertions still go through the real API.
  */
 function dbDeleteAbsenceRemnants() {
-	const sql = `DELETE FROM oc_at_absences WHERE reason LIKE 'atlas-mut%'`
+	// Probe horizon for test C: start up to 30 days back, end today+2 — any
+	// non-cancelled absence overlapping that window blocks every probe (a
+	// leftover approved "seed" vacation already did). Clear those too.
+	const sql = `DELETE FROM oc_at_absences WHERE reason LIKE 'atlas-mut%'
+		OR (user_id = '${EMP}' AND status <> 'cancelled'
+			AND start_date <= CURDATE() + INTERVAL 3 DAY
+			AND end_date >= CURDATE() - INTERVAL 31 DAY)`
 	try {
 		execFileSync('docker', [
 			'compose', 'exec', '-T', 'mariadb', 'mariadb',
@@ -59,6 +68,25 @@ function dbDeleteAbsenceRemnants() {
 		], { cwd: COMPOSE_CWD, encoding: 'utf8', timeout: 60_000 })
 	} catch {
 		/* best-effort: dev DB unreachable — the API overlap check will report honestly */
+	}
+}
+
+/**
+ * Delete ALL of the test employee's time entries for one calendar day. Test D
+ * needs a day with zero entries for its correction-overlap oracle, and shared
+ * dev users accumulate leftovers inside the 14-day edit window — a leftover
+ * finalized month can squeeze every free day out of it. Test hygiene only.
+ */
+function dbDeleteEmployeeEntriesForDay(day) {
+	const sql = `DELETE FROM oc_at_entries WHERE user_id = '${EMP}'
+		AND start_time >= '${day} 00:00:00' AND start_time < '${day} 00:00:00' + INTERVAL 1 DAY`
+	try {
+		execFileSync('docker', [
+			'compose', 'exec', '-T', 'mariadb', 'mariadb',
+			'-u', 'nextcloud', '-pnextcloud_password', 'nextcloud', '-e', sql,
+		], { cwd: COMPOSE_CWD, encoding: 'utf8', timeout: 60_000 })
+	} catch {
+		/* best-effort */
 	}
 }
 
@@ -179,7 +207,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { date, startTime, endTime: '23:25', description: `atlas-mut upd ${UNIQ}` },
 			})
 			expect(upd.ok, `form update failed: ${JSON.stringify(upd.json)}`).toBe(true)
-			const listed = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+			const listed = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 			const row = (listed.entries ?? listed.items ?? []).find((e) => e.id === entryId)
 			expect(row, 'updated entry must be re-readable in list').toBeTruthy()
 			expect(row.end_time ?? row.endTime).toContain('23:25')
@@ -191,7 +219,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			expect(rc.success).toBe(true)
 			const cc = await api(emp, 'POST', `${APP}/api/time-entries/${entryId}/cancel-correction`, { data: {} })
 			expect(cc.success).toBe(true)
-			const after = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+			const after = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 			const row2 = (after.entries ?? after.items ?? []).find((e) => e.id === entryId)
 			expect(row2).toBeTruthy()
 			expect(row2.pending_correction ?? row2.pendingCorrection ?? null).toBeFalsy()
@@ -323,29 +351,55 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			// employee entries: leftovers from prior runs share these slots and
 			// break the correction-overlap oracle (manager create does not run
 			// the employee-side overlap guard, so a free slot is not enough).
-			const SLOTS = [['20:00', '20:40'], ['19:00', '19:40'], ['18:00', '18:40'], ['17:00', '17:40']]
-			let me = null
-			for (let d = 1; d < 14 && !me?.ok; d++) {
+			// Finalized months reject every write — skip them, and when no
+			// in-window day is entry-free, DB-clear the first open one.
+			const fmRes = await apiAllowFailure(emp, 'GET', `${APP}/api/month-closure/finalized-months`)
+			const finalizedYMs = new Set(
+				(fmRes.json?.months ?? []).map((m) => `${m.year}-${String(m.month).padStart(2, '0')}`)
+			)
+			const probeDay = (d) => {
 				const dd = new Date()
 				dd.setUTCDate(dd.getUTCDate() - d)
-				const day = dd.toISOString().slice(0, 10)
-				const dayList = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${day}&end_date=${day}`)
-				if ((dayList.entries ?? dayList.items ?? []).length > 0) {
+				return dd.toISOString().slice(0, 10)
+			}
+			const SLOTS = [['20:00', '20:40'], ['19:00', '19:40'], ['18:00', '18:40'], ['17:00', '17:40']]
+			let me = null
+			let freeDay = null
+			for (let d = 1; d < 14 && !freeDay; d++) {
+				const day = probeDay(d)
+				if (finalizedYMs.has(day.slice(0, 7))) {
 					continue
 				}
+				const dayList = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${day}&end_date=${day}&limit=500`)
+				if ((dayList.entries ?? dayList.items ?? []).length === 0) {
+					freeDay = day
+				}
+			}
+			if (!freeDay) {
+				for (let d = 1; d < 14 && !freeDay; d++) {
+					const day = probeDay(d)
+					if (!finalizedYMs.has(day.slice(0, 7))) {
+						freeDay = day
+					}
+				}
+				if (freeDay) {
+					dbDeleteEmployeeEntriesForDay(freeDay)
+				}
+			}
+			if (freeDay) {
 				for (const [st2, en2] of SLOTS) {
 					me = await apiAllowFailure(mgr, 'POST', `${APP}/api/manager/employee-time-entries`, {
-						data: { userId: EMP, date: day, startTime: st2, endTime: en2, reason: `atlas manager entry ${UNIQ}` },
+						data: { userId: EMP, date: freeDay, startTime: st2, endTime: en2, reason: `atlas manager entry ${UNIQ}` },
 					})
 					if (me.ok) {
-						date = day
+						date = freeDay
 						break
 					}
 				}
 			}
 			expect(me?.ok, `manager entry create failed: ${JSON.stringify(me?.json)}`).toBe(true)
 			entryId = me.json?.id ?? me.json?.entry?.id
-			const empList = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+			const empList = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 			const empRow = (empList.entries ?? empList.items ?? []).find((e) => e.id === entryId)
 			expect(empRow, 'manager-created entry must appear in employee re-read').toBeTruthy()
 
@@ -375,7 +429,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { reason: `atlas reject ${UNIQ}` },
 			})
 			expect(rej.ok, `reject-correction failed: ${JSON.stringify(rej.json)}`).toBe(true)
-			const afterRej = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+			const afterRej = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 			const rowRej = (afterRej.entries ?? afterRej.items ?? []).find((e) => e.id === entryId)
 			expect(rowRej.pending_correction ?? rowRej.pendingCorrection ?? null).toBeFalsy()
 
@@ -392,7 +446,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				data: { date, startTime: sm ? `${sm[1]}:${sm[2]}` : undefined, endTime: newEnd, reason: `atlas direct correct ${UNIQ}` },
 			})
 			expect(corr.ok, `manager correct failed: ${JSON.stringify(corr.json)}`).toBe(true)
-			const afterCorr = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+			const afterCorr = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 			const rowCorr = (afterCorr.entries ?? afterCorr.items ?? []).find((e) => e.id === entryId)
 			expect(rowCorr.end_time ?? rowCorr.endTime).toContain(newEnd)
 		} finally {
@@ -1159,7 +1213,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				return (g.absences ?? g.items ?? []).find((a) => a.id === id)
 			}
 			const findEntry = async (date, id) => {
-				const l = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}`)
+				const l = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${date}&end_date=${date}&limit=500`)
 				return (l.entries ?? l.items ?? []).find((e) => e.id === id)
 			}
 			/** Create a 1-day special_leave absence probing future windows. */
@@ -1178,7 +1232,22 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			}
 
 			// — dashboard-widget/clock/in + clock/out round-trip ————————
-			const st0 = await getStatus()
+			// 'paused' is a resumable-but-not-running session: clock/in refuses it
+			// as already-open and clock/out 403s (no active/break row). The
+			// dashboard itself finishes such sessions via the complete endpoint —
+			// do the same to reach a clean slate before the round-trip.
+			let st0 = await getStatus()
+			if (st0 === 'paused') {
+				const statusPayload = await api(emp, 'GET', `${APP}/api/clock/status`)
+				const pausedId = statusPayload.status?.current_entry?.id
+					?? statusPayload.status?.currentEntry?.id
+					?? statusPayload.current_entry?.id
+				expect(pausedId, 'paused session must expose an entry id').toBeTruthy()
+				const done = await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries/${pausedId}/complete`, { data: {} })
+				expect(done.ok, `complete paused entry ${pausedId} failed: ${JSON.stringify(done.json)}`).toBe(true)
+				st0 = await getStatus()
+			}
+			// st0 cannot be 'paused' here — normalised above.
 			const wasActive = isActive({ status: { status: st0 } })
 			// First leg: whichever direction the ambient state allows.
 			const seqW = wasActive ? [['out', 'clocked_out'], ['in', 'active']] : [['in', 'active'], ['out', 'clocked_out']]
@@ -1195,10 +1264,13 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				const dd = new Date(); dd.setUTCDate(dd.getUTCDate() - d)
 				const iso = dd.toISOString().slice(0, 10)
 				const res = await apiAllowFailure(emp, 'POST', `${APP}/time-entries`, {
-					data: { date: iso, hours: 0.5, description: `atlas-mut webstore ${UNIQ}` },
+					// justification is mandatory when org policy requires manual-entry
+					// approval and is harmlessly stored/ignored when it does not —
+					// sending it unconditionally keeps the sweep config-independent.
+					data: { date: iso, hours: 0.5, description: `atlas-mut webstore ${UNIQ}`, justification: `atlas mutation sweep ${UNIQ}` },
 				})
 				if (res.ok || [301, 302, 303].includes(res.status)) {
-					const l = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${iso}&end_date=${iso}`)
+					const l = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${iso}&end_date=${iso}&limit=500`)
 					const row = (l.entries ?? l.items ?? []).find((e) => (e.description || '').includes(`webstore ${UNIQ}`))
 					if (row) { webEntryId = row.id; webEntryDate = iso }
 				}
@@ -1244,7 +1316,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			} catch (e) {
 				test.skip(true, `dev DB unreachable for paused fixture: ${e.message}`)
 			}
-			const paused = (await api(emp, 'GET', `${APP}/api/time-entries?start_date=${todayIso}&end_date=${todayIso}`))
+			const paused = (await api(emp, 'GET', `${APP}/api/time-entries?start_date=${todayIso}&end_date=${todayIso}&limit=500`))
 			const pausedRow = (paused.entries ?? paused.items ?? []).find((e) => (e.description || '').includes(`paused ${UNIQ}`))
 			expect(pausedRow, 'seeded paused row must be list-visible').toBeTruthy()
 			seededIds.push(pausedRow.id)

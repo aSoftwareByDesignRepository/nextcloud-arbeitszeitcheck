@@ -576,7 +576,15 @@
 				.replace('%1$d', String(userIds.length))
 				.replace('%2$d', String(remaining));
 		}
-		if (!window.confirm(confirmMsg)) {
+		// Accessible confirm — never window.confirm; helper fails closed (§7.3).
+		const confirmResult = await Utils.confirmDestructiveAction({
+			title: t('assignSeatsTitle', 'Assign mobile seats?'),
+			message: confirmMsg,
+			confirmLabel: t('assignSeatsConfirm', 'Assign seats'),
+			cancelLabel: t('cancel', 'Cancel'),
+			variant: 'info',
+		});
+		if (confirmResult === null || confirmResult.confirmed !== true) {
 			return;
 		}
 		hideFeedback();

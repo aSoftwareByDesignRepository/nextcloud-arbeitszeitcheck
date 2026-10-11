@@ -256,6 +256,7 @@ class TimeTrackingController extends Controller
 				'enforced' => $updatedEntry !== null,
 				'daily_maximum_reached' => $wasReachedBeforeEnforcement || $this->timeTrackingService->isAtOrAboveDailyMaximum($userId),
 				'status' => $status,
+				'break_warning' => $updatedEntry !== null ? $this->breakWarningPayload($updatedEntry) : null,
 			]);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeTrackingController::enforceDailyMaximum: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString(), ["exception" => $e]);
@@ -322,6 +323,20 @@ class TimeTrackingController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeTrackingController: ' . $e->getMessage(), ["exception" => $e]);
 			return $this->buildSafeErrorResponse($e);
+		}
+	}
+
+	/**
+	 * Additive break-warning payload — policy warnings never block a stamp.
+	 */
+	private function breakWarningPayload(\OCA\ArbeitszeitCheck\Db\TimeEntry $entry): ?array
+	{
+		try {
+			return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\ComplianceService::class)
+				->breakWarningForEntry($entry);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning('break_warning evaluation failed: ' . $e->getMessage());
+			return null;
 		}
 	}
 

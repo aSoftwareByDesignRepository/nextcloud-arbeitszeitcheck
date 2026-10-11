@@ -46,7 +46,61 @@
                     this.setupNotificationForm();
                 }
                 this.setupGdprDelete();
+                this.setupShowAllHints();
                 this.loadWorkingTimeModelInfo();
+            });
+        },
+
+        /**
+         * B-2: "Show all help texts again" — clears the dismissed_hints set.
+         */
+        setupShowAllHints: function() {
+            const btn = document.getElementById('btn-show-all-hints');
+            if (!btn) {
+                return;
+            }
+            const status = document.getElementById('show-all-hints-status');
+            btn.addEventListener('click', function() {
+                if (btn.disabled) {
+                    return;
+                }
+                btn.disabled = true;
+                btn.setAttribute('aria-busy', 'true');
+                const apiUrl = (window.ArbeitszeitCheck?.apiUrl?.updateSettings)
+                    || azcGenerateUrl('/apps/arbeitszeitcheck/settings');
+                fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'requesttoken': azcRequestToken()
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ dismissed_hints: [] })
+                })
+                .then((r) => r.json())
+                .then((result) => {
+                    if (result && result.success) {
+                        if (status) {
+                            status.textContent = (typeof window.t === 'function')
+                                ? window.t('arbeitszeitcheck', 'All help texts are visible again.')
+                                : 'All help texts are visible again.';
+                        }
+                    } else {
+                        btn.disabled = false;
+                        if (status) {
+                            status.textContent = (result && result.error) || ((typeof window.t === 'function') ? window.t('arbeitszeitcheck', 'Could not save. Please try again.') : 'Could not save. Please try again.');
+                        }
+                    }
+                })
+                .catch(() => {
+                    btn.disabled = false;
+                    if (status) {
+                        status.textContent = (typeof window.t === 'function') ? window.t('arbeitszeitcheck', 'Could not save. Please try again.') : 'Could not save. Please try again.';
+                    }
+                })
+                .finally(() => {
+                    btn.removeAttribute('aria-busy');
+                });
             });
         },
 

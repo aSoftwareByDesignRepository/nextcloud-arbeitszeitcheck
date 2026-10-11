@@ -61,12 +61,15 @@ if ($monthClosureEnabled) {
 $apiUrl = [
 	'timeEntries' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'),
 	'create' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiStore'),
-	'update' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiUpdate', ['id' => '__ID__']),
-	'delete' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiDelete', ['id' => '__ID__']),
-	'deletionImpact' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.getDeletionImpact', ['id' => '__ID__']),
+	// __ID__ URL templates use linkTo(): linkToRoute() validates the pinned \d+
+	// requirements and would reject the sentinel.
+	'update' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__'),
+	'delete' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__'),
+	'deletionImpact' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/deletion-impact'),
 	'export' => $urlGenerator->linkToRoute('arbeitszeitcheck.export.timeEntries'),
-	'requestCorrection' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.requestCorrection', ['id' => '__ID__']),
-	'cancelCorrection' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.cancelCorrection', ['id' => '__ID__']),
+	'exportPdf' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.exportPdf'),
+	'requestCorrection' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/request-correction'),
+	'cancelCorrection' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/cancel-correction'),
 	'timeEntriesList' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
 ];
 

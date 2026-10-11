@@ -33,6 +33,7 @@ class AuditLogPresenter
 		'absence_substitute_approved' => 'Substitute approved',
 		'absence_substitute_declined' => 'Substitute declined',
 		'absence_updated' => 'Absence updated',
+		'break_policy_updated' => 'Central break rules updated',
 		'clock_in' => 'Clock in',
 		'clock_out' => 'Clock out',
 		'compliance_violation_resolved' => 'Compliance issue resolved',
@@ -88,6 +89,7 @@ class AuditLogPresenter
 	/** @var array<string, string> */
 	private const ENTITY_LABELS = [
 		'absence' => 'Absence',
+		'break_policy' => 'Central break rules',
 		'compliance_violation' => 'Compliance issue',
 		'month_closure' => 'Month closure',
 		'overtime_payout' => 'Overtime payout',
@@ -126,6 +128,7 @@ class AuditLogPresenter
 		self::CATEGORY_UPDATE => [
 			'absence_shortened',
 			'absence_updated',
+			'break_policy_updated',
 			'clock_out',
 			'end_break',
 			'overtime_payout_processed',

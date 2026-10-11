@@ -53,6 +53,7 @@ class TimeTrackingService
 	private ?ProjectCheckLaborTimeSyncService $projectCheckLaborSync;
 	private TimeCaptureMethodService $timeCaptureMethodService;
 	private \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory;
+	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -73,6 +74,7 @@ class TimeTrackingService
 		?ProjectCheckLaborTimeSyncService $projectCheckLaborSync = null,
 		?TimeCaptureMethodService $timeCaptureMethodService = null,
 		?\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory = null,
+		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->violationMapper = $violationMapper;
@@ -98,6 +100,32 @@ class TimeTrackingService
 		);
 		$this->lawProfileFactory = $lawProfileFactory
 			?? new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper);
+		$this->breakPolicyResolver = $breakPolicyResolver;
+	}
+
+	/**
+	 * Single source of truth for effective break policy (law ∪ org ∪ model).
+	 * Lazily resolved so existing constructor call sites keep working.
+	 */
+	private function breakPolicyResolver(): \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver
+	{
+		if ($this->breakPolicyResolver === null) {
+			try {
+				$this->breakPolicyResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			} catch (\Throwable) {
+				$this->breakPolicyResolver = new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+					$this->config,
+					$this->lawProfileFactory,
+					$this->userSettingsMapper,
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper,
+					$this->timeEntryMapper,
+					$this->timeZoneService,
+					$this->l10n,
+				);
+			}
+		}
+		return $this->breakPolicyResolver;
 	}
 
 	/**
@@ -1108,24 +1136,35 @@ class TimeTrackingService
 	 */
 	public function calculateRequiredBreakMinutes(float $hoursWorked, ?string $userId = null): int
 	{
-		return $this->lawProfile($userId)->requiredBreakMinutes($hoursWorked);
+		// Effective requirement = max(law, org policy, working-time model) —
+		// seconds-precision threshold comparison inside the resolver (E-32).
+		return $this->breakPolicyResolver()->requiredBreakMinutes((int)round($hoursWorked * 3600), $userId);
 	}
 
 	/**
-	 * Whether ArbZG §4 automatic break insertion is enabled for this user.
-	 * Default is on (matches personal settings / historical behaviour).
+	 * Whether automatic break insertion applies for this user.
+	 * Default is on (matches personal settings / historical behaviour); when an
+	 * enforced organisation break policy exists the employee cannot opt out —
+	 * the stored preference is preserved untouched for when enforcement ends.
 	 */
 	public function isAutoBreakCalculationEnabled(string $userId): bool
 	{
+		if ($this->breakPolicyResolver()->isEnforced()) {
+			return true;
+		}
 		return $this->userSettingsMapper->getStringSetting($userId, 'auto_break_calculation', '1') === '1';
 	}
 
 	/**
-	 * Calculate and set automatic break if no break was entered and break is legally required
-	 * 
-	 * Automatically calculates the legally required break time (ArbZG §4) and adds it to the time entry
-	 * if no break was manually entered. The break is placed in the middle of the working period.
-	 * 
+	 * Calculate and set automatic break if the day still lacks required break time.
+	 *
+	 * Effective requirement = max(law, org policy, working-time model) via
+	 * {@see BreakPolicyResolver}. Day-level (E-25): the remainder after all
+	 * break portions already on the calendar day is appended to this entry's
+	 * `breaks` JSON — never rebuilt. Any manual break on the day suppresses
+	 * automatic insertion; placement prefers the first applicable policy
+	 * window, then the shift midpoint, and never ends at/after the shift end.
+	 *
 	 * @param TimeEntry $timeEntry The time entry to process
 	 * @return bool True if automatic break was added, false otherwise
 	 */
@@ -1136,93 +1175,77 @@ class TimeTrackingService
 			return false;
 		}
 
-		if (!$timeEntry->getStartTime() || !$timeEntry->getEndTime()) {
-			return false;
-		}
-
-		// Check if break was already manually entered
-		$hasManualBreak = false;
-		
-		// Check for breakStartTime/breakEndTime (single break)
-		if ($timeEntry->getBreakStartTime() !== null && $timeEntry->getBreakEndTime() !== null) {
-			$hasManualBreak = true;
-		}
-		
-		// Check for breaks in JSON (multiple breaks)
-		$breaksJson = $timeEntry->getBreaks();
-		if ($breaksJson !== null && $breaksJson !== '') {
-			$breaks = json_decode($breaksJson, true) ?? [];
-			if (!empty($breaks)) {
-				$hasManualBreak = true;
-			}
-		}
-
-		// If break was already entered, don't add automatic break
-		if ($hasManualBreak) {
-			return false;
-		}
-
-		// Calculate total duration (including any breaks that might be in the future)
 		$startTime = $timeEntry->getStartTime();
 		$endTime = $timeEntry->getEndTime();
-		$totalDurationSeconds = $endTime->getTimestamp() - $startTime->getTimestamp();
-		$totalDurationHours = $totalDurationSeconds / 3600;
+		if (!$startTime || !$endTime) {
+			return false;
+		}
 
-		// IMPORTANT: For entries that span multiple work periods (e.g., paused and resumed),
-		// we need to calculate the required break based on TOTAL WORKING TIME OF THE DAY,
-		// not just the duration of this single entry.
-		// This is because ArbZG §4 requires breaks based on total working hours per day.
-		
-		$userId = $timeEntry->getUserId();
+		// Break requirements are based on TOTAL working time of the calendar
+		// day (peak across the entry's span), not this single row — ArbZG §4
+		// and the org/model policy tiers share that day-level semantics.
 		$totalWorkingHoursForDay = $this->dailyWorkingHoursCalculator->getPeakWorkingHoursForEntrySpan(
 			$userId,
 			$timeEntry,
 			$endTime,
 			$timeEntry->getId(),
 		);
+		$workSeconds = (int)round($totalWorkingHoursForDay * 3600);
 
-		// Peak calendar-day working hours → required break for this user's law profile
-		$requiredBreakMinutes = $this->calculateRequiredBreakMinutes($totalWorkingHoursForDay, $userId);
-
-		// If no break is required, nothing to do
+		$resolver = $this->breakPolicyResolver();
+		$required = $resolver->requiredBreakDetailed($workSeconds, $userId);
+		$requiredBreakMinutes = $required['minutes'];
 		if ($requiredBreakMinutes <= 0) {
 			return false;
 		}
 
-		// Calculate break duration in seconds
-		$breakDurationSeconds = $requiredBreakMinutes * 60;
-
-		// Place break in the middle of the working period
-		$workDurationSeconds = $totalDurationSeconds;
-		$breakStartOffset = (int)floor(($workDurationSeconds - $breakDurationSeconds) / 2);
-		if ($breakStartOffset < 0) {
-			$breakStartOffset = 0;
+		$plan = $resolver->planAutoBreak($timeEntry, $requiredBreakMinutes);
+		if ($plan === null) {
+			return false;
 		}
-		$breakStartTime = clone $startTime;
-		$breakStartTime->modify('+' . round($breakStartOffset) . ' seconds');
-		$breakEndTime = clone $breakStartTime;
-		$breakEndTime->modify('+' . $breakDurationSeconds . ' seconds');
 
-		// Store automatic break in breaks JSON array (for multiple breaks support)
-		$breaks = [];
+		$placedMinutes = (int)round($plan['seconds'] / 60);
+		$reasonSource = $required['source'] ?? \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_LAW;
+		$reason = $reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_LAW
+			? $this->l10n->t('Automatically added: Legal break requirement (%s)', [$this->lawProfile($userId)->lawLabel('breaks')])
+			: $this->l10n->t('Automatically added: Organisational break policy (%s)', [
+				$reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_MODEL
+					? $this->l10n->t('working time model')
+					: $this->l10n->t('organisation policy'),
+			]);
+
+		// Append — never rebuild the list. Existing automatic top-ups and any
+		// portions written by pause flows stay untouched.
+		$existingJson = $timeEntry->getBreaks();
+		$breaks = (is_string($existingJson) && $existingJson !== '')
+			? (json_decode($existingJson, true) ?: [])
+			: [];
+		if (!is_array($breaks)) {
+			$breaks = [];
+		}
 		$breaks[] = [
-			'start' => $breakStartTime->format('c'),
-			'end' => $breakEndTime->format('c'),
-			'duration_minutes' => $requiredBreakMinutes,
-			'automatic' => true, // Mark as automatically generated
-			'reason' => $this->l10n->t('Automatically added: Legal break requirement (%s)', [$this->lawProfile($userId)->lawLabel('breaks')])
+			'start' => $plan['start']->format('c'),
+			'end' => $plan['end']->format('c'),
+			'duration_minutes' => $placedMinutes,
+			'automatic' => true,
+			'reason' => $reason,
+			'policy_source' => $reasonSource,
+			'required_break_minutes' => $requiredBreakMinutes,
 		];
-
 		$timeEntry->setBreaks(json_encode($breaks));
 
-		// Log the automatic break addition
 		\OCP\Log\logger('arbeitszeitcheck')->info('Automatic break added to time entry', [
 			'time_entry_id' => $timeEntry->getId(),
-			'user_id' => $timeEntry->getUserId(),
-			'total_duration_hours' => round($totalDurationHours, 2),
+			'user_id' => $userId,
+			'total_duration_hours' => round(($endTime->getTimestamp() - $startTime->getTimestamp()) / 3600, 2),
 			'required_break_minutes' => $requiredBreakMinutes,
-			'break_start' => $breakStartTime->format('c'),
-			'break_end' => $breakEndTime->format('c')
+			'placed_break_minutes' => $placedMinutes,
+			'policy_source' => $reasonSource,
+			'break_window' => $plan['window'] !== null
+				? $plan['window']['start'] . '–' . $plan['window']['end']
+				: null,
+			'break_start' => $plan['start']->format('c'),
+			'break_end' => $plan['end']->format('c'),
 		]);
 
 		return true;

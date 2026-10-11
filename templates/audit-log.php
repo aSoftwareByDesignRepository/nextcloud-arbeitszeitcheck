@@ -209,7 +209,7 @@ $rangeEnd = min($total, $offset + $shownCount);
 				</p>
 			</header>
 			<div class="azc-card__body">
-				<div class="table-container audit-log-page__table-wrap" role="region" aria-label="<?php p($l->t('Activity log')); ?>">
+				<div class="table-container audit-log-page__table-wrap" tabindex="0" role="region" aria-label="<?php p($l->t('Activity log')); ?>">
 					<table class="table table--hover azc-table--responsive audit-log-table" id="audit-log-table" aria-label="<?php p($l->t('Activity log')); ?>">
 						<thead>
 							<tr>

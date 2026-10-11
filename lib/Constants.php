@@ -581,6 +581,22 @@ final class Constants
 	public const COMPLIANCE_SCORE_INFO_WEIGHT = 5;
 	public const COMPLIANCE_SCORE_MAX_DEDUCTION = 100;
 
+	/**
+	 * Organisation break policy (JSON document, versioned — no schema change).
+	 * Shape: {version, enforced, min_break_minutes, tiers[], windows[],
+	 * presence_exemptions[]}. Corrupt content degrades to law-only behaviour
+	 * with a logged warning — see {@see \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver}.
+	 */
+	public const CONFIG_BREAK_POLICY_JSON = 'break_policy_json';
+
+	/** Monotonic revision of {@see CONFIG_BREAK_POLICY_JSON} for audit/diff. */
+	public const CONFIG_BREAK_POLICY_VERSION = 'break_policy_version';
+
+	/**
+	 * Audit-log entity type for organisation break-policy writes.
+	 */
+	public const AUDIT_ENTITY_BREAK_POLICY = 'break_policy';
+
 
 	private function __construct()
 	{

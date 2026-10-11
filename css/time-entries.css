@@ -1630,3 +1630,38 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--time-entries .time-inpu
 	width: 100%;
 	max-width: 100%;
 }
+
+/* Inline break-policy warning after save — replaces auto-redirect (no lost info). */
+#app-content.azc-app--time-entries .time-entry-form__break-warning {
+	margin: var(--azc-spacing-md, 1rem) 0;
+}
+
+#app-content.azc-app--time-entries .azc-break-warning__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+
+/* B-2 dismissible hints */
+#app-content .azc-hint .azc-hint__dismiss {
+	margin-left: 0.75rem;
+	padding: 0.15rem 0.5rem;
+	border: none;
+	border-radius: var(--border-radius);
+	background: transparent;
+	color: var(--color-text-maxcontrast);
+	cursor: pointer;
+	font-size: 0.85em;
+	text-decoration: underline;
+	min-height: 32px;
+}
+
+#app-content .azc-hint .azc-hint__dismiss:hover,
+#app-content .azc-hint .azc-hint__dismiss:focus-visible {
+	color: var(--color-main-text);
+}
+
+#app-content .azc-hint .azc-hint__show {
+	margin: 0 0 var(--azc-spacing-sm, 0.5rem);
+}

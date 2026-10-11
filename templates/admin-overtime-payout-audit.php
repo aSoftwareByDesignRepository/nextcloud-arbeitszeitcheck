@@ -157,7 +157,7 @@ $monthLabels = is_array($_['monthLabels'] ?? null) ? $_['monthLabels'] : [];
                     </div>
                 </header>
                 <div class="azc-card__body">
-                    <div class="table-container" role="region" aria-labelledby="ot-audit-table-heading">
+                    <div class="table-container" tabindex="0" role="region" aria-labelledby="ot-audit-table-heading">
                         <table class="table table--hover azc-table--responsive grid-table admin-ot-audit__grid" id="ot-audit-table">
                             <caption class="sr-only"><?php p($l->t('Recorded overtime payouts matching the current filters')); ?></caption>
                             <thead>

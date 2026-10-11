@@ -170,8 +170,9 @@ class EmployeeStatusWidget implements IAPIWidgetV2, IButtonWidget, IIconWidget, 
 
 		// ── Item 6: vacation pool split (annual + carryover) ───────────────────
 		if (!$vacationYearError) {
-			$carryover = number_format((float)$data['vacationCarryoverUsable'], 1);
-			$annualPool = max(0.0, (float)$data['vacationRemaining'] - (float)$data['vacationCarryoverUsable']);
+			$carryoverUsable = (float)($data['vacationCarryoverUsable'] ?? 0.0);
+			$carryover = number_format($carryoverUsable, 1);
+			$annualPool = max(0.0, (float)($data['vacationRemaining'] ?? 0.0) - $carryoverUsable);
 			$annual = number_format($annualPool, 1);
 			$poolSubtitle = $vacationUnit === 'hours'
 				? $this->l10n->t('Annual: %1$s h · Carryover: %2$s h', [$annual, $carryover])
@@ -184,7 +185,7 @@ class EmployeeStatusWidget implements IAPIWidgetV2, IButtonWidget, IIconWidget, 
 		}
 
 		// ── Item 7 (conditional): break compliance warning ──────────────────────
-		if ((bool)$data['breakRequired'] && (int)$data['remainingBreakMinutes'] > 0) {
+		if ((bool)($data['breakRequired'] ?? false) && (int)($data['remainingBreakMinutes'] ?? 0) > 0) {
 			$remaining = (int)$data['remainingBreakMinutes'];
 			$items[] = new WidgetItem(
 				$this->l10n->t('Break required (%s)', [(string)($data['lawLabelBreaks'] ?? 'ArbZG §4')]),

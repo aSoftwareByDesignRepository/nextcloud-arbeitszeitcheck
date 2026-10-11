@@ -43,6 +43,8 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
+use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -639,7 +641,13 @@ class TimeEntryController extends Controller
 			}
 			if ($end_date) {
 				try {
-					$countFilters['end_date'] = $this->parseDate($end_date);
+					// Match the entries query below: an end_date of 'Y-m-d' must
+					// cover that whole day (exclusive bound at next midnight), or
+					// `total` collapses to 0 whenever start_date = end_date.
+					$countEnd = $this->parseDate($end_date);
+					$countEnd->setTime(0, 0, 0);
+					$countEnd->modify('+1 day');
+					$countFilters['end_date'] = $countEnd;
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->error('Invalid end_date format: ' . $end_date, ['exception' => $e]);
 					return new JSONResponse([
@@ -737,6 +745,146 @@ class TimeEntryController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * B-3: PDF download of the filtered time-entry list.
+	 *
+	 * Mirrors {@see index()} filters (start_date / end_date / status). Without
+	 * a date range it defaults to the last 30 days — same convention as the
+	 * quick CSV export — and any explicit range is capped at 93 days / 5000
+	 * rows so a "whole history" request cannot produce a broken mega-PDF.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function exportPdf(?string $start_date = null, ?string $end_date = null, ?string $status = null): DataDownloadResponse|JSONResponse
+	{
+		try {
+			$userId = $this->getUserId();
+			$appTz = $this->getAppTimeZone();
+
+			try {
+				if ($start_date === null && $end_date === null) {
+					$startDateTime = new \DateTime('today', $appTz);
+					$startDateTime->modify('-29 days');
+					$endDateTime = new \DateTime('today', $appTz);
+				} else {
+					$startDateTime = $start_date !== null ? $this->parseDate($start_date) : new \DateTime('1970-01-01', $appTz);
+					$startDateTime->setTime(0, 0, 0);
+					$endDateTime = $end_date !== null ? $this->parseDate($end_date) : new \DateTime('today', $appTz);
+					$endDateTime->setTime(0, 0, 0);
+				}
+			} catch (\Throwable) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid date format. Expected yyyy-mm-dd or dd.mm.yyyy.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			if ($startDateTime > $endDateTime) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Start date cannot be after end date'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$spanDays = (int)$startDateTime->diff($endDateTime)->days;
+			if ($spanDays > 93) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The selected period is too large for a PDF export. Please narrow the date range to at most 93 days.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$queryEnd = (clone $endDateTime)->modify('+1 day');
+			$entries = $this->timeEntryMapper->findByUserAndDateRange($userId, $startDateTime, $queryEnd);
+			if ($status !== null && $status !== '') {
+				$entries = array_values(array_filter(
+					$entries,
+					static fn (TimeEntry $e) => $e->getStatus() === $status
+				));
+			}
+
+			$statusLabels = [
+				TimeEntry::STATUS_ACTIVE => $this->l10n->t('Active'),
+				TimeEntry::STATUS_COMPLETED => $this->l10n->t('Completed'),
+				TimeEntry::STATUS_BREAK => $this->l10n->t('On break'),
+				TimeEntry::STATUS_PAUSED => $this->l10n->t('Paused'),
+				TimeEntry::STATUS_PENDING_APPROVAL => $this->l10n->t('Pending approval'),
+				TimeEntry::STATUS_REJECTED => $this->l10n->t('Rejected'),
+			];
+
+			$user = $this->userSession->getUser();
+			$displayName = $user ? ($user->getDisplayName() ?: $userId) : $userId;
+
+			$lines = [];
+			$lines[] = $this->l10n->t('Time entries %1$s – %2$s · %3$s', [
+				$startDateTime->format('d.m.Y'),
+				$endDateTime->format('d.m.Y'),
+				$displayName,
+			]);
+			$lines[] = $this->l10n->t('Exported on %s · all times in timezone %s', [
+				(new \DateTime('now', $appTz))->format('d.m.Y H:i'),
+				$appTz->getName(),
+			]);
+			$lines[] = '';
+
+			$truncated = false;
+			if (count($entries) > 5000) {
+				$entries = array_slice($entries, 0, 5000);
+				$truncated = true;
+			}
+
+			if ($entries === []) {
+				$lines[] = $this->l10n->t('No time entries in this period.');
+			} else {
+				foreach ($entries as $entry) {
+					$start = $entry->getStartTime();
+					$end = $entry->getEndTime();
+					$startLocal = $start !== null ? (clone $start)->setTimezone($appTz) : null;
+					$endLocal = $end !== null ? (clone $end)->setTimezone($appTz) : null;
+
+					$datePart = $startLocal !== null ? $startLocal->format('d.m.Y') : '–';
+					$timePart = ($startLocal !== null ? $startLocal->format('H:i') : '?')
+						. '–'
+						. ($endLocal !== null ? $endLocal->format('H:i') : $this->l10n->t('open'));
+					$breakMin = (int)round(($entry->getBreakDurationHours() ?? 0.0) * 60);
+					$breakPart = $this->l10n->t('break %d min', [$breakMin]);
+					$workHours = (float)($entry->getWorkingDurationHours() ?? 0.0);
+					$hoursPart = number_format($workHours, 2, ',', '') . ' h';
+					$statusPart = $statusLabels[$entry->getStatus()] ?? $entry->getStatus();
+					$desc = trim((string)($entry->getDescription() ?? ''));
+
+					$line = $datePart . '  ' . $timePart . '  ·  ' . $hoursPart . ' (' . $breakPart . ')  ·  ' . $statusPart;
+					if ($desc !== '') {
+						$line .= '  ·  ' . mb_substr($desc, 0, 120);
+					}
+					$lines[] = $line;
+				}
+			}
+
+			if ($truncated) {
+				$lines[] = '';
+				$lines[] = $this->l10n->t('Export truncated at 5000 rows — please narrow the date range.');
+			}
+
+			$title = $this->l10n->t('Time entries');
+			$pdf = \OCA\ArbeitszeitCheck\Service\MinimalPdfBuilder::build($title, $lines);
+			$filename = sprintf(
+				'zeiteintraege-%s_bis_%s.pdf',
+				$startDateTime->format('Y-m-d'),
+				$endDateTime->format('Y-m-d')
+			);
+
+			return new DataDownloadResponse($pdf, $filename, 'application/pdf');
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeEntryController::exportPdf: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -1182,6 +1330,7 @@ class TimeEntryController extends Controller
 						return new JSONResponse([
 							'success' => true,
 							'entry' => $savedEntry->getSummary(),
+							'break_warning' => $this->breakWarningPayload($savedEntry),
 							'message' => $this->l10n->t('Manual time entry submitted for manager approval.')
 						], Http::STATUS_CREATED);
 					}
@@ -1208,7 +1357,8 @@ class TimeEntryController extends Controller
 
 					return new JSONResponse([
 						'success' => true,
-						'entry' => $savedEntry->getSummary()
+						'entry' => $savedEntry->getSummary(),
+						'break_warning' => $this->breakWarningPayload($savedEntry)
 					], Http::STATUS_CREATED);
 				});
 			} catch (LockedException $e) {
@@ -1693,7 +1843,8 @@ class TimeEntryController extends Controller
 
 							return new JSONResponse([
 								'success' => true,
-								'entry' => $updatedEntry->getSummary()
+								'entry' => $updatedEntry->getSummary(),
+								'break_warning' => $this->breakWarningPayload($updatedEntry)
 							]);
 						}, $this->db);
 					});
@@ -2057,6 +2208,7 @@ class TimeEntryController extends Controller
 				return new JSONResponse([
 					'success' => true,
 					'entry' => $updatedEntry->getSummary(),
+					'break_warning' => $this->breakWarningPayload($updatedEntry),
 					'message' => $this->l10n->t('Correction request submitted and auto-approved (no approver assigned in the app).')
 				]);
 			}
@@ -2064,6 +2216,7 @@ class TimeEntryController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
+				'break_warning' => $this->breakWarningPayload($updatedEntry),
 				'message' => $this->l10n->t('Correction request submitted successfully')
 			]);
 		} catch (DoesNotExistException $e) {
@@ -2287,6 +2440,7 @@ class TimeEntryController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
+				'break_warning' => $this->breakWarningPayload($updatedEntry),
 				'message' => $this->l10n->t('Paused session was completed and recorded successfully.'),
 			]);
 		} catch (DoesNotExistException $e) {
@@ -2857,6 +3011,7 @@ class TimeEntryController extends Controller
 							return new JSONResponse([
 								'success' => true,
 								'entry' => $savedEntry->getSummary(),
+								'break_warning' => $this->breakWarningPayload($savedEntry),
 								'message' => $this->l10n->t('Manual time entry submitted for manager approval.'),
 							], Http::STATUS_CREATED);
 						}
@@ -2879,7 +3034,8 @@ class TimeEntryController extends Controller
 						}
 						return new JSONResponse([
 							'success' => true,
-							'entry' => $savedEntry->getSummary()
+							'entry' => $savedEntry->getSummary(),
+							'break_warning' => $this->breakWarningPayload($savedEntry)
 						], Http::STATUS_CREATED);
 					}, $this->db);
 				});
@@ -3195,7 +3351,24 @@ class TimeEntryController extends Controller
 	}
 
 	/**
+	 * Additive `break_warning` payload for save responses (SPEC §10).
+	 * Policy-only shortfalls warn — they never block; a null value means
+	 * "no organisational policy violation". Evaluation failures degrade to
+	 * null so a policy defect can never break a save response.
+	 */
+	private function breakWarningPayload(TimeEntry $entry): ?array
+	{
+		try {
+			return $this->complianceService->breakWarningForEntry($entry);
+		} catch (\Throwable) {
+			return null;
+		}
+	}
+
+	/**
 	 * Server-side ArbZG gate before persisting a completed manual/API entry.
+	 * Statutory-only: organisational break-policy findings must never enter
+	 * this gate — they surface via {@see breakWarningPayload()} instead.
 	 */
 	private function complianceSaveBlockResponse(TimeEntry $timeEntry): ?JSONResponse
 	{

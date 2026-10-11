@@ -16,6 +16,7 @@ $availableGroups = is_array($availableGroups ?? null) ? $availableGroups : (is_a
 $availableAppAdmins = is_array($availableAppAdmins ?? null) ? $availableAppAdmins : (is_array($_['availableAppAdmins'] ?? null) ? $_['availableAppAdmins'] : []);
 $availableAccessUsers = is_array($availableAccessUsers ?? null) ? $availableAccessUsers : (is_array($_['availableAccessUsers'] ?? null) ? $_['availableAccessUsers'] : []);
 $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($renderAll);
+$monthClosureOn = !empty($settings['monthClosureEnabled']);
 ?>
                 <section class="azc-card admin-settings-section" aria-labelledby="section-month-closure-heading">
                                         <header class="azc-card__header<?php echo empty($azcSettingsShowCardChrome) ? ' azc-card__header--page-title-only' : ''; ?>">

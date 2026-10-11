@@ -126,6 +126,9 @@ class ManagerControllerTest extends TestCase
 	/** @var TimeEntryCorrectionService|\PHPUnit\Framework\MockObject\MockObject */
 	private $correctionService;
 
+	/** @var \OCA\ArbeitszeitCheck\Service\OvertimeDisplayService|\PHPUnit\Framework\MockObject\MockObject */
+	private $overtimeDisplayService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -146,6 +149,7 @@ class ManagerControllerTest extends TestCase
 		$this->request = $this->createMock(IRequest::class);
 		$this->teamManagerMapper = $this->createMock(TeamManagerMapper::class);
 		$this->overtimeService = $this->createMock(OvertimeService::class);
+		$this->overtimeDisplayService = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeDisplayService::class);
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
 		$this->notificationService = $this->createMock(NotificationService::class);
 		$this->timeEntryMapper = $this->createMock(TimeEntryMapper::class);
@@ -211,7 +215,7 @@ class ManagerControllerTest extends TestCase
 			$this->l10n,
 			$this->teamManagerMapper,
 			$this->overtimeService,
-			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeDisplayService::class),
+			$this->overtimeDisplayService,
 			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
 			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeTrafficLightService::class),
 			$this->auditLogMapper,
@@ -2249,5 +2253,174 @@ class ManagerControllerTest extends TestCase
 
 		$d = $this->controller->createEmployeeTimeEntry()->getData();
 		$this->assertTrue($d['success']);
+	}
+
+
+	/**
+	 * B-4: the overtime CSV must contain a row per team member — the
+	 * unassigned-$teamUserIds regression produced a silent header-only file.
+	 */
+	public function testExportTeamOvertimeCsvContainsMemberRows(): void
+	{
+		$managerId = 'manager1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+
+		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn(['employee1']);
+		$this->userManager->method('getDisplayName')->with('employee1')->willReturn('Employee One');
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->with('employee1')->willReturn([
+			'balance' => 3.5,
+			'balance_label' => 'credit',
+			'traffic_light_state' => 'green',
+			'bank_state' => 'active',
+			'bank_fill_percent' => 12.5,
+			'payout_eligible_hours' => 1.0,
+			'needs_attention' => false,
+		]);
+
+		$response = $this->controller->exportTeamOvertimeCsv();
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+
+		$csv = $response->render();
+		$this->assertStringContainsString('employee1', $csv);
+		$this->assertStringContainsString('Employee One', $csv);
+		$this->assertStringContainsString('3.50', $csv);
+	}
+
+	/**
+	 * B-4(b): months=N adds one delta column per month, capped at 24, and
+	 * each column is computed via getCumulativeWorkDelta (one formula).
+	 */
+	public function testExportTeamOvertimeCsvMonthlyDeltas(): void
+	{
+		$managerId = 'manager1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+
+		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn(['employee1']);
+		$this->userManager->method('getDisplayName')->willReturn('Emp');
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturn([
+			'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
+			'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
+			'needs_attention' => false,
+		]);
+
+		$deltaCalls = 0;
+		$this->overtimeService->method('getCumulativeWorkDelta')->willReturnCallback(
+			function ($uid, $from, $to) use (&$deltaCalls) {
+				$deltaCalls++;
+				return 1.25;
+			}
+		);
+
+		$response = $this->controller->exportTeamOvertimeCsv(3);
+		$csv = $response->render();
+		$this->assertSame(3, $deltaCalls, 'one getCumulativeWorkDelta call per month window per member');
+		$this->assertMatchesRegularExpression('/delta_\d{4}-\d{2}_h/', $csv);
+		// 3 delta columns → header carries three delta_ entries
+		$this->assertSame(3, substr_count(explode("\n", $csv)[0], 'delta_'));
+	}
+
+	/** B-4(b): months is capped at 24. */
+	public function testExportTeamOvertimeCsvCapsMonthsAt24(): void
+	{
+		$managerId = 'manager1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+
+		$this->teamResolver->method('getTeamMemberIds')->willReturn(['employee1']);
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturn([
+			'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
+			'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
+			'needs_attention' => false,
+		]);
+		$this->overtimeService->method('getCumulativeWorkDelta')->willReturn(0.0);
+
+		$csv = $this->controller->exportTeamOvertimeCsv(99)->render();
+		$this->assertSame(24, substr_count(explode("\n", $csv)[0], 'delta_'));
+	}
+
+	/** B-4: non-managers get a uniform 403, never a CSV. */
+	public function testExportTeamOvertimeCsvForbiddenForNonManagers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('employee1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = false;
+		$this->isAdminAccess = false;
+
+		$response = $this->controller->exportTeamOvertimeCsv();
+		$this->assertInstanceOf(JSONResponse::class, $response);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	/**
+	 * B-4(a): team absences aggregate per member x type, are CSV-injection
+	 * safe, and only ever query the manager's own team ids.
+	 */
+	public function testExportTeamAbsencesCsvAggregatesAndEscapes(): void
+	{
+		$managerId = 'manager1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+
+		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn(['employee1']);
+
+		$a1 = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$a1->setUserId('employee1');
+		$a1->setType(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION);
+		$a1->setDays(5.0);
+		$a2 = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$a2->setUserId('employee1');
+		$a2->setType(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION);
+		$a2->setDays(3.0);
+		$a3 = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$a3->setUserId('employee1');
+		$a3->setType(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE);
+		$a3->setDays(1.0);
+
+		// The mapper must be queried with the manager's team ids ONLY.
+		$this->absenceMapper->expects($this->once())
+			->method('findByUsersAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), 'approved', null)
+			->willReturn([$a1, $a2, $a3]);
+
+		// Formula-injection display name must be '-prefixed.
+		$this->userManager->method('getDisplayName')->with('employee1')->willReturn('=cmd|calc');
+
+		$response = $this->controller->exportTeamAbsencesCsv('2024-01-01', '2024-12-31');
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+		$csv = $response->render();
+
+		$this->assertStringContainsString('employee1;\'=cmd|calc;vacation;8.00;2', $csv);
+		$this->assertStringContainsString('employee1;\'=cmd|calc;sick_leave;1.00;1', $csv);
+		$this->assertStringContainsString('team-absences-2024-01-01_bis_2024-12-31.csv',
+			$response->getHeaders()['Content-Disposition'] ?? '');
+	}
+
+	/** B-4(a): invalid type rejected; inverted range rejected. */
+	public function testExportTeamAbsencesCsvValidatesInputs(): void
+	{
+		$managerId = 'manager1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+		$this->teamResolver->method('getTeamMemberIds')->willReturn(['employee1']);
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST,
+			$this->controller->exportTeamAbsencesCsv('2024-01-01', '2024-12-31', 'bogus_type')->getStatus());
+		$this->assertSame(Http::STATUS_BAD_REQUEST,
+			$this->controller->exportTeamAbsencesCsv('2024-12-31', '2024-01-01')->getStatus());
+		$this->assertSame(Http::STATUS_BAD_REQUEST,
+			$this->controller->exportTeamAbsencesCsv('2024-13-45', '2024-01-01')->getStatus());
 	}
 }

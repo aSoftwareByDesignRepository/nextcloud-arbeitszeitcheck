@@ -70,9 +70,10 @@ class KioskOfflineStampService
 			$userId = $this->authService->resolveUserIdFromRfid($terminal, $rfidUid);
 			$this->authService->assertUserEligibleForAction($userId);
 
+			$completedEntry = null;
 			$newStatus = match ($action) {
 				'clock_in' => $this->applyClockIn($userId, $effectiveAt),
-				'clock_out' => $this->applyClockOut($userId, $effectiveAt),
+				'clock_out' => $this->applyClockOut($userId, $effectiveAt, $completedEntry),
 				'break_start' => $this->applyStartBreak($userId, $effectiveAt),
 				'break_end' => $this->applyEndBreak($userId, $effectiveAt),
 				default => throw new KioskException('KIOSK_ACTION_INVALID'),
@@ -83,6 +84,7 @@ class KioskOfflineStampService
 				'data' => [
 					'newStatus' => $newStatus,
 					'message' => $this->actionService->actionMessageFor($action),
+					'break_warning' => $completedEntry !== null ? $this->breakWarning($completedEntry) : null,
 				],
 			];
 			$json = json_encode($payload, JSON_THROW_ON_ERROR);
@@ -142,10 +144,27 @@ class KioskOfflineStampService
 		return 'working';
 	}
 
-	private function applyClockOut(string $userId, \DateTimeInterface $at): string
+	private function applyClockOut(string $userId, \DateTimeInterface $at, ?\OCA\ArbeitszeitCheck\Db\TimeEntry &$entry = null): string
 	{
-		$this->timeTrackingService->clockOut($userId, \OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', $at);
+		$entry = $this->timeTrackingService->clockOut($userId, \OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', $at);
 		return 'off';
+	}
+
+	/**
+	 * Organisational break-policy warning for a completed entry — warnings
+	 * never block, and a failure to compute must not fail the stamp.
+	 */
+	private function breakWarning(\OCA\ArbeitszeitCheck\Db\TimeEntry $entry): ?array
+	{
+		try {
+			if ($entry->getStatus() !== \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED) {
+				return null;
+			}
+			$compliance = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\ComplianceService::class);
+			return $compliance->breakWarningForEntry($entry);
+		} catch (\Throwable) {
+			return null;
+		}
 	}
 
 	private function applyStartBreak(string $userId, \DateTimeInterface $at): string

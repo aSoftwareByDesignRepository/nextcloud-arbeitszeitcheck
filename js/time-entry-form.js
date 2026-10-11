@@ -1947,6 +1947,13 @@ class TimeEntryFormManager {
 					});
 				}
 
+				// Policy break warning: surface inline with actions instead of
+				// a blink-and-gone redirect toast (warning never blocks).
+				if (result.break_warning && this.showBreakWarningNotice(result)) {
+					this.resetSubmitButton(submitBtn, originalText);
+					return;
+				}
+
 				// Redirect after a short delay to show the success message
 				setTimeout(() => {
 					window.location.href = this.formConfig.redirectUrl || '';
@@ -1985,6 +1992,66 @@ class TimeEntryFormManager {
 			this.showErrorNotification(errorMsg);
 			this.resetSubmitButton(submitBtn, originalText);
 		}
+	}
+
+	/**
+	 * Render the org break-policy warning inline. Replaces the auto-redirect:
+	 * the entry is saved, the user can jump straight to the saved entry to
+	 * add the missing break, or continue to the list. Returns true when the
+	 * notice was shown.
+	 */
+	showBreakWarningNotice(result) {
+		const box = document.getElementById('entry-break-warning');
+		const text = document.getElementById('entry-break-warning-text');
+		const editLink = document.getElementById('entry-break-warning-edit');
+		const doneLink = document.getElementById('entry-break-warning-done');
+		if (!box || !text) {
+			return false;
+		}
+		const warning = result.break_warning || {};
+		const parts = [];
+
+		if (warning.window && warning.window.start && warning.window.end) {
+			const w = warning.window;
+			const missing = Math.max(0, (w.required_minutes || 0) - (w.covered_minutes || 0));
+			parts.push(
+				(window.t ? window.t('arbeitszeitcheck', 'The required break window {s}–{e} is missing {m} min.', {s: w.start, e: w.end, m: missing}) : null)
+				|| `The required break window ${w.start}–${w.end} is missing ${missing} min.`
+			);
+		}
+		if (typeof warning.required === 'number' && typeof warning.actual === 'number' && warning.required > warning.actual) {
+			parts.push(
+				(window.t ? window.t('arbeitszeitcheck', 'Required break: {r} min — recorded: {a} min.', {r: warning.required, a: warning.actual}) : null)
+				|| `Required break: ${warning.required} min — recorded: ${warning.actual} min.`
+			);
+		}
+		if (parts.length === 0) {
+			parts.push(
+				(window.t ? window.t('arbeitszeitcheck', 'This entry does not fully meet the break rules.') : null)
+				|| 'This entry does not fully meet the break rules.'
+			);
+		}
+		parts.push(
+			(window.t ? window.t('arbeitszeitcheck', 'The entry was saved.') : null)
+			|| 'The entry was saved.'
+		);
+		text.textContent = parts.join(' ');
+
+		const entryId = result && result.entry ? result.entry.id : null;
+		const editTemplate = this.formConfig.editUrlTemplate || '';
+		if (editLink && entryId && editTemplate) {
+			editLink.href = editTemplate.replace('__ENTRY_ID__', encodeURIComponent(String(entryId)));
+			editLink.hidden = false;
+		} else if (editLink) {
+			editLink.hidden = true;
+		}
+		if (doneLink && this.formConfig.redirectUrl) {
+			doneLink.href = this.formConfig.redirectUrl;
+		}
+		box.hidden = false;
+		// Announce via role=alert without stealing focus (keyboard users keep
+		// their place on the submit button / next control).
+		return true;
 	}
 
 	updateAllHiddenInputs() {

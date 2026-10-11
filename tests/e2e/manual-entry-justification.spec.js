@@ -9,6 +9,8 @@ function addDays(isoDate, days) {
 	return d.toISOString().slice(0, 10)
 }
 
+test.use({ trace: 'off' }) // manual browser.newContext() calls race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network) — screenshots/video still retained on failure
+
 test.describe('Manual time entry justification (four-eyes)', () => {
 	test.skip(!process.env.NC_ADMIN_USER || !process.env.NC_EMPLOYEE_USER, 'Requires NC_ADMIN_USER and NC_EMPLOYEE_USER')
 

@@ -1,3 +1,4 @@
+/* global process */
 import { defineConfig, devices } from '@playwright/test'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
@@ -41,8 +42,16 @@ const STATEFUL_SPECS = [
   /theme-responsive-a11y\.spec\.js/,
   /locale-rendering-overflow-rawkey\.spec\.js/,
   /admin-dach-country-region\.spec\.js/,
+  // Break policy mutates shared org break_policy_json — an enforced policy
+  // left behind locks the employee auto-break checkbox for sibling specs.
+  /break-policy\.spec\.js/,
+  // S5 flows mutate e2e_employee dismissed_hints + create a working time model.
+  /s5-ux-flows\.spec\.js/,
   /admin-holidays-auto-restore\.spec\.js/,
   /admin-time-capture-org\.spec\.js/,
+  // momos clocks in/out with the shared employee in its double-clock-in race
+  // and toggles license/kiosk state — same shared-state race class.
+  /momos-adversarial\.spec\.js/,
   /compliance-gate-smoke\.spec\.js/,
   /concurrent-pending-decision\.spec\.js/,
   /manual-create-pending-approval\.spec\.js/,

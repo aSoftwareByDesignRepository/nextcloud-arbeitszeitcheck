@@ -660,7 +660,7 @@
 
                 const form = document.getElementById('admin-users-bulk-form');
                 if (form) {
-                    form.addEventListener('submit', function(e) {
+                    form.addEventListener('submit', async function(e) {
                         e.preventDefault();
                         const fields = buildFields();
                         const l3Days = (document.getElementById('bulk-l3-days') || {}).value;
@@ -669,7 +669,15 @@
                             Messaging && Messaging.showError && Messaging.showError(auMsg('chooseField', 'Choose a work schedule and/or holiday region.'));
                             return;
                         }
-                        if (!window.confirm(auMsg('confirmBulk', 'Apply these settings to %n people?').replace('%s', String(userIds.length)))) {
+                        // Accessible confirm — never window.confirm; helper fails closed (§7.3).
+                        const confirmResult = await Utils.confirmDestructiveAction({
+                            title: auMsg('applyToSelected', 'Apply to selected…'),
+                            message: auMsg('confirmBulk', 'Apply these settings to %n people?').replace('%s', String(userIds.length)),
+                            confirmLabel: auMsg('apply', 'Apply'),
+                            cancelLabel: auMsg('cancel', 'Cancel'),
+                            variant: 'warning',
+                        });
+                        if (confirmResult === null || confirmResult.confirmed !== true) {
                             return;
                         }
 

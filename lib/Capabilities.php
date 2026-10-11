@@ -73,6 +73,23 @@ class Capabilities implements ICapability {
 			'arbeitszeitcheck', 'min_rest_period', (string)$profile->minRestHoursDefault
 		)));
 
+		// Org break policy — fail open to non-enforced on resolver faults so a
+		// capabilities hiccup never locks companion clients into wrong UI.
+		$breakPolicyEnforced = false;
+		$breakPolicyActive = false;
+		try {
+			$policyResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			$breakPolicyEnforced = $policyResolver->isEnforced();
+			$breakPolicyActive = $policyResolver->isPolicyActive($user !== null ? $user->getUID() : null);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Capabilities: break-policy resolver failed — reporting non-enforced: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			$breakPolicyEnforced = false;
+			$breakPolicyActive = false;
+		}
+
 		return [
 			'arbeitszeitcheck' => [
 				// B-3: report the real installed app version, never a literal.
@@ -127,6 +144,12 @@ class Capabilities implements ICapability {
 					'allowedBreakSplitPatterns' => $profile->allowedBreakSplitPatterns,
 					'weeklyAbsoluteMaxHours' => $profile->weeklyAbsoluteMaxHours,
 					'german-labor-law' => $isGermany,
+					// Additive: older clients ignore this; new clients use it
+					// to lock break preferences and explain managed rules.
+					'breakPolicy' => [
+						'enforced' => $breakPolicyEnforced,
+						'active' => $breakPolicyActive,
+					],
 					'gdpr' => true,
 					'audit-logging' => true,
 					'data-retention' => true,

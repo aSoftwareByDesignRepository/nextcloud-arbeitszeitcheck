@@ -66,7 +66,7 @@ $total = $_['total'] ?? 0;
             </div>
 
             <!-- Violations Table -->
-            <div class="table-container" role="region" aria-label="<?php p($l->t('Compliance violations list')); ?>">
+            <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Compliance violations list')); ?>">
                 <table class="table table--hover azc-table--responsive" id="violations-table" role="table" aria-label="<?php p($l->t('Compliance violations list')); ?>">
                     <thead>
                         <tr>
@@ -103,6 +103,7 @@ $total = $_['total'] ?? 0;
                                     'night_work' => $l->t('Night work'),
                                     'sunday_work' => $l->t('Sunday work'),
                                     'holiday_work' => $l->t('Holiday work'),
+                                    'missing_presence' => $l->t('Required presence not covered'),
                                     default => $typeKey,
                                 };
                                 $severityKey = $violation['severity'] ?? '';

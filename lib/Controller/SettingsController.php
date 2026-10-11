@@ -45,6 +45,7 @@ class SettingsController extends Controller
 	private IL10N $l10n;
 	private IURLGenerator $urlGenerator;
 	private PermissionService $permissionService;
+	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver;
 
 	public function __construct(
 		string $appName,
@@ -55,8 +56,10 @@ class SettingsController extends Controller
 		IL10N $l10n,
 		CSPService $cspService,
 		IURLGenerator $urlGenerator,
-		PermissionService $permissionService
+		PermissionService $permissionService,
+		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null
 	) {
+		$this->breakPolicyResolver = $breakPolicyResolver;
 		parent::__construct($appName, $request);
 		$this->userSession = $userSession;
 		$this->userSettingsMapper = $userSettingsMapper;
@@ -104,9 +107,18 @@ class SettingsController extends Controller
 				}
 			}
 
+			// Org-enforced break policy: report the effective value, not the
+			// (possibly stale) stored opt-out — companions and the settings UI
+			// must both see '1' while enforcement is active.
+			$policyEnforced = $this->isBreakPolicyEnforced();
+			if ($policyEnforced) {
+				$settings['auto_break_calculation'] = '1';
+			}
+
 			return new JSONResponse([
 				'success' => true,
-				'settings' => $settings
+				'settings' => $settings,
+				'break_policy_enforced' => $policyEnforced,
 			]);
 		} catch (\Throwable $e) {
 			if ($this->isMissingTableException($e)) {
@@ -224,10 +236,12 @@ class SettingsController extends Controller
 				'auto_break_calculation',
 				'missing_clock_in_reminders_enabled',
 				'hours_display',
+				'dismissed_hints',
 			];
 
 			$updatedSettings = [];
 			$oldValues = [];
+			$policyEnforced = $this->isBreakPolicyEnforced();
 
 			// Update each setting if provided
 			foreach ($allowedKeys as $key) {
@@ -243,9 +257,34 @@ class SettingsController extends Controller
 						$value = \OCA\ArbeitszeitCheck\Support\HoursDisplay::normalize(
 							is_scalar($value) ? (string)$value : null
 						);
+					} elseif ($key === 'dismissed_hints') {
+						// B-2: JSON array of stable hint ids (a-z0-9_-, ≤64 chars,
+						// ≤64 entries). Unknown ids are kept (forward-compat for
+						// hints added by later versions); malformed input is
+						// rejected rather than silently emptied.
+						$raw = is_string($value) ? json_decode($value, true) : $value;
+						if (!is_array($raw) || array_is_list($raw) === false || count($raw) > 64) {
+							continue;
+						}
+						$clean = [];
+						foreach ($raw as $id) {
+							if (!is_string($id) || !preg_match('/^[a-z0-9_-]{1,64}$/', $id)) {
+								continue;
+							}
+							$clean[$id] = true;
+						}
+						$value = json_encode(array_keys($clean));
 					} else {
 						// Boolean toggles: coerce to canonical '1' / '0'.
 						$value = ($value === true || $value === 'true' || $value === '1' || $value === 1) ? '1' : '0';
+					}
+
+					// Org-enforced break policy: employees cannot opt out of
+					// automatic break calculation. Skip the write but still
+					// report the effective value so the UI reflects reality.
+					if ($key === 'auto_break_calculation' && $value === '0' && $policyEnforced) {
+						$updatedSettings[$key] = '1';
+						continue;
 					}
 
 					$this->userSettingsMapper->setSetting($userId, $key, $value);
@@ -273,7 +312,8 @@ class SettingsController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'message' => $this->l10n->t('Settings updated successfully'),
-				'settings' => $updatedSettings
+				'settings' => $updatedSettings,
+				'breakPolicy' => ['enforced' => $policyEnforced],
 			]);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in SettingsController::update: ' . $e->getMessage(), ["exception" => $e]);
@@ -402,6 +442,26 @@ class SettingsController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('Failed to update onboarding status')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Whether the org break policy currently forces automatic break
+	 * calculation. Fails open to false — a resolver fault must never lock
+	 * employees out of their own preferences.
+	 */
+	private function isBreakPolicyEnforced(): bool
+	{
+		try {
+			$resolver = $this->breakPolicyResolver
+				?? Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			return $resolver->isEnforced();
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Break-policy enforcement check failed — failing open to non-enforced: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return false;
 		}
 	}
 

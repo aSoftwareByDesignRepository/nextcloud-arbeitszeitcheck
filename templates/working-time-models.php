@@ -45,7 +45,7 @@ $models = $_['models'] ?? [];
             </header>
             <div class="azc-card__body">
             <!-- Models Table -->
-            <div class="table-container" role="region" aria-label="<?php p($l->t('Working time models')); ?>">
+            <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Working time models')); ?>">
                 <table class="table table--hover azc-table--responsive" id="models-table" role="table" aria-label="<?php p($l->t('Working time models')); ?>">
                 <thead>
                     <tr>
@@ -133,8 +133,8 @@ $models = $_['models'] ?? [];
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
-    window.ArbeitszeitCheck.l10n.confirmDeleteModel = <?php echo json_encode($l->t('Are you sure you want to delete this work schedule?\n\nThis will permanently remove this schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    window.ArbeitszeitCheck.l10n.confirmDeleteModelWithName = <?php echo json_encode($l->t('Are you sure you want to delete "{name}"?\n\nThis will permanently remove this work schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.confirmDeleteModel = <?php echo json_encode($l->t("Are you sure you want to delete this work schedule?\n\nThis will permanently remove this schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone."), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.confirmDeleteModelWithName = <?php echo json_encode($l->t("Are you sure you want to delete \"{name}\"?\n\nThis will permanently remove this work schedule. If any employees are using this schedule, you should assign them to a different schedule first.\n\nThis action cannot be undone."), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.error = <?php echo json_encode($l->t('An error occurred'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.createModel = <?php echo json_encode($l->t('Create Working Time Model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.editModel = <?php echo json_encode($l->t('Edit Working Time Model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

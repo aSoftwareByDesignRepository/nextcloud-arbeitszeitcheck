@@ -143,6 +143,18 @@ $teamMembers = $_['teamMembers'] ?? [];
 						aria-label="<?php p($l->t('Download team overtime overview as CSV')); ?>">
 						<?php p($l->t('Export CSV')); ?>
 					</a>
+					<a id="team-overtime-export-monthly" class="azc-btn azc-btn--secondary azc-btn--sm"
+						href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.exportTeamOvertimeCsv', ['months' => 12])); ?>"
+						download
+						aria-label="<?php p($l->t('Download team overtime with monthly balances as CSV')); ?>">
+						<?php p($l->t('Export CSV (monthly)')); ?>
+					</a>
+					<a id="team-absences-export" class="azc-btn azc-btn--secondary azc-btn--sm"
+						href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.exportTeamAbsencesCsv')); ?>"
+						download
+						aria-label="<?php p($l->t('Download team absences by type as CSV')); ?>">
+						<?php p($l->t('Absences CSV')); ?>
+					</a>
 				</div>
 			</header>
 			<div class="azc-card__body">
@@ -183,7 +195,7 @@ $teamMembers = $_['teamMembers'] ?? [];
 						<p class="azc-empty-state__text"><?php p($l->t('No team members found')); ?></p>
 					</div>
 				<?php else: ?>
-					<div class="table-container" role="region" aria-label="<?php p($l->t('Team members overview')); ?>">
+					<div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Team members overview')); ?>">
 						<table class="table table--hover azc-table--responsive" role="table" aria-label="<?php p($l->t('Team members overview')); ?>">
 							<thead>
 								<tr>

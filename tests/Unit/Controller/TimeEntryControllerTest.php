@@ -300,6 +300,41 @@ class TimeEntryControllerTest extends TestCase
 	}
 
 	/**
+	 * Regression: the count query must get the same exclusive next-midnight
+	 * end bound as the entries query — otherwise `total` is 0 for same-day
+	 * (start_date = end_date) filters while entries are still returned.
+	 */
+	public function testIndexCountUsesExclusiveEndBound(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->expects($this->once())
+			->method('getUser')
+			->willReturn($user);
+
+		$this->timeEntryMapper->expects($this->once())
+			->method('count')
+			->with($this->callback(static function (array $filters): bool {
+				return isset($filters['end_date'])
+					&& $filters['end_date'] instanceof \DateTime
+					&& $filters['end_date']->format('Y-m-d H:i:s') === '2024-01-16 00:00:00';
+			}))
+			->willReturn(3);
+
+		$this->timeEntryMapper->expects($this->once())
+			->method('findByUserAndDateRange')
+			->willReturn([]);
+
+		$response = $this->controller->index('2024-01-15', '2024-01-15');
+
+		$data = $response->getData();
+		$this->assertTrue($data['success']);
+		$this->assertEquals(3, $data['total']);
+	}
+
+	/**
 	 * Test index applies status filter
 	 */
 	public function testIndexAppliesStatusFilter(): void
@@ -2195,5 +2230,133 @@ class TimeEntryControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_CREATED, $response->getStatus());
 		$this->assertTrue($response->getData()['success']);
 		$this->assertSame(0, $strictCalls, 'compliance_strict_mode=0 must not run strict checkComplianceForCompletedEntry gate');
+	}
+
+
+	/**
+	 * B-3: explicit ranges wider than 93 days are rejected before any work —
+	 * a "whole history" request must not produce a broken mega-PDF.
+	 */
+	public function testExportPdfRejectsRangeOver93Days(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->timeEntryMapper->expects($this->never())->method('findByUserAndDateRange');
+
+		$response = $this->controller->exportPdf('2024-01-01', '2024-06-01');
+		$this->assertInstanceOf(JSONResponse::class, $response);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testExportPdfRejectsInvertedRange(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$response = $this->controller->exportPdf('2024-06-01', '2024-01-01');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	public function testExportPdfRejectsInvalidDate(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$response = $this->controller->exportPdf('2024-13-99', '2024-01-01');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	/**
+	 * B-3 AC: empty filter result still returns a PDF with an explicit
+	 * hint line — never a blank document.
+	 */
+	public function testExportPdfEmptyRangeRendersHintLine(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$user->method('getDisplayName')->willReturn('Test User');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$response = $this->controller->exportPdf('2024-01-01', '2024-01-31');
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+
+		$disposition = $response->getHeaders()['Content-Disposition'] ?? '';
+		$this->assertStringContainsString('zeiteintraege-2024-01-01_bis_2024-01-31.pdf', $disposition);
+
+		$pdf = $response->render();
+		$this->assertStringStartsWith('%PDF-', $pdf);
+		$this->assertStringContainsString('No time entries in this period', $pdf);
+	}
+
+	/**
+	 * B-3: status filter mirrors the list view — only matching entries end
+	 * up in the document; descriptions are escaped for PDF syntax.
+	 */
+	public function testExportPdfFiltersStatusAndEscapesDescription(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$completed = new TimeEntry();
+		$completed->setId(1);
+		$completed->setUserId('testuser');
+		$completed->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$completed->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$completed->setStatus(TimeEntry::STATUS_COMPLETED);
+		$completed->setDescription('marker-completed (parens) \\ backslash');
+
+		$active = new TimeEntry();
+		$active->setId(2);
+		$active->setUserId('testuser');
+		$active->setStartTime(new \DateTime('2024-01-16T09:00:00'));
+		$active->setStatus(TimeEntry::STATUS_ACTIVE);
+		$active->setDescription('marker-active-entry');
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([$completed, $active]);
+
+		$response = $this->controller->exportPdf('2024-01-01', '2024-01-31', TimeEntry::STATUS_COMPLETED);
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+		$pdf = $response->render();
+
+		$this->assertStringContainsString('marker-completed', $pdf);
+		$this->assertStringNotContainsString('marker-active-entry', $pdf);
+		// PDF string escaping: parens and backslash must be backslash-escaped
+		// or they break the Tj operator syntax.
+		$this->assertStringContainsString('\\(parens\\)', $pdf);
+	}
+
+	/**
+	 * B-3 AC: result sets over 5000 rows are truncated with an explicit
+	 * notice line instead of silently dropping entries.
+	 */
+	public function testExportPdfTruncatesAt5000RowsWithNotice(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$entries = [];
+		for ($i = 0; $i < 5001; $i++) {
+			$e = new TimeEntry();
+			$e->setId($i + 1);
+			$e->setUserId('testuser');
+			$e->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+			$e->setEndTime(new \DateTime('2024-01-15T10:00:00'));
+			$e->setStatus(TimeEntry::STATUS_COMPLETED);
+			$entries[] = $e;
+		}
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn($entries);
+
+		$response = $this->controller->exportPdf('2024-01-01', '2024-01-31');
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+		$this->assertStringContainsString('truncated at 5000', $response->render());
 	}
 }

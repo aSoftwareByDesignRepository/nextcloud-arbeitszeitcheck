@@ -90,6 +90,8 @@ $teamsMessageIds = [
 	'%s selected',
 	'Select at least one person.',
 	'Add %1$d people to team “%2$s”?',
+	'Add people to team',
+	'Add to team',
 	'Added %1$d, skipped %2$d, failed %3$d.',
 ];
 

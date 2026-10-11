@@ -128,7 +128,7 @@ class KioskAdminController extends Controller
 				'apiSearchUsers' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.kiosk_admin.searchUsers'),
 				'apiTerminalRevoke' => $this->urlGenerator->linkToRoute(
 					'arbeitszeitcheck.kiosk_admin.revokeTerminal',
-					['terminalId' => '__ID__'],
+					['terminalUid' => '__ID__'],
 				),
 				'apiUserAllowed' => $this->urlGenerator->linkToRoute(
 					'arbeitszeitcheck.kiosk_admin.setUserAllowed',
@@ -287,16 +287,16 @@ class KioskAdminController extends Controller
 	}
 
 	#[NoAdminRequired]
-	public function revokeTerminal(string $terminalId): JSONResponse
+	public function revokeTerminal(string $terminalUid): JSONResponse
 	{
-		if ($this->terminalService->findByTerminalId($terminalId) === null) {
+		if ($this->terminalService->findByTerminalId($terminalUid) === null) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => 'KIOSK_TERMINAL_NOT_FOUND',
 				'message' => $this->kioskErrorMessages->message('KIOSK_TERMINAL_NOT_FOUND'),
 			], Http::STATUS_NOT_FOUND);
 		}
-		$this->terminalService->revoke($terminalId);
+		$this->terminalService->revoke($terminalUid);
 		return new JSONResponse(['success' => true]);
 	}
 

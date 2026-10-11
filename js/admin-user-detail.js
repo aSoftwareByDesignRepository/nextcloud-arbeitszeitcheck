@@ -532,11 +532,18 @@
         });
 
         resetBtn.addEventListener('click', async function () {
-            const confirmed = window.confirm(auMsg(
-                'overtimeAdjustResetConfirm',
-                'Reset this employee’s overtime Saldo to zero? Recorded working time is not changed. Continues only with an audited ledger entry.',
-            ));
-            if (!confirmed) {
+            // Accessible confirm — never window.confirm; helper fails closed (§7.3).
+            const confirmResult = await Utils.confirmDestructiveAction({
+                title: auMsg('overtimeAdjustResetTitle', 'Reset overtime balance?'),
+                message: auMsg(
+                    'overtimeAdjustResetConfirm',
+                    'Reset this employee’s overtime Saldo to zero? Recorded working time is not changed. Continues only with an audited ledger entry.',
+                ),
+                confirmLabel: auMsg('overtimeAdjustResetAction', 'Reset to zero'),
+                cancelLabel: auMsg('cancel', 'Cancel'),
+                variant: 'danger',
+            });
+            if (confirmResult === null || confirmResult.confirmed !== true) {
                 return;
             }
             resetBtn.disabled = true;

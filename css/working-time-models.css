@@ -210,3 +210,66 @@
 		justify-content: center;
 	}
 }
+
+/* presence_windows editor (Feature A-2) + B-6 UE helper */
+#app-content.azc-app--admin-working-time-models .wtm-presence-windows,
+#app-content.azc-app--admin-working-time-models .wtm-ue-helper {
+	margin-top: var(--azc-spacing-md, 1rem);
+	padding: var(--azc-spacing-md, 1rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-windows > legend,
+#app-content.azc-app--admin-working-time-models .wtm-ue-helper > legend {
+	padding: 0 0.25rem;
+	font-weight: 600;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-row .form-select {
+	flex: 1 1 10rem;
+	min-width: 8rem;
+	min-height: 44px;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-row .form-input {
+	flex: 0 1 8rem;
+	min-width: 7rem;
+	min-height: 44px;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-ue-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-ue-row .form-input {
+	width: 6rem;
+	min-height: 44px;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-ue-times,
+#app-content.azc-app--admin-working-time-models .wtm-ue-unit {
+	color: var(--color-text-maxcontrast);
+	font-weight: 600;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-error {
+	color: var(--color-error);
+	font-weight: 600;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-presence-empty {
+	color: var(--color-text-maxcontrast);
+	font-style: italic;
+}

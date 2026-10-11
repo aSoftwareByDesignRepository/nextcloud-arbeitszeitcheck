@@ -20,6 +20,8 @@ const ATTACKER = {
 	password: process.env.NC_BOLA_ATTACKER_PASS || 'AzcBolaB_T3st!',
 }
 
+test.use({ trace: 'off' }) // manual browser.newContext() calls race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network) — screenshots/video still retained on failure
+
 test.describe('BOLA time-entry ownership (live)', () => {
 	test('attacker cannot show/update/delete victim entry', async ({ browser }) => {
 		test.skip(!hasCreds('EMPLOYEE'), 'Requires NC_EMPLOYEE_USER / NC_EMPLOYEE_PASS')

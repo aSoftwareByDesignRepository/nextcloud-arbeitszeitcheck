@@ -132,6 +132,12 @@ final class AdminSettingsSectionCatalog
 			'breakAutoFallbackFlexWindowStart',
 			'breakAutoFallbackFlexWindowEnd',
 			'requireSubstituteTypes',
+			'breakPolicyEnforced',
+			'breakPolicyMinBreakMinutes',
+			'breakPolicyTiers',
+			'breakPolicyWindows',
+			'presenceExemptions',
+			'breakPolicyConfirm',
 		],
 		self::SECTION_TIME_RECORDING => [
 			'clockStampingEnabled',

@@ -52,8 +52,12 @@ const employeeRoutes = [
 const overflowViewports = [
 	{ width: 320, height: 640 },
 	{ width: 375, height: 812 },
+	// 414px is the large-phone edge of the <768px mobile regime (single column, nav behind platform toggle)
+	{ width: 414, height: 896 },
 	{ width: 768, height: 1024 },
 	{ width: 1024, height: 768 },
+	// 1280px is the common laptop floor inside the ≥1024px sacred-desktop regime
+	{ width: 1280, height: 800 },
 	{ width: 1440, height: 900 },
 	{ width: 2560, height: 1440 },
 ]

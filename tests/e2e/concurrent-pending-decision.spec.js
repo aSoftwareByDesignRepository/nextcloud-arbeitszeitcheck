@@ -13,6 +13,8 @@ function addDays(isoDate, days) {
 	return d.toISOString().slice(0, 10)
 }
 
+test.use({ trace: 'off' }) // manual browser.newContext() calls race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network) — screenshots/video still retained on failure
+
 test.describe('Concurrent pending time-entry decision (live)', () => {
 	test.skip(
 		!hasCreds('ADMIN') || !hasCreds('EMPLOYEE') || !hasCreds('MANAGER'),

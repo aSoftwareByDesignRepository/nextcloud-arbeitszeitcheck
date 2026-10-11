@@ -184,6 +184,247 @@
             </fieldset>`;
     }
 
+    /** Weekday <option> list (ISO 1=Mon … 7=Sun) for presence-window rows. */
+    function presenceWeekdayOptions(selected) {
+        const days = [
+            [1, wtmMsg('monday', 'Monday')],
+            [2, wtmMsg('tuesday', 'Tuesday')],
+            [3, wtmMsg('wednesday', 'Wednesday')],
+            [4, wtmMsg('thursday', 'Thursday')],
+            [5, wtmMsg('friday', 'Friday')],
+            [6, wtmMsg('saturday', 'Saturday')],
+            [7, wtmMsg('sunday', 'Sunday')],
+        ];
+        return days.map(function(d) {
+            const sel = Number(selected) === d[0] ? ' selected' : '';
+            return '<option value="' + d[0] + '"' + sel + '>' + Utils.escapeHtml(d[1]) + '</option>';
+        }).join('');
+    }
+
+    /**
+     * presence_windows editor (Feature A-2): weekday-indexed mandatory
+     * presence slots per model. Rows: weekday + start + end. ≤8 rows,
+     * no same-weekday overlap — enforced server-side, mirrored lightly here.
+     */
+    function presenceWindowsSectionHtml(prefix, existing) {
+        const title = wtmMsg('presenceWindows', 'Mandatory presence times (optional)');
+        const lead = wtmMsg(
+            'presenceWindowsHelp',
+            'Times when people on this schedule must be working or on approved leave — e.g. lessons or consultation hours. Days without an entry are never flagged. Leave empty if not needed.'
+        );
+        const addLabel = wtmMsg('presenceWindowAdd', 'Add presence time');
+        const emptyLabel = wtmMsg('presenceWindowsEmpty', 'No mandatory presence times set.');
+        const dayLabel = wtmMsg('day', 'Day');
+        const startLabel = wtmMsg('start', 'Start');
+        const endLabel = wtmMsg('end', 'End');
+        const removeLabel = wtmMsg('presenceWindowRemove', 'Remove');
+
+        const windows = Array.isArray(existing) ? existing : [];
+        let rows = '';
+        windows.forEach(function(w, i) {
+            rows += presenceWindowRowHtml(prefix, i, w, dayLabel, startLabel, endLabel, removeLabel);
+        });
+
+        return `
+            <fieldset class="wtm-presence-windows" data-presence-prefix="${prefix}" data-max-rows="8">
+                <legend class="form-label">${Utils.escapeHtml(title)}</legend>
+                <p class="form-help" id="${prefix}-presence-help">${Utils.escapeHtml(lead)}</p>
+                <p class="wtm-presence-empty" ${windows.length ? 'hidden' : ''}>${Utils.escapeHtml(emptyLabel)}</p>
+                <div class="wtm-presence-rows" role="group" aria-label="${Utils.escapeHtml(title)}">${rows}</div>
+                <p>
+                    <button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="add-presence-window" aria-describedby="${prefix}-presence-help">
+                        ${Utils.escapeHtml(addLabel)}
+                    </button>
+                </p>
+                <p class="wtm-presence-error form-help" role="alert" hidden></p>
+            </fieldset>`;
+    }
+
+    function presenceWindowRowHtml(prefix, index, w, dayLabel, startLabel, endLabel, removeLabel) {
+        const weekday = w && w.weekday ? Number(w.weekday) : 1;
+        const start = w && w.start ? String(w.start) : '';
+        const end = w && w.end ? String(w.end) : '';
+        const idp = prefix + '-pw-' + index;
+        return `
+            <div class="wtm-presence-row" data-presence-row>
+                <label class="visually-hidden" for="${idp}-day">${Utils.escapeHtml(dayLabel)}</label>
+                <select class="form-select wtm-presence-weekday" id="${idp}-day" aria-label="${Utils.escapeHtml(dayLabel)}">
+                    ${presenceWeekdayOptions(weekday)}
+                </select>
+                <label class="visually-hidden" for="${idp}-start">${Utils.escapeHtml(startLabel)}</label>
+                <input type="time" class="form-input wtm-presence-start" id="${idp}-start" value="${Utils.escapeHtml(start)}" aria-label="${Utils.escapeHtml(startLabel)}">
+                <label class="visually-hidden" for="${idp}-end">${Utils.escapeHtml(endLabel)}</label>
+                <input type="time" class="form-input wtm-presence-end" id="${idp}-end" value="${Utils.escapeHtml(end)}" aria-label="${Utils.escapeHtml(endLabel)}">
+                <button type="button" class="azc-btn azc-btn--tertiary azc-btn--sm" data-action="remove-presence-window" aria-label="${Utils.escapeHtml(removeLabel)}">
+                    ${Utils.escapeHtml(removeLabel)}
+                </button>
+            </div>`;
+    }
+
+    /**
+     * Collect presence rows. Returns { windows, error } — error is a message
+     * when a row is half-filled or end<=start; empty editor → windows: null.
+     */
+    function collectPresenceWindows(fieldset) {
+        if (!fieldset) {
+            return { windows: null, error: null };
+        }
+        const rows = fieldset.querySelectorAll('[data-presence-row]');
+        const out = [];
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const weekday = parseInt(row.querySelector('.wtm-presence-weekday')?.value || '0', 10);
+            const start = row.querySelector('.wtm-presence-start')?.value || '';
+            const end = row.querySelector('.wtm-presence-end')?.value || '';
+            if (!start && !end) {
+                continue; // untouched row — ignore silently
+            }
+            if (!start || !end || !(weekday >= 1 && weekday <= 7)) {
+                return { windows: null, error: wtmMsg('presenceWindowIncomplete', 'Each presence time needs a day, a start and an end.') };
+            }
+            const s = parseHmToMinutes(start);
+            const e = parseHmToMinutes(end);
+            if (s === null || e === null || e <= s) {
+                return { windows: null, error: wtmMsg('presenceWindowOrder', 'The end of a presence time must be after its start.') };
+            }
+            out.push({ weekday: weekday, start: start, end: end });
+        }
+        // Same-weekday overlap guard (mirrors resolver validation).
+        for (let i = 0; i < out.length; i++) {
+            for (let j = i + 1; j < out.length; j++) {
+                if (out[i].weekday !== out[j].weekday) {
+                    continue;
+                }
+                if (parseHmToMinutes(out[i].start) < parseHmToMinutes(out[j].end)
+                    && parseHmToMinutes(out[j].start) < parseHmToMinutes(out[i].end)) {
+                    return { windows: null, error: wtmMsg('presenceWindowOverlap', 'Presence times for the same day must not overlap.') };
+                }
+            }
+        }
+        return { windows: out.length ? out : null, error: null };
+    }
+
+    /**
+     * B-6 teaching-unit helper: "27 UE à 45 min" → weeklyHours 20.25.
+     * Display-only `ue_label` lives in break_rules; all math stays real hours.
+     */
+    function ueHelperSectionHtml(prefix, existingUeLabel) {
+        const title = wtmMsg('ueHelper', 'Teaching units helper (optional)');
+        const lead = wtmMsg(
+            'ueHelperHelp',
+            'Enter the weekly units and minutes per unit — the weekly hours above are filled in automatically.'
+        );
+        const unitsLabel = wtmMsg('ueUnits', 'Units per week');
+        const minutesLabel = wtmMsg('ueMinutesPerUnit', 'Minutes per unit');
+        const applyLabel = wtmMsg('ueApply', 'Convert to hours');
+        const existing = existingUeLabel
+            ? `<p class="form-help wtm-ue-existing">${Utils.escapeHtml(wtmMsg('ueExisting', 'Currently stored: {label}').replace('{label}', existingUeLabel))}</p>`
+            : '';
+        return `
+            <fieldset class="wtm-ue-helper">
+                <legend class="form-label">${Utils.escapeHtml(title)}</legend>
+                <p class="form-help">${Utils.escapeHtml(lead)}</p>
+                <div class="wtm-ue-row">
+                    <label class="visually-hidden" for="${prefix}-ue-count">${Utils.escapeHtml(unitsLabel)}</label>
+                    <input type="text" inputmode="decimal" class="form-input wtm-ue-count" id="${prefix}-ue-count"
+                           placeholder="27" aria-label="${Utils.escapeHtml(unitsLabel)}">
+                    <span class="wtm-ue-times" aria-hidden="true">×</span>
+                    <label class="visually-hidden" for="${prefix}-ue-minutes">${Utils.escapeHtml(minutesLabel)}</label>
+                    <input type="text" inputmode="numeric" class="form-input wtm-ue-minutes" id="${prefix}-ue-minutes"
+                           value="45" aria-label="${Utils.escapeHtml(minutesLabel)}">
+                    <span class="wtm-ue-unit" aria-hidden="true">min</span>
+                    <button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="apply-ue">
+                        ${Utils.escapeHtml(applyLabel)}
+                    </button>
+                </div>
+                ${existing}
+                <p class="wtm-ue-result form-help" aria-live="polite"></p>
+            </fieldset>`;
+    }
+
+    /**
+     * Pure UE→hours conversion. Returns null on invalid input; otherwise
+     * { hours, rounded, wasRounded, label }. Rounding lands on the 0.25h grid.
+     */
+    function computeUeConversion(countRaw, minutesRaw) {
+        const count = parseLocalizedDecimal(countRaw, NaN);
+        const minutes = parseLocalizedDecimal(minutesRaw, NaN);
+        if (!Number.isFinite(count) || !Number.isFinite(minutes) || count <= 0 || minutes <= 0 || minutes > 480) {
+            return null;
+        }
+        const hours = (count * minutes) / 60;
+        const rounded = Math.round(hours * 4) / 4;
+        return {
+            hours: hours,
+            rounded: rounded,
+            wasRounded: rounded !== hours,
+            label: count + ' ' + wtmMsg('ueUnitShort', 'UE') + ' à ' + minutes + ' min',
+        };
+    }
+
+    function bindUeHelper(fieldset, form) {
+        if (!fieldset || fieldset.dataset.bound === '1') {
+            return;
+        }
+        fieldset.dataset.bound = '1';
+        const applyBtn = fieldset.querySelector('[data-action="apply-ue"]');
+        const resultEl = fieldset.querySelector('.wtm-ue-result');
+        if (!applyBtn) {
+            return;
+        }
+        applyBtn.addEventListener('click', function() {
+            const conv = computeUeConversion(
+                fieldset.querySelector('.wtm-ue-count')?.value,
+                fieldset.querySelector('.wtm-ue-minutes')?.value,
+            );
+            if (!conv) {
+                if (resultEl) {
+                    resultEl.textContent = wtmMsg('ueInvalid', 'Enter a unit count and minutes per unit (e.g. 27 and 45).');
+                }
+                delete form.dataset.ueLabel;
+                return;
+            }
+            const weeklyInput = form.querySelector('#wtm-model-weekly-hours');
+            if (weeklyInput) {
+                weeklyInput.value = String(conv.rounded);
+                weeklyInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            form.dataset.ueLabel = conv.label;
+            if (resultEl) {
+                let text = wtmMsg('ueApplied', '{label} = {hours} h per week (filled into "Weekly Hours").')
+                    .replace('{label}', conv.label)
+                    .replace('{hours}', String(conv.rounded));
+                if (conv.wasRounded) {
+                    text += ' ' + wtmMsg('ueRounded', 'Rounded to the quarter-hour.');
+                }
+                // weeklyHours is capped at 80 server-side — flag it so the
+                // admin isn't surprised by a field error on save.
+                if (conv.rounded > 80) {
+                    text += ' ' + wtmMsg('ueTooHigh', 'This exceeds the maximum of 80 h per week.');
+                }
+                resultEl.textContent = text;
+            }
+        });
+        // Manual edits after applying invalidate the stored label — and a
+        // stored label must be dropped once hours no longer match it.
+        const weeklyInput = form.querySelector('#wtm-model-weekly-hours');
+        if (weeklyInput) {
+            weeklyInput.addEventListener('input', function() {
+                if (form.dataset.ueLabel || fieldset.querySelector('.wtm-ue-existing')) {
+                    delete form.dataset.ueLabel;
+                    form.dataset.ueCleared = '1';
+                    if (resultEl) {
+                        resultEl.textContent = '';
+                    }
+                    const existingEl = fieldset.querySelector('.wtm-ue-existing');
+                    if (existingEl) {
+                        existingEl.remove();
+                    }
+                }
+            });
+        }
+    }
+
     function parseHmToMinutes(hm) {
         if (!hm || !/^\d{1,2}:\d{2}$/.test(hm)) {
             return null;
@@ -313,6 +554,88 @@
         refreshWeekdayScheduleTotals(fieldset);
     }
 
+    /** Inline, announced error inside the presence fieldset (aria-live, no toast). */
+    function showPresenceError(form, message) {
+        const err = form && form.querySelector('.wtm-presence-windows .wtm-presence-error');
+        if (err) {
+            err.textContent = message;
+            err.hidden = false;
+            err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            Messaging.showError(message);
+        }
+    }
+
+    function clearPresenceError(fieldset) {
+        const err = fieldset && fieldset.querySelector('.wtm-presence-error');
+        if (err) {
+            err.textContent = '';
+            err.hidden = true;
+        }
+    }
+
+    function bindPresenceWindowsFieldset(fieldset) {
+        if (!fieldset || fieldset.dataset.bound === '1') {
+            return;
+        }
+        fieldset.dataset.bound = '1';
+        const prefix = fieldset.getAttribute('data-presence-prefix') || 'wtm';
+        const maxRows = parseInt(fieldset.getAttribute('data-max-rows') || '8', 10);
+        const rowsHost = fieldset.querySelector('.wtm-presence-rows');
+        const emptyHint = fieldset.querySelector('.wtm-presence-empty');
+
+        const refreshEmpty = function() {
+            if (emptyHint) {
+                emptyHint.hidden = rowsHost && rowsHost.querySelector('[data-presence-row]') !== null;
+            }
+        };
+        const nextIndex = function() {
+            return rowsHost ? rowsHost.querySelectorAll('[data-presence-row]').length : 0;
+        };
+
+        fieldset.addEventListener('click', function(e) {
+            const btn = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+            if (!btn || !fieldset.contains(btn)) {
+                return;
+            }
+            const action = btn.getAttribute('data-action');
+            if (action === 'add-presence-window') {
+                clearPresenceError(fieldset);
+                const count = nextIndex();
+                if (count >= maxRows) {
+                    showPresenceError(fieldset, wtmMsg('presenceWindowMax', 'At most 8 presence times per schedule.'));
+                    return;
+                }
+                if (rowsHost) {
+                    rowsHost.insertAdjacentHTML('beforeend', presenceWindowRowHtml(
+                        prefix,
+                        count,
+                        null,
+                        wtmMsg('day', 'Day'),
+                        wtmMsg('start', 'Start'),
+                        wtmMsg('end', 'End'),
+                        wtmMsg('presenceWindowRemove', 'Remove')
+                    ));
+                    refreshEmpty();
+                    const firstInput = rowsHost.querySelectorAll('[data-presence-row]')[count]?.querySelector('select, input');
+                    if (firstInput && typeof firstInput.focus === 'function') {
+                        firstInput.focus();
+                    }
+                }
+            } else if (action === 'remove-presence-window') {
+                const row = btn.closest('[data-presence-row]');
+                if (row) {
+                    row.remove();
+                    refreshEmpty();
+                    clearPresenceError(fieldset);
+                }
+            }
+        });
+        fieldset.addEventListener('input', function() {
+            clearPresenceError(fieldset);
+        });
+    }
+
     function applyScheduleToFieldset(fieldset, schedule) {
         const prefix = fieldset.getAttribute('data-schedule-prefix') || 'wtm';
         const days = schedule.days || {};
@@ -375,6 +698,11 @@
     function buildBreakRulesPayload(form, existingBreakRules) {
         const fieldset = form.querySelector('.wtm-weekday-schedule');
         const schedule = collectWeekdaySchedule(fieldset);
+        const presenceFieldset = form.querySelector('.wtm-presence-windows');
+        const presence = collectPresenceWindows(presenceFieldset);
+        if (presence.error) {
+            return { error: presence.error };
+        }
         const base = (existingBreakRules && typeof existingBreakRules === 'object' && !Array.isArray(existingBreakRules))
             ? { ...existingBreakRules }
             : {};
@@ -382,6 +710,18 @@
             base.weekday_schedule = schedule;
         } else {
             delete base.weekday_schedule;
+        }
+        if (presence.windows) {
+            base.presence_windows = presence.windows;
+        } else {
+            delete base.presence_windows;
+        }
+        // B-6: display-only unit label — set on "Convert", cleared when the
+        // admin edits weekly hours afterwards (label would be a lie then).
+        if (form.dataset && form.dataset.ueLabel) {
+            base.ue_label = form.dataset.ueLabel;
+        } else if (form.dataset && form.dataset.ueCleared === '1') {
+            delete base.ue_label;
         }
         const allowSunday = !!form.querySelector('#wtm-model-allow-sunday-work')?.checked;
         if (allowSunday) {
@@ -483,6 +823,12 @@
         const existingSchedule = (isEdit && model.breakRules && model.breakRules.weekday_schedule)
             ? model.breakRules.weekday_schedule
             : null;
+        const existingPresence = (isEdit && model.breakRules && Array.isArray(model.breakRules.presence_windows))
+            ? model.breakRules.presence_windows
+            : null;
+        const existingUeLabel = (isEdit && model.breakRules && typeof model.breakRules.ue_label === 'string')
+            ? model.breakRules.ue_label
+            : null;
         const existingBreakRules = isEdit ? (model.breakRules || null) : null;
         const modelId = isEdit ? String(model.id) : '';
 
@@ -561,6 +907,8 @@
                     </div>
                 </details>
                 ${weekdayScheduleSectionHtml(schedulePrefix, existingSchedule)}
+                ${ueHelperSectionHtml(schedulePrefix, existingUeLabel)}
+                ${presenceWindowsSectionHtml(schedulePrefix, existingPresence)}
                 <div class="form-actions wtm-editor-actions" role="group" aria-label="${Utils.escapeHtml(submitLabel)}">
                     <button type="submit" class="azc-btn azc-btn--primary azc-btn--touch" id="wtm-model-submit">${Utils.escapeHtml(submitLabel)}</button>
                     <button type="button" class="azc-btn azc-btn--secondary azc-btn--touch" data-action="close-editor">${Utils.escapeHtml(cancelLabel)}</button>
@@ -576,6 +924,8 @@
         const form = document.getElementById('wtm-model-form');
         if (form) {
             bindWeekdayScheduleFieldset(form.querySelector('.wtm-weekday-schedule'));
+            bindPresenceWindowsFieldset(form.querySelector('.wtm-presence-windows'));
+            bindUeHelper(form.querySelector('.wtm-ue-helper'), form);
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 if (editorSaveInflight || host.getAttribute('aria-busy') === 'true') {
@@ -817,6 +1167,10 @@
 
         const formData = new FormData(form);
         const breakRules = buildBreakRulesPayload(form, null);
+        if (breakRules && breakRules.error) {
+            showPresenceError(form, breakRules.error);
+            return;
+        }
         const data = {
             name: formData.get('name'),
             description: formData.get('description') || null,
@@ -891,6 +1245,10 @@
 
         const formData = new FormData(form);
         const breakRules = buildBreakRulesPayload(form, existingBreakRules);
+        if (breakRules && breakRules.error) {
+            showPresenceError(form, breakRules.error);
+            return;
+        }
         const data = {
             name: formData.get('name'),
             description: formData.get('description') || null,
@@ -905,6 +1263,7 @@
         } else if (existingBreakRules && typeof existingBreakRules === 'object') {
             const cleared = { ...existingBreakRules };
             delete cleared.weekday_schedule;
+            delete cleared.presence_windows;
             data.breakRules = cleared;
         }
 
@@ -1039,6 +1398,9 @@
     if (typeof window !== 'undefined') {
         window.__ArbeitszeitCheckWorkingTimeModelsTestables = {
             handleDeleteModel: handleDeleteModel,
+            computeUeConversion: computeUeConversion,
+            ueHelperSectionHtml: ueHelperSectionHtml,
+            bindUeHelper: bindUeHelper,
         };
     }
 

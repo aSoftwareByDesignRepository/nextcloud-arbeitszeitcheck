@@ -34,6 +34,7 @@ $timeEntryFormConfig = [
 	'minJustificationLength' => 10,
 	'submitUrl' => $submitUrl,
 	'redirectUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
+	'editUrlTemplate' => $urlGenerator->linkTo('arbeitszeitcheck', 'time-entries/__ENTRY_ID__/edit'),
 	'timeEntriesListUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
 ];
 

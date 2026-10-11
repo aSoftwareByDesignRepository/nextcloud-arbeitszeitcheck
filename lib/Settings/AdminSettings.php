@@ -128,6 +128,7 @@ class AdminSettings implements ISettings
 			'appAdminUserIds' => $this->readConfiguredAppAdminUserIds(),
 			'projectCheckIntegrationEnabled' => $this->isProjectCheckInstalledOnInstance()
 				&& $this->appConfig->getAppValueString(Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED, Constants::CONFIG_PROJECTCHECK_INTEGRATION_DEFAULT) === '1',
+			'breakPolicy' => $this->breakPolicyPayload(),
 		];
 
 		$projectCheckAvailable = $this->isProjectCheckInstalledOnInstance();
@@ -163,6 +164,32 @@ class AdminSettings implements ISettings
 	private function isProjectCheckInstalledOnInstance(): bool
 	{
 		return $this->appManager->isInstalled(Constants::APP_ID_PROJECTCHECK) === true;
+	}
+
+	/**
+	 * Org break-policy payload for the compliance editor card. Fails open to
+	 * an empty policy so the settings page never breaks on a resolver fault.
+	 */
+	private function breakPolicyPayload(): array
+	{
+		try {
+			$resolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			return $resolver->adminPayload();
+		} catch (\Throwable) {
+			return [
+				'policy' => [
+					'version' => 1,
+					'enforced' => false,
+					'min_break_minutes' => null,
+					'tiers' => [],
+					'windows' => [],
+					'presence_exemptions' => [],
+				],
+				'warnings' => [],
+				'malformed' => false,
+				'storageTimezone' => 'Europe/Berlin',
+			];
+		}
 	}
 
 	private function projectCheckAppsSettingsUrl(): string

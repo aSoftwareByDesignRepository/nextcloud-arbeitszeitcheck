@@ -16,6 +16,9 @@ use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolation;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
@@ -71,6 +74,35 @@ class ComplianceServiceTest extends TestCase
 	private $accessGroupsHook = null;
 
 	private TimeZoneService $timeZoneService;
+
+	/**
+	 * Resolver bound to the test's own config mock — the lazy Server::get
+	 * fallback inside ComplianceService would otherwise resolve the REAL
+	 * services (live container DB) and leak org-policy state between tests.
+	 */
+	private function inertPolicyResolver(?IConfig $config = null): \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver
+	{
+		$config = $config ?? $this->config;
+		$userSettingsMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class);
+		$userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
+		return new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+			$config,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper),
+			$userSettingsMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->timeEntryMapper,
+			$this->timeZoneService,
+			$this->l10n,
+		);
+	}
+
+	private function inertAbsenceMapper(): \OCA\ArbeitszeitCheck\Db\AbsenceMapper
+	{
+		$mapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class);
+		$mapper->method('findByUserAndDateRange')->willReturn([]);
+		return $mapper;
+	}
 
 	private function buildTimeZoneService(IConfig $config): TimeZoneService
 	{
@@ -132,6 +164,8 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 	}
 
@@ -1034,6 +1068,8 @@ class ComplianceServiceTest extends TestCase
 			$tz,
 			new \OCA\ArbeitszeitCheck\Service\DailyWorkingHoursCalculator($this->timeEntryMapper, $tz),
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 
 		$violation = new ComplianceViolation();
@@ -1372,6 +1408,8 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 
 		$issues = $this->service->blockingIssuesForCompletedEntry($afternoon);
@@ -1422,6 +1460,8 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 
 		$this->assertSame([], $this->service->blockingIssuesForCompletedEntry($afternoon));
@@ -1495,6 +1535,8 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 	}
 
@@ -1804,6 +1846,8 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config, $userSettings),
+			$this->inertPolicyResolver($this->config),
+			$this->inertAbsenceMapper(),
 		);
 
 		$timeEntry = new TimeEntry();
@@ -1982,10 +2026,204 @@ class ComplianceServiceTest extends TestCase
 			$this->notificationService, $this->holidayCalendarService, $this->config,
 			$perm, $this->timeZoneService, $dailyHoursCalculator,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($this->config),
+			$this->inertPolicyResolver(),
+			$this->inertAbsenceMapper(),
 		);
 		$stats = $service->runDailyComplianceCheck();
 		$this->assertSame(1, $stats['users_checked']);
 		$this->assertSame(0, $stats['violations_found']);
 		$this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $stats['check_date']);
+	}
+
+	// ------------------------------------------------------------------
+	// Organisational break policy funnel (DISUS) — warn, never block
+	// ------------------------------------------------------------------
+
+	/**
+	 * ComplianceService wired to a real BreakPolicyResolver whose org policy
+	 * JSON / model rules come from the given fixtures.
+	 */
+	private function serviceWithPolicy(array $policy, ?array $modelBreakRules = null): ComplianceService
+	{
+		$config = $this->createMock(IConfig::class);
+		$appValues = [
+			'country' => 'DE',
+			'app_timezone' => 'Europe/Berlin',
+			\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON => json_encode($policy),
+		];
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, $default) => $appValues[$key] ?? $default
+		);
+		$config->method('getUserValue')->willReturn('');
+
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+		$userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
+
+		if ($modelBreakRules !== null) {
+			$model = new WorkingTimeModel();
+			$model->setId(7);
+			$model->setBreakRules(json_encode($modelBreakRules));
+			$assignment = new UserWorkingTimeModel();
+			$assignment->setWorkingTimeModelId(7);
+			$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+			$this->workingTimeModelMapper->method('find')->willReturn($model);
+		}
+
+		$tzService = $this->buildTimeZoneService($config);
+		$dailyCalc = new \OCA\ArbeitszeitCheck\Service\DailyWorkingHoursCalculator(
+			$this->timeEntryMapper,
+			$tzService,
+		);
+		$resolver = new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+			$config,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper),
+			$userSettingsMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->timeEntryMapper,
+			$tzService,
+			$this->l10n,
+		);
+
+		return new ComplianceService(
+			$this->timeEntryMapper,
+			$this->violationMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			$this->holidayCalendarService,
+			$config,
+			$this->permissionService,
+			$tzService,
+			$dailyCalc,
+			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper),
+			$resolver,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+		);
+	}
+
+	private function completedEntry(int $id, string $start, string $end, array $breaks = []): TimeEntry
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setId($id);
+		$entry->setUserId('u1');
+		$entry->setStartTime(new \DateTime($start, $tz));
+		$entry->setEndTime(new \DateTime($end, $tz));
+		$entry->setBreaks(json_encode($breaks));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+		return $entry;
+	}
+
+	public function testPolicyTierViolationWarnsWithoutBlocking(): void
+	{
+		// Org tier: >6h → 45min (tighter than DE law's 30min).
+		$service = $this->serviceWithPolicy([
+			'enforced' => true,
+			'tiers' => [['afterHours' => 6, 'breakMinutes' => 45]],
+		]);
+
+		// 7h work, 30min break — meets the statute, misses the org rule.
+		$entry = $this->completedEntry(1, '2026-10-05 08:00:00', '2026-10-05 16:00:00', [
+			['start' => '2026-10-05T12:00:00+02:00', 'end' => '2026-10-05T12:30:00+02:00', 'automatic' => false],
+		]);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->violationMapper->method('findByTimeEntryId')->willReturn([]);
+		$this->violationMapper->method('createViolation')->willReturnCallback(static function (): ComplianceViolation {
+			$v = new ComplianceViolation();
+			$v->setId(1);
+			return $v;
+		});
+
+		// NN-10: strict mode must not throw on policy-only violations.
+		$violations = $service->checkComplianceForCompletedEntry($entry, true);
+		$policy = array_values(array_filter(
+			$violations,
+			static fn (array $v): bool => ($v['type'] ?? '') === ComplianceViolation::TYPE_MISSING_BREAK
+		));
+		$this->assertNotEmpty($policy, 'Expected a policy missing_break warning');
+		foreach ($policy as $v) {
+			$this->assertSame(ComplianceViolation::SEVERITY_WARNING, $v['severity']);
+		}
+	}
+
+	public function testBreakWarningPayloadShape(): void
+	{
+		$service = $this->serviceWithPolicy([
+			'enforced' => true,
+			'tiers' => [['afterHours' => 6, 'breakMinutes' => 45]],
+		]);
+		$entry = $this->completedEntry(2, '2026-10-05 08:00:00', '2026-10-05 16:00:00', [
+			['start' => '2026-10-05T12:00:00+02:00', 'end' => '2026-10-05T12:30:00+02:00', 'automatic' => false],
+		]);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$warning = $service->breakWarningForEntry($entry);
+		$this->assertNotNull($warning);
+		$this->assertSame(45, $warning['required']);
+		$this->assertSame(30, $warning['actual']);
+		$this->assertSame('org', $warning['policy']);
+	}
+
+	public function testBreakWarningNullWhenNoPolicyActive(): void
+	{
+		$service = $this->serviceWithPolicy([]);
+		$entry = $this->completedEntry(3, '2026-10-05 08:00:00', '2026-10-05 16:00:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->assertNull($service->breakWarningForEntry($entry));
+	}
+
+	public function testMissingPresenceViolationForUncoveredWindow(): void
+	{
+		// Monday presence window 08:00–12:00; entry starts at 09:00 → 60 min missing.
+		$service = $this->serviceWithPolicy([], [
+			'presence_windows' => [['weekday' => 1, 'start' => '08:00', 'end' => '12:00']],
+		]);
+		// 2026-10-05 is a Monday.
+		$entry = $this->completedEntry(4, '2026-10-05 09:00:00', '2026-10-05 16:00:00', [
+			['start' => '2026-10-05T12:30:00+02:00', 'end' => '2026-10-05T13:00:00+02:00', 'automatic' => false],
+		]);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+		$this->holidayCalendarService->method('isHolidayForUser')->willReturn(false);
+		$this->violationMapper->method('findByDateRange')->willReturn([]);
+		$this->violationMapper->method('createViolation')->willReturnCallback(static function (): ComplianceViolation {
+			$v = new ComplianceViolation();
+			$v->setId(9);
+			return $v;
+		});
+
+		$violations = $service->evaluatePresenceForDay('u1', new \DateTime('2026-10-05 12:00:00', new \DateTimeZone('Europe/Berlin')));
+		$this->assertCount(1, $violations);
+		$this->assertSame(ComplianceViolation::TYPE_MISSING_PRESENCE, $violations[0]['type']);
+		$this->assertSame(ComplianceViolation::SEVERITY_WARNING, $violations[0]['severity']);
+		$this->assertSame('08:00', $violations[0]['window']['start']);
+	}
+
+	public function testPresenceExemptionSuppressesViolation(): void
+	{
+		$service = $this->serviceWithPolicy([
+			'presence_exemptions' => [['start' => '2026-10-05', 'end' => '2026-10-09']],
+		], [
+			'presence_windows' => [['weekday' => 1, 'start' => '08:00', 'end' => '12:00']],
+		]);
+		$entry = $this->completedEntry(5, '2026-10-05 09:00:00', '2026-10-05 16:00:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$this->assertSame([], $service->evaluatePresenceForDay('u1', new \DateTime('2026-10-05 12:00:00', new \DateTimeZone('Europe/Berlin'))));
+	}
+
+	public function testPresenceNeverFlagsDayWithoutEntryOrModel(): void
+	{
+		$service = $this->serviceWithPolicy([], [
+			'presence_windows' => [['weekday' => 2, 'start' => '08:00', 'end' => '12:00']],
+		]);
+		// Tuesday with no work at all → nothing flagged.
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->assertSame([], $service->evaluatePresenceForDay('u1', new \DateTime('2026-10-06 12:00:00', new \DateTimeZone('Europe/Berlin'))));
 	}
 }

@@ -542,7 +542,6 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 .form-checkbox > .form-help,
 .form-radio > .form-help {
   flex: 1 1 100%;
-  width: 100%;
   margin-block-start: 0.25rem;
   margin-inline-start: calc(1.25rem + var(--space-2, 0.5rem));
 }

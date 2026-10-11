@@ -144,7 +144,7 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
                         <p class="azc-empty-state__title"><?php p($l->t('No recent violations')); ?></p>
                     </div>
                 <?php else: ?>
-                    <div class="table-container" role="region" aria-label="<?php p($l->t('Recent violations')); ?>">
+                    <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Recent violations')); ?>">
                         <table class="table table--hover azc-table--responsive" aria-label="<?php p($l->t('Recent violations')); ?>">
                             <thead>
                                 <tr>
@@ -168,6 +168,7 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
                                         'night_work' => $l->t('Night work'),
                                         'sunday_work' => $l->t('Sunday work'),
                                         'holiday_work' => $l->t('Holiday work'),
+                                    'missing_presence' => $l->t('Required presence not covered'),
                                         default => $typeKey,
                                     };
                                     $severityKey = $violation['severity'] ?? '';

@@ -280,7 +280,7 @@
 	color: var(--color-text-maxcontrast);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	.dz-project-picker__select {
 		font-size: 1rem; /* iOS zoom prevention */
 	}
@@ -518,7 +518,7 @@
 
 /* Fallback for engines without container queries: key off the viewport. */
 @supports not (container-type: inline-size) {
-	@media (max-width: 480px) {
+	@media (max-width: 479.98px) {
 		.dz-button-row,
 		.dz-link-row {
 			flex-direction: column;

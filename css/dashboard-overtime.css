@@ -37,7 +37,7 @@
 
 .dashboard-overtime-card__formula {
 	margin: 0.35rem 0 0;
-	max-width: 40rem;
+	max-width: 39.99875rem;
 	font-size: 0.95rem;
 	line-height: 1.4;
 	color: var(--color-text-maxcontrast);
@@ -215,7 +215,7 @@
 	font-size: 0.9rem;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	.dashboard-overtime-card__balance-value {
 		font-size: 1.5rem;
 	}

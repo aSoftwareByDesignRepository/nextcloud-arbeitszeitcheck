@@ -560,7 +560,7 @@
 }
 
 /* Tablet/desktop breakpoint: from 769px upward small utility buttons can return to compact chrome. */
-@media (min-width: 769px) {
+@media (min-width: 768px) {
 	#app-content.azc-app .azc-btn--sm,
 	#app-content-wrapper .azc-btn--sm,
 	.azc-nc-admin-settings .azc-btn--sm,
@@ -1064,7 +1064,7 @@
 	box-sizing: border-box;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1023.98px) {
 	#app-content.azc-app .azc-settings-layout,
 	#app-content.azc-app .admin-settings-layout,
 	.azc-nc-admin-settings .azc-settings-layout {
@@ -1089,7 +1089,7 @@
 	}
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app .azc-settings-form__footer,
 	#app-content.azc-app .admin-settings-form__footer,
 	#app-content.azc-app .azc-admin-settings-form__footer,
@@ -1194,7 +1194,7 @@
 	margin: 0 auto var(--azc-space-4);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	.azc-denied {
 		min-height: auto;
 		padding: var(--azc-space-4);
@@ -1210,7 +1210,7 @@
 }
 
 /* ── Responsive page header (table card reflow: page-patterns.css) ── */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
 	.azc-page-header__main {
 		grid-template-columns: 48px 1fr;
 	}

@@ -190,7 +190,7 @@
 }
 
 /* Responsive design */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .arbeitszeitcheck-dashboard__grid {
         grid-template-columns: 1fr;
         gap: 15px;
@@ -229,7 +229,7 @@
     background: var(--color-main-background);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-large);
-    max-width: 600px;
+    max-width: 599.98px;
     margin: 0 auto;
 }
 

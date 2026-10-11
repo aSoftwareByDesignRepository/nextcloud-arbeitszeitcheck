@@ -346,7 +346,7 @@
 	box-shadow: inset 0 0 0 2px var(--color-primary-element);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--reports .report-type-card {
 		grid-template-columns: auto minmax(0, 1fr);
 		padding: var(--azc-space-4, 1rem);
@@ -621,7 +621,7 @@
 }
 
 /* ========== Responsive ========== */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.reports-section {
 		padding-left: max(var(--space-4, 1rem), env(safe-area-inset-left));
 		padding-right: max(var(--space-4, 1rem), env(safe-area-inset-right));
@@ -725,7 +725,7 @@
 	font-weight: 600;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 39.99875rem) {
 	.datev-export-panel__actions {
 		flex-direction: column;
 		align-items: stretch;

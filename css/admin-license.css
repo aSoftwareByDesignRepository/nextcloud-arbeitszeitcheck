@@ -425,7 +425,7 @@ body.azc-license-modal-open {
 	overflow: hidden;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	#app-content.azc-app .azc-license-stat-grid {
 		grid-template-columns: 1fr;
 	}

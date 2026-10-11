@@ -104,7 +104,7 @@
 	margin: 0 0 var(--azc-space-4, var(--space-4, 1rem));
 }
 
-@media (max-width: 47.9375rem) {
+@media (max-width: 47.99875rem) {
 	.azc-projectcheck-admin-settings__missing .azc-callout__actions .azc-btn {
 		width: 100%;
 	}

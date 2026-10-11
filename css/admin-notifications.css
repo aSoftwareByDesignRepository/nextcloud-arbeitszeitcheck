@@ -565,7 +565,7 @@
 }
 
 /* ── Responsive ─────────────────────────────────────────────── */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
 	
 	#app-content.azc-app--admin-notifications .form-row--inline,
 	#app-content.azc-app--admin-notifications .form-row--thresholds,
@@ -1015,7 +1015,7 @@
 	padding-bottom: 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--admin-notifications .azc-settings-nav__chips,
 	#app-content.azc-app--admin-overtime-settings .azc-settings-nav__chips,
 	#app-content.azc-app--admin-vacation-rules .azc-settings-nav__chips,

@@ -102,7 +102,7 @@ html {
 
 /* ===== PAGE-SPECIFIC RESPONSIVE ADJUSTMENTS ===== */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   /* Section adjustments - clear spacing even on small screens */
   .section {
     padding: var(--space-6);
@@ -237,14 +237,14 @@ html {
 
 /* ===== TABLET / SMALL DESKTOP ADJUSTMENTS ===== */
 
-@media (min-width: 769px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1023.98px) {
   #app-content-wrapper,
   .arbeitszeitcheck-content {
     padding: var(--space-6) var(--space-4);
   }
 }
 
-@media (min-width: 1024px) and (max-width: 1280px) {
+@media (min-width: 1024px) and (max-width: 1279.98px) {
   #content.app-arbeitszeitcheck #app-navigation,
   .arbeitszeitcheck-navigation-wrapper {
     width: 240px;
@@ -261,7 +261,7 @@ html {
 
 /* ===== LANDSCAPE MOBILE ADJUSTMENTS ===== */
 
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-width: 767.98px) and (orientation: landscape) {
   #app-content-wrapper,
   .arbeitszeitcheck-content {
     padding: var(--space-3);
@@ -275,7 +275,7 @@ html {
 
 /* ===== PREVENT HORIZONTAL SCROLLING ===== */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   /* Scoped to app content only - avoid breaking flex/grid layouts globally */
   #app-content,
   #app-content-wrapper {
@@ -329,7 +329,7 @@ html {
 
 /* ===== TOUCH TARGET ENHANCEMENTS ===== */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   /* Primary interactive elements: touch-friendly targets (WCAG 2.5.5 AA) */
   button,
   .btn,

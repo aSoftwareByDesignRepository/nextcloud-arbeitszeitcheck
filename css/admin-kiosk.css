@@ -375,7 +375,7 @@
 	max-width: 48rem;
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 29.99875rem) {
 	#app-content.azc-app .azc-kiosk-flow__hint,
 	#app-content.azc-app .azc-kiosk-flow__block > .azc-kiosk-search,
 	#app-content.azc-app .azc-kiosk-flow__block > .azc-kiosk-person,
@@ -512,7 +512,7 @@
 	margin-top: 0.35rem;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 39.99875rem) {
 	#app-content.azc-app .azc-kiosk-assign-grid {
 		grid-template-columns: 1fr;
 	}
@@ -529,7 +529,7 @@
 	min-height: 100%;
 }
 
-@media (min-width: 40.01rem) {
+@media (min-width: 40rem) {
 	#app-content.azc-app .azc-kiosk-assign-card:first-child {
 		padding-inline-end: 1.5rem;
 		border-inline-end: 1px solid var(--azc-border, var(--color-border));
@@ -946,7 +946,7 @@ body.azc-kiosk-modal-open {
 	}
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app .azc-kiosk-form {
 		flex-direction: column;
 		align-items: stretch;

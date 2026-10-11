@@ -483,7 +483,7 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .section {
         padding: var(--space-4, 1rem);
     }
@@ -552,7 +552,7 @@
 }
 
 /* Time pair matrix: narrow screens — stack fields; hide redundant column headers (labels remain on each control) */
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
     .time-pair-matrix__grid {
         grid-template-columns: 1fr;
         gap: var(--space-4, 1rem);
@@ -687,7 +687,7 @@
 }
 
 /* Responsive adjustments for time input group */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .time-input-group {
         gap: var(--space-1, 0.25rem);
         padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
@@ -1076,7 +1076,7 @@
 }
 
 .arbeitszeit-check-tz-context__text {
-    max-width: 40rem;
+    max-width: 39.99875rem;
     margin: 0;
     font-size: 0.9375rem;
     line-height: 1.55;
@@ -1171,7 +1171,7 @@
     gap: var(--azc-space-2, 0.5rem);
 }
 
-@media (max-width: 47.9375rem) {
+@media (max-width: 47.99875rem) {
     #app-content.azc-app--time-entries .azc-row-actions__toggle {
         display: inline-flex;
         width: 100%;
@@ -1203,7 +1203,7 @@
    2.5.5 (Target Size, AA) minimum of 44x44 px on touch surfaces.
    The responsive media query in common/responsive.css already handles
    `.btn--sm`; this rule is a defensive backstop. */
-@media (max-width: 47.9375rem) {
+@media (max-width: 47.99875rem) {
     .actions-cell .btn-complete-entry {
         min-height: 44px;
     }
@@ -1489,7 +1489,7 @@
 	fill: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--time-entries .time-pair-matrix__grid {
 		grid-template-columns: 1fr;
 	}
@@ -1513,7 +1513,7 @@
 	padding-bottom: var(--azc-space-5, 1.25rem);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app--time-entries .time-entries-page__filter-grid {
 		grid-template-columns: 1fr;
 	}
@@ -1557,7 +1557,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--time-entries .time-inpu
 
 /* Auto-break + break-requirement contrast: common/semantic-surfaces.css */
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	#app-content.azc-app--time-entries .auto-break-panel__control {
 		flex-direction: column;
 		align-items: stretch;

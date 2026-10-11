@@ -317,7 +317,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.section {
 		padding: var(--space-4, 1rem);
 	}

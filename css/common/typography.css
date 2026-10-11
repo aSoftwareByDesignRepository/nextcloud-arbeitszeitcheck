@@ -454,7 +454,7 @@ i {
 }
 
 /* Responsive Typography */
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   :root {
     --arbeitszeitcheck-font-size-4xl: 2rem; /* 32px */
     --arbeitszeitcheck-font-size-3xl: 1.75rem; /* 28px */

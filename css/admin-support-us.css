@@ -422,7 +422,7 @@
 
 .azc-support-us__hint {
 	margin: 0;
-	max-width: 40rem;
+	max-width: 39.99875rem;
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: var(--azc-line-base, 1.5);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
@@ -597,7 +597,7 @@
 	text-underline-offset: 0.15em;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.azc-support-us-page__hero {
 		padding: var(--azc-space-5, 1.25rem) var(--azc-space-4, 1rem);
 	}

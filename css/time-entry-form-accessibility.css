@@ -458,7 +458,7 @@
 
 /* ===== MOBILE ACCESSIBILITY ===== */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   /* Ensure all interactive elements are easily tappable on mobile */
   #time-entry-form .btn {
     min-height: 48px; /* Larger on mobile for easier tapping */

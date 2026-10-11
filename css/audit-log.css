@@ -194,7 +194,7 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
-@container audit-filters (max-width: 40rem) {
+@container audit-filters (max-width: 39.99875rem) {
 	#app-content.azc-app--admin-audit-log .audit-log-page__filter-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		grid-template-areas:
@@ -239,7 +239,7 @@
 }
 
 @supports not (container-type: inline-size) {
-	@media (max-width: 900px) {
+	@media (max-width: 899.98px) {
 		#app-content.azc-app--admin-audit-log .audit-log-page__filter-grid {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 			grid-template-areas:
@@ -258,7 +258,7 @@
 		}
 	}
 
-	@media (max-width: 640px) {
+	@media (max-width: 639.98px) {
 		#app-content.azc-app--admin-audit-log .audit-log-page__filter-grid {
 			grid-template-columns: 1fr;
 			grid-template-areas:
@@ -339,7 +339,7 @@
 	color: var(--color-text-maxcontrast);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app--admin-audit-log .audit-log-table thead {
 		position: absolute;
 		width: 1px;

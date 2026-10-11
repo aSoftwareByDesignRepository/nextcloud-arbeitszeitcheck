@@ -129,7 +129,7 @@
 	min-width: 8.5rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899.98px) {
 	#app-content.azc-app--admin-holidays .admin-holidays__filter-grid {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	}

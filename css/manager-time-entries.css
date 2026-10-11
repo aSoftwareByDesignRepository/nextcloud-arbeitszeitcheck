@@ -109,7 +109,7 @@
 	margin-inline-start: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
 	#app-content.azc-app--manager-absences .manager-scope-page__pagination {
 		flex-direction: column;
@@ -124,7 +124,7 @@
 }
 
 /* Responsive results tables: card layout with readable long text columns */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody tr,
 	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody tr {
 		padding: var(--azc-space-4, 1rem);
@@ -239,7 +239,7 @@
 }
 
 /* Compact breakpoint: from 481px upward the manager half-day choices can share the row safely. */
-@media (min-width: 481px) {
+@media (min-width: 480px) {
 	#app-content.azc-app--manager-absences .absence-day-fraction__segment {
 		flex: 1 1 10rem;
 		min-width: 8rem;

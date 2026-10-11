@@ -379,7 +379,7 @@ dialog.entitlement-explain-dialog[open] {
 
 /* ===== RESPONSIVE ACCESSIBILITY ===== */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   /* Ensure touch targets remain accessible on mobile */
   .btn,
   .nav-link,

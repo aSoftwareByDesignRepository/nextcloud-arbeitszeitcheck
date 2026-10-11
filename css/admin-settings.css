@@ -128,7 +128,7 @@
   font-weight: 700;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   #app-content.azc-app--admin-settings .azc-settings-nav__chips,
   .azc-nc-admin-settings .azc-settings-nav__chips {
     flex-direction: column;
@@ -195,7 +195,7 @@
   font-weight: 700;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
   #app-content.azc-app--admin-settings .azc-admin-settings-form__actions--sticky .azc-btn--primary,
   #app-content.azc-app--admin-settings .azc-admin-settings-form__actions--sticky .azc-btn--touch {
     width: 100%;
@@ -621,7 +621,7 @@
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 600px) {
+@media (max-width: 599.98px) {
   #admin-settings-form .form-input,
 #admin-notifications-form .form-input,
   #admin-settings-form .form-select,
@@ -700,7 +700,7 @@
   color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text));
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   #app-content.azc-app--admin-settings .azc-admin-settings-form__footer,
   .azc-nc-admin-settings .azc-admin-settings-form__footer,
   #app-content.azc-app--admin-settings .azc-settings-form__footer,
@@ -875,7 +875,7 @@
 	margin-block: var(--azc-space-3, 0.75rem) 0;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 39.99875rem) {
 	#app-content.azc-app--admin-settings .form-row--2 {
 		grid-template-columns: 1fr;
 	}
@@ -1515,7 +1515,7 @@
 	border: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.azc-support-us__options {
 		grid-template-columns: 1fr;
 	}
@@ -1634,7 +1634,7 @@
 }
 
 /* Rows stack vertically under 640px (BC: responsive rule rows). */
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--admin-settings .azc-policy-row,
 	.azc-nc-admin-settings .azc-policy-row {
 		flex-direction: column;

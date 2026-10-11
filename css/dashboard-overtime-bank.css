@@ -103,7 +103,7 @@
 	margin: 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	.dashboard-overtime-bank-card__payout {
 		flex-direction: column;
 		align-items: flex-start;

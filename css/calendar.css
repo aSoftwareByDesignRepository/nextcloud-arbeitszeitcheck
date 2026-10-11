@@ -615,7 +615,7 @@
 }
 
 /* Desktop: make room beside the drawer so the calendar is not covered */
-@media (min-width: 769px) {
+@media (min-width: 768px) {
 	body.azc-day-panel-open .calendar-section {
 		margin-inline-end: min(26rem, 100%);
 		transition: margin-inline-end 0.2s ease;
@@ -714,7 +714,7 @@
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: var(--azc-line-base, 1.45);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
-	max-width: 40rem;
+	max-width: 39.99875rem;
 }
 
 .day-details-actions__link {
@@ -773,7 +773,7 @@
 }
 
 /* Responsive — NC tablet/phone: stack chrome; keep month grid fluid (≤768px) */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.section {
 		padding: var(--space-4, 1rem);
 		max-width: 100%;

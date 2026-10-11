@@ -1068,7 +1068,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Table Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .table-responsive,
   .table-container,
   .azc-table-wrap {
@@ -1163,7 +1163,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Modal Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .modal {
     max-width: 95vw;
     max-height: 95vh;
@@ -1743,7 +1743,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Responsive Components */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .form--horizontal,
   .form--inline {
     flex-direction: column;

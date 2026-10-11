@@ -335,7 +335,7 @@
 	}
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-date-range,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-date-range {
 		flex-wrap: wrap;
@@ -343,7 +343,7 @@
 	}
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter {
 		grid-template-columns: 1fr;
 		grid-template-areas:

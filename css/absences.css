@@ -69,7 +69,7 @@
 	align-items: end;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--absences .absences-page__filter-grid {
 		grid-template-columns: 1fr;
 	}
@@ -229,7 +229,7 @@
 	margin-top: 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--absences .absence-form-dates__grid {
 		grid-template-columns: 1fr;
 	}
@@ -961,7 +961,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 
 /* Compact breakpoint: from 481px upward the half-day choices can sit side by side without crowding. */
-@media (min-width: 481px) {
+@media (min-width: 480px) {
 	.absence-day-fraction__segment {
 		flex: 1 1 10rem;
 		min-width: 8rem;
@@ -1167,7 +1167,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	min-width: 44px;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
 	.absence-detail-shorten__form {
 		flex-direction: column;
 		align-items: stretch;
@@ -1259,7 +1259,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	.section--detail.absence-detail-view {
 		padding: var(--space-6, 1.5rem);
 	}
@@ -1351,7 +1351,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 
 /* Responsive: table as cards on small screens, stats stack vertically */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
 	.section--form {
 		padding: var(--space-6, 1.5rem);
 	}

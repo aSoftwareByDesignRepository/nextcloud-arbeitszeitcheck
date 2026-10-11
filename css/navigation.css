@@ -599,7 +599,7 @@
 }
 
 /* Responsive: compact nav items on small screens — keep hierarchy tokens in sync */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     #app-navigation {
         --azc-nav-padding-inline: 1rem;
         --azc-nav-icon-size: 1rem;

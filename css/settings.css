@@ -236,7 +236,7 @@
 	min-height: 44px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
 	#app-content.azc-app--settings .azc-settings-nav__chips {
 		flex-direction: column;
 	}

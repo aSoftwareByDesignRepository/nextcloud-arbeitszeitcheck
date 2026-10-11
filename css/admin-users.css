@@ -160,7 +160,7 @@
   color: var(--color-main-text);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 479.98px) {
   #app-content.azc-app--admin-users .azc-page-stack,
   #app-content.azc-app--admin-users #azc-main-content {
     min-width: 0;
@@ -176,7 +176,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .admin-users-filter-panel .azc-filter-grid--search {
     grid-template-columns: 1fr;
   }
@@ -266,7 +266,7 @@
 }
 
 /* Tablet/desktop breakpoint: from 641px upward the dense table actions can return to compact sizing. */
-@media (min-width: 641px) {
+@media (min-width: 640px) {
   .table .user-actions .azc-btn,
   .table .azc-table-actions .azc-btn {
     min-height: 2.25rem;
@@ -275,7 +275,7 @@
 }
 
 /* Compact breakpoint: at 640px and below the search/pager stack and actions center cleanly. */
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .admin-users-toolbar__search {
     max-width: none;
   }
@@ -844,7 +844,7 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   margin-top: var(--space-2, 0.5rem);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .admin-user-detail .user-edit-section__body,
   .admin-user-detail__identity,
   .admin-user-detail__howto-body {
@@ -920,7 +920,7 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
 }
 
 /* ≤768px: reset CTA full width for thumb reach */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .user-overtime-adjust__primary .azc-btn {
     width: 100%;
     justify-content: center;

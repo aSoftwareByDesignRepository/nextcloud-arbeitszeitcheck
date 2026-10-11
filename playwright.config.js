@@ -73,6 +73,9 @@ const STATEFUL_SPECS = [
   // Durable-mutation sweep mutates org settings, clock state, teams, kiosk
   // config and licenses — must not interleave with the parallel pool.
   /atlas-api-mutations\.spec\.js/,
+  // UI invariants create/delete completed entries for the shared employee —
+  // same shared-state class as the mutation sweep.
+  /atlas-ui-invariants\.spec\.js/,
 ]
 
 export default defineConfig({

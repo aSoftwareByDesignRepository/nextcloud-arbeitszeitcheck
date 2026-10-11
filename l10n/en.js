@@ -4812,7 +4812,7 @@
 		"month_closure_pdf_ot_payout_recorded_after_closure" : "Recorded after month closure (supplementary)",
 		"month_closure_pdf_ot_payout_recorded_at_closure" : "Recorded in this month closure",
 		"month_closure_pdf_premium_no_buckets" : "(no premium hours this month)",
-		"month_closure_pdf_premium_orthogonal_note" : "Hours + % for reporting only — not balance and not pay.",
+		"month_closure_pdf_premium_orthogonal_note" : "Hours + %% for reporting only — not balance and not pay.",
 		"month_closure_pdf_section_absences" : "Absences",
 		"month_closure_pdf_section_identification" : "Identification and seal",
 		"month_closure_pdf_section_integrity" : "Integrity note",

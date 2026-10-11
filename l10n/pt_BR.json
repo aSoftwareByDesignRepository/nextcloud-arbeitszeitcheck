@@ -4797,7 +4797,7 @@
         "month_closure_pdf_ot_payout_recorded_after_closure": "Gravado após o encerramento do mês (suplementar)",
         "month_closure_pdf_ot_payout_recorded_at_closure": "Gravado no encerramento deste mês",
         "month_closure_pdf_premium_no_buckets": "(sem horas premium este mês)",
-        "month_closure_pdf_premium_orthogonal_note": "Horas + % apenas para relatórios — sem Saldo e sem pagamento.",
+        "month_closure_pdf_premium_orthogonal_note": "Horas + %% apenas para relatórios — sem Saldo e sem pagamento.",
         "month_closure_pdf_section_absences": "Ausências",
         "month_closure_pdf_section_identification": "Identificação e selo",
         "month_closure_pdf_section_integrity": "Nota de integridade",

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.8.0 - 2026-10-12
+
+### Added
+
+- **Organisation-wide break policy (admin-controlled):** Administrators can now define company break rules centrally under Admin → Compliance: additional break tiers (e.g. "15 min after 4 h"), a minimum countable break length, and an enforcement switch that forces automatic break calculation for every employee — the per-user toggle can no longer be switched off when enforced. Effective requirements always resolve to `max(statutory law, organisation, working-time model)`, so a configured rule can tighten but never weaken the legal minimum. Every change is written to the audit log.
+- **Scheduled break windows:** Policies may prescribe break windows such as "break must lie within 12:00–13:00, 60 min". In `placement` mode the automatic break is placed inside the window instead of mid-shift; in `required` mode a break outside the window triggers a warning and a compliance violation. Overnight windows and multiple windows are supported.
+- **Mandatory presence windows per working-time model (LWS):** Models can define weekday-indexed required presence slots (e.g. school: Mon 08:00–12:00 lessons, Thu 14:00–15:00 consultations). Coverage = recorded work ∪ approved absences; uncovered intervals raise a `missing_presence` violation with manager notification. Organisation-wide exemption ranges (school holidays) suppress false positives.
+- **Working-time model tightening:** `break_rules` on a working-time model can now carry `tiers` and `min_break_minutes` that tighten — never weaken — the effective rule.
+- **Configuration safety:** Statutorily ineffective rules are never silently accepted — save responses and the admin preview mark each rule `effective|shadowed` per country; fully shadowed rules require an explicit confirmation (`CONFIRM_REQUIRED` inline flow, no modal). Corrupt or semantically invalid policy JSON falls back to statutory-only with a visible admin health notice.
+- **Employee transparency:** `/settings/breaks` shows the resolved effective break rule with source labels (law / company rule / working-time model), the locked auto-break toggle marked "set by administrator", and mandatory presence windows where configured.
+- **Feature-B additions:** dismissible help texts persisted per user, PDF export of the filtered time-entries list, manager CSV export with per-month overtime balances, teaching-unit input helper in the working-time model editor (27 units × 45 min → 20.25 h), and a compact employee layout (separate sick-days card, slim header, direct add-entry action).
+- **Companion capability:** `Capabilities` exposes `breakPolicy.enforced` so the mobile app renders the locked state consistently.
+
+### Fixed
+
+- Literal `%` characters in translation catalogs are escaped as `%%`, fixing a `vsprintf` 500 on the month-closure PDF.
+- Media-query boundaries normalized to the `B-0.02` convention, closing a real overflow defect at exactly 768 px.
+- WCAG target-size and live-region announcement fixes caught by the UI invariants suite.
+- Policy-level violations (organisation tier / window / presence) warn and flag without blocking saves; the statutory block path stays statutory-only. Duplicate violation rows on re-save are prevented by entry+type deduplication.
+
 ## 1.7.14 - 2026-10-10
 
 ### Changed

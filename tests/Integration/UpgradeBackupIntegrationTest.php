@@ -54,6 +54,42 @@ final class UpgradeBackupIntegrationTest extends TestCase
 		$this->backupService->restoreSnapshot('../evil', false);
 	}
 
+	public function testRestoreSkipsGeneratedColumns(): void
+	{
+		if (!$this->db->tableExists('at_entries')) {
+			self::markTestSkipped('ArbeitszeitCheck tables not present in this instance.');
+		}
+
+		// A live ('active') entry makes the STORED GENERATED live_user_id
+		// non-NULL in the snapshot; restore must skip it or MariaDB throws 1906.
+		$qb = $this->db->getQueryBuilder();
+		$qb->insert('at_entries')
+			->setValue('user_id', $qb->createNamedParameter('upgrade-backup-test-user'))
+			->setValue('start_time', $qb->createNamedParameter('2026-10-13 08:00:00'))
+			->setValue('status', $qb->createNamedParameter('active'))
+			->setValue('created_at', $qb->createNamedParameter('2026-10-13 08:00:00'))
+			->setValue('updated_at', $qb->createNamedParameter('2026-10-13 08:00:00'))
+			->executeStatement();
+
+		$before = $this->countRows('at_entries');
+		$result = $this->backupService->createSnapshot('integration-test-generated-column');
+		$snapshotId = $result['id'];
+
+		$this->db->getQueryBuilder()
+			->delete('at_entries')
+			->executeStatement();
+		self::assertSame(0, $this->countRows('at_entries'));
+
+		$this->backupService->restoreSnapshot($snapshotId, false);
+		self::assertSame($before, $this->countRows('at_entries'));
+
+		$this->db->getQueryBuilder()
+			->delete('at_entries')
+			->where('user_id = :uid')
+			->setParameter('uid', 'upgrade-backup-test-user')
+			->executeStatement();
+	}
+
 	private function countRows(string $table): int
 	{
 		$qb = $this->db->getQueryBuilder();

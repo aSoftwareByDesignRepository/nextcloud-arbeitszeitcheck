@@ -60,7 +60,7 @@ final class AppFeedbackFooterContractTest extends TestCase
 	{
 		$css = '';
 		$root = dirname(__DIR__, 3);
-		foreach (['css/app.css', 'css/navigation.css', 'css/admin-settings.css'] as $rel) {
+		foreach (['css/app.css', 'css/navigation.css', 'css/admin-settings.css', 'css/azc.css'] as $rel) {
 			$path = $root . '/' . $rel;
 			if (is_file($path)) {
 				$css .= (string)file_get_contents($path);

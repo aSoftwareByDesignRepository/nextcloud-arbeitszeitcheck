@@ -1,0 +1,153 @@
+/**
+ * Custom absence types admin page ("weitere betriebliche Fehlzeiten")
+ *
+ * Builds on the shared azc-card / form-* primitives; this file only carries
+ * page-specific layout (color swatches, editor spacing, i18n rows).
+ *
+ * @copyright Copyright (c) 2026
+ * @license AGPL-3.0-or-later
+ */
+
+.cat-hint {
+	margin: 0 0 1rem;
+}
+
+.cat-name {
+	display: block;
+	font-weight: 600;
+}
+
+.cat-code {
+	display: block;
+	font-family: var(--font-family-monospace, monospace);
+	font-size: 0.75rem;
+	color: var(--color-text-maxcontrast);
+	margin-top: 0.125rem;
+	word-break: break-all;
+}
+
+.cat-empty {
+	padding: 2rem 1rem;
+	color: var(--color-text-maxcontrast);
+}
+
+/* Admin-chosen calendar color preview — small, non-interactive dot. */
+.cat-swatch {
+	display: inline-block;
+	width: 1rem;
+	height: 1rem;
+	border-radius: var(--border-radius-pill, 999px);
+	border: 1px solid var(--color-border-maxcontrast);
+	vertical-align: middle;
+}
+
+.cat-swatch--info {
+	background: var(--color-info);
+}
+
+.cat-swatch--primary {
+	background: var(--color-primary-element, var(--color-primary));
+}
+
+.cat-swatch--success {
+	background: var(--color-success);
+}
+
+.cat-swatch--warning {
+	background: var(--color-warning);
+}
+
+.cat-swatch--error {
+	background: var(--color-error);
+}
+
+/* Editor panel */
+.cat-editor-panel {
+	border: 2px solid var(--color-primary-element, var(--color-primary));
+}
+
+.cat-editor-actions {
+	display: flex;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
+}
+
+.cat-appearance-row {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+	gap: 1rem;
+}
+
+.cat-input--narrow {
+	max-width: 10rem;
+}
+
+.cat-i18n-details {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
+	border-radius: var(--border-radius-large, 8px);
+	background: var(--color-background-hover, var(--color-main-background));
+}
+
+.cat-i18n-details > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 0.25rem 0;
+}
+
+.cat-i18n-details > summary:focus-visible {
+	outline: 2px solid var(--color-primary-element, var(--color-primary));
+	outline-offset: 2px;
+	border-radius: var(--border-radius, 4px);
+}
+
+.cat-i18n-row {
+	margin-top: 0.75rem;
+}
+
+.cat-i18n-row code {
+	font-size: 0.8rem;
+	background: var(--color-background-dark, rgba(0, 0, 0, 0.06));
+	padding: 0.05rem 0.35rem;
+	border-radius: var(--border-radius, 4px);
+	margin-right: 0.35rem;
+}
+
+.cat-field-error {
+	color: var(--color-error);
+	font-size: 0.85rem;
+	margin: 0.25rem 0 0;
+}
+
+.cat-form-errors {
+	background: color-mix(in srgb, var(--color-error) 12%, var(--color-main-background));
+	border: 1px solid color-mix(in srgb, var(--color-error) 45%, var(--color-border-maxcontrast));
+	border-radius: var(--border-radius-large, 8px);
+	color: var(--color-error-text, var(--color-error));
+	padding: 0.75rem 1rem;
+	margin-bottom: 1rem;
+	font-weight: 600;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+	border-color: var(--color-error);
+}
+
+input[aria-invalid="true"]:focus-visible,
+select[aria-invalid="true"]:focus-visible {
+	outline-color: var(--color-error);
+}
+
+@media (max-width: 39.99875rem) {
+	.cat-editor-actions {
+		flex-direction: column;
+	}
+
+	.cat-editor-actions .azc-btn {
+		width: 100%;
+	}
+}

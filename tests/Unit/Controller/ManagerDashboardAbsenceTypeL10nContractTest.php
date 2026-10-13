@@ -16,7 +16,9 @@ class ManagerDashboardAbsenceTypeL10nContractTest extends TestCase
 	{
 		$js = (string) file_get_contents(dirname(__DIR__, 3) . '/js/manager-dashboard.js');
 		$tpl = (string) file_get_contents(dirname(__DIR__, 3) . '/templates/manager-dashboard.php');
-		$labelSrc = (string) file_get_contents(dirname(__DIR__, 3) . '/lib/Util/AbsenceTypeLabel.php');
+		// AbsenceTypeLabel delegates to the canonical AbsenceTypeCatalog —
+		// pin the catalog source so every API type has a translated label.
+		$labelSrc = (string) file_get_contents(dirname(__DIR__, 3) . '/lib/Support/AbsenceTypeCatalog.php');
 
 		self::assertMatchesRegularExpression(
 			'/var ABSENCE_TYPE_TO_L10N_KEY\s*=\s*\{([\s\S]*?)\};/',
@@ -35,6 +37,8 @@ class ManagerDashboardAbsenceTypeL10nContractTest extends TestCase
 			'unpaid_leave' => 'Unpaid leave',
 			'home_office' => 'Home office',
 			'business_trip' => 'Business trip',
+			'child_sick' => 'Sick Child',
+			'overtime_comp' => 'Compensatory Time Off',
 		];
 
 		foreach ($expected as $code => $msgid) {
@@ -48,10 +52,15 @@ class ManagerDashboardAbsenceTypeL10nContractTest extends TestCase
 				$tpl,
 				"manager-dashboard.php must inject translated {$msgid}",
 			);
-			self::assertStringContainsString(
-				"'{$code}' => \$l->t('{$msgid}')",
+			// Catalog keys are Absence::TYPE_* constants (strtoupper(code));
+			// JS-map msgids may intentionally differ in casing from the
+			// catalog's Title-Case labels — pin translation presence, not
+			// msgid equality between the two label sets.
+			$constName = 'Absence::TYPE_' . strtoupper($code);
+			self::assertMatchesRegularExpression(
+				'/' . preg_quote($constName, '/') . '\s*=>\s*\$l->t\(\'/',
 				$labelSrc,
-				"AbsenceTypeLabel must translate {$code}",
+				"AbsenceTypeCatalog must translate {$code}",
 			);
 		}
 

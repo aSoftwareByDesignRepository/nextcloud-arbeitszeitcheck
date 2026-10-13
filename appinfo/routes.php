@@ -101,6 +101,7 @@ return [
 		['name' => 'absence#estimateVacationHours', 'url' => '/api/absences/estimate-hours', 'verb' => 'GET'],
 		['name' => 'absence#entitlementTrace', 'url' => '/api/absences/entitlement-trace', 'verb' => 'GET'],
 		['name' => 'absence#users', 'url' => '/api/colleagues', 'verb' => 'GET'],
+		['name' => 'absence#types', 'url' => '/api/absences/types', 'verb' => 'GET'],
 		['name' => 'absence#index', 'url' => '/api/absences', 'verb' => 'GET'],
 		['name' => 'absence#apiStore', 'url' => '/api/absences', 'verb' => 'POST'],
 		['name' => 'absence#apiShow', 'url' => '/api/absences/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
@@ -185,6 +186,14 @@ return [
 		['name' => 'admin#settings', 'url' => '/admin/settings', 'verb' => 'GET'],
 		['name' => 'admin#settingsSection', 'url' => '/admin/settings/{section}', 'verb' => 'GET', 'requirements' => ['section' => AdminSettingsSectionCatalog::routeRequirement()]],
 		['name' => 'admin#supportUs', 'url' => '/admin/support-us', 'verb' => 'GET'],
+
+		// Custom absence types: admin page + CRUD API (admin-gated via AppAdminMiddleware)
+		['name' => 'absence_type_admin#absenceTypes', 'url' => '/admin/absence-types', 'verb' => 'GET'],
+		['name' => 'absence_type_admin#listAbsenceTypes', 'url' => '/api/admin/absence-types', 'verb' => 'GET'],
+		['name' => 'absence_type_admin#getAbsenceType', 'url' => '/api/admin/absence-types/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence_type_admin#createAbsenceType', 'url' => '/api/admin/absence-types', 'verb' => 'POST'],
+		['name' => 'absence_type_admin#updateAbsenceType', 'url' => '/api/admin/absence-types/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence_type_admin#deleteAbsenceType', 'url' => '/api/admin/absence-types/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
 		['name' => 'license_admin#index', 'url' => '/admin/license', 'verb' => 'GET'],
 		['name' => 'license_admin#applyLicense', 'url' => '/api/admin/license', 'verb' => 'POST'],
 		['name' => 'license_admin#clearLicense', 'url' => '/api/admin/license', 'verb' => 'DELETE'],

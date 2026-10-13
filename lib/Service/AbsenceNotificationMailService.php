@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Util\AbsenceTypeLabel;
@@ -316,17 +318,7 @@ class AbsenceNotificationMailService
 
 	private function getTypeLabel(string $type): string
 	{
-		$map = [
-			'vacation' => $this->l10n->t('Vacation'),
-			'sick_leave' => $this->l10n->t('Sick Leave'),
-			'personal_leave' => $this->l10n->t('Personal Leave'),
-			'parental_leave' => $this->l10n->t('Parental Leave'),
-			'special_leave' => $this->l10n->t('Special Leave'),
-			'unpaid_leave' => $this->l10n->t('Unpaid Leave'),
-			'home_office' => $this->l10n->t('Home Office'),
-			'business_trip' => $this->l10n->t('Business Trip'),
-		];
-		return $map[$type] ?? $type;
+		return AbsenceTypeCatalog::label($this->l10n, $type);
 	}
 
 	/**

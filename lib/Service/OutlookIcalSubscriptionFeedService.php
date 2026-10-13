@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Util\Rfc5545Ics;
@@ -142,17 +144,11 @@ final class OutlookIcalSubscriptionFeedService
 	private function typeLabel(Absence $absence, IL10N $l10n): string
 	{
 		$type = $absence->getType();
-		return match ($type) {
-			Absence::TYPE_VACATION => $l10n->t('Vacation'),
-			Absence::TYPE_SICK_LEAVE => $l10n->t('Absence'), // locked privacy mapping
-			Absence::TYPE_PERSONAL_LEAVE => $l10n->t('Personal Leave'),
-			Absence::TYPE_PARENTAL_LEAVE => $l10n->t('Parental Leave'),
-			Absence::TYPE_SPECIAL_LEAVE => $l10n->t('Special Leave'),
-			Absence::TYPE_UNPAID_LEAVE => $l10n->t('Unpaid Leave'),
-			Absence::TYPE_HOME_OFFICE => $l10n->t('Home Office'),
-			Absence::TYPE_BUSINESS_TRIP => $l10n->t('Business Trip'),
-			default => $type,
-		};
+		// Health-related types stay masked in shared feeds (locked privacy mapping).
+		if ($type === Absence::TYPE_SICK_LEAVE || $type === Absence::TYPE_CHILD_SICK) {
+			return $l10n->t('Absence');
+		}
+		return AbsenceTypeCatalog::label($l10n, (string)$type);
 	}
 
 	private function halfDayLabel(Absence $absence, IL10N $l10n): ?string

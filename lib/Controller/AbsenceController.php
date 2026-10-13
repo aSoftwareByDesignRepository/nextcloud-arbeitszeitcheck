@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Service\VacationUnitService;
 use OCA\ArbeitszeitCheck\Service\VacationHoursDebitService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
@@ -1648,6 +1649,38 @@ class AbsenceController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Absence types selectable for new requests.
+	 *
+	 * Returns built-ins plus active custom types with labels already resolved
+	 * against the requester's language, plus the per-type calendar color/icon
+	 * so web and mobile renderers do not need their own mapping tables.
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function types(): JSONResponse
+	{
+		$labels = AbsenceTypeCatalog::creatableLabels($this->l10n);
+		$types = [];
+		foreach ($labels as $key => $label) {
+			$types[] = [
+				'key' => $key,
+				'label' => $label,
+				'color' => AbsenceTypeCatalog::color((string)$key),
+				'icon' => AbsenceTypeCatalog::icon((string)$key),
+				'maxDays' => AbsenceTypeCatalog::maxCalendarDays((string)$key),
+				'custom' => AbsenceTypeCatalog::isCustom((string)$key),
+			];
+		}
+
+		return new JSONResponse([
+			'success' => true,
+			'types' => $types,
+		]);
 	}
 
 	/**

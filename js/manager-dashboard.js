@@ -97,7 +97,9 @@
         special_leave: 'Special leave',
         unpaid_leave: 'Unpaid leave',
         home_office: 'Home office',
-        business_trip: 'Business trip'
+        business_trip: 'Business trip',
+        child_sick: 'Sick Child',
+        overtime_comp: 'Compensatory Time Off'
     };
 
     /** Normalize codes from API (hyphens, stray unicode) so the map lookup succeeds. */
@@ -125,7 +127,7 @@
     function absenceTitleTypeDisplay(s, typeCode) {
         // Prefer server-localized typeLabel from pending-approvals API (same IL10N as UI language).
         const serverLabel = s.typeLabel != null ? String(s.typeLabel).trim() : '';
-        if (serverLabel !== '' && !/^(vacation|sick_leave|personal_leave|parental_leave|special_leave|unpaid_leave|home_office|business_trip)$/i.test(serverLabel)) {
+        if (serverLabel !== '' && !/^(vacation|sick_leave|child_sick|personal_leave|parental_leave|special_leave|unpaid_leave|home_office|business_trip|overtime_comp)$/i.test(serverLabel)) {
             return serverLabel;
         }
         return absenceTypeDisplay(typeCode);

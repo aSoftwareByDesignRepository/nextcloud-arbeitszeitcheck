@@ -17,21 +17,11 @@ final class AbsenceTypeLabel
 {
 	/**
 	 * Human-readable label for an absence type code (same strings as absences UI).
+	 * Delegates to the central catalog so every surface stays in sync.
 	 */
 	public static function get(IL10N $l, string $type): string
 	{
-		$map = [
-			'vacation' => $l->t('Vacation'),
-			'sick_leave' => $l->t('Sick leave'),
-			'personal_leave' => $l->t('Personal leave'),
-			'parental_leave' => $l->t('Parental leave'),
-			'special_leave' => $l->t('Special leave'),
-			'unpaid_leave' => $l->t('Unpaid leave'),
-			'home_office' => $l->t('Home office'),
-			'business_trip' => $l->t('Business trip'),
-		];
-
-		return $map[$type] ?? $type;
+		return \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($l, $type);
 	}
 
 	/**

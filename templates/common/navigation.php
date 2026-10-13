@@ -85,6 +85,8 @@ $isAdminUsers = $pageId === 'admin-users' || $pageId === 'admin-user-detail'
 	|| ($pageId === '' && strpos($currentPage, '/admin/users') !== false);
 $isAdminWorkingTimeModels = $pageId === 'admin-working-time-models'
 	|| ($pageId === '' && strpos($currentPage, '/admin/working-time-models') !== false);
+$isAdminAbsenceTypes = $pageId === 'admin-absence-types'
+	|| ($pageId === '' && strpos($currentPage, '/admin/absence-types') !== false);
 $isAdminTariffRules = $pageId === 'admin-tariff-rules'
 	|| ($pageId === '' && strpos($currentPage, '/admin/tariff-rules') !== false);
 $isAdminHolidays = $pageId === 'admin-holidays'
@@ -281,6 +283,13 @@ $monthClosureEnabledNav = array_key_exists('monthClosureEnabled', $_)
                                 title="<?php p($l->t('Configure working time models')); ?>"
                                 aria-label="<?php p($l->t('Manage working time models')); ?>">
                                 <span><?php p($l->t('Working time models')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isAdminAbsenceTypes ? 'active' : ''); ?>" <?php p($isAdminAbsenceTypes ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence_type_admin.absenceTypes')); ?>"
+                                title="<?php p($l->t('Define additional absence types for your organisation')); ?>"
+                                aria-label="<?php p($l->t('Manage custom absence types')); ?>">
+                                <span><?php p($l->t('Custom absence types')); ?></span>
                             </a>
                         </li>
                         <li class="<?php p($isAdminHolidays ? 'active' : ''); ?>" <?php p($isAdminHolidays ? 'aria-current="page"' : ''); ?>>

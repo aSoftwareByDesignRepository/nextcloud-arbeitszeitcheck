@@ -2105,4 +2105,147 @@ class AbsenceServiceTest extends TestCase
 			}
 		}
 	}
+
+	/**
+	 * Service with the overtime-comp guard deps wired: debit estimator + entry mapper.
+	 *
+	 * @return array{0: AbsenceService, 1: VacationHoursDebitService&\PHPUnit\Framework\MockObject\MockObject, 2: \OCA\ArbeitszeitCheck\Db\TimeEntryMapper&\PHPUnit\Framework\MockObject\MockObject}
+	 */
+	private function serviceWithCompGuards(): array
+	{
+		$debit = $this->createMock(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class);
+		$entries = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$this->lockingProvider,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService,
+			null,
+			null,
+			null,
+			$debit,
+			null,
+			$entries
+		);
+		return [$service, $debit, $entries];
+	}
+
+	public function testOvertimeCompRejectsHalfDay(): void
+	{
+		[$service] = $this->serviceWithCompGuards();
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\BusinessRuleException::class);
+		$this->expectExceptionMessage('whole days');
+		$m->invoke(
+			$service,
+			Absence::TYPE_OVERTIME_COMP,
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+			['day_fraction' => 0.5],
+			'alice'
+		);
+	}
+
+	public function testOvertimeCompRejectsRangeWithoutPlannedHours(): void
+	{
+		[$service, $debit] = $this->serviceWithCompGuards();
+		$debit->method('estimateForUserRange')->willReturn([
+			'hours' => 0.0, 'one_day_hours' => 0.0, 'average_daily' => 0.0, 'basis' => 'none',
+		]);
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		try {
+			$m->invoke(
+				$service,
+				Absence::TYPE_OVERTIME_COMP,
+				new \DateTime('2026-09-12'), // Sat
+				new \DateTime('2026-09-13'), // Sun
+				[],
+				'alice'
+			);
+			$this->fail('weekend-only overtime_comp must be rejected');
+		} catch (\Throwable $e) {
+			$inner = $e instanceof \ReflectionException || $e instanceof \Exception && method_exists($e, 'getPrevious') ? ($e->getPrevious() ?? $e) : $e;
+			$this->assertStringContainsString('no planned working hours', $inner->getMessage());
+		}
+	}
+
+	public function testOvertimeCompRejectsDayWithTimeEntries(): void
+	{
+		[$service, $debit, $entries] = $this->serviceWithCompGuards();
+		$debit->method('estimateForUserRange')->willReturn([
+			'hours' => 8.0, 'one_day_hours' => 8.0, 'average_daily' => 8.0, 'basis' => 'schedule',
+		]);
+		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
+		$entries->method('findByUserAndDateRange')->willReturn([$entry]);
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		try {
+			$m->invoke(
+				$service,
+				Absence::TYPE_OVERTIME_COMP,
+				new \DateTime('2026-09-09'),
+				new \DateTime('2026-09-09'),
+				[],
+				'alice'
+			);
+			$this->fail('overtime_comp on a worked day must be rejected');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('already contain time entries', $e->getMessage());
+		}
+	}
+
+	public function testOvertimeCompValidFullDayPasses(): void
+	{
+		[$service, $debit, $entries] = $this->serviceWithCompGuards();
+		$debit->method('estimateForUserRange')->willReturn([
+			'hours' => 8.0, 'one_day_hours' => 8.0, 'average_daily' => 8.0, 'basis' => 'schedule',
+		]);
+		$entries->method('findByUserAndDateRange')->willReturn([]);
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		$m->invoke(
+			$service,
+			Absence::TYPE_OVERTIME_COMP,
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+			[],
+			'alice'
+		);
+		$this->assertTrue(true); // reaching here without throw is the assertion
+	}
+
+	public function testOvertimeCompOverThirtyDaysThrows(): void
+	{
+		[$service] = $this->serviceWithCompGuards();
+		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
+		$m->setAccessible(true);
+		try {
+			$m->invoke(
+				$service,
+				Absence::TYPE_OVERTIME_COMP,
+				new \DateTime('2026-09-01'),
+				new \DateTime('2026-10-01'), // 31 days
+				[],
+				'alice'
+			);
+			$this->fail('overtime_comp over 30 days must be rejected');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('Duration cannot exceed 30 days', $e->getMessage());
+		}
+	}
 }

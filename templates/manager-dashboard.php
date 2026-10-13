@@ -27,7 +27,9 @@ $teamMembers = $_['teamMembers'] ?? [];
 		"Special leave": <?php echo json_encode($l->t('Special leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Unpaid leave": <?php echo json_encode($l->t('Unpaid leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Home office": <?php echo json_encode($l->t('Home office'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-		"Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+		"Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Sick Child": <?php echo json_encode($l->t('Sick Child'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Compensatory Time Off": <?php echo json_encode($l->t('Compensatory Time Off'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
 	});
 })();
 </script>
@@ -285,7 +287,9 @@ $teamMembers = $_['teamMembers'] ?? [];
 		"Special leave": <?php echo json_encode($l->t('Special leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Unpaid leave": <?php echo json_encode($l->t('Unpaid leave'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		"Home office": <?php echo json_encode($l->t('Home office'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-		"Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+		"Business trip": <?php echo json_encode($l->t('Business trip'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Sick Child": <?php echo json_encode($l->t('Sick Child'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		"Compensatory Time Off": <?php echo json_encode($l->t('Compensatory Time Off'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
 	});
 </script>
 

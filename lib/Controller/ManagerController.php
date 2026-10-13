@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
@@ -412,17 +414,7 @@ class ManagerController extends Controller
 	 */
 	private function getAbsenceTypeLabel(string $type): string
 	{
-		$map = [
-			'vacation' => $this->l10n->t('Vacation'),
-			'sick_leave' => $this->l10n->t('Sick leave'),
-			'personal_leave' => $this->l10n->t('Personal leave'),
-			'parental_leave' => $this->l10n->t('Parental leave'),
-			'special_leave' => $this->l10n->t('Special leave'),
-			'unpaid_leave' => $this->l10n->t('Unpaid leave'),
-			'home_office' => $this->l10n->t('Home office'),
-			'business_trip' => $this->l10n->t('Business trip'),
-		];
-		return $map[$type] ?? $type;
+		return AbsenceTypeCatalog::label($this->l10n, $type);
 	}
 
 	/**
@@ -1399,16 +1391,7 @@ class ManagerController extends Controller
 				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_REJECTED,
 				\OCA\ArbeitszeitCheck\Db\Absence::STATUS_CANCELLED,
 			];
-			$allowedTypes = [
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PERSONAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PARENTAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SPECIAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_UNPAID_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_HOME_OFFICE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_BUSINESS_TRIP,
-			];
+			$allowedTypes = AbsenceTypeCatalog::all();
 			$statusFilter = ($status !== null && $status !== '' && in_array($status, $allowedStatuses, true)) ? $status : null;
 			$typeFilter = ($type !== null && $type !== '' && in_array($type, $allowedTypes, true)) ? $type : null;
 
@@ -2261,17 +2244,7 @@ class ManagerController extends Controller
 					'error' => $this->l10n->t('Invalid date range.'),
 				], Http::STATUS_BAD_REQUEST);
 			}
-			$validTypes = [
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PERSONAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_PARENTAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_SPECIAL_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_UNPAID_LEAVE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_HOME_OFFICE,
-				\OCA\ArbeitszeitCheck\Db\Absence::TYPE_BUSINESS_TRIP,
-			];
-			if ($type !== null && $type !== '' && !in_array($type, $validTypes, true)) {
+			if ($type !== null && $type !== '' && !AbsenceTypeCatalog::isValid($type)) {
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('Invalid absence type.'),

@@ -250,4 +250,110 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 		$this->assertEqualsWithDelta(4.0, $result['hours'], 0.001);
 	}
+
+	public function testChildSickCreditsLikeSickLeave(): void
+	{
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		$absence = new Absence();
+		$absence->setType(Absence::TYPE_CHILD_SICK);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setStartDate(new \DateTime('2026-09-09'));
+		$absence->setEndDate(new \DateTime('2026-09-09'));
+		$absence->setDays(1.0);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([$absence]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(8.0, $result['hours'], 0.001);
+		$this->assertSame(1, $result['days_credited']);
+	}
+
+	public function testChildSickHalfDayCreditsHalfPlanned(): void
+	{
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		$absence = new Absence();
+		$absence->setType(Absence::TYPE_CHILD_SICK);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setStartDate(new \DateTime('2026-09-09'));
+		$absence->setEndDate(new \DateTime('2026-09-09'));
+		$absence->setDays(0.5);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([$absence]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(4.0, $result['hours'], 0.001);
+	}
+
+	public function testUnapprovedChildSickNeverCredits(): void
+	{
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		foreach ([Absence::STATUS_PENDING, Absence::STATUS_REJECTED, Absence::STATUS_CANCELLED] as $status) {
+			$absence = new Absence();
+			$absence->setType(Absence::TYPE_CHILD_SICK);
+			$absence->setStatus($status);
+			$absence->setStartDate(new \DateTime('2026-09-09'));
+			$absence->setEndDate(new \DateTime('2026-09-09'));
+
+			$mapper = $this->createMock(AbsenceMapper::class);
+			$mapper->method('findByUserAndDateRange')->willReturn([$absence]);
+			$service = new PaidAbsencePlannedHoursCreditService(
+				$this->config,
+				$mapper,
+				$this->userModelMapper,
+				$this->modelMapper,
+				$this->holidayService,
+				$this->rotation,
+			);
+
+			$result = $service->creditHoursForRange(
+				'alice',
+				new \DateTime('2026-09-09'),
+				new \DateTime('2026-09-09'),
+			);
+			$this->assertSame(0.0, $result['hours'], "status $status must not credit");
+		}
+	}
+
+	public function testOvertimeCompNeverCredits(): void
+	{
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		// Approved Freizeitausgleich must NOT credit planned hours — the whole
+		// point is that the day's Soll debits the overtime balance instead.
+		$absence = new Absence();
+		$absence->setType(Absence::TYPE_OVERTIME_COMP);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setStartDate(new \DateTime('2026-09-09'));
+		$absence->setEndDate(new \DateTime('2026-09-09'));
+		$absence->setDays(1.0);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([$absence]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertSame(0.0, $result['hours']);
+		$this->assertSame(0, $result['days_credited']);
+	}
 }

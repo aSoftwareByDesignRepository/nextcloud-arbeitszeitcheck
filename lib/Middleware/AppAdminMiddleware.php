@@ -6,6 +6,7 @@ namespace OCA\ArbeitszeitCheck\Middleware;
 
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Controller\AdminController;
+use OCA\ArbeitszeitCheck\Controller\AbsenceTypeAdminController;
 use OCA\ArbeitszeitCheck\Controller\KioskAdminController;
 use OCA\ArbeitszeitCheck\Controller\LicenseAdminController;
 use OCA\ArbeitszeitCheck\Controller\OvertimePayoutController;
@@ -55,6 +56,7 @@ final class AppAdminMiddleware extends Middleware
 		$isGated = $controller instanceof AdminController
 			|| $controller instanceof LicenseAdminController
 			|| $controller instanceof KioskAdminController
+			|| $controller instanceof AbsenceTypeAdminController
 			|| $controller instanceof OvertimePayoutController;
 		if (!$isGated) {
 			return;

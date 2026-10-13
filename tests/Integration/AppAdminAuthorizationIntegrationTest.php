@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
+use OCA\ArbeitszeitCheck\Controller\AbsenceTypeAdminController;
 use OCA\ArbeitszeitCheck\Controller\AdminController;
 use OCA\ArbeitszeitCheck\Exception\NotAppAdminException;
 use OCA\ArbeitszeitCheck\Middleware\AppAdminMiddleware;
@@ -20,6 +21,16 @@ class AppAdminAuthorizationIntegrationTest extends TestCase
 
 		$this->assertInstanceOf(AppAdminMiddleware::class, $middleware);
 		$this->assertInstanceOf(AdminController::class, $controller);
+	}
+
+	public function testMiddlewareGatesAbsenceTypeAdminController(): void
+	{
+		$middleware = \OC::$server->query(AppAdminMiddleware::class);
+		$controller = \OC::$server->query(AbsenceTypeAdminController::class);
+
+		$this->assertInstanceOf(AbsenceTypeAdminController::class, $controller);
+		$this->expectException(NotAppAdminException::class);
+		$middleware->beforeController($controller, 'list');
 	}
 
 	public function testMiddlewareDeniesAdminControllerWhenNoAuthorizedSession(): void

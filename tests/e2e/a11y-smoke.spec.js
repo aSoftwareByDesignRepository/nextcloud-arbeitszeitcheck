@@ -31,6 +31,7 @@ const a11yRoutes = [
 	{ path: '/apps/arbeitszeitcheck/admin/teams', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/holidays', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/working-time-models', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/absence-types', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/tariff-rules', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/audit-log', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/kiosk', role: 'ADMIN' },

@@ -34,6 +34,7 @@ final class ArbeitszeitCheckTableCatalog
 		'at_kiosk_terminals',
 		'at_absences',
 		'at_audit',
+		'at_custom_absence',
 		'at_entitlement_snapshots',
 		'at_entries',
 		'at_holiday_suppress',

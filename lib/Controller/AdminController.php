@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
@@ -2712,7 +2714,7 @@ class AdminController extends Controller
 					} elseif ($paramKey === 'breakAutoFallbackFlexWindowEnd') {
 						$value = (string)max(1, min(24, (int)$value));
 					} elseif ($paramKey === 'requireSubstituteTypes') {
-						$validTypes = ['vacation', 'sick_leave', 'personal_leave', 'parental_leave', 'special_leave', 'unpaid_leave', 'home_office', 'business_trip'];
+						$validTypes = AbsenceTypeCatalog::all();
 						$arr = is_array($value) ? $value : (is_string($value) ? json_decode($value, true) : []);
 						if (!is_array($arr)) {
 							$arr = [];
@@ -4182,16 +4184,11 @@ class AdminController extends Controller
 	 */
 	private function getNotificationAbsenceTypes(): array
 	{
-		return [
-			['key' => 'vacation', 'label' => $this->l10n->t('Vacation')],
-			['key' => 'sick_leave', 'label' => $this->l10n->t('Sick Leave')],
-			['key' => 'personal_leave', 'label' => $this->l10n->t('Personal Leave')],
-			['key' => 'parental_leave', 'label' => $this->l10n->t('Parental Leave')],
-			['key' => 'special_leave', 'label' => $this->l10n->t('Special Leave')],
-			['key' => 'unpaid_leave', 'label' => $this->l10n->t('Unpaid Leave')],
-			['key' => 'home_office', 'label' => $this->l10n->t('Home Office')],
-			['key' => 'business_trip', 'label' => $this->l10n->t('Business Trip')],
-		];
+		$out = [];
+		foreach (AbsenceTypeCatalog::labels($this->l10n) as $key => $label) {
+			$out[] = ['key' => $key, 'label' => $label];
+		}
+		return $out;
 	}
 
 	/**

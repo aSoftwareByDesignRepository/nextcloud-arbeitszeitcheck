@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+
 use OCA\ArbeitszeitCheck\Db\MonthClosure;
 use OCP\IL10N;
 
@@ -256,17 +258,7 @@ final class MonthClosurePdfDocumentBuilder
 
 	private function labelAbsenceType(string $type): string
 	{
-		return match ($type) {
-			'vacation' => $this->l->t('Vacation'),
-			'sick_leave' => $this->l->t('Sick leave'),
-			'personal_leave' => $this->l->t('Personal Leave'),
-			'parental_leave' => $this->l->t('Parental leave'),
-			'special_leave' => $this->l->t('Special leave'),
-			'unpaid_leave' => $this->l->t('Unpaid leave'),
-			'home_office' => $this->l->t('Home office'),
-			'business_trip' => $this->l->t('Business trip'),
-			default => $type,
-		};
+		return AbsenceTypeCatalog::label($this->l, $type);
 	}
 
 	/**

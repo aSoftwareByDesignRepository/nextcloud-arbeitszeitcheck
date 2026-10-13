@@ -23,6 +23,7 @@ use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
@@ -32,6 +33,9 @@ class PaidAbsencePlannedHoursCreditService
 	/** @var list<string> */
 	public const CREDITABLE_TYPES = [
 		Absence::TYPE_SICK_LEAVE,
+		// Carer's absence for a sick child is a paid excused absence like sick
+		// leave (§45 SGB V territory): the planned hours must not create Minusstunden.
+		Absence::TYPE_CHILD_SICK,
 	];
 
 	public function __construct(
@@ -94,7 +98,7 @@ class PaidAbsencePlannedHoursCreditService
 			if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
 				continue;
 			}
-			if (!in_array($absence->getType(), self::CREDITABLE_TYPES, true)) {
+			if (!AbsenceTypeCatalog::isSollCreditable($absence->getType())) {
 				continue;
 			}
 

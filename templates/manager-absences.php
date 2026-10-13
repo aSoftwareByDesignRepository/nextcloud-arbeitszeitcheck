@@ -53,14 +53,9 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								<div class="azc-filter-field__control">
 									<select id="employee-absences-type-filter" name="type" class="form-select" aria-label="<?php p($l->t('Type')); ?>">
 										<option value=""><?php p($l->t('All types')); ?></option>
-										<option value="vacation"><?php p($l->t('Vacation')); ?></option>
-										<option value="sick_leave"><?php p($l->t('Sick leave')); ?></option>
-										<option value="personal_leave"><?php p($l->t('Personal leave')); ?></option>
-										<option value="parental_leave"><?php p($l->t('Parental leave')); ?></option>
-										<option value="special_leave"><?php p($l->t('Special leave')); ?></option>
-										<option value="unpaid_leave"><?php p($l->t('Unpaid leave')); ?></option>
-										<option value="home_office"><?php p($l->t('Home office')); ?></option>
-										<option value="business_trip"><?php p($l->t('Business trip')); ?></option>
+										<?php foreach (\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($l) as $typeKey => $typeLabel): ?>
+										<option value="<?php p($typeKey); ?>"><?php p($typeLabel); ?></option>
+										<?php endforeach; ?>
 									</select>
 								</div>
 							</div>
@@ -222,14 +217,9 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 							<label for="manager-absence-record-type" class="azc-filter-field__label"><?php p($l->t('Type')); ?></label>
 							<div class="azc-filter-field__control">
 								<select id="manager-absence-record-type" name="record_type" class="form-select" required>
-									<option value="vacation"><?php p($l->t('Vacation')); ?></option>
-									<option value="sick_leave"><?php p($l->t('Sick leave')); ?></option>
-									<option value="personal_leave"><?php p($l->t('Personal leave')); ?></option>
-									<option value="parental_leave"><?php p($l->t('Parental leave')); ?></option>
-									<option value="special_leave"><?php p($l->t('Special leave')); ?></option>
-									<option value="unpaid_leave"><?php p($l->t('Unpaid leave')); ?></option>
-									<option value="home_office"><?php p($l->t('Home office')); ?></option>
-									<option value="business_trip"><?php p($l->t('Business trip')); ?></option>
+									<?php foreach (\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::creatableLabels($l) as $typeKey => $typeLabel): ?>
+									<option value="<?php p($typeKey); ?>"><?php p($typeLabel); ?></option>
+									<?php endforeach; ?>
 								</select>
 							</div>
 						</div>

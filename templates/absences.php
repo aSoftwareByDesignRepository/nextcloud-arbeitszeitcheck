@@ -277,30 +277,18 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                             <?php if ($mode === 'edit'): ?>
                             <option value=""><?php p($l->t('Choose absence type…')); ?></option>
                             <?php endif; ?>
-                            <option value="vacation" <?php echo $typeIsVacation ? 'selected' : ''; ?>>
-                                <?php p($l->t('Vacation')); ?>
+                            <?php
+                            // Create mode offers only creatable (built-in + active custom) types.
+                            // Edit mode keeps the full set so an absence whose custom type was
+                            // later deactivated still renders and keeps its current value.
+                            $absenceTypeOptions = $mode === 'edit'
+                                ? \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($l)
+                                : \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::creatableLabels($l);
+                            foreach ($absenceTypeOptions as $typeKey => $typeLabel): ?>
+                            <option value="<?php p($typeKey); ?>" <?php echo ($absence && $absence->getType() === $typeKey) ? 'selected' : ''; ?>>
+                                <?php p($typeLabel); ?>
                             </option>
-                            <option value="sick_leave" <?php echo ($absence && $absence->getType() === 'sick_leave') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Sick Leave')); ?>
-                            </option>
-                            <option value="personal_leave" <?php echo ($absence && $absence->getType() === 'personal_leave') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Personal Leave')); ?>
-                            </option>
-                            <option value="parental_leave" <?php echo ($absence && $absence->getType() === 'parental_leave') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Parental Leave')); ?>
-                            </option>
-                            <option value="special_leave" <?php echo ($absence && $absence->getType() === 'special_leave') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Special Leave')); ?>
-                            </option>
-                            <option value="unpaid_leave" <?php echo ($absence && $absence->getType() === 'unpaid_leave') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Unpaid Leave')); ?>
-                            </option>
-                            <option value="home_office" <?php echo ($absence && $absence->getType() === 'home_office') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Home Office')); ?>
-                            </option>
-                            <option value="business_trip" <?php echo ($absence && $absence->getType() === 'business_trip') ? 'selected' : ''; ?>>
-                                <?php p($l->t('Business Trip')); ?>
-                            </option>
+                            <?php endforeach; ?>
                         </select>
                         <p id="absence-type-help" class="form-help"><?php p($l->t('Vacation, sick leave, and other types each follow your organisation’s rules.')); ?></p>
                     </div>
@@ -548,19 +536,8 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                         <span class="absence-type-badge type-<?php p($absence->getType()); ?>">
                             <?php
                             $typeKey = $absence->getType();
-                            $typeLabel = match($typeKey) {
-                                'vacation' => $l->t('Vacation'),
-                                'sick' => $l->t('Sick Leave'),
-                                'sick_leave' => $l->t('Sick Leave'),
-                                'personal_leave' => $l->t('Personal Leave'),
-                                'parental_leave' => $l->t('Parental Leave'),
-                                'special_leave' => $l->t('Special Leave'),
-                                'unpaid_leave' => $l->t('Unpaid Leave'),
-                                'home_office' => $l->t('Home Office'),
-                                'business_trip' => $l->t('Business Trip'),
-                                default => $l->t('Absence')
-                            };
-                            p($typeLabel);
+                            if ($typeKey === 'sick') { $typeKey = 'sick_leave'; }
+                            p(\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($l, (string)$typeKey));
                             ?>
                         </span>
                         <span class="badge badge--<?php p(BadgeVariant::forAbsenceStatus((string)$absence->getStatus())); ?>">
@@ -916,19 +893,8 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                                                 <span class="absence-type-badge type-<?php p($absence->getType()); ?>">
                                                     <?php
                                                     $typeKey = $absence->getType();
-                                                    $typeLabel = match($typeKey) {
-                                                        'vacation' => $l->t('Vacation'),
-                                                        'sick' => $l->t('Sick Leave'),
-                                                        'sick_leave' => $l->t('Sick Leave'),
-                                                        'personal_leave' => $l->t('Personal Leave'),
-                                                        'parental_leave' => $l->t('Parental Leave'),
-                                                        'special_leave' => $l->t('Special Leave'),
-                                                        'unpaid_leave' => $l->t('Unpaid Leave'),
-                                                        'home_office' => $l->t('Home Office'),
-                                                        'business_trip' => $l->t('Business Trip'),
-                                                        default => $l->t('Absence')
-                                                    };
-                                                    p($typeLabel);
+                                                    if ($typeKey === 'sick') { $typeKey = 'sick_leave'; }
+                                                    p(\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($l, (string)$typeKey));
                                                     ?>
                                                 </span>
                                                 <?php if ($isPastAbsence): ?>

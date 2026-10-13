@@ -640,14 +640,7 @@ class AbsenceMapper extends QBMapper
 		$sickLeaveDays = $this->getSickLeaveDays($userId, $year);
 
 		$otherAbsences = [];
-		$absenceTypes = [
-			Absence::TYPE_PERSONAL_LEAVE,
-			Absence::TYPE_PARENTAL_LEAVE,
-			Absence::TYPE_SPECIAL_LEAVE,
-			Absence::TYPE_UNPAID_LEAVE,
-			Absence::TYPE_HOME_OFFICE,
-			Absence::TYPE_BUSINESS_TRIP
-		];
+		$absenceTypes = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::statsOtherTypes();
 
 		foreach ($absenceTypes as $type) {
 			$count = $this->countByUserTypeAndYear($userId, $type, $year);

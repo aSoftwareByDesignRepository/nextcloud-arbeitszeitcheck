@@ -387,6 +387,30 @@
 	background: color-mix(in srgb, var(--color-warning) 14%, var(--color-main-background));
 }
 
+/* Sick child (carer's absence) — info accent, distinct from sick/error. */
+.calendar-day-absence--child-sick .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-info) 50%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-info) 13%, var(--color-main-background));
+}
+
+.calendar-day-absence--child-sick .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-info) 22%, var(--color-main-background));
+	color: var(--color-info-text, var(--color-info));
+	border-color: color-mix(in srgb, var(--color-info) 42%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+/* Compensatory time off (Gleittag) — primary-light accent, balance-spend day. */
+.calendar-day-absence--overtime-comp .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-primary-element) 45%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-primary-element-light, var(--color-primary-light)) 45%, var(--color-main-background));
+}
+
+.calendar-day-absence--overtime-comp .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-primary-element) 18%, var(--color-main-background));
+	color: var(--color-primary-element-text, var(--color-primary-element));
+	border-color: color-mix(in srgb, var(--color-primary-element) 38%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
 .calendar-day-absence--coverage .calendar-day-absence-chip {
 	border-color: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 50%, var(--color-border, var(--arbeitszeitcheck-color-border)));
 	background: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 12%, var(--color-main-background));
@@ -396,6 +420,63 @@
 	background: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 22%, var(--color-main-background));
 	color: var(--color-primary-text, var(--color-primary-element-text, var(--color-primary)));
 	border-color: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 40%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+/* Custom admin-defined types — admin-chosen token family per type
+   (`calendar-day-absence--custom-<color>`), same chip recipe as built-ins. */
+.calendar-day-absence--custom-info .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-info) 50%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-info) 13%, var(--color-main-background));
+}
+
+.calendar-day-absence--custom-info .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-info) 22%, var(--color-main-background));
+	color: var(--color-info-text, var(--color-info));
+	border-color: color-mix(in srgb, var(--color-info) 42%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+.calendar-day-absence--custom-primary .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 45%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-primary-element-light, var(--color-primary-light)) 45%, var(--color-main-background));
+}
+
+.calendar-day-absence--custom-primary .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 18%, var(--color-main-background));
+	color: var(--color-primary-element-text, var(--color-primary-element));
+	border-color: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 38%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+.calendar-day-absence--custom-success .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-success) 14%, var(--color-main-background));
+}
+
+.calendar-day-absence--custom-success .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-success) 24%, var(--color-main-background));
+	color: var(--color-success-text, var(--color-success));
+	border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+.calendar-day-absence--custom-warning .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-warning) 50%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-warning) 14%, var(--color-main-background));
+}
+
+.calendar-day-absence--custom-warning .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-warning) 22%, var(--color-main-background));
+	color: var(--color-warning-text, var(--color-warning));
+	border-color: color-mix(in srgb, var(--color-warning) 42%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+}
+
+.calendar-day-absence--custom-error .calendar-day-absence-chip {
+	border-color: color-mix(in srgb, var(--color-error) 45%, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-error) 12%, var(--color-main-background));
+}
+
+.calendar-day-absence--custom-error .calendar-day-absence-chip__icon {
+	background: color-mix(in srgb, var(--color-error) 22%, var(--color-main-background));
+	color: var(--color-error-text, var(--color-error));
+	border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border, var(--arbeitszeitcheck-color-border)));
 }
 
 .btn-close__icon,

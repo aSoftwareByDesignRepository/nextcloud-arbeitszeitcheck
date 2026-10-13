@@ -2548,7 +2548,9 @@
                 special_leave: 'Special Leave',
                 unpaid_leave: 'Unpaid Leave',
                 home_office: 'Home Office',
-                business_trip: 'Business Trip'
+                business_trip: 'Business Trip',
+                child_sick: 'Sick Child',
+                overtime_comp: 'Compensatory Time Off'
             };
             const labelKey = map[key] || 'Absence';
             // Prefer server-provided translation map when available (timeline/index.php),
@@ -2568,6 +2570,11 @@
             if (absence && absence.role === 'substitute' && absence.ownerDisplayName) {
                 const tmpl = (this.config.l10n && this.config.l10n.coveringFor) || 'Covering for %1$s';
                 return String(tmpl).replace('%1$s', absence.ownerDisplayName);
+            }
+            // Server-resolved label (localized, covers custom types whose
+            // labels live in the DB rather than in the injected l10n map).
+            if (absence && absence.typeLabel) {
+                return String(absence.typeLabel);
             }
             return this.getAbsenceTypeLabel(absence ? (absence.type || 'absence') : 'absence');
         },
@@ -2640,6 +2647,12 @@
             if (type === 'sick' || type === 'sick_leave') {
                 return 'circle-alert';
             }
+            if (type === 'child_sick') {
+                return 'shield-check';
+            }
+            if (type === 'overtime_comp') {
+                return 'coffee';
+            }
             if (type === 'unpaid_leave') {
                 return 'calendar-off';
             }
@@ -2648,6 +2661,12 @@
             }
             if (type === 'home_office') {
                 return 'users';
+            }
+            // Custom types carry their icon name in the API payload; allowlist
+            // charset so a malformed value can't inject markup via azcIcon().
+            const customIcon = absence && absence.typeIcon ? String(absence.typeIcon) : '';
+            if (/^[a-z0-9][a-z0-9-]{0,63}$/.test(customIcon)) {
+                return customIcon;
             }
             return 'calendar-off';
         },
@@ -2663,8 +2682,20 @@
             if (type === 'sick' || type === 'sick_leave') {
                 return 'calendar-day-absence--sick';
             }
+            if (type === 'child_sick') {
+                return 'calendar-day-absence--child-sick';
+            }
+            if (type === 'overtime_comp') {
+                return 'calendar-day-absence--overtime-comp';
+            }
             if (type === 'unpaid_leave') {
                 return 'calendar-day-absence--unpaid';
+            }
+            // Custom types: the API sends a token-family color; fall back to
+            // the neutral "other" chip for unknown/missing metadata.
+            const customColor = absence && absence.typeColor ? String(absence.typeColor) : '';
+            if (/^(info|primary|success|warning|error)$/.test(customColor)) {
+                return 'calendar-day-absence--custom-' + customColor;
             }
             return 'calendar-day-absence--other';
         },

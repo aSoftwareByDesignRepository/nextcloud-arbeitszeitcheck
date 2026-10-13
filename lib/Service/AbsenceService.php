@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IDBConnection;
@@ -56,6 +57,7 @@ class AbsenceService
 	private ?VacationUnitService $vacationUnitService;
 	private ?VacationHoursDebitService $vacationHoursDebitService;
 	private ?ManagerPendingApprovalMailService $managerPendingApprovalMailService;
+	private ?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper;
 	/** Shared migrate-idle lock held for the duration of a vacation mutation (anti-TOCTOU). */
 	private ?string $heldVacationUnitMigrateSharedLock = null;
 	/** Shared year-mode lock — blocks exclusive mode flip mid-mutation (lock order: year → migrate). */
@@ -84,6 +86,7 @@ class AbsenceService
 		?VacationUnitService $vacationUnitService = null,
 		?VacationHoursDebitService $vacationHoursDebitService = null,
 		?ManagerPendingApprovalMailService $managerPendingApprovalMailService = null,
+		?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -109,6 +112,8 @@ class AbsenceService
 		$this->vacationUnitService = $vacationUnitService;
 		$this->vacationHoursDebitService = $vacationHoursDebitService;
 		$this->managerPendingApprovalMailService = $managerPendingApprovalMailService;
+		// Same pattern as timeZoneService: never silently skip the worked-day guard.
+		$this->timeEntryMapper = $timeEntryMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
 	}
 
 	/** Calendar "today" at 00:00 in organisation storage TZ. */
@@ -530,7 +535,7 @@ class AbsenceService
 				$validateData['day_fraction'] = '0.5';
 			}
 		}
-		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), []);
+		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), ['existing_type' => $absence->getType()]);
 
 		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
 		if ($absence->getType() === Absence::TYPE_VACATION) {
@@ -1875,7 +1880,7 @@ class AbsenceService
 	 * @param array $data Absence data
 	 * @param string $userId User ID (absence owner)
 	 * @param int|null $excludeAbsenceId When updating, ID of the absence to exclude from overlap check
-	 * @param array<string, bool> $options Recognized keys: `skip_substitute_rules` (bool) — skips substitute requirement and colleague checks (manager-recorded absences).
+	 * @param array<string, mixed> $options Recognized keys: `skip_substitute_rules` (bool) — skips substitute requirement and colleague checks (manager-recorded absences); `existing_type` (string) — the absence's unchanged type on update, so a deactivated custom type stays editable.
 	 * @throws \Exception
 	 */
 	private function validateAbsenceData(array $data, string $userId, ?int $excludeAbsenceId = null, ?\DateTimeInterface $vacationRequestCreatedAt = null, array $options = []): void
@@ -1903,43 +1908,30 @@ class AbsenceService
 			$overlapType = $first->getType();
 			$overlapStart = $first->getStartDate() ? $first->getStartDate()->format('d.m.Y') : '?';
 			$overlapEnd = $first->getEndDate() ? $first->getEndDate()->format('d.m.Y') : '?';
-			$typeLabels = [
-				'vacation' => $this->l10n->t('Vacation'),
-				'sick_leave' => $this->l10n->t('Sick Leave'),
-				'personal_leave' => $this->l10n->t('Personal Leave'),
-				'parental_leave' => $this->l10n->t('Parental Leave'),
-				'special_leave' => $this->l10n->t('Special Leave'),
-				'unpaid_leave' => $this->l10n->t('Unpaid Leave'),
-				'home_office' => $this->l10n->t('Home Office'),
-				'business_trip' => $this->l10n->t('Business Trip'),
-			];
-			$overlapTypeLabel = $typeLabels[$overlapType] ?? $this->l10n->t('Absence');
+			$overlapTypeLabel = AbsenceTypeCatalog::label($this->l10n, (string)$overlapType);
 			$baseMsg = $this->l10n->t('This period overlaps with an existing %1$s (%2$s – %3$s).', [$overlapTypeLabel, $overlapStart, $overlapEnd]);
-			if ($type === Absence::TYPE_SICK_LEAVE && $overlapType === Absence::TYPE_VACATION) {
+			if (in_array($type, [Absence::TYPE_SICK_LEAVE, Absence::TYPE_CHILD_SICK], true) && $overlapType === Absence::TYPE_VACATION) {
 				$hint = $this->l10n->t('If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.');
 				throw new \Exception($baseMsg . ' ' . $hint);
 			}
 			throw new \Exception($baseMsg);
 		}
 
-		// Validate type
+		// Validate type (single enumeration point: AbsenceTypeCatalog)
 		if (empty($type)) {
 			throw new \Exception($this->l10n->t('Absence type is required'));
 		}
-		$validTypes = [
-			Absence::TYPE_VACATION,
-			Absence::TYPE_SICK_LEAVE,
-			Absence::TYPE_PERSONAL_LEAVE,
-			Absence::TYPE_PARENTAL_LEAVE,
-			Absence::TYPE_SPECIAL_LEAVE,
-			Absence::TYPE_UNPAID_LEAVE,
-			Absence::TYPE_HOME_OFFICE,
-			Absence::TYPE_BUSINESS_TRIP,
-		];
-		if (!in_array($type, $validTypes, true)) {
+		if (!AbsenceTypeCatalog::isValid($type)) {
 			throw new \Exception($this->l10n->t('Invalid absence type'));
 		}
-		$this->validateAbsenceTypeRules($type, $startDate, $endDate);
+		// New requests need an active (creatable) type; an unchanged type on
+		// update stays valid even when an admin deactivated the custom type —
+		// history must remain editable, e.g. for manager corrections.
+		$existingType = $options['existing_type'] ?? null;
+		if (!AbsenceTypeCatalog::isCreatable($type) && $type !== $existingType) {
+			throw new \Exception($this->l10n->t('This absence type is no longer available'));
+		}
+		$this->validateAbsenceTypeRules($type, $startDate, $endDate, $data, $userId);
 
 		// Vacation entitlement: FIFO carryover + annual (see VacationAllocationService)
 		if ($type === Absence::TYPE_VACATION) {
@@ -2037,49 +2029,74 @@ class AbsenceService
 	 */
 	/**
 	 * Validate absence type rules (max calendar days per type).
-	 * Limits are documented here and enforced for consistency and abuse prevention.
+	 * Limits live in AbsenceTypeCatalog::MAX_DAYS and are enforced for
+	 * consistency and abuse prevention; per-type messages stay stable for BC.
 	 */
-	private function validateAbsenceTypeRules(string $type, \DateTime $startDate, \DateTime $endDate): void
+	private function validateAbsenceTypeRules(string $type, \DateTime $startDate, \DateTime $endDate, array $data = [], string $userId = ''): void
 	{
 		$days = $startDate->diff($endDate)->days + 1;
+		$maxDays = AbsenceTypeCatalog::maxCalendarDays($type);
 
-		switch ($type) {
-			case Absence::TYPE_VACATION:
-				if ($days > 30) {
+		if ($days > $maxDays) {
+			switch ($type) {
+				case Absence::TYPE_VACATION:
 					throw new \Exception($this->l10n->t('Vacation cannot exceed 30 days'));
-				}
-				break;
-			case Absence::TYPE_SICK_LEAVE:
-				if ($days > Constants::MAX_ABSENCE_DAYS) {
+				case Absence::TYPE_SICK_LEAVE:
 					throw new \Exception($this->l10n->t('Sick leave duration seems unreasonable'));
-				}
-				break;
-			case Absence::TYPE_PERSONAL_LEAVE:
-				if ($days > 5) {
+				case Absence::TYPE_PERSONAL_LEAVE:
 					throw new \Exception($this->l10n->t('Personal leave cannot exceed 5 days'));
-				}
-				break;
-			case Absence::TYPE_PARENTAL_LEAVE:
-				if ($days > 1095) { // ~3 years
+				case Absence::TYPE_PARENTAL_LEAVE:
 					throw new \Exception($this->l10n->t('Parental leave cannot exceed 3 years per request'));
-				}
-				break;
-			case Absence::TYPE_SPECIAL_LEAVE:
-				if ($days > 30) {
+				case Absence::TYPE_SPECIAL_LEAVE:
 					throw new \Exception($this->l10n->t('Special leave cannot exceed 30 days'));
-				}
-				break;
-			case Absence::TYPE_UNPAID_LEAVE:
-				if ($days > Constants::MAX_ABSENCE_DAYS) {
+				case Absence::TYPE_UNPAID_LEAVE:
 					throw new \Exception($this->l10n->t('Unpaid leave cannot exceed 365 days'));
+				default:
+					$msg = $this->l10n->t('Duration cannot exceed %d days', [$maxDays]);
+					// Identity translators (tests) leave %d in place — substitute then.
+					if (str_contains($msg, '%d')) {
+						$msg = sprintf($msg, $maxDays);
+					}
+					throw new \Exception($msg);
+			}
+		}
+
+		if ($type === Absence::TYPE_OVERTIME_COMP) {
+			// Freizeitausgleich debits whole planned days from the overtime balance.
+			// A partial-day balance burn needs no absence record (leaving early
+			// already yields the negative difference) and fractional accounting of
+			// "half a Soll day" would be ambiguous — full-day only, and only where
+			// the range actually contains planned work hours.
+			$isHalfDay = isset($data['day_fraction']) && abs((float)$data['day_fraction'] - 0.5) < 1e-9;
+			if ($isHalfDay) {
+				throw new BusinessRuleException(
+					$this->l10n->t('Compensatory time off can only be requested for whole days.'),
+					'OVERTIME_COMP_FULL_DAY_ONLY'
+				);
+			}
+			if ($userId !== '') {
+				$debit = $this->resolveRangeDebitHours($userId, $startDate, $endDate, (float)$days);
+				if ((float)$debit['hours'] <= 0.0) {
+					throw new BusinessRuleException(
+						$this->l10n->t('The selected period has no planned working hours to take as compensatory time off.'),
+						'OVERTIME_COMP_NO_PLANNED_HOURS'
+					);
 				}
-				break;
-			case Absence::TYPE_HOME_OFFICE:
-			case Absence::TYPE_BUSINESS_TRIP:
-				if ($days > Constants::MAX_ABSENCE_DAYS) {
-					throw new \Exception($this->l10n->t('Duration cannot exceed 365 days'));
+				// A comp day means "away for the whole planned day". With entries already
+				// clocked the absence would burn full Soll on top of worked hours and
+				// over-debit the balance — refuse instead of silently double-counting.
+				if ($this->timeEntryMapper !== null) {
+					// Mapper range is half-open on start_time — include the whole end day.
+					$endExclusive = (clone $endDate)->modify('+1 day');
+					$entries = $this->timeEntryMapper->findByUserAndDateRange($userId, $startDate, $endExclusive);
+					if (!empty($entries)) {
+						throw new BusinessRuleException(
+							$this->l10n->t('Compensatory time off cannot be requested for days that already contain time entries.'),
+							'OVERTIME_COMP_ENTRIES_EXIST'
+						);
+					}
 				}
-				break;
+			}
 		}
 	}
 

@@ -50,6 +50,7 @@ $pageIcons = [
 	'admin-users' => 'users',
 	'admin-user-detail' => 'user-check',
 	'admin-working-time-models' => 'briefcase',
+	'admin-absence-types' => 'layers',
 	'admin-tariff-rules' => 'layers',
 	'admin-holidays' => 'calendar-heart',
 	'admin-teams' => 'building-2',

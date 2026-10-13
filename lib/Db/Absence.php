@@ -60,6 +60,10 @@ class Absence extends Entity
 	public const TYPE_UNPAID_LEAVE = 'unpaid_leave';
 	public const TYPE_HOME_OFFICE = 'home_office';
 	public const TYPE_BUSINESS_TRIP = 'business_trip';
+	/** Carer's absence for a sick child — excused like sick leave. */
+	public const TYPE_CHILD_SICK = 'child_sick';
+	/** Freizeitausgleich / Gleittag — day off paid from the overtime balance (not creditable, not vacation). */
+	public const TYPE_OVERTIME_COMP = 'overtime_comp';
 
 	public const STATUS_PENDING = 'pending';
 	public const STATUS_SUBSTITUTE_PENDING = 'substitute_pending';
@@ -215,18 +219,8 @@ class Absence extends Entity
 			$errors['userId'] = 'User ID is required';
 		}
 
-		// Validate type
-		$validTypes = [
-			self::TYPE_VACATION,
-			self::TYPE_SICK_LEAVE,
-			self::TYPE_PERSONAL_LEAVE,
-			self::TYPE_PARENTAL_LEAVE,
-			self::TYPE_SPECIAL_LEAVE,
-			self::TYPE_UNPAID_LEAVE,
-			self::TYPE_HOME_OFFICE,
-			self::TYPE_BUSINESS_TRIP
-		];
-		if (!in_array($this->type, $validTypes)) {
+		// Validate type (single enumeration point: AbsenceTypeCatalog)
+		if (!\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isValid((string)$this->type)) {
 			$errors['type'] = 'Invalid absence type';
 		}
 
@@ -311,10 +305,19 @@ class Absence extends Entity
 			&& $approvedByUid !== 'system'
 			&& $approvedByUid !== $this->getUserId();
 
+		// Resolved type presentation for API/mobile consumers. `typeLabel` is
+		// server-localized (incl. custom types whose labels live in the DB, not
+		// in client bundles); color/icon drive calendar chips for custom types.
+		// Unknown legacy codes degrade to the raw code + neutral visuals.
+		$type = (string)$this->getType();
+
 		return [
 			'id' => $this->getId(),
 			'userId' => $this->getUserId(),
 			'type' => $this->getType(),
+			'typeLabel' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::resolvedLabel($type),
+			'typeColor' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::color($type),
+			'typeIcon' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::icon($type),
 			'startDate' => $startDate ? $startDate->format('Y-m-d') : null,
 			'endDate' => $endDate ? $endDate->format('Y-m-d') : null,
 			'days' => $this->getDays(),

@@ -161,6 +161,8 @@
 .absence-past-record-badge,
 .calendar-past-record-badge,
 .calendar-day-past-label,
+.absence-type-badge.type-child_sick,
+.absence-type-badge.type-overtime_comp,
 #app-content.azc-app--admin-holidays .admin-holidays-badge--statutory,
 .dz-status-badge[data-status="paused"],
 .dz-list-item .dz-badge[data-status="paused"] {

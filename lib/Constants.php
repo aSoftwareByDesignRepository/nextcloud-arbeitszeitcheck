@@ -263,17 +263,8 @@ final class Constants
 		'employee_shortened',
 	];
 
-	/** @var list<string> */
-	public const ABSENCE_TYPES = [
-		'vacation',
-		'sick_leave',
-		'personal_leave',
-		'parental_leave',
-		'special_leave',
-		'unpaid_leave',
-		'home_office',
-		'business_trip',
-	];
+	/** @var list<string> Single enumeration lives in AbsenceTypeCatalog; kept for BC. */
+	public const ABSENCE_TYPES = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::ORDER;
 
 	/** App config: overtime/undertime traffic light enabled globally. */
 	public const CONFIG_OVERTIME_TRAFFIC_LIGHT_ENABLED = 'overtime_traffic_light_enabled';

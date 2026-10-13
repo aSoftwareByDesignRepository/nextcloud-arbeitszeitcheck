@@ -252,16 +252,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                     </p>
                     <?php
                     $requireTypes = $settings['requireSubstituteTypes'] ?? [];
-                    $absenceTypesForSubstitute = [
-                        'vacation' => $l->t('Vacation'),
-                        'sick_leave' => $l->t('Sick leave'),
-                        'personal_leave' => $l->t('Personal reasons'),
-                        'parental_leave' => $l->t('Parental leave'),
-                        'special_leave' => $l->t('Special leave'),
-                        'unpaid_leave' => $l->t('Unpaid leave'),
-                        'home_office' => $l->t('Home office'),
-                        'business_trip' => $l->t('Business trip'),
-                    ];
+                    $absenceTypesForSubstitute = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($l);
                     foreach ($absenceTypesForSubstitute as $typeKey => $typeLabel):
                         $checked = in_array($typeKey, $requireTypes, true);
                     ?>

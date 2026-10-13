@@ -50,6 +50,11 @@
 			addBreak: t('correctionAddBreak', 'Add break'),
 			reason: t('Reason (min. 10 characters)', 'Reason (min. 10 characters)'),
 			reasonHelp: t('correctionReasonHelp', 'Required for the audit trail (at least 10 characters).'),
+			workLocationLegend: t('workLocationLabel', 'Work location'),
+			workLocationUnspecified: t('workLocationUnspecified', 'Not specified'),
+			workLocationOffice: t('workLocationOffice', 'Office'),
+			workLocationHome: t('workLocationHome', 'Home office'),
+			workLocationExternal: t('workLocationExternal', 'External appointment'),
 		};
 	}
 
@@ -223,6 +228,9 @@
 				};
 				if (result.payload.breaks?.length) {
 					payload.breaks = result.payload.breaks;
+				}
+				if (result.payload.workLocation) {
+					payload.workLocation = result.payload.workLocation;
 				}
 				if (projSel?.value) {
 					payload.projectCheckProjectId = projSel.value;

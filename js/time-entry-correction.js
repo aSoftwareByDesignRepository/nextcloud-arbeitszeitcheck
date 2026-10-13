@@ -399,6 +399,7 @@
 		const btnAddBreak = modal.querySelector('#correction-add-break');
 		const justification = modal.querySelector('#correction-justification');
 		const justificationCount = modal.querySelector('#correction-justification-count');
+		const workLocationSelect = modal.querySelector('#correction-work-location');
 		const entryIdInput = modal.querySelector('#correction-entry-id');
 
 		addTimeOptions(startHour, startMinute, false);
@@ -436,6 +437,20 @@
 			breaksEmptyHint.hidden = hasRows;
 		}
 
+		function formatWorkLocationLabel(raw) {
+			const s = typeof raw === 'string' ? raw : '';
+			if (s === 'home') {
+				return t('workLocationHome', 'Home office');
+			}
+			if (s === 'external') {
+				return t('workLocationExternal', 'External appointment');
+			}
+			if (s === 'office') {
+				return t('workLocationOffice', 'Office');
+			}
+			return t('workLocationUnspecified', 'Not specified');
+		}
+
 		function fillCurrentSummary(summary) {
 			if (!currentSummary) {
 				return;
@@ -445,6 +460,7 @@
 				[t('correctionLabelStart'), formatIsoDisplay(summary.startTime, 'time')],
 				[t('correctionLabelEnd'), formatIsoDisplay(summary.endTime, 'time')],
 				[t('correctionLabelBreaks'), formatBreaksList(summary.breaks)],
+				[t('correctionLabelWorkLocation'), formatWorkLocationLabel(summary.workLocation)],
 				[t('correctionLabelDescription'), summary.description || '–'],
 			];
 			currentSummary.innerHTML = rows.map(([label, val]) => {
@@ -660,8 +676,18 @@
 			const proposedBreaks = collectBreaks();
 			const originalBreaks = normalizeBreaksFromSummary(summary.breaks);
 			const breaksChanged = proposedBreaks.length > 0 && !breaksPayloadEqual(proposedBreaks, originalBreaks);
+			// '__clear' proposes removing the mark; '' means keep current;
+			// NULL/legacy originals stay null so picking "office" on an
+			// unmarked legacy entry still registers as a real change.
+			const proposedLocation = workLocationSelect ? workLocationSelect.value : '';
+			const origLocation = typeof summary.workLocation === 'string' && summary.workLocation !== ''
+				? summary.workLocation
+				: null;
+			const locationChanged = proposedLocation === '__clear'
+				? origLocation !== null
+				: (proposedLocation !== '' && proposedLocation !== origLocation);
 
-			return workChanged || breaksChanged;
+			return workChanged || breaksChanged || locationChanged;
 		}
 
 		function validateForm() {
@@ -738,6 +764,9 @@
 			updateJustificationCount();
 			setSelectHm(startHour, startMinute, { hour: '09', minute: '00' });
 			setSelectHm(endHour, endMinute, { hour: '17', minute: '00' });
+			if (workLocationSelect) {
+				workLocationSelect.value = '';
+			}
 			if (breaksContainer) {
 				breaksContainer.innerHTML = '';
 			}
@@ -848,6 +877,19 @@
 				startTime: startHidden ? startHidden.value : '',
 				endTime: endHidden ? endHidden.value : '',
 			};
+			const proposedLocation = workLocationSelect ? workLocationSelect.value : '';
+			const origLocation = wizardState.originalSummary
+				&& typeof wizardState.originalSummary.workLocation === 'string'
+				&& wizardState.originalSummary.workLocation !== ''
+				? wizardState.originalSummary.workLocation
+				: null;
+			if (proposedLocation === '__clear') {
+				if (origLocation !== null) {
+					body.workLocation = null;
+				}
+			} else if (proposedLocation !== '' && proposedLocation !== origLocation) {
+				body.workLocation = proposedLocation;
+			}
 			const breaks = collectBreaks();
 			const originalBreaks = wizardState.originalSummary
 				? normalizeBreaksFromSummary(wizardState.originalSummary.breaks)

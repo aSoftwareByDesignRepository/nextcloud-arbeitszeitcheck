@@ -859,4 +859,85 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$entry->setJustification(json_encode(['proposed' => ['description' => 'x']]));
 		$service->approve($entry, 'boss', 'ok');
 	}
+
+	public function testApplyProposalSetsWorkLocation(): void
+	{
+		$entry = $this->buildEntry();
+		$this->service->applyProposal($entry, ['workLocation' => 'home']);
+		$this->assertSame('home', $entry->getWorkLocation());
+	}
+
+	public function testApplyProposalClearsWorkLocationOnNull(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setWorkLocation('home');
+		$this->service->applyProposal($entry, ['workLocation' => null]);
+		$this->assertNull($entry->getWorkLocation());
+	}
+
+	public function testApplyProposalLeavesWorkLocationUntouchedWhenAbsent(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setWorkLocation('external');
+		$this->service->applyProposal($entry, ['description' => 'only text changed']);
+		$this->assertSame('external', $entry->getWorkLocation());
+	}
+
+	public function testApplyProposalRejectsInvalidWorkLocation(): void
+	{
+		$entry = $this->buildEntry();
+		$this->expectException(\InvalidArgumentException::class);
+		$this->service->applyProposal($entry, ['workLocation' => 'moon']);
+	}
+
+	public function testRejectRestoresOriginalWorkLocation(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setWorkLocation('external');
+		$entry->setJustification(json_encode([
+			'justification' => 'Was actually at client site.',
+			'original' => [
+				'startTime' => '2026-01-15T09:00:00+00:00',
+				'endTime' => '2026-01-15T17:00:00+00:00',
+				'description' => 'original work',
+				'status' => TimeEntry::STATUS_COMPLETED,
+				'workLocation' => 'office',
+			],
+			'proposed' => ['workLocation' => 'external'],
+		]));
+
+		$result = $this->service->reject($entry, 'manager1', 'Not approved.');
+		$this->assertSame('office', $result->getWorkLocation());
+	}
+
+	public function testRejectRestoresNullWorkLocationFromLegacySnapshot(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setWorkLocation('home');
+		$entry->setJustification(json_encode([
+			'justification' => 'x',
+			'original' => [
+				'startTime' => '2026-01-15T09:00:00+00:00',
+				'endTime' => '2026-01-15T17:00:00+00:00',
+				'status' => TimeEntry::STATUS_COMPLETED,
+				'workLocation' => null,
+			],
+			'proposed' => ['workLocation' => 'home'],
+		]));
+
+		$result = $this->service->reject($entry, 'manager1', 'nope');
+		$this->assertNull($result->getWorkLocation());
+	}
+
+	public function testPrepareManualPendingSnapshotsWorkLocation(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setWorkLocation('external');
+		$this->service->prepareManualPending($entry, 'forgot to track');
+
+		$json = json_decode($entry->getJustification(), true);
+		$this->assertSame('external', $json['proposed']['workLocation']);
+	}
 }

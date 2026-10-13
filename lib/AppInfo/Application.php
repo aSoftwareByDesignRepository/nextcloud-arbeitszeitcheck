@@ -985,7 +985,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(HolidayService::class),
-				$c->query(PermissionService::class)
+				$c->query(PermissionService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class)
 			);
 		});
 

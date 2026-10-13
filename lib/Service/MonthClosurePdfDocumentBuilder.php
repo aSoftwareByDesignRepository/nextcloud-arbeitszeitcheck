@@ -140,6 +140,16 @@ final class MonthClosurePdfDocumentBuilder
 				]),
 			];
 		}
+		$wld = $rep['work_location_days'] ?? null;
+		if (is_array($wld)) {
+			$rows[] = [
+				$this->l->t('month_closure_pdf_label_work_location_days'),
+				$this->l->t('month_closure_pdf_work_location_days_detail', [
+					$this->fmtNum($wld['home'] ?? null),
+					$this->fmtNum($wld['external'] ?? null),
+				]),
+			];
+		}
 		$this->keyValues($rows);
 
 		$bank = $snap['overtime_bank'] ?? null;

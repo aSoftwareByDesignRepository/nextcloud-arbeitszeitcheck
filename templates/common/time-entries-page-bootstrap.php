@@ -23,6 +23,7 @@ $entriesPayload = array_map(static function ($entry) {
 		'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format('c') : null,
 		'status' => $entry->getStatus(),
 		'description' => $entry->getDescription(),
+		'workLocation' => $entry->getWorkLocation(),
 	];
 }, $entries);
 

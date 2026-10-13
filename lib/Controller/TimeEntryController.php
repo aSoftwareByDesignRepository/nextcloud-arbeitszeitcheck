@@ -32,6 +32,8 @@ use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService;
 use OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService;
 use OCA\ArbeitszeitCheck\Service\TimeEntryDeletionPolicy;
+use OCA\ArbeitszeitCheck\Service\UserWorkLocationService;
+use OCA\ArbeitszeitCheck\Support\WorkLocation;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
@@ -85,6 +87,7 @@ class TimeEntryController extends Controller
 	private ProjectCheckLaborTimeSyncService $projectCheckLaborSync;
 	private TimeCaptureMethodService $timeCaptureMethodService;
 	private TimeEntryDeletionPolicy $deletionPolicy;
+	private UserWorkLocationService $userWorkLocationService;
 	private \OCP\IDBConnection $db;
 
 	public function __construct(
@@ -115,6 +118,7 @@ class TimeEntryController extends Controller
 		TimeCaptureMethodService $timeCaptureMethodService,
 		TimeEntryDeletionPolicy $deletionPolicy,
 		?\OCP\IDBConnection $db = null,
+		?UserWorkLocationService $userWorkLocationService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -142,6 +146,8 @@ class TimeEntryController extends Controller
 		$this->timeCaptureMethodService = $timeCaptureMethodService;
 		$this->deletionPolicy = $deletionPolicy;
 		$this->db = $db ?? \OCP\Server::get(\OCP\IDBConnection::class);
+		$this->userWorkLocationService = $userWorkLocationService
+			?? \OCP\Server::get(UserWorkLocationService::class);
 	}
 
 	/**
@@ -155,6 +161,21 @@ class TimeEntryController extends Controller
 			return '?';
 		}
 		return $this->timeZoneService->formatForDisplay($dt, 'H:i', $userId);
+	}
+
+	/**
+	 * Uniform 400 for a work_location value outside the canonical allowlist
+	 * (GH #43). Field-keyed so clients can render the error inline (WCAG 3.3.1).
+	 */
+	private function invalidWorkLocationResponse(): JSONResponse
+	{
+		$message = $this->l10n->t('Invalid work location.');
+		return new JSONResponse([
+			'success' => false,
+			'error' => $message,
+			'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::INVALID_WORK_LOCATION,
+			'fields' => ['workLocation' => $message],
+		], Http::STATUS_BAD_REQUEST);
 	}
 
 	private function jsonMonthFinalizedConflict(): JSONResponse
@@ -285,6 +306,9 @@ class TimeEntryController extends Controller
 			'timeEntryChangesRequireApproval' => $this->requiresChangeApproval(),
 			'manualTimeEntriesRequireApproval' => $this->requiresManualEntryApproval(),
 			'timeCapture' => $this->timeCaptureMethodService->getSettings($userId),
+			// GH #43: preselect the employee default on the create form.
+			'workLocationDefault' => $this->userWorkLocationService->getDefault($userId)
+				?? \OCA\ArbeitszeitCheck\Support\WorkLocation::FALLBACK,
 		] + $this->getNavigationFlags($userId);
 	}
 
@@ -1193,6 +1217,14 @@ class TimeEntryController extends Controller
 			$timeEntry->setProjectCheckProjectId($project_check_project_id);
 			$manualRequiresApproval = $this->requiresManualEntryApproval();
 			$params = $this->request->getParams();
+			try {
+				$timeEntry->setWorkLocation($this->userWorkLocationService->resolveForNewEntry(
+					$userId,
+					$params['workLocation'] ?? $params['work_location'] ?? null
+				));
+			} catch (\InvalidArgumentException) {
+				return $this->invalidWorkLocationResponse();
+			}
 			$justificationText = trim((string)($params['justification'] ?? ''));
 			if ($manualRequiresApproval) {
 				if (mb_strlen($justificationText) < 10) {
@@ -1719,6 +1751,15 @@ class TimeEntryController extends Controller
 				}
 			}
 
+			// Work location: present → validate + set; '' clears; absent → unchanged (GH #43)
+			if (\array_key_exists('workLocation', $params) || \array_key_exists('work_location', $params)) {
+				try {
+					$entry->setWorkLocation(WorkLocation::normalize($params['workLocation'] ?? $params['work_location']));
+				} catch (\InvalidArgumentException) {
+					return $this->invalidWorkLocationResponse();
+				}
+			}
+
 			// Finalise paused entries: when the user supplies an end_time, the entry
 			// is no longer orphaned – promote it to completed so all downstream logic
 			// (compliance checks, reports, approval flow) treats it correctly.
@@ -2072,7 +2113,8 @@ class TimeEntryController extends Controller
 				'breakEndTime' => $entry->getBreakEndTime() ? $entry->getBreakEndTime()->format('c') : null,
 				'breaks' => $originalBreaks,
 				'durationHours' => $entry->getDurationHours(),
-				'description' => $entry->getDescription()
+				'description' => $entry->getDescription(),
+				'workLocation' => $entry->getWorkLocation(),
 			];
 
 			$proposedData = [];
@@ -2129,6 +2171,19 @@ class TimeEntryController extends Controller
 				}
 				if ($newDescription !== null) {
 					$proposedData['description'] = $newDescription;
+				}
+			}
+
+			// Location-only corrections are legitimate (e.g. "I was actually
+			// at a client visit that day") — allow proposing workLocation on
+			// its own; ''/null proposes clearing the mark (GH #43).
+			if (\array_key_exists('workLocation', $params) || \array_key_exists('work_location', $params)) {
+				try {
+					$proposedData['workLocation'] = WorkLocation::normalize(
+						$params['workLocation'] ?? $params['work_location']
+					);
+				} catch (\InvalidArgumentException) {
+					return $this->invalidWorkLocationResponse();
 				}
 			}
 
@@ -2839,6 +2894,14 @@ class TimeEntryController extends Controller
 					return $pcBlock;
 				}
 				$timeEntry->setProjectCheckProjectId($project_check_project_id);
+				try {
+					$timeEntry->setWorkLocation($this->userWorkLocationService->resolveForNewEntry(
+						$userId,
+						$params['workLocation'] ?? $params['work_location'] ?? null
+					));
+				} catch (\InvalidArgumentException) {
+					return $this->invalidWorkLocationResponse();
+				}
 				$manualRequiresApproval = $this->requiresManualEntryApproval();
 				$justificationText = trim((string)($params['justification'] ?? ''));
 				if ($manualRequiresApproval) {

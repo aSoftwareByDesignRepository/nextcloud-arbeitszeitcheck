@@ -533,6 +533,13 @@
 			if (report.total_violations != null) html += `<p class="report-meta"><strong>${L.violations || 'Violations'}:</strong> ${esc(report.total_violations)}</p>`;
 			if (report.violations_count != null) html += `<p class="report-meta"><strong>${L.violations || 'Violations'}:</strong> ${esc(report.violations_count)}</p>`;
 			if (report.total_overtime != null) html += `<p class="report-meta"><strong>${L.overtime || 'Overtime'}:</strong> ${esc(report.total_overtime)} h</p>`;
+			if (report.work_location_days && typeof report.work_location_days === 'object') {
+				const wld = report.work_location_days;
+				html += `<p class="report-meta"><strong>${L.workLocationDays || 'Work location days'}:</strong> `
+					+ esc(L.workLocationDaysHome || 'Home office') + ` ${esc(wld.home ?? 0)}, `
+					+ esc(L.workLocationDaysExternal || 'External appointments') + ` ${esc(wld.external ?? 0)}</p>`;
+				html += `<p class="report-meta report-meta--hint">${esc(L.workLocationDaysHint || 'A day counts toward a location when at least one entry that day carries it — mixed days appear under both.')}</p>`;
+			}
 			if (report.total_undertime != null) html += `<p class="report-meta"><strong>${L.undertime || 'Undertime'}:</strong> ${esc(report.total_undertime)} h</p>`;
 			if (report.bank_enabled) html += `<p class="report-meta"><strong>${L.overtimeBank || 'Overtime bank'}:</strong> ${esc(L.enabled || 'Enabled')}</p>`;
 			if (report.entries && report.entries.length) {
@@ -695,15 +702,26 @@
 				html += '</tbody></table></div>';
 			} else if (report.members && report.members.length) {
 				// Team report (aggregated members)
-				html += `<h4 class="report-subhead">${L.users || 'Users'}</h4><div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${L.name || 'Name'}</th><th>${L.hours || 'Hours'}</th><th>${L.overtime || 'Overtime'}</th></tr></thead><tbody>`;
+				const showWl = report.members.some((m) => m.home_office_days != null || m.external_appointment_days != null);
+				html += `<h4 class="report-subhead">${L.users || 'Users'}</h4><div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${L.name || 'Name'}</th><th>${L.hours || 'Hours'}</th><th>${L.overtime || 'Overtime'}</th>`
+					+ (showWl ? `<th>${esc(L.workLocationDaysHome || 'Home office')}</th><th>${esc(L.workLocationDaysExternal || 'External appointments')}</th>` : '')
+					+ `</tr></thead><tbody>`;
 				report.members.forEach((m) => {
-					html += `<tr>${reportTd(L.name || 'Name', esc(m.display_name || m.user_id || '-'))}${reportTd(L.hours || 'Hours', esc(m.total_hours != null ? m.total_hours : '-'))}${reportTd(L.overtime || 'Overtime', esc(m.overtime_hours != null ? m.overtime_hours : '-'))}</tr>`;
+					html += `<tr>${reportTd(L.name || 'Name', esc(m.display_name || m.user_id || '-'))}${reportTd(L.hours || 'Hours', esc(m.total_hours != null ? m.total_hours : '-'))}${reportTd(L.overtime || 'Overtime', esc(m.overtime_hours != null ? m.overtime_hours : '-'))}`
+						+ (showWl ? reportTd(L.workLocationDaysHome || 'Home office', esc(m.home_office_days != null ? m.home_office_days : '0')) + reportTd(L.workLocationDaysExternal || 'External appointments', esc(m.external_appointment_days != null ? m.external_appointment_days : '0')) : '')
+						+ `</tr>`;
 				});
 				html += '</tbody></table></div>';
 			} else if (report.users && report.users.length) {
-				html += `<h4 class="report-subhead">${L.users || 'Users'}</h4><div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${L.name || 'Name'}</th><th>${L.hours || 'Hours'}</th><th>${L.overtime || 'Overtime'}</th></tr></thead><tbody>`;
+				const showWl = report.users.some((u) => u.work_location_days && typeof u.work_location_days === 'object');
+				html += `<h4 class="report-subhead">${L.users || 'Users'}</h4><div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${L.name || 'Name'}</th><th>${L.hours || 'Hours'}</th><th>${L.overtime || 'Overtime'}</th>`
+					+ (showWl ? `<th>${esc(L.workLocationDaysHome || 'Home office')}</th><th>${esc(L.workLocationDaysExternal || 'External appointments')}</th>` : '')
+					+ `</tr></thead><tbody>`;
 				report.users.forEach((u) => {
-					html += `<tr>${reportTd(L.name || 'Name', esc(u.display_name || u.user_id || '-'))}${reportTd(L.hours || 'Hours', esc(u.total_hours != null ? u.total_hours : (u.total_hours_worked != null ? u.total_hours_worked : '-')))}${reportTd(L.overtime || 'Overtime', esc(u.overtime_hours != null ? u.overtime_hours : '-'))}</tr>`;
+					const wld = (u.work_location_days && typeof u.work_location_days === 'object') ? u.work_location_days : null;
+					html += `<tr>${reportTd(L.name || 'Name', esc(u.display_name || u.user_id || '-'))}${reportTd(L.hours || 'Hours', esc(u.total_hours != null ? u.total_hours : (u.total_hours_worked != null ? u.total_hours_worked : '-')))}${reportTd(L.overtime || 'Overtime', esc(u.overtime_hours != null ? u.overtime_hours : '-'))}`
+						+ (showWl ? reportTd(L.workLocationDaysHome || 'Home office', esc(wld ? wld.home : '0')) + reportTd(L.workLocationDaysExternal || 'External appointments', esc(wld ? wld.external : '0')) : '')
+						+ `</tr>`;
 				});
 				html += '</tbody></table></div>';
 			}

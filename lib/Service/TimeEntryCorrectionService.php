@@ -12,6 +12,7 @@ use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
+use OCA\ArbeitszeitCheck\Support\WorkLocation;
 use OCP\IConfig;
 use OCP\IL10N;
 
@@ -32,7 +33,13 @@ class TimeEntryCorrectionService
 		private readonly ProjectCheckIntegrationService $projectCheckIntegration,
 		private readonly ProjectCheckLaborTimeSyncService $projectCheckLaborSync,
 		private readonly ?LaborLawProfileFactory $lawProfileFactory = null,
+		private readonly ?UserWorkLocationService $userWorkLocationService = null,
 	) {
+	}
+
+	private function userWorkLocationService(): UserWorkLocationService
+	{
+		return $this->userWorkLocationService ?? \OCP\Server::get(UserWorkLocationService::class);
 	}
 
 	private function countableMinBreakMinutes(TimeEntry $entry): int
@@ -68,6 +75,11 @@ class TimeEntryCorrectionService
 		}
 		if (array_key_exists('description', $proposal)) {
 			$entry->setDescription($proposal['description'] === null ? null : (string)$proposal['description']);
+		}
+		// GH #43: null/'' clears the mark; invalid values must already have been
+		// rejected upstream (validateProposal); keep the throw as a last fence.
+		if (\array_key_exists('workLocation', $proposal) || \array_key_exists('work_location', $proposal)) {
+			$entry->setWorkLocation(WorkLocation::normalize($proposal['workLocation'] ?? $proposal['work_location']));
 		}
 		if (\array_key_exists('projectCheckProjectId', $proposal) || \array_key_exists('project_check_project_id', $proposal)) {
 			$raw = $proposal['projectCheckProjectId'] ?? $proposal['project_check_project_id'] ?? null;
@@ -152,7 +164,11 @@ class TimeEntryCorrectionService
 	public function validateProposal(TimeEntry $entry, array $proposal, ?string $actingManagerUserId = null): ?string
 	{
 		$candidate = clone $entry;
-		$this->applyProposal($candidate, $proposal);
+		try {
+			$this->applyProposal($candidate, $proposal);
+		} catch (\InvalidArgumentException $e) {
+			return $e->getMessage();
+		}
 		$this->ensureCandidateStatusForValidation($candidate);
 
 		try {
@@ -484,6 +500,13 @@ class TimeEntryCorrectionService
 		}
 
 		$this->applyProposal($entry, $proposal);
+		// GH #43: manager-recorded entries follow the same resolution as every
+		// other create path — proposal value wins, else the employee default.
+		if ($entry->getWorkLocation() === null) {
+			$entry->setWorkLocation(
+				$this->userWorkLocationService()->resolveForNewEntry($entry->getUserId(), null)
+			);
+		}
 		$this->applyComplianceAdjustments($entry);
 		$entry->setApprovedByUserId($managerId);
 		$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
@@ -506,6 +529,7 @@ class TimeEntryCorrectionService
 			'startTime' => $entry->getStartTime()?->format('c'),
 			'endTime' => $entry->getEndTime()?->format('c'),
 			'description' => $entry->getDescription(),
+			'workLocation' => $entry->getWorkLocation(),
 		];
 		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
 		$entry->setJustification(json_encode([
@@ -562,6 +586,10 @@ class TimeEntryCorrectionService
 		}
 		if (array_key_exists('description', $originalData)) {
 			$entry->setDescription($originalData['description'] ?? '');
+		}
+		if (array_key_exists('workLocation', $originalData)) {
+			$loc = $originalData['workLocation'];
+			$entry->setWorkLocation(is_string($loc) && WorkLocation::isValid($loc) ? $loc : null);
 		}
 
 		$originalStatus = $originalData['status'] ?? null;

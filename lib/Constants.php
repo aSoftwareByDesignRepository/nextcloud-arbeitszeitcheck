@@ -435,6 +435,13 @@ final class Constants
 	/** User setting: when absent or truthy, employee may create manual time entries. Default enabled. */
 	public const SETTING_MANUAL_TIME_ENTRY_ENABLED = 'manual_time_entry_enabled';
 
+	/**
+	 * User setting: per-employee default work location for newly created
+	 * time entries (one of Support\WorkLocation::ALL). Empty/absent falls
+	 * back to 'office'. See decision 20261013-time-entry-work-location.
+	 */
+	public const SETTING_WORK_LOCATION_DEFAULT = 'work_location_default';
+
 	/** App config: organisation allows clock in/out (stamping). Default on. */
 	public const CONFIG_CLOCK_STAMPING_ENABLED = 'clock_stamping_enabled';
 

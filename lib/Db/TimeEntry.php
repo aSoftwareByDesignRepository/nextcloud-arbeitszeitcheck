@@ -59,6 +59,8 @@ use OCP\AppFramework\Db\Entity;
  * @method \DateTime|null getApprovedAt()
  * @method void setApprovedAt(\DateTime|null $approvedAt)
  * @method string|null getLiveUserId()
+ * @method string|null getWorkLocation()
+ * @method void setWorkLocation(string|null $workLocation)
  */
 class TimeEntry extends Entity
 {
@@ -144,6 +146,14 @@ class TimeEntry extends Entity
 	protected $liveUserId;
 
 	/**
+	 * Where the work happened: one of {@see \OCA\ArbeitszeitCheck\Support\WorkLocation::ALL}.
+	 * NULL = "not recorded" (legacy rows); new writes always resolve a value.
+	 *
+	 * @var string|null
+	 */
+	protected $workLocation;
+
+	/**
 	 * Not persisted. Profile floor for countable breaks (DE/CH 15, AT 10).
 	 * When null, {@see resolveCountableMinBreakMinutes()} uses the profile
 	 * for this entry's user when the container is available, else 15.
@@ -175,6 +185,7 @@ class TimeEntry extends Entity
 		$this->addType('approvedByUserId', 'string');
 		$this->addType('approvedAt', 'datetime');
 		$this->addType('liveUserId', 'string');
+		$this->addType('workLocation', 'string');
 	}
 
 	/**
@@ -518,6 +529,11 @@ class TimeEntry extends Entity
 			$errors['justification'] = 'Justification is required for manual time entries';
 		}
 
+		// Validate work location against the canonical allowlist (GH #43)
+		if ($this->workLocation !== null && !\OCA\ArbeitszeitCheck\Support\WorkLocation::isValid($this->workLocation)) {
+			$errors['workLocation'] = 'Invalid work location';
+		}
+
 		// NOTE: Maximum daily working hours validation (ArbZG §3: max 10 hours per day) is NOT done here
 		// because this method only sees a single entry and cannot check the total daily working hours
 		// across multiple entries. The daily maximum check MUST be done in TimeTrackingService::adjustEndTimeForDailyMaximum()
@@ -706,6 +722,7 @@ class TimeEntry extends Entity
 			'policyApplied' => $this->getPolicyApplied(),
 			'isManualEntry' => $this->getIsManualEntry(),
 			'justification' => $this->getJustification(),
+			'workLocation' => $this->getWorkLocation(),
 			'createdAt' => $createdAt ? $createdAt->format('c') : null,
 			'updatedAt' => $updatedAt ? $updatedAt->format('c') : null,
 			'approvedBy' => $this->getApprovedBy(),

@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
+use OCA\ArbeitszeitCheck\Support\WorkLocationDayCounter;
 use OCP\IUserManager;
 use OCP\IL10N;
 
@@ -32,6 +33,7 @@ class ReportingService
 	private IL10N $l10n;
 	private HolidayService $holidayCalendarService;
 	private PermissionService $permissionService;
+	private TimeZoneService $timeZoneService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -42,7 +44,8 @@ class ReportingService
 		IUserManager $userManager,
 		IL10N $l10n,
 		HolidayService $holidayCalendarService,
-		PermissionService $permissionService
+		PermissionService $permissionService,
+		?TimeZoneService $timeZoneService = null
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->absenceMapper = $absenceMapper;
@@ -53,6 +56,7 @@ class ReportingService
 		$this->l10n = $l10n;
 		$this->holidayCalendarService = $holidayCalendarService;
 		$this->permissionService = $permissionService;
+		$this->timeZoneService = $timeZoneService ?? \OCP\Server::get(TimeZoneService::class);
 	}
 
 	/**
@@ -331,6 +335,12 @@ class ReportingService
 				$report['violations_count'] = count($violations);
 				$report['average_hours_per_user'] = $overtimeData['total_hours_worked'];
 				$report['holiday_summary'] = $holidaySummary;
+				// GH #43: distinct days with ≥1 entry at that location (mixed days
+				// count under both — org timezone, same frame as the period bounds).
+				$report['work_location_days'] = WorkLocationDayCounter::countDays(
+					$entries,
+					$this->timeZoneService->storageTimeZone()
+				);
 			}
 		} else {
 			$userIds = [];
@@ -378,7 +388,11 @@ class ReportingService
 						'display_name' => $this->getDisplayName($uid),
 						'total_hours' => round($overtimeData['total_hours_worked'], 2),
 						'overtime_hours' => round($overtimeData['overtime_hours'], 2),
-						'violations_count' => count($violations)
+						'violations_count' => count($violations),
+						'work_location_days' => WorkLocationDayCounter::countDays(
+							$entries,
+							$this->timeZoneService->storageTimeZone()
+						),
 					];
 				}
 			}
@@ -664,6 +678,10 @@ class ReportingService
 				$totalViolations += count($violations);
 			}
 
+			$workLocationDays = WorkLocationDayCounter::countDays(
+				$entries,
+				$this->timeZoneService->storageTimeZone()
+			);
 			$report['members'][] = [
 				'user_id' => $uid,
 				'display_name' => $this->getDisplayName($uid),
@@ -673,7 +691,9 @@ class ReportingService
 				'break_hours' => round($totalBreakHours, 2),
 				'violations_count' => count($violations),
 				'absence_days' => $absenceDays,
-				'entries_count' => count($entries)
+				'entries_count' => count($entries),
+				'home_office_days' => $workLocationDays['home'],
+				'external_appointment_days' => $workLocationDays['external'],
 			];
 		}
 

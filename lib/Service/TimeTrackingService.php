@@ -54,6 +54,7 @@ class TimeTrackingService
 	private TimeCaptureMethodService $timeCaptureMethodService;
 	private \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory;
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver;
+	private ?UserWorkLocationService $userWorkLocationService;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -75,6 +76,7 @@ class TimeTrackingService
 		?TimeCaptureMethodService $timeCaptureMethodService = null,
 		?\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
+		?UserWorkLocationService $userWorkLocationService = null,
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->violationMapper = $violationMapper;
@@ -101,6 +103,17 @@ class TimeTrackingService
 		$this->lawProfileFactory = $lawProfileFactory
 			?? new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper);
 		$this->breakPolicyResolver = $breakPolicyResolver;
+		$this->userWorkLocationService = $userWorkLocationService;
+	}
+
+	private ?UserWorkLocationService $lazyUserWorkLocationService = null;
+
+	private function userWorkLocationService(): UserWorkLocationService
+	{
+		return $this->userWorkLocationService ??= new UserWorkLocationService(
+			$this->userSettingsMapper,
+			$this->auditLogMapper,
+		);
 	}
 
 	/**
@@ -394,6 +407,9 @@ class TimeTrackingService
 	 * @param string $userId
 	 * @param string|null $projectCheckProjectId
 	 * @param string|null $description
+	 * @param string|null $workLocation Explicit location for the new entry
+	 *        (one of {@see \OCA\ArbeitszeitCheck\Support\WorkLocation::ALL});
+	 *        null resolves the employee default, then 'office'.
 	 * @return TimeEntry
 	 * @throws \Exception
 	 */
@@ -402,6 +418,7 @@ class TimeTrackingService
 		?string $projectCheckProjectId = null,
 		?string $description = null,
 		?\DateTimeInterface $effectiveAt = null,
+		?string $workLocation = null,
 	): TimeEntry {
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
@@ -457,6 +474,15 @@ class TimeTrackingService
 
 				$this->timeCaptureMethodService->assertClockStampingAllowed($userId);
 
+				try {
+					$resolvedWorkLocation = $this->userWorkLocationService()->resolveForNewEntry($userId, $workLocation);
+				} catch (\InvalidArgumentException) {
+					throw new BusinessRuleException(
+						$this->l10n->t('Invalid work location.'),
+						BusinessRuleCode::INVALID_WORK_LOCATION,
+					);
+				}
+
 				$this->checkComplianceBeforeClockIn($userId, $eventAt);
 				$todayHours = $this->getTodayHours($userId);
 				$maxDailyHours = $this->getMaxDailyHours();
@@ -480,6 +506,7 @@ class TimeTrackingService
 				$timeEntry->setIsManualEntry(false);
 				$timeEntry->setProjectCheckProjectId($projectCheckProjectId);
 				$timeEntry->setDescription($description);
+				$timeEntry->setWorkLocation($resolvedWorkLocation);
 				$timeEntry->setCreatedAt($now);
 				$timeEntry->setUpdatedAt($now);
 

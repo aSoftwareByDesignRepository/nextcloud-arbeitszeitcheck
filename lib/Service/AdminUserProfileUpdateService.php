@@ -83,6 +83,16 @@ class AdminUserProfileUpdateService
 		return $stored;
 	}
 
+	private ?UserWorkLocationService $lazyUserWorkLocationService = null;
+
+	private function userWorkLocationService(): UserWorkLocationService
+	{
+		return $this->lazyUserWorkLocationService ??= new UserWorkLocationService(
+			$this->userSettingsMapper,
+			$this->auditLogMapper,
+		);
+	}
+
 	/**
 	 * @param array<string, mixed> $summary
 	 * @return array<string, mixed>
@@ -543,10 +553,23 @@ class AdminUserProfileUpdateService
 			);
 		}
 
-		return [
+		$result = [
 			'employmentStart' => $this->userEmploymentSettingsService->getEmploymentStart($userId)?->format('Y-m-d'),
 			'employmentEnd' => $this->userEmploymentSettingsService->getEmploymentEnd($userId)?->format('Y-m-d'),
 		];
+
+		// GH #43: admin can set the employee's default work location; audit-logged
+		// inside UserWorkLocationService::setDefault.
+		if (array_key_exists('workLocationDefault', $params)) {
+			$this->userWorkLocationService()->setDefault(
+				$userId,
+				is_scalar($params['workLocationDefault']) ? (string)$params['workLocationDefault'] : null,
+				$performedBy
+			);
+			$result['workLocationDefault'] = $this->userWorkLocationService()->getDefault($userId) ?? '';
+		}
+
+		return $result;
 	}
 
 	/**
@@ -619,6 +642,17 @@ class AdminUserProfileUpdateService
 			throw new AdminUserProfileUpdateException(
 				$this->l10n->t('Employment start date must be on or before the employment end date.')
 			);
+		}
+		if (array_key_exists('workLocationDefault', $params)) {
+			try {
+				\OCA\ArbeitszeitCheck\Support\WorkLocation::normalize($params['workLocationDefault']);
+			} catch (\InvalidArgumentException) {
+				throw new AdminUserProfileUpdateException(
+					$this->l10n->t('Invalid work location.'),
+					400,
+					['workLocationDefault' => $this->l10n->t('Invalid work location.')]
+				);
+			}
 		}
 	}
 

@@ -101,6 +101,20 @@ $breakPolicyPresenceLines = is_array($breakPolicy['presenceLines'] ?? null) ? $b
 					<?php p($l->t('How working time totals are shown in the app. Decimal stays the default; choose hours and minutes if you prefer clock-style durations.')); ?>
 				</p>
 			</div>
+			<div class="settings-form__group">
+				<label for="work-location-default" class="form-label"><?php p($l->t('Default work location')); ?></label>
+				<select id="work-location-default"
+					name="work_location_default"
+					class="form-select"
+					aria-describedby="work-location-default-help">
+					<option value="office" selected><?php p($l->t('Office')); ?></option>
+					<option value="home"><?php p($l->t('Home office')); ?></option>
+					<option value="external"><?php p($l->t('External appointment')); ?></option>
+				</select>
+				<p id="work-location-default-help" class="settings-form__help">
+					<?php p($l->t('Stamped automatically on new entries — at the clock, the kiosk and in the app. You can still change the location on any entry afterwards.')); ?>
+				</p>
+			</div>
 			<div class="settings-form__actions">
 				<button type="submit"
 					class="azc-btn azc-btn--primary"

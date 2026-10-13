@@ -206,3 +206,119 @@ describe('ArbeitszeitCheckClockForm', () => {
     expect(String(result.error)).toMatch(/15/)
   })
 })
+
+describe('time-entry-clock-form work location (GH #43)', () => {
+  const locationLabels = {
+    workLocationLegend: 'Work location',
+    workLocationUnspecified: 'Keep current location',
+    workLocationOffice: 'Office',
+    workLocationHome: 'Home office',
+    workLocationExternal: 'External appointment',
+    workLocationHelp: 'help text',
+  }
+
+  function baseLabels(overrides = {}) {
+    return {
+      intro: 'Intro',
+      workingDayLegend: 'Working day',
+      date: 'Date',
+      required: 'required',
+      datePlaceholder: 'dd.mm.yyyy',
+      today: 'Today',
+      dateHelp: 'help',
+      workingHours: 'Working hours',
+      startTime: 'Start',
+      endTime: 'End',
+      actions: 'Actions',
+      start: 'Start',
+      end: 'End',
+      nightShiftHint: 'hint',
+      breaksOptional: 'Breaks (optional)',
+      breaksHelp: 'help',
+      breaksEmpty: 'none',
+      addBreak: 'Add break',
+      reason: 'Reason',
+      reasonHelp: 'help',
+      ...overrides,
+    }
+  }
+
+  function mount(labels, initial = {}) {
+    const ClockForm = window.ArbeitszeitCheckClockForm
+    const root = document.createElement('div')
+    root.innerHTML = ClockForm.buildFormHtml('cf', labels)
+    document.body.appendChild(root)
+    const bound = ClockForm.bindForm(root, 'cf', initial, (k, f) => f || k, {})
+    return { root, bound }
+  }
+
+  function fillValidForm(root) {
+    root.querySelector('#cf-date').value = '15.01.2026'
+    root.querySelector('#cf-start-time').value = '09:00'
+    root.querySelector('#cf-end-time').value = '17:00'
+    root.querySelector('#cf-reason').value = 'forgot to correct earlier'
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('renders the location select only when labels are provided', () => {
+    const without = document.createElement('div')
+    without.innerHTML = window.ArbeitszeitCheckClockForm.buildFormHtml('cf', baseLabels())
+    expect(without.querySelector('#cf-work-location')).toBeNull()
+
+    const { root } = mount(baseLabels(locationLabels))
+    const select = root.querySelector('#cf-work-location')
+    expect(select).not.toBeNull()
+    const values = Array.from(select.options).map((o) => o.value)
+    expect(values).toEqual(['', 'office', 'home', 'external'])
+  })
+
+  it('adds the __clear sentinel option only for correction dialogs', () => {
+    const { root } = mount(baseLabels({ ...locationLabels, workLocationClearOption: 'Not specified (remove mark)' }))
+    const values = Array.from(root.querySelector('#cf-work-location').options).map((o) => o.value)
+    expect(values).toEqual(['', 'office', 'home', 'external', '__clear'])
+  })
+
+  it('prefills a valid initial location and defends against unknown values', () => {
+    const { root } = mount(baseLabels(locationLabels), { workLocation: 'home' })
+    expect(root.querySelector('#cf-work-location').value).toBe('home')
+
+    const second = mount(baseLabels(locationLabels), { workLocation: 'moon' })
+    expect(second.root.querySelector('#cf-work-location').value).toBe('')
+
+    const third = mount(baseLabels(locationLabels), { workLocation: null })
+    expect(third.root.querySelector('#cf-work-location').value).toBe('')
+  })
+
+  it('collects the selected location into the payload', () => {
+    const { root, bound } = mount(baseLabels(locationLabels))
+    fillValidForm(root)
+    root.querySelector('#cf-work-location').value = 'external'
+
+    const result = bound.validateAndCollect()
+    expect(result.ok).toBe(true)
+    expect(result.payload.workLocation).toBe('external')
+  })
+
+  it('passes __clear through so callers can propose removing the mark', () => {
+    const { root, bound } = mount(baseLabels({ ...locationLabels, workLocationClearOption: 'Not specified (remove mark)' }))
+    fillValidForm(root)
+    root.querySelector('#cf-work-location').value = '__clear'
+
+    const result = bound.validateAndCollect()
+    expect(result.ok).toBe(true)
+    expect(result.payload.workLocation).toBe('__clear')
+  })
+
+  it('keeps "" as keep-current in the collected payload', () => {
+    const { root, bound } = mount(baseLabels(locationLabels), { workLocation: 'home' })
+    fillValidForm(root)
+    root.querySelector('#cf-work-location').value = ''
+
+    const result = bound.validateAndCollect()
+    expect(result.ok).toBe(true)
+    expect(result.payload.workLocation).toBe('')
+  })
+})

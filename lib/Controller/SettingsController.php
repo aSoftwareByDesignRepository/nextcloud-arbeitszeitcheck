@@ -237,6 +237,7 @@ class SettingsController extends Controller
 				'missing_clock_in_reminders_enabled',
 				'hours_display',
 				'dismissed_hints',
+				'work_location_default',
 			];
 
 			$updatedSettings = [];
@@ -257,6 +258,17 @@ class SettingsController extends Controller
 						$value = \OCA\ArbeitszeitCheck\Support\HoursDisplay::normalize(
 							is_scalar($value) ? (string)$value : null
 						);
+					} elseif ($key === 'work_location_default') {
+						// GH #43: allowlist only; '' clears to the org fallback.
+						try {
+							$value = \OCA\ArbeitszeitCheck\Support\WorkLocation::normalize($value) ?? '';
+						} catch (\InvalidArgumentException) {
+							return new JSONResponse([
+								'success' => false,
+								'error' => $this->l10n->t('Invalid work location.'),
+								'fields' => ['work_location_default' => $this->l10n->t('Invalid work location.')],
+							], Http::STATUS_BAD_REQUEST);
+						}
 					} elseif ($key === 'dismissed_hints') {
 						// B-2: JSON array of stable hint ids (a-z0-9_-, ≤64 chars,
 						// ≤64 entries). Unknown ids are kept (forward-compat for
@@ -329,6 +341,116 @@ class SettingsController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Effective-dated working-time model changes inside a date range.
+	 *
+	 * Powers the calendar "contract model changed" day badge. Only ever
+	 * returns the caller's own assignments — no uid parameter exists, so
+	 * there is no cross-user surface by construction.
+	 *
+	 * Response: { success: true, changes: [{ date: 'Y-m-d', model_name: string }] }
+	 */
+	#[NoAdminRequired]
+	public function workingTimeModelChanges(): JSONResponse
+	{
+		$user = $this->userSession->getUser();
+		if (!$user) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('User not authenticated')
+			], Http::STATUS_UNAUTHORIZED);
+		}
+
+		$startRaw = (string)$this->request->getParam('start_date', '');
+		$endRaw = (string)$this->request->getParam('end_date', '');
+		if ($startRaw === '' && $endRaw === '') {
+			// Default: current month (the calendar always asks for a range;
+			// absent params mean "this month" rather than a 400).
+			$startRaw = (new \DateTime('first day of this month'))->format('Y-m-d');
+			$endRaw = (new \DateTime('last day of this month'))->format('Y-m-d');
+		}
+		$start = $this->parseStrictYmd($startRaw);
+		$end = $this->parseStrictYmd($endRaw);
+		if ($start === null || $end === null || $start > $end) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid date range.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		// Re-parse to reset error state and bound the range (calendar asks for ≤ ~42 days).
+		if ($start->diff($end)->days > 370) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid date range.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			$assignmentMapper = Server::get(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class);
+			$modelMapper = Server::get(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class);
+			$assignments = $assignmentMapper->findByUser($user->getUID());
+			$changes = [];
+			foreach ($assignments as $a) {
+				$sd = $a->getStartDate();
+				if ($sd === null) {
+					continue;
+				}
+				$s = $sd->format('Y-m-d');
+				// Badge marks the effective day of a model — only assignments
+				// that START inside the requested range are a visible "change".
+				if ($s < $startRaw || $s > $endRaw) {
+					continue;
+				}
+				$modelName = '';
+				try {
+					$model = $modelMapper->find($a->getWorkingTimeModelId());
+					$modelName = (string)$model->getName();
+				} catch (\Throwable) {
+					// Model row gone (pruned) — still report the boundary date.
+				}
+				$changes[] = ['date' => $s, 'model_name' => $modelName];
+			}
+			usort($changes, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+
+			return new JSONResponse(['success' => true, 'changes' => $changes]);
+		} catch (\Throwable $e) {
+			if ($this->isMissingTableException($e)) {
+				// Pre-migration installs simply have no model changes.
+				return new JSONResponse(['success' => true, 'changes' => []]);
+			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in workingTimeModelChanges: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Strict date parse: accepts ISO Y-m-d and the app's German-form
+	 * convention DD.MM.YYYY (same as TimeEntryController::parseDate).
+	 * Returns null for malformed or impossible dates ("2024-13-40")
+	 * instead of silently clamping them.
+	 */
+	private function parseStrictYmd(string $raw): ?\DateTime
+	{
+		$raw = trim($raw);
+		if (preg_match('/^(\d{2})\.(\d{2})\.(\d{4})$/', $raw, $m)) {
+			if (!checkdate((int)$m[2], (int)$m[1], (int)$m[3])) {
+				return null;
+			}
+			return \DateTime::createFromFormat('!d.m.Y', $raw) ?: null;
+		}
+		if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+			return null;
+		}
+		$dt = \DateTime::createFromFormat('!Y-m-d', $raw);
+		if ($dt === false || $dt->format('Y-m-d') !== $raw) {
+			return null;
+		}
+		return $dt;
 	}
 
 	/**

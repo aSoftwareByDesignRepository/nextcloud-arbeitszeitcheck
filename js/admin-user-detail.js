@@ -1072,6 +1072,16 @@
                     <input type="text" id="user-employment-end" name="employmentEnd" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${employmentEndVal}" autocomplete="off" aria-describedby="user-employment-end-help">
                     <p id="user-employment-end-help" class="form-help">${Utils.escapeHtml(t('employmentEndHelp', 'Last day of employment. Leave empty for ongoing employment. Vacation for the year of leaving is prorated up to this date.'))}</p>
                 </div>
+                <div class="form-group">
+                    <label for="user-work-location-default" class="form-label">${Utils.escapeHtml(t('workLocationDefaultLabel', 'Default work location'))}</label>
+                    <select id="user-work-location-default" name="workLocationDefault" class="form-select" aria-describedby="user-work-location-default-help">
+                        <option value="" ${!user.workLocationDefault ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationDefaultInherit', 'Organisation default (Office)'))}</option>
+                        <option value="office" ${user.workLocationDefault === 'office' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationOffice', 'Office'))}</option>
+                        <option value="home" ${user.workLocationDefault === 'home' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationHome', 'Home office'))}</option>
+                        <option value="external" ${user.workLocationDefault === 'external' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationExternal', 'External appointment'))}</option>
+                    </select>
+                    <p id="user-work-location-default-help" class="form-help">${Utils.escapeHtml(t('workLocationDefaultHelp', 'Preselected for this person\'s new time entries and stamps; they can still mark each entry individually.'))}</p>
+                </div>
                     </div>
                 </details>
                 <details class="user-edit-section" id="user-edit-datev" open>
@@ -1253,12 +1263,14 @@
         let localPreviewSeq = 0;
         const previewToISO = resolveToISO();
 
+        const workLocationDefaultEl = document.getElementById('user-work-location-default');
         const readEmploymentDraftFromForm = function() {
             const startRaw = String(employmentStartEl?.value || '').trim();
             const endRaw = String(employmentEndEl?.value || '').trim();
             return {
                 start: startRaw ? (previewToISO(startRaw) || '') : '',
                 end: endRaw ? (previewToISO(endRaw) || '') : '',
+                workLocationDefault: String(workLocationDefaultEl?.value || ''),
             };
         };
 
@@ -1624,7 +1636,12 @@
         openingBalanceHours: '#user-overtime-opening',
         employmentStart: '#user-employment-start',
         employmentEnd: '#user-employment-end',
+        workLocationDefault: '#user-work-location-default',
         datevPersonalnummer: '#user-datev-personalnummer',
+        customWeeklyHours: '#user-custom-weekly-hours',
+        customDailyHours: '#user-custom-daily-hours',
+        customWorkDaysPerWeek: '#user-custom-workdays',
+        customWeekdaySchedule: '#user-custom-model-enabled',
     };
 
     /**
@@ -1984,7 +2001,8 @@
         const employmentEndRaw = String(form.querySelector('#user-employment-end')?.value || '').trim();
         const employment = {
             start: employmentStartRaw ? (toISO(employmentStartRaw) || '') : '',
-            end: employmentEndRaw ? (toISO(employmentEndRaw) || '') : ''
+            end: employmentEndRaw ? (toISO(employmentEndRaw) || '') : '',
+            workLocationDefault: String(form.querySelector('#user-work-location-default')?.value || '')
         };
 
         const datev = {

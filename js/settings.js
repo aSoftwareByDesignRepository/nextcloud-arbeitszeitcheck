@@ -135,6 +135,14 @@
                         hoursDisplay.value = result.settings.hours_display === 'hours_minutes' ? 'hours_minutes' : 'decimal';
                     }
 
+                    const workLocationDefault = document.getElementById('work-location-default');
+                    if (workLocationDefault) {
+                        const storedLocation = result.settings.work_location_default;
+                        workLocationDefault.value = (storedLocation === 'home' || storedLocation === 'external')
+                            ? storedLocation
+                            : 'office';
+                    }
+
                     const notificationsEnabled = document.getElementById('notifications-enabled');
                     if (notificationsEnabled) {
                         notificationsEnabled.checked = result.settings.notifications_enabled === '1' || result.settings.notifications_enabled === true;
@@ -253,9 +261,14 @@
                 return;
             }
             const hoursDisplay = form.querySelector('#hours-display');
+            const workLocationDefault = form.querySelector('#work-location-default');
             const data = {
                 auto_break_calculation: !!autoBreak.checked,
-                hours_display: hoursDisplay && hoursDisplay.value === 'hours_minutes' ? 'hours_minutes' : 'decimal'
+                hours_display: hoursDisplay && hoursDisplay.value === 'hours_minutes' ? 'hours_minutes' : 'decimal',
+                work_location_default: workLocationDefault
+                    && (workLocationDefault.value === 'home' || workLocationDefault.value === 'external')
+                    ? workLocationDefault.value
+                    : 'office'
             };
 
             this.submitSettings(data, 'working-time-settings-form');

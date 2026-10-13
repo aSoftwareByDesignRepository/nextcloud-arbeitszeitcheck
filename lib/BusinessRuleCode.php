@@ -24,4 +24,6 @@ final class BusinessRuleCode
 	public const PROJECT_ID_TOO_LONG = 'project_id_too_long';
 	public const MONTH_FINALIZED = 'month_finalized';
 	public const LOCKED = 'locked';
+	/** Request carried a work_location value outside the canonical allowlist. */
+	public const INVALID_WORK_LOCATION = 'invalid_work_location';
 }

@@ -318,6 +318,19 @@
 		});
 	}
 
+	function workLocationCellHtml(location) {
+		if (location === 'home') {
+			return `<span class="badge badge--info azc-work-location-badge">${escapeHtml(t('workLocationHome', 'Home office'))}</span>`;
+		}
+		if (location === 'external') {
+			return `<span class="badge badge--neutral azc-work-location-badge">${escapeHtml(t('workLocationExternal', 'External appointment'))}</span>`;
+		}
+		if (location === 'office') {
+			return `<span class="text-muted">${escapeHtml(t('workLocationOffice', 'Office'))}</span>`;
+		}
+		return `<span class="text-muted" aria-label="${escapeHtml(t('workLocationUnspecified', 'Not specified'))}">—</span>`;
+	}
+
 	function statusBadgeHtml(status) {
 		const label = status || '-';
 		const variant = Utils.badgeVariantForTimeEntryStatus
@@ -355,6 +368,7 @@
 				endTime: entry.displayEndTime || entry.endTime || null,
 				breaks: entry.displayBreaks || entry.breaks || null,
 				minBreakMinutes: entry.minBreakMinutes,
+				workLocation: entry.workLocation || null,
 			};
 			const summaryJson = Utils.encodeAttributeJson(summaryPayload);
 			const actionCell = canCorrect
@@ -372,6 +386,7 @@
 				td(t('Working Hours', 'Working Hours'), escapeHtml(formatHours(entry.workingDurationHours))),
 				td(t('Break', 'Break'), escapeHtml(formatBreaks(entry))),
 				td(t('Status', 'Status'), statusBadgeHtml(entry.status)),
+				td(t('Location', 'Location'), workLocationCellHtml(entry.workLocation)),
 				td(t('Description', 'Description'), escapeHtml(entry.description || t('No description', 'No description')), 'description-cell'),
 				td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${actionCell}</div>`, 'actions-cell'),
 				'</tr>',

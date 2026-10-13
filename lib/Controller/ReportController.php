@@ -697,6 +697,7 @@ class ReportController extends Controller
 								'break_duration_hours' => $row['break_duration_hours'] ?? '',
 								'working_hours' => $row['working_hours'] ?? '',
 								'description' => $row['description'] ?? '',
+								'work_location' => $row['work_location'] ?? '',
 								'status' => $row['status'] ?? '',
 								'is_manual_entry' => $row['is_manual_entry'] ?? '',
 								'project_id' => $row['project_id'] ?? '',
@@ -872,6 +873,8 @@ class ReportController extends Controller
 			'violations_count',
 			'absence_days',
 			'entries_count',
+			'home_office_days',
+			'external_appointment_days',
 		];
 
 		$fp = fopen('php://temp', 'r+');
@@ -897,6 +900,8 @@ class ReportController extends Controller
 					isset($member['violations_count']) ? (string)$member['violations_count'] : '',
 					isset($member['absence_days']) ? (string)$member['absence_days'] : '',
 					isset($member['entries_count']) ? (string)$member['entries_count'] : '',
+					isset($member['home_office_days']) ? (string)$member['home_office_days'] : '',
+					isset($member['external_appointment_days']) ? (string)$member['external_appointment_days'] : '',
 				];
 				fputcsv($fp, $row);
 			}

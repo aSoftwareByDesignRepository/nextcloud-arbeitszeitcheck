@@ -97,6 +97,30 @@
 	}
 
 	/**
+	 * Display label for a work-location value. Missing values render as the
+	 * canonical default (office) to match the server-side semantic.
+	 *
+	 * @param {*} raw
+	 * @param {function(string, string=): string} t
+	 * @returns {string}
+	 */
+	function formatWorkLocation(raw, t) {
+		const s = typeof raw === 'string' ? raw : '';
+		if (s === 'home') {
+			return t('workLocationHome', 'Home office');
+		}
+		if (s === 'external') {
+			return t('workLocationExternal', 'External appointment');
+		}
+		if (s === 'office') {
+			return t('workLocationOffice', 'Office');
+		}
+		// NULL = "not recorded" (legacy rows) or a proposed "remove the mark" —
+		// show it honestly rather than collapsing to the office default.
+		return t('workLocationUnspecified', 'Not specified');
+	}
+
+	/**
 	 * @param {{
 	 *   id: *,
 	 *   displayName?: string,
@@ -155,6 +179,10 @@
 					+ escapeHtml(duration) + ' ' + escapeHtml(t('hours', 'hours')) + '</dd></div>'
 				);
 			}
+			facts.push(
+				'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('workLocationLabel', 'Work location')) + '</dt><dd>'
+				+ escapeHtml(formatWorkLocation(summary.workLocation, t)) + '</dd></div>'
+			);
 			facts.push('</dl>');
 			bodyHtml = facts.join('');
 		} else {
@@ -170,6 +198,12 @@
 				deps.buildCorrectionDiffRow(t('Start', 'Start'), deps.formatCorrectionTime(orig.startTime), deps.formatCorrectionTime(prop.startTime)),
 				deps.buildCorrectionDiffRow(t('End', 'End'), deps.formatCorrectionTime(orig.endTime), deps.formatCorrectionTime(prop.endTime)),
 				deps.buildCorrectionDiffRow(t('Breaks', 'Breaks'), deps.formatCorrectionBreaks(orig.breaks), deps.formatCorrectionBreaks(prop.breaks)),
+				(prop.workLocation !== undefined || orig.workLocation !== undefined)
+					? deps.buildCorrectionDiffRow(
+						t('workLocationLabel', 'Work location'),
+						formatWorkLocation(orig.workLocation, t),
+						formatWorkLocation(prop.workLocation !== undefined ? prop.workLocation : orig.workLocation, t))
+					: '',
 				'</div>',
 			].join('');
 		}

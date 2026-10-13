@@ -1886,6 +1886,14 @@ class ManagerController extends Controller
 				$proposal['description'] = $params['description'];
 			}
 
+			// GH #43: optional location mark; invalid values throw
+			// InvalidArgumentException → 400 via the outer catch.
+			if (array_key_exists('workLocation', $params) || array_key_exists('work_location', $params)) {
+				$proposal['workLocation'] = \OCA\ArbeitszeitCheck\Support\WorkLocation::normalize(
+					$params['workLocation'] ?? $params['work_location']
+				);
+			}
+
 			$rawProjectId = $params['projectCheckProjectId'] ?? $params['project_check_project_id'] ?? null;
 			$projectIdStr = $this->normalizeOptionalProjectCheckProjectId($rawProjectId);
 			if ($projectIdStr !== null) {
@@ -2941,6 +2949,14 @@ class ManagerController extends Controller
 			$proposal = TimeEntryClockPayloadBuilder::mergeIntoProposal($params, [], $minBreakMinutes);
 			if (array_key_exists('description', $params)) {
 				$proposal['description'] = $params['description'];
+			}
+
+			// GH #43: optional location mark; invalid values throw
+			// InvalidArgumentException → 400 via the catch below.
+			if (array_key_exists('workLocation', $params) || array_key_exists('work_location', $params)) {
+				$proposal['workLocation'] = \OCA\ArbeitszeitCheck\Support\WorkLocation::normalize(
+					$params['workLocation'] ?? $params['work_location']
+				);
 			}
 			$rawProjectId = $params['projectCheckProjectId'] ?? $params['project_check_project_id'] ?? null;
 			$projectIdStr = $this->normalizeOptionalProjectCheckProjectId($rawProjectId);

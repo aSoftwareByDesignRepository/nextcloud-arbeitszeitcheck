@@ -40,6 +40,12 @@
 			addBreak: t('correctionAddBreak', 'Add break'),
 			reason: t('Reason (min. 10 characters)', 'Reason (min. 10 characters)'),
 			reasonHelp: t('correctionReasonHelp', 'Required for the audit trail (at least 10 characters).'),
+			workLocationLegend: t('workLocationLabel', 'Work location'),
+			workLocationUnspecified: t('workLocationKeepCurrent', 'Keep current location'),
+			workLocationClearOption: t('workLocationClearMark', 'Not specified (remove mark)'),
+			workLocationOffice: t('workLocationOffice', 'Office'),
+			workLocationHome: t('workLocationHome', 'Home office'),
+			workLocationExternal: t('workLocationExternal', 'External appointment'),
 		};
 	}
 
@@ -90,6 +96,20 @@
 		}).join(', ');
 	}
 
+	function formatWorkLocationLabel(raw) {
+		const s = typeof raw === 'string' ? raw : '';
+		if (s === 'home') {
+			return t('workLocationHome', 'Home office');
+		}
+		if (s === 'external') {
+			return t('workLocationExternal', 'External appointment');
+		}
+		if (s === 'office') {
+			return t('workLocationOffice', 'Office');
+		}
+		return t('workLocationUnspecified', 'Not specified');
+	}
+
 	function buildSnapshotHtml(summary) {
 		const esc = (value) => (Utils.escapeHtml ? Utils.escapeHtml(String(value ?? '')) : String(value ?? ''));
 		const rows = [
@@ -97,6 +117,7 @@
 			[t('correctionLabelStart', 'Start'), formatIsoDisplay(summary.startTime, 'time')],
 			[t('correctionLabelEnd', 'End'), formatIsoDisplay(summary.endTime, 'time')],
 			[t('correctionLabelBreaks', 'Breaks'), formatBreaksList(summary.breaks)],
+			[t('workLocationLabel', 'Work location'), formatWorkLocationLabel(summary.workLocation)],
 		];
 		const rowHtml = rows.map(([label, val]) => {
 			return '<tr><th scope="row">' + esc(label) + '</th><td>' + esc(val) + '</td></tr>';
@@ -236,6 +257,7 @@
 			endTime: summary.endTime,
 			breaks: summary.breaks || [],
 			minBreakMinutes: summary.minBreakMinutes,
+			workLocation: summary.workLocation,
 		};
 		const formApi = ClockForm.bindForm(modal, idPrefix, initial, t, {
 			minBreakMinutes: summary.minBreakMinutes,
@@ -269,6 +291,20 @@
 			};
 			if (result.payload.breaks && result.payload.breaks.length > 0) {
 				payload.breaks = result.payload.breaks;
+			}
+			// '__clear' proposes removing the mark entirely (sent as null —
+			// TimeEntryController treats a present-but-null field as a clear);
+			// '' means "keep current" and is never sent.
+			const currentWorkLocation = typeof summary.workLocation === 'string' && summary.workLocation !== ''
+				? summary.workLocation
+				: null;
+			const proposedLocation = result.payload.workLocation;
+			if (proposedLocation === '__clear') {
+				if (currentWorkLocation !== null) {
+					payload.workLocation = null;
+				}
+			} else if (proposedLocation !== '' && proposedLocation !== currentWorkLocation) {
+				payload.workLocation = proposedLocation;
 			}
 			if (projectSelect && projectOptionsReady) {
 				payload.projectCheckProjectId = projectSelect.value || '';

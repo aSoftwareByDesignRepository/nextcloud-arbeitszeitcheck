@@ -607,6 +607,34 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                         </fieldset>
 
+                        <fieldset class="time-entry-form-fieldset time-entry-form-fieldset--location" aria-describedby="entry-work-location-help">
+                            <legend class="time-entry-form-fieldset__legend">
+                                <span class="time-entry-form-fieldset__legend-icon" aria-hidden="true"><?php print_unescaped(\OCA\ArbeitszeitCheck\Service\IconCatalog::render('briefcase', 'time-entry-form-fieldset__legend-icon-svg')); ?></span>
+                                <?php p($l->t('Work location')); ?> <span class="form-optional"><?php p($l->t('(optional)')); ?></span>
+                            </legend>
+                            <div class="form-group">
+                                <label for="entry-work-location" class="form-label" id="entry-work-location-label">
+                                    <?php p($l->t('Where did you work?')); ?>
+                                </label>
+                                <?php
+                                $azcFormWorkLocation = $entry instanceof \OCA\ArbeitszeitCheck\Db\TimeEntry
+                                    ? $entry->getWorkLocation()
+                                    : (is_string($workLocationDefault ?? null) ? $workLocationDefault : 'office');
+                                ?>
+                                <select id="entry-work-location"
+                                    name="workLocation"
+                                    class="form-select time-entry-form__location-select"
+                                    aria-labelledby="entry-work-location-label"
+                                    aria-describedby="entry-work-location-help">
+                                    <option value="" <?php p(($azcFormWorkLocation === null || $azcFormWorkLocation === '') ? 'selected' : ''); ?>><?php p($l->t('Not specified')); ?></option>
+                                    <option value="office" <?php p($azcFormWorkLocation === 'office' ? 'selected' : ''); ?>><?php p($l->t('Office')); ?></option>
+                                    <option value="home" <?php p($azcFormWorkLocation === 'home' ? 'selected' : ''); ?>><?php p($l->t('Home office')); ?></option>
+                                    <option value="external" <?php p($azcFormWorkLocation === 'external' ? 'selected' : ''); ?>><?php p($l->t('External appointment')); ?></option>
+                                </select>
+                                <p id="entry-work-location-help" class="form-help"><?php p($l->t('Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.')); ?></p>
+                            </div>
+                        </fieldset>
+
                         <?php if ($projectCheckAvailable && !$projectCheckAdminLinkingEnabled && $mode === 'create'): ?>
                             <?php $azcProjectCheckCalloutContext = 'time-entry'; include __DIR__ . '/partials/projectcheck-linking-disabled-callout.php'; ?>
                         <?php elseif ($projectCheckEnabled): ?>
@@ -844,6 +872,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 <th scope="col"><?php p($l->t('Break')); ?></th>
                                 <th scope="col"><?php p($l->t('Working Hours')); ?></th>
                                 <th scope="col"><?php p($l->t('Description')); ?></th>
+                                <th scope="col"><?php p($l->t('Location')); ?></th>
                                 <th scope="col"><?php p($l->t('Status')); ?></th>
                                 <th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
                             </tr>
@@ -993,6 +1022,19 @@ require __DIR__ . '/common/user-display-timezone.php';
                                                 <span class="description-more">...</span>
                                             <?php endif; ?>
                                         </td>
+                                        <td class="work-location-cell" data-label="<?php p($l->t('Location')); ?>">
+                                            <?php
+                                            $azcRowWorkLocation = $entry->getWorkLocation();
+                                            if ($azcRowWorkLocation === 'home' || $azcRowWorkLocation === 'external'): ?>
+                                                <span class="badge badge--<?php p(BadgeVariant::forWorkLocation($azcRowWorkLocation)); ?> azc-work-location-badge">
+                                                    <?php p($azcRowWorkLocation === 'home' ? $l->t('Home office') : $l->t('External appointment')); ?>
+                                                </span>
+                                            <?php elseif ($azcRowWorkLocation === 'office'): ?>
+                                                <span class="text-muted"><?php p($l->t('Office')); ?></span>
+                                            <?php else: ?>
+                                                <span class="text-muted" aria-label="<?php p($l->t('Not specified')); ?>">—</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td data-label="<?php p($l->t('Status')); ?>">
                                             <span class="badge badge--<?php p(BadgeVariant::forTimeEntryStatus((string)$entry->getStatus())); ?>"
                                                 title="<?php
@@ -1131,7 +1173,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="9">
+                                    <td colspan="10">
                                         <?php $azcListFiltered = ($filterStartDate ?? '') !== '' || ($filterEndDate ?? '') !== '' || ($filterStatus ?? '') !== ''; ?>
                                         <div class="azc-empty-state">
                                             <?php if ($azcListFiltered): ?>
@@ -1430,6 +1472,21 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 <div id="correction-breaks-container"></div>
                             </div>
                         <button type="button" class="btn btn--secondary btn--sm" id="correction-add-break"><?php p($l->t('Add break')); ?></button>
+                    </fieldset>
+
+                    <fieldset class="correction-fieldset correction-fieldset--work-location" aria-labelledby="correction-work-location-heading">
+                        <legend id="correction-work-location-heading" class="correction-dialog__section-title"><?php p($l->t('Work location')); ?></legend>
+                        <div class="form-group">
+                            <label for="correction-work-location" class="form-label"><?php p($l->t('Work location')); ?></label>
+                            <select id="correction-work-location" name="workLocation" class="form-input">
+                                <option value=""><?php p($l->t('Keep current location')); ?></option>
+                                <option value="office"><?php p($l->t('Office')); ?></option>
+                                <option value="home"><?php p($l->t('Home office')); ?></option>
+                                <option value="external"><?php p($l->t('External appointment')); ?></option>
+                                <option value="__clear"><?php p($l->t('Not specified (remove mark)')); ?></option>
+                            </select>
+                            <p class="form-help"><?php p($l->t('Only change this if the work location was wrong.')); ?></p>
+                        </div>
                     </fieldset>
 
                     <fieldset class="correction-fieldset correction-fieldset--reason" aria-labelledby="correction-reason-heading">

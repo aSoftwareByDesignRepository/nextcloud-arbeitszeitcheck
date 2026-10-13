@@ -329,6 +329,25 @@
 			'</div>',
 			'<button type="button" class="btn btn--secondary btn--sm ' + p + '-add-break">' + L.addBreak + '</button>',
 			'</fieldset>',
+			L.workLocationLegend ? [
+				'<fieldset class="correction-fieldset correction-fieldset--work-location">',
+				'<legend class="correction-dialog__section-title">' + L.workLocationLegend + '</legend>',
+				'<div class="form-group">',
+				'<label for="' + p + '-work-location" class="form-label">' + L.workLocationLegend + '</label>',
+				'<select id="' + p + '-work-location" class="form-input">',
+				'<option value="">' + (L.workLocationUnspecified || '') + '</option>',
+				'<option value="office">' + (L.workLocationOffice || 'Office') + '</option>',
+				'<option value="home">' + (L.workLocationHome || 'Home office') + '</option>',
+				'<option value="external">' + (L.workLocationExternal || 'External appointment') + '</option>',
+				// Correction dialogs additionally allow proposing "remove the
+				// mark" — sentinelled as __clear so it never collides with
+				// "keep current" ('').
+				L.workLocationClearOption ? '<option value="__clear">' + L.workLocationClearOption + '</option>' : '',
+				'</select>',
+				L.workLocationHelp ? '<p class="form-help">' + L.workLocationHelp + '</p>' : '',
+				'</div>',
+				'</fieldset>',
+			].join('') : '',
 			'<div class="form-group">',
 			'<label for="' + p + '-reason" class="form-label">' + L.reason + ' <span class="form-required" aria-hidden="true">*</span></label>',
 			'<textarea id="' + p + '-reason" class="form-textarea" rows="3" minlength="10" maxlength="2000" required aria-required="true"></textarea>',
@@ -355,6 +374,7 @@
 		const breaksEmpty = root.querySelector('.' + p + '-breaks-empty');
 		const btnAddBreak = root.querySelector('.' + p + '-add-break');
 		const btnToday = root.querySelector('.' + p + '-date-today');
+		const workLocationSelect = root.querySelector('#' + p + '-work-location');
 		const statusEl = root.querySelector('.' + p + '-status');
 
 		addTimeOptions(startHour, startMinute, true);
@@ -367,6 +387,10 @@
 		}
 		setSelectHm(startHour, startMinute, isoToHm(initial.startTime));
 		setSelectHm(endHour, endMinute, isoToHm(initial.endTime));
+		if (workLocationSelect) {
+			const wl = typeof initial.workLocation === 'string' ? initial.workLocation : '';
+			workLocationSelect.value = ['office', 'home', 'external'].includes(wl) ? wl : '';
+		}
 
 		const dpApi = window.ArbeitszeitCheckDatepicker;
 		if (dateInput && dpApi && typeof dpApi.initializeDatepicker === 'function') {
@@ -443,6 +467,7 @@
 			if (reason.trim().length < 10) {
 				return { ok: false, error: t('reasonRequired', 'A reason of at least 10 characters is required.') };
 			}
+			const workLocation = workLocationSelect ? workLocationSelect.value : '';
 			return {
 				ok: true,
 				payload: {
@@ -451,6 +476,7 @@
 					endTime: endHm,
 					breaks,
 					reason: reason.trim(),
+					workLocation,
 				},
 			};
 		}

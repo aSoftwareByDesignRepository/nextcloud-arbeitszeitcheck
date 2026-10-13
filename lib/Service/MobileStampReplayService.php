@@ -39,6 +39,7 @@ class MobileStampReplayService
 		?string $description,
 		?string $clientRequestIdRaw,
 		?string $occurredAtRaw,
+		?string $workLocation = null,
 	): array {
 		return $this->replay(
 			$userId,
@@ -49,6 +50,7 @@ class MobileStampReplayService
 				$projectCheckProjectId,
 				$description,
 				$at,
+				$workLocation,
 			),
 		);
 	}

@@ -4836,6 +4836,11 @@ class AdminController extends Controller
 				LaborLawProfileFactory::USER_SETTING_LABOR_LAW_COUNTRY,
 				''
 			);
+			$userWorkLocationDefault = $this->userSettingsMapper->getStringSetting(
+				$userId,
+				Constants::SETTING_WORK_LOCATION_DEFAULT,
+				''
+			);
 
 			$startDate = $currentModel ? $currentModel->getStartDate() : null;
 			$endDate = $currentModel ? $currentModel->getEndDate() : null;
@@ -4903,6 +4908,9 @@ class AdminController extends Controller
 						? strtoupper($userLaborLawCountry)
 						: '',
 					'instanceCountry' => $this->getConfiguredCountry(),
+					'workLocationDefault' => \OCA\ArbeitszeitCheck\Support\WorkLocation::isValid($userWorkLocationDefault)
+						? $userWorkLocationDefault
+						: '',
 					'userWorkingTimeModel' => $currentModel ? $this->presentUserWorkingTimeModelSummary($currentModel->getSummary()) : null,
 					'vacationPolicy' => $policy ? [
 						'id' => $policy->getId(),

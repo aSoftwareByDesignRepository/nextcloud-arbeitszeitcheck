@@ -37,6 +37,20 @@ final class BadgeVariant
 		};
 	}
 
+	/**
+	 * GH #43 — list badge tone for a work-location mark.
+	 * home/external get a real badge; office/unknown fall back to secondary
+	 * (callers usually render a muted label instead).
+	 */
+	public static function forWorkLocation(?string $location): string
+	{
+		return match ($location) {
+			'home' => self::INFO,
+			'external' => self::NEUTRAL,
+			default => self::SECONDARY,
+		};
+	}
+
 	public static function forAbsenceStatus(string $status): string
 	{
 		return match ($status) {

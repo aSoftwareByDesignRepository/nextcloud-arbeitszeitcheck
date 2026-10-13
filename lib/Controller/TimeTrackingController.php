@@ -147,6 +147,8 @@ class TimeTrackingController extends Controller
 		?string $client_request_id = null,
 		?string $occurredAt = null,
 		?string $occurred_at = null,
+		?string $workLocation = null,
+		?string $work_location = null,
 	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
@@ -156,6 +158,7 @@ class TimeTrackingController extends Controller
 				$description,
 				$clientRequestId ?? $client_request_id,
 				$occurredAt ?? $occurred_at,
+				$workLocation ?? $work_location,
 			);
 			return new JSONResponse($payload);
 		} catch (StampReplayException $e) {

@@ -1871,6 +1871,13 @@ class TimeEntryFormManager {
 				data.projectCheckProjectId = String(projectField).trim();
 			}
 
+			// Work location (GH #43): always send when the control exists —
+			// '' means "not specified" and clears a stored mark on update.
+			const workLocationField = formData.get('workLocation');
+			if (workLocationField !== null) {
+				data.workLocation = String(workLocationField).trim();
+			}
+
 			// Process breaks - include all valid breaks (both manual and auto-generated)
 			const breaks = [];
 			const breakEntries = this.breaksContainer ? this.breaksContainer.querySelectorAll('.break-entry') : [];

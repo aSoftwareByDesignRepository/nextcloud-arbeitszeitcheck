@@ -371,11 +371,13 @@ test.describe('MOMOS adversarial sweep', () => {
 		try {
 			await login(emp, credsFromEnv('EMPLOYEE'))
 			await gotoApp(emp, `${APP}/dashboard`)
-			// normalize: complete any lingering paused/active session first
+			// normalize: clock out any lingering active session first
+			// (the /complete endpoint only handles paused entries — clock/out is
+			// the correct teardown for an active session)
 			const st0 = await apiAllowFailure(emp, 'GET', `${APP}/api/clock/status`)
 			const curId = st0.json?.status?.entry?.id ?? st0.json?.status?.currentEntry?.id ?? st0.json?.status?.entryId
 			if (curId) {
-				await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries/${curId}/complete`, { data: {} })
+				await apiAllowFailure(emp, 'POST', `${APP}/api/clock/out`, { data: {} })
 			}
 			// Another lane may transiently disable org stamping
 			// (admin-time-capture-org) — wait on the real condition, not a sleep.
@@ -395,10 +397,12 @@ test.describe('MOMOS adversarial sweep', () => {
 			const list = await api(emp, 'GET', `${APP}/api/time-entries?status=active&limit=500`)
 			const actives = (list.entries ?? list.items ?? []).filter((e) => (e.status ?? '').toLowerCase() === 'active')
 			expect(actives.length, `${actives.length} active sessions after double clock-in`).toBe(1)
-			// cleanup
+			// cleanup — clock/out, or the leaked active session makes the next
+			// stateful spec's clock-in hit already_clocked_in (observed: broke
+			// admin-time-capture-org expecting clock_stamping_disabled)
 			const cur = await apiAllowFailure(emp, 'GET', `${APP}/api/clock/status`)
 			const cid = cur.json?.status?.entry?.id ?? cur.json?.status?.currentEntry?.id
-			if (cid) await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries/${cid}/complete`, { data: {} })
+			if (cid) await apiAllowFailure(emp, 'POST', `${APP}/api/clock/out`, { data: {} })
 		} finally {
 			await emp.close()
 		}

@@ -50,7 +50,7 @@ describe('Admin user detail — year-scoped balances', () => {
 
 	it('service skips only assignment update on match (no early return)', () => {
 		const needle =
-			'workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate))'
+			'workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate))'
 		const pos = service.indexOf(needle)
 		expect(pos).toBeGreaterThan(-1)
 		const window = service.slice(pos, pos + 280)

@@ -58,6 +58,9 @@ const STATEFUL_SPECS = [
   /manual-entry-justification\.spec\.js/,
   /admin-teams-bulk-find-people\.spec\.js/,
   /admin-users-profile\.spec\.js/,
+  // Mutates the shared employee's working-time assignment (personal model
+  // create/assign/prune) — same shared-state class as admin-users-profile.
+  /concurrent-personal-model\.spec\.js/,
   // Live-clock mutators share the e2e_employee stamp session — running them in
   // the parallel pool lets one spec's clock-out / clock-in race another's
   // (observed: timezone-smoke "not currently clocked in", slice-c rest check

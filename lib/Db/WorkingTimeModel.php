@@ -36,6 +36,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setOvertimeRules(string|null $overtimeRules)
  * @method bool getIsDefault()
  * @method void setIsDefault(bool $isDefault)
+ * @method string|null getUserId()
+ * @method void setUserId(?string $userId)
  * @method \DateTime getCreatedAt()
  * @method void setCreatedAt(\DateTime $createdAt)
  * @method \DateTime getUpdatedAt()
@@ -76,6 +78,9 @@ class WorkingTimeModel extends Entity
     /** @var bool */
     protected $isDefault = false;
 
+    /** @var string|null Owner uid for employee-scoped ("personal") models; null = global */
+    protected $userId;
+
     /** @var \DateTime */
     protected $createdAt;
 
@@ -96,8 +101,18 @@ class WorkingTimeModel extends Entity
         $this->addType('breakRules', 'string');
         $this->addType('overtimeRules', 'string');
         $this->addType('isDefault', 'boolean');
+        $this->addType('userId', 'string');
         $this->addType('createdAt', 'datetime');
         $this->addType('updatedAt', 'datetime');
+    }
+
+    /**
+     * True when this model belongs to a single employee (individual contract
+     * hours) instead of the organisation-wide model pool.
+     */
+    public function isPersonal(): bool
+    {
+        return $this->userId !== null && $this->userId !== '';
     }
 
     /**
@@ -204,6 +219,10 @@ class WorkingTimeModel extends Entity
             $errors['weeklyHours'] = 'Weekly hours cannot exceed 80';
         }
 
+        if ($this->isPersonal() && $this->isDefault) {
+            $errors['isDefault'] = 'A personal working time model cannot be the default model';
+        }
+
         return $errors;
     }
 
@@ -238,6 +257,8 @@ class WorkingTimeModel extends Entity
             'breakRules' => $this->getBreakRulesArray(),
             'overtimeRules' => $this->getOvertimeRulesArray(),
             'isDefault' => $this->getIsDefault(),
+            'userId' => $this->getUserId(),
+            'isPersonal' => $this->isPersonal(),
             'createdAt' => $createdAt ? $createdAt->format('c') : null,
             'updatedAt' => $updatedAt ? $updatedAt->format('c') : null
         ];

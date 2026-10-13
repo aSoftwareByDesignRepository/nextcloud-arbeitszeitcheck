@@ -336,6 +336,14 @@ window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.l10n.openingBalanceHoursRange = <?php echo json_encode($l->t('Opening balance hours must be a number between -9999 and 9999.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.endDateAfterStart = <?php echo json_encode($l->t('The end date must be on or after the start date.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.vacationCarryoverHelpDecimals = <?php echo json_encode($l->t('Up to two decimal places are allowed, e.g. 1.5 or 4.25 — comma or dot both work.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+
+    /* Individual contract hours / weekday schedule (admin-user-detail.js, auMsg()) */
+    window.ArbeitszeitCheck.l10n.scheduleEndAfterStart = <?php echo json_encode($l->t('Each work day needs a start and an end that is later than the start.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.scheduleBreakIncomplete = <?php echo json_encode($l->t('Enter both break start and break end, or leave both empty.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.scheduleBreakOrder = <?php echo json_encode($l->t('The break end must be later than the break start.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWeeklyHoursRange = <?php echo json_encode($l->t('Weekly hours must be between 0.5 and 80.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customDailyHoursRange = <?php echo json_encode($l->t('Daily hours must be between 0.5 and 24.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWorkDaysRange = <?php echo json_encode($l->t('Working days must be between 1 and 7.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.states = <?php echo json_encode($holidayStatesForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.regionGroups = <?php echo json_encode($holidayRegionGroupsForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.holidayRegionContext = <?php echo json_encode($holidayRegionContextForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

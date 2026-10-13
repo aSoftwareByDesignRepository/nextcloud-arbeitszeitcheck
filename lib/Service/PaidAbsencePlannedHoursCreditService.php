@@ -87,7 +87,9 @@ class PaidAbsencePlannedHoursCreditService
 			return ['hours' => 0.0, 'days_credited' => 0];
 		}
 
-		[$schedule, $dailyHours] = $this->resolveContract($userId);
+		// Contract is resolved per calendar day below: an effective-dated model
+		// change inside the range must credit each day with its own Soll, not
+		// the assignment that happens to be current today.
 		/** @var array<string, float> $bestCreditByDay */
 		$bestCreditByDay = [];
 
@@ -114,7 +116,7 @@ class PaidAbsencePlannedHoursCreditService
 			$cursor = clone $dayStart;
 			while ($cursor <= $dayEnd) {
 				$key = $cursor->format('Y-m-d');
-				$planned = $this->plannedNetHoursForDay($userId, $cursor, $schedule, $dailyHours);
+				$planned = $this->plannedNetHoursForDay($userId, $cursor);
 				if ($planned <= 0.0001) {
 					$cursor->modify('+1 day');
 					continue;
@@ -165,7 +167,7 @@ class PaidAbsencePlannedHoursCreditService
 		}
 
 		if ($schedule === null || $dailyHours === null) {
-			[$schedule, $dailyHours] = $this->resolveContract($userId);
+			[$schedule, $dailyHours] = $this->resolveContractForDate($userId, $day);
 		}
 
 		$weight = 0.0;
@@ -229,13 +231,21 @@ class PaidAbsencePlannedHoursCreditService
 	}
 
 	/**
+	 * Contract hours effective on a specific calendar day.
+	 *
+	 * Resolves via the effective-dated assignment ({@see UserWorkingTimeModelMapper::findByUserAndDate})
+	 * so a mid-period model change credits each day with its own Soll. Days
+	 * without a covering assignment fall back to the current one, then to the
+	 * legacy daily-hours default — identical to the previous behaviour.
+	 *
 	 * @return array{0: ?WeekdaySchedule, 1: float}
 	 */
-	private function resolveContract(string $userId): array
+	private function resolveContractForDate(string $userId, \DateTimeInterface $date): array
 	{
 		$dailyHours = 8.0;
 		try {
-			$userModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+			$userModel = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $this->asDay($date))
+				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
 			if ($userModel === null) {
 				return [null, $dailyHours];
 			}

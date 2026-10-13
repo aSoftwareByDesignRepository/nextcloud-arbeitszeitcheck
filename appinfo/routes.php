@@ -344,6 +344,7 @@ return [
 		// Settings routes
 		['name' => 'settings#getOnboardingCompleted', 'url' => '/api/settings/onboarding-completed', 'verb' => 'GET'],
 		['name' => 'settings#setOnboardingCompleted', 'url' => '/api/settings/onboarding-completed', 'verb' => 'POST'],
+		['name' => 'settings#workingTimeModelChanges', 'url' => '/api/settings/working-time-model-changes', 'verb' => 'GET'],
 
 		// Health check route
 		['name' => 'health#check', 'url' => '/health', 'verb' => 'GET'],

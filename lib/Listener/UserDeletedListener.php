@@ -24,6 +24,7 @@ use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper;
@@ -56,6 +57,7 @@ class UserDeletedListener implements IEventListener
 		private readonly AuditLogMapper $auditLogMapper,
 		private readonly UserSettingsMapper $userSettingsMapper,
 		private readonly UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
+		private readonly WorkingTimeModelMapper $workingTimeModelMapper,
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
 		private readonly MobileSeatMapper $mobileSeatMapper,
@@ -209,7 +211,11 @@ class UserDeletedListener implements IEventListener
 
 	private function deleteUserWorkingTimeModels(string $userId): void
 	{
+		// Assignments first, then the employee-scoped ("personal") models they
+		// pointed at — reversed order would leave dangling model ids on rows
+		// that are only deleted afterwards.
 		$this->userWorkingTimeModelMapper->deleteByUser($userId);
-		$this->logger->info('Deleted working time model assignments for user', ['app' => 'arbeitszeitcheck', 'userId' => $userId]);
+		$this->workingTimeModelMapper->deletePersonalByUser($userId);
+		$this->logger->info('Deleted working time model assignments and personal models for user', ['app' => 'arbeitszeitcheck', 'userId' => $userId]);
 	}
 }

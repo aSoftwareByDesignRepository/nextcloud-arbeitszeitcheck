@@ -134,6 +134,7 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		foreach ($this->wtmMapper->findByUser(self::TEST_USER) as $row) {
 			$this->wtmMapper->delete($row);
 		}
+		$this->modelMapper->deletePersonalByUser(self::TEST_USER);
 		$balanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 		$balanceMapper->deleteByUserId(self::TEST_USER);
 		$otBalanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper::class);
@@ -379,5 +380,202 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		], 'integration_test');
 
 		$this->assertCount(0, $this->wtmMapper->findByUser(self::TEST_USER));
+	}
+
+	// ------------------------------------------------------------------
+	// Personal working time models (issue #42 — individual contract hours)
+	// ------------------------------------------------------------------
+
+	private function saveWithCustomModel(array $customModel, ?int $modelId = null): array
+	{
+		return $this->service->updateProfile(self::TEST_USER, [
+			'workingTimeModel' => [
+				'workingTimeModelId' => $modelId,
+				'customModel' => $customModel,
+				'vacationDaysPerYear' => 28,
+				'startDate' => '2026-01-01',
+				'endDate' => null,
+			],
+			'timeCapture' => [
+				'clockStampingEnabled' => true,
+				'manualTimeEntryEnabled' => true,
+			],
+			'overtime' => [
+				'openingBalance' => ['year' => (int)date('Y'), 'hours' => '0'],
+			],
+		], 'integration_test');
+	}
+
+	public function testCustomModelCreatesPersonalModelEndToEnd(): void
+	{
+		$this->saveWithCustomModel([
+			'enabled' => 'true',
+			'weeklyHours' => '32.5',
+			'dailyHours' => '6.5',
+			'workDaysPerWeek' => '5',
+		]);
+
+		$assignment = $this->wtmMapper->findEditableByUser(self::TEST_USER);
+		$this->assertNotNull($assignment);
+		$model = $this->modelMapper->find($assignment->getWorkingTimeModelId());
+		$this->assertTrue($model->isPersonal());
+		$this->assertSame(self::TEST_USER, $model->getUserId());
+		$this->assertSame(32.5, $model->getWeeklyHours());
+		$this->assertSame(6.5, $model->getDailyHours());
+		$this->assertSame(5.0, $model->getWorkDaysPerWeek());
+		$this->assertFalse($model->getIsDefault());
+	}
+
+	public function testPersonalModelNeverAppearsInGlobalModelList(): void
+	{
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weeklyHours' => '30',
+			'dailyHours' => '6',
+			'workDaysPerWeek' => '5',
+		]);
+
+		$personalIds = array_map(
+			fn (WorkingTimeModel $m) => $m->getId(),
+			$this->modelMapper->findPersonalByUser(self::TEST_USER)
+		);
+		$this->assertNotSame([], $personalIds);
+		$globalIds = array_map(
+			fn (WorkingTimeModel $m) => $m->getId(),
+			$this->modelMapper->findAll()
+		);
+		foreach ($personalIds as $id) {
+			$this->assertNotContains($id, $globalIds, 'personal model leaked into global model list');
+		}
+	}
+
+	public function testCustomModelResaveUpdatesInPlaceWithoutDuplicates(): void
+	{
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weeklyHours' => '30',
+			'dailyHours' => '6',
+			'workDaysPerWeek' => '5',
+		]);
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weeklyHours' => '38.5',
+			'dailyHours' => '7.7',
+			'workDaysPerWeek' => '5',
+		]);
+
+		$personal = $this->modelMapper->findPersonalByUser(self::TEST_USER);
+		$this->assertCount(1, $personal, 'resave must not accumulate personal models');
+		$this->assertSame(38.5, $personal[0]->getWeeklyHours());
+
+		$assignments = $this->wtmMapper->findByUser(self::TEST_USER);
+		$this->assertCount(1, $assignments, 'resave must not accumulate assignment rows');
+		$this->assertSame($personal[0]->getId(), $assignments[0]->getWorkingTimeModelId());
+	}
+
+	public function testCustomModelWeekdaySchedulePersistsAndDerivesHours(): void
+	{
+		$day = ['work' => true, 'start' => '08:00', 'end' => '16:30', 'breaks' => [['start' => '12:00', 'end' => '12:30', 'paid' => false]]];
+		$off = ['work' => false];
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weekdaySchedule' => ['version' => 1, 'days' => [
+				'mon' => $day, 'tue' => $day, 'wed' => $day, 'thu' => $day, 'fri' => $day,
+				'sat' => $off, 'sun' => $off,
+			]],
+		]);
+
+		$personal = $this->modelMapper->findPersonalByUser(self::TEST_USER);
+		$this->assertCount(1, $personal);
+		$this->assertSame(40.0, $personal[0]->getWeeklyHours());
+		$this->assertSame(8.0, $personal[0]->getDailyHours());
+		$this->assertNotNull($personal[0]->getWeekdaySchedule());
+	}
+
+	public function testToggleCustomOffReassignsGlobalAndPrunesOrphan(): void
+	{
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weeklyHours' => '30',
+			'dailyHours' => '6',
+			'workDaysPerWeek' => '5',
+		]);
+		$this->assertNotSame([], $this->modelMapper->findPersonalByUser(self::TEST_USER));
+
+		$this->saveWithCustomModel(['enabled' => 'false'], $this->modelId);
+
+		$assignment = $this->wtmMapper->findEditableByUser(self::TEST_USER);
+		$this->assertSame($this->modelId, $assignment?->getWorkingTimeModelId());
+		$this->assertSame(
+			[],
+			$this->modelMapper->findPersonalByUser(self::TEST_USER),
+			'unreferenced personal model must be pruned on the same save'
+		);
+	}
+
+	public function testForeignPersonalModelIdRejected(): void
+	{
+		$this->saveWithCustomModel([
+			'enabled' => true,
+			'weeklyHours' => '30',
+			'dailyHours' => '6',
+			'workDaysPerWeek' => '5',
+		]);
+		$personalId = $this->modelMapper->findPersonalByUser(self::TEST_USER)[0]->getId();
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\AdminUserProfileUpdateException::class);
+		try {
+			$this->service->updateProfile(self::TEST_USER, [
+				'workingTimeModel' => [
+					'workingTimeModelId' => $personalId,
+					'startDate' => '2026-01-01',
+				],
+			], 'integration_test');
+		} finally {
+			$this->assertCount(
+				1,
+				$this->modelMapper->findPersonalByUser(self::TEST_USER),
+				'rejected write must not touch the personal model'
+			);
+		}
+	}
+
+	public function testUserDeletionRemovesPersonalModels(): void
+	{
+		$victim = '__arbeitszeitcheck_profile_int2__';
+		if (!$this->userManager->userExists($victim)) {
+			$this->userManager->createUser($victim, bin2hex(random_bytes(16)) . 'Aa1!');
+		}
+		try {
+			$this->service->updateProfile($victim, [
+				'workingTimeModel' => [
+					'workingTimeModelId' => null,
+					'customModel' => [
+						'enabled' => true,
+						'weeklyHours' => '24',
+						'dailyHours' => '6',
+						'workDaysPerWeek' => '4',
+					],
+					'startDate' => '2026-01-01',
+				],
+			], 'integration_test');
+			$this->assertNotSame([], $this->modelMapper->findPersonalByUser($victim));
+
+			$this->userManager->get($victim)?->delete();
+
+			$this->assertSame(
+				[],
+				$this->modelMapper->findPersonalByUser($victim),
+				'personal models must be deleted together with the user'
+			);
+		} finally {
+			if ($this->userManager->userExists($victim)) {
+				$this->userManager->get($victim)?->delete();
+			}
+			foreach ($this->wtmMapper->findByUser($victim) as $row) {
+				$this->wtmMapper->delete($row);
+			}
+			$this->modelMapper->deletePersonalByUser($victim);
+		}
 	}
 }

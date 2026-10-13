@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv } from './helpers/auth.js'
-import { api } from './helpers/api.js'
+import { api, apiAllowFailure } from './helpers/api.js'
 
 test.describe('Admin employees — atomic profile save', () => {
 	test.skip(!process.env.NC_ADMIN_USER, 'Requires NC_ADMIN_USER / NC_ADMIN_PASS')
@@ -155,5 +155,95 @@ test.describe('Admin employees — atomic profile save', () => {
 		expect(otReloaded.success).toBe(true)
 		expect(Number(otReloaded.user.overtimeOpeningBalanceYear)).toBe(otYear)
 		expect(Number(otReloaded.user.overtimeOpeningBalanceHours)).toBe(otMarker)
+	})
+
+	test('individual contract hours: personal model round-trip', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+
+		const userId = 'e2e_employee'
+		const before = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(before.success).toBe(true)
+		const startDate =
+			before.user.workingTimeModelStartDate ||
+			before.user.userWorkingTimeModel?.startDate ||
+			'2025-03-27'
+
+		// Restore target must be a *global* model — the user may still carry a
+		// personal one from an earlier run, which is a different id space.
+		const modelList = await api(page, 'GET', '/apps/arbeitszeitcheck/api/admin/working-time-models')
+		expect(modelList.success).toBe(true)
+		const globalId =
+			!before.user.workingTimeModel?.isPersonal && before.user.workingTimeModel?.id
+				? before.user.workingTimeModel.id
+				: (modelList.models || [])[0]?.id
+		expect(globalId).toBeTruthy()
+
+		const schedule = {
+			version: 1,
+			days: {
+				mon: { work: true, start: '08:00', end: '15:00', breaks: [{ start: '12:00', end: '12:30', paid: false }] },
+				tue: { work: true, start: '08:00', end: '15:00', breaks: [{ start: '12:00', end: '12:30', paid: false }] },
+				wed: { work: true, start: '08:00', end: '15:00', breaks: [{ start: '12:00', end: '12:30', paid: false }] },
+				thu: { work: true, start: '08:00', end: '15:00', breaks: [{ start: '12:00', end: '12:30', paid: false }] },
+				fri: { work: true, start: '08:00', end: '13:00', breaks: [] },
+				sat: { work: false },
+				sun: { work: false },
+			},
+		}
+
+		// Enable custom contract hours — must create+assign a personal model.
+		const enable = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${userId}/profile`, {
+			data: {
+				workingTimeModel: {
+					startDate,
+					germanState: before.user.germanState || 'NW',
+					customModel: {
+						enabled: 'true',
+						weeklyHours: 30,
+						dailyHours: 6,
+						workDaysPerWeek: 5,
+						weekdaySchedule: schedule,
+					},
+				},
+			},
+		})
+		expect(enable.success).toBe(true)
+
+		const after = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(after.success).toBe(true)
+		expect(after.user.workingTimeModel?.isPersonal).toBe(true)
+		const personalId = after.user.workingTimeModel.id
+		expect(personalId).not.toBe(globalId)
+		expect(after.user.workingTimeModel.weekdaySchedule?.days?.mon?.work).toBe(true)
+
+		// Isolation: the personal model must not leak into the org model list.
+		const models = await api(page, 'GET', '/apps/arbeitszeitcheck/api/admin/working-time-models')
+		expect(models.success).toBe(true)
+		const listedIds = (models.models || []).map((m) => m.id)
+		expect(listedIds).not.toContain(personalId)
+
+		// And the global model CRUD must 404 on the personal id (no oracle).
+		const direct = await apiAllowFailure(page, 'GET', `/apps/arbeitszeitcheck/api/admin/working-time-models/${personalId}`)
+		expect(direct.status).toBe(404)
+		expect(direct.json?.success).toBe(false)
+
+		// Toggle custom hours off — the employee returns to a global model and
+		// the now-unreferenced personal model is pruned.
+		const disable = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${userId}/profile`, {
+			data: {
+				workingTimeModel: {
+					workingTimeModelId: globalId,
+					startDate,
+					germanState: before.user.germanState || 'NW',
+					customModel: { enabled: 'false' },
+				},
+			},
+		})
+		expect(disable.success).toBe(true)
+
+		const restored = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(restored.success).toBe(true)
+		expect(restored.user.workingTimeModel?.isPersonal).toBe(false)
+		expect(Number(restored.user.workingTimeModel?.id)).toBe(Number(globalId))
 	})
 })

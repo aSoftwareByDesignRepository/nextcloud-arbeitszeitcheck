@@ -763,6 +763,25 @@
             modelOptions += `<option value="${Utils.escapeHtml(String(model.id))}" ${selected}>${Utils.escapeHtml(model.name)}</option>`;
         });
 
+        // A personal model never appears in the global <select> — while
+        // individual hours are active the select is disabled anyway, but it
+        // still shows the current contract name instead of a random model.
+        const isPersonalModel = !!(user.workingTimeModel && user.workingTimeModel.isPersonal);
+        if (isPersonalModel) {
+            modelOptions += `<option value="${Utils.escapeHtml(String(user.workingTimeModel.id))}" selected>${Utils.escapeHtml(user.workingTimeModel.name || t('individualContractOption', 'Individual contract'))}</option>`;
+        }
+        const customHours = user.workingTimeModel || {};
+        const customWeekly = isPersonalModel && customHours.weeklyHours != null ? String(customHours.weeklyHours) : '';
+        const customDaily = isPersonalModel && customHours.dailyHours != null ? String(customHours.dailyHours) : '';
+        const customDays = isPersonalModel && customHours.workDaysPerWeek != null ? String(customHours.workDaysPerWeek) : '';
+        const customSchedule = isPersonalModel ? (customHours.weekdaySchedule || null) : null;
+        const weekdayEditor = window.ArbeitszeitCheckWeekdaySchedule || null;
+        const customScheduleHtml = weekdayEditor
+            ? weekdayEditor.sectionHtml('ucm', customSchedule, {
+                scalarFields: 'customWeeklyHours,customDailyHours,customWorkDaysPerWeek',
+            })
+            : '';
+
         // Regions grouped per country (cross-border commuters may pick a region
         // of another supported country). Working-time law can be overridden per user (E-9).
         const regionGroups = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.regionGroups) || null;
@@ -834,6 +853,31 @@
                         ${modelOptions}
                     </select>
                     <p id="user-model-help" class="form-help">${t('selectWorkScheduleHelp', 'Select a work schedule to assign to this employee')}</p>
+                </div>
+                <div class="form-group user-custom-model">
+                    <label class="user-custom-model__toggle" for="user-custom-model-enabled">
+                        <input type="checkbox" id="user-custom-model-enabled" name="customModelEnabled" value="1" class="user-custom-model__checkbox"${isPersonalModel ? ' checked' : ''} aria-describedby="user-custom-model-help">
+                        <span class="user-custom-model__toggle-text">${Utils.escapeHtml(t('individualContractHours', 'Individual contract hours'))}</span>
+                    </label>
+                    <p id="user-custom-model-help" class="form-help">${Utils.escapeHtml(t('individualContractHoursHelp', 'Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.'))}</p>
+                    <div id="user-custom-model-fields" class="user-custom-model__fields"${isPersonalModel ? '' : ' hidden'}>
+                        <div class="form-group">
+                            <label for="user-custom-weekly-hours" class="form-label">${Utils.escapeHtml(t('customWeeklyHours', 'Weekly hours'))}</label>
+                            <input type="number" id="user-custom-weekly-hours" name="customWeeklyHours" class="form-input" min="0.5" max="80" step="0.25" inputmode="decimal" value="${Utils.escapeHtml(customWeekly)}" aria-describedby="user-custom-weekly-hours-help">
+                            <p id="user-custom-weekly-hours-help" class="form-help">${Utils.escapeHtml(t('customWeeklyHoursHelp', 'Contract hours per week (e.g. 38.5).'))}</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-custom-daily-hours" class="form-label">${Utils.escapeHtml(t('customDailyHours', 'Daily hours'))}</label>
+                            <input type="number" id="user-custom-daily-hours" name="customDailyHours" class="form-input" min="0.5" max="24" step="0.25" inputmode="decimal" value="${Utils.escapeHtml(customDaily)}" aria-describedby="user-custom-daily-hours-help">
+                            <p id="user-custom-daily-hours-help" class="form-help">${Utils.escapeHtml(t('customDailyHoursHelp', 'Average contract hours per working day.'))}</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-custom-workdays" class="form-label">${Utils.escapeHtml(t('customWorkDaysPerWeek', 'Working days per week'))}</label>
+                            <input type="number" id="user-custom-workdays" name="customWorkDaysPerWeek" class="form-input" min="1" max="7" step="0.5" inputmode="numeric" value="${Utils.escapeHtml(customDays)}" aria-describedby="user-custom-workdays-help">
+                            <p id="user-custom-workdays-help" class="form-help">${Utils.escapeHtml(t('customWorkDaysPerWeekHelp', 'On how many days per week this person works (1–7).'))}</p>
+                        </div>
+                        ${customScheduleHtml}
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="user-german-state" class="form-label">${germanStateLabel}</label>
@@ -1117,6 +1161,59 @@
         bindOvertimeAdjustmentControls(user.userId);
         bindCarryoverYearReload(user.userId);
         bindOvertimeOpeningYearReload(user.userId);
+
+        // Individual contract hours: toggle shows/hides the custom fields and
+        // disables the shared-model select (it is ignored while custom is on).
+        // First enable prefills the scalar fields from the assigned model so the
+        // admin starts from the contract they saw — nothing is silently copied:
+        // the weekday_schedule of the source model is NOT prefilled (it would
+        // invisibly override the scalar hours below).
+        const customToggle = document.getElementById('user-custom-model-enabled');
+        const customFields = document.getElementById('user-custom-model-fields');
+        const modelSelectEl = document.getElementById('user-model');
+        const customScheduleFieldset = form ? form.querySelector('.wtm-weekday-schedule') : null;
+        if (customScheduleFieldset && weekdayEditor) {
+            weekdayEditor.bind(customScheduleFieldset);
+        }
+        const syncCustomModelState = () => {
+            const on = !!(customToggle && customToggle.checked);
+            if (customFields) {
+                customFields.hidden = !on;
+            }
+            if (modelSelectEl) {
+                modelSelectEl.disabled = on;
+                if (on) {
+                    modelSelectEl.setAttribute('aria-disabled', 'true');
+                } else {
+                    modelSelectEl.removeAttribute('aria-disabled');
+                }
+            }
+        };
+        if (customToggle) {
+            customToggle.addEventListener('change', function() {
+                syncCustomModelState();
+                if (!customToggle.checked) {
+                    return;
+                }
+                const weeklyEl = document.getElementById('user-custom-weekly-hours');
+                const dailyEl = document.getElementById('user-custom-daily-hours');
+                const daysEl = document.getElementById('user-custom-workdays');
+                const empty = [weeklyEl, dailyEl, daysEl].every((el) => !el || String(el.value || '').trim() === '');
+                const assignedModel = models.find((m) => modelSelectEl && String(m.id) === String(modelSelectEl.value));
+                if (empty && assignedModel) {
+                    if (weeklyEl && assignedModel.weeklyHours != null) {
+                        weeklyEl.value = String(assignedModel.weeklyHours);
+                    }
+                    if (dailyEl && assignedModel.dailyHours != null) {
+                        dailyEl.value = String(assignedModel.dailyHours);
+                    }
+                    if (daysEl && assignedModel.workDaysPerWeek != null) {
+                        daysEl.value = String(assignedModel.workDaysPerWeek);
+                    }
+                }
+            });
+        }
+        syncCustomModelState();
 
         // Cross-border note: visible when holiday region country differs from the
         // effective labour-law country (instance default OR per-user override).
@@ -1699,6 +1796,64 @@
             markInvalid(empEndEl, auMsg('employmentEndAfterStart', 'The employment end date must be on or after the employment start date.'));
         }
 
+        // 8. Individual contract hours: when a weekday matrix is active the
+        //    scalars are derived (readonly) and each work day needs start < end
+        //    (and a sane break window); without a matrix the scalar ranges apply.
+        const customToggleEl = form.querySelector('#user-custom-model-enabled');
+        if (customToggleEl && customToggleEl.checked) {
+            const scheduleFieldset = form.querySelector('.wtm-weekday-schedule');
+            const schedule = (window.ArbeitszeitCheckWeekdaySchedule && scheduleFieldset)
+                ? window.ArbeitszeitCheckWeekdaySchedule.collect(scheduleFieldset)
+                : null;
+            if (schedule) {
+                const parseHm = window.ArbeitszeitCheckWeekdaySchedule.parseHmToMinutes;
+                scheduleFieldset.querySelectorAll('tr[data-day]').forEach((tr) => {
+                    if (!tr.querySelector('.wtm-day-work')?.checked) {
+                        return;
+                    }
+                    const startEl2 = tr.querySelector('.wtm-day-start');
+                    const endEl2 = tr.querySelector('.wtm-day-end');
+                    const s = parseHm(startEl2?.value || '');
+                    const e = parseHm(endEl2?.value || '');
+                    if (s === null || e === null || e <= s) {
+                        markInvalid(
+                            s === null ? startEl2 : endEl2,
+                            auMsg('scheduleEndAfterStart', 'Each work day needs a start and an end that is later than the start.')
+                        );
+                        return;
+                    }
+                    const bStartEl = tr.querySelector('.wtm-day-break-start');
+                    const bEndEl = tr.querySelector('.wtm-day-break-end');
+                    const bs = parseHm(bStartEl?.value || '');
+                    const be = parseHm(bEndEl?.value || '');
+                    if ((bs === null) !== (be === null)) {
+                        markInvalid(
+                            bs === null ? bStartEl : bEndEl,
+                            auMsg('scheduleBreakIncomplete', 'Enter both break start and break end, or leave both empty.')
+                        );
+                    } else if (bs !== null && be !== null && be <= bs) {
+                        markInvalid(bEndEl, auMsg('scheduleBreakOrder', 'The break end must be later than the break start.'));
+                    }
+                });
+            } else {
+                const weeklyEl = form.querySelector('#user-custom-weekly-hours');
+                const dailyEl = form.querySelector('#user-custom-daily-hours');
+                const daysEl = form.querySelector('#user-custom-workdays');
+                const weekly = parseLocalizedDecimal(weeklyEl?.value);
+                if (weekly === undefined || weekly <= 0 || weekly > 80) {
+                    markInvalid(weeklyEl, auMsg('customWeeklyHoursRange', 'Weekly hours must be between 0.5 and 80.'));
+                }
+                const daily = parseLocalizedDecimal(dailyEl?.value);
+                if (daily === undefined || daily <= 0 || daily > 24) {
+                    markInvalid(dailyEl, auMsg('customDailyHoursRange', 'Daily hours must be between 0.5 and 24.'));
+                }
+                const days = parseLocalizedDecimal(daysEl?.value);
+                if (days === undefined || days < 1 || days > 7) {
+                    markInvalid(daysEl, auMsg('customWorkDaysRange', 'Working days must be between 1 and 7.'));
+                }
+            }
+        }
+
         return firstInvalid;
     }
 
@@ -1755,8 +1910,21 @@
         const formData = new FormData(form);
         const toISO = resolveToISO();
 
+        const customModelEnabled = !!form.querySelector('#user-custom-model-enabled')?.checked;
+        const customScheduleFieldset = form.querySelector('.wtm-weekday-schedule');
+        const customSchedule = customModelEnabled && window.ArbeitszeitCheckWeekdaySchedule && customScheduleFieldset
+            ? window.ArbeitszeitCheckWeekdaySchedule.collect(customScheduleFieldset)
+            : null;
         const workingTimeModel = {
             workingTimeModelId: formData.get('workingTimeModelId') ? parseInt(formData.get('workingTimeModelId'), 10) : null,
+            customModel: {
+                // Server parses 'false' strings explicitly (form-encoded-bool rule).
+                enabled: customModelEnabled ? 'true' : 'false',
+                weeklyHours: customModelEnabled ? formData.get('customWeeklyHours') : undefined,
+                dailyHours: customModelEnabled ? formData.get('customDailyHours') : undefined,
+                workDaysPerWeek: customModelEnabled ? formData.get('customWorkDaysPerWeek') : undefined,
+                weekdaySchedule: customModelEnabled && customSchedule ? customSchedule : undefined,
+            },
             vacationDaysPerYear: formData.get('vacationDaysPerYear') ? parseInt(formData.get('vacationDaysPerYear'), 10) : null,
             vacationCarryoverDays: formData.get('vacationCarryoverDays') !== null && formData.get('vacationCarryoverDays') !== ''
                 ? parseLocalizedDecimal(formData.get('vacationCarryoverDays'))

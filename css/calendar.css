@@ -399,6 +399,40 @@
 	border-color: color-mix(in srgb, var(--color-info) 42%, var(--color-border, var(--arbeitszeitcheck-color-border)));
 }
 
+/* Working-time model change marker — neutral info strip inside a day cell. */
+.calendar-day-model-change {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	margin-top: 0.25rem;
+	padding: 0.125rem 0.375rem;
+	border-radius: var(--border-radius-pill, 999px);
+	border: 1px dashed var(--color-border-maxcontrast, var(--color-border, var(--arbeitszeitcheck-color-border)));
+	background: color-mix(in srgb, var(--color-info) 8%, var(--color-main-background));
+	color: var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-maxcontrast));
+	font-size: 0.7rem;
+	line-height: 1.2;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+.calendar-day-model-change__icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--color-info-text, var(--color-info));
+}
+
+.calendar-day-model-change__icon-svg {
+	width: 0.75rem;
+	height: 0.75rem;
+}
+
+.calendar-day-model-change__text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* Compensatory time off (Gleittag) — primary-light accent, balance-spend day. */
 .calendar-day-absence--overtime-comp .calendar-day-absence-chip {
 	border-color: color-mix(in srgb, var(--color-primary-element) 45%, var(--color-border, var(--arbeitszeitcheck-color-border)));

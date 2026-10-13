@@ -356,4 +356,57 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 		$this->assertSame(0.0, $result['hours']);
 		$this->assertSame(0, $result['days_credited']);
 	}
+
+	public function testMidRangeModelChangeUsesEffectiveContractPerDay(): void
+	{
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(false);
+
+		// Model A: 8h/day through Wed; model B: 4h/day from Thu. The assignment
+		// in force *today* is B — a current-only resolver would mis-credit Wed.
+		$assignA = new UserWorkingTimeModel();
+		$assignA->setWorkingTimeModelId(11);
+		$assignB = new UserWorkingTimeModel();
+		$assignB->setWorkingTimeModelId(12);
+		$this->userModelMapper->method('findByUserAndDate')->willReturnCallback(
+			static function (string $uid, \DateTime $date) use ($assignA, $assignB) {
+				return $date->format('Y-m-d') <= '2026-09-09' ? $assignA : $assignB;
+			}
+		);
+		$this->userModelMapper->method('findCurrentByUser')->willReturn($assignB);
+
+		$modelA = new WorkingTimeModel();
+		$modelA->setId(11);
+		$modelA->setName('Full');
+		$modelA->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$modelA->setDailyHours(8.0);
+		$modelB = new WorkingTimeModel();
+		$modelB->setId(12);
+		$modelB->setName('Part');
+		$modelB->setType(WorkingTimeModel::TYPE_PART_TIME);
+		$modelB->setDailyHours(4.0);
+		$this->modelMapper->method('find')->willReturnCallback(
+			static function (int $id) use ($modelA, $modelB) {
+				return $id === 11 ? $modelA : $modelB;
+			}
+		);
+
+		$absence = new Absence();
+		$absence->setType(Absence::TYPE_SICK_LEAVE);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setStartDate(new \DateTime('2026-09-09')); // Wed
+		$absence->setEndDate(new \DateTime('2026-09-10'));   // Thu
+		$absence->setDays(2.0);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([$absence]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-10'),
+		);
+
+		// 8h under model A + 4h under model B — not 2×4 (current-only bug).
+		$this->assertEqualsWithDelta(12.0, $result['hours'], 0.001);
+		$this->assertSame(2, $result['days_credited']);
+	}
 }

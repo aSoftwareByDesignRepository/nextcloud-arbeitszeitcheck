@@ -858,7 +858,7 @@ class AdminController extends Controller
 	#[NoCSRFRequired]
 	public function userDetail(string $userId): TemplateResponse
 	{
-		$this->registerFrontEndAssets('admin-user-detail', 'admin-users', [], ['common/datepicker']);
+		$this->registerFrontEndAssets('admin-user-detail', 'admin-users', [], ['common/datepicker', 'common/weekday-schedule']);
 
 		$userId = trim($userId);
 		$user = $userId !== '' ? $this->userManager->get($userId) : null;
@@ -1330,6 +1330,8 @@ class AdminController extends Controller
 				'weeklyHours' => $workingTimeModel->getWeeklyHours(),
 				'dailyHours' => $workingTimeModel->getDailyHours(),
 				'workDaysPerWeek' => $workingTimeModel->getWorkDaysPerWeek(),
+				'isPersonal' => $workingTimeModel->isPersonal(),
+				'weekdaySchedule' => $workingTimeModel->getWeekdaySchedule()?->toArray(),
 			] : null,
 			'vacationDaysPerYear' => $currentModel
 				? $this->presentAdminVacationDays((float)$currentModel->getVacationDaysPerYear())
@@ -2074,7 +2076,7 @@ class AdminController extends Controller
 	#[NoCSRFRequired]
 	public function workingTimeModels(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('working-time-models', 'working-time-models');
+		$this->registerFrontEndAssets('working-time-models', 'working-time-models', [], ['common/weekday-schedule']);
 
 
 
@@ -4888,6 +4890,8 @@ class AdminController extends Controller
 						'weeklyHours' => $workingTimeModel->getWeeklyHours(),
 						'dailyHours' => $workingTimeModel->getDailyHours(),
 						'workDaysPerWeek' => $workingTimeModel->getWorkDaysPerWeek(),
+						'isPersonal' => $workingTimeModel->isPersonal(),
+						'weekdaySchedule' => $workingTimeModel->getWeekdaySchedule()?->toArray(),
 					] : null,
 					'vacationDaysPerYear' => $currentModel
 						? $this->presentAdminVacationDays((float)$currentModel->getVacationDaysPerYear())
@@ -5078,6 +5082,16 @@ class AdminController extends Controller
 		try {
 			$model = $this->workingTimeModelMapper->find($id);
 
+			// Personal models are managed through the employee profile, not
+			// through global model CRUD — same 404 as a missing row so the id
+			// cannot be used as an existence oracle.
+			if ($model->isPersonal()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Working time model not found')
+				], Http::STATUS_NOT_FOUND);
+			}
+
 			return new JSONResponse([
 				'success' => true,
 				'model' => [
@@ -5125,7 +5139,7 @@ class AdminController extends Controller
 			$model->setWeeklyHours($this->parseDecimalInput($params['weeklyHours'] ?? null, 40.0));
 			$model->setDailyHours($this->parseDecimalInput($params['dailyHours'] ?? null, $defaultDaily));
 			$model->setWorkDaysPerWeek($this->parseDecimalInput($params['workDaysPerWeek'] ?? null, 5.0));
-			$model->setIsDefault(isset($params['isDefault']) ? (bool)$params['isDefault'] : false);
+			$model->setIsDefault(isset($params['isDefault']) ? filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN) : false);
 			$model->setCreatedAt(new \DateTime());
 			$model->setUpdatedAt(new \DateTime());
 
@@ -5207,6 +5221,12 @@ class AdminController extends Controller
 	{
 		try {
 			$model = $this->workingTimeModelMapper->find($id);
+			if ($model->isPersonal()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Working time model not found')
+				], Http::STATUS_NOT_FOUND);
+			}
 			$oldValues = $this->workingTimeModelToAuditValues($model);
 			$params = $this->request->getParams();
 
@@ -5229,7 +5249,7 @@ class AdminController extends Controller
 				$model->setWorkDaysPerWeek($this->parseDecimalInput($params['workDaysPerWeek'], $model->getWorkDaysPerWeek()));
 			}
 			if (isset($params['isDefault'])) {
-				$model->setIsDefault((bool)$params['isDefault']);
+				$model->setIsDefault(filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN));
 			}
 			if (isset($params['breakRules']) && is_array($params['breakRules'])) {
 				$scheduleError = $this->applyBreakRulesToWorkingTimeModel($model, $params['breakRules']);
@@ -5315,6 +5335,13 @@ class AdminController extends Controller
 	{
 		try {
 			$model = $this->workingTimeModelMapper->find($id);
+
+			if ($model->isPersonal()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Working time model not found')
+				], Http::STATUS_NOT_FOUND);
+			}
 
 			// Fail closed: never leave the org without an explicit default schedule.
 			if ($model->getIsDefault()) {

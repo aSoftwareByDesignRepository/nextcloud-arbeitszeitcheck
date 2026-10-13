@@ -238,8 +238,13 @@ class LayeredVacationDefaultsService
 			throw new LayeredVacationValidationException('Validation failed', ['workingTimeModelId' => 'Working time model is required']);
 		}
 		try {
-			$this->workingTimeModelMapper->find($workingTimeModelId);
+			$model = $this->workingTimeModelMapper->find($workingTimeModelId);
 		} catch (DoesNotExistException) {
+			throw new LayeredVacationNotFoundException('Working time model not found');
+		}
+		// Personal (employee-scoped) models never take org model defaults —
+		// same not-found as a missing row so personal ids stay unguessable.
+		if ($model->isPersonal()) {
 			throw new LayeredVacationNotFoundException('Working time model not found');
 		}
 

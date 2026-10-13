@@ -266,6 +266,22 @@ class LayeredVacationDefaultsServiceTest extends TestCase
 		], 'admin');
 	}
 
+	public function testUpsertModelRejectsPersonalModel(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setId(43);
+		$model->setUserId('some-employee');
+		$this->workingTimeModelMapper->method('find')->with(43)->willReturn($model);
+		$this->modelMapper->expects(self::never())->method('insert');
+		$this->expectException(LayeredVacationNotFoundException::class);
+		$this->service->upsertModelDefault([
+			'workingTimeModelId' => 43,
+			'vacationMode' => Constants::VACATION_MODE_MANUAL_FIXED,
+			'manualDays' => 24.0,
+			'effectiveFrom' => '2026-01-01',
+		], 'admin');
+	}
+
 	public function testUpsertModelPersistsAndAudits(): void
 	{
 		$model = new WorkingTimeModel();

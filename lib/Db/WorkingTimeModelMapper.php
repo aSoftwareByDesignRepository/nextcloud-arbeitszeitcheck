@@ -33,7 +33,11 @@ class WorkingTimeModelMapper extends QBMapper
 	}
 
 	/**
-	 * Find all working time models
+	 * Find all organisation-wide working time models.
+	 *
+	 * Personal (employee-scoped, user_id IS NOT NULL) models are excluded —
+	 * they belong to a single user and must not appear in model pickers,
+	 * settings lists, or vacation-default layers.
 	 *
 	 * @param int|null $limit
 	 * @param int|null $offset
@@ -44,6 +48,7 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')
 			->from($this->getTableName())
+			->where($qb->expr()->isNull('user_id'))
 			->orderBy('name', 'ASC');
 
 		if ($limit !== null) {
@@ -86,6 +91,7 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb->select('*')
 			->from($this->getTableName())
 			->where($qb->expr()->eq('is_default', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)))
+			->andWhere($qb->expr()->isNull('user_id'))
 			->setMaxResults(1);
 
 		try {
@@ -106,7 +112,8 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->update($this->getTableName())
 			->set('is_default', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL))
-			->where($qb->expr()->eq('is_default', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)));
+			->where($qb->expr()->eq('is_default', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)))
+			->andWhere($qb->expr()->isNull('user_id'));
 
 		if ($exceptId !== null) {
 			$qb->andWhere($qb->expr()->neq('id', $qb->createNamedParameter($exceptId, IQueryBuilder::PARAM_INT)));
@@ -127,6 +134,7 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb->select('*')
 			->from($this->getTableName())
 			->where($qb->expr()->eq('type', $qb->createNamedParameter($type)))
+			->andWhere($qb->expr()->isNull('user_id'))
 			->orderBy('name', 'ASC');
 
 		return $this->findEntities($qb);
@@ -144,13 +152,14 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb->select('*')
 			->from($this->getTableName())
 			->where($qb->expr()->like('name', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($query) . '%')))
+			->andWhere($qb->expr()->isNull('user_id'))
 			->orderBy('name', 'ASC');
 
 		return $this->findEntities($qb);
 	}
 
 	/**
-	 * Count working time models
+	 * Count organisation-wide working time models
 	 *
 	 * @return int
 	 */
@@ -159,8 +168,45 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->select($qb->createFunction('COUNT(*)'));
 
-		$qb->from($this->getTableName());
+		$qb->from($this->getTableName())
+			->where($qb->expr()->isNull('user_id'));
 
 		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
+	 * Find all personal (employee-scoped) models owned by a user.
+	 *
+	 * A user can accumulate several over time: rows that are still referenced
+	 * by a past assignment stay for history, unreferenced ones get pruned on
+	 * the next profile save.
+	 *
+	 * @param string $userId
+	 * @return WorkingTimeModel[]
+	 */
+	public function findPersonalByUser(string $userId): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->orderBy('id', 'ASC');
+
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Delete all personal models owned by a user (used on user deletion).
+	 * Assignments must be removed first so no dangling model ids remain.
+	 *
+	 * @param string $userId
+	 * @return int Number of deleted rows
+	 */
+	public function deletePersonalByUser(string $userId): int
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+		return $qb->executeStatement();
 	}
 }

@@ -2285,6 +2285,9 @@
                 // Handle different response formats
                 if (Array.isArray(data)) {
                     return data;
+                } else if (data && data.success && Array.isArray(data.changes)) {
+                    // Format: {success: true, changes: [...]} — keep full object.
+                    return data;
                 } else if (data && data.success && data.holidays && Array.isArray(data.holidays)) {
                     // Format: {success: true, state: 'NW', holidays: [...]} – return full object so calendar can use .holidays
                     return data;
@@ -2700,6 +2703,39 @@
             return 'calendar-day-absence--other';
         },
 
+        /**
+         * "Working-time model effective from this day" badge — icon + visible
+         * short text (never icon-only); full detail incl. model name in title.
+         */
+        getModelChangeBadgeHtml: function(dateKey) {
+            const changes = (this.calendarData && this.calendarData.modelChanges) || {};
+            if (!Object.prototype.hasOwnProperty.call(changes, dateKey)) {
+                return '';
+            }
+            const modelName = changes[dateKey] || '';
+            const l10n = (this.config && this.config.l10n) || {};
+            const short = l10n.modelChangeShort || 'Model change';
+            const detail = modelName
+                ? String(l10n.modelChangeDetail || 'Working-time model changed to {model}').replace('{model}', modelName)
+                : String(l10n.modelChangeNoName || 'Working-time model changed');
+            return `<span class="calendar-day-model-change" title="${escapeHtml(detail)}">`
+                + `<span class="calendar-day-model-change__icon" aria-hidden="true">${azcIcon('rotate', 'calendar-day-model-change__icon-svg')}</span>`
+                + `<span class="calendar-day-model-change__text">${escapeHtml(short)}</span>`
+                + '</span>';
+        },
+
+        getModelChangeAriaText: function(dateKey) {
+            const changes = (this.calendarData && this.calendarData.modelChanges) || {};
+            if (!Object.prototype.hasOwnProperty.call(changes, dateKey)) {
+                return '';
+            }
+            const modelName = changes[dateKey] || '';
+            const l10n = (this.config && this.config.l10n) || {};
+            return modelName
+                ? String(l10n.modelChangeDetail || 'Working-time model changed to {model}').replace('{model}', modelName)
+                : String(l10n.modelChangeNoName || 'Working-time model changed');
+        },
+
         formatMoreAbsencesLabel: function(extraCount) {
             const count = Number(extraCount);
             if (!Number.isFinite(count) || count < 1) {
@@ -2856,6 +2892,7 @@
                 timeEntries: [],
                 absences: [],
                 holidays: [],
+                modelChanges: {},
                 currentDate: new Date(monthStr + '-01'),
                 currentView: this.config.currentView || 'month'
             };
@@ -3025,6 +3062,7 @@
             const timeEntriesPath = apiUrl.calendar || this._buildApiPath('/apps/arbeitszeitcheck/api/time-entries');
             const absencesPath = apiUrl.absences || this._buildApiPath('/apps/arbeitszeitcheck/api/absences');
             const holidaysPath = apiUrl.holidays || this._buildApiPath('/apps/arbeitszeitcheck/api/holidays');
+            const modelChangesPath = apiUrl.modelChanges || this._buildApiPath('/apps/arbeitszeitcheck/api/settings/working-time-model-changes');
 
             const d = this.calendarData.currentDate;
             const year = d.getFullYear();
@@ -3061,11 +3099,18 @@
             const absencesParams = { start_date: startDate, end_date: endDate, limit: '500' };
             const holidaysParams = { start: startDate, end: endDate };
 
+            const modelChangesParams = { start_date: startDate, end_date: endDate };
+
             Promise.all([
                 this.fetchTimelineData(timeEntriesPath, timeEntriesParams),
                 this.fetchTimelineData(absencesPath, absencesParams),
-                this.fetchTimelineData(holidaysPath, holidaysParams)
-            ]).then(([timeEntries, absences, holidaysResponse]) => {
+                this.fetchTimelineData(holidaysPath, holidaysParams),
+                // Non-blocking: a failed badge fetch must never blank the calendar.
+                this.fetchTimelineData(modelChangesPath, modelChangesParams).catch((err) => {
+                    console.warn('ArbeitszeitCheck: model-change badge fetch failed', err);
+                    return null;
+                })
+            ]).then(([timeEntries, absences, holidaysResponse, modelChangesResponse]) => {
                 this.calendarData.timeEntries = Array.isArray(timeEntries) ? timeEntries : [];
                 this.calendarData.absences = Array.isArray(absences) ? absences : [];
                 // Extract holidays array robustly: {success,holidays}, {ocs:{data:{holidays}}}, or direct array
@@ -3077,6 +3122,16 @@
                         : (Array.isArray(holidaysResponse.ocs?.data?.holidays) ? holidaysResponse.ocs.data.holidays : []);
                 }
                 this.calendarData.holidays = Array.isArray(holidaysArray) ? holidaysArray : [];
+                // Model-change boundaries: { 'Y-m-d': modelName }
+                const changesByDate = {};
+                const rawChanges = (modelChangesResponse && Array.isArray(modelChangesResponse.changes))
+                    ? modelChangesResponse.changes : [];
+                rawChanges.forEach((c) => {
+                    if (c && typeof c.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.date)) {
+                        changesByDate[c.date] = typeof c.model_name === 'string' ? c.model_name : '';
+                    }
+                });
+                this.calendarData.modelChanges = changesByDate;
                 this.renderCalendar();
             }).catch((error) => {
                 const container = document.getElementById('calendar-month-view');
@@ -3181,6 +3236,10 @@
 
                 // Build day content with day number and optional holiday label
                 let dayContent = `<div class="calendar-day-number">${day}</div>`;
+                const modelChangeHtml = this.getModelChangeBadgeHtml(dateKey);
+                if (modelChangeHtml) {
+                    classes.push('calendar-day--model-change');
+                }
                 if (dayHolidays.length > 0) {
                     const firstHolidayName = dayHolidays[0].name ? String(dayHolidays[0].name).trim() : '';
                     if (firstHolidayName) {
@@ -3196,7 +3255,9 @@
                 if (dayData.hasAbsence && dayData.absences.length > 0) {
                     dayContent += this.buildCalendarDayAbsenceContent(dayData);
                 }
-                
+
+                dayContent += modelChangeHtml;
+
                 // Show entry count if multiple entries
                 if (dayData.entries.length > 1) {
                     dayContent += `<div class="calendar-day-entry-count" title="${dayData.entries.length} ${this.config.l10n?.timeEntries || 'entries'}">${dayData.entries.length}×</div>`;
@@ -3206,7 +3267,11 @@
                     .map(h => h.name)
                     .filter(Boolean)
                     .join(', ');
-                const ariaLabel = holidayLabels ? `${dayAriaLabel} – ${holidayLabels}` : dayAriaLabel;
+                let ariaLabel = holidayLabels ? `${dayAriaLabel} – ${holidayLabels}` : dayAriaLabel;
+                const modelChangeAria = this.getModelChangeAriaText(dateKey);
+                if (modelChangeAria) {
+                    ariaLabel += ' – ' + modelChangeAria;
+                }
 
                 html += `<div class="${classes.join(' ')}" data-date="${dateKey}" role="button" tabindex="0" aria-label="${escapeHtml(ariaLabel)}">${dayContent}</div>`;
             }
@@ -3332,6 +3397,8 @@
                 const holidayNames = holidays.filter(h => h && h.date === dateKey).map(h => h.name).filter(Boolean).join(', ');
                 const holidayHtml = holidayNames ? `<div class="week-day-holiday" aria-hidden="true">${escapeHtml(holidayNames)}</div>` : '';
                 const absenceHtml = dayData.hasAbsence ? this.buildCalendarDayAbsenceContent(dayData) : '';
+                const weekModelChangeHtml = this.getModelChangeBadgeHtml(dateKey);
+                if (weekModelChangeHtml) weekDayClasses.push('calendar-day--model-change');
                 html += `
                     <div class="${weekDayClasses.join(' ')}" data-date="${dateKey}">
                         <div class="week-day-name">${weekdays[i]}</div>
@@ -3339,6 +3406,7 @@
                         ${dayData.hours > 0 ? `<div class="week-day-hours">${dayData.hours.toFixed(1)}h</div>` : ''}
                         ${holidayHtml}
                         ${absenceHtml}
+                        ${weekModelChangeHtml}
                     </div>
                 `;
             }
@@ -3367,6 +3435,8 @@
                 let ariaLabel = this.getDayCellAriaLabel(dateKey, dayData);
                 const hLabels = holidaysForAria.filter(h => h && h.date === dateKey).map(h => h.name).filter(Boolean).join(', ');
                 if (hLabels) ariaLabel = ariaLabel.replace(/\.\s*$/, '') + ' – ' + hLabels + '.';
+                const weekModelChangeAria = this.getModelChangeAriaText(dateKey);
+                if (weekModelChangeAria) ariaLabel += ' – ' + weekModelChangeAria;
                 dayEl.setAttribute('aria-label', ariaLabel);
                 dayEl.addEventListener('click', openDay);
                 dayEl.addEventListener('keydown', (e) => {

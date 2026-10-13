@@ -197,6 +197,9 @@ $timeEntryCreateUrl = (string)($_['timeEntryCreateUrl'] ?? $urlGenerator->linkTo
     window.ArbeitszeitCheck.l10n.statusSubstituteDeclined = <?php echo json_encode($l->t('Declined by substitute'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.moreAbsencesOnDay = <?php echo json_encode($l->t('+{count} more'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.moreAbsencesOnDayTitle = <?php echo json_encode($l->t('Additional absences on this day'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.modelChangeShort = <?php echo json_encode($l->t('Model change'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.modelChangeDetail = <?php echo json_encode($l->t('Working-time model changed to {model}'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.modelChangeNoName = <?php echo json_encode($l->t('Working-time model changed'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.absenceTypes = <?php
         $absenceTypeLabels = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($l);
         $absenceTypeLabels['holiday'] = $absenceTypeLabels['vacation']; // legacy alias
@@ -208,6 +211,7 @@ $timeEntryCreateUrl = (string)($_['timeEntryCreateUrl'] ?? $urlGenerator->linkTo
         calendar: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         absences: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         holidays: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.holiday.index'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        modelChanges: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.settings.workingTimeModelChanges'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         absenceCreate: <?php echo json_encode($urlGenerator->linkToRoute('arbeitszeitcheck.absence.create'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         timeEntryCreate: <?php echo json_encode($timeEntryCreateUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };

@@ -409,7 +409,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		$src = (string)file_get_contents(
 			dirname(__DIR__, 3) . '/lib/Service/AdminUserProfileUpdateService.php'
 		);
-		$needle = 'workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate))';
+		$needle = 'workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate))';
 		$pos = strpos($src, $needle);
 		$this->assertNotFalse($pos, 'assignmentMatches call site missing');
 		$window = substr($src, $pos, 280);
@@ -944,5 +944,364 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		} catch (AdminUserProfileUpdateException $e) {
 			$this->assertSame(404, $e->httpStatus);
 		}
+	}
+
+	// ------------------------------------------------------------------
+	// Personal working time models (issue #42 — individual contract hours)
+	// ------------------------------------------------------------------
+
+	private function personalModel(int $id, string $userId, float $weekly = 32.5, float $daily = 6.5, float $days = 5.0): WorkingTimeModel
+	{
+		$model = new WorkingTimeModel();
+		$model->setId($id);
+		$model->setUserId($userId);
+		$model->setName('Individual contract (' . $userId . ')');
+		$model->setType(WorkingTimeModel::TYPE_FLEXIBLE);
+		$model->setWeeklyHours($weekly);
+		$model->setDailyHours($daily);
+		$model->setWorkDaysPerWeek($days);
+		$model->setIsDefault(false);
+		$model->setCreatedAt(new \DateTime());
+		$model->setUpdatedAt(new \DateTime());
+		return $model;
+	}
+
+	private function globalModel(int $id): WorkingTimeModel
+	{
+		$model = new WorkingTimeModel();
+		$model->setId($id);
+		$model->setName('Global ' . $id);
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setWorkDaysPerWeek(5.0);
+		$model->setIsDefault(false);
+		$model->setCreatedAt(new \DateTime());
+		$model->setUpdatedAt(new \DateTime());
+		return $model;
+	}
+
+	private function assignmentFor(int $id, string $userId, int $modelId): UserWorkingTimeModel
+	{
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setId($id);
+		$assignment->setUserId($userId);
+		$assignment->setWorkingTimeModelId($modelId);
+		$assignment->setVacationDaysPerYear(28);
+		$assignment->setStartDate(new \DateTime('2026-01-01'));
+		$assignment->setCreatedAt(new \DateTime());
+		$assignment->setUpdatedAt(new \DateTime());
+		return $assignment;
+	}
+
+	public function testCustomModelCreatesPersonalModelAndPointsAssignmentAtIt(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->with('alice')->willReturn([]);
+
+		$inserted = null;
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->willReturnCallback(function (WorkingTimeModel $m) use (&$inserted) {
+				$m->setId(77);
+				$inserted = $m;
+				return $m;
+			});
+
+		$assignedModelId = null;
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->willReturnCallback(function (UserWorkingTimeModel $a) use (&$assignedModelId) {
+				$assignedModelId = $a->getWorkingTimeModelId();
+				$a->setId(10);
+				return $a;
+			});
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'customModel' => [
+				'enabled' => 'true',
+				'weeklyHours' => '32.5',
+				'dailyHours' => '6.5',
+				'workDaysPerWeek' => '5',
+			],
+			'workingTimeModelId' => null,
+			'startDate' => '2026-01-01',
+		], 'admin');
+
+		$this->assertNotNull($inserted);
+		$this->assertSame(77, $assignedModelId);
+		$this->assertTrue($inserted->isPersonal());
+		$this->assertSame('alice', $inserted->getUserId());
+		$this->assertSame(32.5, $inserted->getWeeklyHours());
+		$this->assertSame(6.5, $inserted->getDailyHours());
+		$this->assertFalse($inserted->getIsDefault());
+	}
+
+	public function testCustomModelUpdatesExistingPersonalModelInPlace(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$personal = $this->personalModel(50, 'alice', 30.0, 6.0, 5.0);
+		$assignment = $this->assignmentFor(10, 'alice', 50);
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->method('find')->with(50)->willReturn($personal);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([$personal]);
+		// Still referenced after the save — prune must not touch it.
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([$assignment]);
+
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->isInstanceOf(WorkingTimeModel::class))
+			->willReturnCallback(fn (WorkingTimeModel $m) => $m);
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+		$this->workingTimeModelMapper->expects($this->never())->method('delete');
+		// Assignment already points at the personal model — no reassignment write.
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('update');
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('insert');
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'customModel' => [
+				'enabled' => true,
+				'weeklyHours' => '38.5',
+				'dailyHours' => '7.7',
+				'workDaysPerWeek' => '5',
+			],
+			'workingTimeModelId' => null,
+			'startDate' => '2026-01-01',
+			'vacationDaysPerYear' => 28,
+		], 'admin');
+
+		$this->assertSame(38.5, $personal->getWeeklyHours());
+		$this->assertSame(7.7, $personal->getDailyHours());
+	}
+
+	public function testCustomModelAdoptsUnreferencedPersonalLeftover(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$global = $this->globalModel(5);
+		$orphan = $this->personalModel(60, 'alice');
+		$assignment = $this->assignmentFor(10, 'alice', 5);
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->method('find')->with(5)->willReturn($global);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([$orphan]);
+		// Adoption check: unreferenced. Prune check: referenced again after the
+		// assignment was repointed at the adopted model.
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')
+			->willReturnOnConsecutiveCalls([], [$assignment]);
+
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->willReturnCallback(fn (WorkingTimeModel $m) => $m);
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+		$this->workingTimeModelMapper->expects($this->never())->method('delete');
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(fn (UserWorkingTimeModel $a) => $a->getWorkingTimeModelId() === 60))
+			->willReturnCallback(fn (UserWorkingTimeModel $a) => $a);
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'customModel' => [
+				'enabled' => true,
+				'weeklyHours' => '20',
+				'dailyHours' => '4',
+				'workDaysPerWeek' => '5',
+			],
+			'workingTimeModelId' => null,
+			'startDate' => '2026-01-01',
+		], 'admin');
+
+		$this->assertSame(20.0, $orphan->getWeeklyHours());
+	}
+
+	public function testForeignPersonalModelIdIsRejectedLikeMissingModel(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->method('find')->with(42)->willReturn($this->personalModel(42, 'bob'));
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('insert');
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('update');
+
+		try {
+			$this->service->applyWorkingTimeModel('alice', [
+				'workingTimeModelId' => 42,
+				'startDate' => '2026-01-01',
+			], 'admin');
+			$this->fail('expected AdminUserProfileUpdateException for foreign personal model id');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(404, $e->httpStatus);
+		}
+	}
+
+	public function testCustomModelRejectsOutOfRangeScalarHours(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		try {
+			$this->service->applyWorkingTimeModel('alice', [
+				'customModel' => [
+					'enabled' => true,
+					'weeklyHours' => '0',
+					'dailyHours' => '8',
+					'workDaysPerWeek' => '5',
+				],
+				'workingTimeModelId' => null,
+				'startDate' => '2026-01-01',
+			], 'admin');
+			$this->fail('expected AdminUserProfileUpdateException for weeklyHours=0');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(400, $e->httpStatus);
+			$this->assertArrayHasKey('customWeeklyHours', $e->fieldErrors);
+		}
+	}
+
+	public function testCustomModelEnabledStringFalseIsNotCustom(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->method('find')->with(5)->willReturn($this->globalModel(5));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([]);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->userWorkingTimeModelMapper->method('insert')->willReturnCallback(function (UserWorkingTimeModel $a) {
+			$a->setId(10);
+			return $a;
+		});
+		// Form-encoded "false" must NOT trigger personal model creation.
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'customModel' => [
+				'enabled' => 'false',
+				'weeklyHours' => '32.5',
+				'dailyHours' => '6.5',
+				'workDaysPerWeek' => '5',
+			],
+			'workingTimeModelId' => 5,
+			'startDate' => '2026-01-01',
+		], 'admin');
+	}
+
+	public function testCustomModelWeekdayScheduleDerivesScalarHours(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([]);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+
+		$day = ['work' => true, 'start' => '08:00', 'end' => '16:30', 'breaks' => [['start' => '12:00', 'end' => '12:30', 'paid' => false]]];
+		$off = ['work' => false];
+		$schedule = ['version' => 1, 'days' => [
+			'mon' => $day, 'tue' => $day, 'wed' => $day, 'thu' => $day, 'fri' => $day,
+			'sat' => $off, 'sun' => $off,
+		]];
+
+		$inserted = null;
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->willReturnCallback(function (WorkingTimeModel $m) use (&$inserted) {
+				$m->setId(88);
+				$inserted = $m;
+				return $m;
+			});
+		$this->userWorkingTimeModelMapper->method('insert')->willReturnCallback(function (UserWorkingTimeModel $a) {
+			$a->setId(11);
+			return $a;
+		});
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'customModel' => [
+				'enabled' => true,
+				'weeklyHours' => '99',
+				'dailyHours' => '99',
+				'workDaysPerWeek' => '1',
+				'weekdaySchedule' => $schedule,
+			],
+			'workingTimeModelId' => null,
+			'startDate' => '2026-01-01',
+		], 'admin');
+
+		// 8.5h - 0.5h break = 8h per day, five days = 40h. Client-sent scalars
+		// (deliberately bogus) must be ignored — the schedule is the truth.
+		$this->assertSame(40.0, $inserted->getWeeklyHours());
+		$this->assertSame(8.0, $inserted->getDailyHours());
+		$this->assertSame(5.0, $inserted->getWorkDaysPerWeek());
+		$this->assertNotNull($inserted->getWeekdaySchedule());
+	}
+
+	public function testCustomModelRejectsInvalidWeekdaySchedule(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$schedule = ['version' => 1, 'days' => [
+			'mon' => ['work' => true, 'start' => '16:00', 'end' => '08:00'],
+			'tue' => ['work' => false], 'wed' => ['work' => false], 'thu' => ['work' => false],
+			'fri' => ['work' => false], 'sat' => ['work' => false], 'sun' => ['work' => false],
+		]];
+
+		try {
+			$this->service->applyWorkingTimeModel('alice', [
+				'customModel' => [
+					'enabled' => true,
+					'weekdaySchedule' => $schedule,
+				],
+				'workingTimeModelId' => null,
+				'startDate' => '2026-01-01',
+			], 'admin');
+			$this->fail('expected AdminUserProfileUpdateException for end-before-start schedule');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(400, $e->httpStatus);
+			$this->assertArrayHasKey('customWeekdaySchedule', $e->fieldErrors);
+		}
+	}
+
+	public function testSavePrunesUnreferencedPersonalModelWhenCustomOff(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$global = $this->globalModel(5);
+		$orphan = $this->personalModel(60, 'alice');
+		$assignment = $this->assignmentFor(10, 'alice', 5);
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->method('find')->with(5)->willReturn($global);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([$orphan]);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->with(60)->willReturn([]);
+
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('delete')
+			->with($orphan);
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 5,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+		], 'admin');
+	}
+
+	public function testSaveKeepsHistoricallyReferencedPersonalModel(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$global = $this->globalModel(5);
+		$personal = $this->personalModel(60, 'alice');
+		$assignment = $this->assignmentFor(10, 'alice', 5);
+		$historical = $this->assignmentFor(9, 'alice', 60);
+		$historical->setEndDate(new \DateTime('2025-12-31'));
+
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->method('find')->with(5)->willReturn($global);
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([$personal]);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->with(60)->willReturn([$historical]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('delete');
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 5,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '2026-01-01',
+		], 'admin');
 	}
 }

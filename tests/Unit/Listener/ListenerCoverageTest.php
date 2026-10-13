@@ -31,6 +31,7 @@ use OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignmentMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationRolloverLogMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Listener\CSPListener;
@@ -150,6 +151,7 @@ class ListenerCoverageTest extends TestCase
 			'auditLogMapper' => AuditLogMapper::class,
 			'userSettingsMapper' => UserSettingsMapper::class,
 			'userWorkingTimeModelMapper' => UserWorkingTimeModelMapper::class,
+			'workingTimeModelMapper' => WorkingTimeModelMapper::class,
 			'teamMemberMapper' => TeamMemberMapper::class,
 			'teamManagerMapper' => TeamManagerMapper::class,
 			'mobileSeatMapper' => MobileSeatMapper::class,
@@ -176,7 +178,7 @@ class ListenerCoverageTest extends TestCase
 		$listener = new UserDeletedListener(
 			$mocks['timeEntryMapper'], $mocks['absenceMapper'], $mocks['complianceViolationMapper'],
 			$mocks['auditLogMapper'], $mocks['userSettingsMapper'], $mocks['userWorkingTimeModelMapper'],
-			$mocks['teamMemberMapper'], $mocks['teamManagerMapper'], $mocks['mobileSeatMapper'],
+			$mocks['workingTimeModelMapper'], $mocks['teamMemberMapper'], $mocks['teamManagerMapper'], $mocks['mobileSeatMapper'],
 			$mocks['mobileStampIdempotencyMapper'], $mocks['kioskCredMapper'], $mocks['kioskSessionMapper'],
 			$mocks['kioskSettingsService'], $mocks['vacationYearBalanceMapper'], $mocks['vacationRolloverLogMapper'],
 			$mocks['userOvertimeYearBalanceMapper'], $mocks['overtimePayoutMapper'], $mocks['overtimeAdjustmentMapper'],
@@ -205,6 +207,8 @@ class ListenerCoverageTest extends TestCase
 		$m['auditLogMapper']->expects($this->once())->method('deleteByUser')->with('deleted-user');
 		$m['userSettingsMapper']->expects($this->once())->method('deleteByUser')->with('deleted-user');
 		$m['userWorkingTimeModelMapper']->expects($this->once())->method('deleteByUser')->with('deleted-user');
+		// Personal models are purged too — and only after the assignments above.
+		$m['workingTimeModelMapper']->expects($this->once())->method('deletePersonalByUser')->with('deleted-user');
 		$m['kioskSettingsService']->expects($this->once())->method('setUserKioskAllowed')->with('deleted-user', false);
 		$m['notificationService']->expects($this->never())->method('notifySubstituteDeclined');
 

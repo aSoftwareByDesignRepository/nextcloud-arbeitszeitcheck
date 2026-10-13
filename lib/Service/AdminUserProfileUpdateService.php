@@ -13,6 +13,7 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\AdminUserProfileUpdateException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
@@ -20,6 +21,7 @@ use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\OpeningBalanceYearValidator;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCA\ArbeitszeitCheck\Support\StrictYmdDates;
+use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
 use OCA\ArbeitszeitCheck\Support\DatevOrgCredentials;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\TTransactional;
@@ -201,107 +203,142 @@ class AdminUserProfileUpdateService
 		$startDate = $params['startDate'] ?? null;
 		$endDate = $params['endDate'] ?? null;
 		$germanState = isset($params['germanState']) ? (string)$params['germanState'] : null;
+		$customModel = is_array($params['customModel'] ?? null) ? $params['customModel'] : null;
+		// Checkbox payloads arrive as string "false" in form-encoded calls —
+		// parse explicitly; never trust truthiness (see form-encoded-bool bug).
+		$customEnabled = $customModel !== null
+			&& filter_var($customModel['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-		// Resolve the row this dialog edits *in place*. Using the editable
-		// resolution (active-today, else the latest assignment) instead of
-		// "active today" only is what stops a duplicate row being inserted on
-		// every save when the assignment is future-dated ("Gültig von" set ahead
-		// of time) or already ended.
-		$currentModel = $this->userWorkingTimeModelMapper->findEditableByUser($userId);
-		$oldValues = $currentModel ? $this->userWorkingTimeModelToAuditValues($currentModel) : null;
-		$updated = null;
+		// Personal-model upsert + assignment write + orphan prune share one
+		// transaction: a failure anywhere must never leave a half-written
+		// model or an assignment pointing at a row that was rolled back.
+		// Nested inside updateProfile's atomic this degrades to a savepoint.
+		$updated = $this->atomic(function () use (
+			$userId,
+			$params,
+			$customEnabled,
+			$customModel,
+			$workingTimeModelId,
+			$vacationDaysPerYear,
+			$startDate,
+			$endDate,
+			$performedBy
+		): ?UserWorkingTimeModel {
+			// Resolve the row this dialog edits *in place*. Using the editable
+			// resolution (active-today, else the latest assignment) instead of
+			// "active today" only is what stops a duplicate row being inserted on
+			// every save when the assignment is future-dated ("Gültig von" set ahead
+			// of time) or already ended.
+			$currentModel = $this->userWorkingTimeModelMapper->findEditableByUser($userId);
+			$oldValues = $currentModel ? $this->userWorkingTimeModelToAuditValues($currentModel) : null;
 
-		// Assignment "unchanged" must only skip the model-row update. Region,
-		// labour-law country, and vacation carryover live in the same payload
-		// and must still run (customer bug: carryover alone never persisted).
-		if ($currentModel && $workingTimeModelId !== null && $workingTimeModelId > 0) {
-			if ($this->workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate)) {
-				$updated = $currentModel;
-			} else {
-				if ($startDate) {
-					$currentModel->setStartDate(new \DateTime((string)$startDate));
+			$effectiveModelId = $workingTimeModelId;
+			if ($customEnabled) {
+				$effectiveModelId = $this->upsertPersonalWorkingTimeModel(
+					$userId,
+					$customModel ?? [],
+					$currentModel,
+					$performedBy
+				);
+			}
+
+			$updated = null;
+			// Assignment "unchanged" must only skip the model-row update. Region,
+			// labour-law country, and vacation carryover live in the same payload
+			// and must still run (customer bug: carryover alone never persisted).
+			if ($currentModel && $effectiveModelId !== null && $effectiveModelId > 0) {
+				if ($this->workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate)) {
+					$updated = $currentModel;
+				} else {
+					if ($startDate) {
+						$currentModel->setStartDate(new \DateTime((string)$startDate));
+					}
+					if ($endDate !== null) {
+						$currentModel->setEndDate($endDate ? new \DateTime((string)$endDate) : null);
+					}
+					$currentModel->setWorkingTimeModelId($effectiveModelId);
+					if ($vacationDaysPerYear !== null) {
+						$currentModel->setVacationDaysPerYear($vacationDaysPerYear);
+					}
+					$currentModel->setUpdatedAt(new \DateTime());
+					$this->assertEntityValid($currentModel->validate());
+					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+					$this->auditLogMapper->logAction(
+						$userId,
+						'user_working_time_model_updated',
+						'user_working_time_model',
+						$updated->getId(),
+						$oldValues,
+						$this->userWorkingTimeModelToAuditValues($updated),
+						$performedBy
+					);
 				}
-				if ($endDate !== null) {
-					$currentModel->setEndDate($endDate ? new \DateTime((string)$endDate) : null);
+			} elseif ($effectiveModelId !== null && $effectiveModelId > 0) {
+				$newModel = new UserWorkingTimeModel();
+				$newModel->setUserId($userId);
+				$newModel->setWorkingTimeModelId($effectiveModelId);
+				$newModel->setVacationDaysPerYear($vacationDaysPerYear ?? $this->defaultVacationDaysSuggestion());
+				$newModel->setStartDate(new \DateTime($startDate ? (string)$startDate : 'now'));
+				if ($endDate) {
+					$newModel->setEndDate(new \DateTime((string)$endDate));
 				}
-				$currentModel->setWorkingTimeModelId($workingTimeModelId);
-				if ($vacationDaysPerYear !== null) {
-					$currentModel->setVacationDaysPerYear($vacationDaysPerYear);
-				}
-				$currentModel->setUpdatedAt(new \DateTime());
-				$this->assertEntityValid($currentModel->validate());
-				$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+				$newModel->setCreatedAt(new \DateTime());
+				$newModel->setUpdatedAt(new \DateTime());
+				$this->assertEntityValid($newModel->validate());
+				$updated = $this->userWorkingTimeModelMapper->insert($newModel);
 				$this->auditLogMapper->logAction(
 					$userId,
-					'user_working_time_model_updated',
+					'user_working_time_model_created',
 					'user_working_time_model',
 					$updated->getId(),
-					$oldValues,
-					$this->userWorkingTimeModelToAuditValues($updated),
-					$performedBy
-				);
-			}
-		} elseif ($workingTimeModelId !== null && $workingTimeModelId > 0) {
-			$newModel = new UserWorkingTimeModel();
-			$newModel->setUserId($userId);
-			$newModel->setWorkingTimeModelId($workingTimeModelId);
-			$newModel->setVacationDaysPerYear($vacationDaysPerYear ?? $this->defaultVacationDaysSuggestion());
-			$newModel->setStartDate(new \DateTime($startDate ? (string)$startDate : 'now'));
-			if ($endDate) {
-				$newModel->setEndDate(new \DateTime((string)$endDate));
-			}
-			$newModel->setCreatedAt(new \DateTime());
-			$newModel->setUpdatedAt(new \DateTime());
-			$this->assertEntityValid($newModel->validate());
-			$updated = $this->userWorkingTimeModelMapper->insert($newModel);
-			$this->auditLogMapper->logAction(
-				$userId,
-				'user_working_time_model_created',
-				'user_working_time_model',
-				$updated->getId(),
-				null,
-				$this->userWorkingTimeModelToAuditValues($updated),
-				$performedBy
-			);
-		} elseif ($currentModel && array_key_exists('workingTimeModelId', $params)) {
-			// No model selected ("No Model Assigned"): retire the editable
-			// assignment. Requires an explicit workingTimeModelId key — a
-			// payload that only carries germanState/vacation fields must not
-			// silently end the current assignment. A not-yet-started
-			// assignment is deleted outright —
-			// ending it with today's date would produce an invalid start > end
-			// range — while an active or past one is closed with an end date.
-			$today = new \DateTime();
-			$today->setTime(0, 0, 0);
-			$startsInFuture = $currentModel->getStartDate() !== null && $currentModel->getStartDate() > $today;
-			if ($startsInFuture) {
-				$this->userWorkingTimeModelMapper->delete($currentModel);
-				$this->auditLogMapper->logAction(
-					$userId,
-					'user_working_time_model_ended',
-					'user_working_time_model',
-					$currentModel->getId(),
-					$oldValues,
 					null,
-					$performedBy
-				);
-			} else {
-				$endDateForRemoval = $endDate ? new \DateTime((string)$endDate) : new \DateTime();
-				$currentModel->setEndDate($endDateForRemoval);
-				$currentModel->setUpdatedAt(new \DateTime());
-				$this->assertEntityValid($currentModel->validate());
-				$updated = $this->userWorkingTimeModelMapper->update($currentModel);
-				$this->auditLogMapper->logAction(
-					$userId,
-					'user_working_time_model_ended',
-					'user_working_time_model',
-					$currentModel->getId(),
-					$oldValues,
 					$this->userWorkingTimeModelToAuditValues($updated),
 					$performedBy
 				);
+			} elseif ($currentModel && array_key_exists('workingTimeModelId', $params)) {
+				// No model selected ("No Model Assigned"): retire the editable
+				// assignment. Requires an explicit workingTimeModelId key — a
+				// payload that only carries germanState/vacation fields must not
+				// silently end the current assignment. A not-yet-started
+				// assignment is deleted outright —
+				// ending it with today's date would produce an invalid start > end
+				// range — while an active or past one is closed with an end date.
+				$today = new \DateTime();
+				$today->setTime(0, 0, 0);
+				$startsInFuture = $currentModel->getStartDate() !== null && $currentModel->getStartDate() > $today;
+				if ($startsInFuture) {
+					$this->userWorkingTimeModelMapper->delete($currentModel);
+					$this->auditLogMapper->logAction(
+						$userId,
+						'user_working_time_model_ended',
+						'user_working_time_model',
+						$currentModel->getId(),
+						$oldValues,
+						null,
+						$performedBy
+					);
+				} else {
+					$endDateForRemoval = $endDate ? new \DateTime((string)$endDate) : new \DateTime();
+					$currentModel->setEndDate($endDateForRemoval);
+					$currentModel->setUpdatedAt(new \DateTime());
+					$this->assertEntityValid($currentModel->validate());
+					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+					$this->auditLogMapper->logAction(
+						$userId,
+						'user_working_time_model_ended',
+						'user_working_time_model',
+						$currentModel->getId(),
+						$oldValues,
+						$this->userWorkingTimeModelToAuditValues($updated),
+						$performedBy
+					);
+				}
 			}
-		}
+
+			$this->pruneOrphanedPersonalModels($userId, $performedBy);
+
+			return $updated;
+		}, $this->db);
 
 		if ($germanState !== null) {
 			if ($germanState === '') {
@@ -670,15 +707,29 @@ class AdminUserProfileUpdateService
 			}
 		}
 
-		$workingTimeModelIdRaw = $params['workingTimeModelId'] ?? null;
-		$workingTimeModelId = ($workingTimeModelIdRaw !== null && $workingTimeModelIdRaw !== '')
-			? (int)$workingTimeModelIdRaw
-			: null;
-		if ($workingTimeModelId !== null) {
-			try {
-				$this->workingTimeModelMapper->find($workingTimeModelId);
-			} catch (DoesNotExistException) {
-				throw new AdminUserProfileUpdateException($this->l10n->t('Working time model not found'), 404);
+		$customModel = is_array($params['customModel'] ?? null) ? $params['customModel'] : null;
+		$customEnabled = $customModel !== null
+			&& filter_var($customModel['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+		if ($customEnabled) {
+			$this->preflightCustomModel($customModel ?? []);
+		} else {
+			$workingTimeModelIdRaw = $params['workingTimeModelId'] ?? null;
+			$workingTimeModelId = ($workingTimeModelIdRaw !== null && $workingTimeModelIdRaw !== '')
+				? (int)$workingTimeModelIdRaw
+				: null;
+			if ($workingTimeModelId !== null) {
+				try {
+					$model = $this->workingTimeModelMapper->find($workingTimeModelId);
+				} catch (DoesNotExistException) {
+					throw new AdminUserProfileUpdateException($this->l10n->t('Working time model not found'), 404);
+				}
+				// Personal models are never assignable by id — the id of another
+				// employee's contract must not be an existence oracle nor a way
+				// to graft foreign hours onto this user. Same 404 as a missing
+				// model (uniform not-found, api-security-patterns §1).
+				if ($model->isPersonal()) {
+					throw new AdminUserProfileUpdateException($this->l10n->t('Working time model not found'), 404);
+				}
 			}
 		}
 
@@ -1076,5 +1127,240 @@ class AdminUserProfileUpdateService
 		}
 
 		return Constants::DEFAULT_VACATION_DAYS_PER_YEAR;
+	}
+
+	/**
+	 * Validate the per-employee contract block before any write happens.
+	 * A weekday schedule wins over the scalar fields — it carries per-day
+	 * start/end/break times and its net hours are the contract truth, so the
+	 * scalars (which the UI derives from the schedule) are only required when
+	 * no schedule was submitted.
+	 *
+	 * @param array<string, mixed> $custom
+	 */
+	private function preflightCustomModel(array $custom): void
+	{
+		$scheduleRaw = $custom['weekdaySchedule'] ?? null;
+		$hasSchedule = $scheduleRaw !== null && $scheduleRaw !== '';
+		if ($hasSchedule) {
+			if (!is_array($scheduleRaw)) {
+				throw new AdminUserProfileUpdateException(
+					$this->l10n->t('The individual weekday schedule is invalid'),
+					400,
+					['customWeekdaySchedule' => $this->l10n->t('The individual weekday schedule is invalid')]
+				);
+			}
+			$scheduleErrors = WeekdaySchedule::validate($scheduleRaw);
+			if ($scheduleErrors !== []) {
+				throw new AdminUserProfileUpdateException(
+					$this->l10n->t('The individual weekday schedule is invalid'),
+					400,
+					['customWeekdaySchedule' => $this->l10n->t('The individual weekday schedule is invalid')]
+				);
+			}
+			$net = WeekdaySchedule::fromValidated($scheduleRaw)->weeklyNetHours();
+			if ($net <= 0) {
+				throw new AdminUserProfileUpdateException(
+					$this->l10n->t('The individual weekday schedule has no working days'),
+					400,
+					['customWeekdaySchedule' => $this->l10n->t('The individual weekday schedule has no working days')]
+				);
+			}
+
+			return;
+		}
+
+		$fieldErrors = [];
+		$weekly = $this->parseDecimalInput($custom['weeklyHours'] ?? null, -1.0);
+		if ($weekly <= 0 || $weekly > 80) {
+			$fieldErrors['customWeeklyHours'] = $this->l10n->t('Weekly hours must be between 0 and 80');
+		}
+		$daily = $this->parseDecimalInput($custom['dailyHours'] ?? null, -1.0);
+		if ($daily <= 0 || $daily > 24) {
+			$fieldErrors['customDailyHours'] = $this->l10n->t('Daily hours must be between 0 and 24');
+		}
+		$days = $this->parseDecimalInput($custom['workDaysPerWeek'] ?? null, -1.0);
+		if ($days < 1 || $days > 7) {
+			$fieldErrors['customWorkDaysPerWeek'] = $this->l10n->t('Working days must be between 1 and 7');
+		}
+		if ($fieldErrors !== []) {
+			throw new AdminUserProfileUpdateException($this->l10n->t('Validation failed'), 400, $fieldErrors);
+		}
+	}
+
+	/**
+	 * Create or update the employee's personal working time model and return
+	 * its id. Reuses the model currently referenced by the editable
+	 * assignment when it is already this user's personal model; otherwise
+	 * adopts an unreferenced personal leftover (concurrent saves can produce
+	 * one) instead of growing rows. New models copy type, break rules, and
+	 * overtime rules from the previously assigned model so toggling
+	 * "individual hours" starts from the contract the admin saw — the
+	 * weekday_schedule key is deliberately NOT inherited: it would silently
+	 * override the scalar hours the admin just entered.
+	 *
+	 * @param array<string, mixed> $custom
+	 */
+	private function upsertPersonalWorkingTimeModel(
+		string $userId,
+		array $custom,
+		?UserWorkingTimeModel $currentModel,
+		string $performedBy
+	): int {
+		$scheduleRaw = $custom['weekdaySchedule'] ?? null;
+		$schedule = (is_array($scheduleRaw) && $scheduleRaw !== [] && WeekdaySchedule::validate($scheduleRaw) === [])
+			? WeekdaySchedule::fromValidated($scheduleRaw)
+			: null;
+
+		if ($schedule !== null) {
+			$weekly = $schedule->weeklyNetHours();
+			$daily = $schedule->averageDailyNetHours();
+			$days = $schedule->workDaysPerWeek();
+		} else {
+			$weekly = $this->parseDecimalInput($custom['weeklyHours'] ?? null, 0.0);
+			$daily = $this->parseDecimalInput($custom['dailyHours'] ?? null, 0.0);
+			$days = $this->parseDecimalInput($custom['workDaysPerWeek'] ?? null, 0.0);
+		}
+
+		$assigned = null;
+		if ($currentModel !== null) {
+			try {
+				$assigned = $this->workingTimeModelMapper->find($currentModel->getWorkingTimeModelId());
+			} catch (DoesNotExistException) {
+				$assigned = null;
+			}
+		}
+
+		$isNew = false;
+		if ($assigned !== null && $assigned->isPersonal() && $assigned->getUserId() === $userId) {
+			$model = $assigned;
+		} else {
+			$model = null;
+			foreach ($this->workingTimeModelMapper->findPersonalByUser($userId) as $candidate) {
+				if ($this->userWorkingTimeModelMapper->findByWorkingTimeModel($candidate->getId(), false) === []) {
+					$model = $candidate;
+					break;
+				}
+			}
+			if ($model === null) {
+				$isNew = true;
+				$model = new WorkingTimeModel();
+				$model->setUserId($userId);
+				$model->setName($this->l10n->t('Individual contract (%s)', [$userId]));
+				$model->setType($assigned !== null ? (string)$assigned->getType() : WorkingTimeModel::TYPE_FLEXIBLE);
+				$model->setIsDefault(false);
+				if ($assigned !== null && $assigned->getOvertimeRulesArray() !== null) {
+					$model->setOvertimeRulesArray($assigned->getOvertimeRulesArray());
+				}
+				$model->setCreatedAt(new \DateTime());
+			}
+		}
+
+		// Snapshot before mutation: the no-op check and the audit oldValues both
+		// need the pre-change state (schedule compare included — setBreakRulesArray
+		// below would overwrite it before the comparison ran).
+		$oldAuditValues = $isNew ? null : $this->personalModelAuditValues($model);
+		$oldScheduleArray = $isNew ? null : ($model->getWeekdaySchedule()?->toArray() ?? null);
+		$oldWeekly = $model->getWeeklyHours();
+		$oldDaily = $model->getDailyHours();
+		$oldDays = $model->getWorkDaysPerWeek();
+
+		// Break rules: keep (new: copied from the previous model, existing:
+		// own) everything except the weekday_schedule key, then re-attach the
+		// submitted schedule if there is one.
+		$baseRules = $isNew
+			? ($assigned !== null ? ($assigned->getBreakRulesArray() ?? []) : [])
+			: ($model->getBreakRulesArray() ?? []);
+		unset($baseRules[WeekdaySchedule::KEY]);
+		if ($schedule !== null) {
+			$baseRules[WeekdaySchedule::KEY] = $schedule->toArray();
+		}
+
+		$unchanged = !$isNew
+			&& $this->floatsEqual($oldWeekly, $weekly)
+			&& $this->floatsEqual($oldDaily, $daily)
+			&& $this->floatsEqual($oldDays, $days)
+			&& $oldScheduleArray === ($schedule?->toArray() ?? null)
+			&& ($model->getBreakRulesArray() ?? []) === $baseRules;
+		if ($unchanged) {
+			return $model->getId();
+		}
+
+		$model->setBreakRulesArray($baseRules !== [] ? $baseRules : null);
+		$model->setWeeklyHours($weekly);
+		$model->setDailyHours($daily);
+		$model->setWorkDaysPerWeek($days);
+		$model->setUpdatedAt(new \DateTime());
+		$this->assertEntityValid($model->validate());
+		if ($isNew) {
+			$model = $this->workingTimeModelMapper->insert($model);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'personal_working_time_model_created',
+				'working_time_model',
+				$model->getId(),
+				null,
+				$this->personalModelAuditValues($model),
+				$performedBy
+			);
+		} else {
+			$model = $this->workingTimeModelMapper->update($model);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'personal_working_time_model_updated',
+				'working_time_model',
+				$model->getId(),
+				$oldAuditValues,
+				$this->personalModelAuditValues($model),
+				$performedBy
+			);
+		}
+
+		return $model->getId();
+	}
+
+	/**
+	 * Remove personal models that were never referenced by any assignment.
+	 * Orphans appear when an admin toggles individual hours off again, or when
+	 * two concurrent saves each created one (the loser's stays unreferenced).
+	 * Models with historical assignments are kept — deleting them would
+	 * degrade assignment-history display, same trade-off as global model
+	 * deletion.
+	 */
+	private function pruneOrphanedPersonalModels(string $userId, string $performedBy): void
+	{
+		foreach ($this->workingTimeModelMapper->findPersonalByUser($userId) as $model) {
+			$refs = $this->userWorkingTimeModelMapper->findByWorkingTimeModel($model->getId(), false);
+			if ($refs !== []) {
+				continue;
+			}
+			$this->workingTimeModelMapper->delete($model);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'personal_working_time_model_deleted',
+				'working_time_model',
+				$model->getId(),
+				$this->personalModelAuditValues($model),
+				null,
+				$performedBy
+			);
+		}
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function personalModelAuditValues(WorkingTimeModel $model): array
+	{
+		return [
+			'id' => $model->getId(),
+			'userId' => $model->getUserId(),
+			'name' => $model->getName(),
+			'type' => $model->getType(),
+			'weeklyHours' => $model->getWeeklyHours(),
+			'dailyHours' => $model->getDailyHours(),
+			'workDaysPerWeek' => $model->getWorkDaysPerWeek(),
+			'weekdaySchedule' => $model->getWeekdaySchedule()?->toArray(),
+		];
 	}
 }

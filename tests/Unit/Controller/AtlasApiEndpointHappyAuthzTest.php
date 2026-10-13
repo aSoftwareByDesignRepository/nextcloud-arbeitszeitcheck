@@ -298,6 +298,9 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'OCA\ArbeitszeitCheck\Service\VacationEntitlementEngine::redactTraceForUser' => [],
 			'OCA\ArbeitszeitCheck\Service\TeamResolverService::getTeamMemberIds' => ['bob'],
 			'OCA\ArbeitszeitCheck\Db\WorkingTimeModel::validate' => [],
+			// Declared method (not __call): the generic entity fixture models a
+			// global org model — personal models 404 on global CRUD by design.
+			'OCA\ArbeitszeitCheck\Db\WorkingTimeModel::isPersonal' => false,
 			'OCA\ArbeitszeitCheck\Db\TariffRuleSet::validate' => [],
 			'OCA\ArbeitszeitCheck\Service\TimeZoneService::nowAsIso' => '2026-09-10T10:00:00Z',
 			'OCA\ArbeitszeitCheck\Service\TimeZoneService::storageTimeZoneName' => 'UTC',

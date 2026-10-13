@@ -74,13 +74,18 @@ test.describe('Work location marking (GH #43)', () => {
 		const page = await context.newPage()
 		try {
 			await login(page, credsFromEnv('EMPLOYEE'))
-			const created = await createEntry(page, { workLocation: 'home' })
+			const created = await createEntry(page, { workLocation: 'home', recentDays: true })
 			expect(created.success).toBe(true)
 			expect(created.entry?.workLocation ?? created.workLocation).toBe('home')
+			const id = created.entry?.id ?? created.id
+			expect(id).toBeTruthy()
 
+			// The list renders only the 100 most recent entries (findByUser($uid, 100),
+			// newest first) — the badge must be scoped to this entry's row or it can
+			// match a badge belonging to a different entry.
 			await page.goto('/apps/arbeitszeitcheck/time-entries')
 			await assertArbeitszeitcheckLoaded(page)
-			const badge = page.locator('.azc-work-location-badge').first()
+			const badge = page.locator(`tr[data-entry-id="${id}"] .azc-work-location-badge`)
 			await expect(badge).toBeVisible()
 			await expect(badge).toContainText(/home|Homeoffice/i)
 		} finally {

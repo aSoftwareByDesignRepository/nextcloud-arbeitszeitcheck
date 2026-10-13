@@ -35,6 +35,18 @@ function dbExec(sql) {
 	}
 }
 
+/**
+ * Satisfy the ArbZG §5 rest window for an e2e_* user so clock-in can succeed.
+ * A leftover shift ending < min_rest_period ago legitimately rejects clock-in —
+ * without this the race test's outcome depends on when the suite last ran.
+ */
+function ensureE2eClockReady(userId) {
+	execFileSync('docker', [
+		'compose', 'exec', '-T', '-u', 'www-data', 'nextcloud',
+		'php', 'occ', 'arbeitszeitcheck:ensure-e2e-clock', userId, '--force',
+	], { cwd: COMPOSE_CWD, encoding: 'utf8', timeout: 60_000 })
+}
+
 /** SELECT returning the first column of the first row, or null when unreachable. */
 function dbScalar(sql) {
 	try {
@@ -371,6 +383,8 @@ test.describe('MOMOS adversarial sweep', () => {
 				const w = await apiAllowFailure(emp, 'GET', `${APP}/api/dashboard-widget/employee`)
 				return w.json?.data?.timeCapture?.clockStampingEnabled
 			}, { timeout: 30_000, intervals: [1_000, 2_000, 3_000] }).not.toBe(false)
+			// Precondition: employee must be able to clock in (rest window satisfied).
+			ensureE2eClockReady(EMP)
 			const [_r1, _r2] = await Promise.all([
 				apiAllowFailure(emp, 'POST', `${APP}/api/clock/in`, { data: {} }),
 				apiAllowFailure(emp, 'POST', `${APP}/api/clock/in`, { data: {} }),

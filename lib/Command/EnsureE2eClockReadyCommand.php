@@ -86,32 +86,44 @@ class EnsureE2eClockReadyCommand extends Command
 		$minRestHours = max(1.0, min(24.0, $minRestHours));
 		$bufferHours = $minRestHours + 1.0;
 
-		$last = $this->timeEntryMapper->findLastCompletedByUser($userId);
-		if ($last === null || $last->getEndTime() === null) {
-			$io->writeln('No completed entry to adjust; clock-in should be allowed.');
-			$io->success('E2E clock ready for ' . $userId);
-			return Command::SUCCESS;
+		// Backdate every completed entry whose end still sits inside the rest
+		// window — a single-shot fix is not enough when e.g. a split shift left
+		// two recent ends. Use findLastCompletedBeforeTime so the loop tracks the
+		// same reference the clock-in check uses (future-dated ends excluded).
+		for ($i = 0; $i < 20; $i++) {
+			$now = new \DateTime();
+			$last = $this->timeEntryMapper->findLastCompletedBeforeTime($userId, $now);
+			if ($last === null || $last->getEndTime() === null) {
+				$io->writeln('No completed entry to adjust; clock-in should be allowed.');
+				break;
+			}
+
+			$end = $last->getEndTime();
+			$hoursSinceEnd = ($now->getTimestamp() - $end->getTimestamp()) / 3600;
+			if ($hoursSinceEnd >= $minRestHours) {
+				$io->writeln(sprintf('Last shift ended %.1f h ago (rest %.0f h satisfied).', $hoursSinceEnd, $minRestHours));
+				break;
+			}
+
+			$newEnd = (clone $now)->modify(sprintf('-%.0f hours', (int)ceil($bufferHours)));
+			$last->setEndTime($newEnd);
+			$last->setUpdatedAt($now);
+			$this->timeEntryMapper->update($last);
+			$io->writeln(sprintf(
+				'Backdated entry #%d end to %s (was within %.1f h rest window).',
+				$last->getId(),
+				$newEnd->format('Y-m-d H:i:s'),
+				$hoursSinceEnd,
+			));
 		}
 
-		$end = $last->getEndTime();
 		$now = new \DateTime();
-		$hoursSinceEnd = ($now->getTimestamp() - $end->getTimestamp()) / 3600;
-		if ($hoursSinceEnd >= $minRestHours) {
-			$io->writeln(sprintf('Last shift ended %.1f h ago (rest %.0f h satisfied).', $hoursSinceEnd, $minRestHours));
-			$io->success('E2E clock ready for ' . $userId);
-			return Command::SUCCESS;
+		$last = $this->timeEntryMapper->findLastCompletedBeforeTime($userId, $now);
+		if ($last !== null && $last->getEndTime() !== null
+			&& ($now->getTimestamp() - $last->getEndTime()->getTimestamp()) / 3600 < $minRestHours) {
+			$io->error(sprintf('Rest window still blocked by entry #%d after 20 adjustments.', $last->getId()));
+			return Command::FAILURE;
 		}
-
-		$newEnd = (clone $now)->modify(sprintf('-%.0f hours', (int)ceil($bufferHours)));
-		$last->setEndTime($newEnd);
-		$last->setUpdatedAt($now);
-		$this->timeEntryMapper->update($last);
-		$io->writeln(sprintf(
-			'Backdated entry #%d end to %s (was within %.1f h rest window).',
-			$last->getId(),
-			$newEnd->format('Y-m-d H:i:s'),
-			$hoursSinceEnd,
-		));
 
 		$io->success('E2E clock ready for ' . $userId);
 		return Command::SUCCESS;

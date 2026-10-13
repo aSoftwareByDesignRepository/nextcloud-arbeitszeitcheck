@@ -328,7 +328,7 @@ class CommandCoveragePart2Test extends TestCase
 		$mapper = $this->createMock(TimeEntryMapper::class);
 		$mapper->method('findActiveByUser')->willReturn(null);
 		$mapper->method('findOnBreakByUser')->willReturn(null);
-		$mapper->method('findLastCompletedByUser')->willReturn(null);
+		$mapper->method('findLastCompletedBeforeTime')->willReturn(null);
 		$mapper->expects($this->never())->method('update');
 
 		[$code, $display] = $this->runCmd($this->clockReadyCmd(['userManager' => $um, 'timeEntryMapper' => $mapper]), ['user_id' => 'e2e_a'], ['--force' => true]);
@@ -350,7 +350,7 @@ class CommandCoveragePart2Test extends TestCase
 		$mapper = $this->createMock(TimeEntryMapper::class);
 		$mapper->method('findActiveByUser')->willReturn($active);
 		$mapper->method('findOnBreakByUser')->willReturn(null);
-		$mapper->method('findLastCompletedByUser')->willReturn($last);
+		$mapper->method('findLastCompletedBeforeTime')->willReturn($last);
 		$mapper->expects($this->once())->method('update')
 			->with($this->callback(static fn (TimeEntry $e) => $e->getEndTime() < new \DateTime('-11 hours')));
 
@@ -376,8 +376,39 @@ class CommandCoveragePart2Test extends TestCase
 		$mapper = $this->createMock(TimeEntryMapper::class);
 		$mapper->method('findActiveByUser')->willReturn(null);
 		$mapper->method('findOnBreakByUser')->willReturn(null);
-		$mapper->method('findLastCompletedByUser')->willReturn($last);
+		$mapper->method('findLastCompletedBeforeTime')->willReturn($last);
 		$mapper->expects($this->never())->method('update');
+
+		[$code] = $this->runCmd($this->clockReadyCmd(['userManager' => $um, 'timeEntryMapper' => $mapper]), ['user_id' => 'e2e_a'], ['--force' => true]);
+		$this->assertSame(Command::SUCCESS, $code);
+	}
+
+	public function testE2eClockBackdatesEveryEntryInsideRestWindow(): void
+	{
+		$um = $this->createMock(IUserManager::class);
+		$um->method('userExists')->willReturn(true);
+
+		// Two completed ends inside the rest window (e.g. split shift) — the
+		// second stays hidden behind the first and must be backdated too.
+		$e1 = new TimeEntry();
+		$e1->setUserId('e2e_a');
+		$e1->setEndTime(new \DateTime('-30 minutes'));
+		$e2 = new TimeEntry();
+		$e2->setUserId('e2e_a');
+		$e2->setEndTime(new \DateTime('-40 minutes'));
+
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('findActiveByUser')->willReturn(null);
+		$mapper->method('findOnBreakByUser')->willReturn(null);
+		$mapper->method('findLastCompletedBeforeTime')->willReturnCallback(
+			static function () use ($e1, $e2) {
+				$e1End = $e1->getEndTime();
+				$e2End = $e2->getEndTime();
+				return ($e1End !== null && $e2End !== null && $e1End > $e2End) ? $e1 : $e2;
+			}
+		);
+		$mapper->expects($this->exactly(2))->method('update')
+			->with($this->callback(static fn (TimeEntry $e) => $e->getEndTime() < new \DateTime('-11 hours')));
 
 		[$code] = $this->runCmd($this->clockReadyCmd(['userManager' => $um, 'timeEntryMapper' => $mapper]), ['user_id' => 'e2e_a'], ['--force' => true]);
 		$this->assertSame(Command::SUCCESS, $code);

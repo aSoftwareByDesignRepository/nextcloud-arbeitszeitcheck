@@ -14,9 +14,18 @@
 
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
-    const API = (Utils.resolveUrl || (window.OC && window.OC.generateUrl) || ((p) => p))(
-        '/apps/arbeitszeitcheck/api/admin/absence-types'
-    );
+
+    // resolveUrl is a method using `this` — call it on Utils, not unbound.
+    function generateUrl(path) {
+        if (Utils.resolveUrl) {
+            return Utils.resolveUrl(path);
+        }
+        if (window.OC && typeof window.OC.generateUrl === 'function') {
+            return window.OC.generateUrl(path);
+        }
+        return path;
+    }
+    const API = generateUrl('/apps/arbeitszeitcheck/api/admin/absence-types');
 
     /** Guard against double Enter / double-click save races. */
     let editorSaveInflight = false;

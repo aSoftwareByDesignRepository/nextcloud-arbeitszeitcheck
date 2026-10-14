@@ -129,3 +129,59 @@ test.describe('Bachus theme × viewport: dashboard + calendar', () => {
 		expect(USER_THEMES.length).toBeGreaterThan(0)
 	})
 })
+
+test.describe('Bachus theme × viewport: admin surfaces', () => {
+	test.setTimeout(240_000)
+	test.skip(!process.env.NC_ADMIN_USER, 'Requires NC_ADMIN_USER / NC_ADMIN_PASS')
+
+	const adminViewports = [320, 375, 768, 1024, 1280]
+
+	for (const theme of ['light', 'dark', 'dark-highcontrast']) {
+		test(`${theme}: custom absence types — table + inline editor + overflow`, async ({ page }) => {
+			await loginAs(page, 'ADMIN')
+			await gotoApp(page, '/apps/arbeitszeitcheck/admin/absence-types')
+			await page.waitForSelector('#cat-table', { timeout: 30_000 })
+			await setUserTheme(page, theme)
+
+			for (const vp of adminViewports) {
+				await page.setViewportSize({ width: vp, height: 800 })
+				await expectNoHorizontalOverflow(page, `${theme}/absence-types@${vp}`)
+			}
+
+			// Open the inline editor at the narrowest viewport — the densest region.
+			await page.setViewportSize({ width: 320, height: 640 })
+			await page.click('#cat-create')
+			await expect(page.locator('#cat-label')).toBeVisible({ timeout: 15000 })
+			await expectNoHorizontalOverflow(page, `${theme}/absence-types-editor@320`)
+			await runAxeApp(page, `${theme}/absence-types-editor@320`)
+		})
+
+		test(`${theme}: user detail — personal-model editor + overflow`, async ({ page }) => {
+			await loginAs(page, 'ADMIN')
+			const userId = process.env.NC_EMPLOYEE_USER || 'e2e_employee'
+			await gotoApp(page, `/apps/arbeitszeitcheck/admin/users/${encodeURIComponent(userId)}`)
+			// Form is client-rendered; the personal-model toggle proves it loaded.
+			await page.waitForSelector('#user-custom-model-enabled', { timeout: 30_000 })
+			await setUserTheme(page, theme)
+
+			for (const vp of adminViewports) {
+				await page.setViewportSize({ width: vp, height: 800 })
+				await expectNoHorizontalOverflow(page, `${theme}/user-detail@${vp}`)
+			}
+
+			// Expand the individual-contract block at mobile width and re-check.
+			await page.setViewportSize({ width: 375, height: 812 })
+			await page.check('#user-custom-model-enabled')
+			await expect(page.locator('#user-custom-model-fields')).toBeVisible()
+			await expectNoHorizontalOverflow(page, `${theme}/user-detail-personal-model@375`)
+			await runAxeApp(page, `${theme}/user-detail@375`)
+		})
+	}
+
+	test('reset admin theme after admin matrix', async ({ page }) => {
+		await loginAs(page, 'ADMIN')
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/absence-types')
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 })
+		await resetUserTheme(page)
+	})
+})

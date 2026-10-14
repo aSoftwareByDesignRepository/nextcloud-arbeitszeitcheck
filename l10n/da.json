@@ -5353,7 +5353,7 @@
         "Default work location": "Standardarbejdssted",
         "External appointment": "Ekstern aftale",
         "External appointment days": "Dage med eksterne aftaler",
-        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.",
+        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Indgår i rapporterne om hjemmearbejde og rejser — f.eks. hjemmearbejdstillægget eller dokumentation til transportselskabet.",
         "Home office days": "Hjemmearbejdsdage",
         "Invalid work location.": "Ugyldigt arbejdssted.",
         "Keep current location": "Behold nuværende sted",
@@ -5369,7 +5369,17 @@
         "Work location days": "Dage pr. arbejdssted",
         "month_closure_pdf_label_work_location_days": "Dage pr. arbejdssted",
         "month_closure_pdf_work_location_days_detail": "Hjemmearbejde: %1$s, eksterne aftaler: %2$s dage",
-        "Not specified (remove mark)": "Ikke angivet (fjern markering)"
+        "Not specified (remove mark)": "Ikke angivet (fjern markering)",
+        "Could not open the confirmation. Please reload the page and try again.": "Bekræftelsen kunne ikke åbnes. Genindlæs siden, og prøv igen.",
+        "Delete absence type?": "Slet fraværstype?",
+        "Average contract hours per working day.": "Gennemsnitlige kontraktimer pr. arbejdsdag.",
+        "Contract hours per week (e.g. 38.5).": "Kontraktimer pr. uge (f.eks. 38,5).",
+        "Individual contract": "Individuel kontrakt",
+        "Individual contract hours": "Individuelle kontraktimer",
+        "On how many days per week this person works (1–7).": "Hvor mange dage om ugen denne person arbejder (1–7).",
+        "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lønnummer til DATEV-eksport. Lad stå tomt, hvis denne person ikke eksporteres til DATEV.",
+        "Up to 8 digits. Required for DATEV export of this employee.": "Op til 8 cifre. Påkrævet for DATEV-eksport af denne medarbejder.",
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Brug dette, når kontrakten ikke passer til nogen delt arbejdstidsmodel. Uge- og dagtimerne nedenfor gælder kun for denne medarbejder."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

@@ -5361,7 +5361,17 @@
 	"Work location days" : "Dias por local de trabalho",
 	"month_closure_pdf_label_work_location_days" : "Dias por local de trabalho",
 	"month_closure_pdf_work_location_days_detail" : "Home office: %1$s, compromissos externos: %2$s dias",
-	"Not specified (remove mark)" : "Não especificado (remover a marca)"
+	"Not specified (remove mark)" : "Não especificado (remover a marca)",
+	"Could not open the confirmation. Please reload the page and try again." : "Não foi possível abrir a confirmação. Recarregue a página e tente novamente.",
+	"Delete absence type?" : "Excluir tipo de ausência?",
+	"Average contract hours per working day." : "Horas contratuais médias por dia útil.",
+	"Contract hours per week (e.g. 38.5)." : "Horas contratuais por semana (ex.: 38,5).",
+	"Individual contract" : "Contrato individual",
+	"Individual contract hours" : "Horas contratuais individuais",
+	"On how many days per week this person works (1–7)." : "Em quantos dias por semana esta pessoa trabalha (1–7).",
+	"Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV." : "Número de folha de pagamento para exportação DATEV. Deixe vazio se esta pessoa não for exportada para o DATEV.",
+	"Up to 8 digits. Required for DATEV export of this employee." : "Até 8 dígitos. Obrigatório para a exportação DATEV deste funcionário.",
+	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Use quando o contrato não corresponder a nenhum modelo de horário compartilhado. As horas semanais e diárias abaixo se aplicam apenas a este funcionário."
 	}
 );
 }});})();

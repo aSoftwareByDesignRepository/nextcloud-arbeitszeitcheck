@@ -14,7 +14,9 @@
 
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
-    const API = '/apps/arbeitszeitcheck/api/admin/absence-types';
+    const API = (Utils.resolveUrl || (window.OC && window.OC.generateUrl) || ((p) => p))(
+        '/apps/arbeitszeitcheck/api/admin/absence-types'
+    );
 
     /** Guard against double Enter / double-click save races. */
     let editorSaveInflight = false;
@@ -325,13 +327,28 @@
         });
     }
 
-    function confirmDelete(btn) {
+    async function confirmDelete(btn) {
         const id = btn.getAttribute('data-type-id');
         const name = btn.getAttribute('data-type-name') || '';
         const inUse = parseInt(btn.getAttribute('data-in-use') || '0', 10) > 0;
         const template = msg(inUse ? 'confirmDelete' : 'confirmDeleteUnused', 'Delete this absence type?');
         const text = template.replace('{name}', name);
-        if (!window.confirm(text)) {
+        // Accessible confirm — never window.confirm; helper fails closed (§7.3).
+        const Components = window.AzcComponents || window.ArbeitszeitCheckComponents;
+        if (!Components || typeof Components.confirmDialog !== 'function') {
+            if (Messaging.showError) {
+                Messaging.showError(msg('confirmUnavailable', 'Could not open the confirmation. Please reload the page and try again.'));
+            }
+            return;
+        }
+        const result = await Components.confirmDialog({
+            title: msg('confirmDeleteTitle', 'Delete absence type?'),
+            message: text,
+            confirmLabel: msg('delete', 'Delete'),
+            cancelLabel: msg('cancel', 'Cancel'),
+            variant: 'destructive',
+        });
+        if (result !== true && !(result && result.confirmed)) {
             return;
         }
         btn.disabled = true;

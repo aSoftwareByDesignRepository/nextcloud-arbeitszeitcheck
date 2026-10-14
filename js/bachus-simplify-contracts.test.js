@@ -1,11 +1,37 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+function* jsFiles(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      yield* jsFiles(full)
+    } else if (entry.name.endsWith('.js') && !entry.name.endsWith('.test.js')) {
+      yield full
+    }
+  }
+}
+
 describe('Bachus simplify source contracts', () => {
+  it('no production JS uses native blocking dialogs (confirmDialog only, §7.3)', () => {
+    const offenders = []
+    for (const file of jsFiles(path.join(root, 'js'))) {
+      const src = readFileSync(file, 'utf8')
+      // Strip block + line comments so documentation mentions don't flag.
+      const code = src
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .map((line) => line.replace(/\/\/.*$/, ''))
+        .join('\n')
+      const hits = code.match(/window\.(confirm|alert|prompt)\s*\(/g)
+      if (hits) offenders.push(path.relative(root, file) + ': ' + hits.join(', '))
+    }
+    expect(offenders, 'native dialogs found — use AzcComponents.confirmDialog').toEqual([])
+  })
   it('admin overtime Nullung exposes one primary reset; custom fields stay in details', () => {
     const src = readFileSync(path.join(root, 'js/admin-user-detail.js'), 'utf8')
     expect(src).toContain('btn-overtime-adj-reset')

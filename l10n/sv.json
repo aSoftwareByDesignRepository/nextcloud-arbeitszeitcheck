@@ -5353,7 +5353,7 @@
         "Default work location": "Standardarbetsplats",
         "External appointment": "Externt möte",
         "External appointment days": "Dagar med externa möten",
-        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.",
+        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Matar rapporterna för distansarbete och resor — t.ex. distansarbetstillägget eller underlag för transportbolaget.",
         "Home office days": "Hemmakontorsdagar",
         "Invalid work location.": "Ogiltig arbetsplats.",
         "Keep current location": "Behåll nuvarande plats",
@@ -5369,7 +5369,17 @@
         "Work location days": "Dagar per arbetsplats",
         "month_closure_pdf_label_work_location_days": "Dagar per arbetsplats",
         "month_closure_pdf_work_location_days_detail": "Hemmakontor: %1$s, externa möten: %2$s dagar",
-        "Not specified (remove mark)": "Ej angivet (ta bort markering)"
+        "Not specified (remove mark)": "Ej angivet (ta bort markering)",
+        "Could not open the confirmation. Please reload the page and try again.": "Bekräftelsen kunde inte öppnas. Ladda om sidan och försök igen.",
+        "Delete absence type?": "Ta bort frånvarotyp?",
+        "Average contract hours per working day.": "Genomsnittliga kontraktstimmar per arbetsdag.",
+        "Contract hours per week (e.g. 38.5).": "Kontraktstimmar per vecka (t.ex. 38,5).",
+        "Individual contract": "Individuellt kontrakt",
+        "Individual contract hours": "Individuella kontraktstimmar",
+        "On how many days per week this person works (1–7).": "Hur många dagar i veckan denna person arbetar (1–7).",
+        "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lönenummer för DATEV-export. Lämna tomt om personen inte exporteras till DATEV.",
+        "Up to 8 digits. Required for DATEV export of this employee.": "Upp till 8 siffror. Krävs för DATEV-export av denna anställd.",
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Använd när kontraktet inte matchar någon delad arbetstidsmodell. Vecko- och dagtimmarna nedan gäller bara denna anställd."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

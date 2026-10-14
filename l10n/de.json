@@ -5353,7 +5353,7 @@
         "Default work location": "Standard-Arbeitsort",
         "External appointment": "Außentermin",
         "External appointment days": "Außentermin-Tage",
-        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.",
+        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Speist die Homeoffice- und Reiseberichte — zum Beispiel die Homeoffice-Pauschale oder den Nachweis für das Verkehrsmittel.",
         "Home office days": "Homeoffice-Tage",
         "Invalid work location.": "Ungültiger Arbeitsort.",
         "Keep current location": "Aktuellen Arbeitsort beibehalten",
@@ -5369,7 +5369,17 @@
         "Work location days": "Tage nach Arbeitsort",
         "month_closure_pdf_label_work_location_days": "Tage nach Arbeitsort",
         "month_closure_pdf_work_location_days_detail": "Homeoffice: %1$s, Außentermine: %2$s Tage",
-        "Not specified (remove mark)": "Nicht angegeben (Markierung entfernen)"
+        "Not specified (remove mark)": "Nicht angegeben (Markierung entfernen)",
+        "Could not open the confirmation. Please reload the page and try again.": "Die Bestätigung konnte nicht geöffnet werden. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+        "Delete absence type?": "Abwesenheitstyp löschen?",
+        "Average contract hours per working day.": "Durchschnittliche Vertragsstunden pro Arbeitstag.",
+        "Contract hours per week (e.g. 38.5).": "Vertragsstunden pro Woche (z. B. 38,5).",
+        "Individual contract": "Individueller Vertrag",
+        "Individual contract hours": "Individuelle Vertragsstunden",
+        "On how many days per week this person works (1–7).": "An wie vielen Tagen pro Woche diese Person arbeitet (1–7).",
+        "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Personalnummer für den DATEV-Export. Leer lassen, wenn diese Person nicht nach DATEV exportiert wird.",
+        "Up to 8 digits. Required for DATEV export of this employee.": "Bis zu 8 Ziffern. Erforderlich für den DATEV-Export dieses Mitarbeiters.",
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Verwenden Sie diese Option, wenn der Vertrag keinem gemeinsamen Arbeitszeitmodell entspricht. Die folgenden Wochen- und Tagesstunden gelten nur für diesen Mitarbeiter."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

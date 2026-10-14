@@ -5345,7 +5345,7 @@
 	"Default work location" : "Domyślne miejsce pracy",
 	"External appointment" : "Spotkanie zewnętrzne",
 	"External appointment days" : "Dni spotkań zewnętrznych",
-	"Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence." : "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.",
+	"Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence." : "Zasila raporty o pracy zdalnej i podróżach służbowych — np. dodatek za pracę zdalną lub dowód dla przewoźnika.",
 	"Home office days" : "Dni pracy zdalnej",
 	"Invalid work location." : "Nieprawidłowe miejsce pracy.",
 	"Keep current location" : "Zachowaj bieżącą lokalizację",
@@ -5361,7 +5361,17 @@
 	"Work location days" : "Dni wg miejsca pracy",
 	"month_closure_pdf_label_work_location_days" : "Dni wg miejsca pracy",
 	"month_closure_pdf_work_location_days_detail" : "Praca zdalna: %1$s, spotkania zewnętrzne: %2$s dni",
-	"Not specified (remove mark)" : "Nie określono (usuń oznaczenie)"
+	"Not specified (remove mark)" : "Nie określono (usuń oznaczenie)",
+	"Could not open the confirmation. Please reload the page and try again." : "Nie można otworzyć potwierdzenia. Odśwież stronę i spróbuj ponownie.",
+	"Delete absence type?" : "Usunąć typ nieobecności?",
+	"Average contract hours per working day." : "Średnie godziny umowne na dzień roboczy.",
+	"Contract hours per week (e.g. 38.5)." : "Godziny umowne tygodniowo (np. 38,5).",
+	"Individual contract" : "Umowa indywidualna",
+	"Individual contract hours" : "Indywidualne godziny umowne",
+	"On how many days per week this person works (1–7)." : "Ile dni w tygodniu pracuje ta osoba (1–7).",
+	"Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV." : "Numer płacowy do eksportu DATEV. Pozostaw puste, jeśli ta osoba nie jest eksportowana do DATEV.",
+	"Up to 8 digits. Required for DATEV export of this employee." : "Do 8 cyfr. Wymagane do eksportu DATEV tego pracownika.",
+	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Użyj, gdy umowa nie pasuje do żadnego wspólnego modelu czasu pracy. Poniższe godziny tygodniowe i dzienne dotyczą tylko tego pracownika."
 	}
 );
 }});})();

@@ -45,6 +45,36 @@ function futureWeekday(daysAhead) {
 	return d.toISOString().slice(0, 10)
 }
 
+/**
+ * First future weekday not covered by an existing absence of the logged-in
+ * user — other specs may leave absences behind, so a fixed offset is flaky.
+ */
+async function freeWeekday(page, daysAhead) {
+	// Date-range filter avoids the default 25-row list cap hiding conflicts.
+	const from = futureWeekday(0)
+	const to = futureWeekday(daysAhead + 400)
+	const list = await apiAllowFailure(page, 'GET',
+		`${APP}/api/absences?start_date=${from}&end_date=${to}&limit=500`)
+	const rows = list?.json?.absences || []
+	const covered = new Set()
+	for (const r of rows) {
+		const s = r.startDate || r.start_date
+		const e = r.endDate || r.end_date
+		if (!s || !e) continue
+		const cur = new Date(`${s}T00:00:00Z`)
+		const end = new Date(`${e}T00:00:00Z`)
+		while (cur <= end) {
+			covered.add(cur.toISOString().slice(0, 10))
+			cur.setUTCDate(cur.getUTCDate() + 1)
+		}
+	}
+	for (let ahead = daysAhead; ahead < daysAhead + 400; ahead++) {
+		const day = futureWeekday(ahead)
+		if (!covered.has(day)) return day
+	}
+	throw new Error('no free weekday found')
+}
+
 test.use({ trace: 'off' })
 test.describe.configure({ mode: 'serial' })
 
@@ -223,12 +253,70 @@ test.describe('Custom absence types (admin-defined)', () => {
 
 		// Crafted request must still be rejected server-side — a missing
 		// select option is not a security boundary.
-		const day = futureWeekday(21)
-		const crafted = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
-			data: { type: typeOf(t).code, start_date: day, end_date: day, reason: `e2e-crafted-${UNIQ}` },
-		})
+		let crafted = null
+		for (let ahead = 21; ahead < 200 && !crafted; ahead++) {
+			const day = await freeWeekday(page, ahead)
+			const attempt = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
+				data: { type: typeOf(t).code, start_date: day, end_date: day, reason: `e2e-crafted-${UNIQ}` },
+			})
+			// Skip residual overlap conflicts — we need the type-availability rejection.
+			if (!attempt.ok && /overlap|überschneid/i.test(String(attempt.json?.error || ''))) continue
+			crafted = attempt
+		}
+		expect(crafted, 'crafted request produced no response').toBeTruthy()
 		expect(crafted.ok, 'deactivated type must reject crafted create').toBe(false)
 		expect(String(crafted.json?.error || '')).toMatch(/no longer available|not.*available|nicht.*verf.gbar/i)
+	})
+
+	test('delete uses accessible confirmDialog — cancel keeps row, confirm deletes', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+		await gotoApp(page, `${APP}/admin/absence-types`)
+
+		const label = `E2E Custom dialog ${UNIQ}`
+		const created = await api(page, 'POST', `${APP}/api/admin/absence-types`, {
+			data: { label },
+		})
+		expect(typeOf(created).id).toBeTruthy()
+
+		// Fail closed: native dialogs must not appear (confirmDialog only, §7.3).
+		// If a native confirm fires, the accessible dialog never shows and this
+		// test fails on the toBeVisible below.
+		page.on('dialog', (d) => { void d.dismiss() })
+
+		await page.reload()
+		const row = page.locator('#cat-table tbody tr', { hasText: label })
+		await expect(row).toBeVisible({ timeout: 15000 })
+		const deleteBtn = row.locator('[data-action="cat-delete"]')
+		const deleteUrl = `/api/admin/absence-types/${typeOf(created).id}`
+
+		// 1) Cancel path: dialog opens, cancel leaves the row untouched and
+		//    sends no DELETE.
+		let deleteSeen = false
+		page.on('request', (req) => {
+			if (req.method() === 'DELETE' && req.url().includes(deleteUrl)) deleteSeen = true
+		})
+		await deleteBtn.click()
+		const confirmDialog = page.locator('.confirm-dialog[role="alertdialog"], .confirm-dialog[role="dialog"]')
+		await expect(confirmDialog).toBeVisible({ timeout: 10000 })
+		await expect(confirmDialog.locator('.confirm-dialog__message')).toContainText(label)
+		await expect(confirmDialog.locator('.confirm-dialog__confirm')).toBeVisible()
+		await confirmDialog.locator('.confirm-dialog__cancel').click()
+		await expect(confirmDialog).toHaveCount(0)
+		await page.waitForTimeout(400)
+		expect(deleteSeen, 'cancel must not send DELETE').toBe(false)
+		await expect(row).toBeVisible()
+
+		// 2) Confirm path: destructive action deletes the unused type.
+		const delResponse = page.waitForResponse(
+			(res) => res.request().method() === 'DELETE' && res.url().includes(deleteUrl),
+			{ timeout: 15000 },
+		)
+		await deleteBtn.click()
+		await expect(confirmDialog).toBeVisible({ timeout: 10000 })
+		await confirmDialog.locator('.confirm-dialog__confirm').click()
+		expect((await delResponse).ok()).toBeTruthy()
+		await page.waitForLoadState('load')
+		await expect(page.locator('#cat-table tbody tr', { hasText: label })).toHaveCount(0, { timeout: 15000 })
 	})
 
 	test('in-use delete deactivates; unused delete removes', async ({ page }) => {
@@ -244,16 +332,26 @@ test.describe('Custom absence types (admin-defined)', () => {
 		const gone = await apiAllowFailure(page, 'GET', `${APP}/api/admin/absence-types/${typeOf(unused).id}`)
 		expect(gone.status).toBe(404)
 
-		// Used → deactivate (insert absence via employee API)
+		// Used → deactivate (insert absence via employee API). Probe forward
+		// for a collision-free weekday — other specs may leave absences behind.
 		const used = await api(page, 'POST', `${APP}/api/admin/absence-types`, {
 			data: { label: `E2E Used inuse ${UNIQ}` },
 		})
 		await relogin(page, 'EMPLOYEE')
 		await gotoApp(page, `${APP}/absences`)
-		const day2 = futureWeekday(14)
-		const created = await api(page, 'POST', `${APP}/api/absences`, {
-			data: { type: typeOf(used).code, start_date: day2, end_date: day2, reason: `e2e-inuse-${UNIQ}` },
-		})
+		// Retry on overlap as a safety net — the list probe is best-effort.
+		let created = null
+		for (let ahead = 14; ahead < 120 && !created; ahead++) {
+			const day2 = await freeWeekday(page, ahead)
+			const attempt = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
+				data: { type: typeOf(used).code, start_date: day2, end_date: day2, reason: `e2e-inuse-${UNIQ}` },
+			})
+			if (attempt.ok) {
+				created = attempt.json
+			} else if (!/overlap|überschneid/i.test(String(attempt.json?.error || ''))) {
+				throw new Error(`unexpected absence-create failure: ${attempt.json?.error}`)
+			}
+		}
 		expect(created, 'absence with custom type must create').toBeTruthy()
 
 		await relogin(page, 'ADMIN')

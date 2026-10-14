@@ -344,6 +344,19 @@ window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.l10n.vacationCarryoverHelpDecimals = <?php echo json_encode($l->t('Up to two decimal places are allowed, e.g. 1.5 or 4.25 — comma or dot both work.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
     /* Individual contract hours / weekday schedule (admin-user-detail.js, auMsg()) */
+    window.ArbeitszeitCheck.l10n.individualContractOption = <?php echo json_encode($l->t('Individual contract'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.individualContractHours = <?php echo json_encode($l->t('Individual contract hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.individualContractHoursHelp = <?php echo json_encode($l->t('Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWeeklyHours = <?php echo json_encode($l->t('Weekly hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWeeklyHoursHelp = <?php echo json_encode($l->t('Contract hours per week (e.g. 38.5).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customDailyHours = <?php echo json_encode($l->t('Daily hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customDailyHoursHelp = <?php echo json_encode($l->t('Average contract hours per working day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWorkDaysPerWeek = <?php echo json_encode($l->t('Working days per week'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.customWorkDaysPerWeekHelp = <?php echo json_encode($l->t('On how many days per week this person works (1–7).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.sectionGuideDatev = <?php echo json_encode($l->t('Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.datevPersonal = <?php echo json_encode($l->t('DATEV Personalnummer'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.datevPersonalnummer = <?php echo json_encode($l->t('DATEV Personalnummer'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.datevPersonalnummerHelp = <?php echo json_encode($l->t('Up to 8 digits. Required for DATEV export of this employee.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.scheduleEndAfterStart = <?php echo json_encode($l->t('Each work day needs a start and an end that is later than the start.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.scheduleBreakIncomplete = <?php echo json_encode($l->t('Enter both break start and break end, or leave both empty.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.scheduleBreakOrder = <?php echo json_encode($l->t('The break end must be later than the break start.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

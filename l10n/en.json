@@ -5369,7 +5369,17 @@
         "Work location days": "Work location days",
         "month_closure_pdf_label_work_location_days": "Work location days",
         "month_closure_pdf_work_location_days_detail": "Home office: %1$s, external appointments: %2$s days",
-        "Not specified (remove mark)": "Not specified (remove mark)"
+        "Not specified (remove mark)": "Not specified (remove mark)",
+        "Could not open the confirmation. Please reload the page and try again.": "Could not open the confirmation. Please reload the page and try again.",
+        "Delete absence type?": "Delete absence type?",
+        "Average contract hours per working day.": "Average contract hours per working day.",
+        "Contract hours per week (e.g. 38.5).": "Contract hours per week (e.g. 38.5).",
+        "Individual contract": "Individual contract",
+        "Individual contract hours": "Individual contract hours",
+        "On how many days per week this person works (1–7).": "On how many days per week this person works (1–7).",
+        "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.",
+        "Up to 8 digits. Required for DATEV export of this employee.": "Up to 8 digits. Required for DATEV export of this employee.",
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

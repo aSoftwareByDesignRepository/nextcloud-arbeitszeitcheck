@@ -5353,7 +5353,7 @@
         "Default work location": "Standaard werklocatie",
         "External appointment": "Externe afspraak",
         "External appointment days": "Dagen met externe afspraken",
-        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.",
+        "Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.": "Voedt de rapportages over thuiswerken en reizen — bijvoorbeeld de thuiswerkvergoeding of het bewijs voor de vervoerder.",
         "Home office days": "Thuiswerkdagen",
         "Invalid work location.": "Ongeldige werklocatie.",
         "Keep current location": "Huidige locatie behouden",
@@ -5369,7 +5369,17 @@
         "Work location days": "Dagen per werklocatie",
         "month_closure_pdf_label_work_location_days": "Dagen per werklocatie",
         "month_closure_pdf_work_location_days_detail": "Thuiswerk: %1$s, externe afspraken: %2$s dagen",
-        "Not specified (remove mark)": "Niet opgegeven (markering verwijderen)"
+        "Not specified (remove mark)": "Niet opgegeven (markering verwijderen)",
+        "Could not open the confirmation. Please reload the page and try again.": "De bevestiging kon niet worden geopend. Vernieuw de pagina en probeer het opnieuw.",
+        "Delete absence type?": "Afwezigheidstype verwijderen?",
+        "Average contract hours per working day.": "Gemiddelde contracturen per werkdag.",
+        "Contract hours per week (e.g. 38.5).": "Contracturen per week (bijv. 38,5).",
+        "Individual contract": "Individueel contract",
+        "Individual contract hours": "Individuele contracturen",
+        "On how many days per week this person works (1–7).": "Op hoeveel dagen per week deze persoon werkt (1–7).",
+        "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Personeelsnummer voor DATEV-export. Laat leeg als deze persoon niet naar DATEV wordt geëxporteerd.",
+        "Up to 8 digits. Required for DATEV export of this employee.": "Maximaal 8 cijfers. Vereist voor DATEV-export van deze medewerker.",
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Gebruik dit als het contract niet overeenkomt met een gedeeld arbeidstijdmodel. De onderstaande week- en daguren gelden alleen voor deze medewerker."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

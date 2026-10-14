@@ -5380,7 +5380,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lønnummer til DATEV-eksport. Lad stå tomt, hvis denne person ikke eksporteres til DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Op til 8 cifre. Påkrævet for DATEV-eksport af denne medarbejder.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Brug dette, når kontrakten ikke passer til nogen delt arbejdstidsmodel. Uge- og dagtimerne nedenfor gælder kun for denne medarbejder.",
-        "The offline sync reference does not match this stamp.": "Offline-synkroniseringsreferencen matcher ikke denne stempling."
+        "The offline sync reference does not match this stamp.": "Offline-synkroniseringsreferencen matcher ikke denne stempling.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "En administrator opdaterer i øjeblikket fraværstypekataloget. Vent et øjeblik og prøv igen.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "En anden ændring af fraværstypekataloget er i gang. Vent et øjeblik og prøv igen.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "Kataloget over arbejdstidsmodeller opdateres i øjeblikket. Vent et øjeblik og prøv igen.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "Denne medarbejderprofil opdateres af en anden forespørgsel. Vent et øjeblik og prøv igen.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "Denne overarbejdssaldo opdateres af en anden forespørgsel. Vent et øjeblik og prøv igen.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "En anden fraværsændring er i gang på denne konto. Vent et øjeblik og prøv igen."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

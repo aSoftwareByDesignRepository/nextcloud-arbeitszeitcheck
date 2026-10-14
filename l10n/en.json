@@ -5380,7 +5380,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Up to 8 digits. Required for DATEV export of this employee.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.",
-        "The offline sync reference does not match this stamp.": "The offline sync reference does not match this stamp."
+        "The offline sync reference does not match this stamp.": "The offline sync reference does not match this stamp.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "An administrator is currently updating the absence type catalog. Please wait a moment and try again.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "Another change to the absence type catalog is in progress. Please wait a moment and try again.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "The working time model catalog is being updated. Please wait a moment and try again.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "This employee profile is being updated by another request. Please wait a moment and try again.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "This overtime balance is being updated by another request. Please wait a moment and try again.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "Another absence change is in progress on this account. Please wait a moment and try again."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

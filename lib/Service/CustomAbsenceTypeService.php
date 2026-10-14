@@ -27,6 +27,8 @@ use OCP\AppFramework\Db\TTransactional;
 use OCP\DB\Exception as DbException;
 use OCP\IDBConnection;
 use OCP\IL10N;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 
 class CustomAbsenceTypeService
 {
@@ -51,7 +53,31 @@ class CustomAbsenceTypeService
 		private readonly AuditLogMapper $auditLogMapper,
 		private readonly IDBConnection $db,
 		private readonly IL10N $l10n,
+		private readonly ILockingProvider $lockingProvider,
 	) {
+	}
+
+	/**
+	 * Every write mutates the catalog that absence create/update validates
+	 * against — serialize it so a delete can never orphan an in-flight
+	 * absence (deleteOrDeactivate's count→delete is only safe while no
+	 * creatable-type check is concurrently in flight).
+	 */
+	private function atomicWithCatalogLock(callable $callback): mixed
+	{
+		$this->lockingProvider->acquireLock(
+			DbLockKeys::absenceTypeCatalog(),
+			ILockingProvider::LOCK_EXCLUSIVE,
+			'Custom absence type catalog write',
+		);
+		try {
+			return $this->atomic($callback, $this->db);
+		} finally {
+			$this->lockingProvider->releaseLock(
+				DbLockKeys::absenceTypeCatalog(),
+				ILockingProvider::LOCK_EXCLUSIVE,
+			);
+		}
 	}
 
 	/**
@@ -105,7 +131,7 @@ class CustomAbsenceTypeService
 		$type->setUpdatedBy($performedBy);
 
 		try {
-			$saved = $this->atomic(function () use ($type, $performedBy) {
+			$saved = $this->atomicWithCatalogLock(function () use ($type, $performedBy) {
 				if ($this->mapper->codeExists($type->getCode())) {
 					throw new CustomAbsenceTypeCodeTakenException();
 				}
@@ -121,6 +147,8 @@ class CustomAbsenceTypeService
 				);
 				return $inserted;
 			}, $this->db);
+		} catch (LockedException $e) {
+			return $this->catalogBusy();
 		} catch (CustomAbsenceTypeCodeTakenException | DbException $e) {
 			// Unique-index race: another request created the same code first.
 			return ['data' => null, 'errors' => ['code' => $this->l10n->t('This identifier is already in use. Please choose a different one.')], 'code' => 409];
@@ -151,19 +179,23 @@ class CustomAbsenceTypeService
 		$type->setUpdatedAt(new \DateTime());
 		$type->setUpdatedBy($performedBy);
 
-		$updated = $this->atomic(function () use ($type, $oldValues, $performedBy) {
-			$updated = $this->mapper->update($type);
-			$this->auditLogMapper->logAction(
-				$performedBy,
-				self::ACTION_UPDATED,
-				self::ENTITY_TYPE,
-				$updated->getId(),
-				$oldValues,
-				$updated->getSummary(),
-				$performedBy,
-			);
-			return $updated;
-		}, $this->db);
+		try {
+			$updated = $this->atomicWithCatalogLock(function () use ($type, $oldValues, $performedBy) {
+				$updated = $this->mapper->update($type);
+				$this->auditLogMapper->logAction(
+					$performedBy,
+					self::ACTION_UPDATED,
+					self::ENTITY_TYPE,
+					$updated->getId(),
+					$oldValues,
+					$updated->getSummary(),
+					$performedBy,
+				);
+				return $updated;
+			}, $this->db);
+		} catch (LockedException $e) {
+			return $this->catalogBusy();
+		}
 
 		AbsenceTypeCatalog::resetCustomTypeCache();
 		return ['data' => $updated->getSummary(), 'errors' => [], 'code' => 200];
@@ -178,7 +210,7 @@ class CustomAbsenceTypeService
 	public function deleteOrDeactivate(int $id, string $performedBy): array
 	{
 		try {
-			$result = $this->atomic(function () use ($id, $performedBy) {
+			$result = $this->atomicWithCatalogLock(function () use ($id, $performedBy) {
 				$type = $this->mapper->find($id);
 				$oldValues = $type->getSummary();
 				$usage = $this->mapper->countAbsenceUsage($type->getCode());
@@ -202,10 +234,28 @@ class CustomAbsenceTypeService
 			}, $this->db);
 		} catch (DoesNotExistException $e) {
 			return ['data' => null, 'errors' => [], 'code' => 404];
+		} catch (LockedException $e) {
+			return $this->catalogBusy();
 		}
 
 		AbsenceTypeCatalog::resetCustomTypeCache();
 		return ['data' => $result, 'errors' => [], 'code' => 200];
+	}
+
+	/**
+	 * Fail-fast lock contention must surface as a retryable 409, never a
+	 * masked 500 — clients need to distinguish "busy, retry" from failure.
+	 *
+	 * @return array{data: ?array<string,mixed>, errors: array<string,string>, code: int, error: string}
+	 */
+	private function catalogBusy(): array
+	{
+		return [
+			'data' => null,
+			'errors' => [],
+			'code' => 409,
+			'error' => $this->l10n->t('Another change to the absence type catalog is in progress. Please wait a moment and try again.'),
+		];
 	}
 
 	/**

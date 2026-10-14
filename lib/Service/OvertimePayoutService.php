@@ -33,6 +33,7 @@ class OvertimePayoutService
 		private readonly NotificationService $notificationService,
 		private readonly OvertimePayoutMailService $payoutMailService,
 		private readonly IConfig $config,
+		private readonly \OCP\Lock\ILockingProvider $lockingProvider,
 	) {
 	}
 
@@ -239,53 +240,94 @@ class OvertimePayoutService
 			];
 		}
 
-		$entity = new OvertimePayout();
-		$entity->setUserId($userId);
-		$entity->setCalendarYear($year);
-		$entity->setCalendarMonth($month);
-		$entity->setHoursPaid(round($eligible, 2));
-		$entity->setEffectiveBalanceBefore($effectiveBefore);
-		$entity->setEffectiveBalanceAfter($effectiveAfter);
-		$entity->setRawBalanceBefore((float)$snapshot['raw_balance']);
-		$entity->setBankMaxHours($bankMax);
-		$entity->setProcessedBy($actorUserId);
-		$entity->setCreatedAt(new \DateTime());
-
-		try {
-			$saved = $this->payoutMapper->insertPayout($entity);
-		} catch (\OCP\DB\Exception $e) {
+		$outcome = $this->withOvertimeBalanceLock($userId, function () use ($userId, $year, $month, $actorUserId): array {
+			// Re-check under the lock: an adjustment or payout may have landed
+			// between the unlocked snapshot read above and now.
 			if ($this->payoutMapper->existsForUserAndMonth($userId, $year, $month)) {
 				return ['action' => 'skipped_already_paid', 'user_id' => $userId];
 			}
-			throw $e;
+
+			$snapshot = $this->bankService->getMonthEndSnapshot($userId, $year, $month);
+			$eligible = (float)$snapshot['payout_eligible_hours'];
+			if ($eligible < 0.01) {
+				return ['action' => 'skipped_zero', 'user_id' => $userId, 'payout_eligible_hours' => $eligible];
+			}
+			$bankMax = (float)$snapshot['bank_max_hours'];
+			$effectiveBefore = (float)$snapshot['effective_balance'];
+			$effectiveAfter = round(min($effectiveBefore, $bankMax), 2);
+
+			$entity = new OvertimePayout();
+			$entity->setUserId($userId);
+			$entity->setCalendarYear($year);
+			$entity->setCalendarMonth($month);
+			$entity->setHoursPaid(round($eligible, 2));
+			$entity->setEffectiveBalanceBefore($effectiveBefore);
+			$entity->setEffectiveBalanceAfter($effectiveAfter);
+			$entity->setRawBalanceBefore((float)$snapshot['raw_balance']);
+			$entity->setBankMaxHours($bankMax);
+			$entity->setProcessedBy($actorUserId);
+			$entity->setCreatedAt(new \DateTime());
+
+			try {
+				$saved = $this->payoutMapper->insertPayout($entity);
+			} catch (\OCP\DB\Exception $e) {
+				if ($this->payoutMapper->existsForUserAndMonth($userId, $year, $month)) {
+					return ['action' => 'skipped_already_paid', 'user_id' => $userId];
+				}
+				throw $e;
+			}
+			$payoutArray = $this->entityToArray($saved);
+
+			$this->auditLogMapper->logAction(
+				$userId,
+				'overtime_payout_processed',
+				'overtime_payout',
+				$saved->getId(),
+				null,
+				[
+					'year' => $year,
+					'month' => $month,
+					'hours_paid' => $saved->getHoursPaid(),
+					'effective_balance_before' => $saved->getEffectiveBalanceBefore(),
+					'effective_balance_after' => $saved->getEffectiveBalanceAfter(),
+					'bank_max_hours' => $saved->getBankMaxHours(),
+					'raw_balance_before' => $saved->getRawBalanceBefore(),
+				],
+				$actorUserId
+			);
+
+			return [
+				'action' => 'paid',
+				'user_id' => $userId,
+				'payout' => $payoutArray,
+			];
+		});
+
+		// Employee notification deliberately outside the lock.
+		if (($outcome['action'] ?? '') === 'paid' && isset($outcome['payout'])) {
+			$this->notifyEmployeeAfterPayout($userId, $outcome['payout']);
 		}
-		$payoutArray = $this->entityToArray($saved);
 
-		$this->auditLogMapper->logAction(
-			$userId,
-			'overtime_payout_processed',
-			'overtime_payout',
-			$saved->getId(),
-			null,
-			[
-				'year' => $year,
-				'month' => $month,
-				'hours_paid' => $saved->getHoursPaid(),
-				'effective_balance_before' => $saved->getEffectiveBalanceBefore(),
-				'effective_balance_after' => $saved->getEffectiveBalanceAfter(),
-				'bank_max_hours' => $saved->getBankMaxHours(),
-				'raw_balance_before' => $saved->getRawBalanceBefore(),
-			],
-			$actorUserId
-		);
+		return $outcome;
+	}
 
-		$this->notifyEmployeeAfterPayout($userId, $payoutArray);
-
-		return [
-			'action' => 'paid',
-			'user_id' => $userId,
-			'payout' => $payoutArray,
-		];
+	/**
+	 * Serialize per-user Saldo mutations against {@see OvertimeAdjustmentService} —
+	 * both write the balance_before/after audit chain for the same ledger.
+	 *
+	 * @template T
+	 * @param callable():T $callback
+	 * @return T
+	 */
+	private function withOvertimeBalanceLock(string $userId, callable $callback): mixed
+	{
+		$key = DbLockKeys::overtimeBalance($userId);
+		$this->lockingProvider->acquireLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
+		try {
+			return $callback();
+		} finally {
+			$this->lockingProvider->releaseLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE);
+		}
 	}
 
 	/**
@@ -304,7 +346,12 @@ class OvertimePayoutService
 		$results = [];
 
 		foreach ($targets as $userId) {
-			$result = $this->processPayout($userId, $year, $month, $actorUserId, $dryRun);
+			try {
+				$result = $this->processPayout($userId, $year, $month, $actorUserId, $dryRun);
+			} catch (\OCP\Lock\LockedException $e) {
+				// Fail-fast ledger lock contention → per-item error, never a batch 500.
+				$result = ['action' => 'error', 'message' => 'balance_busy', 'user_id' => $userId];
+			}
 			$results[] = $result;
 			$action = (string)($result['action'] ?? '');
 			if ($action === 'paid' || $action === 'dry_run') {

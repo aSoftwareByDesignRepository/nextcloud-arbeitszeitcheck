@@ -37,6 +37,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$this->createMock(NotificationService::class),
 			$this->createMock(OvertimePayoutMailService::class),
 			$this->createMock(IConfig::class),
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 	}
 
@@ -107,7 +108,8 @@ class OvertimePayoutServiceTest extends TestCase
 				$this->createMock(UserOvertimeSettingsService::class),
 				$this->createMock(PermissionService::class),
 				$notify, $mail, $config,
-			);
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
+		);
 
 			$result = $service->processPayout('user1', 2020, 6, 'admin', false);
 			$this->assertSame('paid', $result['action']);
@@ -166,6 +168,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$notify,
 			$this->createMock(OvertimePayoutMailService::class),
 			$config,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 
 		$result = $service->processPayout('user1', 2020, 6, 'admin', false);
@@ -253,6 +256,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$perm, $this->createMock(NotificationService::class),
 			$this->createMock(OvertimePayoutMailService::class),
 			$this->createMock(IConfig::class),
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 
 		$out = $service->listMonthOverview(2020, 6);
@@ -327,6 +331,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$perm, $this->createMock(NotificationService::class),
 			$this->createMock(OvertimePayoutMailService::class),
 			$this->createMock(IConfig::class),
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 
 		$csv = $service->buildPayrollCsv(2020, 6);
@@ -367,6 +372,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$this->createMock(NotificationService::class),
 			$this->createMock(OvertimePayoutMailService::class),
 			$this->createMock(IConfig::class),
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 
 		$out = $service->processBulkPayouts(2020, 6, 'admin', ['pay_user', 'zero_user', 'ghost'], false);
@@ -413,6 +419,7 @@ class OvertimePayoutServiceTest extends TestCase
 			$bank, $payoutMapper, $this->createMock(AuditLogMapper::class),
 			$userManager, $this->createMock(UserOvertimeSettingsService::class),
 			$this->createMock(PermissionService::class), $notify, $mail, $config,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 
 		$result = $service->processPayout('user1', 2020, 6, 'admin', false);

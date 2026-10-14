@@ -20,6 +20,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\AbsenceNotificationMailService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
@@ -275,6 +276,165 @@ class AbsenceServiceTest extends TestCase
 		$result = $this->service->createAbsence($data, $userId);
 
 		$this->assertSame($absence, $result);
+	}
+
+	/**
+	 * Custom-type writes must serialize against admin delete/deactivate:
+	 * a `custom_*` create acquires the SHARED catalog lock (exclusive twin
+	 * lives in CustomAbsenceTypeService) and releases it on every exit path —
+	 * including validation failure. Built-in types must not touch it.
+	 */
+	public function testCustomTypeCreateAcquiresAndReleasesCatalogLock(): void
+	{
+		$acquired = [];
+		$released = [];
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$acquired): void {
+				$acquired[] = [$key, $type];
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$released): void {
+				$released[] = [$key, $type];
+			}
+		);
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$lp,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+
+		$start = (new \DateTime())->modify('+14 days');
+		try {
+			// custom_* type — catalog lock must wrap even the failing validation
+			$service->createAbsence([
+				'type' => 'custom_lockprobe',
+				'start_date' => $start->format('Y-m-d'),
+				'end_date' => $start->format('Y-m-d'),
+			], 'testuser');
+		} catch (\Throwable $e) {
+			// validation failure acceptable — we assert the lock protocol
+		}
+		$this->assertContains(
+			[DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_SHARED],
+			$acquired,
+			'custom-type create must acquire the shared catalog lock'
+		);
+		$this->assertContains(
+			[DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_SHARED],
+			$released,
+			'catalog lock must be released on the exception path'
+		);
+	}
+
+	public function testBuiltinTypeNeverTouchesCatalogLock(): void
+	{
+		$acquired = [];
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$acquired): void {
+				$acquired[] = $key;
+			}
+		);
+		$lp->method('releaseLock');
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$lp,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+
+		try {
+			$service->updateAbsence(999, [
+				'type' => Absence::TYPE_PERSONAL_LEAVE,
+				'start_date' => '2026-10-22',
+				'end_date' => '2026-10-22',
+			], 'testuser');
+		} catch (\Throwable $e) {
+			// find(999) may throw — irrelevant; only the lock behavior matters
+		}
+		$this->assertNotContains(DbLockKeys::absenceTypeCatalog(), $acquired);
+	}
+
+	public function testCatalogLockContentionThrowsCatalogBusyException(): void
+	{
+		// Fail-fast catalog contention must surface as CatalogBusyException
+		// (HTTP 409 ABSENCE_TYPE_CATALOG_BUSY) — never an opaque 500 — and must
+		// still release the already-held user mutation lock.
+		$released = [];
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type): void {
+				if ($key === DbLockKeys::absenceTypeCatalog()) {
+					throw new \OCP\Lock\LockedException($key);
+				}
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$released): void {
+				$released[] = $key;
+			}
+		);
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$lp,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+
+		$start = (new \DateTime())->modify('+14 days');
+		try {
+			$service->createAbsence([
+				'type' => 'custom_lockprobe',
+				'start_date' => $start->format('Y-m-d'),
+				'end_date' => $start->format('Y-m-d'),
+			], 'testuser');
+			$this->fail('expected CatalogBusyException');
+		} catch (\OCA\ArbeitszeitCheck\Exception\CatalogBusyException $e) {
+			$this->assertSame('ABSENCE_TYPE_CATALOG_BUSY', $e->getReasonCode());
+		}
+		$this->assertNotEmpty($released, 'user mutation lock must be released on the contention path');
 	}
 
 	public function testCreateAbsenceTriggersHrRequestCreatedNotification(): void

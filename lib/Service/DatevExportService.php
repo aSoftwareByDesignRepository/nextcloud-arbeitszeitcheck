@@ -90,8 +90,8 @@ class DatevExportService
 		$currentYear = (int)$startDate->format('Y');
 		$lines[] = sprintf(
 			'%s|%s|%d|%s',
-			str_pad($beraternummer, 7, '0', STR_PAD_LEFT),
-			str_pad($mandantennummer, 5, '0', STR_PAD_LEFT),
+			str_pad(self::datevField($beraternummer), 7, '0', STR_PAD_LEFT),
+			str_pad(self::datevField($mandantennummer), 5, '0', STR_PAD_LEFT),
 			$currentYear,
 			'1' // Version number
 		);
@@ -133,12 +133,12 @@ class DatevExportService
 
 			$lines[] = sprintf(
 				'%s|%s|%s|%.2f|%s|%s',
-				str_pad($personalnummer, 8, '0', STR_PAD_LEFT),
+				str_pad(self::datevField($personalnummer), 8, '0', STR_PAD_LEFT),
 				$date,
-				str_pad($lohnart, 4, '0', STR_PAD_LEFT),
+				str_pad(self::datevField($lohnart), 4, '0', STR_PAD_LEFT),
 				$hours,
 				'Std',
-				$description
+				self::datevField($description)
 			);
 		}
 
@@ -170,8 +170,8 @@ class DatevExportService
 		$currentYear = (int)$startDate->format('Y');
 		$allLines[] = sprintf(
 			'%s|%s|%d|%s',
-			str_pad($beraternummer, 7, '0', STR_PAD_LEFT),
-			str_pad($mandantennummer, 5, '0', STR_PAD_LEFT),
+			str_pad(self::datevField($beraternummer), 7, '0', STR_PAD_LEFT),
+			str_pad(self::datevField($mandantennummer), 5, '0', STR_PAD_LEFT),
 			$currentYear,
 			'1'
 		);
@@ -206,12 +206,12 @@ class DatevExportService
 
 				$allLines[] = sprintf(
 					'%s|%s|%s|%.2f|%s|%s',
-					str_pad($personalnummer, 8, '0', STR_PAD_LEFT),
+					str_pad(self::datevField($personalnummer), 8, '0', STR_PAD_LEFT),
 					$date,
-					str_pad($lohnart_normal, 4, '0', STR_PAD_LEFT),
+					str_pad(self::datevField($lohnart_normal), 4, '0', STR_PAD_LEFT),
 					$hours,
 					'Std',
-					$description
+					self::datevField($description)
 				);
 			}
 
@@ -273,7 +273,7 @@ class DatevExportService
 
 		// Stamp = last inclusive calendar day of the export (not exclusive end).
 		$date = (string)($summary['stamp_ymd'] ?? $endDate->format('Ymd'));
-		$pn = str_pad($personalnummer, 8, '0', STR_PAD_LEFT);
+		$pn = str_pad(self::datevField($personalnummer), 8, '0', STR_PAD_LEFT);
 
 		foreach ($summary['buckets'] as $bucket) {
 			if (!is_array($bucket)) {
@@ -290,10 +290,10 @@ class DatevExportService
 				'%s|%s|%s|%.2f|%s|%s',
 				$pn,
 				$date,
-				str_pad($lohnart, 4, '0', STR_PAD_LEFT),
+				str_pad(self::datevField($lohnart), 4, '0', STR_PAD_LEFT),
 				$hours,
 				'Std',
-				$label
+				self::datevField($label)
 			);
 		}
 	}
@@ -457,5 +457,16 @@ class DatevExportService
 		);
 
 		return DatevPremiumLohnartMap::fromJson(is_string($raw) ? $raw : '');
+	}
+
+	/**
+	 * Strip characters that break the pipe-delimited DATEV record structure.
+	 * Time-entry descriptions and user-supplied Personalnummer are free text —
+	 * without this, `|` or a newline injects extra columns or whole forged
+	 * payroll lines into the export.
+	 */
+	private static function datevField(string $value): string
+	{
+		return str_replace(['|', "\r", "\n", "\t"], ' ', $value);
 	}
 }

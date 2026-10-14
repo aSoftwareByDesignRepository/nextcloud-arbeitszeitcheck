@@ -16,9 +16,14 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\CustomAbsenceTypeMapper;
+use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
+use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\CustomAbsenceTypeService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCP\IDBConnection;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use Test\TestCase;
 
 final class CustomAbsenceTypeIntegrationTest extends TestCase
@@ -212,5 +217,94 @@ final class CustomAbsenceTypeIntegrationTest extends TestCase
 		$id = $this->insertAbsence($code);
 		$row = $this->absenceMapper->find($id);
 		self::assertSame($code, $row->getType(), 'long custom code must not be truncated in at_absences.type');
+	}
+
+	/**
+	 * TOCTOU guard: admin delete/deactivate runs the usage-count → delete
+	 * sequence under an EXCLUSIVE catalog lock; absence create/update paths
+	 * hold the SHARED twin while validating+writing a `custom_*` type. Prove
+	 * both sides contend on the same key, so a delete can never interleave
+	 * between a create's isCreatable() check and its insert.
+	 */
+	public function testCatalogLockMutualExclusion(): void
+	{
+		$locking = \OC::$server->get(ILockingProvider::class);
+		$key = DbLockKeys::absenceTypeCatalog();
+		$absenceService = \OC::$server->get(AbsenceService::class);
+
+		$r = $this->service->create(['label' => 'Katalogsperre'], 'it-admin');
+		$id = (int)$r['data']['id'];
+		$this->createdTypeIds[] = $id;
+		$code = (string)$r['data']['code'];
+		AbsenceTypeCatalog::resetCustomTypeCache();
+
+		// Reader (absence-write) side holds SHARED → admin delete must refuse
+		// with the retryable-409 contract (never an opaque 500).
+		$locking->acquireLock($key, ILockingProvider::LOCK_SHARED, 'test reader side');
+		$deleteRefused = false;
+		try {
+			try {
+				$result = $this->service->deleteOrDeactivate($id, 'it-admin');
+				$deleteRefused = $result['code'] === 409 && ($result['error'] ?? '') !== '';
+			} catch (LockedException $e) {
+				$deleteRefused = true;
+			}
+		} finally {
+			$locking->releaseLock($key, ILockingProvider::LOCK_SHARED);
+		}
+		self::assertTrue($deleteRefused, 'deleteOrDeactivate must refuse while a shared catalog lock is held');
+
+		// Admin (writer) side holds EXCLUSIVE → custom-type absence create must refuse.
+		$locking->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'test writer side');
+		$createRefused = false;
+		$updateRefused = false;
+		try {
+			try {
+				$absenceService->createAbsence([
+					'type' => $code,
+					'start_date' => '2026-10-21',
+					'end_date' => '2026-10-21',
+					'reason' => 'lock probe',
+				], '__azct_integration__');
+			} catch (CatalogBusyException | LockedException $e) {
+				$createRefused = true;
+			}
+			// Same on the update path (type switch to a custom code).
+			$absenceId = $this->insertAbsence(Absence::TYPE_PERSONAL_LEAVE);
+			try {
+				$absenceService->updateAbsence($absenceId, [
+					'type' => $code,
+					'start_date' => '2026-10-21',
+					'end_date' => '2026-10-21',
+				], '__azct_integration__');
+			} catch (CatalogBusyException | LockedException $e) {
+				$updateRefused = true;
+			}
+		} finally {
+			$locking->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		}
+		self::assertTrue($createRefused, 'createAbsence must refuse while the exclusive catalog lock is held');
+		self::assertTrue($updateRefused, 'updateAbsence must refuse while the exclusive catalog lock is held');
+
+		// Built-in type must NOT contend on the catalog lock at all.
+		$locking->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'test writer side');
+		$builtinBlocked = false;
+		try {
+			try {
+				$absenceService->createAbsence([
+					'type' => Absence::TYPE_PERSONAL_LEAVE,
+					'start_date' => '2026-10-22',
+					'end_date' => '2026-10-22',
+					'reason' => 'lock-free path',
+				], '__azct_integration__');
+			} catch (LockedException $e) {
+				$builtinBlocked = true;
+			} catch (\Throwable $e) {
+				// domain validation failure is fine — the lock was skipped
+			}
+		} finally {
+			$locking->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		}
+		self::assertFalse($builtinBlocked, 'built-in absence types must not acquire the catalog lock');
 	}
 }

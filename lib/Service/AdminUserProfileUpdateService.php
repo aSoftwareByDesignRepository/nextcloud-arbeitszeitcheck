@@ -58,7 +58,48 @@ class AdminUserProfileUpdateService
 		private readonly ?IConfig $config = null,
 		private readonly ?VacationUnitService $vacationUnitService = null,
 		private readonly ?VacationUnitMigrationService $vacationUnitMigrationService = null,
+		private readonly ?\OCP\Lock\ILockingProvider $lockingProvider = null,
 	) {
+	}
+
+	/** @var array<string, true> request-scoped: profile locks this instance holds. */
+	private array $heldUserProfileLocks = [];
+
+	/**
+	 * Serialize the whole profile write for one employee. Without it two
+	 * concurrent admin saves both resolve findEditableByUser() to the same
+	 * row and can insert duplicate overlapping assignments — at_user_models
+	 * has no unique index to backstop that. Nullable only for legacy manual
+	 * constructions in tests; the DI container always injects it.
+	 *
+	 * Reentrant per instance (updateProfile locks once, then calls the
+	 * apply* wrappers which would otherwise deadlock on the same key).
+	 *
+	 * @template T
+	 * @param callable():T $callback
+	 * @return T
+	 */
+	private function withUserProfileLock(string $userId, callable $callback): mixed
+	{
+		if ($this->lockingProvider === null || isset($this->heldUserProfileLocks[$userId])) {
+			return $callback();
+		}
+		$key = DbLockKeys::userProfile($userId);
+		try {
+			$this->lockingProvider->acquireLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Employee profile update for user ' . $userId);
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new AdminUserProfileUpdateException(
+				$this->l10n->t('This employee profile is being updated by another request. Please wait a moment and try again.'),
+				409
+			);
+		}
+		$this->heldUserProfileLocks[$userId] = true;
+		try {
+			return $callback();
+		} finally {
+			unset($this->heldUserProfileLocks[$userId]);
+			$this->lockingProvider->releaseLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE);
+		}
 	}
 
 	private function vacationAmountCeiling(): float
@@ -136,7 +177,7 @@ class AdminUserProfileUpdateService
 		$this->preflightEmployment($userId, $employment);
 		$this->preflightDatev($datev);
 
-		return $this->atomic(function () use ($userId, $workingTimeModel, $vacationPolicy, $timeCapture, $overtime, $employment, $datev, $performedBy): array {
+		return $this->withUserProfileLock($userId, fn (): array => $this->atomic(function () use ($userId, $workingTimeModel, $vacationPolicy, $timeCapture, $overtime, $employment, $datev, $performedBy): array {
 			$result = ['success' => true];
 			// Empty sections must be skipped: applyVacationPolicy() on an empty
 			// payload would fabricate a manual_fixed policy with null days and
@@ -164,7 +205,7 @@ class AdminUserProfileUpdateService
 			}
 
 			return $result;
-		}, $this->db);
+		}, $this->db));
 	}
 
 	/**
@@ -192,6 +233,51 @@ class AdminUserProfileUpdateService
 	 * @return array<string, mixed>
 	 */
 	public function applyWorkingTimeModel(string $userId, array $params, string $performedBy): array
+	{
+		return $this->withUserProfileLock(
+			$userId,
+			fn (): array => $this->withSharedModelCatalogLock(
+				fn (): array => $this->applyWorkingTimeModelLocked($userId, $params, $performedBy)
+			)
+		);
+	}
+
+	/**
+	 * Shared catalog lock while writing a working-time-model assignment —
+	 * global model delete holds the exclusive twin, so a model can never be
+	 * deleted between its "no assignments" check and an in-flight insert.
+	 * Ordering: userProfile → wtmCatalog (consistent with the delete path,
+	 * which takes only wtmCatalog).
+	 *
+	 * @template T
+	 * @param callable():T $callback
+	 * @return T
+	 */
+	private function withSharedModelCatalogLock(callable $callback): mixed
+	{
+		if ($this->lockingProvider === null) {
+			return $callback();
+		}
+		try {
+			$this->lockingProvider->acquireLock(
+				DbLockKeys::workingTimeModelCatalog(),
+				\OCP\Lock\ILockingProvider::LOCK_SHARED,
+				'Working-time-model assignment write',
+			);
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new AdminUserProfileUpdateException(
+				$this->l10n->t('The working time model catalog is being updated. Please wait a moment and try again.'),
+				409
+			);
+		}
+		try {
+			return $callback();
+		} finally {
+			$this->lockingProvider->releaseLock(DbLockKeys::workingTimeModelCatalog(), \OCP\Lock\ILockingProvider::LOCK_SHARED);
+		}
+	}
+
+	private function applyWorkingTimeModelLocked(string $userId, array $params, string $performedBy): array
 	{
 		$this->preflightWorkingTimeModel($userId, $params);
 
@@ -433,6 +519,11 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyVacationPolicy(string $userId, array $params, string $performedBy): array
 	{
+		return $this->withUserProfileLock($userId, fn (): array => $this->applyVacationPolicyLocked($userId, $params, $performedBy));
+	}
+
+	private function applyVacationPolicyLocked(string $userId, array $params, string $performedBy): array
+	{
 		$this->preflightVacationPolicy($userId, $params);
 
 		$normalized = $this->normalizeVacationPolicyParams($params);
@@ -481,6 +572,11 @@ class AdminUserProfileUpdateService
 	 * @return array<string, mixed>
 	 */
 	public function applyOvertimeSettings(string $userId, array $params, string $performedBy): array
+	{
+		return $this->withUserProfileLock($userId, fn (): array => $this->applyOvertimeSettingsLocked($userId, $params, $performedBy));
+	}
+
+	private function applyOvertimeSettingsLocked(string $userId, array $params, string $performedBy): array
 	{
 		// Guard every per-user mutation against ghost uids: writing overtime
 		// settings for a nonexistent user must not persist stray setting rows.
@@ -538,6 +634,11 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyEmploymentSettings(string $userId, array $params, string $performedBy): array
 	{
+		return $this->withUserProfileLock($userId, fn (): array => $this->applyEmploymentSettingsLocked($userId, $params, $performedBy));
+	}
+
+	private function applyEmploymentSettingsLocked(string $userId, array $params, string $performedBy): array
+	{
 		if ($params === []) {
 			return [];
 		}
@@ -579,6 +680,11 @@ class AdminUserProfileUpdateService
 	 * @return array<string, mixed>
 	 */
 	public function applyDatevSettings(string $userId, array $params, string $performedBy): array
+	{
+		return $this->withUserProfileLock($userId, fn (): array => $this->applyDatevSettingsLocked($userId, $params, $performedBy));
+	}
+
+	private function applyDatevSettingsLocked(string $userId, array $params, string $performedBy): array
 	{
 		if ($params === [] || !array_key_exists('personalnummer', $params)) {
 			return [];
@@ -697,6 +803,11 @@ class AdminUserProfileUpdateService
 	 * @return array<string, mixed>
 	 */
 	public function applyTimeCaptureSettings(string $userId, array $params, string $performedBy): array
+	{
+		return $this->withUserProfileLock($userId, fn (): array => $this->applyTimeCaptureSettingsLocked($userId, $params, $performedBy));
+	}
+
+	private function applyTimeCaptureSettingsLocked(string $userId, array $params, string $performedBy): array
 	{
 		$this->assertUserExists($userId);
 

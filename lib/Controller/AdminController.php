@@ -5363,8 +5363,22 @@ class AdminController extends Controller
 			$oldValues = $this->workingTimeModelToAuditValues($model);
 			$performedBy = $this->getPerformedBy();
 
-			// Atomic re-check + vacation-default purge + delete closes the
-			// assign-during-delete TOCTOU and avoids orphan L1 vacation rows.
+			// Exclusive catalog lock + atomic re-check + vacation-default purge +
+			// delete closes the assign-during-delete TOCTOU and avoids orphan L1
+			// vacation rows. The lock is what the txn alone cannot provide: a
+			// concurrent assignment insert shares DbLockKeys::workingTimeModelCatalog().
+			$locking = $this->lockingProvider ?? \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
+			$catalogKey = \OCA\ArbeitszeitCheck\Service\DbLockKeys::workingTimeModelCatalog();
+			try {
+				$locking->acquireLock($catalogKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Working time model delete');
+			} catch (\OCP\Lock\LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The working time model catalog is being updated. Please wait a moment and try again.'),
+					'code' => 'MODEL_CATALOG_BUSY',
+				], Http::STATUS_CONFLICT);
+			}
+			try {
 			$this->atomic(function () use ($id, $model, $oldValues, $performedBy): void {
 				$fresh = $this->workingTimeModelMapper->find($id);
 				if ($fresh->getIsDefault()) {
@@ -5395,6 +5409,9 @@ class AdminController extends Controller
 					$performedBy
 				);
 			}, $this->db);
+			} finally {
+				$locking->releaseLock($catalogKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE);
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -6010,6 +6027,12 @@ class AdminController extends Controller
 			return new JSONResponse(array_merge(['success' => true], $result), Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\OCP\Lock\LockedException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This overtime balance is being updated by another request. Please wait a moment and try again.'),
+				'code' => 'OVERTIME_BALANCE_BUSY',
+			], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('createUserOvertimeAdjustment failed', ['exception' => $e]);
 			return new JSONResponse([
@@ -6039,6 +6062,12 @@ class AdminController extends Controller
 			return new JSONResponse(array_merge(['success' => true], $result));
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\OCP\Lock\LockedException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This overtime balance is being updated by another request. Please wait a moment and try again.'),
+				'code' => 'OVERTIME_BALANCE_BUSY',
+			], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('resetUserOvertimeBalance failed', ['exception' => $e]);
 			return new JSONResponse([

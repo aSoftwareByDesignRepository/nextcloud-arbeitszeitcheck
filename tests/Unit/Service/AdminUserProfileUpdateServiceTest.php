@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\AdminUserProfileUpdateException;
 use OCA\ArbeitszeitCheck\Service\AdminUserProfileUpdateService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService;
 use OCA\ArbeitszeitCheck\Service\UserEmploymentSettingsService;
 use OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService;
@@ -78,6 +79,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		UserSettingsMapper $userSettingsMapper,
 		?LaborLawProfileFactory $laborLawProfileFactory = null,
 		?UserEmploymentSettingsService $employmentSettingsService = null,
+		?\OCP\Lock\ILockingProvider $lockingProvider = null,
 	): AdminUserProfileUpdateService {
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
@@ -98,6 +100,10 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			$l10n,
 			$this->createMock(IDBConnection::class),
 			$laborLawProfileFactory,
+			null,
+			null,
+			null,
+			$lockingProvider,
 		);
 	}
 
@@ -1303,5 +1309,113 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			'vacationDaysPerYear' => 28,
 			'startDate' => '2026-01-01',
 		], 'admin');
+	}
+
+	/**
+	 * applyWorkingTimeModel must serialize per-user (exclusive userProfile
+	 * lock) AND hold the shared model-catalog lock so a global model delete
+	 * cannot interleave with the assignment write. Asserted via acquire/
+	 * release callback records.
+	 */
+	public function testApplyWorkingTimeModelTakesUserAndCatalogLocks(): void
+	{
+		$acquired = [];
+		$released = [];
+		$lp = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$acquired): void {
+				$acquired[] = [$key, $type];
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$released): void {
+				$released[] = [$key, $type];
+			}
+		);
+
+		$service = $this->serviceWithUserSettingsMapper(
+			$this->createMock(UserSettingsMapper::class),
+			null,
+			null,
+			$lp
+		);
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('find')->willReturn(new WorkingTimeModel());
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([]);
+
+		try {
+			$service->applyWorkingTimeModel('alice', ['workingTimeModelId' => 5], 'admin');
+		} catch (\Throwable $e) {
+			// downstream validation may throw — the lock protocol still applies
+		}
+
+		$this->assertContains(
+			[DbLockKeys::userProfile('alice'), \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE],
+			$acquired,
+			'per-user profile lock must be exclusive'
+		);
+		$this->assertContains(
+			[DbLockKeys::workingTimeModelCatalog(), \OCP\Lock\ILockingProvider::LOCK_SHARED],
+			$acquired,
+			'assignment write must hold the shared model-catalog lock'
+		);
+		$this->assertContains(
+			[DbLockKeys::userProfile('alice'), \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE],
+			$released
+		);
+		$this->assertContains(
+			[DbLockKeys::workingTimeModelCatalog(), \OCP\Lock\ILockingProvider::LOCK_SHARED],
+			$released
+		);
+	}
+
+	/**
+	 * updateProfile holds the per-user lock and calls the apply* wrappers —
+	 * the reentrancy guard must skip the nested acquire or updateProfile
+	 * self-deadlocks (DB lock providers throw LockedException on re-acquire).
+	 */
+	public function testUpdateProfileDoesNotDoubleAcquireUserLock(): void
+	{
+		$held = [];
+		$lp = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$held): void {
+				if (isset($held[$key])) {
+					throw new \OCP\Lock\LockedException('double-acquire: ' . $key);
+				}
+				$held[$key] = $type;
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$held): void {
+				unset($held[$key]);
+			}
+		);
+
+		$service = $this->serviceWithUserSettingsMapper(
+			$this->createMock(UserSettingsMapper::class),
+			null,
+			null,
+			$lp
+		);
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('find')->willReturn(new WorkingTimeModel());
+		$this->workingTimeModelMapper->method('findPersonalByUser')->willReturn([]);
+		$this->vacationPolicyMapper->method('findByUser')->willReturn([]);
+
+		try {
+			$service->updateProfile('alice', [
+				'workingTimeModel' => ['workingTimeModelId' => 5],
+				'overtime' => ['enabled' => false],
+			], 'admin');
+		} catch (\OCP\Lock\LockedException $e) {
+			$this->fail('updateProfile self-deadlocked: ' . $e->getMessage());
+		} catch (\Throwable $e) {
+			// domain validation failures are fine — the assertion is that no
+			// LockedException escaped
+		}
+		$this->assertSame([], $held, 'all locks must be released');
 	}
 }

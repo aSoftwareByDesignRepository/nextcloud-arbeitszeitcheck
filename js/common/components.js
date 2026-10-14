@@ -433,6 +433,24 @@ const ArbeitszeitCheckComponents = {
       ? options.duration
       : ((type === 'error' || type === 'critical' || type === 'danger') ? 9000 : 5000);
 
+    // Dedup on kind+text: an identical toast already visible just gets its
+    // timer reset instead of stacking duplicates.
+    this._activeToasts = this._activeToasts || {};
+    const dedupKey = `${type}|${title ?? ''}|${message}`;
+    const existing = this._activeToasts[dedupKey];
+    if (existing && existing.isConnected) {
+      if (existing._dismissTimer) {
+        clearTimeout(existing._dismissTimer);
+      }
+      existing.classList.add('toast--show');
+      if (duration > 0) {
+        existing._dismissTimer = setTimeout(() => {
+          this.hideToast(existing);
+        }, duration);
+      }
+      return existing;
+    }
+
     const container = document.getElementById('toast-container') || document.body;
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
@@ -478,10 +496,12 @@ const ArbeitszeitCheckComponents = {
 
     // Auto-dismiss
     if (duration > 0) {
-      setTimeout(() => {
+      toast._dismissTimer = setTimeout(() => {
         this.hideToast(toast);
       }, duration);
     }
+    toast._dedupKey = dedupKey;
+    this._activeToasts[dedupKey] = toast;
 
     return toast;
   },
@@ -490,6 +510,13 @@ const ArbeitszeitCheckComponents = {
    * Hide toast
    */
   hideToast(toast) {
+    if (toast._dismissTimer) {
+      clearTimeout(toast._dismissTimer);
+      toast._dismissTimer = null;
+    }
+    if (this._activeToasts && toast._dedupKey && this._activeToasts[toast._dedupKey] === toast) {
+      delete this._activeToasts[toast._dedupKey];
+    }
     toast.classList.remove('toast--show');
     setTimeout(() => {
       if (toast.parentNode) {

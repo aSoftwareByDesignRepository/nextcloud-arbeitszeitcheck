@@ -5380,7 +5380,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lönenummer för DATEV-export. Lämna tomt om personen inte exporteras till DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Upp till 8 siffror. Krävs för DATEV-export av denna anställd.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Använd när kontraktet inte matchar någon delad arbetstidsmodell. Vecko- och dagtimmarna nedan gäller bara denna anställd.",
-        "The offline sync reference does not match this stamp.": "Offline-synkreferensen matchar inte denna stämpling."
+        "The offline sync reference does not match this stamp.": "Offline-synkreferensen matchar inte denna stämpling.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "En administratör uppdaterar just nu frånvarotypkatalogen. Vänta ett ögonblick och försök igen.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "En annan ändring av frånvarotypkatalogen pågår. Vänta ett ögonblick och försök igen.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "Katalogen över arbetstidsmodeller uppdateras just nu. Vänta ett ögonblick och försök igen.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "Den här medarbetarprofilen uppdateras av en annan förfrågan. Vänta ett ögonblick och försök igen.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "Det här övertidssaldot uppdateras av en annan förfrågan. Vänta ett ögonblick och försök igen.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "En annan frånvaroändring pågår på det här kontot. Vänta ett ögonblick och försök igen."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

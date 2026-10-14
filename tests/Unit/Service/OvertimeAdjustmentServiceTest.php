@@ -7,10 +7,12 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustment;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService;
 use OCA\ArbeitszeitCheck\Service\OvertimeBankService;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 
 class OvertimeAdjustmentServiceTest extends TestCase
@@ -35,7 +37,9 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$users = $this->createMock(IUserManager::class);
 		$users->method('get')->with('alice')->willReturn($user);
 
-		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users);
+		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
+		);
 		$result = $svc->createAdjustment(
 			'alice',
 			-10.0,
@@ -65,7 +69,8 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$mapper,
 			$bank,
 			$this->createMock(AuditLogMapper::class),
-			$users
+			$users,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 		$result = $svc->resetBalanceToZero('alice', 'admin1');
 		$this->assertSame('skipped_zero', $result['action']);
@@ -93,7 +98,8 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$mapper,
 			$bank,
 			$this->createMock(AuditLogMapper::class),
-			$users
+			$users,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 		$result = $svc->resetBalanceToZero('alice', 'admin1');
 		$this->assertSame('reset', $result['action']);
@@ -108,7 +114,8 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$this->createMock(OvertimeAdjustmentMapper::class),
 			$this->createMock(OvertimeBankService::class),
 			$this->createMock(AuditLogMapper::class),
-			$users
+			$users,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 		$this->expectException(\InvalidArgumentException::class);
 		$svc->createAdjustment('alice', 0.0, OvertimeAdjustment::REASON_CUSTOM, null, 'admin');
@@ -136,7 +143,9 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$mapper->method('countByUserAndYear')->with('alice', 2026)->willReturn(1);
 		$bank->method('getBankStatus')->willReturn(['effective_balance' => 12.5]);
 
-		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users);
+		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
+		);
 		$r = $svc->listForUser('alice', 2026);
 
 		$this->assertSame(1, $r['total']);
@@ -146,6 +155,92 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$this->assertSame(7, $r['items'][0]['id']);
 		$this->assertSame(2.5, $r['items'][0]['hours_delta']);
 		$this->assertSame('2026-03-01', $r['items'][0]['effective_on']);
+	}
+
+	/**
+	 * The balance read → compute → insert sequence must run under the
+	 * per-user exclusive ledger lock, or two concurrent adjustments persist
+	 * a self-contradicting balance_before/balance_after chain. Assert the
+	 * lock wraps the whole mutation and is released on every exit.
+	 */
+	public function testCreateAdjustmentHoldsExclusiveLedgerLockAroundMutation(): void
+	{
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$lockHeldDuringInsert = false;
+		$acquired = [];
+		$released = [];
+
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$acquired): void {
+				$acquired[] = [$key, $type];
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$released): void {
+				$released[] = [$key, $type];
+			}
+		);
+		$lp->method('isLocked')->willReturnCallback(
+			static function (string $key, int $type): bool {
+				return true; // our own exclusive lock reads as locked
+			}
+		);
+
+		$mapper->expects($this->once())
+			->method('insertAdjustment')
+			->willReturnCallback(static function (OvertimeAdjustment $e) use (&$lockHeldDuringInsert, $lp): OvertimeAdjustment {
+				$lockHeldDuringInsert = $lp->isLocked(
+					DbLockKeys::overtimeBalance('alice'),
+					ILockingProvider::LOCK_EXCLUSIVE
+				);
+				$e->setId(1);
+				return $e;
+			});
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp
+		);
+		$svc->createAdjustment('alice', 5.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin');
+
+		$this->assertContains([DbLockKeys::overtimeBalance('alice'), ILockingProvider::LOCK_EXCLUSIVE], $acquired);
+		$this->assertContains([DbLockKeys::overtimeBalance('alice'), ILockingProvider::LOCK_EXCLUSIVE], $released);
+		$this->assertTrue($lockHeldDuringInsert, 'insert must run under the exclusive ledger lock');
+	}
+
+	public function testLockReleasedWhenInsertThrows(): void
+	{
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$mapper->method('insertAdjustment')->willThrowException(new \RuntimeException('db gone'));
+
+		$released = [];
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$released): void {
+				$released[] = [$key, $type];
+			}
+		);
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp
+		);
+		try {
+			$svc->createAdjustment('alice', 5.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin');
+			$this->fail('expected RuntimeException');
+		} catch (\RuntimeException $e) {
+			// expected
+		}
+		$this->assertContains([DbLockKeys::overtimeBalance('alice'), ILockingProvider::LOCK_EXCLUSIVE], $released);
 	}
 
 }

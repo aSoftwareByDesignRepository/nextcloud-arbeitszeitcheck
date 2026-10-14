@@ -35,6 +35,38 @@ final class DbLockKeys
 		return 'azc/es/' . md5($userId . '|' . $year . '|' . $asOfYmd);
 	}
 
+	/**
+	 * Overtime Saldo ledger. Serializes read-balance → compute → insert across
+	 * at_ot_adj adjustments and at_ot_payout payouts so the recorded
+	 * balance_before/balance_after chain can never interleave into a lie.
+	 */
+	public static function overtimeBalance(string $userId): string
+	{
+		return 'azc/ot/' . md5($userId);
+	}
+
+	/**
+	 * Admin employee-profile update. Serializes the findEditableByUser →
+	 * update/insert sequence so two concurrent saves cannot insert duplicate
+	 * overlapping working-time-model assignments (no unique index backstops it).
+	 */
+	public static function userProfile(string $userId): string
+	{
+		return 'azc/up/' . md5($userId);
+	}
+
+	/**
+	 * Working-time-model catalog. Model delete takes LOCK_EXCLUSIVE;
+	 * assignment writes take LOCK_SHARED so a delete can never interleave
+	 * between the "no assignments" check and an in-flight assignment insert
+	 * (at_user_models.working_time_model_id has no FK). Same shape as
+	 * {@see absenceTypeCatalog()}.
+	 */
+	public static function workingTimeModelCatalog(): string
+	{
+		return 'azc/wtm/catalog';
+	}
+
 	public static function vacationUnitMigration(): string
 	{
 		return 'azc/vu/migrate';
@@ -50,5 +82,16 @@ final class DbLockKeys
 	public static function vacationYearMode(): string
 	{
 		return 'azc/vy/mode';
+	}
+
+	/**
+	 * Custom absence-type catalog. Admin writes (create/update/delete) take
+	 * LOCK_EXCLUSIVE; absence create/update paths take LOCK_SHARED so a
+	 * hard-deleted type can never be referenced by an absence that validated
+	 * against the pre-delete catalog (count→delete TOCTOU).
+	 */
+	public static function absenceTypeCatalog(): string
+	{
+		return 'azc/at/catalog';
 	}
 }

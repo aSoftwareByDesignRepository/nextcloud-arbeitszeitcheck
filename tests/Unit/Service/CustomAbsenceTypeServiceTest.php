@@ -54,6 +54,7 @@ final class CustomAbsenceTypeServiceTest extends TestCase
 			$this->auditLogMapper,
 			$this->db,
 			$l10n,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
 		);
 	}
 
@@ -320,5 +321,34 @@ final class CustomAbsenceTypeServiceTest extends TestCase
 		$this->mapper->method('find')->willThrowException(new DoesNotExistException(''));
 		$result = $this->service->deleteOrDeactivate(99, 'admin');
 		self::assertSame(404, $result['code']);
+	}
+
+	public function testCatalogLockContentionReturnsRetryable409(): void
+	{
+		// Fail-fast lock contention must surface as a distinct retryable 409,
+		// never propagate as an opaque 500 (lock_contention_opaque_error).
+		$locking = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$locking->method('acquireLock')
+			->willThrowException(new \OCP\Lock\LockedException('absence_type_catalog'));
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnArgument(0);
+		$service = new CustomAbsenceTypeService(
+			$this->mapper,
+			$this->auditLogMapper,
+			$this->db,
+			$l10n,
+			$locking,
+		);
+
+		$this->mapper->expects(self::never())->method('delete');
+		$this->mapper->expects(self::never())->method('update');
+
+		$result = $service->deleteOrDeactivate(7, 'admin');
+		self::assertSame(409, $result['code']);
+		self::assertNull($result['data']);
+		self::assertSame(
+			'Another change to the absence type catalog is in progress. Please wait a moment and try again.',
+			$result['error']
+		);
 	}
 }

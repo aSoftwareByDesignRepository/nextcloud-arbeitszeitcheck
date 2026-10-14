@@ -79,6 +79,10 @@ const STATEFUL_SPECS = [
   // UI invariants create/delete completed entries for the shared employee —
   // same shared-state class as the mutation sweep.
   /atlas-ui-invariants\.spec\.js/,
+  // work-location seeds entries in the shared employee's recent window and
+  // asserts the badge inside the 100-row list — parallel seeders starve the
+  // date probe and can evict the row mid-assert (workers>1 failure 2026-10-14).
+  /work-location\.spec\.js/,
 ]
 
 export default defineConfig({

@@ -414,6 +414,13 @@
      * Render users table
      */
     function buildEmptyStateHtml() {
+        if (listSearch.trim() !== '') {
+            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
+                + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'
+                + '<button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">'
+                + Utils.escapeHtml(auMsg('clearSearch', 'Clear search'))
+                + '</button></td></tr>';
+        }
         if (isAccessRestricted && listAccessFilter === FILTER_APP_ACCESS) {
             const message = auMsg(
                 'noAppAccessEmployees',
@@ -429,13 +436,6 @@
                 + '<button type="button" class="azc-btn azc-btn--secondary" data-action="show-all-accounts">'
                 + Utils.escapeHtml(showAll) + '</button>'
                 + '</div></td></tr>';
-        }
-        if (listSearch.trim() !== '') {
-            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-                + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'
-                + '<button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">'
-                + Utils.escapeHtml(auMsg('clearSearch', 'Clear search'))
-                + '</button></td></tr>';
         }
         return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
             + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'

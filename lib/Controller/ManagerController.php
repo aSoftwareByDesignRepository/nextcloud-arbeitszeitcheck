@@ -34,7 +34,9 @@ use OCA\ArbeitszeitCheck\Service\MonthClosureFeature;
 use OCA\ArbeitszeitCheck\Service\MonthClosureGuard;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
+use OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Service\TimeZoneService;
@@ -1713,6 +1715,10 @@ class ManagerController extends Controller
 
 			try {
 				$absence = $this->absenceService->createApprovedAbsenceForEmployeeByManager($actorUserId, $targetUserId, $data);
+			} catch (CatalogBusyException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (AbsenceMutationBusyException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
 			} catch (BusinessRuleException $e) {
 				\OCP\Log\logger('arbeitszeitcheck')->info(
 					'ManagerController::createEmployeeAbsence business rule: ' . $e->getMessage(),

@@ -25,7 +25,9 @@ use OCP\IDBConnection;
 use OCP\IL10N;
 use OCP\Lock\ILockingProvider;
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Util\AbsenceNotificationPayload;
 use OCP\IUserManager;
@@ -161,7 +163,9 @@ class AbsenceService
 	{
 		$data = $this->scrubClientAuthoredDebitFields($data);
 		$lockKey = $this->acquireUserMutationLock($userId);
+		$catalogLockHeld = false;
 		try {
+			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
@@ -295,6 +299,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -318,7 +323,9 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($targetUserId);
+		$catalogLockHeld = false;
 		try {
+			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
@@ -412,6 +419,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -454,7 +462,9 @@ class AbsenceService
 	{
 		$data = $this->scrubClientAuthoredDebitFields($data);
 		$lockKey = $this->acquireUserMutationLock($userId);
+		$catalogLockHeld = false;
 		try {
+			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			$absence = $this->getAbsence($id, $userId);
 			if (!$absence) {
 				throw new \Exception($this->l10n->t('Absence not found'));
@@ -607,6 +617,7 @@ class AbsenceService
 
 			return $updatedAbsence;
 		} finally {
+			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -877,7 +888,7 @@ class AbsenceService
 		$lockAbsence = $this->absenceMapper->find($id);
 		try {
 			$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
-		} catch (\OCP\Lock\LockedException $e) {
+		} catch (AbsenceMutationBusyException $e) {
 			throw new ConcurrentDecisionException(
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
@@ -983,7 +994,7 @@ class AbsenceService
 		$lockAbsence = $this->absenceMapper->find($id);
 		try {
 			$lockKey = $this->acquireUserMutationLock($lockAbsence->getUserId());
-		} catch (\OCP\Lock\LockedException $e) {
+		} catch (AbsenceMutationBusyException $e) {
 			throw new ConcurrentDecisionException(
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
@@ -1318,8 +1329,47 @@ class AbsenceService
 	private function acquireUserMutationLock(string $userId): string
 	{
 		$key = DbLockKeys::absenceUser($userId);
-		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Absence workflow lock for user ' . $userId);
+		try {
+			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Absence workflow lock for user ' . $userId);
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new AbsenceMutationBusyException(
+				$this->l10n->t('Another absence change is in progress on this account. Please wait a moment and try again.')
+			);
+		}
 		return $key;
+	}
+
+	/**
+	 * Shared catalog lock while validating+writing an absence whose incoming
+	 * type is a custom one — closes the TOCTOU where an admin hard-deletes
+	 * (or deactivates) the type between the isCreatable() check and the
+	 * insert/update commit. CustomAbsenceTypeService writes hold the
+	 * exclusive twin of this lock.
+	 */
+	private function acquireSharedCustomTypeCatalogLock(array $data): bool
+	{
+		if (!str_starts_with((string)($data['type'] ?? ''), 'custom_')) {
+			return false;
+		}
+		try {
+			$this->lockingProvider->acquireLock(
+				DbLockKeys::absenceTypeCatalog(),
+				ILockingProvider::LOCK_SHARED,
+				'Absence write referencing a custom absence type',
+			);
+		} catch (\OCP\Lock\LockedException $e) {
+			throw new CatalogBusyException(
+				$this->l10n->t('An administrator is currently updating the absence type catalog. Please wait a moment and try again.')
+			);
+		}
+		return true;
+	}
+
+	private function releaseSharedCustomTypeCatalogLock(bool $held): void
+	{
+		if ($held) {
+			$this->lockingProvider->releaseLock(DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_SHARED);
+		}
 	}
 
 	/**

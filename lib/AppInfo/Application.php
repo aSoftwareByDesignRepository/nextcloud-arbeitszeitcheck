@@ -268,6 +268,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
 			);
 		});
 
@@ -913,6 +914,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
 			);
 		});
 
@@ -944,6 +946,7 @@ class Application extends App implements IBootstrap {
 				$c->query(NotificationService::class),
 				$c->query(OvertimePayoutMailService::class),
 				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
 			);
 		});
 

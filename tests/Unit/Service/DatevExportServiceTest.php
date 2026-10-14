@@ -353,6 +353,60 @@ class DatevExportServiceTest extends TestCase
 	}
 
 	/**
+	 * Regression: a description containing the record separator `|` or newlines
+	 * must not be able to inject extra columns or forged payroll lines.
+	 */
+	public function testExportTimeEntriesSanitizesDescription(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-31');
+
+		$this->config->expects($this->exactly(4))
+			->method('getAppValue')
+			->willReturnMap([
+				['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
+				['arbeitszeitcheck', 'datev_mandantennummer', '', '12345'],
+				['arbeitszeitcheck', 'datev_lohnart_normal', '1000', '1000'],
+				['arbeitszeitcheck', 'datev_lohnart_ueberstunden', '2000', '2000']
+			]);
+
+		$this->config->expects($this->once())
+			->method('getUserValue')
+			->willReturn('12345678');
+
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-15 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreaks(json_encode([[
+			'start' => '2024-01-15T12:00:00+00:00',
+			'end' => '2024-01-15T13:00:00+00:00',
+		]]));
+		// Pipe would forge extra columns; newline would forge a second payroll line.
+		$entry->setDescription("A|1000|9.99\r\n12345678|20240115|9999");
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+
+		$this->timeEntryMapper->expects($this->once())
+			->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		$result = $this->service->exportTimeEntries($userId, $startDate, $endDate);
+
+		// Every data row must have exactly 6 pipe-separated fields.
+		foreach (explode("\r\n", trim($result)) as $i => $row) {
+			$fields = explode('|', $row);
+			$this->assertCount($i === 0 ? 4 : 6, $fields, "Row $i has wrong field count: $row");
+		}
+		$this->assertStringNotContainsString('9999', $result);
+		$this->assertSame(2, substr_count(trim($result), "\r\n") + 1); // header + 1 data row
+	}
+
+	/**
 	 * Test exporting multiple users
 	 */
 	public function testExportMultipleUsers(): void

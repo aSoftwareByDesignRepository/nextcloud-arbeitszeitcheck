@@ -5380,7 +5380,13 @@
 		"Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Número de processamento para exportação DATEV. Deixe vazio se esta pessoa não for exportada para o DATEV.",
 		"Up to 8 digits. Required for DATEV export of this employee.": "Até 8 dígitos. Necessário para a exportação DATEV deste colaborador.",
 		"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Use isto quando o contrato não corresponde a nenhum modelo de horário partilhado. As horas semanais e diárias abaixo aplicam-se só a este colaborador.",
-		"The offline sync reference does not match this stamp.": "A referência de sincronização offline não corresponde a esta picagem."
+		"The offline sync reference does not match this stamp.": "A referência de sincronização offline não corresponde a esta picagem.",
+		"An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "Um administrador está a atualizar o catálogo de tipos de ausência. Aguarde um momento e tente novamente.",
+		"Another change to the absence type catalog is in progress. Please wait a moment and try again.": "Outra alteração ao catálogo de tipos de ausência está em curso. Aguarde um momento e tente novamente.",
+		"The working time model catalog is being updated. Please wait a moment and try again.": "O catálogo de modelos de horário de trabalho está a ser atualizado. Aguarde um momento e tente novamente.",
+		"This employee profile is being updated by another request. Please wait a moment and try again.": "Este perfil de funcionário está a ser atualizado por outro pedido. Aguarde um momento e tente novamente.",
+		"This overtime balance is being updated by another request. Please wait a moment and try again.": "Este saldo de horas extra está a ser atualizado por outro pedido. Aguarde um momento e tente novamente.",
+		"Another absence change is in progress on this account. Please wait a moment and try again.": "Outra alteração de ausência está em curso nesta conta. Aguarde um momento e tente novamente."
 	},
 	"pluralForm": "nplurals=2; plural=(n > 1);"
 }

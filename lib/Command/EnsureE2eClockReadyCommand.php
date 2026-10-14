@@ -16,6 +16,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Command;
 
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\IConfig;
 use OCP\IUserManager;
@@ -91,7 +92,7 @@ class EnsureE2eClockReadyCommand extends Command
 		// two recent ends. Use findLastCompletedBeforeTime so the loop tracks the
 		// same reference the clock-in check uses (future-dated ends excluded).
 		for ($i = 0; $i < 20; $i++) {
-			$now = new \DateTime();
+			$now = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
 			$last = $this->timeEntryMapper->findLastCompletedBeforeTime($userId, $now);
 			if ($last === null || $last->getEndTime() === null) {
 				$io->writeln('No completed entry to adjust; clock-in should be allowed.');
@@ -106,7 +107,47 @@ class EnsureE2eClockReadyCommand extends Command
 			}
 
 			$newEnd = (clone $now)->modify(sprintf('-%.0f hours', (int)ceil($bufferHours)));
+			// Shift the whole interval, not only end_time: a session shorter than
+			// the rest window would otherwise end up with end_time < start_time —
+			// corrupt rows that poison rest/overlap probes for every later run.
+			$shiftSeconds = $newEnd->getTimestamp() - $end->getTimestamp();
+			$shift = static function (?\DateTimeInterface $v) use ($shiftSeconds): ?\DateTime {
+				if (!$v instanceof \DateTimeInterface) {
+					return null;
+				}
+				return \DateTime::createFromInterface($v)->modify(($shiftSeconds >= 0 ? '+' : '') . $shiftSeconds . ' seconds');
+			};
+			$shiftedStart = $shift($last->getStartTime());
+			if ($shiftedStart !== null) {
+				$last->setStartTime($shiftedStart);
+			}
 			$last->setEndTime($newEnd);
+			$last->setBreakStartTime($shift($last->getBreakStartTime()));
+			$last->setBreakEndTime($shift($last->getBreakEndTime()));
+			$breaksJson = $last->getBreaks();
+			if ($breaksJson !== null && $breaksJson !== '') {
+				$decoded = json_decode($breaksJson, true);
+				if (is_array($decoded)) {
+					foreach ($decoded as &$b) {
+						if (!is_array($b)) {
+							continue;
+						}
+						foreach (['start', 'end'] as $k) {
+							if (isset($b[$k]) && is_string($b[$k]) && $b[$k] !== '') {
+								try {
+									$b[$k] = (new \DateTime($b[$k]))
+										->modify(($shiftSeconds >= 0 ? '+' : '') . $shiftSeconds . ' seconds')
+										->format('c');
+								} catch (\Throwable) {
+									// Leave unparseable break timestamps untouched.
+								}
+							}
+						}
+					}
+					unset($b);
+					$last->setBreaks((string)json_encode($decoded));
+				}
+			}
 			$last->setUpdatedAt($now);
 			$this->timeEntryMapper->update($last);
 			$io->writeln(sprintf(
@@ -117,7 +158,7 @@ class EnsureE2eClockReadyCommand extends Command
 			));
 		}
 
-		$now = new \DateTime();
+		$now = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
 		$last = $this->timeEntryMapper->findLastCompletedBeforeTime($userId, $now);
 		if ($last !== null && $last->getEndTime() !== null
 			&& ($now->getTimestamp() - $last->getEndTime()->getTimestamp()) / 3600 < $minRestHours) {

@@ -163,6 +163,13 @@ class AbsenceTypeAdminController extends Controller
 		if ($result['code'] === 404) {
 			return $this->notFound();
 		}
+		if (($result['error'] ?? null) !== null) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $result['error'],
+				'code' => 'ABSENCE_TYPE_CATALOG_LOCKED',
+			], $result['code']);
+		}
 		return new JSONResponse([
 			'success' => true,
 			'mode' => $result['data']['mode'],
@@ -177,6 +184,13 @@ class AbsenceTypeAdminController extends Controller
 	{
 		if ($result['code'] === 404) {
 			return $this->notFound();
+		}
+		if (($result['error'] ?? null) !== null) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $result['error'],
+				'code' => 'ABSENCE_TYPE_CATALOG_LOCKED',
+			], $result['code']);
 		}
 		if ($result['errors'] !== []) {
 			return new JSONResponse([

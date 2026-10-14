@@ -5380,7 +5380,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Numéro de paie pour l’export DATEV. Laisser vide si cette personne n’est pas exportée vers DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Jusqu’à 8 chiffres. Requis pour l’export DATEV de cet employé.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Utilisez cette option lorsque le contrat ne correspond à aucun modèle d’horaires partagé. Les heures hebdomadaires et journalières ci-dessous s’appliquent uniquement à cet employé.",
-        "The offline sync reference does not match this stamp.": "La référence de synchronisation hors ligne ne correspond pas à ce pointage."
+        "The offline sync reference does not match this stamp.": "La référence de synchronisation hors ligne ne correspond pas à ce pointage.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "Un administrateur met actuellement à jour le catalogue de types d’absence. Veuillez patienter puis réessayer.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "Une autre modification du catalogue de types d’absence est en cours. Veuillez patienter puis réessayer.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "Le catalogue de modèles de temps de travail est en cours de mise à jour. Veuillez patienter puis réessayer.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "Ce profil d’employé est en cours de mise à jour par une autre requête. Veuillez patienter puis réessayer.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "Ce compteur d’heures supplémentaires est en cours de mise à jour par une autre requête. Veuillez patienter puis réessayer.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "Une autre modification d’absence est en cours sur ce compte. Veuillez patienter puis réessayer."
     },
     "pluralForm": null
 }

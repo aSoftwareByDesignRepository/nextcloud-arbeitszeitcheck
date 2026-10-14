@@ -414,6 +414,37 @@ class CommandCoveragePart2Test extends TestCase
 		$this->assertSame(Command::SUCCESS, $code);
 	}
 
+	public function testE2eClockBackdatingShiftsWholeInterval(): void
+	{
+		$um = $this->createMock(IUserManager::class);
+		$um->method('userExists')->willReturn(true);
+
+		// 5-minute session inside the rest window: moving only end_time would
+		// leave end < start. The command must shift start with it.
+		$start = new \DateTime('-35 minutes');
+		$end = new \DateTime('-30 minutes');
+		$last = new TimeEntry();
+		$last->setUserId('e2e_a');
+		$last->setStartTime(clone $start);
+		$last->setEndTime(clone $end);
+
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('findActiveByUser')->willReturn(null);
+		$mapper->method('findOnBreakByUser')->willReturn(null);
+		$mapper->method('findLastCompletedBeforeTime')->willReturn($last);
+		$mapper->expects($this->once())->method('update')
+			->with($this->callback(static function (TimeEntry $e) {
+				$s = $e->getStartTime();
+				$t = $e->getEndTime();
+				return $s !== null && $t !== null
+					&& $t > $s
+					&& abs(($t->getTimestamp() - $s->getTimestamp()) - 300) <= 1;
+			}));
+
+		[$code] = $this->runCmd($this->clockReadyCmd(['userManager' => $um, 'timeEntryMapper' => $mapper]), ['user_id' => 'e2e_a'], ['--force' => true]);
+		$this->assertSame(Command::SUCCESS, $code);
+	}
+
 	// -----------------------------------------------------------
 	// EnsureE2eVacationEntitlementCommand
 	// -----------------------------------------------------------

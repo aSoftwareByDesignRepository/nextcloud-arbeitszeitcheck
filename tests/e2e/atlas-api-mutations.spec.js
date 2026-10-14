@@ -108,11 +108,149 @@ async function kioskApi(page, method, url, terminal, { data } = {}) {
 	return { ok: res.ok(), status: res.status(), json }
 }
 
-function findFreeSlot() {
-	// late evening slots within the 14-day edit window
-	const d = new Date()
-	d.setUTCDate(d.getUTCDate() - 1)
-	return { date: d.toISOString().slice(0, 10), startTime: '22:30', endTime: '23:10' }
+/**
+ * Pick candidate slots inside the 14-day edit window that satisfy the ArbZG
+ * rules the create AND the extend-to-23:25 update both face, mirroring
+ * DailyWorkingHoursCalculator semantics:
+ *  - §5 rest: 12h after the previous shift's end and before the next
+ *    shift's start — measured against the *extended* 23:25 end, so the
+ *    update can't newly violate it;
+ *  - §4 break: >6h of work in a calendar day needs a break — the extended
+ *    entry itself stays ≤6h (start ≥ 17:25) and the day's merged clipped
+ *    work (existing entries + extended span, minus breaks) stays under 6h;
+ *  - no overlap with existing entries on [start, 23:25) — rows whose stored
+ *    end precedes their start clamp to a point, exactly like the server's
+ *    occupancyEnd handling, so they still clash when their start lands
+ *    inside the candidate.
+ * The wire exposes naive local walls (`startTime`/`endTime` ISO); comparing
+ * them on a date-indexed minute axis reproduces the storage-TZ math without
+ * depending on the runner's timezone.
+ */
+// naive wall ("2026-10-14T21:00:00+02:00" or "2026-10-14 21:00:00") →
+// continuous local-minute axis via the date part's day index — mirrors
+// storage-TZ semantics without depending on the runner's timezone.
+function wireWallToAbs(v) {
+	const m = String(v ?? '').match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/)
+	if (!m) {
+		return null
+	}
+	return Math.round(Date.parse(`${m[1]}T00:00:00Z`) / 86400000) * 1440
+		+ Number(m[2]) * 60 + Number(m[3])
+}
+
+async function findFreeRecentSlots(emp) {
+	const REST_MIN = 12 * 60
+	const EXTENDED_END_MIN = 23 * 60 + 25 // the update extends end to 23:25
+	const MAX_WORK_MIN = 6 * 60 - 5 // §4: break mandatory beyond 6h — keep margin
+	const today = new Date()
+	const dayStart = (off) =>
+		new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - off))
+	const iso = (d) => d.toISOString().slice(0, 10)
+	const hm = (mins) =>
+		`${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+	const toAbs = wireWallToAbs
+	const mergeSum = (spans) => {
+		const sorted = spans.filter((s) => s[1] > s[0]).sort((a, b) => a[0] - b[0])
+		let total = 0
+		let cur = null
+		for (const s of sorted) {
+			if (cur === null || s[0] > cur[1]) {
+				if (cur !== null) {
+					total += cur[1] - cur[0]
+				}
+				cur = [...s]
+			} else {
+				cur[1] = Math.max(cur[1], s[1])
+			}
+		}
+		return total + (cur === null ? 0 : cur[1] - cur[0])
+	}
+
+	const list = await api(
+		emp,
+		'GET',
+		`${APP}/api/time-entries?start_date=${iso(dayStart(14))}&end_date=${iso(today)}&limit=500`,
+	)
+	const entries = (list?.entries ?? list?.items ?? [])
+		.map((e) => {
+			let breaks = e.breaks ?? []
+			if (typeof breaks === 'string') {
+				try {
+					breaks = JSON.parse(breaks)
+				} catch {
+					breaks = []
+				}
+			}
+			const bSpans = (Array.isArray(breaks) ? breaks : [])
+				.map((b) => [toAbs(b?.start ?? b?.start_time), toAbs(b?.end ?? b?.end_time)])
+				.filter(([a, b]) => a !== null && b !== null && b > a)
+			const bs = toAbs(e.breakStartTime)
+			const be = toAbs(e.breakEndTime)
+			if (bs !== null && be !== null && be > bs) {
+				bSpans.push([bs, be])
+			}
+			return { s: toAbs(e.startTime), e: toAbs(e.endTime), breaks: bSpans }
+		})
+		.filter((x) => x.s !== null)
+	// live sessions (no stored end) occupy through the end of the axis
+	for (const x of entries) {
+		if (x.e === null) {
+			x.e = Number.MAX_SAFE_INTEGER / 2
+		}
+	}
+
+	const dayWorkMin = (dayIdx) => {
+		const d0 = dayIdx * 1440
+		const d1 = d0 + 1440
+		const periods = []
+		const bspans = []
+		for (const x of entries) {
+			const effEnd = Math.max(x.s, x.e)
+			const cs = Math.max(x.s, d0)
+			const ce = Math.min(effEnd, d1)
+			if (ce > cs) {
+				periods.push([cs, ce])
+			}
+			for (const [ba, bb] of x.breaks) {
+				const bcs = Math.max(ba, d0)
+				const bce = Math.min(bb, d1)
+				if (bce > bcs) {
+					bspans.push([bcs, bce])
+				}
+			}
+		}
+		return Math.max(0, mergeSum(periods) - mergeSum(bspans))
+	}
+
+	const candidates = []
+	for (let d = 13; d >= 1; d--) {
+		const date = iso(dayStart(d))
+		const dayIdx = Math.round(Date.parse(`${date}T00:00:00Z`) / 86400000)
+		const total = dayWorkMin(dayIdx)
+		// late starts walk back; ≥17:25 keeps the extended entry itself ≤6h
+		for (let m = 21 * 60; m >= EXTENDED_END_MIN - MAX_WORK_MIN; m -= 30) {
+			const candStart = dayIdx * 1440 + m
+			const candEnd = dayIdx * 1440 + EXTENDED_END_MIN
+			const clashes = entries.some((x) => x.s < candEnd && Math.max(x.s, x.e) > candStart)
+			const prevEnd = Math.max(
+				...entries.filter((x) => x.e !== null && x.e <= candStart).map((x) => x.e),
+				-Infinity,
+			)
+			const nextStart = Math.min(
+				...entries.filter((x) => x.s >= candEnd).map((x) => x.s),
+				Infinity,
+			)
+			if (
+				!clashes &&
+				candStart - prevEnd >= REST_MIN &&
+				nextStart - candEnd >= REST_MIN &&
+				total + (EXTENDED_END_MIN - m) <= MAX_WORK_MIN
+			) {
+				candidates.push({ date, startTime: hm(m), endTime: hm(m + 40) })
+			}
+		}
+	}
+	return candidates
 }
 
 test.describe('ATLAS durable-mutation sweep', () => {
@@ -194,12 +332,35 @@ test.describe('ATLAS durable-mutation sweep', () => {
 		try {
 			await login(emp, credsFromEnv('EMPLOYEE'))
 			await gotoApp(emp, `${APP}/time-entries`)
-			const { date, startTime, endTime } = findFreeSlot()
-			const created = await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries`, {
-				data: { date, startTime, endTime, description: `atlas-mut ${UNIQ}` },
-			})
-			expect(created.ok, `entry create must succeed: ${JSON.stringify(created.json)}`).toBe(true)
-			entryId = created.json?.id ?? created.json?.entry?.id
+			const candidates = await findFreeRecentSlots(emp)
+			expect(
+				candidates.length,
+				'no ArbZG-legal slot found in the last 13 days',
+			).toBeGreaterThan(0)
+			let date = null
+			let startTime = null
+			let lastCreate = null
+			// Probe candidates in order — a slot another worker just took, or a
+			// guard the analytical model can't see (day locks), advances to the
+			// next candidate instead of failing the sweep.
+			for (const cand of candidates.slice(0, 8)) {
+				const created = await apiAllowFailure(emp, 'POST', `${APP}/api/time-entries`, {
+					data: {
+						date: cand.date,
+						startTime: cand.startTime,
+						endTime: cand.endTime,
+						description: `atlas-mut ${UNIQ}`,
+					},
+				})
+				lastCreate = created
+				if (created.ok) {
+					date = cand.date
+					startTime = cand.startTime
+					entryId = created.json?.id ?? created.json?.entry?.id
+					break
+				}
+			}
+			expect(date, `entry create must succeed: ${JSON.stringify(lastCreate?.json)}`).not.toBeNull()
 			expect(entryId).toBeTruthy()
 
 			// POST /time-entries/{id}/update — legacy form endpoint → same write path as PUT
@@ -363,6 +524,23 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				return dd.toISOString().slice(0, 10)
 			}
 			const SLOTS = [['20:00', '20:40'], ['19:00', '19:40'], ['18:00', '18:40'], ['17:00', '17:40']]
+			// The zero-entry check attributes by start date — a leftover row whose
+			// start sits on another day can still leave an *end* on the candidate
+			// day (corrupt or overnight rows), and §5 rest applies to ends, not to
+			// day buckets. Filter slots against the latest end before them.
+			const allList = await api(
+				emp,
+				'GET',
+				`${APP}/api/time-entries?start_date=${probeDay(14)}&end_date=${probeDay(0)}&limit=500`,
+			)
+			const entryEnds = (allList.entries ?? allList.items ?? [])
+				.map((e) => wireWallToAbs(e.endTime ?? e.end_time))
+				.filter((x) => x !== null)
+			const restOk = (day, st) => {
+				const slotAbs = wireWallToAbs(`${day} ${st}`)
+				const prevEnd = Math.max(...entryEnds.filter((x) => x <= slotAbs), -Infinity)
+				return slotAbs - prevEnd >= 12 * 60
+			}
 			let me = null
 			let freeDay = null
 			for (let d = 1; d < 14 && !freeDay; d++) {
@@ -371,7 +549,8 @@ test.describe('ATLAS durable-mutation sweep', () => {
 					continue
 				}
 				const dayList = await api(emp, 'GET', `${APP}/api/time-entries?start_date=${day}&end_date=${day}&limit=500`)
-				if ((dayList.entries ?? dayList.items ?? []).length === 0) {
+				if ((dayList.entries ?? dayList.items ?? []).length === 0
+					&& SLOTS.some(([st2]) => restOk(day, st2))) {
 					freeDay = day
 				}
 			}
@@ -388,6 +567,9 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			}
 			if (freeDay) {
 				for (const [st2, en2] of SLOTS) {
+					if (!restOk(freeDay, st2)) {
+						continue
+					}
 					me = await apiAllowFailure(mgr, 'POST', `${APP}/api/manager/employee-time-entries`, {
 						data: { userId: EMP, date: freeDay, startTime: st2, endTime: en2, reason: `atlas manager entry ${UNIQ}` },
 					})

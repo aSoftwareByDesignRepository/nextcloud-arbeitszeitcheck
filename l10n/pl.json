@@ -5383,7 +5383,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Numer płacowy do eksportu DATEV. Pozostaw puste, jeśli ta osoba nie jest eksportowana do DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Do 8 cyfr. Wymagane do eksportu DATEV tego pracownika.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Użyj, gdy umowa nie pasuje do żadnego wspólnego modelu czasu pracy. Poniższe godziny tygodniowe i dzienne dotyczą tylko tego pracownika.",
-        "The offline sync reference does not match this stamp.": "Odwołanie synchronizacji offline nie pasuje do tego odbicia."
+        "The offline sync reference does not match this stamp.": "Odwołanie synchronizacji offline nie pasuje do tego odbicia.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "Administrator aktualizuje właśnie katalog typów nieobecności. Poczekaj chwilę i spróbuj ponownie.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "Trwa inna zmiana w katalogu typów nieobecności. Poczekaj chwilę i spróbuj ponownie.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "Katalog modeli czasu pracy jest właśnie aktualizowany. Poczekaj chwilę i spróbuj ponownie.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "Ten profil pracownika jest właśnie aktualizowany przez inne żądanie. Poczekaj chwilę i spróbuj ponownie.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "To saldo nadgodzin jest właśnie aktualizowane przez inne żądanie. Poczekaj chwilę i spróbuj ponownie.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "Trwa inna zmiana nieobecności na tym koncie. Poczekaj chwilę i spróbuj ponownie."
     },
     "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

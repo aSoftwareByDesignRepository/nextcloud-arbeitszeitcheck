@@ -43,4 +43,35 @@ describe('ArbeitszeitCheckComponents showToast HTML safety', () => {
 		expect(title.textContent).toBe('<b>Boom</b>')
 		expect(title.querySelector('b')).toBeNull()
 	})
+
+	it('dedups identical kind+text toasts instead of stacking', () => {
+		const Components = window.ArbeitszeitCheckComponents
+		Components.showToast({ type: 'error', message: 'Save failed', duration: 5000 })
+		Components.showToast({ type: 'error', message: 'Save failed', duration: 5000 })
+		Components.showToast({ type: 'error', message: 'Save failed', duration: 5000 })
+		expect(document.querySelectorAll('.toast')).toHaveLength(1)
+
+		// Different kind or different text must still render separately.
+		Components.showToast({ type: 'success', message: 'Save failed', duration: 5000 })
+		Components.showToast({ type: 'error', message: 'Other failure', duration: 5000 })
+		expect(document.querySelectorAll('.toast')).toHaveLength(3)
+	})
+
+	it('resets the dismiss timer on a dedup hit', () => {
+		vi.useFakeTimers()
+		try {
+			const Components = window.ArbeitszeitCheckComponents
+			const first = Components.showToast({ type: 'info', message: 'Retryable', duration: 1000 })
+			vi.advanceTimersByTime(900)
+			const second = Components.showToast({ type: 'info', message: 'Retryable', duration: 1000 })
+			expect(second).toBe(first)
+			vi.advanceTimersByTime(900)
+			// Original timer would have fired at t=1000; the reset keeps it alive.
+			expect(document.querySelectorAll('.toast')).toHaveLength(1)
+			vi.advanceTimersByTime(500) // dismiss at t≈1900 + 300ms removal
+			expect(document.querySelectorAll('.toast')).toHaveLength(0)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
 })

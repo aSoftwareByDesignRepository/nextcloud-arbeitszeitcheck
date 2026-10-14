@@ -26,19 +26,23 @@ test.describe('Work location marking (GH #43)', () => {
 	 * Create an entry via the API, probing dates to dodge existing rows.
 	 * recentDays=true stays inside the 14-day editability window; otherwise
 	 * scans historical dates (cheaper, no collision with real activity).
+	 * The probe walks distinct 1-hour slots across the day — parallel spec
+	 * seeders cover the old narrow 08:00–14:30 window and starved the probe.
 	 */
 	async function createEntry(page, { workLocation, recentDays = false } = {}) {
 		const stamp = Date.now()
 		const today = new Date().toISOString().slice(0, 10)
 		const base = recentDays ? null : addDays('1994-03-01', stamp % 300)
-		for (let i = 0; i < 40; i++) {
+		let lastError = null
+		for (let i = 0; i < 60; i++) {
 			const date = recentDays
 				? addDays(today, -(1 + (i % 13))) // stay inside the 14-day editability window
 				: addDays(base, i)
+			const startHour = 6 + (i % 16) // 06:00..21:00 → 1h slots
 			const data = {
 				date,
-				startTime: `0${8 + (i % 2)}:00`.slice(-5),
-				endTime: `1${2 + (i % 3)}:30`.slice(-5),
+				startTime: `${String(startHour).padStart(2, '0')}:00`,
+				endTime: `${String(startHour + 1).padStart(2, '0')}:00`,
 				description: `e2e work-location ${stamp}`,
 			}
 			if (workLocation !== undefined) {
@@ -48,8 +52,9 @@ test.describe('Work location marking (GH #43)', () => {
 			if (res.ok && res.json?.success) {
 				return res.json
 			}
+			lastError = { status: res.status, error: res.json?.error, code: res.json?.code }
 		}
-		throw new Error('could not seed a time entry on any probed date')
+		throw new Error(`could not seed a time entry on any probed date (last rejection: ${JSON.stringify(lastError)})`)
 	}
 
 	test('create form exposes an accessible work-location select', async ({ browser }) => {

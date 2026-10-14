@@ -67,6 +67,14 @@ class UpgradeRepairIntegrationTest extends TestCase
 			->andWhere($qb->expr()->eq('version', $qb->createNamedParameter($version)));
 		$deleted = $qb->executeStatement();
 		self::assertSame(1, $deleted, 'fixture must roll back migration ' . $version);
+		// Later column-level migrations must roll back too: recreate via 1045
+		// alone leaves the table without columns added by still-recorded
+		// migrations (e.g. 1050 payload_hash) — degrading the shared dev DB.
+		$qb2 = $db->getQueryBuilder();
+		$qb2->delete('migrations')
+			->where($qb2->expr()->eq('app', $qb2->createNamedParameter('arbeitszeitcheck')))
+			->andWhere($qb2->expr()->eq('version', $qb2->createNamedParameter('1050Date20261020090000')));
+		$qb2->executeStatement();
 		self::assertFalse($db->tableExists($table));
 
 		try {
@@ -87,6 +95,22 @@ class UpgradeRepairIntegrationTest extends TestCase
 			self::assertNotEmpty(
 				array_filter($messages, static fn (string $m): bool => str_contains($m, 'missing')),
 				'repair step must report the missing table before migrating'
+			);
+			// The recreate must restore columns from later migrations too —
+			// a table recreated at 1045 shape without 1050's payload_hash
+			// silently breaks every replay consumer afterwards.
+			$schema = $db->createSchema();
+			$schemaTable = null;
+			foreach ($schema->getTableNames() as $name) {
+				if (str_ends_with($name, $table)) {
+					$schemaTable = $schema->getTable($name);
+					break;
+				}
+			}
+			self::assertNotNull($schemaTable, 'recreated table must appear in schema');
+			self::assertTrue(
+				$schemaTable->hasColumn('payload_hash'),
+				'recreated table must include later-migration columns'
 			);
 		} finally {
 			if (!$db->tableExists($table)) {

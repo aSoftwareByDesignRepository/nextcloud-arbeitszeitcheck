@@ -48,6 +48,27 @@ function nextFutureWeekday(offsetDays) {
 	return d.toISOString().slice(0, 10)
 }
 
+/**
+ * Probe-fragility guard: other specs/fixtures can leave absences covering the
+ * candidate date, and overlap rejections would then mask the guard under test.
+ * Fetch the real list and return the first future weekday outside every
+ * existing absence range.
+ */
+async function freeFutureWeekday(page, startOffset) {
+	const existing = await api(page, 'GET', `${APP}/api/absences?limit=500`)
+	const rows = existing.absences ?? existing.items ?? []
+	const occupied = rows
+		.map((a) => [a.start_date ?? a.startDate, a.end_date ?? a.endDate])
+		.filter(([s, e]) => typeof s === 'string' && typeof e === 'string')
+	for (let off = startOffset; off <= 120; off++) {
+		const candidate = nextFutureWeekday(off)
+		if (!occupied.some(([s, e]) => candidate >= s && candidate <= e)) {
+			return candidate
+		}
+	}
+	return null
+}
+
 test.describe('New absence types: child_sick + overtime_comp', () => {
 	test.skip(!process.env.NC_EMPLOYEE_PASS, 'e2e creds required')
 
@@ -75,7 +96,9 @@ test.describe('New absence types: child_sick + overtime_comp', () => {
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await gotoApp(page, `${APP}/absences`)
 
-		const day = nextFutureWeekday(14)
+		const day = await freeFutureWeekday(page, 14)
+		expect(day, 'no future weekday free of existing absences within +120d').toBeTruthy()
+
 		const created = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
 			data: { type: 'child_sick', start_date: day, end_date: day, reason: `atlas-nt ${UNIQ}` },
 		})
@@ -93,11 +116,15 @@ test.describe('New absence types: child_sick + overtime_comp', () => {
 	test('overtime_comp rejects half-day requests', async ({ page }) => {
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await gotoApp(page, `${APP}/absences`)
-		const day = nextFutureWeekday(21)
+		const day = await freeFutureWeekday(page, 21)
+		expect(day, 'no free future weekday found').toBeTruthy()
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
 			data: { type: 'overtime_comp', start_date: day, end_date: day, day_fraction: 0.5, reason: `atlas-nt ${UNIQ}` },
 		})
 		expect(res.ok, 'half-day overtime_comp must be rejected').toBe(false)
+		// Assert the *right* guard fired — an overlap rejection would also be !ok
+		// but proves nothing about the half-day rule.
+		expect(res.json?.code ?? res.json?.error ?? '').toContain('OVERTIME_COMP_FULL_DAY_ONLY')
 	})
 
 	test('overtime_comp rejects a free weekend day (no planned hours)', async ({ page }) => {
@@ -114,16 +141,17 @@ test.describe('New absence types: child_sick + overtime_comp', () => {
 			data: { type: 'overtime_comp', start_date: sunday, end_date: sunday, reason: `atlas-nt ${UNIQ}` },
 		})
 		expect(res.ok, 'overtime_comp on a non-planned day must be rejected').toBe(false)
+		expect(res.json?.code ?? res.json?.error ?? '').toContain('OVERTIME_COMP_NO_PLANNED_HOURS')
 	})
 
 	test('overtime_comp accepts a future full weekday and re-reads', async ({ page }) => {
 		dbDeleteAbsenceRemnants()
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await gotoApp(page, `${APP}/absences`)
-		// ~5 weeks out: safely future, inside the 30-day-per-request cap is
-		// irrelevant for a single day. If the employee has NO planned hours on
-		// that weekday the guard legitimately rejects — report it honestly.
-		const day = nextFutureWeekday(35)
+		// If the employee has NO planned hours on that weekday the guard
+		// legitimately rejects — report it honestly.
+		const day = await freeFutureWeekday(page, 35)
+		expect(day, 'no free future weekday found').toBeTruthy()
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
 			data: { type: 'overtime_comp', start_date: day, end_date: day, reason: `atlas-nt ${UNIQ}` },
 		})

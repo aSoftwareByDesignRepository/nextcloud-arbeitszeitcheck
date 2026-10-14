@@ -26,7 +26,9 @@ use OCA\ArbeitszeitCheck\Service\VacationHoursDebitService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCP\AppFramework\Controller;
@@ -1126,6 +1128,20 @@ class AbsenceController extends Controller
 				'success' => true,
 				'absence' => $absence->getSummary()
 			], Http::STATUS_CREATED);
+		} catch (CatalogBusyException $e) {
+			$msg = $e->getMessage();
+			if (!$json) {
+				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
+				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
+			}
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+		} catch (AbsenceMutationBusyException $e) {
+			$msg = $e->getMessage();
+			if (!$json) {
+				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
+				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
+			}
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::store: ' . $e->getMessage(), ['exception' => $e]);
 			$msg = $this->getSafeErrorMessage($e);
@@ -1291,6 +1307,10 @@ class AbsenceController extends Controller
 				'success' => true,
 				'absence' => $absence->getSummary()
 			]);
+		} catch (CatalogBusyException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+		} catch (AbsenceMutationBusyException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::update: ' . $e->getMessage(), ['exception' => $e]);
 			$payload = [

@@ -70,7 +70,11 @@ test.describe('S5 Feature B flows', () => {
 			// @ts-ignore test hook
 			window.open = (url) => { window.__openedUrls.push(String(url)); return null }
 		})
-		await page.locator('#btn-export-pdf').click()
+		// scrollIntoView first — a late-injected banner shifted layout mid-click
+		// in a suite run and the actionability check stalled on "outside viewport".
+		const pdfBtn = page.locator('#btn-export-pdf')
+		await pdfBtn.scrollIntoViewIfNeeded()
+		await pdfBtn.click()
 
 		const urls = await page.evaluate(() => window.__openedUrls)
 		expect(urls.length).toBe(1)

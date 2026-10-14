@@ -307,6 +307,12 @@ class OvertimePayoutController extends Controller
 			return new JSONResponse(['success' => true, 'result' => $result]);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\OCP\Lock\LockedException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This overtime balance is being updated by another request. Please wait a moment and try again.'),
+				'code' => 'OVERTIME_BALANCE_BUSY',
+			], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::processOne: ' . $e->getMessage(), ['exception' => $e]);
 

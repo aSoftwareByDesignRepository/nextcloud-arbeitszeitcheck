@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustment;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
 
 /**
  * Admin-only hour-ledger adjustments for overtime Saldo (Nullung / manual payout).
@@ -23,6 +24,7 @@ class OvertimeAdjustmentService
 		private readonly OvertimeBankService $bankService,
 		private readonly AuditLogMapper $auditLogMapper,
 		private readonly IUserManager $userManager,
+		private readonly ILockingProvider $lockingProvider,
 	) {
 	}
 
@@ -75,6 +77,28 @@ class OvertimeAdjustmentService
 			? \DateTime::createFromInterface($effectiveOn)
 			: new \DateTime('today');
 		$effective->setTime(0, 0, 0);
+
+		return $this->withOvertimeBalanceLock(
+			$userId,
+			fn (): array => $this->createAdjustmentLocked($userId, $hoursDelta, $reasonCode, $note, $actorUserId, $effective),
+		);
+	}
+
+	/**
+	 * Read-balance → compute → insert under the per-user overtime ledger lock.
+	 * Without it, two concurrent adjustments both read the same balance_before
+	 * and persist a self-contradicting before/after chain — the audit record
+	 * would no longer reconcile even though the summed balance stays correct.
+	 * Callers MUST already hold {@see DbLockKeys::overtimeBalance()}.
+	 */
+	private function createAdjustmentLocked(
+		string $userId,
+		float $hoursDelta,
+		string $reasonCode,
+		?string $note,
+		string $actorUserId,
+		\DateTime $effective,
+	): array {
 		$year = (int)$effective->format('Y');
 
 		$balanceBefore = $this->getCurrentEffectiveBalance($userId, $effective);
@@ -124,34 +148,63 @@ class OvertimeAdjustmentService
 		?string $note = null,
 		?\DateTimeInterface $effectiveOn = null,
 	): array {
-		$before = $this->getCurrentEffectiveBalance($userId, $effectiveOn);
-		if (abs($before) < self::MIN_ABS_HOURS) {
+		return $this->withOvertimeBalanceLock($userId, function () use ($userId, $actorUserId, $note, $effectiveOn): array {
+			$before = $this->getCurrentEffectiveBalance($userId, $effectiveOn);
+			if (abs($before) < self::MIN_ABS_HOURS) {
+				return [
+					'action' => 'skipped_zero',
+					'balance_before' => $before,
+					'balance_after' => $before,
+				];
+			}
+
+			$reason = $before > 0
+				? OvertimeAdjustment::REASON_PERIOD_NULLUNG
+				: OvertimeAdjustment::REASON_UNDERTIME_WAIVER;
+			$delta = round(-$before, 2);
+			if (abs($delta) > self::MAX_ABS_HOURS) {
+				throw new \InvalidArgumentException('Hours delta out of range');
+			}
+			$effective = $effectiveOn !== null
+				? \DateTime::createFromInterface($effectiveOn)
+				: new \DateTime('today');
+			$effective->setTime(0, 0, 0);
+			$result = $this->createAdjustmentLocked(
+				$userId,
+				$delta,
+				$reason,
+				$note ?? 'Balance reset to zero (Nullung)',
+				$actorUserId,
+				$effective,
+			);
+
 			return [
-				'action' => 'skipped_zero',
-				'balance_before' => $before,
-				'balance_after' => $before,
+				'action' => 'reset',
+				'adjustment' => $result['adjustment'],
+				'balance_before' => $result['balance_before'],
+				'balance_after' => $result['balance_after'],
 			];
+		});
+	}
+
+	/**
+	 * Serialize balance-ledger mutations for one user. Held for the whole
+	 * read → compute → insert (plus audit write) so concurrent writers can
+	 * never interleave the stored balance_before/balance_after chain.
+	 *
+	 * @template T
+	 * @param callable():T $callback
+	 * @return T
+	 */
+	private function withOvertimeBalanceLock(string $userId, callable $callback): mixed
+	{
+		$key = DbLockKeys::overtimeBalance($userId);
+		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
+		try {
+			return $callback();
+		} finally {
+			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
 		}
-
-		$reason = $before > 0
-			? OvertimeAdjustment::REASON_PERIOD_NULLUNG
-			: OvertimeAdjustment::REASON_UNDERTIME_WAIVER;
-		$delta = round(-$before, 2);
-		$result = $this->createAdjustment(
-			$userId,
-			$delta,
-			$reason,
-			$note ?? 'Balance reset to zero (Nullung)',
-			$actorUserId,
-			$effectiveOn
-		);
-
-		return [
-			'action' => 'reset',
-			'adjustment' => $result['adjustment'],
-			'balance_before' => $result['balance_before'],
-			'balance_after' => $result['balance_after'],
-		];
 	}
 
 	/**

@@ -521,7 +521,12 @@ test.describe('ATLAS durable CRUD (web)', () => {
 						break
 					}
 					const err = String(res.json?.error || res.json?.message || '')
-					const retryable = ['overlap', 'überschneid', 'finalisier', 'finalized', 'maximum', 'überschreit']
+					const retryable = [
+						'overlap', 'überschneid', 'finalisier', 'finalized', 'maximum', 'überschreit',
+						// ArbZG §5 rest-period: leftover shifts from earlier specs can make
+						// yesterday's slot ineligible — probe the next day instead of failing.
+						'rest period', 'ruhezeit', 'cannot start before',
+					]
 					if (!retryable.some((k) => err.toLowerCase().includes(k))) {
 						throw new Error(`time-entry create failed: ${err || res.status}`)
 					}
@@ -625,7 +630,7 @@ test.describe('ATLAS durable CRUD (web)', () => {
 				break
 			}
 			const err = String(res.json?.error || '')
-			const retryable = ['overlap', 'überschneid', 'finalisier', 'finalized']
+			const retryable = ['overlap', 'überschneid', 'finalisier', 'finalized', 'rest period', 'ruhezeit', 'cannot start before']
 			if (!retryable.some((k) => err.toLowerCase().includes(k))) {
 				throw new Error(`seed time entry failed: ${err || res.status}`)
 			}

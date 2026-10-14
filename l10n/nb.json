@@ -5380,7 +5380,13 @@
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lønnsnummer for DATEV-eksport. La stå tomt hvis personen ikke eksporteres til DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Opptil 8 sifre. Kreves for DATEV-eksport av denne ansatte.",
         "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Bruk når kontrakten ikke samsvarer med noen delt arbeidstidsmodell. Uke- og dagtimene nedenfor gjelder bare denne ansatte.",
-        "The offline sync reference does not match this stamp.": "Offline-synkroniseringsreferansen samsvarer ikke med dette stempelet."
+        "The offline sync reference does not match this stamp.": "Offline-synkroniseringsreferansen samsvarer ikke med dette stempelet.",
+        "An administrator is currently updating the absence type catalog. Please wait a moment and try again.": "En administrator oppdaterer fraværstypekatalogen akkurat nå. Vent litt og prøv igjen.",
+        "Another change to the absence type catalog is in progress. Please wait a moment and try again.": "En annen endring i fraværstypekatalogen pågår. Vent litt og prøv igjen.",
+        "The working time model catalog is being updated. Please wait a moment and try again.": "Katalogen over arbeidstidsmodeller oppdateres akkurat nå. Vent litt og prøv igjen.",
+        "This employee profile is being updated by another request. Please wait a moment and try again.": "Denne ansattprofilen oppdateres av en annen forespørsel. Vent litt og prøv igjen.",
+        "This overtime balance is being updated by another request. Please wait a moment and try again.": "Denne overtiddsaldoen oppdateres av en annen forespørsel. Vent litt og prøv igjen.",
+        "Another absence change is in progress on this account. Please wait a moment and try again.": "En annen fraværsendring pågår på denne kontoen. Vent litt og prøv igjen."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

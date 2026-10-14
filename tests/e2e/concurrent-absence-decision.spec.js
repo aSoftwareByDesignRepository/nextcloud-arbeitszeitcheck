@@ -63,7 +63,15 @@ test.describe('Concurrent pending absence decision (live)', () => {
 				}
 				lastErr = res.json?.error || `HTTP ${res.status}`
 				const err = String(lastErr).toLowerCase()
-				if (!err.includes('overlap') && !err.includes('working day')) {
+				// 423 busy = another spec holds the shared employee's mutation lock
+				// — retry-safe (nothing persisted), probe again.
+				const retryable =
+					err.includes('overlap') ||
+					err.includes('working day') ||
+					err.includes('in progress') ||
+					err.includes('wait a moment') ||
+					res.status === 423
+				if (!retryable) {
 					throw new Error(lastErr || `Failed to seed absence (${res.status})`)
 				}
 			}

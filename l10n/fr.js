@@ -5371,7 +5371,8 @@
 	"On how many days per week this person works (1–7)." : "Nombre de jours de travail par semaine pour cette personne (1–7).",
 	"Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV." : "Numéro de paie pour l’export DATEV. Laisser vide si cette personne n’est pas exportée vers DATEV.",
 	"Up to 8 digits. Required for DATEV export of this employee." : "Jusqu’à 8 chiffres. Requis pour l’export DATEV de cet employé.",
-	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Utilisez cette option lorsque le contrat ne correspond à aucun modèle d’horaires partagé. Les heures hebdomadaires et journalières ci-dessous s’appliquent uniquement à cet employé."
+	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Utilisez cette option lorsque le contrat ne correspond à aucun modèle d’horaires partagé. Les heures hebdomadaires et journalières ci-dessous s’appliquent uniquement à cet employé.",
+	"The offline sync reference does not match this stamp." : "La référence de synchronisation hors ligne ne correspond pas à ce pointage."
 	}
 );
 }});})();

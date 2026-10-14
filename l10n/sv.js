@@ -5371,7 +5371,8 @@
 	"On how many days per week this person works (1–7)." : "Hur många dagar i veckan denna person arbetar (1–7).",
 	"Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV." : "Lönenummer för DATEV-export. Lämna tomt om personen inte exporteras till DATEV.",
 	"Up to 8 digits. Required for DATEV export of this employee." : "Upp till 8 siffror. Krävs för DATEV-export av denna anställd.",
-	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Använd när kontraktet inte matchar någon delad arbetstidsmodell. Vecko- och dagtimmarna nedan gäller bara denna anställd."
+	"Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee." : "Använd när kontraktet inte matchar någon delad arbetstidsmodell. Vecko- och dagtimmarna nedan gäller bara denna anställd.",
+	"The offline sync reference does not match this stamp." : "Offline-synkreferensen matchar inte denna stämpling."
 	}
 );
 }});})();

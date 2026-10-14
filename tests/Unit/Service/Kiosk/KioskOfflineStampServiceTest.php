@@ -116,11 +116,13 @@ final class KioskOfflineStampServiceTest extends TestCase
 	public function testStampRfidHappyPathClockIn(): void
 	{
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
+		$claim = new KioskStampIdempotency();
+		$claim->setId(5);
+		$this->idempotencyMapper->method('tryInsert')->willReturn($claim);
 		$this->timeTrackingService->expects($this->once())->method('clockIn')
 			->with('alice', null, null, $this->isInstanceOf(\DateTimeInterface::class));
-		$this->idempotencyMapper->expects($this->once())->method('updateResponseJson')
-			->with('term-1', 'req-1', $this->stringContains('"newStatus":"working"'));
+		$this->idempotencyMapper->expects($this->once())->method('updateResponseJsonForId')
+			->with(5, $this->stringContains('"newStatus":"working"'));
 
 		$out = $this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
 		$this->assertTrue($out['success']);
@@ -131,11 +133,13 @@ final class KioskOfflineStampServiceTest extends TestCase
 	public function testStampRfidReleasesClaimOnActionFailure(): void
 	{
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
+		$claim = new KioskStampIdempotency();
+		$claim->setId(5);
+		$this->idempotencyMapper->method('tryInsert')->willReturn($claim);
 		$this->timeTrackingService->method('clockOut')->willThrowException(new KioskException('KIOSK_NO_ACTIVE_SESSION'));
 		$this->idempotencyMapper->expects($this->once())
-			->method('deleteByTerminalAndRequestId')->with('term-1', 'req-1');
-		$this->idempotencyMapper->expects($this->never())->method('updateResponseJson');
+			->method('deleteById')->with(5);
+		$this->idempotencyMapper->expects($this->never())->method('updateResponseJsonForId');
 
 		$this->expectException(KioskException::class);
 		$this->expectExceptionMessage('KIOSK_NO_ACTIVE_SESSION');
@@ -147,14 +151,16 @@ final class KioskOfflineStampServiceTest extends TestCase
 		// Regression: a rest-period rejection used to surface as KIOSK_INTERNAL_ERROR
 		// (generic Throwable catch in the controller) — indistinguishable from a 500.
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
+		$claim = new KioskStampIdempotency();
+		$claim->setId(5);
+		$this->idempotencyMapper->method('tryInsert')->willReturn($claim);
 		$this->timeTrackingService->method('clockIn')->willThrowException(
 			new BusinessRuleException('Minimum 12-hour rest period required', BusinessRuleCode::REST_PERIOD_REQUIRED)
 		);
 		// Claim must be released so a replay re-evaluates instead of returning IN_FLIGHT.
 		$this->idempotencyMapper->expects($this->once())
-			->method('deleteByTerminalAndRequestId')->with('term-1', 'req-1');
-		$this->idempotencyMapper->expects($this->never())->method('updateResponseJson');
+			->method('deleteById')->with(5);
+		$this->idempotencyMapper->expects($this->never())->method('updateResponseJsonForId');
 
 		try {
 			$this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
@@ -168,8 +174,10 @@ final class KioskOfflineStampServiceTest extends TestCase
 	public function testStampRfidRejectsUnknownAction(): void
 	{
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
-		$this->idempotencyMapper->expects($this->once())->method('deleteByTerminalAndRequestId');
+		$claim = new KioskStampIdempotency();
+		$claim->setId(5);
+		$this->idempotencyMapper->method('tryInsert')->willReturn($claim);
+		$this->idempotencyMapper->expects($this->once())->method('deleteById');
 
 		$this->expectException(KioskException::class);
 		$this->expectExceptionMessage('KIOSK_ACTION_INVALID');
@@ -180,18 +188,62 @@ final class KioskOfflineStampServiceTest extends TestCase
 	{
 		$pending = new KioskStampIdempotency();
 		$pending->setResponseJson('{"pending":true}');
+		$pending->setCreatedAt(1770000000);
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn($pending);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(false);
 
 		$this->expectException(StampReplayException::class);
 		$this->expectExceptionMessage('STAMP_CLIENT_REQUEST_IN_FLIGHT');
 		$this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
 	}
 
+	/**
+	 * A PENDING claim older than STALE_CLAIM_SECONDS is abandoned (the request
+	 * died mid-flight): it must be conditionally deleted and re-claimed so the
+	 * key cannot wedge forever.
+	 */
+	public function testStampRfidReclaimsStalePendingClaim(): void
+	{
+		$stale = new KioskStampIdempotency();
+		$stale->setResponseJson('{"pending":true}');
+		// timeFactory->getTime() is 1770000000 — this claim is 1h old, far past
+		// the 300s stale window.
+		$stale->setCreatedAt(1770000000 - 3600);
+		$claim = new KioskStampIdempotency();
+		$claim->setId(7);
+		$this->idempotencyMapper->method('findByTerminalAndRequestId')
+			->willReturnOnConsecutiveCalls($stale, null);
+		$this->idempotencyMapper->expects($this->once())->method('deleteStalePending');
+		$this->idempotencyMapper->expects($this->once())->method('tryInsert')->willReturn($claim);
+		$this->timeTrackingService->expects($this->once())->method('clockIn');
+
+		$payload = $this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
+		$this->assertSame('working', $payload['data']['newStatus']);
+	}
+
+	public function testStampRfidRejectsPayloadMismatchOnRequestIdReuse(): void
+	{
+		// Same clientRequestId, different rfidUid → stored hash differs → the
+		// server must refuse instead of replaying the other badge's result.
+		$existing = new KioskStampIdempotency();
+		$existing->setResponseJson('{"success":true,"data":{"newStatus":"working","message":"Done"}}');
+		$existing->setPayloadHash('b'.str_repeat('0', 63));
+		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn($existing);
+		$this->timeTrackingService->expects($this->never())->method('clockIn');
+
+		try {
+			$this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-1', $this->occurredAt());
+			$this->fail('expected StampReplayException');
+		} catch (StampReplayException $e) {
+			$this->assertSame('STAMP_CLIENT_REQUEST_MISMATCH', $e->getErrorCode());
+		}
+	}
+
 	public function testStampRfidBreakAndClockOutStatuses(): void
 	{
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')->willReturn(null);
-		$this->idempotencyMapper->method('tryInsert')->willReturn(true);
+		$claim = new KioskStampIdempotency();
+		$claim->setId(5);
+		$this->idempotencyMapper->method('tryInsert')->willReturn($claim);
 
 		$this->assertSame('on_break', $this->service->stampRfid($this->terminal, 'A1B2', 'break_start', 'r1', $this->occurredAt())['data']['newStatus']);
 		$this->assertSame('working', $this->service->stampRfid($this->terminal, 'A1B2', 'break_end', 'r2', $this->occurredAt('-30 minutes'))['data']['newStatus']);
@@ -210,6 +262,7 @@ final class KioskOfflineStampServiceTest extends TestCase
 
 		$pending = new KioskStampIdempotency();
 		$pending->setResponseJson('{"pending":true}');
+		$pending->setCreatedAt(1770000000);
 
 		$calls = 0;
 		$this->idempotencyMapper->method('findByTerminalAndRequestId')
@@ -223,7 +276,7 @@ final class KioskOfflineStampServiceTest extends TestCase
 					default => $completed,
 				};
 			});
-		$this->idempotencyMapper->method('tryInsert')->willReturn(false);
+		$this->idempotencyMapper->method('tryInsert')->willReturn(null);
 
 		$out = $this->service->stampRfid($this->terminal, 'A1B2', 'clock_in', 'req-9', $this->occurredAt());
 		$this->assertSame('working', $out['data']['newStatus']);

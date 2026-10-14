@@ -21,6 +21,14 @@ use OCP\AppFramework\Utility\ITimeFactory;
 class KioskOfflineStampService
 {
 	private const PENDING_JSON = '{"pending":true}';
+	/**
+	 * A PENDING claim older than this is treated as abandoned (the request died
+	 * mid-flight) and may be reclaimed. Must stay far above any realistic
+	 * request runtime so a slow-but-alive request is never double-applied.
+	 */
+	private const STALE_CLAIM_SECONDS = 300;
+	private const WAIT_POLL_US = 25_000;
+	private const WAIT_ROUNDS = 12;
 
 	public function __construct(
 		private readonly KioskAuthService $authService,
@@ -53,18 +61,16 @@ class KioskOfflineStampService
 		}
 
 		$terminalId = $terminal->getTerminalId();
-		$cached = $this->readCompletedPayload($terminalId, $clientRequestId);
-		if ($cached !== null) {
-			return $cached;
+		$payloadHash = hash('sha256', implode('|', [
+			$action,
+			(string)$effectiveAt->getTimestamp(),
+			$rfidUid,
+		]));
+		$claim = $this->claimOrReplay($terminalId, $clientRequestId, $payloadHash);
+		if ($claim['cached'] !== null) {
+			return $claim['cached'];
 		}
-		$now = $this->timeFactory->getTime();
-		if (!$this->idempotencyMapper->tryInsert($terminalId, $clientRequestId, self::PENDING_JSON, $now)) {
-			$cached = $this->waitForCompletedPayload($terminalId, $clientRequestId);
-			if ($cached !== null) {
-				return $cached;
-			}
-			throw new StampReplayException('STAMP_CLIENT_REQUEST_IN_FLIGHT');
-		}
+		$claimId = $claim['claimId'];
 
 		try {
 			$userId = $this->authService->resolveUserIdFromRfid($terminal, $rfidUid);
@@ -88,10 +94,10 @@ class KioskOfflineStampService
 				],
 			];
 			$json = json_encode($payload, JSON_THROW_ON_ERROR);
-			$this->idempotencyMapper->updateResponseJson($terminalId, $clientRequestId, $json);
+			$this->idempotencyMapper->updateResponseJsonForId($claimId, $json);
 			return $payload;
 		} catch (\Throwable $e) {
-			$this->idempotencyMapper->deleteByTerminalAndRequestId($terminalId, $clientRequestId);
+			$this->idempotencyMapper->deleteById($claimId);
 			if ($e instanceof BusinessRuleException) {
 				// Business rejections (rest period, already clocked in, …) must keep
 				// their typed kiosk code — an INTERNAL_ERROR 500 would make terminals
@@ -103,39 +109,51 @@ class KioskOfflineStampService
 	}
 
 	/**
-	 * @return array{success: bool, data: array{newStatus: string, message: string}}|null
+	 * Resolve an existing claim, or take it. Same contract as the mobile
+	 * replay: cached response on completed, claimId when this caller owns the
+	 * claim; MISMATCH on same-id/different-payload; stale PENDING claims are
+	 * reclaimed so a crashed request cannot wedge the key forever.
+	 *
+	 * @return array{cached: array{success: bool, data: array{newStatus: string, message: string}}|null, claimId: ?int}
 	 */
-	private function readCompletedPayload(string $terminalId, string $clientRequestId): ?array
+	private function claimOrReplay(string $terminalId, string $clientRequestId, string $payloadHash): array
 	{
-		$existing = $this->idempotencyMapper->findByTerminalAndRequestId($terminalId, $clientRequestId);
-		if ($existing === null) {
-			return null;
-		}
-		$raw = $existing->getResponseJson();
-		if ($raw === self::PENDING_JSON) {
-			return null;
-		}
-		/** @var array{success: bool, data: array{newStatus: string, message: string}} $decoded */
-		$decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-		return $decoded;
-	}
+		for ($i = 0; $i < self::WAIT_ROUNDS; $i++) {
+			$row = $this->idempotencyMapper->findByTerminalAndRequestId($terminalId, $clientRequestId);
+			if ($row === null) {
+				$claim = $this->idempotencyMapper->tryInsert($terminalId, $clientRequestId, self::PENDING_JSON, $this->timeFactory->getTime(), $payloadHash);
+				if ($claim !== null) {
+					return ['cached' => null, 'claimId' => (int)$claim->getId()];
+				}
+				// Lost a claim race — loop and re-read the winner's row.
+				continue;
+			}
 
-	/**
-	 * @return array{success: bool, data: array{newStatus: string, message: string}}|null
-	 */
-	private function waitForCompletedPayload(string $terminalId, string $clientRequestId): ?array
-	{
-		for ($i = 0; $i < 8; $i++) {
-			usleep(25_000);
-			$cached = $this->readCompletedPayload($terminalId, $clientRequestId);
-			if ($cached !== null) {
-				return $cached;
+			$storedHash = $row->getPayloadHash();
+			if ($storedHash !== null && !hash_equals($storedHash, $payloadHash)) {
+				throw new StampReplayException('STAMP_CLIENT_REQUEST_MISMATCH');
 			}
-			if ($this->idempotencyMapper->findByTerminalAndRequestId($terminalId, $clientRequestId) === null) {
-				return null;
+
+			$raw = $row->getResponseJson();
+			if ($raw !== self::PENDING_JSON) {
+				/** @var array{success: bool, data: array{newStatus: string, message: string}} $decoded */
+				$decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+				return ['cached' => $decoded, 'claimId' => null];
 			}
+
+			if ($this->timeFactory->getTime() - $row->getCreatedAt() >= self::STALE_CLAIM_SECONDS) {
+				$this->idempotencyMapper->deleteStalePending(
+					$terminalId,
+					$clientRequestId,
+					self::PENDING_JSON,
+					$this->timeFactory->getTime() - self::STALE_CLAIM_SECONDS,
+				);
+				continue;
+			}
+
+			usleep(self::WAIT_POLL_US);
 		}
-		return $this->readCompletedPayload($terminalId, $clientRequestId);
+		throw new StampReplayException('STAMP_CLIENT_REQUEST_IN_FLIGHT');
 	}
 
 	private function applyClockIn(string $userId, \DateTimeInterface $at): string

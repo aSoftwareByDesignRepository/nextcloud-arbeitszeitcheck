@@ -71,7 +71,11 @@ class TimeTrackingControllerTest extends TestCase
 		$timeZoneService = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
 		$idempotency = $this->createMock(MobileStampIdempotencyMapper::class);
 		$idempotency->method('findByUserAndRequestId')->willReturn(null);
-		$idempotency->method('tryInsert')->willReturn(true);
+		$idempotency->method('tryInsert')->willReturnCallback(static function () {
+			$claim = new \OCA\ArbeitszeitCheck\Db\MobileStampIdempotency();
+			$claim->setId(1);
+			return $claim;
+		});
 		$timeFactory = $this->createMock(ITimeFactory::class);
 		$timeFactory->method('getTime')->willReturn(time());
 		$stampReplay = new MobileStampReplayService(

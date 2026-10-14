@@ -50,8 +50,8 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 		$first = $this->idempotency->tryInsert(self::TEST_USER, self::REQUEST_ID, '{"pending":true}', $now);
 		$second = $this->idempotency->tryInsert(self::TEST_USER, self::REQUEST_ID, '{"pending":true}', $now);
 
-		$this->assertTrue($first, 'First claim must succeed');
-		$this->assertFalse($second, 'Second claim must lose unique race');
+		$this->assertNotNull($first, 'First claim must succeed');
+		$this->assertNull($second, 'Second claim must lose unique race');
 		$this->assertSame(1, $this->countIdemRows(), 'DB truth: one row for (user, clientRequestId)');
 	}
 

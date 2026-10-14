@@ -6,7 +6,6 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\MobileStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
-use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Support\StampClientRequestNormalizer;
 use OCA\ArbeitszeitCheck\Support\StampOccurredAtParser;
@@ -21,6 +20,14 @@ use OCP\AppFramework\Utility\ITimeFactory;
 class MobileStampReplayService
 {
 	private const PENDING_JSON = '{"pending":true}';
+	/**
+	 * A PENDING claim older than this is treated as abandoned (the request died
+	 * mid-flight) and may be reclaimed. Must stay far above any realistic
+	 * request runtime so a slow-but-alive request is never double-applied.
+	 */
+	private const STALE_CLAIM_SECONDS = 300;
+	private const WAIT_POLL_US = 25_000;
+	private const WAIT_ROUNDS = 12;
 
 	public function __construct(
 		private readonly TimeTrackingService $timeTrackingService,
@@ -52,6 +59,13 @@ class MobileStampReplayService
 				$at,
 				$workLocation,
 			),
+			fn (?\DateTimeInterface $at) => self::fingerprint([
+				'clock_in',
+				$at?->getTimestamp() ?? 'now',
+				$projectCheckProjectId ?? '',
+				$description ?? '',
+				$workLocation ?? '',
+			]),
 		);
 	}
 
@@ -65,6 +79,7 @@ class MobileStampReplayService
 			$clientRequestIdRaw,
 			$occurredAtRaw,
 			fn (?\DateTimeInterface $at) => $this->timeTrackingService->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', $at),
+			fn (?\DateTimeInterface $at) => self::fingerprint(['clock_out', $at?->getTimestamp() ?? 'now']),
 		);
 	}
 
@@ -78,6 +93,7 @@ class MobileStampReplayService
 			$clientRequestIdRaw,
 			$occurredAtRaw,
 			fn (?\DateTimeInterface $at) => $this->timeTrackingService->startBreak($userId, $at),
+			fn (?\DateTimeInterface $at) => self::fingerprint(['break_start', $at?->getTimestamp() ?? 'now']),
 		);
 	}
 
@@ -91,11 +107,28 @@ class MobileStampReplayService
 			$clientRequestIdRaw,
 			$occurredAtRaw,
 			fn (?\DateTimeInterface $at) => $this->timeTrackingService->endBreak($userId, $at),
+			fn (?\DateTimeInterface $at) => self::fingerprint(['break_end', $at?->getTimestamp() ?? 'now']),
 		);
 	}
 
 	/**
+	 * Canonical payload fingerprint: sha256 over the action + normalized inputs
+	 * so an idempotent retry with a *different* payload is rejected instead of
+	 * silently replaying the stale response.
+	 *
+	 * @param list<string|int> $parts
+	 */
+	private static function fingerprint(array $parts): string
+	{
+		return hash('sha256', implode('|', array_map(
+			static fn ($p) => (string)$p,
+			$parts,
+		)));
+	}
+
+	/**
 	 * @param callable(?\DateTimeInterface): TimeEntry $mutator
+	 * @param callable(?\DateTimeInterface): string $fingerprintFn
 	 * @return array{success: bool, timeEntry: array<string, mixed>}
 	 */
 	private function replay(
@@ -103,35 +136,26 @@ class MobileStampReplayService
 		?string $clientRequestIdRaw,
 		?string $occurredAtRaw,
 		callable $mutator,
+		callable $fingerprintFn,
 	): array {
 		$clientRequestId = StampClientRequestNormalizer::normalize($clientRequestIdRaw);
 		$effectiveAt = $this->occurredAtParser->parseOptional($occurredAtRaw, $clientRequestId);
+		$payloadHash = $fingerprintFn($effectiveAt);
 
+		$claimId = null;
 		if ($clientRequestId !== null) {
-			$cached = $this->readCompletedPayload($userId, $clientRequestId);
-			if ($cached !== null) {
-				return $cached;
+			$claim = $this->claimOrReplay($userId, $clientRequestId, $payloadHash);
+			if ($claim['cached'] !== null) {
+				return $claim['cached'];
 			}
-			$now = $this->timeFactory->getTime();
-			if (!$this->idempotencyMapper->tryInsert($userId, $clientRequestId, self::PENDING_JSON, $now)) {
-				$cached = $this->waitForCompletedPayload($userId, $clientRequestId);
-				if ($cached !== null) {
-					return $cached;
-				}
-				throw new StampReplayException('STAMP_CLIENT_REQUEST_IN_FLIGHT');
-			}
+			$claimId = $claim['claimId'];
 		}
 
 		try {
 			$timeEntry = $mutator($effectiveAt);
-		} catch (MonthFinalizedException $e) {
-			if ($clientRequestId !== null) {
-				$this->idempotencyMapper->deleteByUserAndRequestId($userId, $clientRequestId);
-			}
-			throw $e;
 		} catch (\Throwable $e) {
-			if ($clientRequestId !== null) {
-				$this->idempotencyMapper->deleteByUserAndRequestId($userId, $clientRequestId);
+			if ($claimId !== null) {
+				$this->idempotencyMapper->deleteById($claimId);
 			}
 			throw $e;
 		}
@@ -143,49 +167,73 @@ class MobileStampReplayService
 			'break_warning' => $this->breakWarning($timeEntry),
 		];
 
-		if ($clientRequestId !== null) {
+		if ($claimId !== null) {
 			$json = json_encode($payload, JSON_THROW_ON_ERROR);
-			$this->idempotencyMapper->updateResponseJson($userId, $clientRequestId, $json);
+			$this->idempotencyMapper->updateResponseJsonForId($claimId, $json);
 		}
 
 		return $payload;
 	}
 
 	/**
-	 * @return array{success: bool, timeEntry: array<string, mixed>}|null
+	 * Resolve an existing claim, or take it.
+	 *
+	 * Returns ['cached' => <stored response>] when the request was already
+	 * applied, ['claimId' => <row id>] when this caller owns the claim and must
+	 * run the mutator. Throws MISMATCH on same-id/different-payload, IN_FLIGHT
+	 * when a live pending claim outlived the wait budget.
+	 *
+	 * @return array{cached: array{success: bool, timeEntry: array<string, mixed>}|null, claimId: ?int}
 	 */
-	private function readCompletedPayload(string $userId, string $clientRequestId): ?array
+	private function claimOrReplay(string $userId, string $clientRequestId, string $payloadHash): array
 	{
-		$existing = $this->idempotencyMapper->findByUserAndRequestId($userId, $clientRequestId);
-		if ($existing === null) {
-			return null;
+		for ($i = 0; $i < self::WAIT_ROUNDS; $i++) {
+			$row = $this->idempotencyMapper->findByUserAndRequestId($userId, $clientRequestId);
+			if ($row === null) {
+				$claim = $this->idempotencyMapper->tryInsert($userId, $clientRequestId, self::PENDING_JSON, $this->timeFactory->getTime(), $payloadHash);
+				if ($claim !== null) {
+					return ['cached' => null, 'claimId' => (int)$claim->getId()];
+				}
+				// Lost a claim race — loop and re-read the winner's row.
+				continue;
+			}
+
+			$this->assertPayloadMatches($row->getPayloadHash(), $payloadHash);
+
+			$raw = $row->getResponseJson();
+			if ($raw !== self::PENDING_JSON) {
+				/** @var array{success: bool, timeEntry: array<string, mixed>} $decoded */
+				$decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+				return ['cached' => $decoded, 'claimId' => null];
+			}
+
+			if ($this->timeFactory->getTime() - $row->getCreatedAt() >= self::STALE_CLAIM_SECONDS) {
+				// Abandoned claim (request died mid-flight): conditional delete —
+				// whoever's delete lands first owns the reclaim, everyone else
+				// keeps waiting on the winner's fresh claim.
+				$this->idempotencyMapper->deleteStalePending(
+					$userId,
+					$clientRequestId,
+					self::PENDING_JSON,
+					$this->timeFactory->getTime() - self::STALE_CLAIM_SECONDS,
+				);
+				continue;
+			}
+
+			usleep(self::WAIT_POLL_US);
 		}
-		$raw = $existing->getResponseJson();
-		if ($raw === self::PENDING_JSON) {
-			return null;
-		}
-		/** @var array{success: bool, timeEntry: array<string, mixed>} $decoded */
-		$decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-		return $decoded;
+		throw new StampReplayException('STAMP_CLIENT_REQUEST_IN_FLIGHT');
 	}
 
 	/**
-	 * @return array{success: bool, timeEntry: array<string, mixed>}|null
+	 * Rows written before the payload_hash column existed carry NULL — they
+	 * cannot be verified and are accepted; anything else must match exactly.
 	 */
-	private function waitForCompletedPayload(string $userId, string $clientRequestId): ?array
+	private function assertPayloadMatches(?string $storedHash, string $incomingHash): void
 	{
-		for ($i = 0; $i < 8; $i++) {
-			usleep(25_000);
-			$cached = $this->readCompletedPayload($userId, $clientRequestId);
-			if ($cached !== null) {
-				return $cached;
-			}
-			$still = $this->idempotencyMapper->findByUserAndRequestId($userId, $clientRequestId);
-			if ($still === null) {
-				return null;
-			}
+		if ($storedHash !== null && !hash_equals($storedHash, $incomingHash)) {
+			throw new StampReplayException('STAMP_CLIENT_REQUEST_MISMATCH');
 		}
-		return $this->readCompletedPayload($userId, $clientRequestId);
 	}
 
 	/**

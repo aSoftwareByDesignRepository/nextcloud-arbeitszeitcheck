@@ -352,9 +352,10 @@ class TimeTrackingController extends Controller
 			'STAMP_CLIENT_REQUEST_ID_INVALID' => $this->l10n->t('Invalid offline sync reference.'),
 			'STAMP_CLIENT_REQUEST_ID_REQUIRED' => $this->l10n->t('Offline sync requires a client reference id.'),
 			'STAMP_CLIENT_REQUEST_IN_FLIGHT' => $this->l10n->t('That stamp is still being processed. Please wait a moment.'),
+			'STAMP_CLIENT_REQUEST_MISMATCH' => $this->l10n->t('The offline sync reference does not match this stamp.'),
 			default => $this->l10n->t('Could not apply the offline stamp.'),
 		};
-		$status = $code === 'STAMP_CLIENT_REQUEST_IN_FLIGHT'
+		$status = in_array($code, ['STAMP_CLIENT_REQUEST_IN_FLIGHT', 'STAMP_CLIENT_REQUEST_MISMATCH'], true)
 			? Http::STATUS_CONFLICT
 			: Http::STATUS_UNPROCESSABLE_ENTITY;
 		return new JSONResponse([

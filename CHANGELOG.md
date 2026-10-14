@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.1 - 2026-10-20
+
+### Security
+
+- **Offline stamp idempotency integrity:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` now store a `payload_hash` fingerprint (Version1050). A `clientRequestId` reused with a *different* payload is rejected with `STAMP_CLIENT_REQUEST_MISMATCH` (409) instead of silently replaying the stale cached response — closing a silent data-loss path where a buggy client could drop an unapplied stamp from its queue.
+
+### Fixed
+
+- **Abandoned stamp claims could wedge a clientRequestId forever:** a request that died between claim and finalize left a permanent `{"pending":true}` row, so every later retry returned `STAMP_CLIENT_REQUEST_IN_FLIGHT` indefinitely. Pending claims older than 5 minutes are now reclaimed via a conditional delete (completed rows are never touched), and claim bookkeeping is keyed by row id so a late writer can never overwrite a reclaimer's row.
+- **Unbounded idempotency growth:** new daily `StampIdempotencyCleanupJob` reaps rows past the 7-day replay window on both stamp-idempotency tables.
+
 ## 1.8.0 - 2026-10-12
 
 ### Added

@@ -5379,7 +5379,8 @@
         "On how many days per week this person works (1–7).": "Hvor mange dage om ugen denne person arbejder (1–7).",
         "Payroll employee number for DATEV export. Leave empty if this person is not exported to DATEV.": "Lønnummer til DATEV-eksport. Lad stå tomt, hvis denne person ikke eksporteres til DATEV.",
         "Up to 8 digits. Required for DATEV export of this employee.": "Op til 8 cifre. Påkrævet for DATEV-eksport af denne medarbejder.",
-        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Brug dette, når kontrakten ikke passer til nogen delt arbejdstidsmodel. Uge- og dagtimerne nedenfor gælder kun for denne medarbejder."
+        "Use this when the contract does not match any shared working time model. The weekly and daily hours below apply only to this employee.": "Brug dette, når kontrakten ikke passer til nogen delt arbejdstidsmodel. Uge- og dagtimerne nedenfor gælder kun for denne medarbejder.",
+        "The offline sync reference does not match this stamp.": "Offline-synkroniseringsreferencen matcher ikke denne stempling."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

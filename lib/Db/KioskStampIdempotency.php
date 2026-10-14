@@ -15,6 +15,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setResponseJson(string $v)
  * @method int getCreatedAt()
  * @method void setCreatedAt(int $v)
+ * @method string|null getPayloadHash()
+ * @method void setPayloadHash(?string $v)
  */
 class KioskStampIdempotency extends Entity
 {
@@ -22,6 +24,7 @@ class KioskStampIdempotency extends Entity
 	protected string $clientRequestId = '';
 	protected string $responseJson = '';
 	protected int $createdAt = 0;
+	protected ?string $payloadHash = null;
 
 	public function __construct()
 	{
@@ -29,5 +32,6 @@ class KioskStampIdempotency extends Entity
 		$this->addType('clientRequestId', 'string');
 		$this->addType('responseJson', 'string');
 		$this->addType('createdAt', 'integer');
+		$this->addType('payloadHash', 'string');
 	}
 }

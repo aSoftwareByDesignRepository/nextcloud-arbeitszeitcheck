@@ -22,6 +22,15 @@ class BadgeVariantTest extends TestCase
 		$this->assertSame(BadgeVariant::SECONDARY, BadgeVariant::forTimeEntryStatus('unknown'));
 	}
 
+	public function testForWorkLocationMapsKnownValues(): void
+	{
+		$this->assertSame(BadgeVariant::INFO, BadgeVariant::forWorkLocation('home'));
+		$this->assertSame(BadgeVariant::NEUTRAL, BadgeVariant::forWorkLocation('external'));
+		$this->assertSame(BadgeVariant::SECONDARY, BadgeVariant::forWorkLocation('office'));
+		$this->assertSame(BadgeVariant::SECONDARY, BadgeVariant::forWorkLocation(null));
+		$this->assertSame(BadgeVariant::SECONDARY, BadgeVariant::forWorkLocation('unknown'));
+	}
+
 	public function testForAbsenceStatusMapsKnownValues(): void
 	{
 		$this->assertSame(BadgeVariant::SUCCESS, BadgeVariant::forAbsenceStatus(Absence::STATUS_APPROVED));

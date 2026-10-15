@@ -26,23 +26,23 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
 $outlookIntroDescId = !empty($azcSettingsShowCardChrome) ? 'outlook-ical-subscription-intro' : 'azc-page-help';
 $outlookTeamsUrl = $outlookApiUrl(
 	'arbeitszeitcheck.outlook_ical_subscription.adminTeams',
-	'/apps/arbeitszeitcheck/api/admin/outlook-ical/teams',
+	'/index.php/apps/arbeitszeitcheck/api/admin/outlook-ical/teams',
 );
 $outlookRotateUrl = $outlookApiUrl(
 	'arbeitszeitcheck.outlook_ical_subscription.adminRotateToken',
-	'/apps/arbeitszeitcheck/api/admin/outlook-ical/rotate',
+	'/index.php/apps/arbeitszeitcheck/api/admin/outlook-ical/rotate',
 );
 $outlookCreateUrl = $outlookApiUrl(
 	'arbeitszeitcheck.outlook_ical_subscription.adminCreateToken',
-	'/apps/arbeitszeitcheck/api/admin/outlook-ical/create',
+	'/index.php/apps/arbeitszeitcheck/api/admin/outlook-ical/create',
 );
 $outlookActiveSubscriptionsUrl = $outlookApiUrl(
 	'arbeitszeitcheck.outlook_ical_subscription.adminActiveSubscriptions',
-	'/apps/arbeitszeitcheck/api/admin/outlook-ical/active-subscriptions',
+	'/index.php/apps/arbeitszeitcheck/api/admin/outlook-ical/active-subscriptions',
 );
 $outlookWebcalLocalAccessUrl = $outlookApiUrl(
 	'arbeitszeitcheck.outlook_ical_subscription.adminWebcalLocalAccess',
-	'/apps/arbeitszeitcheck/api/admin/outlook-ical/webcal-local-access',
+	'/index.php/apps/arbeitszeitcheck/api/admin/outlook-ical/webcal-local-access',
 );
 $outlookFeedLanguageOptions = OutlookIcalSubscriptionLanguageCatalog::optionsForUi();
 $outlookDefaultFeedLanguage = OutlookIcalSubscriptionLanguageCatalog::resolveDefault($l->getLanguageCode());

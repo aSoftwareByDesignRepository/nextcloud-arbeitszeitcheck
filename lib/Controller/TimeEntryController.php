@@ -1090,6 +1090,7 @@ class TimeEntryController extends Controller
 					'complianceStrictMode' => $complianceStrictMode,
 				] + $this->getTimeEntriesSharedTemplateParams($this->getUserId()))
 			);
+			$response->setStatus(Http::STATUS_NOT_FOUND);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in edit method: ' . $e->getMessage(), ['exception' => $e]);
@@ -1113,6 +1114,7 @@ class TimeEntryController extends Controller
 					'complianceStrictMode' => $complianceStrictMode,
 				] + $shared)
 			);
+			$response->setStatus(Http::STATUS_INTERNAL_SERVER_ERROR);
 			return $this->configureCSP($response);
 		}
 	}

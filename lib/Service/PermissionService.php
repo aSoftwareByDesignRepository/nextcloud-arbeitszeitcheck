@@ -154,7 +154,14 @@ class PermissionService
 			if ($userId === '' || isset($unique[$userId])) {
 				continue;
 			}
-			if (!$user->isEnabled()) {
+			try {
+				// LazyUser lookups hit the backend lazily; a user deleted after
+				// search() throws here — skip it instead of crashing the scan.
+				$enabled = $user->isEnabled();
+			} catch (\Throwable) {
+				continue;
+			}
+			if (!$enabled) {
 				continue;
 			}
 			if (!$this->isUserAllowedByAccessGroups($userId)) {

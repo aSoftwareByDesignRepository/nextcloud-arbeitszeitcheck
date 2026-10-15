@@ -254,7 +254,10 @@ async function findFreeRecentSlots(emp) {
 }
 
 test.describe('ATLAS durable-mutation sweep', () => {
-	test.skip(!process.env.NC_EMPLOYEE_PASS || !process.env.NC_MANAGER_PASS, 'e2e creds required')
+	test.skip(
+		!process.env.NC_EMPLOYEE_PASS || !process.env.NC_MANAGER_PASS || !process.env.NC_SUBSTITUTE_PASS,
+		'e2e creds required',
+	)
 
 	test('A: break start/end + widget break + enforce-daily-maximum persist via break/status', async ({ browser }) => {
 		const emp = await browser.newPage()
@@ -330,7 +333,11 @@ test.describe('ATLAS durable-mutation sweep', () => {
 		const emp = await browser.newPage()
 		let entryId = null
 		try {
-			await login(emp, credsFromEnv('EMPLOYEE'))
+			// e2e_substitute, not e2e_employee: the shared employee calendar is
+			// saturated by keep-location/work-location seeds — inside the 14-day
+			// edit window no day clears the 12h-rest + ≤6h model. The substitute
+			// persona owns the entry the same way and its calendar stays sparse.
+			await login(emp, credsFromEnv('SUBSTITUTE'))
 			await gotoApp(emp, `${APP}/time-entries`)
 			const candidates = await findFreeRecentSlots(emp)
 			expect(

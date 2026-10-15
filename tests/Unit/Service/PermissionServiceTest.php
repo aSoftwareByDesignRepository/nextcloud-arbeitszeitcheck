@@ -330,4 +330,29 @@ class PermissionServiceTest extends TestCase
 		);
 		$service->logPermissionDenied('bob', 'absence.approve', 'absence', '42');
 	}
+
+	public function testListAppAccessUserIdsSkipsUserWhoseBackendThrows(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+
+		// LazyUser: a uid deleted between search() and isEnabled() throws —
+		// the scan must skip it instead of aborting the whole directory door.
+		$ghost = $this->createMock(IUser::class);
+		$ghost->method('getUID')->willReturn('ghost_user');
+		$ghost->method('isEnabled')->willThrowException(new \RuntimeException('user backend gone'));
+		$ok = $this->createMock(IUser::class);
+		$ok->method('getUID')->willReturn('ok_user');
+		$ok->method('isEnabled')->willReturn(true);
+		$disabled = $this->createMock(IUser::class);
+		$disabled->method('getUID')->willReturn('disabled_user');
+		$disabled->method('isEnabled')->willReturn(false);
+
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('search')->willReturn([$ghost, $ok, $disabled]);
+
+		$service = $this->createService($groupManager, $teamResolver, null, null, $userManager);
+		$this->assertSame(['ok_user'], $service->listAppAccessUserIds());
+	}
 }

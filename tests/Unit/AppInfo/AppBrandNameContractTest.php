@@ -54,12 +54,23 @@ final class AppBrandNameContractTest extends TestCase
 		}
 
 		$appPhp = (string)file_get_contents($this->root . '/lib/AppInfo/Application.php');
-		$this->assertStringContainsString('INavigationManager', $appPhp);
+		$navGate = (string)file_get_contents($this->root . '/lib/Support/NavGate.php');
+		$this->assertStringContainsString(
+			'NavGate::register(',
+			$appPhp,
+			'Dynamic navigation must be registered via the NavGate helper',
+		);
+		$this->assertStringContainsString('INavigationManager', $navGate);
 		$quoted = preg_quote(self::NAV_L10N_KEY, '/');
 		$this->assertMatchesRegularExpression(
-			"/->t\\(['\"]{$quoted}['\"]\\)/",
+			"/NavGate::register\\([^)]*['\"]{$quoted}['\"]/s",
 			$appPhp,
-			'Dynamic navigation must register the English brand via l10n',
+			'Dynamic navigation must register the English brand',
+		);
+		$this->assertMatchesRegularExpression(
+			'/->t\(\$name\)/',
+			$navGate,
+			'NavGate must translate the registered name via l10n',
 		);
 	}
 

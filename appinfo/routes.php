@@ -55,9 +55,9 @@ return [
 		['name' => 'time_entry#create', 'url' => '/time-entries/create', 'verb' => 'GET'],
 		['name' => 'time_entry#store', 'url' => '/time-entries', 'verb' => 'POST'],
 		// Literal routes must precede the bare {id} routes — Symfony matches in
-		// registration order. {id} is pinned to \d+; id URL templates are built
-		// via linkTo() with an __ID__ sentinel because linkToRoute() validates
-		// requirements at generation time.
+		// registration order. {id} is pinned to \d+; __ID__ URL templates are
+		// built via Support\RouteUrlTemplate because linkToRoute() validates
+		// requirements at generation time (and linkTo() drops /apps).
 		['name' => 'time_entry#exportPdf', 'url' => '/time-entries/export.pdf', 'verb' => 'GET'],
 		['name' => 'time_entry#show', 'url' => '/time-entries/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#edit', 'url' => '/time-entries/{id}/edit', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
@@ -74,7 +74,7 @@ return [
 		['name' => 'time_entry#apiAssignableProjectcheckProjects', 'url' => '/api/projectcheck/assignable-projects', 'verb' => 'GET'],
 		// Literal routes must precede the bare {id} routes below — Symfony matches
 		// in registration order, so check-overlap would otherwise be shadowed by
-		// {id} (see note above on \d+ pinning and __ID__ URL templates).
+		// {id} (see note above on \d+ pinning and URL templates).
 		['name' => 'time_entry#checkOverlap', 'url' => '/api/time-entries/check-overlap', 'verb' => 'GET'],
 		['name' => 'time_entry#apiShow', 'url' => '/api/time-entries/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#apiStore', 'url' => '/api/time-entries', 'verb' => 'POST'],

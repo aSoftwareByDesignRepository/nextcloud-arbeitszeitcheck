@@ -55,6 +55,7 @@ use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Support\NavGate;
 use OCA\ArbeitszeitCheck\Service\AdminEmployeeDirectoryService;
 use OCA\ArbeitszeitCheck\Service\OvertimeTrafficLightService;
 use OCA\ArbeitszeitCheck\Service\OvertimeNotificationMailService;
@@ -1113,6 +1114,16 @@ class Application extends App implements IBootstrap {
 	 * the FrontEndAssetService bundle (which is the single source of truth).
 	 */
 	public function boot(IBootContext $context): void {
-		// Intentionally empty — see FrontEndAssetService::registerCore().
+		$app = $context->getAppContainer();
+		// Menu entry only for users with app access — a static <navigation>
+		// entry would advertise the app to users the door denies.
+		NavGate::register(
+			$app,
+			'arbeitszeitcheck.page.index',
+			'app.svg',
+			'ArbeitszeitCheck',
+			15,
+			static fn(string $uid): bool => $app->get(PermissionService::class)->isUserAllowedByAccessGroups($uid),
+		);
 	}
 }

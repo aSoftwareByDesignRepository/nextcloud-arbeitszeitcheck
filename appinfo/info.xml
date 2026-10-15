@@ -370,14 +370,9 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<command>OCA\ArbeitszeitCheck\Command\VerifyHolidaysCommand</command>
 	</commands>
 
-	<navigations>
-		<navigation>
-			<name>ArbeitszeitCheck</name>
-			<route>arbeitszeitcheck.page.index</route>
-			<icon>app.svg</icon>
-			<order>15</order>
-		</navigation>
-	</navigations>
+	<!-- No <navigation> here: the menu entry is registered conditionally via
+	     NavGate — a static entry would advertise the app to users the
+	     access gate denies. -->
 
 	<keywords>
 		<keyword>time tracking</keyword>

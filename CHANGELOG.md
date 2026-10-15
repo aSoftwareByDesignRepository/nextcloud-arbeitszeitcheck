@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **404 on every ID-bearing UI action:** URL templates generated with `IURLGenerator::linkTo()` (introduced in 1.8.0) silently dropped the `/apps/` prefix, so request-correction, cancel-correction, time-entry delete/deletion-impact, absence show/edit/update/delete, time-entry edit links, and substitution approve/decline all called `/arbeitszeitcheck/...` and returned 404. Templates are now generated via `Support\RouteUrlTemplate` (linkToRoute with a numeric placeholder rewritten to the `__ID__`/`__ENTRY_ID__` sentinel), and a contract test forbids `linkTo()` references to non-existent app files.
 - **Abandoned stamp claims could wedge a clientRequestId forever:** a request that died between claim and finalize left a permanent `{"pending":true}` row, so every later retry returned `STAMP_CLIENT_REQUEST_IN_FLIGHT` indefinitely. Pending claims older than 5 minutes are now reclaimed via a conditional delete (completed rows are never touched), and claim bookkeeping is keyed by row id so a late writer can never overwrite a reclaimer's row.
 - **Unbounded idempotency growth:** new daily `StampIdempotencyCleanupJob` reaps rows past the 7-day replay window on both stamp-idempotency tables.
 

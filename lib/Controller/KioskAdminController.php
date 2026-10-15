@@ -126,13 +126,15 @@ class KioskAdminController extends Controller
 				'apiEnrollmentCancel' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.kiosk_admin.cancelEnrollment'),
 				'apiKioskEnabled' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.kiosk_admin.setKioskEnabled'),
 				'apiSearchUsers' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.kiosk_admin.searchUsers'),
-				'apiTerminalRevoke' => $this->urlGenerator->linkToRoute(
+				'apiTerminalRevoke' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for(
+					$this->urlGenerator,
 					'arbeitszeitcheck.kiosk_admin.revokeTerminal',
-					['terminalUid' => '__ID__'],
+					'terminalUid',
 				),
-				'apiUserAllowed' => $this->urlGenerator->linkToRoute(
+				'apiUserAllowed' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for(
+					$this->urlGenerator,
 					'arbeitszeitcheck.kiosk_admin.setUserAllowed',
-					['userId' => '__ID__'],
+					'userId',
 				),
 				'requesttoken' => Util::callRegister(),
 				'urlGenerator' => $this->urlGenerator,

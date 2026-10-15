@@ -1956,7 +1956,7 @@
             void changedId; void nowDismissed;
             const apiUrl = this.resolveRequestUrl(
                 (this.config && this.config.apiUrl && this.config.apiUrl.updateSettings)
-                    || '/apps/arbeitszeitcheck/settings'
+                    || '/apps/arbeitszeitcheck/settings' // urlgate:ok — resolveRequestUrl normalizes via Utils.resolveUrl
             );
             const token = this.getRequestToken();
             return fetch(apiUrl, {

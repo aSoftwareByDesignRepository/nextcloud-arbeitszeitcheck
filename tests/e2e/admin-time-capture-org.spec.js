@@ -38,6 +38,26 @@ test.describe('Organisation time recording methods', () => {
 			restoreClock = before.settings?.clockStampingEnabled !== false
 			restoreManual = before.settings?.manualTimeEntryEnabled !== false
 
+			await login(employeePage, credsFromEnv('EMPLOYEE'))
+
+			// Normalize the shared employee's clock state BEFORE disabling
+			// stamping: once clockStampingEnabled=false, clock/out is itself
+			// blocked and /complete only handles paused entries — a leftover
+			// active session (killed lane, momos double-clock-in race) would
+			// be unclosable and clock/in would answer 400 already_clocked_in
+			// before ever reaching the stamping-disabled check.
+			const completeActive = async () => {
+				// clock/out is the correct teardown for an ACTIVE session;
+				// /complete only accepts paused entries (momos spec convention).
+				await apiAllowFailure(employeePage, 'POST', '/apps/arbeitszeitcheck/api/clock/out', { data: {} })
+				const st = await apiAllowFailure(employeePage, 'GET', '/apps/arbeitszeitcheck/api/clock/status')
+				const id = st.json?.status?.entry?.id ?? st.json?.status?.currentEntry?.id ?? st.json?.status?.entryId
+				if (id) {
+					await apiAllowFailure(employeePage, 'POST', `/apps/arbeitszeitcheck/api/time-entries/${id}/complete`, { data: {} })
+				}
+			}
+			await completeActive()
+
 			await api(adminPage, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
 				data: {
 					clockStampingEnabled: false,
@@ -50,20 +70,6 @@ test.describe('Organisation time recording methods', () => {
 			expect(after.settings?.clockStampingEnabled).toBe(false)
 			expect(after.settings?.manualTimeEntryEnabled).toBe(true)
 
-			await login(employeePage, credsFromEnv('EMPLOYEE'))
-
-			// Another lane may legitimately hold an active session for this
-			// shared employee fixture (e.g. the momos double-clock-in race).
-			// Completing it right before the clock-in assert ensures we reach
-			// the stamping-disabled check instead of a 400 already_clocked_in.
-			const completeActive = async () => {
-				const st = await apiAllowFailure(employeePage, 'GET', '/apps/arbeitszeitcheck/api/clock/status')
-				const id = st.json?.status?.entry?.id ?? st.json?.status?.currentEntry?.id ?? st.json?.status?.entryId
-				if (id) {
-					await apiAllowFailure(employeePage, 'POST', `/apps/arbeitszeitcheck/api/time-entries/${id}/complete`, { data: {} })
-				}
-			}
-
 			const widget = await api(employeePage, 'GET', '/apps/arbeitszeitcheck/api/dashboard-widget/employee')
 			expect(widget.success).toBe(true)
 			expect(widget.data?.timeCapture?.clockStampingEnabled).toBe(false)
@@ -72,6 +78,9 @@ test.describe('Organisation time recording methods', () => {
 			// Bounded retry: a concurrent lane may have just opened a session
 			// after our normalize; complete it once more and retry rather than
 			// mistaking already_clocked_in for the disabled-stamping path.
+			// Once stamping is disabled clock/out is itself blocked, so a session
+			// opened in the gap is unclosable — re-open the stamping window,
+			// close the session, and re-disable before the second attempt.
 			let clockIn = null
 			for (let attempt = 0; attempt < 2; attempt++) {
 				await completeActive()
@@ -79,6 +88,15 @@ test.describe('Organisation time recording methods', () => {
 					data: {},
 				})
 				if (clockIn.json?.error_code !== 'already_clocked_in') break
+				if (attempt === 0) {
+					await api(adminPage, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
+						data: { clockStampingEnabled: true, manualTimeEntryEnabled: true },
+					})
+					await completeActive()
+					await api(adminPage, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
+						data: { clockStampingEnabled: false, manualTimeEntryEnabled: true },
+					})
+				}
 			}
 			expect(clockIn.ok, `clockIn payload: ${JSON.stringify(clockIn.json)}`).toBe(false)
 			expect(clockIn.status, `clockIn payload: ${JSON.stringify(clockIn.json)}`).toBe(403)

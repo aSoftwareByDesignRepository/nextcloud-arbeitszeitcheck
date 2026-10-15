@@ -166,6 +166,8 @@ class UpgradeBackupService
 			try {
 				$snapshots[] = $this->readManifest($this->getSnapshotFolder($snapshotId), $snapshotId);
 			} catch (\Throwable $e) {
+				// best-effort: one corrupt folder must not hide every good
+				// snapshot from the restore listing — skip it and log.
 				$this->logger->warning('ArbeitszeitCheck: skipping unreadable upgrade backup folder', [
 					'app' => UpgradeBackupCatalog::APP_ID,
 					'folder' => $snapshotId,
@@ -219,7 +221,8 @@ class UpgradeBackupService
 			UpgradeBackupCatalog::existingBackupTables(fn (string $table): bool => $this->db->tableExists($table)),
 		);
 		$fkChecksDisabled = false;
-		$pgReplicaRole = false;
+		$pgTriggerTables = [];
+		$pgTriggersDisabled = [];
 		$sqliteFkDisabled = false;
 		$oracleConstraintsDeferred = false;
 
@@ -227,8 +230,12 @@ class UpgradeBackupService
 			$this->db->executeStatement('SET FOREIGN_KEY_CHECKS=0');
 			$fkChecksDisabled = true;
 		} elseif ($this->db->getDatabaseProvider() === IDBConnection::PLATFORM_POSTGRES) {
-			$this->db->executeStatement('SET session_replication_role = replica');
-			$pgReplicaRole = true;
+			// `SET session_replication_role = replica` requires superuser,
+			// which the Nextcloud DB user must not have in production.
+			// Per-table `DISABLE TRIGGER ALL` only needs table ownership and
+			// is transactional in PostgreSQL, so it runs inside the restore
+			// transaction and reverts automatically on rollback.
+			$pgTriggerTables = array_values(array_unique(array_merge($tablesToClear, $tables)));
 		} elseif ($this->db->getDatabaseProvider() === IDBConnection::PLATFORM_SQLITE) {
 			$this->db->executeStatement('PRAGMA foreign_keys = OFF');
 			$sqliteFkDisabled = true;
@@ -237,8 +244,10 @@ class UpgradeBackupService
 				$this->db->executeStatement('ALTER SESSION SET CONSTRAINTS = DEFERRED');
 				$oracleConstraintsDeferred = true;
 			} catch (\Throwable $e) {
-				// best-effort: deferrable constraints are an optimization; the
-				// restore falls back to insertion order when Oracle declines.
+				// best-effort: deferred constraints are an optimization; when the
+				// ALTER SESSION fails the FK-safe table order from
+				// UpgradeBackupCatalog::sortedRestoreTables still keeps the
+				// restore consistent, so warn and continue.
 				$this->logger->warning('ArbeitszeitCheck: Oracle constraints could not be deferred for restore; relying on restore table order.', [
 					'exception' => $e,
 				]);
@@ -247,12 +256,34 @@ class UpgradeBackupService
 
 		$this->db->beginTransaction();
 		try {
+			foreach ($pgTriggerTables as $pgTable) {
+				try {
+					$this->db->executeStatement(
+						'ALTER TABLE ' . $this->quotePgIdent($this->tablePrefix() . $pgTable) . ' DISABLE TRIGGER ALL',
+					);
+					$pgTriggersDisabled[] = $pgTable;
+				} catch (\Throwable $e) {
+					// best-effort: missing ownership (e.g. shared/schema-managed
+					// installs) must not abort the restore — the FK-safe order
+					// from sortedRestoreTables still keeps it consistent.
+					$this->logger->warning('ArbeitszeitCheck: PostgreSQL triggers could not be disabled for restore; relying on restore table order.', [
+						'exception' => $e,
+					]);
+				}
+			}
+
 			foreach (array_reverse($tablesToClear) as $table) {
 				$this->truncateTableIfExists($table);
 			}
 
 			foreach ($tables as $table) {
 				$this->restoreTableRows($folder, $table, $tableManifest[$table] ?? []);
+			}
+
+			foreach ($pgTriggersDisabled as $pgTable) {
+				$this->db->executeStatement(
+					'ALTER TABLE ' . $this->quotePgIdent($this->tablePrefix() . $pgTable) . ' ENABLE TRIGGER ALL',
+				);
 			}
 
 			$this->restorePreferences($folder);
@@ -264,9 +295,6 @@ class UpgradeBackupService
 		} finally {
 			if ($fkChecksDisabled) {
 				$this->db->executeStatement('SET FOREIGN_KEY_CHECKS=1');
-			}
-			if ($pgReplicaRole) {
-				$this->db->executeStatement('SET session_replication_role = DEFAULT');
 			}
 			if ($sqliteFkDisabled) {
 				$this->db->executeStatement('PRAGMA foreign_keys = ON');
@@ -465,6 +493,7 @@ class UpgradeBackupService
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($table);
 		$result = $qb->executeQuery();
+		/** @var list<array<string, mixed>> $rows */
 		$rows = $result->fetchAll();
 		$result->closeCursor();
 
@@ -522,6 +551,7 @@ class UpgradeBackupService
 			->where($qb->expr()->eq('app', $qb->createNamedParameter(UpgradeBackupCatalog::APP_ID)));
 
 		$result = $qb->executeQuery();
+		/** @var list<array<string, mixed>> $rows */
 		$rows = $result->fetchAll();
 		$result->closeCursor();
 
@@ -631,7 +661,7 @@ class UpgradeBackupService
 			foreach ($row as $column => $value) {
 				// Generated columns (e.g. at_entries.live_user_id) are recomputed
 				// by the engine on insert — writing them explicitly is an SQL
-				// error (MySQL/MariaDB 1906).
+				// error (MySQL/MariaDB 1906, Postgres 42602-class).
 				if (isset($generatedColumns[(string)$column])) {
 					continue;
 				}
@@ -648,30 +678,61 @@ class UpgradeBackupService
 	}
 
 	/**
-	 * Column names declared GENERATED ALWAYS on $table (MySQL/MariaDB report
+	 * Column names declared GENERATED ALWAYS on $table. MySQL/MariaDB report
 	 * them via SHOW COLUMNS Extra containing "GENERATED"; PostgreSQL exposes
-	 * attgenerated='s'). Unknown/unsupported platforms return an empty set —
+	 * attgenerated <> ''. Unknown/unsupported platforms return an empty set —
 	 * worst case the engine raises its own error on insert, as before.
 	 *
 	 * @return array<string, true>
 	 */
 	private function generatedColumnsOf(string $table): array
 	{
-		$physical = $this->config->getSystemValueString('dbtableprefix', 'oc_') . $table;
-		$safe = str_replace('`', '``', $physical);
+		$physical = $this->tablePrefix() . $table;
+		$out = [];
 		try {
-			$cols = $this->db->executeQuery("SHOW COLUMNS FROM `{$safe}`")->fetchAll();
+			if ($this->db->getDatabaseProvider() === IDBConnection::PLATFORM_POSTGRES) {
+				$rows = $this->db->executeQuery(
+					"SELECT a.attname FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid"
+					. " JOIN pg_namespace n ON n.oid = c.relnamespace"
+					. " WHERE c.relname = :tbl AND n.nspname = current_schema()"
+					. " AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated <> ''",
+					['tbl' => $physical],
+				)->fetchAll();
+				foreach ($rows as $r) {
+					$out[(string)$r['attname']] = true;
+				}
+				return $out;
+			}
+			$safe = str_replace('`', '``', $physical);
+			foreach ($this->db->executeQuery("SHOW COLUMNS FROM `{$safe}`")->fetchAll() as $col) {
+				if (str_contains(strtoupper((string)($col['Extra'] ?? '')), 'GENERATED')) {
+					$out[(string)$col['Field']] = true;
+				}
+			}
 		} catch (\Throwable) {
 			return [];
 		}
-		$out = [];
-		foreach ($cols as $col) {
-			$extra = strtoupper((string)($col['Extra'] ?? ''));
-			if (str_contains($extra, 'GENERATED')) {
-				$out[(string)$col['Field']] = true;
-			}
-		}
 		return $out;
+	}
+
+	/**
+	 * Reads the table prefix from `IConfig` because the public
+	 * `IDBConnection` interface does not expose `getPrefix()`.
+	 */
+	private function tablePrefix(): string
+	{
+		return (string)$this->config->getSystemValue('dbtableprefix', 'oc_');
+	}
+
+	/**
+	 * Double-quote a Postgres identifier. Only used on the Postgres restore
+	 * branch; the input is whitelist-derived (prefix + BACKUP_TABLES name).
+	 * `IDBConnection` does not expose `quoteIdentifier()` (runtime-only on
+	 * `OC\DB\Connection`), so we quote locally.
+	 */
+	private function quotePgIdent(string $name): string
+	{
+		return '"' . str_replace('"', '""', $name) . '"';
 	}
 
 	private function truncateTableIfExists(string $table): void
@@ -707,7 +768,7 @@ class UpgradeBackupService
 
 	private function restorePreferences(Folder $snapshotFolder): void
 	{
-		/** @var list<array{userid: string, configkey: string, configvalue: string}> $rows */
+		/** @var list<array<string, mixed>> $rows */
 		$rows = json_decode($this->readFile($snapshotFolder, 'preferences.json'), true, 512, JSON_THROW_ON_ERROR);
 
 		$deleteQb = $this->db->getQueryBuilder();
@@ -758,6 +819,9 @@ class UpgradeBackupService
 		}
 	}
 
+	/**
+	 * @param list<string> $excludeIds
+	 */
 	private function rotateSnapshots(array $excludeIds = []): void
 	{
 		$max = UpgradeBackupCatalog::clampMaxSnapshots((int)$this->config->getAppValue(
@@ -784,6 +848,9 @@ class UpgradeBackupService
 
 	/**
 	 * @param array<string, mixed> $payload
+	 */
+	/**
+	 * @param array<array-key, mixed> $payload
 	 */
 	private function writeJsonFile(Folder $parent, string $name, array $payload): void
 	{
@@ -840,8 +907,10 @@ class UpgradeBackupService
 					$folder->delete();
 				}
 			} catch (\Throwable $e) {
-				// best-effort: purge must continue past one unreadable snapshot;
-				// the corrupt folder id is logged for manual cleanup.
+				// best-effort per snapshot: a corrupt/unreadable manifest or a
+				// failed ->delete() must not abort the purge sweep; the folder is
+				// still removed through the fallback path below so the corrupt
+				// snapshot cannot poison later listSnapshots() runs.
 				$this->logger->warning('ArbeitszeitCheck: removing corrupt upgrade backup folder', [
 					'app' => UpgradeBackupCatalog::APP_ID,
 					'folder' => $snapshotId,

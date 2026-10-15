@@ -95,6 +95,7 @@ class AbsenceControllerTest extends TestCase
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->cspService = $this->createMock(CSPService::class);
+		$this->cspService->method('applyPolicyWithNonce')->willReturnCallback(static fn ($r) => $r);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(fn ($s) => $s);
 		$this->config = $this->createMock(IConfig::class);
@@ -808,8 +809,12 @@ class AbsenceControllerTest extends TestCase
 		$this->absenceService->method('getAbsence')->willReturn(null);
 
 		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $this->controller->create());
-		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $this->controller->show(1));
-		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $this->controller->edit(1));
+		$show = $this->controller->show(1);
+		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $show);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $show->getStatus());
+		$edit = $this->controller->edit(1);
+		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $edit);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $edit->getStatus());
 	}
 
 	public function testUpdatePostDelegatesToUpdate(): void

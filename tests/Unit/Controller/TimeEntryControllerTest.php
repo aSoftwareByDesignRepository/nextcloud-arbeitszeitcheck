@@ -1047,6 +1047,7 @@ class TimeEntryControllerTest extends TestCase
 		$r = $this->controller->edit(1);
 		$params = $r->getParams();
 		$this->assertSame('list', $params['mode']);
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $r->getStatus());
 		// fallback params shape (user context unavailable)
 		$this->assertFalse($params['monthClosureEnabled']);
 		$this->assertFalse($params['showAdminNav']);
@@ -1064,6 +1065,7 @@ class TimeEntryControllerTest extends TestCase
 		$r = $this->controller->edit(1);
 		$params = $r->getParams();
 		$this->assertSame('list', $params['mode']);
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $r->getStatus());
 		$this->assertFalse($params['monthClosureEnabled']);
 		$this->assertFalse($params['showSubstitutionLink']);
 		$this->assertFalse($params['showManagerLink']);
@@ -2043,6 +2045,7 @@ class TimeEntryControllerTest extends TestCase
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 		$edit = $this->controller->edit(1);
 		$this->assertInstanceOf(\OCP\AppFramework\Http\TemplateResponse::class, $edit);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $edit->getStatus());
 	}
 
 	public function testCompleteInvalidId(): void
@@ -2358,5 +2361,27 @@ class TimeEntryControllerTest extends TestCase
 		$response = $this->controller->exportPdf('2024-01-01', '2024-01-31');
 		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
 		$this->assertStringContainsString('truncated at 5000', $response->render());
+	}
+
+	/**
+	 * GH #43: the invalid-work-location response must be a uniform 400 with a
+	 * field-keyed error so clients can render it inline (WCAG 3.3.1).
+	 */
+	public function testInvalidWorkLocationResponseShape(): void
+	{
+		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\TimeEntryController::class, 'invalidWorkLocationResponse');
+		$m->setAccessible(true);
+
+		/** @var \OCP\AppFramework\Http\JSONResponse $response */
+		$response = $m->invoke($this->controller);
+		$this->assertSame(400, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame(
+			\OCA\ArbeitszeitCheck\BusinessRuleCode::INVALID_WORK_LOCATION,
+			$data['error_code']
+		);
+		$this->assertArrayHasKey('workLocation', $data['fields']);
+		$this->assertSame($data['error'], $data['fields']['workLocation']);
 	}
 }

@@ -887,6 +887,7 @@ class AbsenceController extends Controller
 					'absences',
 					$this->buildAbsenceListErrorParams($this->l10n->t('Absence not found'))
 				);
+				$response->setStatus(Http::STATUS_NOT_FOUND);
 				return $this->configureCSP($response);
 			}
 
@@ -922,6 +923,7 @@ class AbsenceController extends Controller
 				'absences',
 				$this->buildAbsenceListErrorParams($this->l10n->t('Absence not found'))
 			);
+			$response->setStatus(Http::STATUS_NOT_FOUND);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::edit: ' . $e->getMessage(), ['exception' => $e]);
@@ -932,6 +934,7 @@ class AbsenceController extends Controller
 					$this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 				)
 			);
+			$response->setStatus(Http::STATUS_INTERNAL_SERVER_ERROR);
 			return $this->configureCSP($response);
 		}
 	}
@@ -958,6 +961,7 @@ class AbsenceController extends Controller
 					'absences',
 					$this->buildAbsenceListErrorParams($this->l10n->t('Absence not found'))
 				);
+				$response->setStatus(Http::STATUS_NOT_FOUND);
 				return $this->configureCSP($response);
 			}
 
@@ -1005,6 +1009,7 @@ class AbsenceController extends Controller
 					$this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 				)
 			);
+			$response->setStatus(Http::STATUS_INTERNAL_SERVER_ERROR);
 			return $this->configureCSP($response);
 		}
 	}

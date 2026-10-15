@@ -3093,6 +3093,32 @@ class AdminControllerTest extends TestCase
 	}
 
 	/**
+	 * JSON export variant: same data, download carries .json filename.
+	 */
+	public function testExportUsersJsonProducesJsonDownload(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('user1');
+		$user->method('getDisplayName')->willReturn('User One');
+		$user->method('getEMailAddress')->willReturn('user1@example.com');
+		$user->method('isEnabled')->willReturn(true);
+
+		$this->userManager->method('search')
+			->willReturn([$user]);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
+			->willReturn(null);
+
+		$response = $this->controller->exportUsers('json');
+
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$headers = method_exists($response, 'getHeaders') ? $response->getHeaders() : [];
+		$contentDisposition = $headers['Content-Disposition'] ?? $headers['content-disposition'] ?? '';
+		$this->assertStringContainsString('users-export-', $contentDisposition);
+		$this->assertStringContainsString('.json', $contentDisposition);
+	}
+
+	/**
 	 * AC-013: Restricted export without filter param uses app_access default (filename suffix).
 	 */
 	public function testExportUsersDefaultsToAppAccessWhenRestricted(): void
@@ -4263,5 +4289,45 @@ class AdminControllerTest extends TestCase
 		$this->assertNotEmpty($final['windows'], 'Request B\'s windows never persisted');
 		$this->assertSame('2', $store[\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_VERSION] ?? null,
 			'Two committed saves must produce version 2 — a repeated version breaks audit diffs');
+	}
+
+	/**
+	 * Locale-independent schema-outdated detection: sentinel message, previous
+	 * chain, and driver-column heuristics — plus negatives for unrelated errors.
+	 */
+	public function testIsVacationUnitSchemaOutdatedErrorDetection(): void
+	{
+		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\AdminController::class, 'isVacationUnitSchemaOutdatedError');
+		$m->setAccessible(true);
+
+		$this->assertTrue($m->invoke($this->controller,
+			new \RuntimeException(\OCA\ArbeitszeitCheck\Constants::VAC_UNIT_SCHEMA_OUTDATED)));
+		$this->assertTrue($m->invoke($this->controller,
+			new \RuntimeException('Unknown column \'duration_hours\' in \'field list\'')));
+		$this->assertTrue($m->invoke($this->controller,
+			new \Exception('driver fail', 0, new \RuntimeException('no such column: carryover_hours'))));
+		$this->assertTrue($m->invoke($this->controller,
+			new \Exception('outer', 0, new \RuntimeException(\OCA\ArbeitszeitCheck\Constants::VAC_UNIT_SCHEMA_OUTDATED))));
+
+		$this->assertFalse($m->invoke($this->controller, new \RuntimeException('deadlock victim')));
+		$this->assertFalse($m->invoke($this->controller, new \RuntimeException('Unknown column \'other_col\'')));
+	}
+
+	/**
+	 * Missing-table detection must catch DBAL object-not-found chains and the
+	 * string fallback used for raw driver exceptions.
+	 */
+	public function testIsMissingTableExceptionDetection(): void
+	{
+		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\AdminController::class, 'isMissingTableException');
+		$m->setAccessible(true);
+
+		$this->assertTrue($m->invoke($this->controller, new \Exception('no such table: at_teams')));
+		$this->assertTrue($m->invoke($this->controller, new \Exception("Table 'oc_at_teams' doesn't exist")));
+		$this->assertTrue($m->invoke($this->controller, new \Exception('undefined table at_teams')));
+
+		$this->assertFalse($m->invoke($this->controller, new \Exception('unique constraint violation')));
+		$this->assertFalse($m->invoke($this->controller,
+			new \Exception('outer', 0, new \Exception('no such table: at_teams'))));
 	}
 }

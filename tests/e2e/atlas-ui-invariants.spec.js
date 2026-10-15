@@ -1,4 +1,5 @@
 // @ts-check
+/* global process */
 /**
  * Atlas UI invariants — shared-contract coverage for ArbeitszeitCheck web.
  *
@@ -80,7 +81,10 @@ async function cleanupStamped(page) {
 }
 
 test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
-	test.skip(!process.env.NC_EMPLOYEE_PASS, 'Requires NC_EMPLOYEE_USER / NC_EMPLOYEE_PASS')
+	test.skip(
+		!process.env.NC_EMPLOYEE_PASS || !process.env.NC_SUBSTITUTE_PASS,
+		'Requires NC_EMPLOYEE_* + NC_SUBSTITUTE_* creds (substitute owns entry-creating probes)',
+	)
 
 	test.beforeEach(async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 900 })
@@ -174,7 +178,19 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 		).toBeLessThanOrEqual(12)
 	})
 
-	test('stored-xss: entry description payloads render escaped on /time-entries', async ({ page }) => {
+	// Entry-creating probes run as e2e_substitute, not e2e_employee: the shared
+	// employee calendar is saturated (daily ~09:00 work + 20:00–20:30 evening
+	// seeds) so no 22:30 slot clears the 12h rest rule inside the edit window.
+	// browser.newPage() gives a fresh context — login() on the already-logged-in
+	// `page` would redirect off /login and silently keep the employee session.
+	async function loginSubstitutePage(browser) {
+		const sub = await browser.newPage()
+		await login(sub, credsFromEnv('SUBSTITUTE'))
+		return sub
+	}
+
+	test('stored-xss: entry description payloads render escaped on /time-entries', async ({ browser }) => {
+		const page = await loginSubstitutePage(browser)
 		const created = []
 		try {
 			for (let i = 0; i < 3; i++) {
@@ -188,10 +204,12 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 			await assertNoInjection(page)
 		} finally {
 			await cleanupStamped(page)
+			await page.close()
 		}
 	})
 
-	test('mutation freshness: API entry appears, then disappears, without manual reload', async ({ page }) => {
+	test('mutation freshness: API entry appears, then disappears, without manual reload', async ({ browser }) => {
+		const page = await loginSubstitutePage(browser)
 		const desc = `${STAMP}-fresh`
 		let id = null
 		try {
@@ -210,6 +228,7 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 			await expect(page.locator(CONTENT)).not.toContainText(desc)
 		} finally {
 			await cleanupStamped(page)
+			await page.close()
 		}
 	})
 

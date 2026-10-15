@@ -77,6 +77,19 @@ class AbsenceTypeCatalogTest extends TestCase
 		$this->assertSame('sick', AbsenceTypeCatalog::label($this->l10n(), 'sick'));
 	}
 
+	public function testLabelForUserResolvesLabelsAndFallsBackToRawType(): void
+	{
+		$labels = AbsenceTypeCatalog::labels($this->l10n());
+		foreach (AbsenceTypeCatalog::all() as $type) {
+			$this->assertSame(
+				$labels[$type],
+				AbsenceTypeCatalog::labelForUser($this->l10n(), $type),
+				"labelForUser mismatch for $type",
+			);
+		}
+		$this->assertSame('exotic_type', AbsenceTypeCatalog::labelForUser($this->l10n(), 'exotic_type'));
+	}
+
 	public function testMaxCalendarDays(): void
 	{
 		$this->assertSame(30, AbsenceTypeCatalog::maxCalendarDays(Absence::TYPE_OVERTIME_COMP));

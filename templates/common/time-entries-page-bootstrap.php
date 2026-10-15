@@ -59,18 +59,22 @@ if ($monthClosureEnabled) {
 	];
 }
 
+// __ID__ templates go through RouteUrlTemplate: linkToRoute() rejects the
+// sentinel (pinned \d+ requirements), and linkTo() drops the /apps prefix for
+// non-file paths — both produce broken client URLs.
+$routeTemplate = static fn (string $route): string =>
+	\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, $route);
+
 $apiUrl = [
 	'timeEntries' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'),
 	'create' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiStore'),
-	// __ID__ URL templates use linkTo(): linkToRoute() validates the pinned \d+
-	// requirements and would reject the sentinel.
-	'update' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__'),
-	'delete' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__'),
-	'deletionImpact' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/deletion-impact'),
+	'update' => $routeTemplate('arbeitszeitcheck.time_entry.apiUpdate'),
+	'delete' => $routeTemplate('arbeitszeitcheck.time_entry.apiDelete'),
+	'deletionImpact' => $routeTemplate('arbeitszeitcheck.time_entry.getDeletionImpact'),
 	'export' => $urlGenerator->linkToRoute('arbeitszeitcheck.export.timeEntries'),
 	'exportPdf' => $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.exportPdf'),
-	'requestCorrection' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/request-correction'),
-	'cancelCorrection' => $urlGenerator->linkTo('arbeitszeitcheck', 'api/time-entries/__ID__/cancel-correction'),
+	'requestCorrection' => $routeTemplate('arbeitszeitcheck.time_entry.requestCorrection'),
+	'cancelCorrection' => $routeTemplate('arbeitszeitcheck.time_entry.cancelCorrection'),
 	'timeEntriesList' => $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries'),
 ];
 

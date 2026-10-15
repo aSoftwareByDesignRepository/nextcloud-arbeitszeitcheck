@@ -16,10 +16,8 @@ $requests = $_['requests'] ?? [];
 $error = $_['error'] ?? null;
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
 $apiListUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.substitute.getPending');
-// __ID__ URL templates use linkTo(): linkToRoute() validates the pinned \d+
-// requirements and would reject the sentinel.
-$apiApproveUrl = $urlGenerator->linkTo('arbeitszeitcheck', 'api/substitution-requests/__ID__/approve');
-$apiDeclineUrl = $urlGenerator->linkTo('arbeitszeitcheck', 'api/substitution-requests/__ID__/decline');
+$apiApproveUrl = \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.substitute.approve', 'absenceId');
+$apiDeclineUrl = \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.substitute.decline', 'absenceId');
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>

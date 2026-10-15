@@ -194,31 +194,63 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			});
 		}
 
-		/* --- absence create form: field-level error state --- */
+		/* --- absence create form: field-level error state ---
+		   Dates default to today and type defaults to Vacation, so a bare
+		   submit would CREATE a real absence row and land on the list.
+		   Clear both dates: the server rejects the POST and re-renders the
+		   form with the error callout — honest error state, zero mutation. */
 		await gotoApp(page, '/apps/arbeitszeitcheck/absences/create');
 		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
 		{
+			// Datepicker inputs are readonly — clear via value+events (same
+			// pattern as the filter leg below), never fill().
+			await page.evaluate(() => {
+				for (const id of ['absence-start-date', 'absence-end-date']) {
+					const el = document.getElementById(id);
+					if (el instanceof HTMLInputElement) {
+						el.removeAttribute('readonly');
+						el.value = '';
+						el.dispatchEvent(new Event('input', { bubbles: true }));
+						el.dispatchEvent(new Event('change', { bubbles: true }));
+					}
+				}
+			});
 			const submitBtn = page.locator(
 				'#absence-form button[type="submit"], form button[type="submit"].azc-btn--primary, #azc-main-content form button[type="submit"]',
 			).first();
 			if (await submitBtn.count()) {
 				await submitBtn.click();
-				await page.waitForTimeout(800);
+				await expect(page.locator('#absence-form-error')).toBeVisible({ timeout: 20_000 });
 				await shot(page, 'azc-absences-create-errors.png', { settleMs: 300 });
 			}
 		}
 
-		/* --- time entry create form + invalid submit errors --- */
+		/* --- time entry create form + invalid submit errors ---
+		   The form pre-fills today and current times — a bare submit creates
+		   a real 0-duration entry. Clear the date so client-side validation
+		   flags #entry-date-error (role=alert) and nothing is persisted. */
 		await gotoApp(page, '/apps/arbeitszeitcheck/time-entries/create');
 		await page.waitForSelector('#time-entry-form, #azc-main-content', { timeout: 30_000 });
 		{
+			await page.evaluate(() => {
+				const el = document.getElementById('entry-date');
+				if (el instanceof HTMLInputElement) {
+					el.removeAttribute('readonly');
+					el.value = '';
+					el.dispatchEvent(new Event('input', { bubbles: true }));
+					el.dispatchEvent(new Event('change', { bubbles: true }));
+				}
+			});
 			const submitBtn = page.locator(
 				'#time-entry-form button[type="submit"], #time-entry-form .time-entry-form__actions .azc-btn--primary',
 			).first();
 			if (await submitBtn.count()) {
 				await submitBtn.click();
-				await page.waitForTimeout(800);
-				await shot(page, 'azc-time-entries-create-errors.png', { settleMs: 300 });
+				await expect(page.locator('#entry-date-error .form-error')).toBeVisible({ timeout: 10_000 });
+				await shot(page, 'azc-time-entries-create-errors.png', {
+					scroll: '#entry-date-error, #entry-date',
+					settleMs: 300,
+				});
 			}
 		}
 

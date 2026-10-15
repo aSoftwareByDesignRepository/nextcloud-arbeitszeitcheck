@@ -276,6 +276,9 @@ test.describe('Admin calendar subscription UI', () => {
 	})
 
 	test('responsive layout stays usable across core breakpoints', async ({ page }) => {
+		// Six full page reloads (one per breakpoint) take ~35-40s on a quiet
+		// instance; shared-instance contention pushed a run past the 60s cap.
+		test.setTimeout(120_000)
 		await login(page, credsFromEnv('ADMIN'))
 		await wireOutlookMocks(page)
 

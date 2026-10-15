@@ -95,9 +95,17 @@ try {
 			continue;
 		}
 		echo "== mutate: {$m['name']} ==\n";
-		file_put_contents($source, str_replace($m['from'], $m['to'], $src));
+		if (file_put_contents($source, str_replace($m['from'], $m['to'], $src)) === false) {
+			fwrite(STDERR, "MUTANT WRITE FAILED: {$m['name']} — fix file perms, do not trust survivors\n");
+			$failed++;
+			continue;
+		}
 		$code = $run();
-		file_put_contents($source, $orig);
+		if (file_put_contents($source, $orig) === false) {
+			fwrite(STDERR, "RESTORE FAILED: {$m['name']} — source left mutated, STOP\n");
+			$failed++;
+			continue;
+		}
 		if ($code === 0) {
 			fwrite(STDERR, "SURVIVED: {$m['name']}\n");
 			$failed++;

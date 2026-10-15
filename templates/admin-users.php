@@ -24,14 +24,9 @@ $defaultFilter = (string)($_['defaultFilter'] ?? $accessFilter);
 $hiddenCount = (int)($_['hiddenCount'] ?? 0);
 $isAccessRestricted = (bool)($_['isAccessRestricted'] ?? false);
 $listTruncated = (bool)($_['truncated'] ?? false);
-/** @var \OCP\IURLGenerator|null $urlGenerator */
-$urlGenerator = $_['urlGenerator'] ?? null;
-$accessSettingsUrl = $urlGenerator
-	? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.settingsAccess')
-	: '/apps/arbeitszeitcheck/admin/settings/access';
-$exportBaseUrl = $urlGenerator
-	? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.exportUsers', ['format' => 'csv'])
-	: '/apps/arbeitszeitcheck/api/admin/users/export?format=csv';
+$urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
+$accessSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.settingsAccess');
+$exportBaseUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.exportUsers', ['format' => 'csv']);
 $exportHref = $exportBaseUrl . (str_contains($exportBaseUrl, '?') ? '&' : '?') . 'filter=' . rawurlencode($accessFilter);
 $filterIntro = $isAccessRestricted
 	? $l->t('Search by name. Choose who appears: people who can open the app, or every Nextcloud account.')
@@ -312,12 +307,10 @@ $filterIntro = $isAccessRestricted
         'truncated' => $listTruncated,
         'accessSettingsUrl' => $accessSettingsUrl,
         'organizationTimeCapture' => $_['organizationTimeCapture'] ?? ['clockStampingEnabled' => true, 'manualTimeEntryEnabled' => true],
-        'userDetailUrlTemplate' => ($urlGenerator
-            ? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => '__USER_ID__'])
-            : '/apps/arbeitszeitcheck/admin/users/__USER_ID__'),
-        'adminTeamsUrl' => ($urlGenerator
-            ? $urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams')
-            : '/apps/arbeitszeitcheck/admin/teams'),
+        'userDetailUrlTemplate' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for(
+            $urlGenerator, 'arbeitszeitcheck.admin.userDetail', 'userId', '__USER_ID__'
+        ),
+        'adminTeamsUrl' => $urlGenerator->linkToRoute('arbeitszeitcheck.admin.teams'),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 

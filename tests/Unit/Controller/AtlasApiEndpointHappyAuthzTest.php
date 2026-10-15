@@ -836,7 +836,11 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 
 		if ($typeName === IURLGenerator::class) {
 			$mock = $this->createMock(IURLGenerator::class);
-			$this->stubMethod($mock, 'linkToRoute', 'https://x/apps/arbeitszeitcheck');
+			// Route params become path segments like the real generator, so
+			// RouteUrlTemplate's /0 → sentinel rewrite has a segment to find.
+			$this->stubMethod($mock, 'linkToRoute', static fn (string $route, array $params = []): string =>
+				'https://x/apps/arbeitszeitcheck'
+				. ($params === [] ? '' : '/' . implode('/', array_values($params))));
 			$this->stubMethod($mock, 'linkToRouteAbsolute', 'https://x/apps/arbeitszeitcheck');
 			$this->stubMethod($mock, 'linkTo', 'https://x/');
 			$this->stubMethod($mock, 'getAbsoluteURL', 'https://x/');

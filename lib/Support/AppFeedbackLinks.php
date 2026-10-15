@@ -153,9 +153,6 @@ final class AppFeedbackLinks
 		$query = [];
 		if (!empty($parts['query'])) {
 			parse_str((string)$parts['query'], $query);
-			if (!is_array($query)) {
-				$query = [];
-			}
 			foreach (array_keys($query) as $key) {
 				if ($this->isBlockedQueryKey((string)$key)) {
 					unset($query[$key]);

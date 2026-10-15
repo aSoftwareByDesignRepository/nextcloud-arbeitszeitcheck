@@ -540,6 +540,25 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		}
 	}
 
+	public function testEmploymentWorkLocationDefaultPersistsAndAuditLogs(): void
+	{
+		$result = $this->service->applyEmploymentSettings(self::TEST_USER, [
+			'workLocationDefault' => 'home',
+		], 'integration_test');
+
+		$this->assertSame('home', $result['workLocationDefault']);
+
+		/** @var \OCA\ArbeitszeitCheck\Service\UserWorkLocationService $locations */
+		$locations = \OC::$server->get(\OCA\ArbeitszeitCheck\Service\UserWorkLocationService::class);
+		$this->assertSame('home', $locations->getDefault(self::TEST_USER));
+
+		// Clearing the key must remove the stored default again.
+		$this->service->applyEmploymentSettings(self::TEST_USER, [
+			'workLocationDefault' => '',
+		], 'integration_test');
+		$this->assertNull($locations->getDefault(self::TEST_USER));
+	}
+
 	public function testUserDeletionRemovesPersonalModels(): void
 	{
 		$victim = '__arbeitszeitcheck_profile_int2__';

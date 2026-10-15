@@ -191,7 +191,12 @@ function main() {
 		getAttribute(k) {
 			return this[k] || null;
 		},
-		querySelector() {
+		querySelector(sel) {
+			// No pre-existing report link inside the toast — the
+			// attachReportLink guard must not early-return here.
+			if (String(sel).indexOf('toast__feedback') !== -1) {
+				return null;
+			}
 			return { appendChild() {} };
 		},
 	};

@@ -151,6 +151,27 @@ final class CustomAbsenceTypeIntegrationTest extends TestCase
 		self::assertNotNull(AbsenceTypeCatalog::resolvedLabel($code));
 	}
 
+	public function testFindAllActiveReturnsOnlyActiveTypes(): void
+	{
+		$active = $this->service->create(['label' => 'Fortbildung'], 'it-admin');
+		$idActive = (int)$active['data']['id'];
+		$this->createdTypeIds[] = $idActive;
+		$codeActive = (string)$active['data']['code'];
+
+		$inactive = $this->service->create(['label' => 'Sonstiges Inaktiv'], 'it-admin');
+		$idInactive = (int)$inactive['data']['id'];
+		$this->createdTypeIds[] = $idInactive;
+		$codeInactive = (string)$inactive['data']['code'];
+		$this->service->update($idInactive, ['active' => 'false'], 'it-admin');
+
+		$codes = array_map(
+			static fn (\OCA\ArbeitszeitCheck\Db\CustomAbsenceType $t): string => $t->getCode(),
+			$this->mapper->findAllActive(),
+		);
+		self::assertContains($codeActive, $codes);
+		self::assertNotContains($codeInactive, $codes, 'inactive custom type leaked into active list');
+	}
+
 	public function testDeactivateKeepsValidButBlocksCreatable(): void
 	{
 		$result = $this->service->create(['label' => 'Blutspende'], 'it-admin');

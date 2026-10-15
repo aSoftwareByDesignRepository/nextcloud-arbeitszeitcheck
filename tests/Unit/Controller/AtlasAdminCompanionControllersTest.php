@@ -72,7 +72,12 @@ class AtlasAdminCompanionControllersTest extends TestCase
 	private function url(): IURLGenerator
 	{
 		$url = $this->createMock(IURLGenerator::class);
-		$url->method('linkToRoute')->willReturn('/x');
+		// Mimic the real generator: route params become path segments so
+		// RouteUrlTemplate's /0 → sentinel rewrite has a segment to find.
+		$url->method('linkToRoute')->willReturnCallback(
+			static fn (string $route, array $params = []): string =>
+				'/x' . ($params === [] ? '' : '/' . implode('/', array_values($params)))
+		);
 		return $url;
 	}
 

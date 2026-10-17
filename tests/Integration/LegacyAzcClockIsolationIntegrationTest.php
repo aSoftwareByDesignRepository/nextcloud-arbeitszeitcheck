@@ -106,13 +106,23 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 		$this->assertNotNull($out->getEndTime());
 
 		$absence = \OCP\Server::get(AbsenceService::class);
-		// Resolve the expected rejection text through the same l10n factory the
-		// service uses — the message is translated for the instance default
-		// language (de on this host), so a hardcoded English substring is
-		// locale-fragile.
-		$expectedRejection = \OCP\Server::get(\OCP\L10N\IFactory::class)
-			->get('arbeitszeitcheck')
-			->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.');
+		// The service's lazy IL10N may have bound to a language resolved earlier
+		// in this phpunit process (cached requestLanguage / session user), so a
+		// fresh factory->get() can resolve a different catalog. Accept every
+		// plausible translation of the msgid instead of pinning one language.
+		$l10nFactory = \OCP\Server::get(\OCP\L10N\IFactory::class);
+		$msgid = 'Vacation must include at least one working day. The selected period contains only weekends or public holidays.';
+		$user = \OCP\Server::get(\OCP\IUserManager::class)->get($this->uid);
+		$candidateLangs = array_unique(array_filter([
+			$l10nFactory->getUserLanguage($user),
+			$l10nFactory->findLanguage('arbeitszeitcheck'),
+			'en',
+			'de',
+		]));
+		$expectedRejections = array_map(
+			static fn (string $lang): string => $l10nFactory->get('arbeitszeitcheck', $lang)->t($msgid),
+			$candidateLangs,
+		);
 		$suffix = bin2hex(random_bytes(2));
 		$row = null;
 		$cursor = new \DateTimeImmutable('tomorrow');
@@ -127,7 +137,7 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 					'server_may_fill_hours' => true,
 				], $this->uid);
 			} catch (\Exception $e) {
-				$this->assertStringContainsString($expectedRejection, $e->getMessage());
+				$this->assertContains($e->getMessage(), $expectedRejections);
 			}
 		}
 		$this->assertNotNull($row, 'no working day found in the next 14 days');

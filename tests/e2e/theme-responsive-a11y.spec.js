@@ -52,6 +52,10 @@ const employeeRoutes = [
 	{ id: 'business-trips', path: '/apps/arbeitszeitcheck/business-trips', ready: '#bt-root' },
 ]
 
+const managerRoutes = [
+	{ id: 'manager-business-trips', path: '/apps/arbeitszeitcheck/manager/business-trips', ready: '#mbt-root' },
+]
+
 const overflowViewports = [
 	{ width: 320, height: 640 },
 	{ width: 375, height: 812 },
@@ -268,6 +272,28 @@ test.describe('ArbeitszeitCheck theme × viewport (employee dashboard)', () => {
 		for (const route of employeeRoutes) {
 			test(`${theme}: ${route.id}`, async ({ page }) => {
 				await login(page, credsFromEnv('EMPLOYEE'))
+				await gotoReady(page, route.path, route.ready)
+				await setUserTheme(page, theme)
+				await assertThemeTokensResolved(page)
+				for (const viewport of overflowViewports) {
+					await page.setViewportSize(viewport)
+					await expectNoHorizontalOverflow(page, `${theme}/${route.id}@${viewport.width}px`)
+				}
+				await page.setViewportSize({ width: 1280, height: 800 })
+				await runAxe(page, `${theme}/${route.id}@1280px`)
+			})
+		}
+	}
+})
+
+test.describe('ArbeitszeitCheck theme × viewport (manager)', () => {
+	test.setTimeout(180_000)
+	test.skip(!process.env.NC_MANAGER_USER, 'Requires NC_MANAGER_USER / NC_MANAGER_PASS')
+
+	for (const theme of ['light', 'dark']) {
+		for (const route of managerRoutes) {
+			test(`${theme}: ${route.id}`, async ({ page }) => {
+				await login(page, credsFromEnv('MANAGER'))
 				await gotoReady(page, route.path, route.ready)
 				await setUserTheme(page, theme)
 				await assertThemeTokensResolved(page)

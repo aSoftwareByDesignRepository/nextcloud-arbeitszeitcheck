@@ -1,4 +1,6 @@
 /* global process */
+// shared-state-safe: the only /api/admin/settings POST is intercepted by
+// page.route and fulfilled locally — no write ever reaches the server.
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { login, credsFromEnv } from './helpers/auth.js'

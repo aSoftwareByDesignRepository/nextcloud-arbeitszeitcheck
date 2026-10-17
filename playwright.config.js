@@ -87,6 +87,9 @@ const STATEFUL_SPECS = [
   // org-scoped rule assignments, and share a tripId across tests — the
   // rollout+resolve chain races any parallel spec touching admin state.
   /business-trips\.spec\.js/,
+  // Custom absence-type CRUD writes the shared type catalog — a parallel
+  // spec enumerating types can observe a phantom row mid-flight.
+  /admin-absence-types\.spec\.js/,
 ]
 
 export default defineConfig({

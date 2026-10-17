@@ -256,24 +256,24 @@
  * color-mix convention as css/dashboard.css) so light/dark/high-contrast and
  * custom accent colors all resolve automatically — never raw hex. */
 .azc-status-chip[data-status='submitted'] {
-	--status-accent: var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
-	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
-	color: var(--status-accent);
+	--status-accent: var(--color-info, var(--color-primary-element, var(--arbeitszeitcheck-color-primary)));
+	background: color-mix(in srgb, var(--status-accent) 14%, var(--color-main-background));
+	color: var(--color-info-text, var(--status-accent));
 	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
 }
 
 .azc-status-chip[data-status='approved'] {
 	--status-accent: var(--color-success, var(--arbeitszeitcheck-color-success));
-	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
-	color: var(--status-accent);
+	background: color-mix(in srgb, var(--status-accent) 14%, var(--color-main-background));
+	color: var(--color-success-text, var(--status-accent));
 	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
 }
 
 .azc-status-chip[data-status='rejected'],
 .azc-status-chip[data-status='cancelled'] {
 	--status-accent: var(--color-error, var(--arbeitszeitcheck-color-error));
-	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
-	color: var(--status-accent);
+	background: color-mix(in srgb, var(--status-accent) 14%, var(--color-main-background));
+	color: var(--color-error-text, var(--status-accent));
 	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
 }
 

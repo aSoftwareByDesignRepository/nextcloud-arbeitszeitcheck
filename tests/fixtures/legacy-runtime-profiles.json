@@ -6,7 +6,7 @@
   },
   "profiles": [
     {
-      "key": "v1.8.0-on-nc35",
+      "key": "nc32-35-on-nc35",
       "sourceMin": "32",
       "sourceMax": "35",
       "serverVersion": "35",

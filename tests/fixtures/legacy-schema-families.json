@@ -2,7 +2,7 @@
   "format": 1,
   "families": [
     {
-      "key": "v1.8.0-production-source",
+      "key": "v1.8.0-to-v1.8.0",
       "tags": ["v1.8.0"],
       "migrationVersions": [
         1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009,

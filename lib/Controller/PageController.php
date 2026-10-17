@@ -955,7 +955,7 @@ class PageController extends Controller
 	#[NoCSRFRequired]
 	public function reports(): TemplateResponse|RedirectResponse
 	{
-		$this->registerFrontEndAssets('reports', 'reports');
+		$this->registerFrontEndAssets('reports', 'reports', [], ['common/csv']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 
 		try {

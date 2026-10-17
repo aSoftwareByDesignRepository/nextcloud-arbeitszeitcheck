@@ -1187,6 +1187,15 @@
 				downloadBlob(JSON.stringify(report, null, 2), 'application/json', 'overtime-report-' + startIso + '_' + endIso + '.json');
 				return;
 			}
+			// Formula-injection guard is mandatory for client-built CSV
+			// (user-controlled cells: user_id, display_name). Fail closed.
+			const csvCell = window.ArbeitszeitCheckCsv && typeof window.ArbeitszeitCheckCsv.cell === 'function'
+				? window.ArbeitszeitCheckCsv.cell
+				: null;
+			if (!csvCell) {
+				showDownloadError((A.l10n && A.l10n.error) || 'An error occurred. Please try again.');
+				return;
+			}
 			const headers = [
 				'user_id',
 				'display_name',
@@ -1202,16 +1211,16 @@
 			const rows = [headers.join(';')];
 			report.users.forEach((u) => {
 				const cols = [
-					u.user_id || '',
-					(u.display_name || '').replace(/;/g, ','),
-					u.total_hours_worked != null ? u.total_hours_worked : '',
-					u.required_hours != null ? u.required_hours : '',
-					u.period_overtime_hours != null ? u.period_overtime_hours : '',
-					u.period_undertime_hours != null ? u.period_undertime_hours : '',
-					u.effective_balance != null ? u.effective_balance : '',
+					csvCell(u.user_id),
+					csvCell(u.display_name),
+					csvCell(u.total_hours_worked),
+					csvCell(u.required_hours),
+					csvCell(u.period_overtime_hours),
+					csvCell(u.period_undertime_hours),
+					csvCell(u.effective_balance),
 				];
 				if (bankOn) {
-					cols.push(u.banked_hours != null ? u.banked_hours : '', u.payout_eligible_hours != null ? u.payout_eligible_hours : '');
+					cols.push(csvCell(u.banked_hours), csvCell(u.payout_eligible_hours));
 				}
 				rows.push(cols.join(';'));
 			});

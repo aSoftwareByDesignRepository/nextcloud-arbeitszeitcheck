@@ -335,7 +335,6 @@ class TimeEntryController extends Controller
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, [
 			'time-entries',
 			'time-entry-correction',
-			'time-entry-form',
 			'time-entry-form-accessibility',
 		], [
 			'common/datepicker',

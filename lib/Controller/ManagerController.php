@@ -552,7 +552,10 @@ class ManagerController extends Controller
 	{
 		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
-		Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		if ($this->workforceSuiteConfig !== null
+			&& $this->workforceSuiteConfig->isEnabled('work_location_catalog_enabled')) {
+			Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		}
 		Util::addScript('arbeitszeitcheck', 'common/time-entry-clock-form');
 		Util::addScript('arbeitszeitcheck', 'manager-correction-dialog');
 		Util::addScript('arbeitszeitcheck', 'manager-create-time-entry');

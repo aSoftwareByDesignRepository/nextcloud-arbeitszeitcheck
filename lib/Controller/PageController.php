@@ -354,7 +354,9 @@ class PageController extends Controller
 			'dashboard-overtime',
 			'common/projectcheck',
 		]);
-		Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		if ($this->workLocationCatalogEnabled()) {
+			Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		}
 
 		try {
 			$userId = $this->getUserId();
@@ -560,7 +562,9 @@ class PageController extends Controller
 		foreach ($extraScripts as $script) {
 			\OCP\Util::addScript('arbeitszeitcheck', $script);
 		}
-		\OCP\Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		if ($this->workLocationCatalogEnabled()) {
+			\OCP\Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
+		}
 		if ($this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_MONTH_CLOSURE_ENABLED, '0') === '1') {
 			\OCP\Util::addScript('arbeitszeitcheck', 'month-closure');
 		}
@@ -693,7 +697,9 @@ class PageController extends Controller
 	{
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker']);
 		Util::addScript('arbeitszeitcheck', 'entitlement-explainer');
-		Util::addScript('arbeitszeitcheck', 'absence-entitlements');
+		if ($this->specialEntitlementsEnabled()) {
+			Util::addScript('arbeitszeitcheck', 'absence-entitlements');
+		}
 
 		try {
 			$userId = $this->getUserId();
@@ -914,6 +920,22 @@ class PageController extends Controller
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'business-trips', $params);
 		return $this->configureCSP($response);
+	}
+
+	private function specialEntitlementsEnabled(): bool
+	{
+		if ($this->workforceSuiteConfig !== null) {
+			return $this->workforceSuiteConfig->isEnabled('special_entitlements_enabled');
+		}
+		return $this->config->getAppValue('arbeitszeitcheck', 'special_entitlements_enabled', '0') === '1';
+	}
+
+	private function workLocationCatalogEnabled(): bool
+	{
+		if ($this->workforceSuiteConfig !== null) {
+			return $this->workforceSuiteConfig->isEnabled('work_location_catalog_enabled');
+		}
+		return $this->config->getAppValue('arbeitszeitcheck', 'work_location_catalog_enabled', '0') === '1';
 	}
 
 	private function businessTripsEnabled(): bool
@@ -1161,11 +1183,15 @@ class PageController extends Controller
 			return new NotFoundResponse();
 		}
 
+		$settingsScripts = ['employee-settings-legacy-redirect'];
+		if ($this->workLocationCatalogEnabled()) {
+			$settingsScripts[] = 'common/work-location-catalog';
+		}
 		$this->registerFrontEndAssets(
 			'settings',
 			'settings',
-			['common/projectcheck', 'common/work-location-catalog'],
-			['employee-settings-legacy-redirect']
+			['common/projectcheck'],
+			$settingsScripts
 		);
 
 		try {

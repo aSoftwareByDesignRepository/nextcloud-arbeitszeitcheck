@@ -90,11 +90,30 @@ const STATEFUL_SPECS = [
   // Custom absence-type CRUD writes the shared type catalog — a parallel
   // spec enumerating types can observe a phantom row mid-flight.
   /admin-absence-types\.spec\.js/,
+  // Creates/deletes absence rows on the shared e2e_employee — a parallel
+  // absence mutation holds the per-account change lock → "Another absence
+  // change is in progress" (locked) mid-suite (observed 2026-10-17).
+  /absence-new-types\.spec\.js/,
+  // Seeds a pending absence on the shared e2e_employee — sibling absence
+  // writers saturate its candidate windows (40×2d probe exhausted with
+  // overlap, observed 2026-10-17). The intra-test approve+reject concurrency
+  // is preserved; it is inter-test interference that must be removed.
+  /concurrent-absence-decision\.spec\.js/,
 ]
 
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
+  // One transient shared-instance flake must not abort the 31-project
+  // dependent chain: project `dependencies` skip all downstream stateful
+  // specs when any earlier project fails. A single retry recovers genuine
+  // environmental blips (session-load races, NC throttle echoes) while real
+  // defects still fail both attempts and correctly gate the tail — failed
+  // tests surface as "flaky" in the report, never silently.
+  retries: 1,
+  // Normalize the shared instance before the first browser opens: fixture
+  // passwords (external churn), brute-force testing mode, leaked core/lang.
+  globalSetup: './tests/e2e/global-setup.js',
   // Durable user-language restore even when a run is interrupted (SIGINT /
   // crash): locale specs mutate shared users' core/lang via occ. Without this,
   // a killed run leaves e.g. pt_BR and poisons every sibling spec.

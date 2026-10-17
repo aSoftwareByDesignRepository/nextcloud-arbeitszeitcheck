@@ -171,6 +171,10 @@ async function assertPolicyChromeTouchTargets(page) {
 					'#outlookIcalTeamSearch',
 					'#outlookIcalFeedLanguage',
 					'#outlookIcalEnableWebcalLocalBtn',
+					'#bta-root .azc-btn',
+					'#bt-root .azc-btn',
+					'#mbt-root .azc-btn',
+					'#se-admin-root .azc-btn',
 				].join(', '),
 			),
 		]

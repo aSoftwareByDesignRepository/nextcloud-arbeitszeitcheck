@@ -28,6 +28,7 @@ use OCA\ArbeitszeitCheck\Constants;
 use OCP\AppFramework\Services\IAppConfig;
 use OCP\DB\Exception as DBException;
 use OCP\IDBConnection;
+use OCP\Server;
 
 class BreakPolicyStore
 {
@@ -74,6 +75,13 @@ class BreakPolicyStore
 	{
 		$this->updateValue(Constants::CONFIG_BREAK_POLICY_JSON, $json);
 		$this->updateValue(Constants::CONFIG_BREAK_POLICY_VERSION, (string)$version);
+		// Direct appconfig writes bypass IAppConfig's cache invalidation — with
+		// 'cache_app_config' enabled every later request would keep serving the
+		// pre-write document. Clearing inside the transaction is safe: a
+		// rollback restores the DB row the repopulated cache then reflects.
+		// Resolved lazily: the app DI container cannot autowire OCP\IAppConfig
+		// (its alias lives on the server container).
+		Server::get(\OCP\IAppConfig::class)->clearCache();
 	}
 
 	/**

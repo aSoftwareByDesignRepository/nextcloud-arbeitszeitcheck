@@ -621,7 +621,9 @@
 	min-width: 0;
 }
 #app-content.azc-app .azc-card__header-actions {
-	flex: 0 0 auto;
+	/* shrink allowed so the inner flex-wrap can engage below max-content */
+	flex: 0 1 auto;
+	min-width: 0;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;

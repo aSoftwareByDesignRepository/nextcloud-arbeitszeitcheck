@@ -160,6 +160,25 @@ test.describe('Business trips', () => {
 		})
 		expect(submitted.trip.status).toBe('submitted')
 
+		// Flow-parity: submit recalculates under lock — the persisted fact
+		// set must equal the advisory preview it was promised on (same day
+		// rows, same payload hash). A drift here is a silent-write bug.
+		const persisted = await api(employeePage, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
+		const project = (d) => ({
+			localDate: d.localDate,
+			ruleSetId: d.ruleSetId,
+			presenceMinutes: d.presenceMinutes,
+			actualWorkMinutes: d.actualWorkMinutes,
+			activeTravelMinutes: d.activeTravelMinutes,
+			passiveTravelMinutes: d.passiveTravelMinutes,
+			complianceMinutes: d.complianceMinutes,
+			accountTargetMinutes: d.accountTargetMinutes,
+			accountTopUpMinutes: d.accountTopUpMinutes,
+			exportMinutes: d.exportMinutes,
+		})
+		expect(persisted.days.map(project)).toEqual(preview.days.map(project))
+		expect(persisted.snapshotToken).toBe(snapshotToken)
+
 		// A second submit must fail closed — no silent re-transition.
 		const again = await apiAllowFailure(employeePage, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {
 			data: { revision: submitted.trip.revision },

@@ -106,6 +106,13 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 		$this->assertNotNull($out->getEndTime());
 
 		$absence = \OCP\Server::get(AbsenceService::class);
+		// Resolve the expected rejection text through the same l10n factory the
+		// service uses — the message is translated for the instance default
+		// language (de on this host), so a hardcoded English substring is
+		// locale-fragile.
+		$expectedRejection = \OCP\Server::get(\OCP\L10N\IFactory::class)
+			->get('arbeitszeitcheck')
+			->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.');
 		$suffix = bin2hex(random_bytes(2));
 		$row = null;
 		$cursor = new \DateTimeImmutable('tomorrow');
@@ -120,7 +127,7 @@ final class LegacyAzcClockIsolationIntegrationTest extends TestCase
 					'server_may_fill_hours' => true,
 				], $this->uid);
 			} catch (\Exception $e) {
-				$this->assertStringContainsString('working day', $e->getMessage());
+				$this->assertStringContainsString($expectedRejection, $e->getMessage());
 			}
 		}
 		$this->assertNotNull($row, 'no working day found in the next 14 days');

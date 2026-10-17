@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\Service\LicenseService;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\MobileSeatService;
 use OCA\ArbeitszeitCheck\Tests\Support\Azc2TestSigning;
 use OCP\IUserManager;
@@ -22,9 +23,6 @@ use Test\TestCase;
  */
 class ConcurrentMobileSeatCapacityIntegrationTest extends TestCase
 {
-	/** Must match MobileSeatService::CAPACITY_LOCK */
-	private const CAPACITY_LOCK = 'arbeitszeitcheck/mobile_seat_capacity';
-
 	private const PREFIX = '__azc_atlas_seat_';
 
 	private MobileSeatService $seats;
@@ -84,12 +82,12 @@ class ConcurrentMobileSeatCapacityIntegrationTest extends TestCase
 	{
 		$this->assertGreaterThanOrEqual(1, $this->seats->getSeatLimit(), 'Test fixture must provide an active mobile plan');
 		$uid = $this->createTempUser('lock');
-		$this->locking->acquireLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'atlas held seat lock');
+		$this->locking->acquireLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'atlas held seat lock');
 		try {
 			$this->expectException(LockedException::class);
 			$this->seats->assignSeat($uid, 'atlas');
 		} finally {
-			$this->locking->releaseLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+			$this->locking->releaseLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE);
 		}
 		$this->assertFalse(
 			$this->seats->isUserAllowed($uid),

@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck;
 use OCA\ArbeitszeitCheck\Service\MonthClosureFeature;
 use OCA\ArbeitszeitCheck\Service\OvertimeBankService;
 use OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService;
+use OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
@@ -63,6 +64,7 @@ class Capabilities implements ICapability {
 			default => 'arbzg-compliance',
 		};
 		$isGermany = $profile->country === RegionRegistry::COUNTRY_DE;
+		$workforceSuite = new WorkforceSuiteConfig($this->config);
 
 		// Effective limits: explicit admin config wins over the profile default
 		// (same clamping as ComplianceService).
@@ -94,6 +96,11 @@ class Capabilities implements ICapability {
 			'arbeitszeitcheck' => [
 				// B-3: report the real installed app version, never a literal.
 				'version' => $this->appManager->getAppVersion('arbeitszeitcheck'),
+				'workforceSuite' => [
+					'contractVersion' => 1,
+					'installState' => $workforceSuite->installState(),
+					'features' => $workforceSuite->flags(),
+				],
 				'features' => [
 					'time-tracking',
 					'compliance-monitoring',

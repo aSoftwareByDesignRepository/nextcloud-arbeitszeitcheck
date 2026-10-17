@@ -34,6 +34,7 @@ class ReportingService
 	private HolidayService $holidayCalendarService;
 	private PermissionService $permissionService;
 	private TimeZoneService $timeZoneService;
+	private WorkLocationReportAggregator $workLocationAggregator;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -45,7 +46,8 @@ class ReportingService
 		IL10N $l10n,
 		HolidayService $holidayCalendarService,
 		PermissionService $permissionService,
-		?TimeZoneService $timeZoneService = null
+		?TimeZoneService $timeZoneService = null,
+		?WorkLocationReportAggregator $workLocationAggregator = null
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->absenceMapper = $absenceMapper;
@@ -57,6 +59,27 @@ class ReportingService
 		$this->holidayCalendarService = $holidayCalendarService;
 		$this->permissionService = $permissionService;
 		$this->timeZoneService = $timeZoneService ?? \OCP\Server::get(TimeZoneService::class);
+		$this->workLocationAggregator = $workLocationAggregator ?? \OCP\Server::get(WorkLocationReportAggregator::class);
+	}
+
+	/**
+	 * Machine-stable work-location report structure (spec §9.10):
+	 * `workLocation => {byCode, byCategory, mixedDays}`. Live view — open
+	 * entries count through "now"; finalized closures only pass completed
+	 * rows upstream.
+	 *
+	 * @param iterable<TimeEntry> $entries
+	 * @param \DateTimeInterface|null $openAsOf `now` for live views;
+	 *        `null` excludes still-open entries (final closures).
+	 * @return array{byCode: array, byCategory: array, mixedDays: int}
+	 */
+	public function workLocationReport(iterable $entries, ?\DateTimeInterface $openAsOf = null): array
+	{
+		return $this->workLocationAggregator->aggregate(
+			$entries,
+			$this->timeZoneService->storageTimeZone(),
+			$openAsOf
+		);
 	}
 
 	/**
@@ -339,8 +362,10 @@ class ReportingService
 				// count under both — org timezone, same frame as the period bounds).
 				$report['work_location_days'] = WorkLocationDayCounter::countDays(
 					$entries,
-					$this->timeZoneService->storageTimeZone()
+					$this->timeZoneService->storageTimeZone(),
+					new \DateTimeImmutable('now')
 				);
+				$report['workLocation'] = $this->workLocationReport($entries, new \DateTimeImmutable('now'));
 			}
 		} else {
 			$userIds = [];
@@ -391,8 +416,10 @@ class ReportingService
 						'violations_count' => count($violations),
 						'work_location_days' => WorkLocationDayCounter::countDays(
 							$entries,
-							$this->timeZoneService->storageTimeZone()
+							$this->timeZoneService->storageTimeZone(),
+							new \DateTimeImmutable('now')
 						),
+						'workLocation' => $this->workLocationReport($entries, new \DateTimeImmutable('now')),
 					];
 				}
 			}
@@ -680,7 +707,8 @@ class ReportingService
 
 			$workLocationDays = WorkLocationDayCounter::countDays(
 				$entries,
-				$this->timeZoneService->storageTimeZone()
+				$this->timeZoneService->storageTimeZone(),
+				new \DateTimeImmutable('now')
 			);
 			$report['members'][] = [
 				'user_id' => $uid,
@@ -694,6 +722,7 @@ class ReportingService
 				'entries_count' => count($entries),
 				'home_office_days' => $workLocationDays['home'],
 				'external_appointment_days' => $workLocationDays['external'],
+				'workLocation' => $this->workLocationReport($entries, new \DateTimeImmutable('now')),
 			];
 		}
 

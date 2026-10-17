@@ -309,6 +309,11 @@ class TimeEntryController extends Controller
 			// GH #43: preselect the employee default on the create form.
 			'workLocationDefault' => $this->userWorkLocationService->getDefault($userId)
 				?? \OCA\ArbeitszeitCheck\Support\WorkLocation::FALLBACK,
+			// Catalog-backed select options once the feature is enabled; the
+			// template falls back to its built-in enum otherwise.
+			'workLocationOptions' => $this->userWorkLocationService->selectableOptions(
+				$this->l10n->getLocaleCode()
+			),
 		] + $this->getNavigationFlags($userId);
 	}
 
@@ -1222,7 +1227,8 @@ class TimeEntryController extends Controller
 			try {
 				$timeEntry->setWorkLocation($this->userWorkLocationService->resolveForNewEntry(
 					$userId,
-					$params['workLocation'] ?? $params['work_location'] ?? null
+					$params['workLocation'] ?? $params['work_location'] ?? null,
+					$startDateTime
 				));
 			} catch (\InvalidArgumentException) {
 				return $this->invalidWorkLocationResponse();

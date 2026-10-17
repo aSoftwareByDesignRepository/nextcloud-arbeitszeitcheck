@@ -1,0 +1,308 @@
+/* Business trips — employee, manager, and admin surfaces. */
+
+.bt-trip-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bt-trip-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+}
+
+.bt-trip-item__link,
+.bt-trip-item__button {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: start;
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.bt-trip-item__button {
+	cursor: pointer;
+}
+
+.bt-trip-item__link:hover .bt-trip-item__title,
+.bt-trip-item__button:hover .bt-trip-item__title,
+.bt-trip-item__link:focus-visible .bt-trip-item__title,
+.bt-trip-item__button:focus-visible .bt-trip-item__title {
+	text-decoration: underline;
+}
+
+.bt-trip-item__title {
+	font-weight: 600;
+	color: var(--color-main-text, #222);
+}
+
+.bt-trip-item__sub {
+	font-size: 0.85em;
+	color: var(--color-text-maxcontrast, #767676);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bt-trip-item__main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.bt-step {
+	margin-block-start: 24px;
+	padding-block-start: 16px;
+	border-block-start: 1px solid var(--color-border, #e5e5e5);
+}
+
+.bt-step__title {
+	margin: 0 0 8px;
+	font-size: 1.05em;
+	font-weight: 600;
+}
+
+.bt-segment-list,
+.bt-suggestion-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 8px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bt-segment {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 12px;
+}
+
+.bt-segment__text {
+	font-variant-numeric: tabular-nums;
+}
+
+.bt-segment-form {
+	margin-block-start: 12px;
+}
+
+.bt-suggestion__label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	cursor: pointer;
+	min-height: 44px;
+}
+
+.bt-suggestion__label input[type='checkbox'] {
+	flex: 0 0 auto;
+	min-width: 20px;
+	min-height: 20px;
+}
+
+.bt-summary {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 12px;
+	margin: 0 0 12px;
+}
+
+.bt-summary__item {
+	padding: 12px 14px;
+	border: 1px solid var(--color-border, #e5e5e5);
+	border-radius: var(--border-radius-large, 8px);
+	background: var(--color-background-hover, #f7f7f7);
+}
+
+.bt-summary__item dt {
+	font-size: 0.82em;
+	color: var(--color-text-maxcontrast, #767676);
+	margin: 0 0 4px;
+}
+
+.bt-summary__item dd {
+	margin: 0;
+	font-size: 1.25em;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.bt-day-details {
+	margin-block: 8px;
+}
+
+.bt-day-details summary {
+	cursor: pointer;
+	padding: 8px 0;
+	font-weight: 600;
+}
+
+.bt-warning {
+	color: var(--color-warning-text, #8a5a00);
+}
+
+.bt-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.mbt-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 16px;
+	margin-block: 16px;
+}
+
+.mbt-reject-group {
+	margin-block-start: 12px;
+	max-width: 560px;
+}
+
+.bta-threshold-table {
+	max-width: 640px;
+}
+
+.bta-threshold-table input.bta-hm {
+	width: 7em;
+	font-variant-numeric: tabular-nums;
+}
+
+.azc-input-suffix {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.azc-input-suffix input {
+	width: 6em;
+}
+
+.azc-input-suffix__unit {
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+.bt-advanced summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 4px 0;
+}
+
+.form-grid--4 {
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.form-group--checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+.form-group--checkbox input[type='checkbox'] {
+	margin-block-start: 3px;
+}
+
+.user-picker {
+	position: relative;
+}
+
+.user-picker__list {
+	position: absolute;
+	z-index: 30;
+	inset-inline: 0;
+	margin-block-start: 2px;
+	max-height: 220px;
+	overflow-y: auto;
+	background: var(--color-main-background, #fff);
+	border: 1px solid var(--color-border, #e5e5e5);
+	border-radius: var(--border-radius-large, 8px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.azc-status-chip {
+	flex: 0 0 auto;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 0.8em;
+	font-weight: 600;
+	border: 1px solid var(--color-border, #e5e5e5);
+}
+
+.azc-status-chip[data-status='draft'] {
+	background: var(--color-background-dark, #eee);
+	color: var(--color-main-text, #333);
+}
+
+/* Status accents derive from Nextcloud theme vars (same --status-accent +
+ * color-mix convention as css/dashboard.css) so light/dark/high-contrast and
+ * custom accent colors all resolve automatically — never raw hex. */
+.azc-status-chip[data-status='submitted'] {
+	--status-accent: var(--color-primary-element, var(--arbeitszeitcheck-color-primary));
+	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
+	color: var(--status-accent);
+	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
+}
+
+.azc-status-chip[data-status='approved'] {
+	--status-accent: var(--color-success, var(--arbeitszeitcheck-color-success));
+	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
+	color: var(--status-accent);
+	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
+}
+
+.azc-status-chip[data-status='rejected'],
+.azc-status-chip[data-status='cancelled'] {
+	--status-accent: var(--color-error, var(--arbeitszeitcheck-color-error));
+	background: color-mix(in srgb, var(--status-accent) 14%, transparent);
+	color: var(--status-accent);
+	border-color: color-mix(in srgb, var(--status-accent) 32%, transparent);
+}
+
+@media (max-width: 639.98px) {
+	.mbt-cards {
+		grid-template-columns: 1fr;
+	}
+
+	.bt-trip-item {
+		flex-wrap: wrap;
+	}
+}
+
+/* Admin rollout card (Phase 6) */
+.bta-presets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.bta-rollout-check {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.azc-card__header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}

@@ -39,6 +39,8 @@ const adminRoutes = [
 		path: '/apps/arbeitszeitcheck/admin/settings/outlook-subscription',
 		ready: '#outlook-ical-subscription',
 	},
+	{ id: 'business-trips', path: '/apps/arbeitszeitcheck/admin/business-trips', ready: '#bta-root' },
+	{ id: 'special-entitlements', path: '/apps/arbeitszeitcheck/admin/special-entitlements', ready: '#se-admin-root' },
 ]
 
 const employeeRoutes = [
@@ -47,6 +49,7 @@ const employeeRoutes = [
 	{ id: 'settings-privacy', path: '/apps/arbeitszeitcheck/settings/data-privacy', ready: '#btn-gdpr-delete' },
 	{ id: 'time-entries', path: '/apps/arbeitszeitcheck/time-entries', ready: '#azc-main-content' },
 	{ id: 'calendar', path: '/apps/arbeitszeitcheck/calendar', ready: '#azc-main-content' },
+	{ id: 'business-trips', path: '/apps/arbeitszeitcheck/business-trips', ready: '#bt-root' },
 ]
 
 const overflowViewports = [

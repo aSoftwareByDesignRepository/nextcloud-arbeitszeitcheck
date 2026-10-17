@@ -148,7 +148,9 @@
 			const idPrefix = 'mgr-create';
 			const { wrap: empWrap, prefix: empPrefix } = buildEmployeeField();
 			const { wrap: projWrap, sel: projSel } = buildProjectField();
-			const formHtml = ClockForm.buildFormHtml(idPrefix, labels());
+			const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
+			const wlOptions = wlCatalog ? wlCatalog.options() : null;
+			const formHtml = ClockForm.buildFormHtml(idPrefix, labels(), { workLocations: wlOptions });
 			const footerHtml = [
 				'<div class="reject-modal-actions modal-footer">',
 				`<button type="button" class="btn btn--secondary btn-mgr-create-cancel">${t('Cancel', 'Cancel')}</button>`,
@@ -169,7 +171,7 @@
 				meta.appendChild(projWrap);
 			}
 
-			const bindOpts = { minBreakMinutes: undefined };
+			const bindOpts = { minBreakMinutes: undefined, workLocations: wlOptions };
 			const formApi = ClockForm.bindForm(modal, idPrefix, {}, t, bindOpts);
 			const initPicker = window.ArbeitszeitCheck?.initManagerScopedEmployeePicker;
 			let employeePicker = null;

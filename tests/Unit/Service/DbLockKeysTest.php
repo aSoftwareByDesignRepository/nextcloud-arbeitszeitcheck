@@ -61,4 +61,30 @@ class DbLockKeysTest extends TestCase
 		$this->assertLessThanOrEqual(64, strlen(DbLockKeys::premiumPolicy()));
 		$this->assertSame('azc/pp/policy', DbLockKeys::premiumPolicy());
 	}
+
+	public function testSingletonLocksUseStableWireValues(): void
+	{
+		// Key strings are pinned: a stale lock row must still be matchable by
+		// its release path, and contending writers must share the same key.
+		$this->assertSame('arbeitszeitcheck-upgrade-backup', DbLockKeys::upgradeBackup());
+		$this->assertSame('arbeitszeitcheck/kiosk_pair', DbLockKeys::kioskPairing());
+		$this->assertSame('arbeitszeitcheck/mobile_seat_capacity', DbLockKeys::mobileSeatCapacity());
+		$this->assertSame('arbeitszeitcheck/terminal_device_slot', DbLockKeys::terminalDeviceSlot());
+		$this->assertSame('arbeitszeitcheck/kiosk_rfid_salt', DbLockKeys::kioskRfidSalt());
+		$this->assertSame('arbeitszeitcheck/layered-vacation/org', DbLockKeys::vacationLayeredOrg());
+		$this->assertSame('arbeitszeitcheck/layered-vacation/model/7', DbLockKeys::vacationLayeredModel(7));
+		$this->assertSame('arbeitszeitcheck/layered-vacation/team/3', DbLockKeys::vacationLayeredTeam(3));
+		foreach ([
+			DbLockKeys::upgradeBackup(),
+			DbLockKeys::kioskPairing(),
+			DbLockKeys::mobileSeatCapacity(),
+			DbLockKeys::terminalDeviceSlot(),
+			DbLockKeys::kioskRfidSalt(),
+			DbLockKeys::vacationLayeredOrg(),
+			DbLockKeys::vacationLayeredModel(PHP_INT_MAX),
+			DbLockKeys::vacationLayeredTeam(PHP_INT_MAX),
+		] as $key) {
+			$this->assertLessThanOrEqual(64, strlen($key), $key);
+		}
+	}
 }

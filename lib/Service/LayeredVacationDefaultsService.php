@@ -54,7 +54,6 @@ class LayeredVacationDefaultsService
 {
 	use TTransactional;
 
-	private const LOCK_NAMESPACE = 'arbeitszeitcheck/layered-vacation';
 
 	public function __construct(
 		private readonly OrgVacationDefaultMapper $orgMapper,
@@ -104,7 +103,7 @@ class LayeredVacationDefaultsService
 	 */
 	public function upsertOrgDefault(array $payload, string $performedBy): OrgVacationDefault
 	{
-		$lockKey = self::LOCK_NAMESPACE . '/org';
+		$lockKey = DbLockKeys::vacationLayeredOrg();
 		$this->acquireWriteLock($lockKey, 'Org vacation default write lock');
 		try {
 			return $this->atomic(function () use ($payload, $performedBy): OrgVacationDefault {
@@ -189,7 +188,7 @@ class LayeredVacationDefaultsService
 
 	public function deleteOrgDefault(int $id, string $performedBy): void
 	{
-		$lockKey = self::LOCK_NAMESPACE . '/org';
+		$lockKey = DbLockKeys::vacationLayeredOrg();
 		$this->acquireWriteLock($lockKey, 'Org vacation default delete lock');
 		try {
 			try {
@@ -248,7 +247,7 @@ class LayeredVacationDefaultsService
 			throw new LayeredVacationNotFoundException('Working time model not found');
 		}
 
-		$lockKey = self::LOCK_NAMESPACE . '/model/' . $workingTimeModelId;
+		$lockKey = DbLockKeys::vacationLayeredModel($workingTimeModelId);
 		$this->acquireWriteLock($lockKey, 'Model vacation default write lock');
 		try {
 			return $this->atomic(function () use ($payload, $workingTimeModelId, $performedBy): ModelVacationDefault {
@@ -297,7 +296,7 @@ class LayeredVacationDefaultsService
 		} catch (DoesNotExistException) {
 			throw new LayeredVacationNotFoundException('Model vacation default not found');
 		}
-		$lockKey = self::LOCK_NAMESPACE . '/model/' . (int)$existing->getWorkingTimeModelId();
+		$lockKey = DbLockKeys::vacationLayeredModel((int)$existing->getWorkingTimeModelId());
 		$this->acquireWriteLock($lockKey, 'Model vacation default delete lock');
 		try {
 			$before = $existing->getSummary();
@@ -358,7 +357,7 @@ class LayeredVacationDefaultsService
 		} catch (DoesNotExistException) {
 			throw new LayeredVacationNotFoundException('Team not found');
 		}
-		$lockKey = self::LOCK_NAMESPACE . '/team/' . $teamId;
+		$lockKey = DbLockKeys::vacationLayeredTeam($teamId);
 		$this->acquireWriteLock($lockKey, 'Team vacation policy write lock');
 		try {
 			return $this->atomic(function () use ($payload, $teamId, $performedBy): TeamVacationPolicy {
@@ -408,7 +407,7 @@ class LayeredVacationDefaultsService
 		} catch (DoesNotExistException) {
 			throw new LayeredVacationNotFoundException('Team vacation policy not found');
 		}
-		$lockKey = self::LOCK_NAMESPACE . '/team/' . (int)$existing->getTeamId();
+		$lockKey = DbLockKeys::vacationLayeredTeam((int)$existing->getTeamId());
 		$this->acquireWriteLock($lockKey, 'Team vacation policy delete lock');
 		try {
 			$before = $existing->getSummary();

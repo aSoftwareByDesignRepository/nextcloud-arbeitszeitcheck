@@ -81,6 +81,8 @@ final class DedicatedAppAdminContractTest extends TestCase
 			'lib/Controller/AdminController.php',
 			'lib/Controller/LicenseAdminController.php',
 			'lib/Controller/KioskAdminController.php',
+			'lib/Controller/WorkLocationAdminController.php',
+			'lib/Controller/SpecialEntitlementAdminController.php',
 		];
 		foreach ($controllers as $rel) {
 			$src = (string)file_get_contents($this->root . '/' . $rel);
@@ -127,6 +129,7 @@ final class DedicatedAppAdminContractTest extends TestCase
 	{
 		$src = (string)file_get_contents($this->root . '/lib/Middleware/AppAdminMiddleware.php');
 		$this->assertStringContainsString('OvertimePayoutController', $src);
+		$this->assertStringContainsString('SpecialEntitlementAdminController', $src);
 		$this->assertStringContainsString("'myHistory'", $src);
 		$this->assertStringContainsString('access-denied', $src);
 		$this->assertStringNotContainsString("'core', '403'", $src);
@@ -160,7 +163,7 @@ final class DedicatedAppAdminContractTest extends TestCase
 	public function testMobileSeatAssignUsesExclusiveCapacityLock(): void
 	{
 		$src = (string)file_get_contents($this->root . '/lib/Service/MobileSeatService.php');
-		$this->assertStringContainsString('CAPACITY_LOCK', $src);
+		$this->assertStringContainsString('DbLockKeys::mobileSeatCapacity()', $src);
 		$this->assertStringContainsString('LOCK_EXCLUSIVE', $src);
 		$this->assertStringContainsString('acquireLock', $src);
 		$this->assertStringContainsString('releaseLock', $src);

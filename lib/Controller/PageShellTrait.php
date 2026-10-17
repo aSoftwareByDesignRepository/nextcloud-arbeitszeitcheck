@@ -244,7 +244,12 @@ trait PageShellTrait
 		];
 		[$title, $help] = $titles[$mode] ?? $titles['list'];
 
-		return $this->buildShellParams('time-entries', $title, $help, $navFlags);
+		return $this->buildShellParams('time-entries', $title, $help, $navFlags) + [
+			// Catalog-backed work-location select options (null → built-in enum
+			// fallback in the template while the feature is disabled).
+			'workLocationOptions' => \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\UserWorkLocationService::class)
+				->selectableOptions($this->l10n->getLocaleCode()),
+		];
 	}
 
 	/**

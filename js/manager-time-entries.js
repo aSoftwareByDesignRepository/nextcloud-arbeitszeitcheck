@@ -319,14 +319,24 @@
 	}
 
 	function workLocationCellHtml(location) {
+		const builtin = {
+			home: t('workLocationHome', 'Home office'),
+			external: t('workLocationExternal', 'External appointment'),
+			office: t('workLocationOffice', 'Office'),
+		};
+		const catalog = window.ArbeitszeitCheckWorkLocationCatalog;
+		const label = typeof location === 'string' && location !== ''
+			? (catalog ? catalog.labelFor(location, builtin[location] || null) : (builtin[location] || location))
+			: '';
 		if (location === 'home') {
-			return `<span class="badge badge--info azc-work-location-badge">${escapeHtml(t('workLocationHome', 'Home office'))}</span>`;
+			return `<span class="badge badge--info azc-work-location-badge">${escapeHtml(label)}</span>`;
 		}
 		if (location === 'external') {
-			return `<span class="badge badge--neutral azc-work-location-badge">${escapeHtml(t('workLocationExternal', 'External appointment'))}</span>`;
+			return `<span class="badge badge--neutral azc-work-location-badge">${escapeHtml(label)}</span>`;
 		}
-		if (location === 'office') {
-			return `<span class="text-muted">${escapeHtml(t('workLocationOffice', 'Office'))}</span>`;
+		if (typeof location === 'string' && location !== '') {
+			// office + catalog-defined codes: plain label (raw code for unknown).
+			return `<span class="text-muted">${escapeHtml(label)}</span>`;
 		}
 		return `<span class="text-muted" aria-label="${escapeHtml(t('workLocationUnspecified', 'Not specified'))}">—</span>`;
 	}
@@ -747,6 +757,9 @@
 
 
 	function init() {
+		if (window.ArbeitszeitCheckWorkLocationCatalog) {
+			window.ArbeitszeitCheckWorkLocationCatalog.prefetch();
+		}
 		initEmployeeFilterPicker();
 		initManagerCorrectDelegation();
 		setDefaultDateRange(false);

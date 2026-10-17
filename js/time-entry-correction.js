@@ -439,16 +439,18 @@
 
 		function formatWorkLocationLabel(raw) {
 			const s = typeof raw === 'string' ? raw : '';
-			if (s === 'home') {
-				return t('workLocationHome', 'Home office');
+			const builtin = {
+				home: t('workLocationHome', 'Home office'),
+				external: t('workLocationExternal', 'External appointment'),
+				office: t('workLocationOffice', 'Office'),
+			};
+			if (s === '') {
+				return t('workLocationUnspecified', 'Not specified');
 			}
-			if (s === 'external') {
-				return t('workLocationExternal', 'External appointment');
-			}
-			if (s === 'office') {
-				return t('workLocationOffice', 'Office');
-			}
-			return t('workLocationUnspecified', 'Not specified');
+			const catalog = window.ArbeitszeitCheckWorkLocationCatalog;
+			// Catalog label wins; built-in translation next; raw code last —
+			// unknown codes never render blank.
+			return catalog ? catalog.labelFor(s, builtin[s] || null) : (builtin[s] || s);
 		}
 
 		function fillCurrentSummary(summary) {
@@ -959,6 +961,9 @@
 	let correctionReloadOnClose = false;
 
 	function init() {
+		if (window.ArbeitszeitCheckWorkLocationCatalog) {
+			window.ArbeitszeitCheckWorkLocationCatalog.prefetch();
+		}
 		cacheCorrectionTemplate();
 
 		window.addEventListener('modal-close', (e) => {

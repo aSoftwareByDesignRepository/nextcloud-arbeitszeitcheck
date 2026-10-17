@@ -183,28 +183,31 @@ function main() {
 	assert(typeof problem.href === 'string' && problem.href.startsWith('mailto:dev@'), 'nav problem link refreshed');
 
 	// Toast hook must not throw when wrapping showError.
-	const toast = {
-		className: 'toast toast--error',
-		setAttribute(k, v) {
-			this[k] = v;
-		},
-		getAttribute(k) {
-			return this[k] || null;
-		},
-		querySelector(sel) {
-			// No pre-existing report link inside the toast — the
-			// attachReportLink guard must not early-return here.
-			if (String(sel).indexOf('toast__feedback') !== -1) {
-				return null;
-			}
-			return { appendChild() {} };
-		},
-	};
+	function makeToast(hasReportLink) {
+		return {
+			className: 'toast toast--error',
+			setAttribute(k, v) {
+				this[k] = v;
+			},
+			getAttribute(k) {
+				return this[k] || null;
+			},
+			querySelector(sel) {
+				// attachReportLink dedup guard: matches existing self-attached
+				// report links (family class variants + any mailto: anchor).
+				if (/toast__feedback|toast__report|mailto:/.test(String(sel))) {
+					return hasReportLink ? { tagName: 'A' } : null;
+				}
+				return { appendChild() {} };
+			},
+		};
+	}
 	sandbox.BudgetCheckComponents = {
 		showError(msg) {
 			return msg;
 		},
 	};
+	const toast = makeToast(false);
 	doc.querySelectorAll = () => [toast];
 	sandbox.SbdAppFeedback.install();
 	try {
@@ -213,6 +216,14 @@ function main() {
 		assert(false, 'showError wrapper must not throw: ' + e.message);
 	}
 	assert(toast.getAttribute('data-app-feedback-bound') === '1', 'toast gets report link binding');
+
+	// Regression (duplicate_cta_in_toast_chrome): a toast that already
+	// carries a self-attached mailto report link must not be bound again —
+	// the observer/wrapper would otherwise append a second identical link.
+	const preLinked = makeToast(true);
+	doc.querySelectorAll = () => [preLinked];
+	sandbox.BudgetCheckComponents.showError('Save failed again');
+	assert(preLinked.getAttribute('data-app-feedback-bound') !== '1', 'pre-linked toast skipped — no duplicate report link');
 
 	if (failures > 0) {
 		process.stderr.write('\n' + failures + ' failure(s)\n');

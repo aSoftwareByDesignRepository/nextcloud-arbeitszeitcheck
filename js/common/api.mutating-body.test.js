@@ -38,6 +38,18 @@ describe('AzcApi mutating request body', () => {
 		expect(new Headers(init.headers).get('Content-Type')).toBe('application/json')
 	})
 
+	it('attaches requesttoken on GET too — Nextcloud CSRF-checks all verbs', async () => {
+		const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), {
+			status: 200,
+			headers: { 'content-type': 'application/json' },
+		}))
+		globalThis.fetch = fetchMock
+
+		await globalThis.window.AzcApi.fetch('/apps/arbeitszeitcheck/api/business-trips', { silent: true })
+		const init = fetchMock.mock.calls[0][1]
+		expect(new Headers(init.headers).get('requesttoken')).toBe('tok-abc')
+	})
+
 	it('preserves explicit json payloads', async () => {
 		const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), {
 			status: 200,

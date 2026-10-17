@@ -16,6 +16,7 @@ const SECTIONS = [
 	{ id: 'hours', marker: '#maxDailyHours' },
 	{ id: 'regional', marker: '#country-de' },
 	{ id: 'retention', marker: '#retentionPeriod' },
+	{ id: 'work-locations', marker: '#section-work-locations-heading, #work-location-create-form' },
 	{ id: 'projectcheck', marker: '#projectCheckIntegrationEnabled, #section-projectcheck-heading' },
 ]
 
@@ -157,10 +158,10 @@ test.describe('Admin global settings multipage', () => {
 				await route.continue()
 			})
 
-			// Outlook subscription uses dedicated create/rotate APIs — no sticky Save footer.
+			// Outlook subscription + work locations use dedicated APIs — no sticky Save footer.
 			const save = page.locator('#admin-settings-save')
 			if ((await save.count()) === 0) {
-				expect(section.id).toBe('outlook-subscription')
+				expect(['outlook-subscription', 'work-locations']).toContain(section.id)
 				return
 			}
 

@@ -38,7 +38,23 @@ final class WorkLocation
 
 	public static function isValid(string $value): bool
 	{
-		return in_array($value, self::ALL, true);
+		if (in_array($value, self::ALL, true)) {
+			return true;
+		}
+		// Catalog-defined codes are valid only while the feature is enabled —
+		// flag-off keeps the byte-identical static allowlist so upgraded and
+		// rolled-back installations can never write a code their build does
+		// not understand.
+		try {
+			if (!\OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class)
+				->isEnabled('work_location_catalog_enabled')) {
+				return false;
+			}
+			return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class)
+				->isKnown($value);
+		} catch (\Throwable) {
+			return false;
+		}
 	}
 
 	/**

@@ -29,7 +29,7 @@ declare(strict_types=1);
  */
 
 $base = __DIR__ . '/../l10n';
-$locales = ['de', 'fr', 'es', 'da', 'nl', 'it', 'pl', 'sv', 'nb'];
+$locales = ['de', 'fr', 'es', 'da', 'nl', 'it', 'pl', 'sv', 'nb', 'pt', 'pt_BR'];
 
 /**
  * Extract a normalized placeholder signature of a string.

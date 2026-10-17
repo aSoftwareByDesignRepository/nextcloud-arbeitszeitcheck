@@ -172,6 +172,51 @@ class UserWorkingTimeModelMapper extends QBMapper
 	}
 
 	/**
+	 * User IDs whose model assignment covers $date — bounded sample for
+	 * preview surfaces (deterministic order).
+	 *
+	 * @return list<string>
+	 */
+	public function findUserIdsEffectiveAt(int $workingTimeModelId, string $date, int $limit): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('user_id')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('working_time_model_id', $qb->createNamedParameter($workingTimeModelId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($date, IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->isNull('end_date'),
+				$qb->expr()->gte('end_date', $qb->createNamedParameter($date, IQueryBuilder::PARAM_STR))
+			))
+			->orderBy('user_id', 'ASC')
+			->setMaxResults($limit);
+		$result = $qb->executeQuery();
+		$ids = [];
+		while ($row = $result->fetch()) {
+			$ids[] = (string)$row['user_id'];
+		}
+		$result->closeCursor();
+		return $ids;
+	}
+
+	public function countUserIdsEffectiveAt(int $workingTimeModelId, string $date): int
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->func()->count($qb->createFunction('DISTINCT user_id'), 'cnt'))
+			->from($this->getTableName())
+			->where($qb->expr()->eq('working_time_model_id', $qb->createNamedParameter($workingTimeModelId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($date, IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->isNull('end_date'),
+				$qb->expr()->gte('end_date', $qb->createNamedParameter($date, IQueryBuilder::PARAM_STR))
+			));
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->free();
+		return $count;
+	}
+
+	/**
 	 * Check if a user has overlapping working time model assignments
 	 *
 	 * @param string $userId

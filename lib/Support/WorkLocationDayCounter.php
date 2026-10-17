@@ -18,6 +18,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Support;
 
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
+use OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator;
 
 final class WorkLocationDayCounter
 {
@@ -26,6 +27,13 @@ final class WorkLocationDayCounter
 	}
 
 	/**
+	 * Deprecated compatibility derivative (spec §9.10). Distinct-day
+	 * attribution goes through
+	 * {@see WorkLocationReportAggregator::splitNetSecondsByDay()} so the
+	 * legacy counters share the new midnight-safe segmentation. Open
+	 * entries count through "now" (live view); callers building finalized
+	 * month closures must pre-filter to completed entries.
+	 *
 	 * @param iterable<TimeEntry> $entries
 	 * @return array{home: int, external: int} distinct calendar-day counts
 	 */
@@ -36,17 +44,15 @@ final class WorkLocationDayCounter
 			WorkLocation::EXTERNAL => [],
 		];
 
+		$now = new \DateTimeImmutable('now');
 		foreach ($entries as $entry) {
 			$location = $entry->getWorkLocation();
 			if ($location !== WorkLocation::HOME && $location !== WorkLocation::EXTERNAL) {
 				continue;
 			}
-			$start = $entry->getStartTime();
-			if ($start === null) {
-				continue;
+			foreach (WorkLocationReportAggregator::splitNetSecondsByDay($entry, $tz, $now) as $day => $net) {
+				$days[$location][$day] = true;
 			}
-			$day = (clone $start)->setTimezone($tz)->format('Y-m-d');
-			$days[$location][$day] = true;
 		}
 
 		return [

@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "timezone": "Europe/Berlin",
+  "clock": "2026-01-20T12:00:00+01:00",
+  "vacationModes": [
+    {"key": "days", "appConfig": {"vacation_unit": "days", "vacation_hours_per_day": "8"}},
+    {"key": "hours", "appConfig": {"vacation_unit": "hours", "vacation_hours_per_day": "8"}}
+  ],
+  "users": [
+    {"key": "employee_days", "model": "standard", "teams": ["therapy"]},
+    {"key": "employee_hours", "model": "part_time", "teams": ["therapy"]},
+    {"key": "manager", "model": "standard", "manages": ["therapy"]},
+    {"key": "deleted_ghost", "deleted": true, "staleTeamRows": ["therapy"]}
+  ],
+  "models": [
+    {"key": "standard", "weeklyMinutes": 2400, "weekdayMinutes": [480, 480, 480, 480, 480, 0, 0], "tariff": "base_tariff"},
+    {"key": "part_time", "weeklyMinutes": 1200, "weekdayMinutes": [240, 240, 240, 240, 240, 0, 0], "tariff": "base_tariff"},
+    {"key": "personal_hours", "owner": "employee_hours", "weeklyMinutes": 1500, "weekdayMinutes": [300, 300, 300, 300, 300, 0, 0], "tariff": "night_tariff"}
+  ],
+  "tariffs": [
+    {"key": "base_tariff", "revision": 1, "active": true},
+    {"key": "night_tariff", "revision": 3, "active": true, "modules": ["night", "sunday"]}
+  ],
+  "timeEntries": [
+    {"key": "completed_with_break", "user": "employee_days", "status": "completed", "start": "2026-01-12T08:00:00+01:00", "end": "2026-01-12T17:00:00+01:00", "breaks": [{"start": "2026-01-12T12:00:00+01:00", "end": "2026-01-12T12:30:00+01:00"}], "workLocation": null},
+    {"key": "paused", "user": "employee_hours", "status": "paused", "start": "2026-01-19T08:00:00+01:00", "breaks": [{"start": "2026-01-19T10:00:00+01:00", "end": null}], "workLocation": "home"},
+    {"key": "open_stamp", "user": "employee_days", "status": "active", "start": "2026-01-20T08:00:00+01:00", "end": null, "breaks": [], "workLocation": "office"},
+    {"key": "overnight", "user": "employee_days", "status": "completed", "start": "2026-01-15T22:00:00+01:00", "end": "2026-01-16T06:00:00+01:00", "breaks": [], "workLocation": "external"}
+  ],
+  "absenceTypes": [
+    {"code": "vacation", "custom": false},
+    {"code": "sick", "custom": false},
+    {"code": "child_sick", "custom": false},
+    {"code": "home_office", "custom": false},
+    {"code": "business_trip", "custom": false},
+    {"code": "custom_bereavement", "custom": true, "publicLabel": "Personal leave"}
+  ],
+  "absences": [
+    {"key": "vacation_days_approved", "user": "employee_days", "type": "vacation", "status": "approved", "unit": "days", "amount": 2, "from": "2026-02-02", "to": "2026-02-03"},
+    {"key": "vacation_hours_pending", "user": "employee_hours", "type": "vacation", "status": "pending", "unit": "hours", "amount": 4, "from": "2026-02-04", "to": "2026-02-04"},
+    {"key": "sick_approved", "user": "employee_days", "type": "sick", "status": "approved", "unit": "days", "amount": 1, "from": "2026-01-05", "to": "2026-01-05"},
+    {"key": "child_sick_rejected", "user": "employee_days", "type": "child_sick", "status": "rejected", "unit": "days", "amount": 1, "from": "2026-01-06", "to": "2026-01-06"},
+    {"key": "home_pending", "user": "employee_days", "type": "home_office", "status": "pending", "unit": "days", "amount": 1, "from": "2026-01-21", "to": "2026-01-21"},
+    {"key": "home_approved", "user": "employee_days", "type": "home_office", "status": "approved", "unit": "days", "amount": 1, "from": "2026-01-08", "to": "2026-01-08"},
+    {"key": "home_rejected", "user": "employee_days", "type": "home_office", "status": "rejected", "unit": "days", "amount": 1, "from": "2026-01-09", "to": "2026-01-09"},
+    {"key": "trip_pending", "user": "employee_hours", "type": "business_trip", "status": "pending", "unit": "days", "amount": 1, "from": "2026-01-22", "to": "2026-01-22"},
+    {"key": "trip_approved", "user": "employee_hours", "type": "business_trip", "status": "approved", "unit": "days", "amount": 2, "from": "2026-01-13", "to": "2026-01-14"},
+    {"key": "trip_rejected", "user": "employee_hours", "type": "business_trip", "status": "rejected", "unit": "days", "amount": 1, "from": "2026-01-07", "to": "2026-01-07"},
+    {"key": "custom_cancelled", "user": "employee_days", "type": "custom_bereavement", "status": "cancelled", "unit": "days", "amount": 1, "from": "2026-03-02", "to": "2026-03-02"}
+  ],
+  "months": [
+    {"user": "employee_days", "month": "2025-11", "status": "closed", "revision": 1},
+    {"user": "employee_days", "month": "2025-12", "status": "reopened", "revision": 2},
+    {"user": "employee_days", "month": "2026-01", "status": "open", "revision": 0}
+  ],
+  "idempotency": [
+    {"channel": "mobile", "key": "legacy-mobile-complete", "state": "completed", "payloadHash": null},
+    {"channel": "mobile", "key": "legacy-mobile-pending", "state": "pending", "payloadHash": null},
+    {"channel": "kiosk", "key": "legacy-kiosk-complete", "state": "completed", "payloadHash": null},
+    {"channel": "kiosk", "key": "legacy-kiosk-pending", "state": "pending", "payloadHash": null}
+  ],
+  "substitutions": [
+    {"absence": "vacation_days_approved", "substitute": "manager", "status": "approved"},
+    {"absence": "vacation_hours_pending", "substitute": "manager", "status": "pending"}
+  ],
+  "audit": [
+    {"sequence": 1, "action": "clock_in", "actor": "employee_days", "subject": "completed_with_break"},
+    {"sequence": 2, "action": "absence_created", "actor": "employee_days", "subject": "vacation_days_approved"},
+    {"sequence": 3, "action": "month_reopened", "actor": "manager", "subject": "employee_days:2025-12"}
+  ],
+  "delivery": {
+    "mail": [{"template": "absence_decision", "absence": "vacation_days_approved"}],
+    "ical": [{"scope": "team", "team": "therapy", "absence": "vacation_days_approved"}]
+  },
+  "bridges": [
+    {"app": "deskcheck", "mode": "soft", "signal": "home_office"},
+    {"app": "dutycheck", "mode": "soft", "signal": "absence"}
+  ]
+}

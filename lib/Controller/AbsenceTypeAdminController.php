@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\CustomAbsenceTypeService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Support\ApiError;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -170,6 +171,14 @@ class AbsenceTypeAdminController extends Controller
 				'code' => 'ABSENCE_TYPE_CATALOG_LOCKED',
 			], $result['code']);
 		}
+		if (($result['data']['mode'] ?? null) === 'entitlement_linked') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.'),
+				'error_code' => 'ABSENCE_TYPE_ENTITLEMENT_LINKED',
+				'fields' => new \stdClass(),
+			], Http::STATUS_CONFLICT);
+		}
 		return new JSONResponse([
 			'success' => true,
 			'mode' => $result['data']['mode'],
@@ -208,10 +217,7 @@ class AbsenceTypeAdminController extends Controller
 	private function notFound(): JSONResponse
 	{
 		// Canonical payload shared by "missing" and "not accessible" (API rule §1).
-		return new JSONResponse([
-			'success' => false,
-			'error' => $this->l10n->t('Absence type not found'),
-		], Http::STATUS_NOT_FOUND);
+		return ApiError::notFound();
 	}
 
 	private function actorUid(): string

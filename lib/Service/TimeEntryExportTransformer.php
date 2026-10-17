@@ -27,7 +27,7 @@ class TimeEntryExportTransformer
 	 */
 	public const WIDE_LAYOUT_MAX_PAIRS_PER_ROW = 6;
 
-	public function __construct(IConfig $config)
+	public function __construct(IConfig $config, private readonly ?WorkLocationCatalog $workLocationCatalog = null)
 	{
 		$configured = $config->getAppValue('arbeitszeitcheck', 'app_timezone', '');
 		if ($configured !== '' && timezone_open($configured) !== false) {
@@ -37,6 +37,25 @@ class TimeEntryExportTransformer
 
 		$phpTimezone = date_default_timezone_get();
 		$this->timezone = ($phpTimezone !== '' && $phpTimezone !== 'UTC') ? $phpTimezone : 'Europe/Berlin';
+	}
+
+	/**
+	 * Localized label + reporting category for a stored work-location code.
+	 * Unknown/custom codes degrade to (code, 'other'); NULL stays empty.
+	 * Without an injected catalog (legacy constructions) columns stay empty —
+	 * the code column always remains authoritative.
+	 *
+	 * @return array{0:string,1:string}
+	 */
+	private function workLocationMeta(?string $code): array
+	{
+		if ($code === null || $code === '' || $this->workLocationCatalog === null) {
+			return ['', ''];
+		}
+		return [
+			$this->workLocationCatalog->labelFor($code),
+			$this->workLocationCatalog->categoryOf($code) ?? 'other',
+		];
 	}
 
 	public function getTimezone(): string
@@ -212,6 +231,8 @@ class TimeEntryExportTransformer
 				'working_hours' => $workingPart !== null ? round($workingPart, self::HOUR_ROUND_PRECISION) : null,
 				'description' => $entry->getDescription() ?? '',
 				'work_location' => $entry->getWorkLocation() ?? '',
+				'work_location_label' => $this->workLocationMeta($entry->getWorkLocation())[0],
+				'work_location_category' => $this->workLocationMeta($entry->getWorkLocation())[1],
 				'status' => $entry->getStatus(),
 				'ended_reason' => $entry->getEndedReason() ?? '',
 				'policy_applied' => $entry->getPolicyApplied() ?? '',
@@ -272,6 +293,8 @@ class TimeEntryExportTransformer
 			'working_hours' => $entry->getWorkingDurationHours(),
 			'description' => $entry->getDescription() ?? '',
 			'work_location' => $entry->getWorkLocation() ?? '',
+			'work_location_label' => $this->workLocationMeta($entry->getWorkLocation())[0],
+			'work_location_category' => $this->workLocationMeta($entry->getWorkLocation())[1],
 			'status' => $entry->getStatus(),
 			'ended_reason' => $entry->getEndedReason() ?? '',
 			'policy_applied' => $entry->getPolicyApplied() ?? '',

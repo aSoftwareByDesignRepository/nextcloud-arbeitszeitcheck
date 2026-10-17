@@ -11,6 +11,7 @@ const a11yRoutes = [
 	{ path: '/apps/arbeitszeitcheck/time-entries/create', role: 'EMPLOYEE' },
 	{ path: '/apps/arbeitszeitcheck/absences', role: 'EMPLOYEE' },
 	{ path: '/apps/arbeitszeitcheck/absences/create', role: 'EMPLOYEE' },
+	{ path: '/apps/arbeitszeitcheck/business-trips', role: 'EMPLOYEE' },
 	{ path: '/apps/arbeitszeitcheck/reports', role: 'EMPLOYEE' },
 	{ path: '/apps/arbeitszeitcheck/calendar', role: 'EMPLOYEE' },
 	{ path: '/apps/arbeitszeitcheck/timeline', role: 'EMPLOYEE' },
@@ -26,6 +27,7 @@ const a11yRoutes = [
 	{ path: '/apps/arbeitszeitcheck/manager/time-entries', role: 'MANAGER' },
 	{ path: '/apps/arbeitszeitcheck/manager/absences', role: 'MANAGER' },
 	{ path: '/apps/arbeitszeitcheck/manager/month-closures', role: 'MANAGER' },
+	{ path: '/apps/arbeitszeitcheck/manager/business-trips', role: 'MANAGER' },
 	{ path: '/apps/arbeitszeitcheck/admin', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/users', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/teams', role: 'ADMIN' },
@@ -47,6 +49,8 @@ const a11yRoutes = [
 	{ path: '/apps/arbeitszeitcheck/admin/settings/access', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/settings/compliance', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/settings/regional', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/business-trips', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/special-entitlements', role: 'ADMIN' },
 ];
 
 for (const route of a11yRoutes) {

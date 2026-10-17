@@ -147,14 +147,46 @@ final class AbsenceTypeCatalog
 
 	/**
 	 * Valid for *new requests*: built-in or an active custom row.
+	 *
+	 * `home_office` and `business_trip` remain creatable only while their
+	 * legacy-create flags allow it (Workforce Policy Suite Phase 3/5). Once
+	 * the respective rollout disables legacy creation the type stays valid
+	 * for history but rejects new requests — uniformly, on every create path
+	 * that funnels through this catalog.
 	 */
 	public static function isCreatable(string $type): bool
 	{
 		if (in_array($type, self::ORDER, true)) {
+			if ($type === Absence::TYPE_HOME_OFFICE) {
+				return self::legacyFlagEnabled('legacy_home_absence_create_enabled');
+			}
+			if ($type === Absence::TYPE_BUSINESS_TRIP) {
+				return self::legacyFlagEnabled('legacy_trip_absence_create_enabled');
+			}
 			return true;
 		}
 		$custom = self::customTypes()[$type] ?? null;
 		return $custom !== null && (bool)$custom->getActive();
+	}
+
+	/**
+	 * Lifecycle metadata for API/UX: a deprecated type renders existing
+	 * records but steers users to the replacement (`replacement` in payloads).
+	 *
+	 * @return array{deprecated: bool, replacement: string|null}
+	 */
+	public static function lifecycle(string $type): array
+	{
+		return match ($type) {
+			Absence::TYPE_HOME_OFFICE => ['deprecated' => true, 'replacement' => 'work_location_home'],
+			Absence::TYPE_BUSINESS_TRIP => ['deprecated' => true, 'replacement' => 'business_trip_booking'],
+			default => ['deprecated' => false, 'replacement' => null],
+		};
+	}
+
+	public static function isDeprecated(string $type): bool
+	{
+		return self::lifecycle($type)['deprecated'];
 	}
 
 	public static function isCustom(string $type): bool
@@ -225,12 +257,12 @@ final class AbsenceTypeCatalog
 		return $labels;
 	}
 
-	/** @return array<string, string> Ordered map type => localized label for creation selects (active custom only). */
+	/** @return array<string, string> Ordered map type => localized label for creation selects (creatable types only). */
 	public static function creatableLabels(IL10N $l, ?string $locale = null): array
 	{
 		$labels = self::labels($l, $locale);
-		foreach (self::customTypes() as $code => $custom) {
-			if (!(bool)$custom->getActive()) {
+		foreach ($labels as $code => $_label) {
+			if (!self::isCreatable($code)) {
 				unset($labels[$code]);
 			}
 		}
@@ -346,6 +378,20 @@ final class AbsenceTypeCatalog
 			}
 		}
 		return self::$customCache;
+	}
+
+	/**
+	 * Reads a workforce-suite feature flag. Fails open to the legacy-safe
+	 * default (enabled) when the suite config is unavailable — a pre-suite
+	 * install must keep legacy create paths working.
+	 */
+	private static function legacyFlagEnabled(string $flag): bool
+	{
+		try {
+			return Server::get(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class)->isEnabled($flag);
+		} catch (\Throwable) {
+			return true;
+		}
 	}
 
 	private static function userLocale(): ?string

@@ -28,6 +28,7 @@ final class AdminSettingsSectionCatalog
 	public const SECTION_HOURS = 'hours';
 	public const SECTION_REGIONAL = 'regional';
 	public const SECTION_RETENTION = 'retention';
+	public const SECTION_WORK_LOCATIONS = 'work-locations';
 	public const SECTION_PROJECTCHECK = 'projectcheck';
 
 	/** Sentinel for Nextcloud Administration mega-form (full write parity). */
@@ -49,6 +50,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_HOURS,
 		self::SECTION_REGIONAL,
 		self::SECTION_RETENTION,
+		self::SECTION_WORK_LOCATIONS,
 		self::SECTION_PROJECTCHECK,
 	];
 
@@ -71,6 +73,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_OUTLOOK_SUBSCRIPTION,
 			self::SECTION_MONTH_CLOSURE,
 			self::SECTION_RETENTION,
+			self::SECTION_WORK_LOCATIONS,
 		],
 		'connections' => [self::SECTION_PROJECTCHECK],
 	];
@@ -92,6 +95,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_HOURS => 'hours.php',
 		self::SECTION_REGIONAL => 'regional.php',
 		self::SECTION_RETENTION => 'retention.php',
+		self::SECTION_WORK_LOCATIONS => 'work-locations.php',
 		self::SECTION_PROJECTCHECK => 'projectcheck', // special: shared partial
 	];
 
@@ -175,6 +179,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_RETENTION => [
 			'retentionPeriod',
 		],
+		self::SECTION_WORK_LOCATIONS => [],
 		self::SECTION_PROJECTCHECK => [
 			'projectCheckIntegrationEnabled',
 		],
@@ -208,6 +213,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_HOURS => $l->t('Daily hours and rest periods'),
 			self::SECTION_REGIONAL => $l->t('Country and region'),
 			self::SECTION_RETENTION => $l->t('Data retention'),
+			self::SECTION_WORK_LOCATIONS => $l->t('Work locations'),
 			self::SECTION_PROJECTCHECK => $l->t('ProjectCheck connection'),
 			default => $l->t('Global settings'),
 		};
@@ -226,6 +232,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_HOURS => $l->t('Hours & rest'),
 			self::SECTION_REGIONAL => $l->t('Country'),
 			self::SECTION_RETENTION => $l->t('Retention'),
+			self::SECTION_WORK_LOCATIONS => $l->t('Locations'),
 			self::SECTION_PROJECTCHECK => $l->t('ProjectCheck'),
 			default => $l->t('Settings'),
 		};
@@ -244,6 +251,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_HOURS => $l->t('Daily maximum, rest between days, and default hours.'),
 			self::SECTION_REGIONAL => $l->t('Country, default holiday region, and statutory holiday seeding.'),
 			self::SECTION_RETENTION => $l->t('How long time records are kept before cleanup.'),
+			self::SECTION_WORK_LOCATIONS => $l->t('Manage selectable work locations, effective defaults, and the home-office migration.'),
 			self::SECTION_PROJECTCHECK => $l->t('Optional link from time entries to ProjectCheck projects.'),
 			default => '',
 		};

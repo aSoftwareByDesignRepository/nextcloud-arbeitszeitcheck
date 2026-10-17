@@ -24,12 +24,15 @@ use OCP\IURLGenerator;
 final class RouteUrlTemplate {
 	/**
 	 * @param string $route route name (e.g. arbeitszeitcheck.time_entry.apiUpdate)
-	 * @param string $param pinned \d+ route parameter name (e.g. id, absenceId)
+	 * @param string $param pinned route parameter name (e.g. id, absenceId)
 	 * @param string $sentinel literal segment the client replaces (e.g. __ID__)
+	 * @param string|int $placeholder generation-time value satisfying the
+	 *        route's requirement — numeric for `\d+` params, a valid enum
+	 *        member for constrained params (e.g. `DE` for DE|AT|CH|custom)
 	 */
-	public static function for(IURLGenerator $urlGenerator, string $route, string $param = 'id', string $sentinel = '__ID__'): string {
-		$url = $urlGenerator->linkToRoute($route, [$param => 0]);
-		$template = preg_replace('#/0(?=/|$)#', '/' . $sentinel, $url, 1, $count);
+	public static function for(IURLGenerator $urlGenerator, string $route, string $param = 'id', string $sentinel = '__ID__', string|int $placeholder = 0): string {
+		$url = $urlGenerator->linkToRoute($route, [$param => $placeholder]);
+		$template = preg_replace('#/' . preg_quote((string)$placeholder, '#') . '(?=/|$)#', '/' . $sentinel, $url, 1, $count);
 		if ($template === null || $count !== 1) {
 			throw new \RuntimeException('Route URL template generation failed for ' . $route);
 		}

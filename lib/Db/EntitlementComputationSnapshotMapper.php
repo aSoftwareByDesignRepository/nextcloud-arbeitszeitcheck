@@ -85,6 +85,7 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 			$existing->setComputedAt($snapshot->getComputedAt());
 			$existing->setComputedBy($snapshot->getComputedBy());
 			$existing->setPolicyFingerprint($snapshot->getPolicyFingerprint());
+			$this->copySpecialEntitlementFields($snapshot, $existing);
 			return $this->update($existing);
 		}
 		if ($existing !== null && $existingAsOfDate !== null) {
@@ -95,6 +96,7 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 			$existing->setComputedAt($snapshot->getComputedAt());
 			$existing->setComputedBy($snapshot->getComputedBy());
 			$existing->setPolicyFingerprint($snapshot->getPolicyFingerprint());
+			$this->copySpecialEntitlementFields($snapshot, $existing);
 			return $this->update($existing);
 		}
 		try {
@@ -115,10 +117,21 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 				$conflict->setComputedAt($snapshot->getComputedAt());
 				$conflict->setComputedBy($snapshot->getComputedBy());
 				$conflict->setPolicyFingerprint($snapshot->getPolicyFingerprint());
+				$this->copySpecialEntitlementFields($snapshot, $conflict);
 				return $this->update($conflict);
 			}
 			throw new \RuntimeException('Snapshot upsert conflict could not be resolved');
 		}
+	}
+
+	private function copySpecialEntitlementFields(EntitlementComputationSnapshot $from, EntitlementComputationSnapshot $to): void
+	{
+		$to->setEntitlementTypeId($from->getEntitlementTypeId());
+		$to->setAlgorithmVersion($from->getAlgorithmVersion());
+		$to->setPeriodStart($from->getPeriodStart());
+		$to->setPeriodEnd($from->getPeriodEnd());
+		$to->setUnit($from->getUnit());
+		$to->setEffectiveAmount($from->getEffectiveAmount());
 	}
 
 	public function deleteByUser(string $userId): int {

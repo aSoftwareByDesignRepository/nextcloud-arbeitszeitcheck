@@ -578,6 +578,8 @@ class AbsenceController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.')
 			], Http::STATUS_CONFLICT);
+		} catch (\OCA\ArbeitszeitCheck\Exception\AbsenceTypeDeprecatedException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 		} catch (DoesNotExistException $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -1147,6 +1149,13 @@ class AbsenceController extends Controller
 				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
 			}
 			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
+		} catch (\OCA\ArbeitszeitCheck\Exception\AbsenceTypeDeprecatedException $e) {
+			$msg = $e->getMessage();
+			if (!$json) {
+				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?error=' . rawurlencode($msg);
+				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);
+			}
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::store: ' . $e->getMessage(), ['exception' => $e]);
 			$msg = $this->getSafeErrorMessage($e);

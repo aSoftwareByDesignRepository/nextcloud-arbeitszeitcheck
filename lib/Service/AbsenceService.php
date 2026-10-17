@@ -60,6 +60,7 @@ class AbsenceService
 	private ?VacationHoursDebitService $vacationHoursDebitService;
 	private ?ManagerPendingApprovalMailService $managerPendingApprovalMailService;
 	private ?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper;
+	private ?SpecialEntitlementService $specialEntitlementService;
 	/** Shared migrate-idle lock held for the duration of a vacation mutation (anti-TOCTOU). */
 	private ?string $heldVacationUnitMigrateSharedLock = null;
 	/** Shared year-mode lock — blocks exclusive mode flip mid-mutation (lock order: year → migrate). */
@@ -89,6 +90,7 @@ class AbsenceService
 		?VacationHoursDebitService $vacationHoursDebitService = null,
 		?ManagerPendingApprovalMailService $managerPendingApprovalMailService = null,
 		?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper = null,
+		?SpecialEntitlementService $specialEntitlementService = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -114,6 +116,7 @@ class AbsenceService
 		$this->vacationUnitService = $vacationUnitService;
 		$this->vacationHoursDebitService = $vacationHoursDebitService;
 		$this->managerPendingApprovalMailService = $managerPendingApprovalMailService;
+		$this->specialEntitlementService = $specialEntitlementService;
 		// Same pattern as timeZoneService: never silently skip the worked-day guard.
 		$this->timeEntryMapper = $timeEntryMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
 	}
@@ -162,6 +165,10 @@ class AbsenceService
 	public function createAbsence(array $data, string $userId): Absence
 	{
 		$data = $this->scrubClientAuthoredDebitFields($data);
+		$specialContext = $this->specialEntitlementService?->beginReservation($userId, $data);
+		if (isset($specialContext['replayAbsence']) && $specialContext['replayAbsence'] instanceof Absence) {
+			return $specialContext['replayAbsence'];
+		}
 		$lockKey = $this->acquireUserMutationLock($userId);
 		$catalogLockHeld = false;
 		try {
@@ -212,6 +219,13 @@ class AbsenceService
 				$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
 				$absence->setDays($workingDays);
 			}
+			$specialAmount = null;
+			if ($specialContext !== null) {
+				$specialAmount = $this->specialEntitlementService->requestAmount($specialContext, $absence);
+				if ($specialContext['type']->getUnit() === 'hours') {
+					$absence->setDurationHours($specialAmount);
+				}
+			}
 
 			// All DB writes are atomic: if the audit log insertion fails, the absence
 			// insertion is rolled back and the user sees an error rather than having an
@@ -228,6 +242,9 @@ class AbsenceService
 				}
 
 				$savedAbsence = $this->absenceMapper->insert($absence);
+				if ($specialContext !== null && $specialAmount !== null) {
+					$this->specialEntitlementService->completeReservation($specialContext, $savedAbsence, $specialAmount, $userId);
+				}
 
 			$this->auditLogMapper->logAction(
 				$userId,
@@ -242,6 +259,9 @@ class AbsenceService
 			if ($savedAbsence->getStatus() === Absence::STATUS_PENDING && !$this->teamResolver->hasAssignableManagerForEmployee($userId)) {
 				$savedAbsence = $this->doAutoApproveDbWork($savedAbsence);
 				$autoApproved = true;
+			}
+			if ($autoApproved && $specialContext !== null) {
+				$this->specialEntitlementService->consumeForAbsence($savedAbsence, $userId);
 			}
 
 				$this->db->commit();
@@ -301,6 +321,7 @@ class AbsenceService
 		} finally {
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
+			$this->specialEntitlementService?->releaseReservationContext($specialContext);
 		}
 	}
 
@@ -322,6 +343,10 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('You cannot record an absence for yourself with this action.'));
 		}
 
+		$specialContext = $this->specialEntitlementService?->beginReservation($targetUserId, $data);
+		if (isset($specialContext['replayAbsence']) && $specialContext['replayAbsence'] instanceof Absence) {
+			return $specialContext['replayAbsence'];
+		}
 		$lockKey = $this->acquireUserMutationLock($targetUserId);
 		$catalogLockHeld = false;
 		try {
@@ -360,6 +385,13 @@ class AbsenceService
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
 			}
+			$specialAmount = null;
+			if ($specialContext !== null) {
+				$specialAmount = $this->specialEntitlementService->requestAmount($specialContext, $absence);
+				if ($specialContext['type']->getUnit() === 'hours') {
+					$absence->setDurationHours($specialAmount);
+				}
+			}
 
 			$savedAbsence = null;
 			$this->db->beginTransaction();
@@ -387,6 +419,10 @@ class AbsenceService
 				}
 
 				$savedAbsence = $this->absenceMapper->insert($absence);
+				if ($specialContext !== null && $specialAmount !== null) {
+					$this->specialEntitlementService->completeReservation($specialContext, $savedAbsence, $specialAmount, $managerUserId);
+					$this->specialEntitlementService->consumeForAbsence($savedAbsence, $managerUserId);
+				}
 
 				$this->auditLogMapper->logAction(
 					$targetUserId,
@@ -421,6 +457,7 @@ class AbsenceService
 		} finally {
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
+			$this->specialEntitlementService?->releaseReservationContext($specialContext);
 		}
 	}
 
@@ -577,6 +614,7 @@ class AbsenceService
 				throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
 			}
 
+			$this->specialEntitlementService?->syncForUpdatedAbsence($absence, $validateData, $oldData, $userId);
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -651,6 +689,7 @@ class AbsenceService
 
 			$this->db->beginTransaction();
 			try {
+				$this->specialEntitlementService?->releaseForAbsence($absence, $userId);
 				$this->absenceMapper->delete($absence);
 
 				$this->auditLogMapper->logAction(
@@ -732,6 +771,7 @@ class AbsenceService
 			$this->db->beginTransaction();
 			try {
 				$updatedAbsence = $this->absenceMapper->update($absence);
+				$this->specialEntitlementService?->releaseForAbsence($updatedAbsence, $userId);
 
 				$this->auditLogMapper->logAction(
 					$userId,
@@ -852,6 +892,7 @@ class AbsenceService
 			$this->db->beginTransaction();
 			try {
 				$updatedAbsence = $this->absenceMapper->update($absence);
+				$this->specialEntitlementService?->adjustConsumedAbsence($updatedAbsence, $data, $oldData, $userId);
 
 				$this->auditLogMapper->logAction(
 					$userId,
@@ -943,6 +984,7 @@ class AbsenceService
 			}
 
 			$updatedAbsence = $this->absenceMapper->update($absence);
+			$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, $approverId);
 
 			$this->auditLogMapper->logAction(
 				$updatedAbsence->getUserId(),
@@ -1025,6 +1067,7 @@ class AbsenceService
 			$absence->setUpdatedAt(new \DateTime());
 
 			$updatedAbsence = $this->absenceMapper->update($absence);
+			$this->specialEntitlementService?->releaseForAbsence($updatedAbsence, $approverId);
 
 			$this->auditLogMapper->logAction(
 				$updatedAbsence->getUserId(),
@@ -1178,6 +1221,7 @@ class AbsenceService
 			// When no assignable manager: auto-approve immediately (DB work only; notifications after commit)
 			if (!$this->teamResolver->hasAssignableManagerForEmployee($absence->getUserId())) {
 				$updatedAbsence = $this->doAutoApproveDbWork($updatedAbsence);
+				$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
 				$wasAutoApproved = true;
 			}
 
@@ -1979,6 +2023,13 @@ class AbsenceService
 		// history must remain editable, e.g. for manager corrections.
 		$existingType = $options['existing_type'] ?? null;
 		if (!AbsenceTypeCatalog::isCreatable($type) && $type !== $existingType) {
+			$lifecycle = AbsenceTypeCatalog::lifecycle($type);
+			if ($lifecycle['deprecated'] && $lifecycle['replacement'] !== null) {
+				throw new \OCA\ArbeitszeitCheck\Exception\AbsenceTypeDeprecatedException(
+					$this->l10n->t('This absence type is no longer available for new requests.'),
+					$lifecycle['replacement'],
+				);
+			}
 			throw new \Exception($this->l10n->t('This absence type is no longer available'));
 		}
 		$this->validateAbsenceTypeRules($type, $startDate, $endDate, $data, $userId);
@@ -2216,6 +2267,7 @@ class AbsenceService
 		$this->db->beginTransaction();
 		try {
 			$updatedAbsence = $this->doAutoApproveDbWork($absence);
+			$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();

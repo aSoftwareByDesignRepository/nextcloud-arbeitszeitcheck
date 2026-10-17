@@ -41,6 +41,12 @@ class EntitlementComputationSnapshot extends Entity {
 	protected \DateTime $computedAt;
 	protected string $computedBy = 'system';
 	protected ?string $policyFingerprint = null;
+	protected ?int $entitlementTypeId = null;
+	protected ?string $algorithmVersion = null;
+	protected ?\DateTime $periodStart = null;
+	protected ?\DateTime $periodEnd = null;
+	protected ?string $unit = null;
+	protected ?float $effectiveAmount = null;
 
 	public function __construct() {
 		$this->addType('userId', 'string');
@@ -53,6 +59,12 @@ class EntitlementComputationSnapshot extends Entity {
 		$this->addType('computedAt', 'datetime');
 		$this->addType('computedBy', 'string');
 		$this->addType('policyFingerprint', 'string');
+		$this->addType('entitlementTypeId', 'integer');
+		$this->addType('algorithmVersion', 'string');
+		$this->addType('periodStart', 'date');
+		$this->addType('periodEnd', 'date');
+		$this->addType('unit', 'string');
+		$this->addType('effectiveAmount', 'float');
 		// Typed \DateTime properties must be initialized before Entity::setter()
 		// compares them; otherwise the first setAsOfDate()/setComputedAt() call
 		// throws "must not be accessed before initialization".

@@ -26,6 +26,7 @@ namespace OCA\ArbeitszeitCheck\Support;
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Constants;
 use OCP\AppFramework\Services\IAppConfig;
+use OCP\DB\Exception as DBException;
 use OCP\IDBConnection;
 
 class BreakPolicyStore
@@ -66,13 +67,13 @@ class BreakPolicyStore
 
 	/**
 	 * Persist the merged document and its new revision. Call inside the
-	 * same transaction that performed lockAndRead() — setAppValueString
-	 * participates in it because it shares the connection.
+	 * same transaction that performed lockAndRead() so both direct updates
+	 * participate in the transaction and bypass the per-request config cache.
 	 */
 	public function write(string $json, int $version): void
 	{
-		$this->appConfig->setAppValueString(Constants::CONFIG_BREAK_POLICY_JSON, $json);
-		$this->appConfig->setAppValueString(Constants::CONFIG_BREAK_POLICY_VERSION, (string)$version);
+		$this->updateValue(Constants::CONFIG_BREAK_POLICY_JSON, $json);
+		$this->updateValue(Constants::CONFIG_BREAK_POLICY_VERSION, (string)$version);
 	}
 
 	/**
@@ -96,15 +97,26 @@ class BreakPolicyStore
 			return;
 		}
 		try {
-			$this->db->insertIfNotExist('appconfig', [
-				'appid' => Application::APP_ID,
-				'configkey' => $key,
-				'configvalue' => $value,
-				'configtype' => \OCP\IAppConfig::VALUE_STRING,
-			], ['appid', 'configkey']);
-		} catch (\Throwable) {
-			// A concurrent first save won the insert — the row exists either
-			// way, which is all lockAndRead() needs.
+			$qb = $this->db->getQueryBuilder();
+			$qb->insert('appconfig')
+				->setValue('appid', $qb->createNamedParameter(Application::APP_ID))
+				->setValue('configkey', $qb->createNamedParameter($key))
+				->setValue('configvalue', $qb->createNamedParameter($value));
+			$qb->executeStatement();
+		} catch (DBException $e) {
+			if ($e->getReason() !== DBException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $e;
+			}
 		}
+	}
+
+	private function updateValue(string $key, string $value): void
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->update('appconfig')
+			->set('configvalue', $qb->createNamedParameter($value))
+			->where($qb->expr()->eq('appid', $qb->createNamedParameter(Application::APP_ID)))
+			->andWhere($qb->expr()->eq('configkey', $qb->createNamedParameter($key)))
+			->executeStatement();
 	}
 }

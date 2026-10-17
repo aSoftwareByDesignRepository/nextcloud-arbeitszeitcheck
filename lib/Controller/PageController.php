@@ -122,7 +122,8 @@ class PageController extends Controller
 		ProjectCheckIntegrationService $projectCheckIntegration,
 		TimeCaptureMethodService $timeCaptureMethodService,
 		TimeEntryDeletionPolicy $deletionPolicy,
-		IL10N $l10n
+		IL10N $l10n,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null
 	) {
 		parent::__construct($appName, $request);
 		$this->timeTrackingService = $timeTrackingService;
@@ -161,6 +162,28 @@ class PageController extends Controller
 			throw new \Exception('User not authenticated');
 		}
 		return $user->getUID();
+	}
+
+	private function workLocationChipContext(string $userId, array $status): ?array
+	{
+		try {
+			$service = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\UserWorkLocationService::class);
+			$effective = $service->effectiveToday($userId);
+			$options = $service->selectableOptions($this->l10n->getLocaleCode());
+			if ($options === null) {
+				return null;
+			}
+			$labels = array_column($options, 'label', 'code');
+			$currentCode = $status['current_entry']['workLocation'] ?? null;
+			return [
+				'code' => $effective['code'],
+				'label' => $labels[$effective['code']] ?? $effective['code'],
+				'currentLabel' => is_string($currentCode) && $currentCode !== '' ? ($labels[$currentCode] ?? $currentCode) : null,
+				'date' => (new \DateTimeImmutable('today'))->format('Y-m-d'),
+			];
+		} catch (\Throwable) {
+			return null;
+		}
 	}
 
 	/**
@@ -331,6 +354,7 @@ class PageController extends Controller
 			'dashboard-overtime',
 			'common/projectcheck',
 		]);
+		Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
 
 		try {
 			$userId = $this->getUserId();
@@ -436,6 +460,7 @@ class PageController extends Controller
 				'projectCheckAvailable' => $this->projectCheckIntegration->isProjectCheckAvailable(),
 				'projectCheckEnabled' => $projectCheckLinkingEnabled,
 				'projectCheckProjects' => $projectCheckLinkingEnabled ? $this->projectCheckIntegration->getAvailableProjects($userId) : [],
+				'workLocation' => $this->workLocationChipContext($userId, $status),
 				'timeCapture' => $this->timeCaptureMethodService->getSettings($userId),
 				'stats' => [
 					'total_time_entries' => $timeEntryCount,
@@ -535,6 +560,7 @@ class PageController extends Controller
 		foreach ($extraScripts as $script) {
 			\OCP\Util::addScript('arbeitszeitcheck', $script);
 		}
+		\OCP\Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
 		if ($this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_MONTH_CLOSURE_ENABLED, '0') === '1') {
 			\OCP\Util::addScript('arbeitszeitcheck', 'month-closure');
 		}
@@ -667,6 +693,7 @@ class PageController extends Controller
 	{
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker']);
 		Util::addScript('arbeitszeitcheck', 'entitlement-explainer');
+		Util::addScript('arbeitszeitcheck', 'absence-entitlements');
 
 		try {
 			$userId = $this->getUserId();
@@ -746,6 +773,9 @@ class PageController extends Controller
 		$pendingCount = count(array_filter($absencesForStats, function ($a) {
 			return in_array($a->getStatus(), ['pending', 'substitute_pending'], true);
 		}));
+		$showHomeOfficeMigrationHint = count(array_filter($absencesForStats, static function ($a) {
+			return $a->getType() === 'home_office';
+		})) > 0;
 
 		// Precompute working days for absences with days=NULL (HolidayService, state-aware)
 		$computedWorkingDays = [];
@@ -791,6 +821,7 @@ class PageController extends Controller
 			],
 			'employeeHasAssignableManager' => $employeeHasAssignableManager,
 			'useAppTeams' => $useAppTeams,
+			'showHomeOfficeMigrationHint' => $showHomeOfficeMigrationHint,
 		];
 
 			$response = new TemplateResponse('arbeitszeitcheck', 'absences', $params);
@@ -819,6 +850,79 @@ class PageController extends Controller
 			]);
 			return $this->configureCSP($response);
 		}
+	}
+
+	/**
+	 * Employee business-trip page — list and create/detail in one view
+	 * (spec §7.2: a dedicated capture route, never a big dialog form).
+	 * The page itself is always renderable; the flag-off state explains
+	 * that the organisation has not enabled trips. The API stays 404
+	 * while disabled, so the JS cannot leak data either way.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function businessTrips(): TemplateResponse
+	{
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips'], ['common/datepicker']);
+		Util::addScript('arbeitszeitcheck', 'business-trips');
+
+		$userId = $this->getUserId();
+		$navFlags = $this->getNavigationFlags($userId);
+
+		$params = $this->buildShellParams(
+			'business-trips',
+			$this->l10n->t('Business trips'),
+			$this->l10n->t('Record business trips, link working time, and submit them for review'),
+			$navFlags,
+		) + [
+			'businessTripsEnabled' => $this->businessTripsEnabled(),
+			'initialTripId' => 0,
+			'tripApiBase' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.business_trip.index'),
+			'timeEntriesApi' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'),
+		];
+
+		$response = new TemplateResponse('arbeitszeitcheck', 'business-trips', $params);
+		return $this->configureCSP($response);
+	}
+
+	/**
+	 * Deep link into a single trip (emails, dashboard entries). The trip
+	 * id is passed through to the client — ownership and existence are
+	 * enforced by the API, never by the page.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function businessTripDetail(int $id): TemplateResponse
+	{
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips'], ['common/datepicker']);
+		Util::addScript('arbeitszeitcheck', 'business-trips');
+
+		$userId = $this->getUserId();
+		$navFlags = $this->getNavigationFlags($userId);
+
+		$params = $this->buildShellParams(
+			'business-trips',
+			$this->l10n->t('Business trip'),
+			$this->l10n->t('Review the trip timeline, calculation, and status'),
+			$navFlags,
+		) + [
+			'businessTripsEnabled' => $this->businessTripsEnabled(),
+			'initialTripId' => $id,
+			'tripApiBase' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.business_trip.index'),
+			'timeEntriesApi' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.apiIndex'),
+		];
+
+		$response = new TemplateResponse('arbeitszeitcheck', 'business-trips', $params);
+		return $this->configureCSP($response);
+	}
+
+	private function businessTripsEnabled(): bool
+	{
+		if ($this->workforceSuiteConfig !== null) {
+			return $this->workforceSuiteConfig->isEnabled('business_trips_enabled');
+		}
+		// Fallback for constructions that predate the dependency (tests).
+		return $this->config->getAppValue('arbeitszeitcheck', 'business_trips_enabled', '0') === '1';
 	}
 
 	/**
@@ -1060,7 +1164,7 @@ class PageController extends Controller
 		$this->registerFrontEndAssets(
 			'settings',
 			'settings',
-			['common/projectcheck'],
+			['common/projectcheck', 'common/work-location-catalog'],
 			['employee-settings-legacy-redirect']
 		);
 

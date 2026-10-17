@@ -504,7 +504,7 @@ class TimeEntryCorrectionService
 		// other create path — proposal value wins, else the employee default.
 		if ($entry->getWorkLocation() === null) {
 			$entry->setWorkLocation(
-				$this->userWorkLocationService()->resolveForNewEntry($entry->getUserId(), null)
+				$this->userWorkLocationService()->resolveForNewEntry($entry->getUserId(), null, $entry->getStartTime())
 			);
 		}
 		$this->applyComplianceAdjustments($entry);

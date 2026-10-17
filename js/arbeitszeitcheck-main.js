@@ -124,6 +124,7 @@
             const initPage = () => {
                 this.initTimer();
                 this.initClockButtons();
+                this.initWorkLocationPicker();
                 this.initEventListeners();
                 
                 // Initialize page-specific functionality
@@ -553,6 +554,81 @@
                     }
                 }
             }
+        },
+
+        initWorkLocationPicker: function() {
+            const root = document.getElementById('dashboard-work-location');
+            const catalog = window.ArbeitszeitCheckWorkLocationCatalog;
+            if (!root || !catalog) {
+                return;
+            }
+            const toggle = document.getElementById('dashboard-work-location-toggle');
+            const picker = document.getElementById('dashboard-work-location-picker');
+            const optionsRoot = document.getElementById('dashboard-work-location-options');
+            const status = document.getElementById('dashboard-work-location-status');
+            if (!toggle || !picker || !optionsRoot || !status) {
+                return;
+            }
+            let revision = null;
+            let selectedCode = null;
+            const setOpen = (open) => {
+                picker.hidden = !open;
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+            const render = (payload) => {
+                if (!payload || !Array.isArray(payload.items)) {
+                    root.hidden = true;
+                    return;
+                }
+                revision = payload.effectiveDefault ? payload.effectiveDefault.revision : null;
+                selectedCode = payload.effectiveDefault ? payload.effectiveDefault.code : null;
+                optionsRoot.replaceChildren();
+                payload.items.forEach((item) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'azc-btn azc-btn--secondary azc-dashboard-work-location__option';
+                    button.setAttribute('role', 'option');
+                    button.setAttribute('aria-selected', item.code === selectedCode ? 'true' : 'false');
+                    button.textContent = item.label;
+                    button.addEventListener('click', async () => {
+                        status.textContent = root.dataset.saving || '';
+                        optionsRoot.querySelectorAll('button').forEach((node) => { node.disabled = true; });
+                        try {
+                            const url = window.OC.generateUrl('/apps/arbeitszeitcheck/api/work-location/day/{date}', { date: root.dataset.date });
+                            const response = await fetch(url, {
+                                method: 'PUT',
+                                credentials: 'same-origin',
+                                headers: {
+                                    Accept: 'application/json',
+                                    'Content-Type': 'application/json',
+                                    requesttoken: window.OC.requestToken,
+                                },
+                                body: JSON.stringify({ code: item.code, revision }),
+                            });
+                            const body = await response.json();
+                            if (!response.ok || body.success !== true) {
+                                throw new Error(body.error || 'save_failed');
+                            }
+                            revision = body.revision;
+                            selectedCode = body.code;
+                            toggle.textContent = (root.dataset.labelTemplate || '{label}').replace('{label}', body.label || item.label);
+                            optionsRoot.querySelectorAll('[role="option"]').forEach((node) => {
+                                node.setAttribute('aria-selected', node === button ? 'true' : 'false');
+                            });
+                            status.textContent = root.dataset.saved || '';
+                            setOpen(false);
+                            toggle.focus();
+                        } catch (error) {
+                            status.textContent = root.dataset.failed || '';
+                        } finally {
+                            optionsRoot.querySelectorAll('button').forEach((node) => { node.disabled = false; });
+                        }
+                    });
+                    optionsRoot.appendChild(button);
+                });
+            };
+            toggle.addEventListener('click', () => setOpen(picker.hidden));
+            catalog.load().then(render);
         },
 
         /**

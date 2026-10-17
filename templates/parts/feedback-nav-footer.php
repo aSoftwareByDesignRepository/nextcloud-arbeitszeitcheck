@@ -79,6 +79,7 @@ $sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
 <nav
 	class="<?php p($prefix); ?>-nav-footer"
 	id="<?php p($footerId); ?>"
+	aria-label="<?php p($l->t('Help')); ?>"
 	data-app-feedback="1"
 	data-app-feedback-app="<?php p((string)$links['appId']); ?>"
 >

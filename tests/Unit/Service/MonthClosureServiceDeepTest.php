@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\PremiumSurchargeService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\TimeZoneService;
+use OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig;
 use OCP\IConfig;
 use OCP\IDateTimeZone;
 use OCP\IDBConnection;
@@ -166,7 +167,9 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturnCallback(fn () => $this->allowedByAccessGroups);
 	}
 
-	private function svc(): MonthClosureService
+	private function svc(
+		?\OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry $contributorRegistry = null,
+	): MonthClosureService
 	{
 		return new MonthClosureService(
 			$this->closureMapper,
@@ -184,7 +187,9 @@ final class MonthClosureServiceDeepTest extends TestCase
 			$this->overtimePayoutMapper,
 			$this->timeZoneService,
 			$this->lockingProvider,
-			$this->premiumSurchargeService
+			$this->premiumSurchargeService,
+			$contributorRegistry,
+			new WorkforceSuiteConfig($this->config),
 		);
 	}
 
@@ -465,6 +470,95 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionMessage('disk full');
 		$this->svc()->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
+	}
+
+	// ---------------------------------------------------------------
+	// Feature flag ↔ contributor registry contract
+	// ---------------------------------------------------------------
+
+	/**
+	 * A contributor whose domain flag is off must perform zero domain work:
+	 * it is never consulted for blockers and its snapshot/contributions/hash
+	 * never reach the canonical payload (Phase 1 requirement — disabled
+	 * features leave the closure bit-identical).
+	 */
+	public function testFlaggedOffContributorIsFullyInert(): void
+	{
+		$this->entries = [$this->completedEntry()];
+		$contributor = $this->createMock(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributor::class);
+		$contributor->method('id')->willReturn('test_domain');
+		$contributor->method('featureFlag')->willReturn('business_trips_enabled');
+		$contributor->expects($this->never())->method('blockers');
+		$contributor->expects($this->never())->method('snapshot');
+		$contributor->expects($this->never())->method('contributions');
+		$contributor->expects($this->never())->method('canonicalHash');
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register($contributor);
+
+		$result = $this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
+
+		$this->assertSame(MonthClosure::STATUS_FINALIZED, $result->getStatus());
+		$payload = json_decode((string)$this->inserted[0]->getCanonicalPayload(), true);
+		$this->assertArrayNotHasKey('contributors', $payload);
+	}
+
+	public function testEnabledContributorBlocksFinalize(): void
+	{
+		$this->appValues['business_trips_enabled'] = '1';
+		$this->entries = [$this->completedEntry()];
+		$contributor = $this->createMock(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributor::class);
+		$contributor->method('id')->willReturn('test_domain');
+		$contributor->method('featureFlag')->willReturn('business_trips_enabled');
+		$contributor->method('blockers')->willReturn(['TRIP_UNREVIEWED']);
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register($contributor);
+
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('domain_blocker:test_domain');
+		$this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
+	}
+
+	public function testEnabledContributorFoldedIntoCanonicalPayload(): void
+	{
+		$this->appValues['business_trips_enabled'] = '1';
+		$this->entries = [$this->completedEntry()];
+		$contributor = $this->createMock(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributor::class);
+		$contributor->method('id')->willReturn('test_domain');
+		$contributor->method('featureFlag')->willReturn('business_trips_enabled');
+		$contributor->method('blockers')->willReturn([]);
+		$contributor->method('snapshot')->willReturn(['trips' => 2]);
+		$contributor->method('contributions')->willReturn([['id' => 'bt:1']]);
+		$contributor->method('canonicalHash')->willReturn(str_repeat('b', 64));
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register($contributor);
+
+		$this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
+
+		$payload = json_decode((string)$this->inserted[0]->getCanonicalPayload(), true);
+		// MonthClosureCanonical::encode sorts keys recursively, so the stored
+		// payload reflects canonical (alphabetical) key order.
+		$this->assertSame(
+			['canonical_hash' => str_repeat('b', 64), 'contributions' => [['id' => 'bt:1']], 'snapshot' => ['trips' => 2]],
+			$payload['contributors']['test_domain'] ?? null,
+		);
+	}
+
+	/**
+	 * A contributor declaring an unknown flag fails closed: isEnabled()
+	 * throws, so the closure aborts rather than silently trusting an
+	 * ungated domain.
+	 */
+	public function testContributorWithUnknownFlagFailsClosed(): void
+	{
+		$this->entries = [$this->completedEntry()];
+		$contributor = $this->createMock(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributor::class);
+		$contributor->method('id')->willReturn('test_domain');
+		$contributor->method('featureFlag')->willReturn('not_a_real_flag');
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register($contributor);
+
+		$this->expectException(\InvalidArgumentException::class);
+		$this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
 	}
 
 	// ---------------------------------------------------------------

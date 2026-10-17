@@ -23,6 +23,9 @@ final class AppFeedbackFooterContractTest extends TestCase
 		$src = $this->footer();
 		self::assertStringContainsString('data-app-feedback="1"', $src);
 		self::assertStringContainsString('<nav', $src);
+		// landmark_uniqueness: the footer <nav> sits inside #app-navigation's
+		// own navigation landmark — it must carry a distinguishing accessible name.
+		self::assertMatchesRegularExpression('/<nav[\s\S]*?aria-label=/', $src);
 		self::assertStringContainsString('nav-footer__trigger', $src);
 		self::assertStringContainsString('nav-footer__menu', $src);
 		self::assertStringContainsString('role="menu"', $src);

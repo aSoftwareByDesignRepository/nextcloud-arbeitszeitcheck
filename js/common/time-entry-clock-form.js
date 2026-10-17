@@ -269,9 +269,21 @@
 		return entry;
 	}
 
-	function buildFormHtml(idPrefix, labels) {
+	function buildFormHtml(idPrefix, labels, options) {
 		const p = idPrefix;
 		const L = labels;
+		// Server-catalog options (Workforce Suite) replace the built-in enum
+		// once provided; the fallback keeps older servers identical.
+		const wlOptions = Array.isArray(options && options.workLocations) && options.workLocations.length > 0
+			? options.workLocations
+			: null;
+		const builtinWlOption = (code, label) =>
+			'<option value="' + code + '">' + (label || code) + '</option>';
+		const wlOptionHtml = wlOptions !== null
+			? wlOptions.map((it) => builtinWlOption(it.code, it.label)).join('')
+			: builtinWlOption('office', L.workLocationOffice || 'Office')
+				+ builtinWlOption('home', L.workLocationHome || 'Home office')
+				+ builtinWlOption('external', L.workLocationExternal || 'External appointment');
 		return [
 			'<p class="form-help clock-form-intro">' + L.intro + '</p>',
 			'<fieldset class="correction-fieldset">',
@@ -336,9 +348,7 @@
 				'<label for="' + p + '-work-location" class="form-label">' + L.workLocationLegend + '</label>',
 				'<select id="' + p + '-work-location" class="form-input">',
 				'<option value="">' + (L.workLocationUnspecified || '') + '</option>',
-				'<option value="office">' + (L.workLocationOffice || 'Office') + '</option>',
-				'<option value="home">' + (L.workLocationHome || 'Home office') + '</option>',
-				'<option value="external">' + (L.workLocationExternal || 'External appointment') + '</option>',
+				wlOptionHtml,
 				// Correction dialogs additionally allow proposing "remove the
 				// mark" — sentinelled as __clear so it never collides with
 				// "keep current" ('').
@@ -389,7 +399,18 @@
 		setSelectHm(endHour, endMinute, isoToHm(initial.endTime));
 		if (workLocationSelect) {
 			const wl = typeof initial.workLocation === 'string' ? initial.workLocation : '';
-			workLocationSelect.value = ['office', 'home', 'external'].includes(wl) ? wl : '';
+			const known = Array.isArray(opts.workLocations) && opts.workLocations.length > 0
+				? opts.workLocations.map((it) => it.code)
+				: ['office', 'home', 'external'];
+			if (wl !== '' && !known.includes(wl)) {
+				// Stored code no longer in the catalog — keep it visible and
+				// selectable so a correction never silently drops the mark.
+				const synthetic = document.createElement('option');
+				synthetic.value = wl;
+				synthetic.textContent = wl;
+				workLocationSelect.appendChild(synthetic);
+			}
+			workLocationSelect.value = known.includes(wl) || wl !== '' ? wl : '';
 		}
 
 		const dpApi = window.ArbeitszeitCheckDatepicker;

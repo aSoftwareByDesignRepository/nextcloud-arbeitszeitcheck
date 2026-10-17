@@ -157,9 +157,12 @@
 		if (!toast || toast.getAttribute('data-app-feedback-bound') === '1') {
 			return;
 		}
-		// App-owned toasts (common/toasts.js) already carry their own report
-		// link; only fill the gap for legacy/external error toasts.
-		if (toast.querySelector('.' + PREFIX + '-toast__feedback, .toast__feedback')) {
+		// App-owned toasts (common/toasts.js, common/messaging.js self-attach)
+		// already carry their own report link; only fill the gap for
+		// legacy/external error toasts. Self-attach class names differ per
+		// app (-toast__feedback, -toast__report, -nav-footer__toast-link), so
+		// the reliable dedup signal is an existing mailto: anchor.
+		if (toast.querySelector('.' + PREFIX + '-toast__feedback, .toast__feedback, .' + PREFIX + '-toast__report, a[href^="mailto:"]')) {
 			return;
 		}
 		toast.setAttribute('data-app-feedback-bound', '1');

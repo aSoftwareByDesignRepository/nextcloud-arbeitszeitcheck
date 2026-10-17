@@ -396,6 +396,19 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             </div>
                         <?php endif; ?>
 
+                        <?php if (is_array($workLocation ?? null)): ?>
+                        <div id="dashboard-work-location" class="azc-dashboard-work-location" data-date="<?php p((string)$workLocation['date']); ?>" data-label-template="<?php p($l->t('Today: %s', ['{label}'])); ?>" data-saving="<?php p($l->t('Saving…')); ?>" data-saved="<?php p($l->t('Work location saved.')); ?>" data-failed="<?php p($l->t('The work location could not be saved. Reload and try again.')); ?>">
+                            <button id="dashboard-work-location-toggle" class="azc-btn azc-btn--secondary azc-dashboard-work-location__toggle" type="button" aria-expanded="false" aria-controls="dashboard-work-location-picker">
+                                <?php p($l->t('Today: %s', [(string)$workLocation['label']])); ?>
+                            </button>
+                            <div id="dashboard-work-location-picker" class="azc-dashboard-work-location__picker" hidden>
+                                <p class="form-help"><?php p($statusKeySafe === 'active' || $statusKeySafe === 'break' ? $l->t('This applies to the next entry. The running entry remains %s.', [(string)($workLocation['currentLabel'] ?? $workLocation['label'])]) : $l->t('Choose the work location for your next entry.')); ?></p>
+                                <div id="dashboard-work-location-options" class="azc-dashboard-work-location__options" role="listbox" aria-label="<?php p($l->t('Work location')); ?>"></div>
+                                <p id="dashboard-work-location-status" class="form-help" role="status" aria-live="polite"></p>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if ($showPunchActionGroup): ?>
                         <div class="azc-dashboard-punch__actions azc-dashboard-status__actions<?php echo ($statusKeySafe === 'clocked_out' && $showClockInButton && !$showCompletePausedButton) ? ' azc-dashboard-punch__actions--solo' : ''; ?>" role="group" aria-label="<?php p($l->t('Time tracking actions')); ?>">
                             <?php if ($showClockInButton): ?>

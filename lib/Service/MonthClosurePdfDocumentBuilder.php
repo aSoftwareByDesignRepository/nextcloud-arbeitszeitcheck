@@ -150,6 +150,24 @@ final class MonthClosurePdfDocumentBuilder
 				]),
 			];
 		}
+		$wlByCode = $rep['workLocation']['byCode'] ?? null;
+		if (is_array($wlByCode)) {
+			foreach ($wlByCode as $wlCode => $wlRow) {
+				if (!is_array($wlRow)) {
+					continue;
+				}
+				$wlMinutes = isset($wlRow['netMinutes']) && is_numeric($wlRow['netMinutes']) ? (int)$wlRow['netMinutes'] : 0;
+				$rows[] = [
+					$this->l->t('month_closure_pdf_label_work_location_entry', [
+						is_string($wlRow['label'] ?? null) && $wlRow['label'] !== '' ? $wlRow['label'] : (string)$wlCode,
+					]),
+					$this->l->t('month_closure_pdf_work_location_entry_detail', [
+						$this->fmtNum($wlRow['days'] ?? null),
+						$this->fmtNum(round($wlMinutes / 60, 2)),
+					]),
+				];
+			}
+		}
 		$this->keyValues($rows);
 
 		$bank = $snap['overtime_bank'] ?? null;

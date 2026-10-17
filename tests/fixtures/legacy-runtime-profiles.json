@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "targetNextcloud": {
+    "min": "32",
+    "max": "35"
+  },
+  "profiles": [
+    {
+      "key": "v1.8.0-on-nc35",
+      "sourceMin": "32",
+      "sourceMax": "35",
+      "serverVersion": "35",
+      "serverImage": "nextcloud:35",
+      "tags": ["v1.8.0"]
+    }
+  ]
+}

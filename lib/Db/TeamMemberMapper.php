@@ -60,6 +60,40 @@ class TeamMemberMapper extends QBMapper
 	}
 
 	/**
+	 * Bounded member-userId sample for preview surfaces (deterministic order).
+	 *
+	 * @return list<string>
+	 */
+	public function findMemberUserIds(int $teamId, int $limit): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('user_id')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId, IQueryBuilder::PARAM_INT)))
+			->orderBy('user_id', 'ASC')
+			->setMaxResults($limit);
+		$result = $qb->executeQuery();
+		$ids = [];
+		while ($row = $result->fetch()) {
+			$ids[] = (string)$row['user_id'];
+		}
+		$result->closeCursor();
+		return $ids;
+	}
+
+	public function countMembers(int $teamId): int
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->func()->count('user_id', 'cnt'))
+			->from($this->getTableName())
+			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId, IQueryBuilder::PARAM_INT)));
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->free();
+		return $count;
+	}
+
+	/**
 	 * @return TeamMember[]
 	 */
 	public function findByUserId(string $userId): array

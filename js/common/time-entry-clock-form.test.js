@@ -285,8 +285,10 @@ describe('time-entry-clock-form work location (GH #43)', () => {
     const { root } = mount(baseLabels(locationLabels), { workLocation: 'home' })
     expect(root.querySelector('#cf-work-location').value).toBe('home')
 
+    // A stored code no longer in the catalog is kept as a synthetic option —
+    // correcting such an entry must never silently drop the mark.
     const second = mount(baseLabels(locationLabels), { workLocation: 'moon' })
-    expect(second.root.querySelector('#cf-work-location').value).toBe('')
+    expect(second.root.querySelector('#cf-work-location').value).toBe('moon')
 
     const third = mount(baseLabels(locationLabels), { workLocation: null })
     expect(third.root.querySelector('#cf-work-location').value).toBe('')

@@ -356,4 +356,39 @@ describe('main confirm call-sites open→cancel→confirm', () => {
     document.querySelector('.confirm-dialog__confirm').click()
     await vi.waitFor(() => expect(callApi.mock.calls.some((c) => c[1] === 'DELETE')).toBe(true))
   })
+
+  it('dashboard work-location picker persists the selected code with its CAS revision', async () => {
+    const app = globalThis.window.ArbeitszeitCheckApp
+    globalThis.OC.generateUrl = (url, params) => url.replace('{date}', params?.date || '')
+    globalThis.OC.requestToken = 'token'
+    globalThis.window.ArbeitszeitCheckWorkLocationCatalog = {
+      load: vi.fn().mockResolvedValue({
+        items: [{ code: 'office', label: 'Office' }, { code: 'home', label: 'Home' }],
+        effectiveDefault: { code: 'office', revision: 4 },
+      }),
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, code: 'home', label: 'Home', revision: 5 }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `<div id="dashboard-work-location" data-date="2026-10-16" data-label-template="Today: {label}" data-saving="Saving" data-saved="Saved" data-failed="Failed">
+        <button id="dashboard-work-location-toggle" aria-expanded="false"></button>
+        <div id="dashboard-work-location-picker" hidden>
+          <div id="dashboard-work-location-options"></div>
+          <p id="dashboard-work-location-status"></p>
+        </div>
+      </div>`,
+    )
+
+    app.initWorkLocationPicker()
+    await vi.waitFor(() => expect(document.querySelectorAll('[role="option"]')).toHaveLength(2))
+    document.querySelectorAll('[role="option"]')[1].click()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ code: 'home', revision: 4 })
+    await vi.waitFor(() => expect(document.getElementById('dashboard-work-location-toggle').textContent).toBe('Today: Home'))
+    vi.unstubAllGlobals()
+  })
 })

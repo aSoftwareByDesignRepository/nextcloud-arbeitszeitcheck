@@ -132,6 +132,7 @@ class ManagerController extends Controller
 		ProjectCheckIntegrationService $projectCheckIntegration,
 		LocaleFormatService $localeFormat,
 		NavigationFlagsService $navigationFlags,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->absenceService = $absenceService;
@@ -551,6 +552,7 @@ class ManagerController extends Controller
 	{
 		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
+		Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
 		Util::addScript('arbeitszeitcheck', 'common/time-entry-clock-form');
 		Util::addScript('arbeitszeitcheck', 'manager-correction-dialog');
 		Util::addScript('arbeitszeitcheck', 'manager-create-time-entry');
@@ -656,6 +658,62 @@ class ManagerController extends Controller
 				$navFlags,
 			) + [
 				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			]);
+			return $this->configureCSP($response);
+		}
+	}
+
+	/**
+	 * Manager business-trip review page (spec §7.5): pending queue plus
+	 * the three-card detail — what was recorded, what the rule computed,
+	 * what gets booked. Scope is enforced per trip in the API.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function businessTripsPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
+	{
+		$tripsEnabled = $this->workforceSuiteConfig !== null
+			? $this->workforceSuiteConfig->isEnabled('business_trips_enabled')
+			: $this->config->getAppValue('arbeitszeitcheck', 'business_trips_enabled', '0') === '1';
+		if (!$tripsEnabled) {
+			return new \OCP\AppFramework\Http\RedirectResponse($this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index'));
+		}
+
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips']);
+		Util::addScript('arbeitszeitcheck', 'manager-business-trips');
+
+		try {
+			$actorUserId = $this->getUserId();
+			if (!$this->permissionService->isAdmin($actorUserId) && !$this->permissionService->canAccessManagerDashboard($actorUserId)) {
+				return new \OCP\AppFramework\Http\RedirectResponse($this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index'));
+			}
+			$navFlags = $this->getNavigationFlags($actorUserId);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-business-trips', $this->buildManagerShellParams(
+				'manager-business-trips',
+				$this->l10n->t('Business trips'),
+				$this->l10n->t('Review submitted business trips of your team members.'),
+				$navFlags,
+			) + [
+				'tripQueueUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_manager.index'),
+				'tripDetailTemplate' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($this->urlGenerator, 'arbeitszeitcheck.business_trip_manager.show', 'id'),
+				'tripApproveTemplate' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($this->urlGenerator, 'arbeitszeitcheck.business_trip_manager.approve', 'id'),
+				'tripRejectTemplate' => \OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($this->urlGenerator, 'arbeitszeitcheck.business_trip_manager.reject', 'id'),
+				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
+			]);
+			return $this->configureCSP($response);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::businessTripsPage',
+				['exception' => $e]
+			);
+			$navFlags = $this->getNavigationFlagsForSession();
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-business-trips', $this->buildManagerShellParams(
+				'manager-business-trips',
+				$this->l10n->t('Business trips'),
+				$this->l10n->t('Review submitted business trips of your team members.'),
+				$navFlags,
+			) + [
 				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
 			]);
 			return $this->configureCSP($response);

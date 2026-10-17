@@ -42,12 +42,12 @@ class BreakPolicyStoreIntegrationTest extends TestCase
 		foreach ($this->snapshot as $key => $value) {
 			$this->deleteConfigValue($key);
 			if ($value !== false) {
-				$this->db->insertIfNotExist('appconfig', [
-					'appid' => Application::APP_ID,
-					'configkey' => $key,
-					'configvalue' => $value,
-					'configtype' => \OCP\IAppConfig::VALUE_STRING,
-				], ['appid', 'configkey']);
+				$qb = $this->db->getQueryBuilder();
+				$qb->insert('appconfig')
+					->setValue('appid', $qb->createNamedParameter(Application::APP_ID))
+					->setValue('configkey', $qb->createNamedParameter($key))
+					->setValue('configvalue', $qb->createNamedParameter($value))
+					->executeStatement();
 			}
 		}
 		parent::tearDown();

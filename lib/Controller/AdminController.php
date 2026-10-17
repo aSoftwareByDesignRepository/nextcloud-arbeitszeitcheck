@@ -940,7 +940,7 @@ class AdminController extends Controller
 			'admin-settings',
 			'admin-settings',
 			['common/projectcheck', 'common/country-region'],
-			['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription']
+			['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription', 'admin-work-locations']
 		);
 
 		$requireSubstituteJson = $this->appConfig->getAppValueString('require_substitute_types', '[]');

@@ -151,7 +151,11 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 		$t->setVacationMode(Constants::VACATION_MODE_MANUAL_FIXED);
 		$t->setManualDays($days);
 		$t->setPriority($priority);
-		$t->setEffectiveFrom(new \DateTime('2025-01-01'));
+		// Far past so the row is active for every as-of date the suite uses —
+		// several tests resolve back-dated dates (EC-11 partial_history) and
+		// the kernel now checks EffectiveRange honestly, like the mapper's
+		// `effective_from <= asOf` predicate would on a real database.
+		$t->setEffectiveFrom(new \DateTime('2000-01-01'));
 		return $t;
 	}
 

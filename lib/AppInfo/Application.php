@@ -20,9 +20,12 @@ use OCA\ArbeitszeitCheck\Repair\BackupBeforeUpdate;
 use OCA\ArbeitszeitCheck\Capabilities;
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
+use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
+use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
 use OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
+use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
 use OCA\ArbeitszeitCheck\Listener\LoadSidebarScripts;
 use OCA\ArbeitszeitCheck\Listener\CSPListener;
@@ -383,6 +386,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
 				$c->query(\OCP\Lock\ILockingProvider::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\PremiumSurchargeService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
 			);
 		});
 
@@ -405,6 +410,225 @@ class Application extends App implements IBootstrap {
 				$c->query(IDBConnection::class),
 				$c->query(\OCP\IConfig::class),
 			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class, function ($c): \OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig {
+			return new \OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig($c->query(\OCP\IConfig::class));
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver::class, fn (): \OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver => new \OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver());
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementMonthClosureContributor::class, fn ($c): \OCA\ArbeitszeitCheck\Service\SpecialEntitlementMonthClosureContributor => new \OCA\ArbeitszeitCheck\Service\SpecialEntitlementMonthClosureContributor(
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry::class, function ($c): \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry {
+			$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+			$registry->register($c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementMonthClosureContributor::class));
+			$registry->register($c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor::class));
+			return $registry;
+		});
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\PolicyCohortMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\PolicyCohortMapper => new \OCA\ArbeitszeitCheck\Db\PolicyCohortMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper => new \OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\PolicyCohortResolver::class, fn ($c): \OCA\ArbeitszeitCheck\Service\PolicyCohortResolver => new \OCA\ArbeitszeitCheck\Service\PolicyCohortResolver(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\TimeDomainConflictService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\TimeDomainConflictService => new \OCA\ArbeitszeitCheck\Service\TimeDomainConflictService(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+		));
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper => new \OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper => new \OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\WorkLocationDayOverrideMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\WorkLocationDayOverrideMapper => new \OCA\ArbeitszeitCheck\Db\WorkLocationDayOverrideMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper => new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPolicyMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementPolicyMapper => new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementPolicyMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper => new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper => new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper => new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver::class, fn ($c): \OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver => new \OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver(
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPolicyMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\PolicyCohortResolver::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\UserEmploymentSettingsService::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\SpecialEntitlementService => new \OCA\ArbeitszeitCheck\Service\SpecialEntitlementService(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\EntitlementSnapshotService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCP\IDBConnection::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementAdminService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\SpecialEntitlementAdminService => new \OCA\ArbeitszeitCheck\Service\SpecialEntitlementAdminService(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPolicyMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\EntitlementComputationSnapshotMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\CustomAbsenceTypeMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\PolicyCohortMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TariffRuleSetMapper::class),
+			$c->query(\OCP\IUserManager::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationCatalog => new \OCA\ArbeitszeitCheck\Service\WorkLocationCatalog(
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper::class),
+			$c->query(\Psr\Log\LoggerInterface::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationDefaultResolver::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationDefaultResolver => new \OCA\ArbeitszeitCheck\Service\WorkLocationDefaultResolver(
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationDayOverrideService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationDayOverrideService => new \OCA\ArbeitszeitCheck\Service\WorkLocationDayOverrideService(
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDayOverrideMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationAdminService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationAdminService => new \OCA\ArbeitszeitCheck\Service\WorkLocationAdminService(
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+			$c->query(\OCP\IUserManager::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator => new \OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkLocationMigrationReadinessService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkLocationMigrationReadinessService => new \OCA\ArbeitszeitCheck\Service\WorkLocationMigrationReadinessService(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper::class),
+		));
+		$context->registerService(SeedWorkLocationCatalog::class, function ($c): SeedWorkLocationCatalog {
+			return new SeedWorkLocationCatalog(
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
+			);
+		});
+
+		// Business-trip domain (Phase 5).
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripSegmentMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripSegmentMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripSegmentMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripTimeEntryLinkMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripTimeEntryLinkMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripTimeEntryLinkMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper => new \OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\BusinessTripSnapshotMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\BusinessTripSnapshotMapper => new \OCA\ArbeitszeitCheck\Db\BusinessTripSnapshotMapper($c->query(\OCP\IDBConnection::class)));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator::class, fn (): \OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator => new \OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator());
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripTimelineValidator::class, fn (): \OCA\ArbeitszeitCheck\Service\BusinessTripTimelineValidator => new \OCA\ArbeitszeitCheck\Service\BusinessTripTimelineValidator());
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\TravelComplianceClassifier::class, fn (): \OCA\ArbeitszeitCheck\Service\TravelComplianceClassifier => new \OCA\ArbeitszeitCheck\Service\TravelComplianceClassifier());
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleCatalog::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripRuleCatalog => new \OCA\ArbeitszeitCheck\Service\BusinessTripRuleCatalog(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver => new \OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver(
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\PolicyCohortResolver::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripCalculationEngine::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripCalculationEngine => new \OCA\ArbeitszeitCheck\Service\BusinessTripCalculationEngine(
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\TravelComplianceClassifier::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\DailyWorkingHoursCalculator::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService => new \OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService(
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripSnapshotMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripCreditLedger::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripCreditLedger => new \OCA\ArbeitszeitCheck\Service\BusinessTripCreditLedger(
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripService => new \OCA\ArbeitszeitCheck\Service\BusinessTripService(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripSegmentMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripTimeEntryLinkMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripTimelineValidator::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripCalculationEngine::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripCreditLedger::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor => new \OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor(
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripAdminService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripAdminService => new \OCA\ArbeitszeitCheck\Service\BusinessTripAdminService(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCP\Lock\ILockingProvider::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleCatalog::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator::class),
+			$c->query(\OCP\IUserManager::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService::class),
+			$c->query(\Psr\Log\LoggerInterface::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService => new \OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper::class),
+		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripExportService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripExportService => new \OCA\ArbeitszeitCheck\Service\BusinessTripExportService(
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService::class),
+		));
+
+		$context->registerService(InitializeWorkforceSuiteFreshState::class, function ($c): InitializeWorkforceSuiteFreshState {
+			return new InitializeWorkforceSuiteFreshState($c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class));
+		});
+
+		$context->registerService(InitializeWorkforceSuiteUpgradeState::class, function ($c): InitializeWorkforceSuiteUpgradeState {
+			return new InitializeWorkforceSuiteUpgradeState($c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class));
 		});
 
 		$context->registerService(BackfillAbsenceDays::class, function ($c): BackfillAbsenceDays {
@@ -975,7 +1199,8 @@ class Application extends App implements IBootstrap {
 
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Service\TimeEntryExportTransformer(
-				$c->query(\OCP\IConfig::class)
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class)
 			);
 		});
 
@@ -990,7 +1215,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IL10N::class),
 				$c->query(HolidayService::class),
 				$c->query(PermissionService::class),
-				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class)
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator::class)
 			);
 		});
 

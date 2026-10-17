@@ -14,7 +14,6 @@ use OCP\Lock\ILockingProvider;
 
 class MobileSeatService
 {
-	private const CAPACITY_LOCK = 'arbeitszeitcheck/mobile_seat_capacity';
 
 	public function __construct(
 		private readonly MobileSeatMapper $mobileSeatMapper,
@@ -80,7 +79,7 @@ class MobileSeatService
 		// Exclusive capacity lock (parity with TerminalDeviceService::reserveSlot):
 		// under READ COMMITTED two concurrent assignSeat calls must not both observe
 		// free capacity and exceed the licensed seat limit.
-		$this->lockingProvider->acquireLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
+		$this->lockingProvider->acquireLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
 		try {
 			$this->db->beginTransaction();
 			try {
@@ -110,7 +109,7 @@ class MobileSeatService
 				throw $e;
 			}
 		} finally {
-			$this->lockingProvider->releaseLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+			$this->lockingProvider->releaseLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE);
 		}
 		return ['ok' => true];
 	}
@@ -151,7 +150,7 @@ class MobileSeatService
 		$skipped = 0;
 		$failed = 0;
 
-		$this->lockingProvider->acquireLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
+		$this->lockingProvider->acquireLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
 		try {
 			foreach ($unique as $userId) {
 				if ($this->userManager->get($userId) === null) {
@@ -206,7 +205,7 @@ class MobileSeatService
 				}
 			}
 		} finally {
-			$this->lockingProvider->releaseLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+			$this->lockingProvider->releaseLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE);
 		}
 
 		return [

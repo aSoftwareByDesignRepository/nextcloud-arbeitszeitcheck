@@ -175,6 +175,24 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
         <?php endif; ?>
 
         <?php if ($mode === 'list'): ?>
+            <section id="se-accounts" class="azc-card se-accounts" aria-labelledby="se-accounts-title" hidden
+                     data-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.special_entitlement.index')); ?>"
+                     data-history-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.special_entitlement.history', 'typeCode')); ?>">
+                <header class="azc-card__header">
+                    <div class="azc-card__header-text">
+                        <h2 id="se-accounts-title" class="azc-card__title"><?php p($l->t('Additional leave accounts')); ?></h2>
+                    </div>
+                </header>
+                <div class="azc-card__body">
+                    <p id="se-accounts-status" role="status" aria-live="polite" class="form-help"></p>
+                    <ul id="se-accounts-list" class="azc-list se-accounts__list"></ul>
+                    <div id="se-account-history" hidden>
+                        <h3 id="se-account-history-title" class="form-label"></h3>
+                        <ul id="se-account-history-list" class="azc-list"></ul>
+                        <button id="se-account-history-close" type="button" class="azc-btn azc-btn--secondary"><?php p($l->t('Close history')); ?></button>
+                    </div>
+                </div>
+            </section>
             <?php
             $filterStartDate = $_['filterStartDate'] ?? '';
             $filterEndDate = $_['filterEndDate'] ?? '';
@@ -291,6 +309,15 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                             <?php endforeach; ?>
                         </select>
                         <p id="absence-type-help" class="form-help"><?php p($l->t('Vacation, sick leave, and other types each follow your organisation’s rules.')); ?></p>
+                        <?php if ($mode !== 'edit' && !empty($showHomeOfficeMigrationHint)): ?>
+                        <div class="azc-callout azc-callout--info" role="note">
+                            <div class="azc-callout__body">
+                                <p class="azc-callout__title"><?php p($l->t('Home office is working time.')); ?></p>
+                                <p class="azc-callout__text"><?php p($l->t('Choose Home office as your work location when you clock in.')); ?></p>
+                                <a class="azc-btn azc-btn--secondary" href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.dashboard')); ?>#dashboard-work-location"><?php p($l->t('Change today’s work location')); ?></a>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <div class="absence-form-dates" role="group" aria-labelledby="absence-dates-legend">

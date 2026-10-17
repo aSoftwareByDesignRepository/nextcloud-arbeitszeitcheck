@@ -326,16 +326,22 @@ class AdminControllerTest extends TestCase
 		$db = $this->createMock(IDBConnection::class);
 		return new class($this->appConfig, $db, $this) extends \OCA\ArbeitszeitCheck\Support\BreakPolicyStore {
 			public function __construct(
-				\OCP\AppFramework\Services\IAppConfig $appConfig,
+				private \OCP\AppFramework\Services\IAppConfig $testAppConfig,
 				\OCP\IDBConnection $db,
 				private AdminControllerTest $testCase,
 			) {
-				parent::__construct($appConfig, $db);
+				parent::__construct($testAppConfig, $db);
 			}
 
 			public function ensureRowsExist(): void
 			{
 				// The array store has no row concept — nothing to seed.
+			}
+
+			public function write(string $json, int $version): void
+			{
+				$this->testAppConfig->setAppValueString(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_JSON, $json);
+				$this->testAppConfig->setAppValueString(\OCA\ArbeitszeitCheck\Constants::CONFIG_BREAK_POLICY_VERSION, (string)$version);
 			}
 
 			protected function readLocked(string $key): ?string

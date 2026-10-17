@@ -1,142 +1,279 @@
 {
-  "schemaVersion": 1,
-  "appId": "arbeitszeitcheck",
-  "companionDir": "mobile/arbeitszeitcheck",
-  "contracts": [
-    {
-      "id": "manual-time-entry-justification",
-      "param": "justification",
-      "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
-      "errorCodes": ["justification_too_short"],
-      "server": [
+    "schemaVersion": 1,
+    "appId": "arbeitszeitcheck",
+    "companionDir": "mobile/arbeitszeitcheck",
+    "contracts": [
         {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "params['justification']",
-            "justification_too_short",
-            "A justification of at least 10 characters is required for manual time entries."
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "id=\"entry-justification\"",
-            "name=\"justification\"",
-            "$manualTimeEntriesRequireApproval"
-          ]
+            "id": "manual-time-entry-justification",
+            "param": "justification",
+            "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
+            "errorCodes": [
+                "justification_too_short"
+            ],
+            "server": [
+                {
+                    "file": "lib/Controller/TimeEntryController.php",
+                    "needles": [
+                        "params['justification']",
+                        "justification_too_short",
+                        "A justification of at least 10 characters is required for manual time entries."
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "templates/time-entries.php",
+                    "needles": [
+                        "id=\"entry-justification\"",
+                        "name=\"justification\"",
+                        "$manualTimeEntriesRequireApproval"
+                    ]
+                },
+                {
+                    "file": "js/time-entry-form.js",
+                    "needles": [
+                        "validateJustification",
+                        "data.justification = this.getJustificationValue()"
+                    ]
+                },
+                {
+                    "file": "lib/Controller/AdminController.php",
+                    "needles": [
+                        "'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1'"
+                    ]
+                }
+            ],
+            "mobile": [
+                {
+                    "file": "src/screens/CreateTimeEntryScreen.tsx",
+                    "needles": [
+                        "testID=\"time.create.justification\"",
+                        "manualTimeEntriesRequireApproval",
+                        "justification.trim().length >= 10"
+                    ]
+                },
+                {
+                    "file": "src/api/client.ts",
+                    "needles": [
+                        "justification?: string",
+                        "requestBody.justification = justification"
+                    ]
+                }
+            ]
         },
         {
-          "file": "js/time-entry-form.js",
-          "needles": [
-            "validateJustification",
-            "data.justification = this.getJustificationValue()"
-          ]
+            "id": "time-entry-correction-justification",
+            "param": "justification",
+            "description": "Employee correction requests require ≥10 character justification on web and mobile.",
+            "errorCodes": [
+                "justification_required",
+                "justification_too_short"
+            ],
+            "server": [
+                {
+                    "file": "lib/Controller/TimeEntryController.php",
+                    "needles": [
+                        "justification_required",
+                        "justification_too_short",
+                        "Justification is required for correction requests"
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "templates/time-entries.php",
+                    "needles": [
+                        "id=\"correction-justification\"",
+                        "name=\"justification\""
+                    ]
+                },
+                {
+                    "file": "js/time-entry-correction.js",
+                    "needles": [
+                        "correction-justification",
+                        "justification:"
+                    ]
+                }
+            ],
+            "mobile": [
+                {
+                    "file": "src/screens/RequestCorrectionScreen.tsx",
+                    "needles": [
+                        "justification",
+                        "MIN_CORRECTION_JUSTIFICATION"
+                    ]
+                },
+                {
+                    "file": "src/utils/correctionRequest.ts",
+                    "needles": [
+                        "MIN_CORRECTION_JUSTIFICATION",
+                        "justification"
+                    ]
+                }
+            ]
         },
         {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1'"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/CreateTimeEntryScreen.tsx",
-          "needles": [
-            "testID=\"time.create.justification\"",
-            "manualTimeEntriesRequireApproval",
-            "justification.trim().length >= 10"
-          ]
+            "id": "manager-correction-reason",
+            "param": "reason",
+            "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
+            "errorCodes": [],
+            "server": [
+                {
+                    "file": "lib/Controller/ManagerController.php",
+                    "needles": [
+                        "A reason of at least 10 characters is required."
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "js/common/time-entry-clock-form.js",
+                    "needles": [
+                        "minlength=\"10\"",
+                        "reason.trim().length < 10",
+                        "reason: reason.trim()"
+                    ]
+                },
+                {
+                    "file": "js/manager-correction-dialog.js",
+                    "needles": [
+                        "reason: result.payload.reason"
+                    ]
+                }
+            ],
+            "mobile": null
         },
         {
-          "file": "src/api/client.ts",
-          "needles": [
-            "justification?: string",
-            "requestBody.justification = justification"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "time-entry-correction-justification",
-      "param": "justification",
-      "description": "Employee correction requests require ≥10 character justification on web and mobile.",
-      "errorCodes": ["justification_required", "justification_too_short"],
-      "server": [
-        {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "justification_required",
-            "justification_too_short",
-            "Justification is required for correction requests"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "id=\"correction-justification\"",
-            "name=\"justification\""
-          ]
+            "id": "time-entry-work-location",
+            "param": "workLocation",
+            "description": "Work-location code: web + mobile submit the stored catalog code; server validates against catalog when the feature flag is on.",
+            "errorCodes": [
+                "invalid_work_location"
+            ],
+            "server": [
+                {
+                    "file": "lib/Controller/TimeEntryController.php",
+                    "needles": [
+                        "params['workLocation']",
+                        "work_location"
+                    ]
+                },
+                {
+                    "file": "lib/Controller/WorkLocationController.php",
+                    "needles": [
+                        "public function index()",
+                        "'default' => $default"
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "templates/time-entries.php",
+                    "needles": [
+                        "workLocationOptions",
+                        "name=\"workLocation\""
+                    ]
+                },
+                {
+                    "file": "js/common/time-entry-clock-form.js",
+                    "needles": [
+                        "options.workLocations",
+                        "-work-location"
+                    ]
+                },
+                {
+                    "file": "js/common/work-location-catalog.js",
+                    "needles": [
+                        "generateUrl",
+                        "api/work-locations"
+                    ]
+                }
+            ],
+            "mobile": [
+                {
+                    "file": "src/screens/CreateTimeEntryScreen.tsx",
+                    "needles": [
+                        "workLocationTouched",
+                        "workLocationOptions"
+                    ]
+                },
+                {
+                    "file": "src/api/client.ts",
+                    "needles": [
+                        "workLocation?: string",
+                        "fetchWorkLocationCatalog",
+                        "setWorkLocationDayOverride"
+                    ]
+                },
+                {
+                    "file": "src/offline/stampQueueDrain.ts",
+                    "needles": [
+                        "item.workLocation"
+                    ]
+                }
+            ]
         },
         {
-          "file": "js/time-entry-correction.js",
-          "needles": [
-            "correction-justification",
-            "justification:"
-          ]
+            "id": "special-entitlement-admin-mutations",
+            "param": "entitlementTypeId/scopeType/scopeId/operation/amount/effectiveFrom",
+            "description": "Special-entitlement admin: type+policy create, activation, period close/correction require server-validated fields; web admin page collects them; companion is employee read-only.",
+            "errorCodes": [
+                "VALIDATION_ERROR",
+                "ASSIGNMENT_OVERLAP",
+                "REVISION_CONFLICT",
+                "ENTITLEMENT_DISABLED",
+                "NOT_FOUND"
+            ],
+            "server": [
+                {
+                    "file": "lib/Service/SpecialEntitlementAdminService.php",
+                    "needles": [
+                        "createType",
+                        "createPolicy",
+                        "ASSIGNMENT_OVERLAP",
+                        "REVISION_CONFLICT",
+                        "previewPolicy"
+                    ]
+                },
+                {
+                    "file": "lib/Controller/SpecialEntitlementAdminController.php",
+                    "needles": [
+                        "createPolicyFlat",
+                        "previewPolicy",
+                        "endCohortMember"
+                    ]
+                },
+                {
+                    "file": "appinfo/routes.php",
+                    "needles": [
+                        "special-entitlement-preview",
+                        "special-entitlement-policies"
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "templates/admin-special-entitlements.php",
+                    "needles": [
+                        "data-preview-url",
+                        "data-policy-create-url",
+                        "se-scope",
+                        "se-amount",
+                        "se-from"
+                    ]
+                },
+                {
+                    "file": "js/admin-special-entitlements.js",
+                    "needles": [
+                        "scopeType: scopeSel.value",
+                        "policyCreateUrl",
+                        "previewUrl",
+                        "cohortMembershipTemplate"
+                    ]
+                }
+            ],
+            "mobile": null,
+            "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec §7.3/§7.4."
         }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/RequestCorrectionScreen.tsx",
-          "needles": [
-            "justification",
-            "MIN_CORRECTION_JUSTIFICATION"
-          ]
-        },
-        {
-          "file": "src/utils/correctionRequest.ts",
-          "needles": [
-            "MIN_CORRECTION_JUSTIFICATION",
-            "justification"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "manager-correction-reason",
-      "param": "reason",
-      "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
-      "errorCodes": [],
-      "server": [
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "A reason of at least 10 characters is required."
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "js/common/time-entry-clock-form.js",
-          "needles": [
-            "minlength=\"10\"",
-            "reason.trim().length < 10",
-            "reason: reason.trim()"
-          ]
-        },
-        {
-          "file": "js/manager-correction-dialog.js",
-          "needles": [
-            "reason: result.payload.reason"
-          ]
-        }
-      ],
-      "mobile": null
-    }
-  ]
+    ]
 }

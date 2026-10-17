@@ -64,14 +64,18 @@ $isManagerDashboard = $pageId === 'manager-dashboard';
 $isManagerTimeEntries = $pageId === 'manager-time-entries';
 $isManagerAbsences = $pageId === 'manager-absences';
 $isManagerMonthClosures = $pageId === 'manager-month-closures';
-$isManagerPage = $isManagerDashboard || $isManagerTimeEntries || $isManagerAbsences || $isManagerMonthClosures
+$isManagerBusinessTrips = $pageId === 'manager-business-trips';
+$isManagerPage = $isManagerDashboard || $isManagerTimeEntries || $isManagerAbsences || $isManagerMonthClosures || $isManagerBusinessTrips
 	|| ($pageId === '' && strpos($currentPage, '/manager') !== false);
 if ($pageId === '' && $isManagerPage) {
 	$isManagerTimeEntries = strpos($currentPage, '/manager/time-entries') !== false;
 	$isManagerAbsences = strpos($currentPage, '/manager/absences') !== false;
 	$isManagerMonthClosures = strpos($currentPage, '/manager/month-closures') !== false;
-	$isManagerDashboard = $isManagerPage && !$isManagerTimeEntries && !$isManagerAbsences && !$isManagerMonthClosures;
+	$isManagerBusinessTrips = strpos($currentPage, '/manager/business-trips') !== false;
+	$isManagerDashboard = $isManagerPage && !$isManagerTimeEntries && !$isManagerAbsences && !$isManagerMonthClosures && !$isManagerBusinessTrips;
 }
+$isBusinessTrips = $pageId === 'business-trips'
+	|| ($pageId === '' && strpos($currentPage, '/business-trips') !== false);
 $isSubstitutionRequests = $pageId === 'substitution-requests'
 	|| ($pageId === '' && strpos($currentPage, '/substitution-requests') !== false);
 $isCompliance = str_starts_with($pageId, 'compliance-')
@@ -87,6 +91,10 @@ $isAdminWorkingTimeModels = $pageId === 'admin-working-time-models'
 	|| ($pageId === '' && strpos($currentPage, '/admin/working-time-models') !== false);
 $isAdminAbsenceTypes = $pageId === 'admin-absence-types'
 	|| ($pageId === '' && strpos($currentPage, '/admin/absence-types') !== false);
+$isAdminSpecialEntitlements = $pageId === 'admin-special-entitlements'
+	|| ($pageId === '' && strpos($currentPage, '/admin/special-entitlements') !== false);
+$isAdminBusinessTrips = $pageId === 'admin-business-trips'
+	|| ($pageId === '' && strpos($currentPage, '/admin/business-trips') !== false);
 $isAdminTariffRules = $pageId === 'admin-tariff-rules'
 	|| ($pageId === '' && strpos($currentPage, '/admin/tariff-rules') !== false);
 $isAdminHolidays = $pageId === 'admin-holidays'
@@ -125,7 +133,7 @@ $isAdminPolicyPage = $isAdminVacationLayers
 $isDashboard = $pageId === 'dashboard' ||
     ($pageId === '' && (strpos($currentPage, '/dashboard') !== false ||
     (!$isTimeEntries && !$isAbsences && !$isReports && !$isCompliance && !$isCalendar && !$isTimeline && !$isSettings &&
-        !$isSubstitutionRequests && !$isAdmin && strpos($currentPage, '/apps/arbeitszeitcheck') !== false) && !$isManagerPage));
+        !$isSubstitutionRequests && !$isBusinessTrips && !$isAdmin && strpos($currentPage, '/apps/arbeitszeitcheck') !== false) && !$isManagerPage));
 
 // Show Substitution requests link only when user has pending requests (where they are the substitute)
 $showSubstitutionLink = !empty($_['showSubstitutionLink']);
@@ -143,6 +151,9 @@ $showAdminNav = !empty($_['showAdminNav']);
 $monthClosureEnabledNav = array_key_exists('monthClosureEnabled', $_)
 	? !empty($_['monthClosureEnabled'])
 	: (\OCP\Server::get(\OCP\IConfig::class)->getAppValue('arbeitszeitcheck', Constants::CONFIG_MONTH_CLOSURE_ENABLED, '0') === '1');
+$businessTripsEnabledNav = array_key_exists('businessTripsEnabled', $_)
+	? !empty($_['businessTripsEnabled'])
+	: (\OCP\Server::get(\OCP\IConfig::class)->getAppValue('arbeitszeitcheck', 'business_trips_enabled', '0') === '1');
 ?>
 
 <!-- App layout wrapper: flex container for sidebar + content (desktop), stacked (mobile) -->
@@ -211,6 +222,16 @@ $monthClosureEnabledNav = array_key_exists('monthClosureEnabled', $_)
                     <span><?php p($l->t('Timeline')); ?></span>
                 </a>
             </li>
+            <?php if ($businessTripsEnabledNav): ?>
+            <li class="<?php p($isBusinessTrips ? 'active' : ''); ?>" <?php p($isBusinessTrips ? 'aria-current="page"' : ''); ?>>
+                <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.businessTrips')); ?>"
+                    title="<?php p($l->t('Business trips: Record travel, link working time, submit for review')); ?>"
+                    aria-label="<?php p($l->t('Go to business trips')); ?>">
+                    <span class="azc-nav__icon" aria-hidden="true"><?php print_unescaped($azcNavIcon('briefcase')); ?></span>
+                    <span><?php p($l->t('Business trips')); ?></span>
+                </a>
+            </li>
+            <?php endif; ?>
             <li class="<?php p($isCompliance ? 'active' : ''); ?>" <?php p($isCompliance ? 'aria-current="page"' : ''); ?>>
                 <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard')); ?>"
                     title="<?php p($l->t('Working time compliance: Check whether your times comply with the configured labour law')); ?>"
@@ -290,6 +311,20 @@ $monthClosureEnabledNav = array_key_exists('monthClosureEnabled', $_)
                                 title="<?php p($l->t('Define additional absence types for your organisation')); ?>"
                                 aria-label="<?php p($l->t('Manage custom absence types')); ?>">
                                 <span><?php p($l->t('Custom absence types')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isAdminSpecialEntitlements ? 'active' : ''); ?>" <?php p($isAdminSpecialEntitlements ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.special_entitlement_admin.page')); ?>"
+                                title="<?php p($l->t('Define additional leave entitlements and their quotas')); ?>"
+                                aria-label="<?php p($l->t('Manage special leave entitlements')); ?>">
+                                <span><?php p($l->t('Special leave entitlements')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isAdminBusinessTrips ? 'active' : ''); ?>" <?php p($isAdminBusinessTrips ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.page')); ?>"
+                                title="<?php p($l->t('Define how business trips count towards the time account')); ?>"
+                                aria-label="<?php p($l->t('Manage business trip rules')); ?>">
+                                <span><?php p($l->t('Business trip rules')); ?></span>
                             </a>
                         </li>
                         <li class="<?php p($isAdminHolidays ? 'active' : ''); ?>" <?php p($isAdminHolidays ? 'aria-current="page"' : ''); ?>>
@@ -390,6 +425,15 @@ $monthClosureEnabledNav = array_key_exists('monthClosureEnabled', $_)
                                 <span><?php p($l->t('Employee absences')); ?></span>
                             </a>
                         </li>
+                        <?php if ($businessTripsEnabledNav): ?>
+                        <li class="<?php p($isManagerBusinessTrips ? 'active' : ''); ?>" <?php p($isManagerBusinessTrips ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.businessTripsPage')); ?>"
+                                title="<?php p($l->t('Review submitted business trips of your team members')); ?>"
+                                aria-label="<?php p($l->t('Open business trip reviews')); ?>">
+                                <span><?php p($l->t('Business trips')); ?></span>
+                            </a>
+                        </li>
+                        <?php endif; ?>
                         <?php if ($monthClosureEnabledNav): ?>
                         <li class="<?php p($isManagerMonthClosures ? 'active' : ''); ?>" <?php p($isManagerMonthClosures ? 'aria-current="page"' : ''); ?>>
                             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.monthClosuresPage')); ?>"

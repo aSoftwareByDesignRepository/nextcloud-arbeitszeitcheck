@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Db\MonthClosureRevision;
 use OCA\ArbeitszeitCheck\Db\MonthClosureRevisionMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry;
 use OCP\IDBConnection;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -50,6 +51,8 @@ class MonthClosureService
 	private TimeZoneService $timeZoneService;
 	private ILockingProvider $lockingProvider;
 	private ?PremiumSurchargeService $premiumSurchargeService;
+	private MonthClosureContributorRegistry $contributorRegistry;
+	private WorkforceSuiteConfig $workforceConfig;
 
 	public function __construct(
 		MonthClosureMapper $closureMapper,
@@ -68,6 +71,8 @@ class MonthClosureService
 		?TimeZoneService $timeZoneService = null,
 		?\OCP\Lock\ILockingProvider $lockingProvider = null,
 		?PremiumSurchargeService $premiumSurchargeService = null,
+		?MonthClosureContributorRegistry $contributorRegistry = null,
+		?WorkforceSuiteConfig $workforceConfig = null,
 	) {
 		$this->closureMapper = $closureMapper;
 		$this->revisionMapper = $revisionMapper;
@@ -85,6 +90,26 @@ class MonthClosureService
 		$this->timeZoneService = $timeZoneService ?? \OCP\Server::get(TimeZoneService::class);
 		$this->lockingProvider = $lockingProvider ?? \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
 		$this->premiumSurchargeService = $premiumSurchargeService;
+		$this->contributorRegistry = $contributorRegistry ?? new MonthClosureContributorRegistry();
+		$this->workforceConfig = $workforceConfig ?? new WorkforceSuiteConfig($config);
+	}
+
+	/**
+	 * Contributors whose domain feature flag is currently enabled.
+	 * A flag-off contributor performs no domain work and must never reach
+	 * the closure payload or blocker chain.
+	 *
+	 * @return list<MonthClosureContributor>
+	 */
+	private function activeContributors(): array
+	{
+		$active = [];
+		foreach ($this->contributorRegistry->all() as $contributor) {
+			if ($this->workforceConfig->isEnabled($contributor->featureFlag())) {
+				$active[] = $contributor;
+			}
+		}
+		return $active;
 	}
 
 	private function todayInStorage(): \DateTimeImmutable
@@ -483,6 +508,18 @@ class MonthClosureService
 		$entries = $this->timeEntryMapper->findByUserAndDateRange($userId, $start, $end);
 		$absences = $this->absenceMapper->findByUserAndDateRange($userId, $start, $end);
 
+		// Spec §9.10: open entries count only in live views — a finalized
+		// snapshot aggregates completed rows exclusively.
+		$closedEntries = array_values(array_filter(
+			$entries,
+			static fn (TimeEntry $e): bool => $e->getEndTime() !== null
+		));
+		$report['workLocation'] = $this->reportingService->workLocationReport($closedEntries, null);
+		$report['work_location_days'] = \OCA\ArbeitszeitCheck\Support\WorkLocationDayCounter::countDays(
+			$closedEntries,
+			$this->timeZoneService->storageTimeZone()
+		);
+
 		usort($entries, static function (TimeEntry $a, TimeEntry $b) {
 			return $a->getId() <=> $b->getId();
 		});
@@ -548,6 +585,19 @@ class MonthClosureService
 				]);
 				throw $e;
 			}
+		}
+
+		$contributors = [];
+		$period = sprintf('%04d-%02d', $year, $month);
+		foreach ($this->activeContributors() as $contributor) {
+			$contributors[$contributor->id()] = [
+				'snapshot' => $contributor->snapshot($userId, $period),
+				'contributions' => $contributor->contributions($userId, $period),
+				'canonical_hash' => $contributor->canonicalHash($userId, $period),
+			];
+		}
+		if ($contributors !== []) {
+			$payload['contributors'] = $contributors;
 		}
 
 		return $payload;
@@ -620,6 +670,12 @@ class MonthClosureService
 			$blockReason = $this->getMonthFinalizeBlockReason($targetUserId, $year, $month);
 			if ($blockReason !== null) {
 				throw new \RuntimeException($blockReason);
+			}
+			$period = sprintf('%04d-%02d', $year, $month);
+			foreach ($this->activeContributors() as $contributor) {
+				if ($contributor->blockers($targetUserId, $period) !== []) {
+					throw new \RuntimeException('domain_blocker:' . $contributor->id());
+				}
 			}
 
 			return $this->persistFinalizedMonth($actorUserId, $targetUserId, $year, $month, $existing, 'month_closure_finalized');

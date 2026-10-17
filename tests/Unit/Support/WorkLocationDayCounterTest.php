@@ -6,8 +6,11 @@ declare(strict_types=1);
  * Tests for {@see WorkLocationDayCounter} (GH #43).
  *
  * Contract: a calendar day counts toward a location when at least one entry
- * starting that day (in the organisation timezone) carries it; mixed days
- * appear under both counters; office/NULL rows never count.
+ * segment falls on that day in the organisation timezone (entries crossing
+ * local midnight count on every day they span); mixed days appear under
+ * both counters; office/NULL rows never count. Fixtures are completed
+ * entries (20 min) so day attribution is deterministic — open entries
+ * count through "now" in live views only.
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later
@@ -25,6 +28,7 @@ class WorkLocationDayCounterTest extends TestCase
 	{
 		$e = new TimeEntry();
 		$e->setStartTime(new \DateTime($start));
+		$e->setEndTime((new \DateTime($start))->modify('+20 minutes'));
 		$e->setWorkLocation($location);
 		return $e;
 	}

@@ -540,6 +540,29 @@
 					+ esc(L.workLocationDaysExternal || 'External appointments') + ` ${esc(wld.external ?? 0)}</p>`;
 				html += `<p class="report-meta report-meta--hint">${esc(L.workLocationDaysHint || 'A day counts toward a location when at least one entry that day carries it — mixed days appear under both.')}</p>`;
 			}
+			if (report.workLocation && report.workLocation.byCode && typeof report.workLocation.byCode === 'object') {
+				const wlCodes = Object.keys(report.workLocation.byCode);
+				if (wlCodes.length) {
+					html += `<div class="table-container" role="region"><table class="table report-table report-table--work-location"><thead><tr>`
+						+ `<th>${esc(L.workLocation || 'Work location')}</th>`
+						+ `<th>${esc(L.workLocationCategory || 'Category')}</th>`
+						+ `<th>${esc(L.days || 'Days')}</th>`
+						+ `<th>${esc(L.workLocationNetHours || 'Net hours')}</th>`
+						+ `</tr></thead><tbody>`;
+					wlCodes.forEach((wlCode) => {
+						const wlRow = report.workLocation.byCode[wlCode] || {};
+						const wlMinutes = typeof wlRow.netMinutes === 'number' ? wlRow.netMinutes : 0;
+						html += `<tr><td data-label="${esc(L.workLocation || 'Work location')}">${esc(wlRow.label || wlCode)}</td>`
+							+ `<td data-label="${esc(L.workLocationCategory || 'Category')}">${esc(wlRow.category || '-')}</td>`
+							+ `<td data-label="${esc(L.days || 'Days')}">${esc(wlRow.days != null ? wlRow.days : 0)}</td>`
+							+ `<td data-label="${esc(L.workLocationNetHours || 'Net hours')}">${esc((wlMinutes / 60).toFixed(2))}</td></tr>`;
+					});
+					html += `</tbody></table></div>`;
+					if (report.workLocation.mixedDays != null && report.workLocation.mixedDays > 0) {
+						html += `<p class="report-meta report-meta--hint">${esc((L.workLocationMixedDays || 'Days with entries at more than one location: {n}').replace('{n}', report.workLocation.mixedDays))}</p>`;
+					}
+				}
+			}
 			if (report.total_undertime != null) html += `<p class="report-meta"><strong>${L.undertime || 'Undertime'}:</strong> ${esc(report.total_undertime)} h</p>`;
 			if (report.bank_enabled) html += `<p class="report-meta"><strong>${L.overtimeBank || 'Overtime bank'}:</strong> ${esc(L.enabled || 'Enabled')}</p>`;
 			if (report.entries && report.entries.length) {

@@ -51,7 +51,7 @@
 			const headers = new Headers(options.headers || {});
 			const token = this.getRequestToken();
 
-			if (method !== 'GET' && method !== 'HEAD' && token) {
+			if (token) {
 				headers.set('requesttoken', token);
 			}
 

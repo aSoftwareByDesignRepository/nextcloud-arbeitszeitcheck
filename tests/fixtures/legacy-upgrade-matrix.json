@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "databases": ["mysql", "pgsql"],
+  "serverImages": ["nextcloud:32", "nextcloud:35"],
+  "sourceTags": ["v1.8.0"]
+}

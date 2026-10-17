@@ -283,6 +283,21 @@ class PermissionService
 	}
 
 	/**
+	 * User ids the actor may manage (direct + delegated team members).
+	 * Empty when app teams are disabled or the actor manages nobody —
+	 * the caller treats an empty list as "no scope", never as "all".
+	 *
+	 * @return list<string>
+	 */
+	public function getManagedEmployeeIds(string $managerUserId): array
+	{
+		if (!$this->teamResolver->useAppTeams()) {
+			return [];
+		}
+		return $this->teamResolver->getTeamMemberIds($managerUserId);
+	}
+
+	/**
 	 * Whether the user may access the manager dashboard (has at least one team member or is admin).
 	 */
 	public function canAccessManagerDashboard(string $userId): bool

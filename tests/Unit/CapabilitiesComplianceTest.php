@@ -61,6 +61,17 @@ class CapabilitiesComplianceTest extends TestCase
 		);
 	}
 
+	public function testWorkforceSuiteCapabilityDefaultsAreLegacySafe(): void
+	{
+		$caps = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)->getCapabilities()['arbeitszeitcheck']['workforceSuite'];
+		self::assertSame(1, $caps['contractVersion']);
+		self::assertSame('upgraded_legacy', $caps['installState']);
+		self::assertFalse($caps['features']['work_location_catalog_enabled']);
+		self::assertFalse($caps['features']['special_entitlements_enabled']);
+		self::assertTrue($caps['features']['legacy_home_absence_create_enabled']);
+		self::assertTrue($caps['features']['legacy_trip_absence_create_enabled']);
+	}
+
 	public function testGermanComplianceBlock(): void
 	{
 		$caps = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)->getCapabilities();

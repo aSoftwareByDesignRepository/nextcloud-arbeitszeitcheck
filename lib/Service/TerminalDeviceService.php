@@ -15,7 +15,6 @@ use OCP\Lock\ILockingProvider;
  */
 class TerminalDeviceService
 {
-	private const CAPACITY_LOCK = 'arbeitszeitcheck/terminal_device_slot';
 
 	public function __construct(
 		private readonly TerminalDeviceMapper $terminalDeviceMapper,
@@ -46,7 +45,7 @@ class TerminalDeviceService
 	 */
 	public function reserveSlot(string $label): TerminalDevice
 	{
-		$this->lockingProvider->acquireLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'Terminal device capacity');
+		$this->lockingProvider->acquireLock(DbLockKeys::terminalDeviceSlot(), ILockingProvider::LOCK_EXCLUSIVE, 'Terminal device capacity');
 		try {
 			$this->db->beginTransaction();
 			try {
@@ -66,7 +65,7 @@ class TerminalDeviceService
 				throw $e;
 			}
 		} finally {
-			$this->lockingProvider->releaseLock(self::CAPACITY_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+			$this->lockingProvider->releaseLock(DbLockKeys::terminalDeviceSlot(), ILockingProvider::LOCK_EXCLUSIVE);
 		}
 	}
 

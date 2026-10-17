@@ -111,7 +111,9 @@ class VacationEntitlementEngine {
 		private TeamMemberMapper $teamMemberMapper,
 		private IConfig $config,
 		private ?VacationUnitService $vacationUnitService = null,
+		private ?\OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver $scopeResolver = null,
 	) {
+		$this->scopeResolver ??= new \OCA\ArbeitszeitCheck\Policy\PolicyScopeResolver();
 	}
 
 	/**
@@ -664,48 +666,67 @@ class VacationEntitlementEngine {
 			return null;
 		}
 		$hypothetical = !empty($ctx['hypothetical']);
-		// Tie-break: deepest team subtree first, then highest priority,
-		// then smallest id (stable).
+		// Winner selection is delegated to the shared policy kernel so the
+		// deepest-subtree → highest-priority → smallest-team_id ordering has
+		// exactly one implementation. The candidate id carries team_id because
+		// the stable final tie-break is `team_id ASC`. `teamDepths` carries the
+		// authoritative depth — including the -1 sentinel for teams absent from
+		// parentMap (stale memberships of deleted teams) — and doubles as the
+		// TEAM-scope membership check for the resolver.
+		$teamDepths = [];
 		$candidates = [];
 		foreach ($policies as $p) {
 			$teamId = (int)$p->getTeamId();
 			$depth = $this->computeTeamDepth($teamId, $ctx['parentMap']);
-			$candidates[] = [
-				'policy' => $p,
-				'team_id' => $teamId,
-				'team_depth' => $depth,
-				'priority' => (int)$p->getPriority(),
+			$teamDepths[$teamId] = $depth;
+			$effectiveFrom = $p->getEffectiveFrom();
+			if ($effectiveFrom === null) {
+				// Mirrors the mapper's `effective_from <= asOf` predicate: a
+				// NULL start can never be active, so the row is not an eligible
+				// candidate (unreachable via findActiveByTeamIds, but mocks
+				// can inject it).
+				continue;
+			}
+			$candidates[] = new \OCA\ArbeitszeitCheck\Policy\PolicyCandidate(
+				$teamId,
+				\OCA\ArbeitszeitCheck\Policy\PolicyScope::TEAM,
+				(string)$teamId,
+				new \OCA\ArbeitszeitCheck\Policy\EffectiveRange(
+					$this->toImmutable($effectiveFrom),
+					$p->getEffectiveTo() !== null ? $this->toImmutable($p->getEffectiveTo()) : null,
+				),
+				(int)$p->getPriority(),
+				max(0, $depth),
+				$p,
+			);
+		}
+		$resolution = $this->scopeResolver->resolve(
+			new \OCA\ArbeitszeitCheck\Policy\PolicyScopeContext($userId, null, [], $teamDepths),
+			$asOfDate,
+			$candidates,
+		);
+		$winnerCandidate = $resolution->winner;
+		if ($winnerCandidate === null) {
+			return null;
+		}
+		/** @var TeamVacationPolicy $winningPolicy */
+		$winningPolicy = $winnerCandidate->value;
+		$resolved = $this->resolveFromLayerRow($userId, $winningPolicy->getVacationMode(), $winningPolicy->getManualDays(), $winningPolicy->getTariffRuleSetId(), $asOfDate);
+		$candList = array_map(static function (\OCA\ArbeitszeitCheck\Policy\PolicyCandidate $c) use ($teamDepths): array {
+			/** @var TeamVacationPolicy $p */
+			$p = $c->value;
+			return [
+				'team_id' => (int)$c->scopeId,
+				'team_depth' => $teamDepths[$c->scopeId] ?? $c->depth,
+				'priority' => $c->priority,
 				'policy_id' => (int)$p->getId(),
 			];
-		}
-		usort($candidates, function (array $a, array $b): int {
-			$d = $b['team_depth'] <=> $a['team_depth'];
-			if ($d !== 0) {
-				return $d;
-			}
-			$pri = $b['priority'] <=> $a['priority'];
-			if ($pri !== 0) {
-				return $pri;
-			}
-			return $a['team_id'] <=> $b['team_id'];
-		});
-		$winner = $candidates[0];
-		/** @var TeamVacationPolicy $winningPolicy */
-		$winningPolicy = $winner['policy'];
-		$resolved = $this->resolveFromLayerRow($userId, $winningPolicy->getVacationMode(), $winningPolicy->getManualDays(), $winningPolicy->getTariffRuleSetId(), $asOfDate);
-		$candList = array_map(static function (array $c): array {
-			return [
-				'team_id' => $c['team_id'],
-				'team_depth' => $c['team_depth'],
-				'priority' => $c['priority'],
-				'policy_id' => $c['policy_id'],
-			];
-		}, $candidates);
+		}, $resolution->eligible);
 		return [
-			'team_id' => $winner['team_id'],
-			'team_depth' => $winner['team_depth'],
-			'priority' => $winner['priority'],
-			'policy_id' => $winner['policy_id'],
+			'team_id' => (int)$winnerCandidate->scopeId,
+			'team_depth' => $teamDepths[$winnerCandidate->scopeId] ?? $winnerCandidate->depth,
+			'priority' => $winnerCandidate->priority,
+			'policy_id' => (int)$winningPolicy->getId(),
 			'resolved' => $resolved,
 			'candidates' => $candList,
 			'hypothetical' => $hypothetical,
@@ -1075,6 +1096,14 @@ class VacationEntitlementEngine {
 	 *
 	 * @param array<int, int|null> $parentMap
 	 */
+	private function toImmutable(\DateTimeInterface $date): \DateTimeImmutable
+	{
+		// Date-column semantics: effective_from/to are `date` type, so the
+		// instant is meaningless — compare on Y-m-d only, which is also all
+		// {@see EffectiveRange::contains()} ever inspects.
+		return new \DateTimeImmutable($date->format('Y-m-d'));
+	}
+
 	private function computeTeamDepth(int $teamId, array $parentMap): int
 	{
 		if (!array_key_exists($teamId, $parentMap)) {

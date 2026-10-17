@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mariadb:10.11
+    restart: "no"
+    environment:
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      MYSQL_INNODB_BUFFER_POOL_SIZE: 128M
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin --user=root --password=$$MYSQL_ROOT_PASSWORD --silent ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+
+  app:
+    image: ${SERVER_IMAGE:?SERVER_IMAGE is required}
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      NEXTCLOUD_TRUSTED_DOMAINS: localhost
+      NEXTCLOUD_UPDATE: "1"
+      OVERWRITEPROTOCOL: http
+      OVERWRITEHOST: localhost
+      AZC_ALLOW_VENDOR_KEY_OVERRIDE: ${AZC_ALLOW_VENDOR_KEY_OVERRIDE:?AZC_ALLOW_VENDOR_KEY_OVERRIDE is required}
+      AZC_VENDOR_PUBLIC_KEY_B64: ${AZC_VENDOR_PUBLIC_KEY_B64:?AZC_VENDOR_PUBLIC_KEY_B64 is required}
+    volumes:
+      - app_data:/var/www/html
+      - ${APPS_DIR:?APPS_DIR is required}:/var/www/html/custom_apps
+      - ${APP_DIR:?APP_DIR is required}:/var/www/html/custom_apps/arbeitszeitcheck:ro
+    healthcheck:
+      test: ["CMD-SHELL", "php /var/www/html/occ status --output=json | grep -q '\"installed\":true'"]
+      interval: 3s
+      timeout: 5s
+      retries: 80
+      start_period: 10s
+
+networks:
+  default:
+    name: ${NETWORK_NAME:?NETWORK_NAME is required}
+
+volumes:
+  db_data:
+  app_data:

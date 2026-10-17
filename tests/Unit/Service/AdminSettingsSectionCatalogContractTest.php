@@ -26,7 +26,7 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('/admin/settings/{section}', $routes);
 		$this->assertStringContainsString('AdminSettingsSectionCatalog::routeRequirement()', $routes);
 		$this->assertSame(
-			'access|compliance|time-recording|time-approvals|exports|outlook-subscription|month-closure|hours|regional|retention|projectcheck',
+			'access|compliance|time-recording|time-approvals|exports|outlook-subscription|month-closure|hours|regional|retention|work-locations|projectcheck',
 			$req,
 			'routeRequirement must stay the stable allowlist'
 		);
@@ -87,6 +87,20 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('$projectCheckAppsUrl', $tpl);
 		$this->assertStringNotContainsString('Jump to settings sections', $tpl);
 		$this->assertStringNotContainsString('Save all settings', $tpl);
+		$this->assertStringContainsString('SECTION_WORK_LOCATIONS', $tpl);
+		$workLocations = file_get_contents(dirname(__DIR__, 3) . '/templates/partials/admin-settings/work-locations.php');
+		$this->assertNotFalse($workLocations);
+		$this->assertStringContainsString('work_location_admin.index', $workLocations);
+		$this->assertStringContainsString('work_location_admin.enableCatalog', $workLocations);
+		$this->assertStringContainsString('work_location_admin.disableLegacyHomeAbsence', $workLocations);
+		$this->assertStringContainsString('work_location_admin.policies', $workLocations);
+		$this->assertStringContainsString('work_location_admin.createPolicy', $workLocations);
+		$this->assertStringContainsString('work_location_admin.endPolicy', $workLocations);
+		$client = file_get_contents(dirname(__DIR__, 3) . '/js/admin-work-locations.js');
+		$this->assertNotFalse($client);
+		$this->assertStringContainsString('acknowledgeRollbackWarning: true', $client);
+		$this->assertStringContainsString("method: 'POST'", $client);
+		$this->assertStringContainsString("aria-invalid", $client);
 	}
 
 	public function testLegacyAnchorsCoverFormerJumpTargets(): void

@@ -161,7 +161,9 @@
 		}
 
 		const idPrefix = 'mgr-correct-' + entryId;
-		const formHtml = buildSnapshotHtml(summary) + ClockForm.buildFormHtml(idPrefix, labels()) + '</section>';
+		const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
+		const wlOptions = wlCatalog ? wlCatalog.options() : null;
+		const formHtml = buildSnapshotHtml(summary) + ClockForm.buildFormHtml(idPrefix, labels(), { workLocations: wlOptions }) + '</section>';
 		const footerHtml = [
 			'<div class="reject-modal-actions modal-footer">',
 			'<button type="button" class="btn btn--secondary btn-mgr-correct-cancel">' + t('Cancel', 'Cancel') + '</button>',
@@ -261,6 +263,7 @@
 		};
 		const formApi = ClockForm.bindForm(modal, idPrefix, initial, t, {
 			minBreakMinutes: summary.minBreakMinutes,
+			workLocations: wlOptions,
 		});
 
 		if (projectSelect && !projectOptionsReady && saveBtn) {

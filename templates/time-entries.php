@@ -621,15 +621,35 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     ? $entry->getWorkLocation()
                                     : (is_string($workLocationDefault ?? null) ? $workLocationDefault : 'office');
                                 ?>
+                                <?php
+                                // Catalog-backed options once the feature is
+                                // enabled; otherwise the built-in enum below.
+                                $azcWlOptions = is_array($workLocationOptions ?? null) ? $workLocationOptions : null;
+                                $azcWlKnown = $azcWlOptions !== null
+                                    ? array_column($azcWlOptions, 'code')
+                                    : ['office', 'home', 'external'];
+                                $azcWlStoredIsUnknown = is_string($azcFormWorkLocation)
+                                    && $azcFormWorkLocation !== ''
+                                    && !in_array($azcFormWorkLocation, $azcWlKnown, true);
+                                ?>
                                 <select id="entry-work-location"
                                     name="workLocation"
                                     class="form-select time-entry-form__location-select"
                                     aria-labelledby="entry-work-location-label"
                                     aria-describedby="entry-work-location-help">
                                     <option value="" <?php p(($azcFormWorkLocation === null || $azcFormWorkLocation === '') ? 'selected' : ''); ?>><?php p($l->t('Not specified')); ?></option>
-                                    <option value="office" <?php p($azcFormWorkLocation === 'office' ? 'selected' : ''); ?>><?php p($l->t('Office')); ?></option>
-                                    <option value="home" <?php p($azcFormWorkLocation === 'home' ? 'selected' : ''); ?>><?php p($l->t('Home office')); ?></option>
-                                    <option value="external" <?php p($azcFormWorkLocation === 'external' ? 'selected' : ''); ?>><?php p($l->t('External appointment')); ?></option>
+                                    <?php if ($azcWlOptions !== null): ?>
+                                        <?php foreach ($azcWlOptions as $azcWlOption): ?>
+                                            <option value="<?php p($azcWlOption['code']); ?>" <?php p($azcFormWorkLocation === $azcWlOption['code'] ? 'selected' : ''); ?>><?php p($azcWlOption['label']); ?></option>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <option value="office" <?php p($azcFormWorkLocation === 'office' ? 'selected' : ''); ?>><?php p($l->t('Office')); ?></option>
+                                        <option value="home" <?php p($azcFormWorkLocation === 'home' ? 'selected' : ''); ?>><?php p($l->t('Home office')); ?></option>
+                                        <option value="external" <?php p($azcFormWorkLocation === 'external' ? 'selected' : ''); ?>><?php p($l->t('External appointment')); ?></option>
+                                    <?php endif; ?>
+                                    <?php if ($azcWlStoredIsUnknown): ?>
+                                        <option value="<?php p($azcFormWorkLocation); ?>" selected><?php p($azcFormWorkLocation); ?></option>
+                                    <?php endif; ?>
                                 </select>
                                 <p id="entry-work-location-help" class="form-help"><?php p($l->t('Feeds the home-office and travel reports — for example the home-office allowance or carrier evidence.')); ?></p>
                             </div>
@@ -1480,9 +1500,15 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <label for="correction-work-location" class="form-label"><?php p($l->t('Work location')); ?></label>
                             <select id="correction-work-location" name="workLocation" class="form-input">
                                 <option value=""><?php p($l->t('Keep current location')); ?></option>
-                                <option value="office"><?php p($l->t('Office')); ?></option>
-                                <option value="home"><?php p($l->t('Home office')); ?></option>
-                                <option value="external"><?php p($l->t('External appointment')); ?></option>
+                                <?php if (!empty($workLocationOptions) && is_array($workLocationOptions)): ?>
+                                    <?php foreach ($workLocationOptions as $azcCorrWlOption): ?>
+                                        <option value="<?php p($azcCorrWlOption['code']); ?>"><?php p($azcCorrWlOption['label']); ?></option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="office"><?php p($l->t('Office')); ?></option>
+                                    <option value="home"><?php p($l->t('Home office')); ?></option>
+                                    <option value="external"><?php p($l->t('External appointment')); ?></option>
+                                <?php endif; ?>
                                 <option value="__clear"><?php p($l->t('Not specified (remove mark)')); ?></option>
                             </select>
                             <p class="form-help"><?php p($l->t('Only change this if the work location was wrong.')); ?></p>

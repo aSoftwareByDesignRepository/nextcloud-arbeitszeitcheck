@@ -10,6 +10,7 @@ use OCA\ArbeitszeitCheck\Controller\AbsenceTypeAdminController;
 use OCA\ArbeitszeitCheck\Controller\KioskAdminController;
 use OCA\ArbeitszeitCheck\Controller\LicenseAdminController;
 use OCA\ArbeitszeitCheck\Controller\OvertimePayoutController;
+use OCA\ArbeitszeitCheck\Controller\SpecialEntitlementAdminController;
 use OCA\ArbeitszeitCheck\Exception\NotAppAdminException;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Support\SafeHomeUrl;
@@ -57,6 +58,9 @@ final class AppAdminMiddleware extends Middleware
 			|| $controller instanceof LicenseAdminController
 			|| $controller instanceof KioskAdminController
 			|| $controller instanceof AbsenceTypeAdminController
+			|| $controller instanceof \OCA\ArbeitszeitCheck\Controller\WorkLocationAdminController
+			|| $controller instanceof SpecialEntitlementAdminController
+			|| $controller instanceof \OCA\ArbeitszeitCheck\Controller\BusinessTripAdminController
 			|| $controller instanceof OvertimePayoutController;
 		if (!$isGated) {
 			return;

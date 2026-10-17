@@ -54,6 +54,7 @@ class CustomAbsenceTypeService
 		private readonly IDBConnection $db,
 		private readonly IL10N $l10n,
 		private readonly ILockingProvider $lockingProvider,
+		private readonly ?\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper $specialEntitlementTypes = null,
 	) {
 	}
 
@@ -180,7 +181,16 @@ class CustomAbsenceTypeService
 		$type->setUpdatedBy($performedBy);
 
 		try {
-			$updated = $this->atomicWithCatalogLock(function () use ($type, $oldValues, $performedBy) {
+			$updated = $this->atomicWithCatalogLock(function () use ($type, $oldValues, $performedBy, $params) {
+				// The linked special entitlement owns the active flag — a direct
+				// deactivate would desynchronize the two lifecycle states. The
+				// check runs under the catalog lock so a concurrent
+				// entitlement link can never interleave.
+				if (array_key_exists('active', $params)
+					&& (bool)$type->getActive() !== (bool)($oldValues['active'] ?? true)
+					&& $this->specialEntitlementTypes?->findByAbsenceTypeCode($type->getCode()) !== null) {
+					return 'entitlement_linked';
+				}
 				$updated = $this->mapper->update($type);
 				$this->auditLogMapper->logAction(
 					$performedBy,
@@ -195,6 +205,10 @@ class CustomAbsenceTypeService
 			}, $this->db);
 		} catch (LockedException $e) {
 			return $this->catalogBusy();
+		}
+
+		if ($updated === 'entitlement_linked') {
+			return ['data' => null, 'errors' => ['active' => $this->l10n->t('This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.')], 'code' => 409];
 		}
 
 		AbsenceTypeCatalog::resetCustomTypeCache();
@@ -214,6 +228,14 @@ class CustomAbsenceTypeService
 				$type = $this->mapper->find($id);
 				$oldValues = $type->getSummary();
 				$usage = $this->mapper->countAbsenceUsage($type->getCode());
+
+				// A type linked to a special entitlement is owned by that
+				// entitlement's lifecycle: deleting/deactivating it here would
+				// leave a dangling absence_type_code. Manage it via the
+				// entitlement admin instead.
+				if ($this->specialEntitlementTypes?->findByAbsenceTypeCode($type->getCode()) !== null) {
+					return ['mode' => 'entitlement_linked'];
+				}
 
 				if ($usage === 0) {
 					$this->mapper->delete($type);

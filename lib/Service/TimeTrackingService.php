@@ -475,7 +475,7 @@ class TimeTrackingService
 				$this->timeCaptureMethodService->assertClockStampingAllowed($userId);
 
 				try {
-					$resolvedWorkLocation = $this->userWorkLocationService()->resolveForNewEntry($userId, $workLocation);
+					$resolvedWorkLocation = $this->userWorkLocationService()->resolveForNewEntry($userId, $workLocation, $today);
 				} catch (\InvalidArgumentException) {
 					throw new BusinessRuleException(
 						$this->l10n->t('Invalid work location.'),

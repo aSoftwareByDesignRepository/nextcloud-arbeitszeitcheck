@@ -83,6 +83,10 @@ const STATEFUL_SPECS = [
   // asserts the badge inside the 100-row list — parallel seeders starve the
   // date probe and can evict the row mid-assert (workers>1 failure 2026-10-14).
   /work-location\.spec\.js/,
+  // Business trips flip the global business_trips_enabled flag, create
+  // org-scoped rule assignments, and share a tripId across tests — the
+  // rollout+resolve chain races any parallel spec touching admin state.
+  /business-trips\.spec\.js/,
 ]
 
 export default defineConfig({

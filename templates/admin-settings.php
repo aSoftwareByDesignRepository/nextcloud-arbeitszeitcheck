@@ -45,6 +45,7 @@ $sectionFiles = [
 	'hours' => 'hours.php',
 	'regional' => 'regional.php',
 	'retention' => 'retention.php',
+	'work-locations' => 'work-locations.php',
 ];
 
 $renderAll = $isNcAdminShell || $settingsSection === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL;
@@ -59,8 +60,10 @@ $projectCheckEnabledForCurrentUser = !empty($_['projectCheckEnabledForCurrentUse
 $projectCheckAppsUrl = (string)($_['projectCheckAppsUrl'] ?? '');
 $useAppTeams = !empty($_['useAppTeams']);
 // Outlook subscription uses dedicated API actions — hide misleading sticky Save on that page only.
-$showSettingsSaveFooter = $renderAll
-	|| $settingsSection !== \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_OUTLOOK_SUBSCRIPTION;
+$showSettingsSaveFooter = $renderAll || !in_array($settingsSection, [
+	\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_OUTLOOK_SUBSCRIPTION,
+	\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_WORK_LOCATIONS,
+], true);
 ?>
 
 <?php if (!$isNcAdminShell): ?>

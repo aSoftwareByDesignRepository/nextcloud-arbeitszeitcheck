@@ -137,10 +137,34 @@
 
                     const workLocationDefault = document.getElementById('work-location-default');
                     if (workLocationDefault) {
-                        const storedLocation = result.settings.work_location_default;
-                        workLocationDefault.value = (storedLocation === 'home' || storedLocation === 'external')
-                            ? storedLocation
+                        const storedLocation = typeof result.settings.work_location_default === 'string'
+                            && result.settings.work_location_default !== ''
+                            ? result.settings.work_location_default
                             : 'office';
+                        const catalog = window.ArbeitszeitCheckWorkLocationCatalog;
+                        const applyLocation = () => {
+                            const options = catalog ? catalog.options() : [];
+                            if (options.length > 0) {
+                                workLocationDefault.replaceChildren(...options.map((item) => {
+                                    const option = document.createElement('option');
+                                    option.value = item.code;
+                                    option.textContent = item.label || item.code;
+                                    return option;
+                                }));
+                            }
+                            if (![...workLocationDefault.options].some((option) => option.value === storedLocation)) {
+                                const historical = document.createElement('option');
+                                historical.value = storedLocation;
+                                historical.textContent = storedLocation;
+                                workLocationDefault.appendChild(historical);
+                            }
+                            workLocationDefault.value = storedLocation;
+                        };
+                        if (catalog) {
+                            catalog.load().then(applyLocation);
+                        } else {
+                            applyLocation();
+                        }
                     }
 
                     const notificationsEnabled = document.getElementById('notifications-enabled');
@@ -265,8 +289,7 @@
             const data = {
                 auto_break_calculation: !!autoBreak.checked,
                 hours_display: hoursDisplay && hoursDisplay.value === 'hours_minutes' ? 'hours_minutes' : 'decimal',
-                work_location_default: workLocationDefault
-                    && (workLocationDefault.value === 'home' || workLocationDefault.value === 'external')
+                work_location_default: workLocationDefault && workLocationDefault.value
                     ? workLocationDefault.value
                     : 'office'
             };

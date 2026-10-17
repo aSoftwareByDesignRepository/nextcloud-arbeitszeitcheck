@@ -1,0 +1,147 @@
+{
+  "format": 1,
+  "sections": [
+    {
+      "scenario": "users",
+      "order": 10,
+      "writes": [
+        {"target": "external.nextcloud_users", "operation": "provision"},
+        {"target": "at_teams", "operation": "insert"},
+        {"target": "at_team_members", "operation": "insert"},
+        {"target": "at_team_managers", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "vacationModes",
+      "order": 15,
+      "writes": [
+        {"target": "external.appconfig", "operation": "emit"}
+      ]
+    },
+    {
+      "scenario": "tariffs",
+      "order": 20,
+      "writes": [
+        {"target": "at_tariff_rule_sets", "operation": "insert"},
+        {"target": "at_tariff_rule_modules", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "models",
+      "order": 30,
+      "writes": [
+        {"target": "at_models", "operation": "insert"},
+        {"target": "at_user_models", "operation": "insert"},
+        {"target": "at_model_vacation_defaults", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "timeEntries",
+      "order": 40,
+      "writes": [
+        {"target": "at_entries", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "absenceTypes",
+      "order": 50,
+      "writes": [
+        {"target": "at_custom_absence", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "absences",
+      "order": 60,
+      "writes": [
+        {"target": "at_absences", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "substitutions",
+      "order": 70,
+      "writes": [
+        {"target": "at_absences", "operation": "update"}
+      ]
+    },
+    {
+      "scenario": "months",
+      "order": 80,
+      "writes": [
+        {"target": "at_month_closure", "operation": "insert"},
+        {"target": "at_month_closure_revision", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "idempotency",
+      "order": 90,
+      "writes": [
+        {"target": "at_mob_stamp_idem", "operation": "insert"},
+        {"target": "at_kiosk_stamp_idem", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "audit",
+      "order": 100,
+      "writes": [
+        {"target": "at_audit", "operation": "insert"}
+      ]
+    },
+    {
+      "scenario": "delivery",
+      "order": 110,
+      "writes": [
+        {"target": "external.mailhog", "operation": "emit"},
+        {"target": "external.ical", "operation": "emit"}
+      ]
+    },
+    {
+      "scenario": "bridges",
+      "order": 120,
+      "writes": [
+        {"target": "external.deskcheck", "operation": "emit"},
+        {"target": "external.dutycheck", "operation": "emit"}
+      ]
+    }
+  ],
+  "stateTranslations": {
+    "timeEntries.status": {
+      "active": "active",
+      "completed": "completed",
+      "paused": "paused"
+    },
+    "absences.status": {
+      "pending": "pending",
+      "approved": "approved",
+      "rejected": "rejected",
+      "cancelled": "cancelled"
+    },
+    "absences.type": {
+      "vacation": "vacation",
+      "sick": "sick_leave",
+      "child_sick": "child_sick",
+      "home_office": "home_office",
+      "business_trip": "business_trip",
+      "custom_bereavement": "custom_bereavement"
+    },
+    "months.status": {
+      "open": "open",
+      "closed": "finalized",
+      "reopened": "open"
+    }
+  },
+  "stateEvidence": {
+    "months.reopened": {
+      "required": ["at_month_closure_revision"],
+      "openStatus": "open",
+      "finalizedStatus": "finalized"
+    }
+  },
+  "externalTargets": [
+    "external.nextcloud_users",
+    "external.appconfig",
+    "external.mailhog",
+    "external.ical",
+    "external.deskcheck",
+    "external.dutycheck"
+  ]
+}

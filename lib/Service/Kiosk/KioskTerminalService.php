@@ -11,11 +11,11 @@ use OCA\ArbeitszeitCheck\Kiosk\KioskCrypto;
 use OCA\ArbeitszeitCheck\Service\LicenseService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCP\Lock\ILockingProvider;
 
 class KioskTerminalService
 {
-	private const PAIR_LOCK = 'arbeitszeitcheck/kiosk_pair';
 
 	public function __construct(
 		private readonly KioskTerminalMapper $terminalMapper,
@@ -80,7 +80,7 @@ class KioskTerminalService
 			throw new KioskException('TERMINAL_LICENSE_REQUIRED');
 		}
 
-		$this->lockingProvider->acquireLock(self::PAIR_LOCK, ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk terminal pairing');
+		$this->lockingProvider->acquireLock(DbLockKeys::kioskPairing(), ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk terminal pairing');
 		try {
 			$now = $this->timeFactory->getDateTime();
 			$pending = $this->findPendingByPairingCode($pairingCode, $now);
@@ -130,7 +130,7 @@ class KioskTerminalService
 				'label' => $fresh !== null ? $fresh->getLabel() : $pending->getLabel(),
 			];
 		} finally {
-			$this->lockingProvider->releaseLock(self::PAIR_LOCK, ILockingProvider::LOCK_EXCLUSIVE);
+			$this->lockingProvider->releaseLock(DbLockKeys::kioskPairing(), ILockingProvider::LOCK_EXCLUSIVE);
 		}
 	}
 

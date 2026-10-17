@@ -43,13 +43,57 @@
 		else element.removeAttribute('aria-busy');
 	}
 
+	// The admin-settings shell wraps every section partial in the outer
+	// #admin-settings-form. Nested <form> elements are dropped by the HTML
+	// parser (the first inner form never reaches the DOM and its stray
+	// </form> closes the outer form early), so the create/policy groups are
+	// plain role="group" containers and submission is wired explicitly:
+	// data-field drives the payload, Enter/click drive submit, per-control
+	// checkValidity drives validation.
+	function fieldValues(group) {
+		const data = {};
+		group.querySelectorAll('[data-field]').forEach((el) => { data[el.dataset.field] = el.value; });
+		return data;
+	}
+
+	function validateGroup(group) {
+		const bad = [...group.querySelectorAll('input, select, textarea')].find((el) => !el.checkValidity());
+		if (bad) bad.reportValidity();
+		return !bad;
+	}
+
+	function resetFields(group) {
+		group.querySelectorAll('[data-field]').forEach((el) => {
+			if (el instanceof HTMLSelectElement) {
+				el.selectedIndex = Math.max(0, [...el.options].findIndex((o) => o.defaultSelected));
+			} else if (el.type === 'checkbox' || el.type === 'radio') {
+				el.checked = el.defaultChecked;
+			} else {
+				el.value = el.defaultValue;
+			}
+		});
+	}
+
+	function bindSubmits(group, handler) {
+		group.querySelector('[data-submit]').addEventListener('click', handler);
+		group.addEventListener('keydown', (event) => {
+			if (event.key !== 'Enter' || event.defaultPrevented
+				|| !(event.target instanceof HTMLInputElement)
+				|| event.target.closest('.user-picker')) {
+				return;
+			}
+			event.preventDefault();
+			handler();
+		});
+	}
+
 	function clearErrors(target = form) {
 		target.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
 		target.closest('section').querySelectorAll('.azc-field-error').forEach((error) => { error.hidden = true; error.textContent = ''; });
 	}
 
 	function showFieldError(fieldName, message, target = form) {
-		const field = target.elements.namedItem(fieldName);
+		const field = [...target.querySelectorAll('[data-field]')].find((el) => el.dataset.field === fieldName);
 		const error = document.getElementById(`work-location-${fieldName}-error`)
 			|| document.getElementById(`work-location-policy-${fieldName}-error`);
 		if (!field || !error) return false;
@@ -194,22 +238,21 @@
 	}
 
 	form.addEventListener('input', (event) => {
-		if (event.target?.name) {
+		if (event.target?.dataset?.field) {
 			event.target.removeAttribute('aria-invalid');
-			const error = document.getElementById(`work-location-${event.target.name}-error`);
+			const error = document.getElementById(`work-location-${event.target.dataset.field}-error`);
 			if (error) { error.hidden = true; error.textContent = ''; }
 		}
 	});
 
-	form.addEventListener('submit', async (event) => {
-		event.preventDefault();
+	bindSubmits(form, async () => {
 		clearErrors();
-		if (!form.reportValidity()) return;
-		const submit = form.querySelector('[type="submit"]');
+		if (!validateGroup(form)) return;
+		const submit = form.querySelector('[data-submit]');
 		setBusy(submit, true);
 		try {
-			await request(root.dataset.createUrl, { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(form))) });
-			form.reset();
+			await request(root.dataset.createUrl, { method: 'POST', body: JSON.stringify(fieldValues(form)) });
+			resetFields(form);
 			listStatus.textContent = t('Work location added.');
 			await loadCatalog();
 		} catch (error) {
@@ -222,7 +265,7 @@
 	});
 
 	policyForm.addEventListener('input', (event) => {
-		if (event.target?.name) event.target.removeAttribute('aria-invalid');
+		if (event.target?.dataset?.field) event.target.removeAttribute('aria-invalid');
 	});
 
 	scopeType.addEventListener('change', loadScopeTargets);
@@ -238,14 +281,13 @@
 		onChange: loadPolicies,
 	});
 
-	policyForm.addEventListener('submit', async (event) => {
-		event.preventDefault();
+	bindSubmits(policyForm, async () => {
 		clearErrors(policyForm);
-		if (!policyForm.reportValidity()) return;
-		const submit = policyForm.querySelector('[type="submit"]');
+		if (!validateGroup(policyForm)) return;
+		const submit = policyForm.querySelector('[data-submit]');
 		setBusy(submit, true);
 		try {
-			const data = Object.fromEntries(new FormData(policyForm));
+			const data = fieldValues(policyForm);
 			data.scopeId = selectedScopeId();
 			await request(root.dataset.policyCreateUrl, { method: 'POST', body: JSON.stringify(data) });
 			policyStatus.textContent = t('Default policy created.');

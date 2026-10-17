@@ -75,15 +75,21 @@
 	}
 
 	function bindSubmits(group, handler) {
-		group.querySelector('[data-submit]').addEventListener('click', handler);
+		let inFlight = false;
+		const run = async () => {
+			if (inFlight) return;
+			inFlight = true;
+			try { await handler(); } finally { inFlight = false; }
+		};
+		group.querySelector('[data-submit]').addEventListener('click', run);
 		group.addEventListener('keydown', (event) => {
-			if (event.key !== 'Enter' || event.defaultPrevented
+			if (event.key !== 'Enter' || event.defaultPrevented || event.isComposing
 				|| !(event.target instanceof HTMLInputElement)
 				|| event.target.closest('.user-picker')) {
 				return;
 			}
 			event.preventDefault();
-			handler();
+			run();
 		});
 	}
 

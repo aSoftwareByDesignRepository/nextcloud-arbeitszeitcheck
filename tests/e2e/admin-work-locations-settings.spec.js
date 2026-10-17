@@ -49,6 +49,23 @@ test.describe('Admin work-locations settings', () => {
 		expect(pageErrors).toEqual([])
 	})
 
+	test('NC mega-form keeps every section + save button inside the form', async ({ page }) => {
+		const pageErrors = []
+		page.on('pageerror', (err) => pageErrors.push(String(err)))
+
+		await login(page, credsFromEnv('ADMIN'))
+		await page.goto('/settings/admin/arbeitszeitcheck')
+
+		// The stray inner </form> used to close #admin-settings-form early,
+		// ejecting every later section and the sticky Save button.
+		await expect(page.locator('#admin-settings-form')).toBeAttached()
+		await expect(page.locator('#admin-settings-form form')).toHaveCount(0)
+		await expect(page.locator('#admin-settings-form .azc-work-location-admin')).toBeAttached()
+		await expect(page.locator('#admin-settings-form #admin-settings-save')).toBeAttached()
+
+		expect(pageErrors).toEqual([])
+	})
+
 	test('create control submits via click and Enter', async ({ page }) => {
 		await login(page, credsFromEnv('ADMIN'))
 		await page.goto('/apps/arbeitszeitcheck/admin/settings/work-locations')

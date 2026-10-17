@@ -38,7 +38,7 @@
 	background: var(--color-background-dark);
 	border-radius: var(--border-radius-large, 10px);
 }
-.azc-se-admin .se-preview__warn { color: var(--color-warning); }
+.azc-se-admin .se-preview__warn { color: var(--color-warning-text, var(--color-warning)); }
 .azc-se-admin .se-trace {
 	font-family: var(--font-face-mono, monospace);
 	font-size: 0.85rem;

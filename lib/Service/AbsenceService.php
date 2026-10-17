@@ -892,7 +892,12 @@ class AbsenceService
 			$this->db->beginTransaction();
 			try {
 				$updatedAbsence = $this->absenceMapper->update($absence);
-				$this->specialEntitlementService?->adjustConsumedAbsence($updatedAbsence, $data, $oldData, $userId);
+				$this->specialEntitlementService?->adjustConsumedAbsence(
+					$updatedAbsence,
+					['end_date' => $newEnd->format('Y-m-d')],
+					$oldData,
+					$userId
+				);
 
 				$this->auditLogMapper->logAction(
 					$userId,

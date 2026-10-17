@@ -59,7 +59,7 @@ class PolicyCohortMembershipMapper extends QBMapper
 			->where($qb->expr()->eq('cohort_id', $qb->createNamedParameter($cohortId, IQueryBuilder::PARAM_INT)));
 		$result = $qb->executeQuery();
 		$count = (int)$result->fetchOne();
-		$result->free();
+		$result->closeCursor();
 		return $count;
 	}
 
@@ -97,7 +97,7 @@ class PolicyCohortMembershipMapper extends QBMapper
 			));
 		$result = $qb->executeQuery();
 		$count = (int)$result->fetchOne();
-		$result->free();
+		$result->closeCursor();
 		return $count;
 	}
 

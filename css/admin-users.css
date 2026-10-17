@@ -471,7 +471,7 @@
 
 .admin-user-detail__status--error {
   border-color: var(--color-error);
-  background: color-mix(in srgb, var(--color-error) 8%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-error-text) 8%, var(--color-main-background));
 }
 
 .admin-user-detail__status-text {

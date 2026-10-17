@@ -1039,7 +1039,6 @@ final class SpecialEntitlementAdminService
 					$entry->setReason($reason);
 					$entry->setCreatedAt(new \DateTime());
 					$entry = $this->ledger->insert($entry);
-					$period->setRevision((int)$period->getRevision() + 1);
 					if (!$this->periods->updateIfRevision($period)) {
 						throw new SpecialEntitlementException('REVISION_CONFLICT', 'The period changed concurrently.', 409);
 					}

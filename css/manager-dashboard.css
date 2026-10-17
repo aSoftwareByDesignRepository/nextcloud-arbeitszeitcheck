@@ -129,7 +129,7 @@
 }
 
 #app-content.azc-app--manager-dashboard .team-overtime-empty--ok {
-	color: var(--color-success);
+	color: var(--color-success-text, var(--color-success));
 }
 
 #app-content.azc-app--manager-dashboard .team-overtime-count {

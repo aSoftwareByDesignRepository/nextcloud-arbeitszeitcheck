@@ -9,6 +9,7 @@ use OCA\ArbeitszeitCheck\Db\CustomAbsenceType;
 use OCA\ArbeitszeitCheck\Db\CustomAbsenceTypeMapper;
 use OCA\ArbeitszeitCheck\Db\EntitlementComputationSnapshotMapper;
 use OCA\ArbeitszeitCheck\Db\PolicyCohortMapper;
+use OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntry;
 use OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper;
 use OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriod;
 use OCA\ArbeitszeitCheck\Db\SpecialEntitlementPeriodMapper;
@@ -233,6 +234,33 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		$this->expectException(SpecialEntitlementException::class);
 		$this->expectExceptionMessage('closed');
 		$this->service->postCorrection(31, ['revision' => 2, 'amount' => '1.00', 'reason' => 'x', 'eventKey' => 'evt-12345678'], 'admin');
+	}
+
+	public function testPostCorrectionCommitsWithSingleCasBump(): void
+	{
+		// Regression: the service must not pre-bump revision before
+		// updateIfRevision — the mapper owns the +1, otherwise its WHERE
+		// never matches and every correction 409s 'changed concurrently'.
+		$period = $this->period(end: '2999-12-31');
+		$this->periods->method('find')->willReturn($period);
+		$this->ledger->method('findByEventKey')->willReturn(null);
+		$this->ledger->expects($this->once())->method('insert')
+			->willReturnCallback(static function (SpecialEntitlementLedgerEntry $e) {
+				$e->setId(77);
+				return $e;
+			});
+		$this->periods->expects($this->once())->method('updateIfRevision')
+			->with(self::callback(static fn (SpecialEntitlementPeriod $p): bool => (int)$p->getRevision() === 2))
+			->willReturn(true);
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('commit');
+		$this->audit->expects($this->once())->method('logAction');
+
+		$out = $this->service->postCorrection(31, [
+			'revision' => 2, 'amount' => '1.00', 'reason' => 'manual fix', 'eventKey' => 'evt-unique-1',
+		], 'admin');
+		self::assertSame(77, (int)$out['id']);
+		self::assertSame('correction', $out['kind']);
 	}
 
 	public function testUpdatePolicyRejectsImmutableScopeChange(): void

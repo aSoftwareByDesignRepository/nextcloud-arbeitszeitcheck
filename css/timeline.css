@@ -221,7 +221,7 @@
 }
 
 .timeline-item--absence .timeline-item-icon {
-	background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+	background: color-mix(in srgb, var(--color-warning-text) 10%, transparent);
 }
 
 .timeline-item--holiday .timeline-item-icon {

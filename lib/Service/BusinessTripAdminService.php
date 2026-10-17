@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\BusinessTrip;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignment;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper;
@@ -40,6 +41,7 @@ final class BusinessTripAdminService
 		private readonly IUserManager $userManager,
 		private readonly BusinessTripRolloutReadinessService $readiness,
 		private readonly LoggerInterface $logger,
+		private readonly AuditLogMapper $audit,
 	) {
 	}
 
@@ -57,8 +59,8 @@ final class BusinessTripAdminService
 		string $name,
 		string $jurisdiction,
 		string $configJson,
-		?\DateTime $validFrom,
-		?\DateTime $validTo,
+		?\DateTimeInterface $validFrom,
+		?\DateTimeInterface $validTo,
 		string $actor,
 	): array {
 		$this->assertEnabled();
@@ -201,6 +203,7 @@ final class BusinessTripAdminService
 				$assignment->setCreatedAt($now);
 				$assignment->setUpdatedAt($now);
 				$saved = $this->assignments->insert($assignment);
+				$this->audit->logAction($actor, 'business_trip_rule_assignment_created', 'business_trip_rule_assignment', (int)$saved->getId(), null, $this->serializeAssignment($saved), $actor);
 				$this->db->commit();
 				return $this->serializeAssignment($saved);
 			} catch (\Throwable $e) {
@@ -226,11 +229,21 @@ final class BusinessTripAdminService
 			if ($effectiveTo->format('Y-m-d') < $assignment->getEffectiveFrom()->format('Y-m-d')) {
 				throw new BusinessTripException('RULE_ASSIGNMENT_INVALID', 'effectiveTo must not precede effectiveFrom.', 400, ['effectiveTo' => 'before_from']);
 			}
+			$old = $this->serializeAssignment($assignment);
 			$assignment->setEffectiveTo(new \DateTime($effectiveTo->format('Y-m-d')));
 			$assignment->setRevision((int)$assignment->getRevision() + 1);
 			$assignment->setUpdatedBy($actor);
 			$assignment->setUpdatedAt(new \DateTime());
-			return $this->serializeAssignment($this->assignments->update($assignment));
+			$this->db->beginTransaction();
+			try {
+				$saved = $this->assignments->update($assignment);
+				$this->audit->logAction($actor, 'business_trip_rule_assignment_ended', 'business_trip_rule_assignment', (int)$saved->getId(), $old, $this->serializeAssignment($saved), $actor);
+				$this->db->commit();
+				return $this->serializeAssignment($saved);
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
 		} finally {
 			$this->lockingProvider->releaseLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
 		}
@@ -263,7 +276,19 @@ final class BusinessTripAdminService
 		$profile->setUpdatedBy($actor);
 		$profile->setCreatedAt($now);
 		$profile->setUpdatedAt($now);
-		$saved = $this->profiles->insert($profile);
+		$this->db->beginTransaction();
+		try {
+			$saved = $this->profiles->insert($profile);
+			$this->audit->logAction($actor, 'user_business_trip_profile_set', 'user_business_trip_profile', (int)$saved->getId(), null, [
+				'userId' => (string)$saved->getUserId(),
+				'normalCommuteMinutes' => $saved->getNormalCommuteMinutes(),
+				'effectiveFrom' => $saved->getEffectiveFrom()?->format('Y-m-d'),
+			], $actor);
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 		return [
 			'id' => (int)$saved->getId(),
 			'userId' => (string)$saved->getUserId(),
@@ -326,6 +351,7 @@ final class BusinessTripAdminService
 	{
 		$this->config->updateFlags(['business_trips_enabled' => true]);
 		$this->logger->info('business_trips_enabled set to true', ['actor' => $actor]);
+		$this->audit->logAction($actor, 'business_trip_feature_enabled', 'feature_flag', null, ['business_trips_enabled' => false], ['business_trips_enabled' => true], $actor);
 	}
 
 	/**
@@ -344,6 +370,7 @@ final class BusinessTripAdminService
 		}
 		$this->config->updateFlags(['legacy_trip_absence_create_enabled' => false]);
 		$this->logger->info('legacy_trip_absence_create_enabled set to false', ['actor' => $actor, 'preflight' => $preflight]);
+		$this->audit->logAction($actor, 'business_trip_legacy_absence_disabled', 'feature_flag', null, ['legacy_trip_absence_create_enabled' => true], ['legacy_trip_absence_create_enabled' => false], $actor);
 		return [
 			'legacy_trip_absence_create_enabled' => false,
 			'preflight' => $preflight,

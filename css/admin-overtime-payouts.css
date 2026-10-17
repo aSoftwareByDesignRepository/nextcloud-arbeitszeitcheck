@@ -108,7 +108,7 @@
 	border-left-width: 4px;
 	border-left-color: var(--color-success);
 	color: var(--color-main-text);
-	background-color: color-mix(in srgb, var(--color-success) 14%, var(--color-main-background));
+	background-color: color-mix(in srgb, var(--color-success-text) 14%, var(--color-main-background));
 }
 
 @media (max-width: 767.98px) {

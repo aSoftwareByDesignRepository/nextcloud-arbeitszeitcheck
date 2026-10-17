@@ -94,12 +94,12 @@
 }
 
 .dashboard-overtime-card__balance-value.positive {
-	background: var(--azc-tint-success, color-mix(in srgb, var(--color-success) 18%, transparent));
+	background: var(--azc-tint-success, color-mix(in srgb, var(--color-success-text) 18%, transparent));
 	border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
 }
 
 .dashboard-overtime-card__balance-value.negative {
-	background: var(--azc-tint-danger, color-mix(in srgb, var(--color-error) 22%, transparent));
+	background: var(--azc-tint-danger, color-mix(in srgb, var(--color-error-text) 22%, transparent));
 	border-color: color-mix(in srgb, var(--color-error) 50%, var(--color-border));
 }
 
@@ -173,17 +173,17 @@
 .ot-semaphore--yellow .ot-semaphore__lamp--yellow,
 .ot-semaphore--green .ot-semaphore__lamp--green {
 	opacity: 1;
-	background: var(--arbeitszeitcheck-color-error, var(--color-error));
+	background: var(--color-element-error);
 	border-color: color-mix(in srgb, var(--color-main-text) 25%, transparent);
 	box-shadow: 0 0 0 2px var(--color-main-background);
 }
 
 .ot-semaphore--yellow .ot-semaphore__lamp--yellow {
-	background: var(--arbeitszeitcheck-color-warning, var(--color-warning));
+	background: var(--color-element-warning);
 }
 
 .ot-semaphore--green .ot-semaphore__lamp--green {
-	background: var(--arbeitszeitcheck-color-success, var(--color-success));
+	background: var(--color-element-success);
 }
 
 .dashboard-overtime-card__bank {

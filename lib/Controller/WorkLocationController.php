@@ -180,6 +180,15 @@ class WorkLocationController extends Controller
 
 	private function invalidResponse(mixed $rawCode, \InvalidArgumentException $e): JSONResponse
 	{
+		if ($e->getMessage() === WorkLocationDayOverrideService::ERROR_DATE_INVALID) {
+			$message = $this->l10n->t('Invalid date');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $message,
+				'error_code' => 'INVALID_DATE',
+				'fields' => ['date' => $message],
+			], Http::STATUS_BAD_REQUEST);
+		}
 		if ($e->getMessage() === WorkLocationDayOverrideService::ERROR_DATE_OUT_OF_WINDOW) {
 			$message = $this->l10n->t('The day override can only be set for today or up to %d days ahead.', [WorkLocationDayOverrideService::FUTURE_WINDOW_DAYS]);
 			return new JSONResponse([

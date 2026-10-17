@@ -67,7 +67,7 @@
 /* Ensure error messages have high contrast (main text on tinted surface; error = left border) */
 #time-entry-form .form-error {
   color: var(--color-main-text);
-  background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
+  background-color: color-mix(in srgb, var(--color-error-text) 14%, var(--color-main-background));
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
   border-left: 4px solid var(--color-error);
 }
@@ -353,19 +353,19 @@
 }
 
 #time-entry-form .compliance-status.compliant {
-  background: color-mix(in srgb, var(--color-success) 12%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-success-text) 12%, var(--color-main-background));
   color: var(--color-main-text);
   border: 1px solid color-mix(in srgb, var(--color-success) 45%, var(--color-border));
 }
 
 #time-entry-form .compliance-status.warning {
-  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-warning-text) 14%, var(--color-main-background));
   color: var(--color-main-text);
   border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
 }
 
 #time-entry-form .compliance-status.violation {
-  background: color-mix(in srgb, var(--color-error) 12%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-error-text) 12%, var(--color-main-background));
   color: var(--color-main-text);
   border: 1px solid color-mix(in srgb, var(--color-error) 45%, var(--color-border));
 }

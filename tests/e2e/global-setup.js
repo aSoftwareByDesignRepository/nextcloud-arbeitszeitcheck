@@ -19,6 +19,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { acquireInstanceLock } from './instance-lock.js'
 
 const configDir = dirname(fileURLToPath(import.meta.url))
 const nextcloudRoot = resolve(configDir, '../../..')
@@ -139,6 +140,11 @@ export default async function globalSetup() {
 		// eslint-disable-next-line no-console
 		console.warn(`[e2e globalSetup] WARNING: ${siblings.length} other playwright run(s) detected on this shared instance — config/user mutations may race:\n${siblings.map((s) => `  ${s.trim()}`).join('\n')}`)
 	}
+
+	// Serialize cooperating runs on the shared instance — STATEFUL_SPECS
+	// serializes within one run; the lease serializes between runs (including
+	// sibling agents invoking the same globalSetup in this tree).
+	acquireInstanceLock()
 
 	if (!dockerReachable()) {
 		// eslint-disable-next-line no-console

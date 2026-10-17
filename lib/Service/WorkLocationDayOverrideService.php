@@ -36,6 +36,7 @@ final class WorkLocationDayOverrideService
 
 	public const ERROR_REVISION_CONFLICT = 'REVISION_CONFLICT';
 	public const ERROR_DATE_OUT_OF_WINDOW = 'DAY_OVERRIDE_OUT_OF_WINDOW';
+	public const ERROR_DATE_INVALID = 'INVALID_DATE_FORMAT';
 
 	public function __construct(
 		private readonly WorkLocationDayOverrideMapper $mapper,
@@ -223,10 +224,16 @@ final class WorkLocationDayOverrideService
 	private function assertDateInWindow(string $localDate): void
 	{
 		if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $localDate) !== 1) {
-			throw new \InvalidArgumentException('Invalid date format');
+			throw new \InvalidArgumentException(self::ERROR_DATE_INVALID);
 		}
 		$today = new \DateTime('today');
 		$max = (clone $today)->modify('+' . self::FUTURE_WINDOW_DAYS . ' days');
+		$target = \DateTimeImmutable::createFromFormat('!Y-m-d', $localDate);
+		// createFromFormat is lenient (month 13 overflows into next year) —
+		// the round-trip check is what actually rejects impossible dates.
+		if ($target === false || $target->format('Y-m-d') !== $localDate) {
+			throw new \InvalidArgumentException(self::ERROR_DATE_INVALID);
+		}
 		$target = new \DateTime($localDate);
 		if ($target < $today || $target > $max) {
 			throw new \InvalidArgumentException(self::ERROR_DATE_OUT_OF_WINDOW);

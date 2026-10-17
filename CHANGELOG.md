@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 1.9.1 - 2026-10-20
 
+### Added
+
+- **Per-employee working-time models (GH #42):** Contract hours no longer require a shared organisation model — administrators can assign an individual working-time model directly in the employee profile ("individual contract hours"), with per-weekday start/end times and optional breaks in a shared schedule editor. Personal models apply only to that employee, stay out of the global model lists and defaults, are cleaned up when the user is deleted, and are effective-dated so paid-absence crediting uses each day's own target hours. The calendar shows a badge when the effective model changes mid-period.
+
 ### Security
 
 - **Offline stamp idempotency integrity:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` now store a `payload_hash` fingerprint (Version1050). A `clientRequestId` reused with a *different* payload is rejected with `STAMP_CLIENT_REQUEST_MISMATCH` (409) instead of silently replaying the stale cached response — closing a silent data-loss path where a buggy client could drop an unapplied stamp from its queue.

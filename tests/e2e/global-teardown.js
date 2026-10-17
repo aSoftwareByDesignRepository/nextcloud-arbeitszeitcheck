@@ -17,6 +17,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { releaseInstanceLock } from './instance-lock.js'
 
 const configDir = dirname(fileURLToPath(import.meta.url))
 const nextcloudRoot = resolve(configDir, '../../..')
@@ -81,4 +82,5 @@ export default async function globalTeardown() {
 		// eslint-disable-next-line no-console
 		console.log(`[e2e globalTeardown] core/lang reset to 'en' for: ${[...new Set(users)].join(', ')}`)
 	}
+	releaseInstanceLock()
 }

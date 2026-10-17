@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { login, credsFromEnv, hasCreds, gotoApp } from './helpers/auth.js';
 import { setUserTheme, resetUserTheme } from './helpers/theming.js';
 import { apiAllowFailure } from './helpers/api.js';
+import { applyLabLicense } from './helpers/license.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(
@@ -83,6 +84,7 @@ const EMPLOYEE_VIEWS = [
 	['reports', '/apps/arbeitszeitcheck/reports', '#azc-main-content'],
 	['calendar', '/apps/arbeitszeitcheck/calendar', '#calendar-container, #azc-main-content'],
 	['timeline', '/apps/arbeitszeitcheck/timeline', '#timeline-container, #azc-main-content'],
+	['business-trips', '/apps/arbeitszeitcheck/business-trips', '#bt-trip-list .bt-trip-item, #bt-empty:not([hidden]), #bt-root'],
 	['settings-breaks', '/apps/arbeitszeitcheck/settings/breaks', '#azc-main-content'],
 	['settings-notifications', '/apps/arbeitszeitcheck/settings/notifications', '#azc-main-content'],
 	['settings-data-privacy', '/apps/arbeitszeitcheck/settings/data-privacy', '#azc-main-content'],
@@ -99,12 +101,13 @@ const MANAGER_VIEWS = [
 	['manager-time-entries', '/apps/arbeitszeitcheck/manager/time-entries', '#azc-main-content'],
 	['manager-absences', '/apps/arbeitszeitcheck/manager/absences', '#azc-main-content'],
 	['manager-month-closures', '/apps/arbeitszeitcheck/manager/month-closures', '#azc-main-content'],
+	['manager-business-trips', '/apps/arbeitszeitcheck/manager/business-trips', '#mbt-root, #azc-main-content'],
 ];
 
 const ADMIN_SETTINGS_SECTIONS = [
 	'access', 'compliance', 'time-recording', 'time-approvals', 'exports',
 	'outlook-subscription', 'month-closure', 'hours', 'regional', 'retention',
-	'projectcheck',
+	'projectcheck', 'work-locations',
 ];
 
 const ADMIN_VIEWS = [
@@ -124,6 +127,8 @@ const ADMIN_VIEWS = [
 	['admin-vacation-rules', '/apps/arbeitszeitcheck/admin/vacation-rules', '#admin-vacation-policy-form, #azc-main-content'],
 	['admin-vacation-layers', '/apps/arbeitszeitcheck/admin/vacation-layers', '#layer-l0, #azc-main-content'],
 	['admin-teams', '/apps/arbeitszeitcheck/admin/teams', '#azc-main-content'],
+	['admin-business-trips', '/apps/arbeitszeitcheck/admin/business-trips', '#bta-root, #azc-main-content'],
+	['admin-special-entitlements', '/apps/arbeitszeitcheck/admin/special-entitlements', '#se-admin-root, #azc-main-content'],
 ];
 
 /** Dark + HC re-capture subset (primary views). */
@@ -330,6 +335,27 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 				settleMs: 300,
 			});
 		}
+
+		/* --- business trips: create view (open → cancel, zero mutation) and a
+		   real detail surface via the first rendered trip link --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/business-trips');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		const newTripBtn = page.locator('#bt-new-trip, #bt-empty-create').first();
+		if (await newTripBtn.count()) {
+			await newTripBtn.click();
+			await expect(page.locator('#bt-create-view')).toBeVisible({ timeout: 10_000 });
+			await shot(page, 'azc-business-trips-create.png', { settleMs: 300 });
+			await page.locator('#bt-create-cancel').click().catch(() => {});
+		}
+		const tripLink = page.locator('#bt-trip-list .bt-trip-item__link').first();
+		if (await tripLink.count()) {
+			const href = await tripLink.getAttribute('href');
+			if (href) {
+				await gotoApp(page, href);
+				await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+				await shot(page, 'azc-business-trips-detail.png', { settleMs: 500 });
+			}
+		}
 	});
 
 	test('craft employee themes (dark + light-highcontrast)', async ({ page }) => {
@@ -376,6 +402,31 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 				await modal.locator('.btn-mgr-create-cancel, .azc-btn--secondary').first().click()
 					.catch(() => page.keyboard.press('Escape'));
 			}
+		}
+
+		/* --- bulk decision: select pending cards → count toolbar → reject modal ---
+		   Checkboxes render inside pending-approval cards after the ajax list
+		   loads; the toolbar only unhides once ≥1 item is selected. Reject opens
+		   a modal (open → cancel, never confirm — zero mutation). */
+		await gotoApp(page, '/apps/arbeitszeitcheck/manager');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		const bulkCbs = page.locator('#pending-approvals-items .bulk-select-checkbox');
+		if (await bulkCbs.first().isVisible({ timeout: 20_000 }).catch(() => false)) {
+			await bulkCbs.nth(0).check();
+			if ((await bulkCbs.count()) >= 2) {
+				await bulkCbs.nth(1).check();
+			}
+			const toolbar = page.locator('#bulk-decision-toolbar');
+			await expect(toolbar).not.toHaveClass(/visually-hidden/, { timeout: 10_000 });
+			await shot(page, 'azc-manager-bulk-toolbar.png', { settleMs: 300 });
+			await page.locator('#bulk-decision-reject').click();
+			const rejectModal = page.locator('#bulk-reject-modal');
+			if (await rejectModal.isVisible({ timeout: 10_000 }).catch(() => false)) {
+				await shot(page, 'azc-manager-dialog-bulk-reject.png', { settleMs: 300 });
+				await rejectModal.locator('.btn-reject-modal-cancel').first().click()
+					.catch(() => page.keyboard.press('Escape'));
+			}
+			await page.locator('#bulk-decision-clear').click().catch(() => {});
 		}
 
 		/* --- dark + HC on manager dashboard --- */
@@ -490,6 +541,164 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			}
 		}
 		await resetUserTheme(page).catch(() => {});
+	});
+
+	test('craft admin dialogs + filter toolbars (3.5.15 inventory)', async ({ page }) => {
+		test.skip(!hasCreds('ADMIN'), 'Requires NC_ADMIN_* creds');
+		test.setTimeout(420_000);
+
+		await login(page, credsFromEnv('ADMIN'));
+		await resetUserTheme(page).catch(() => {});
+		await setUserTheme(page, 'light');
+
+		/* --- tariff-rules modal (role=dialog): create trigger + cancel --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/tariff-rules');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await page.locator('#tariff-rules-create').click();
+		const tariffModal = page.locator('#tariff-rules-modal[role="dialog"]');
+		await expect(tariffModal).toBeVisible({ timeout: 15_000 });
+		await shot(page, 'azc-admin-tariff-rules-modal.png', { settleMs: 300 });
+		await tariffModal.locator('[data-dismiss="modal"]').first().click();
+		await expect(tariffModal).toBeHidden({ timeout: 10_000 });
+
+		/* --- holiday calendar filters: year select re-queries the list --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/holidays');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await expect(page.locator('#holiday-calendar-filters')).toBeVisible();
+		const yearSel = page.locator('#holiday-year-select');
+		const curYear = await yearSel.inputValue();
+		const altYear = String(parseInt(curYear, 10) + 1);
+		const holResp = page.waitForResponse(
+			(r) => r.url().includes('/api/admin/state-holidays')
+				&& r.url().includes(`year=${altYear}`), { timeout: 20_000 });
+		await yearSel.selectOption(altYear);
+		await holResp;
+		await expect(page.locator('#holiday-tbody tr').first())
+			.toBeVisible({ timeout: 15_000 });
+		// Region select drives the same loader — switch back+forth proves the control.
+		const stateSel = page.locator('#holiday-state-select');
+		if (await stateSel.count()) {
+			const curState = await stateSel.inputValue();
+			const otherState = await stateSel.locator('option')
+				.evaluateAll((opts, cur) =>
+					(opts.find((o) => o.value !== cur) || {}).value || cur, curState);
+			const stResp = page.waitForResponse(
+				(r) => r.url().includes('/api/admin/state-holidays')
+					&& r.url().includes(`state=${encodeURIComponent(otherState)}`), { timeout: 20_000 });
+			await stateSel.selectOption(otherState);
+			await stResp;
+		}
+
+		/* --- compliance violations filters: severity drives the query --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/compliance/violations');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await expect(page.locator('.compliance-violations__filters')).toBeVisible();
+		await page.locator('#severity-filter').selectOption('error');
+		const vResp = page.waitForResponse(
+			(r) => r.url().includes('/api/compliance/violations')
+				&& r.url().includes('severity=error'), { timeout: 20_000 });
+		await page.locator('#apply-filters').click();
+		await vResp;
+		// Rendered severity badges (if any rows) must all match the filter value.
+		const badges = page.locator('#violations-tbody .badge--error, #violations-tbody .badge--warning, #violations-tbody .badge--primary');
+		const nBadges = await badges.count();
+		for (let i = 0; i < nBadges; i++) {
+			await expect(badges.nth(i)).toHaveClass(/badge--error/);
+		}
+
+		/* --- overtime payouts filter: month+year reload via refresh --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/overtime-payouts');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await expect(page.locator('.admin-ot-payouts__filters')).toBeVisible();
+		const monthEl = page.locator('#ot-payout-month');
+		const curMonth = parseInt(await monthEl.inputValue(), 10);
+		const altMonth = curMonth === 1 ? 2 : 1;
+		const otResp = page.waitForResponse(
+			(r) => r.url().includes('/api/admin/overtime-payouts')
+				&& r.url().includes(`month=${altMonth}`), { timeout: 20_000 });
+		await monthEl.selectOption(String(altMonth));
+		await page.locator('#ot-payout-refresh').click();
+		await otResp;
+
+		/* --- overtime payout audit filter form: month select + submit --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/overtime-payout-audit');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await expect(page.locator('#ot-audit-filter-form')).toBeVisible();
+		await page.locator('#ot-audit-month').selectOption('1');
+		const auResp = page.waitForResponse(
+			(r) => r.url().includes('/api/admin/overtime-payout-audit')
+				&& r.url().includes('month=1'), { timeout: 20_000 });
+		await page.locator('#ot-audit-apply').click();
+		await auResp;
+
+		/* --- license clear modal: real confirm leg (destructive → restore) ---
+		   open→confirm→cleared-state re-read, then re-apply the lab license
+		   and re-seat the fixture users so shared test state is restored. */
+		// Seed a license first — the clear trigger only renders when licensed,
+		// and sibling lanes can clear it at any time.
+		const seed = await applyLabLicense(page, apiAllowFailure);
+		expect(seed.ok, `license seed failed: ${JSON.stringify(seed.res?.json)}`).toBe(true);
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		const clearOpen = page.locator('#azc-license-clear');
+		await expect(clearOpen).toBeVisible({ timeout: 15_000 });
+		await clearOpen.click();
+		const clearModal = page.locator('#azc-license-clear-modal[role="dialog"]');
+		await expect(clearModal).toBeVisible({ timeout: 10_000 });
+		await shot(page, 'azc-admin-license-clear-confirm.png', { settleMs: 300 });
+		await page.locator('#azc-license-clear-confirm').click();
+		// cleared state re-read: reload shows the apply form, no clear trigger
+		await page.waitForSelector('#azc-license-key-input', { timeout: 30_000 });
+		await expect(page.locator('#azc-license-clear')).toHaveCount(0);
+		const lic = await applyLabLicense(page, apiAllowFailure);
+		expect(lic.ok, `license re-apply failed: ${JSON.stringify(lic.res?.json)}`).toBe(true);
+		const seats = await apiAllowFailure(page, 'POST',
+			'/apps/arbeitszeitcheck/api/admin/license/mobile-seats/batch',
+			{ data: { userIds: ['e2e_employee', 'e2e_manager', 'e2e_substitute', 'azc_gdpr_probe'] } });
+		expect(seats.ok, `seat restore failed: ${JSON.stringify(seats.json)}`).toBe(true);
+		// restore re-read: the licensed surface renders the clear trigger again
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
+		await expect(page.locator('#azc-license-clear')).toBeVisible({ timeout: 15_000 });
+
+		await resetUserTheme(page).catch(() => {});
+	});
+
+	test('craft employee timeline filters + calendar day panel (3.5.15 inventory)', async ({ page }) => {
+		test.skip(!hasCreds('EMPLOYEE'), 'Requires NC_EMPLOYEE_* creds');
+		test.setTimeout(300_000);
+
+		await login(page, credsFromEnv('EMPLOYEE'));
+		await page.evaluate(() => sessionStorage.removeItem('arbeitszeitcheck-timeline-filters'));
+		await gotoApp(page, '/apps/arbeitszeitcheck/timeline');
+		await page.waitForSelector('#timeline-container, #azc-main-content', { timeout: 30_000 });
+		await expect(page.locator('#timeline-filters')).toBeVisible();
+
+		// Unchecking a type must remove its rendered items (client-side filter
+		// re-render from cached data + sessionStorage persistence).
+		const absenceBox = page.locator('#timeline-filter-absences');
+		const entriesBox = page.locator('#timeline-filter-time-entries');
+		await absenceBox.uncheck();
+		await expect(page.locator('.timeline-item--absence')).toHaveCount(0, { timeout: 10_000 });
+		await absenceBox.check();
+		await entriesBox.uncheck();
+		await expect(page.locator('.timeline-item--time-entry')).toHaveCount(0, { timeout: 10_000 });
+		// sessionStorage persistence leg
+		const persisted = await page.evaluate(
+			() => JSON.parse(sessionStorage.getItem('arbeitszeitcheck-timeline-filters') || '{}'));
+		expect(persisted.timeEntries).toBe(false);
+		await entriesBox.check();
+
+		/* --- calendar day-details panel (role=dialog): open → close --- */
+		await gotoApp(page, '/apps/arbeitszeitcheck/calendar');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		const dayCell = page.locator('.calendar-day[data-date]').first();
+		await expect(dayCell).toBeVisible({ timeout: 30_000 });
+		await dayCell.click();
+		const dayPanel = page.locator('#day-details-panel[role="dialog"]');
+		await expect(dayPanel).toBeVisible({ timeout: 15_000 });
+		await shot(page, 'azc-calendar-day-details-panel.png', { settleMs: 300 });
+		await page.locator('#btn-close-panel').click();
+		await expect(dayPanel).toBeHidden({ timeout: 10_000 });
 	});
 
 	test.afterAll(async () => {

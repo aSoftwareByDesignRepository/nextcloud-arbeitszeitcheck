@@ -215,9 +215,9 @@
 }
 
 .dz-capture-notice--warning {
-	border-color: color-mix(in srgb, var(--color-warning) 45%, transparent);
-	border-left-color: var(--color-warning);
-	background: color-mix(in srgb, var(--color-warning) 10%, var(--color-main-background));
+	border-color: color-mix(in srgb, var(--color-warning-text) 45%, transparent);
+	border-left-color: var(--color-warning-text);
+	background: color-mix(in srgb, var(--color-warning-text) 10%, var(--color-main-background));
 }
 
 .dz-capture-notice--neutral {
@@ -297,7 +297,7 @@
 	border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent);
 	border-left: 4px solid var(--color-error);
 	border-radius: var(--radius-base, 6px);
-	background-color: color-mix(in srgb, var(--color-error) 10%, var(--color-main-background));
+	background-color: color-mix(in srgb, var(--color-error-text) 10%, var(--color-main-background));
 	box-sizing: border-box;
 }
 

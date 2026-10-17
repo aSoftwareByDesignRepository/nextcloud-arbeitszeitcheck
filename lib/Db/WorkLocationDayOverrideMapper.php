@@ -21,7 +21,7 @@ class WorkLocationDayOverrideMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-			->andWhere($qb->expr()->eq('local_date', $qb->createNamedParameter($localDate, IQueryBuilder::PARAM_DATE)));
+			->andWhere($qb->expr()->eq('local_date', $qb->createNamedParameter($localDate, IQueryBuilder::PARAM_STR)));
 		try {
 			return $this->findEntity($qb);
 		} catch (DoesNotExistException) {
@@ -37,8 +37,8 @@ class WorkLocationDayOverrideMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-			->andWhere($qb->expr()->gte('local_date', $qb->createNamedParameter($fromDate, IQueryBuilder::PARAM_DATE)))
-			->andWhere($qb->expr()->lte('local_date', $qb->createNamedParameter($toDate, IQueryBuilder::PARAM_DATE)))
+			->andWhere($qb->expr()->gte('local_date', $qb->createNamedParameter($fromDate, IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->lte('local_date', $qb->createNamedParameter($toDate, IQueryBuilder::PARAM_STR)))
 			->orderBy('local_date', 'ASC');
 		return $this->findEntities($qb);
 	}
@@ -48,7 +48,7 @@ class WorkLocationDayOverrideMapper extends QBMapper
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-			->andWhere($qb->expr()->eq('local_date', $qb->createNamedParameter($localDate, IQueryBuilder::PARAM_DATE)));
+			->andWhere($qb->expr()->eq('local_date', $qb->createNamedParameter($localDate, IQueryBuilder::PARAM_STR)));
 		$qb->executeStatement();
 	}
 }

@@ -43,15 +43,15 @@
 }
 
 .dashboard-overtime-bank-card__meter-fill--success {
-	background: var(--arbeitszeitcheck-color-success, var(--color-success));
+	background: var(--color-element-success);
 }
 
 .dashboard-overtime-bank-card__meter-fill--warning {
-	background: var(--arbeitszeitcheck-color-warning, var(--color-warning));
+	background: var(--color-element-warning);
 }
 
 .dashboard-overtime-bank-card__meter-fill--error {
-	background: var(--arbeitszeitcheck-color-error, var(--color-error));
+	background: var(--color-element-error);
 }
 
 .dashboard-overtime-bank-card__meter-value {

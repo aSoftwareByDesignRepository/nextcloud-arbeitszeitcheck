@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
+use OCA\ArbeitszeitCheck\Service\SpecialEntitlementService;
 use OCA\ArbeitszeitCheck\Service\VacationAllocationService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
@@ -2164,6 +2165,60 @@ class AbsenceServiceTest extends TestCase
 		$out = $this->service->shortenAbsence(23, 'alice', (new \DateTime('+3 days'))->format('Y-m-d'));
 		$this->assertSame((new \DateTime('+3 days'))->format('Y-m-d'), $out->getEndDate()->format('Y-m-d'));
 		$this->assertSame(2.0, $out->getDays()); // holiday service stub returns 2.0
+	}
+
+	/**
+	 * Regression: shortenAbsence must pass a defined request payload to
+	 * adjustConsumedAbsence — with the SE service wired (production path),
+	 * an undefined $data arg threw a TypeError that escaped as a generic 500.
+	 */
+	public function testShortenAbsenceAdjustsConsumedSpecialEntitlement(): void
+	{
+		$newEnd = (new \DateTime('+3 days'))->format('Y-m-d');
+		$absence = $this->makeAbsenceRow(24, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SPECIAL_LEAVE, '-5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->once())->method('update')
+			->willReturnCallback(static fn (Absence $a) => $a);
+
+		// SpecialEntitlementService is final: build it without the constructor and
+		// inject the reservations mapper through class scope (readonly-safe). The
+		// adjust path early-returns on no reservation, but reaching it at all proves
+		// a defined array was passed — previously the call died on undefined $data.
+		$reservations = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class);
+		$reservations->expects($this->once())->method('findByAbsenceId')->with(24)->willReturn(null);
+		$se = (new \ReflectionClass(SpecialEntitlementService::class))->newInstanceWithoutConstructor();
+		\Closure::bind(function (object $r): void {
+			$this->reservations = $r;
+		}, $se, SpecialEntitlementService::class)($reservations);
+
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$this->lockingProvider,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			$se
+		);
+		$out = $service->shortenAbsence(24, 'alice', $newEnd);
+		$this->assertSame($newEnd, $out->getEndDate()->format('Y-m-d'));
 	}
 
 	public function testAutoApprovePendingIfNoAssignableManager(): void

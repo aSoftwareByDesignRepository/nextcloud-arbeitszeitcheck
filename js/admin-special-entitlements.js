@@ -158,7 +158,9 @@
 			listEl.append(li);
 		});
 		emptyEl.hidden = visible.length > 0;
-		announce(visible.length === 0 ? '' : `${visible.length} ${t('entitlements')}`);
+		announce(visible.length === 0 ? '' : (typeof window.n === 'function'
+			? window.n('arbeitszeitcheck', '1 entitlement', '%n entitlements', visible.length)
+			: `${visible.length} ${visible.length === 1 ? t('entitlement') : t('entitlements')}`));
 	}
 
 	async function loadTypes() {
@@ -582,7 +584,10 @@
 			title.textContent = c.publicLabel;
 			const meta = document.createElement('p');
 			meta.className = 'form-help';
-			meta.textContent = `${c.code} · ${c.memberCount} ${t('members')} · ${c.active ? t('Active') : t('Inactive')}`;
+			const memberText = typeof window.n === 'function'
+				? window.n('arbeitszeitcheck', '1 member', '%n members', c.memberCount)
+				: `${c.memberCount} ${c.memberCount === 1 ? t('member') : t('members')}`;
+			meta.textContent = `${c.code} · ${memberText} · ${c.active ? t('Active') : t('Inactive')}`;
 			text.append(title, meta);
 			const actions = document.createElement('span');
 			actions.className = 'azc-list__actions';

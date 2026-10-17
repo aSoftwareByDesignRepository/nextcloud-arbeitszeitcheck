@@ -91,13 +91,13 @@
 }
 
 .action-buttons button.error {
-    background: var(--color-error);
+    background: var(--azc-danger-fill);
     color: var(--color-primary-text);
-    border-color: var(--color-error);
+    border-color: var(--color-element-error);
 }
 
 .action-buttons button.error:hover {
-    background: var(--color-error-dark, var(--color-error));
+    background: var(--color-error-dark, color-mix(in srgb, var(--azc-danger-fill) 82%, var(--color-main-text)));
 }
 
 /* Scoped: do not override sidebar footer .stat-item in navigation.css */
@@ -122,8 +122,8 @@
     font-size: 1.1rem;
 }
 
-.stat-value.positive { color: var(--color-success); }
-.stat-value.negative { color: var(--color-error); }
+.stat-value.positive { color: var(--color-success-text, var(--color-success)); }
+.stat-value.negative { color: var(--color-error-text, var(--color-error)); }
 
 .arbeitszeitcheck-section {
     margin-bottom: 30px;

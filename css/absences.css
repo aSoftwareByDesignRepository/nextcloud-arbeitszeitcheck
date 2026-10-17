@@ -561,7 +561,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	padding: 0.85rem 1rem;
 	border-radius: var(--border-radius, 6px);
 	border: 1px solid color-mix(in srgb, var(--color-error) 40%, var(--color-border));
-	background: color-mix(in srgb, var(--color-error) 10%, var(--color-background-hover));
+	background: color-mix(in srgb, var(--color-error-text) 10%, var(--color-background-hover));
 	color: var(--color-main-text);
 	line-height: 1.45;
 }
@@ -692,7 +692,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 .entitlement-explain-dialog__banner--warn {
 	border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
-	background: color-mix(in srgb, var(--color-warning) 14%, var(--color-background-hover));
+	background: color-mix(in srgb, var(--color-warning-text) 14%, var(--color-background-hover));
 }
 .entitlement-explain-dialog__banner--info {
 	border-color: color-mix(in srgb, var(--color-primary-element) 30%, var(--color-border));

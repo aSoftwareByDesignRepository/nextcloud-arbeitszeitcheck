@@ -89,7 +89,7 @@ class TeamMemberMapper extends QBMapper
 			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId, IQueryBuilder::PARAM_INT)));
 		$result = $qb->executeQuery();
 		$count = (int)$result->fetchOne();
-		$result->free();
+		$result->closeCursor();
 		return $count;
 	}
 

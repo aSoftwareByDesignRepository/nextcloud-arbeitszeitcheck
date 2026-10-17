@@ -27,13 +27,13 @@
 
 #app-content.azc-app .azc-license-feedback--success {
 	border-color: var(--color-success-text, var(--color-success));
-	background: var(--azc-tint-success, color-mix(in srgb, var(--color-success) 12%, transparent));
+	background: var(--azc-tint-success, color-mix(in srgb, var(--color-success-text) 12%, transparent));
 	color: var(--color-main-text);
 }
 
 #app-content.azc-app .azc-license-feedback--error {
 	border-color: var(--color-error-text, var(--color-error));
-	background: var(--azc-tint-danger, color-mix(in srgb, var(--color-error) 12%, transparent));
+	background: var(--azc-tint-danger, color-mix(in srgb, var(--color-error-text) 12%, transparent));
 	color: var(--color-main-text);
 }
 
@@ -69,7 +69,7 @@
 }
 
 #app-content.azc-app .azc-license-meter__fill--full {
-	background: var(--color-warning-text, var(--color-warning));
+	background: var(--color-warning-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -141,7 +141,7 @@
 }
 
 #app-content.azc-app .azc-btn--danger {
-	background: var(--color-element-error, var(--color-error));
+	background: var(--color-element-error);
 	color: var(--color-primary-element-text, var(--color-primary-text));
 	border: 2px solid var(--color-element-error, var(--color-error));
 }
@@ -230,12 +230,12 @@
 }
 
 #app-content.azc-app .azc-badge--success {
-	background: color-mix(in srgb, var(--color-success) 18%, transparent);
+	background: color-mix(in srgb, var(--color-success-text) 18%, transparent);
 	color: var(--color-success-text, var(--color-success));
 }
 
 #app-content.azc-app .azc-badge--warning {
-	background: color-mix(in srgb, var(--color-warning) 22%, transparent);
+	background: color-mix(in srgb, var(--color-warning-text) 22%, transparent);
 	color: var(--color-warning-text, var(--color-warning));
 }
 

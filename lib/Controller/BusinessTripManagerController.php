@@ -53,6 +53,13 @@ final class BusinessTripManagerController extends Controller
 			return ApiError::notFound();
 		}
 		$manager = $this->uid();
+		if (!$this->permissions->isAdmin($manager) && !$this->permissions->canAccessManagerDashboard($manager)) {
+			$this->permissions->logPermissionDenied($manager, 'list_business_trips', 'manager_api');
+			return new JSONResponse([
+				'success' => false,
+				'error' => 'Access denied.',
+			], Http::STATUS_FORBIDDEN);
+		}
 		// Admin sees everything; a manager only their own team members.
 		$members = $this->permissions->isAdmin($manager)
 			? null

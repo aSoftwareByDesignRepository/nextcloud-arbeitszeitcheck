@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 
+use OCA\ArbeitszeitCheck\Db\AuditLog;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSet;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
@@ -31,24 +33,36 @@ final class BusinessTripRuleCatalogTest extends TestCase
 	private IDBConnection $db;
 	private ILockingProvider $locks;
 	private BusinessTripRuleSetMapper $ruleSets;
+	private AuditLogMapper $audit;
 	private BusinessTripRuleCatalog $catalog;
 	/** @var list<string> */
 	private array $released = [];
+	/** @var list<array{user:string,action:string,entityType:string,entityId:?int,old:?array,new:?array,performedBy:?string}> */
+	private array $audited = [];
 
 	protected function setUp(): void
 	{
 		$this->db = $this->createMock(IDBConnection::class);
 		$this->locks = $this->createMock(ILockingProvider::class);
 		$this->released = [];
+		$this->audited = [];
 		$this->locks->method('releaseLock')->willReturnCallback(function (string $key): void {
 			$this->released[] = $key;
 		});
 		$this->ruleSets = $this->createMock(BusinessTripRuleSetMapper::class);
+		$this->audit = $this->createMock(AuditLogMapper::class);
+		$this->audit->method('logAction')->willReturnCallback(
+			function (string $u, string $a, string $et, ?int $eid, ?array $old, ?array $new, ?string $pb): AuditLog {
+				$this->audited[] = ['user' => $u, 'action' => $a, 'entityType' => $et, 'entityId' => $eid, 'old' => $old, 'new' => $new, 'performedBy' => $pb];
+				return $this->createMock(AuditLog::class);
+			}
+		);
 		$this->catalog = new BusinessTripRuleCatalog(
 			$this->db,
 			$this->locks,
 			$this->ruleSets,
 			new BusinessTripRuleConfigValidator(),
+			$this->audit,
 		);
 	}
 
@@ -99,6 +113,14 @@ final class BusinessTripRuleCatalogTest extends TestCase
 		$this->assertSame('admin', $saved->getCreatedBy());
 		// Lock released on success.
 		$this->assertContains(DbLockKeys::businessTripRuleCatalog(), $this->released);
+		// Policy mutation writes an audit row naming actor + entity.
+		$this->assertCount(1, $this->audited);
+		$row = $this->audited[0];
+		$this->assertSame('business_trip_rule_set_created', $row['action']);
+		$this->assertSame('business_trip_rule_set', $row['entityType']);
+		$this->assertSame(9, $row['entityId']);
+		$this->assertSame('admin', $row['performedBy']);
+		$this->assertSame('de-default', $row['new']['code'] ?? null);
 	}
 
 	public function testUpdateNonDraftIsImmutable(): void
@@ -162,12 +184,17 @@ final class BusinessTripRuleCatalogTest extends TestCase
 	public function testMarkReviewedOnlyOnDrafts(): void
 	{
 		$set = new BusinessTripRuleSet();
+		$set->setId(9);
 		$set->setStatus(BusinessTripRuleSet::STATUS_DRAFT);
 		$set->setConfigHash(hash('sha256', self::VALID_CONFIG));
 		$this->ruleSets->method('update')->willReturnArgument(0);
 		$saved = $this->catalog->markReviewed($set, 'legal@corp', hash('sha256', self::VALID_CONFIG));
 		$this->assertSame('legal@corp', $saved->getReviewedBy());
 		$this->assertNotNull($saved->getReviewedAt());
+		// The §10.5 legal gate lands its own audit row.
+		$this->assertCount(1, $this->audited);
+		$this->assertSame('business_trip_rule_set_reviewed', $this->audited[0]['action']);
+		$this->assertSame('legal@corp', $this->audited[0]['performedBy']);
 
 		$active = new BusinessTripRuleSet();
 		$active->setStatus(BusinessTripRuleSet::STATUS_ACTIVE);
@@ -227,13 +254,19 @@ final class BusinessTripRuleCatalogTest extends TestCase
 		$expr = $this->createMock(IExpressionBuilder::class);
 		$expr->method('eq')->willReturn('e');
 		$expr->method('neq')->willReturn('n');
+		$result = $this->createMock(IResult::class);
+		// One still-active sibling version (id 7) gets retired by the activate.
+		$result->method('fetchAll')->willReturn([['id' => 7]]);
 		$qb = $this->createMock(IQueryBuilder::class);
 		$qb->method('expr')->willReturn($expr);
 		$qb->method('createNamedParameter')->willReturn(':p');
+		$qb->method('select')->willReturn($qb);
+		$qb->method('from')->willReturn($qb);
 		$qb->method('update')->willReturn($qb);
 		$qb->method('set')->willReturn($qb);
 		$qb->method('where')->willReturn($qb);
 		$qb->method('andWhere')->willReturn($qb);
+		$qb->method('executeQuery')->willReturn($result);
 		$qb->expects($this->once())->method('executeStatement')->willReturn(1);
 		$this->db->method('getQueryBuilder')->willReturn($qb);
 		$this->db->expects($this->once())->method('beginTransaction');
@@ -246,5 +279,15 @@ final class BusinessTripRuleCatalogTest extends TestCase
 		$this->assertSame(BusinessTripRuleSet::STATUS_ACTIVE, $saved->getStatus());
 		$this->assertSame('admin', $saved->getActivatedBy());
 		$this->assertContains(DbLockKeys::businessTripRuleCatalog(), $this->released);
+		// Audit trail: the retired sibling + the activation itself.
+		$actions = array_column($this->audited, 'action');
+		$this->assertContains('business_trip_rule_set_retired', $actions);
+		$this->assertContains('business_trip_rule_set_activated', $actions);
+		$retired = $this->audited[array_search('business_trip_rule_set_retired', $actions, true)];
+		$this->assertSame(7, $retired['entityId']);
+		$this->assertSame(9, $retired['new']['supersededByRuleSetId'] ?? null);
+		$activated = $this->audited[array_search('business_trip_rule_set_activated', $actions, true)];
+		$this->assertSame(9, $activated['entityId']);
+		$this->assertSame([7], $activated['new']['retiredRuleSetIds'] ?? null);
 	}
 }

@@ -32,6 +32,7 @@ use OCA\ArbeitszeitCheck\Listener\CSPListener;
 use OCA\ArbeitszeitCheck\Listener\TimeClientBootstrapListener;
 use OCA\ArbeitszeitCheck\Listener\LoadUsersSettingsArbeitszeitListener;
 use OCA\ArbeitszeitCheck\Listener\UserDeletedListener;
+use OCA\ArbeitszeitCheck\Middleware\ApiExceptionMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\ApiValidationErrorMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\AppAccessMiddleware;
 use OCA\ArbeitszeitCheck\Middleware\AppAdminMiddleware;
@@ -97,6 +98,16 @@ class Application extends App implements IBootstrap {
 
 		// Register notification provider
 		$context->registerNotifierService(Notifier::class);
+		// Registered FIRST so its afterException runs LAST (reverse order):
+		// JSON 500 envelope for any throwable no specialised middleware handled.
+		$context->registerService(ApiExceptionMiddleware::class, function ($c): ApiExceptionMiddleware {
+			return new ApiExceptionMiddleware(
+				$c->query(\OCP\IRequest::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+		$context->registerMiddleware(ApiExceptionMiddleware::class);
+
 		$context->registerService(AppAdminMiddleware::class, function ($c): AppAdminMiddleware {
 			$l10nFactory = $c->query(\OCP\L10N\IFactory::class);
 			return new AppAdminMiddleware(
@@ -554,6 +565,7 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCP\Lock\ILockingProvider::class),
 			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleConfigValidator::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 		));
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver => new \OCA\ArbeitszeitCheck\Service\BusinessTripRuleResolver(
 			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripRuleAssignmentMapper::class),
@@ -612,6 +624,7 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCP\IUserManager::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService::class),
 			$c->query(\Psr\Log\LoggerInterface::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 		));
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService => new \OCA\ArbeitszeitCheck\Service\BusinessTripRolloutReadinessService(
 			$c->query(\OCP\IDBConnection::class),
@@ -843,6 +856,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class),
 				$c->query(ManagerPendingApprovalMailService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class),
 			);
 		});
 

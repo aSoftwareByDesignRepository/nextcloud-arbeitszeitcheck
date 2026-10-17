@@ -284,7 +284,7 @@
 .azc-manager-correction-modal .correction-dialog__status--error:not(:empty),
 #time-entry-correction-modal .correction-dialog__status.inline-message--error:not(:empty),
 .azc-manager-correction-modal .correction-dialog__status.inline-message--error:not(:empty) {
-	background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
+	background-color: color-mix(in srgb, var(--color-error-text) 14%, var(--color-main-background));
 	border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
 	border-left-width: 4px;
 	border-left-color: var(--color-error);
@@ -347,7 +347,7 @@
 
 /* List page helpers */
 .time-entry-row--pending {
-	background: color-mix(in srgb, var(--color-warning) 10%, var(--color-main-background));
+	background: color-mix(in srgb, var(--color-warning-text) 10%, var(--color-main-background));
 }
 
 .time-entry-row--pending .badge--warning {

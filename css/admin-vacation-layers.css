@@ -141,7 +141,7 @@
 }
 .layer-card--l2 .layer-card__chip {
   border-color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-warning-text) 10%, var(--color-main-background));
 }
 .layer-card--l1 .layer-card__chip {
   border-color: var(--color-primary-element);
@@ -392,15 +392,15 @@ dialog.layer-dialog::backdrop {
 }
 .layer-dialog__impact[data-state="ok"] {
   border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
-  background: color-mix(in srgb, var(--color-success) 10%, var(--color-background-hover));
+  background: color-mix(in srgb, var(--color-success-text) 10%, var(--color-background-hover));
 }
 .layer-dialog__impact[data-state="warn"] {
   border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-background-hover));
+  background: color-mix(in srgb, var(--color-warning-text) 14%, var(--color-background-hover));
 }
 .layer-dialog__impact[data-state="error"] {
   border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border));
-  background: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-error-text) 14%, var(--color-main-background));
   color: var(--color-main-text);
 }
 .layer-dialog__impact-icon {
@@ -441,7 +441,7 @@ dialog.layer-dialog::backdrop {
   color: var(--color-main-text);
 }
 .form-required {
-  color: var(--color-error);
+  color: var(--color-error-text, var(--color-error));
   font-weight: 700;
   margin-left: .15rem;
 }
@@ -570,7 +570,7 @@ dialog.layer-dialog::backdrop {
   color: var(--color-text-maxcontrast);
 }
 .trace-table tr[data-matched="true"] {
-  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  background: color-mix(in srgb, var(--color-success-text) 14%, transparent);
 }
 .trace-table tr[data-matched="true"] td:first-child {
   border-left: 3px solid color-mix(in srgb, var(--color-success) 70%, var(--color-border));
@@ -594,7 +594,7 @@ dialog.layer-dialog::backdrop {
 }
 .trace-flag--warn {
   border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-background-hover));
+  background: color-mix(in srgb, var(--color-warning-text) 18%, var(--color-background-hover));
 }
 .trace-flag--info {
   border-color: color-mix(in srgb, var(--color-primary-element) 35%, var(--color-border));
@@ -611,7 +611,7 @@ dialog.layer-dialog::backdrop {
 }
 .layer-sim__banner--warn {
   border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 16%, var(--color-background-hover));
+  background: color-mix(in srgb, var(--color-warning-text) 16%, var(--color-background-hover));
 }
 .layer-sim__banner--info {
   border-color: color-mix(in srgb, var(--color-primary-element) 35%, var(--color-border));
@@ -716,7 +716,7 @@ dialog.layer-dialog::backdrop {
   padding: .65rem .85rem;
   border-radius: var(--border-radius, 6px);
   border: 1px solid color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-background-hover));
+  background: color-mix(in srgb, var(--color-warning-text) 18%, var(--color-background-hover));
   font-weight: 500;
   color: var(--color-main-text);
 }

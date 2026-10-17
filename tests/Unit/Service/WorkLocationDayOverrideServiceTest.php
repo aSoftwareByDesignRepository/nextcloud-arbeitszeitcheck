@@ -131,6 +131,15 @@ final class WorkLocationDayOverrideServiceTest extends TestCase
 		$this->service->setOverride('u1', '2020-01-01', 'home', null, 'web', 'u1');
 	}
 
+	public function testImpossibleCalendarDateRejectedAsInvalid(): void
+	{
+		// '9999-13-40' satisfies the \d{4}-\d{2}-\d{2} route requirement but is
+		// not a real date — must surface as InvalidArgumentException (HTTP 400),
+		// not a raw \Exception escaping as a 500.
+		$this->expectException(\InvalidArgumentException::class);
+		$this->service->setOverride('u1', '9999-13-40', 'home', null, 'web', 'u1');
+	}
+
 	public function testDateBeyondWindowRejected(): void
 	{
 		$far = (new \DateTime('today'))->modify('+' . (WorkLocationDayOverrideService::FUTURE_WINDOW_DAYS + 1) . ' days')->format('Y-m-d');

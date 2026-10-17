@@ -730,8 +730,8 @@
 
 /* Auto-generated break styling */
 .break-entry[data-auto-break] {
-    background: color-mix(in srgb, var(--color-success) 10%, var(--color-main-background));
-    border: 2px solid color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+    background: color-mix(in srgb, var(--color-success-text) 10%, var(--color-main-background));
+    border: 2px solid color-mix(in srgb, var(--color-success-text) 45%, var(--color-border));
     border-radius: var(--radius-lg, 8px);
     padding: var(--space-3, 0.75rem);
     margin-bottom: var(--space-4, 1rem);
@@ -874,13 +874,13 @@
 }
 
 .form-toggle input[type="checkbox"]:checked + .toggle-slider {
-    background: var(--color-success);
-    border-color: var(--color-success);
+    background: var(--color-element-success);
+    border-color: var(--color-element-success);
 }
 
 .form-toggle input[type="checkbox"]:checked + .toggle-slider::before {
     transform: translateX(22px);
-    border-color: color-mix(in srgb, var(--color-success) 65%, var(--color-main-text));
+    border-color: color-mix(in srgb, var(--color-element-success) 65%, var(--color-main-text));
     background: var(--color-main-background);
 }
 
@@ -1453,12 +1453,12 @@
 }
 
 #app-content.azc-app--time-entries .time-entry-form__char-count--warn {
-	border-color: var(--color-warning);
+	border-color: var(--color-warning-text);
 	border-left-width: 4px;
 }
 
 #app-content.azc-app--time-entries .time-entry-form__char-count--ok {
-	border-color: var(--color-success);
+	border-color: var(--color-success-text);
 	border-left-width: 4px;
 }
 
@@ -1468,7 +1468,7 @@
 }
 
 #app-content.azc-app--time-entries .break-entry[data-auto-break] .form-label-icon {
-	color: var(--color-success);
+	color: var(--color-success-text, var(--color-success));
 }
 
 #app-content.azc-app--time-entries .time-entry-form-fieldset__legend-icon {

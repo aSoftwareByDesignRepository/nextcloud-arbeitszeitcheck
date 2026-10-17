@@ -115,7 +115,7 @@
             const mode = hit.mode || hit.reason || '';
             const parts = [t('previewResolvedByLayer', 'Determined by: {layer}.').replace('{layer}', layerLabel)];
             if (days) {
-                parts.push(`${days} ${t('vacationDays', 'vacation days')}`);
+                parts.push(auN('1 vacation day', '%n vacation days', Number(days)));
             }
             if (mode) {
                 parts.push(String(mode));
@@ -168,7 +168,7 @@
         const technical = previewEl.querySelector('.entitlement-preview__technical code');
 
         if (value) {
-            value.textContent = `${formatPreviewDays(days)} ${t('vacationDays', 'vacation days')}`;
+            value.textContent = auN('1 vacation day', '%n vacation days', Number(formatPreviewDays(days)));
         }
         if (meta) {
             meta.textContent = sourceLabel || '';
@@ -268,7 +268,7 @@
     function buildEntitlementPreviewHtml(entitlementPreview, t) {
         const days = entitlementPreview ? formatPreviewDays(entitlementPreview.days) : '';
         const valueText = entitlementPreview
-            ? `${days} ${t('vacationDays', 'vacation days')}`
+            ? auN('1 vacation day', '%n vacation days', Number(days))
             : t('notAvailable', 'Not available');
         const metaText = entitlementPreview
             ? localizedEntitlementSourceLabel(entitlementPreview.source, t)
@@ -329,6 +329,14 @@
             return window.t('arbeitszeitcheck', englishFallback);
         }
         return englishFallback || '';
+    }
+
+    /** window.n for count copy; degrades to English singular/plural. */
+    function auN(singular, plural, count) {
+        if (typeof window.n === 'function') {
+            return window.n('arbeitszeitcheck', singular, plural, count);
+        }
+        return `${count} ${Number(count) === 1 ? singular : plural}`;
     }
 
 

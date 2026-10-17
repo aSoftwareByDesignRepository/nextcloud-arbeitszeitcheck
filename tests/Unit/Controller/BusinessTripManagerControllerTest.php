@@ -155,6 +155,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$in = $this->submittedTrip(7, 'alice');
 		$out = $this->submittedTrip(8, 'mallory');
 		$this->permissions->method('isAdmin')->with('manager')->willReturn(false);
+		$this->permissions->method('canAccessManagerDashboard')->with('manager')->willReturn(true);
 		$this->permissions->method('getManagedEmployeeIds')->with('manager')->willReturn(['alice', 'bob']);
 		$this->tripMapper->method('findSubmitted')->willReturn([$in, $out]);
 		$r = $this->controller()->index();
@@ -172,6 +173,20 @@ final class BusinessTripManagerControllerTest extends TestCase
 		]);
 		$r = $this->controller()->index();
 		$this->assertCount(2, $this->payload($r)['items']);
+	}
+
+	public function testIndexDeniesPlainEmployee(): void
+	{
+		// A collection route cannot lean on per-object scope checks — an empty
+		// list is indistinguishable from denial. Non-managers must get 403.
+		$this->permissions->method('isAdmin')->with('mallory')->willReturn(false);
+		$this->permissions->method('canAccessManagerDashboard')->with('mallory')->willReturn(false);
+		$this->permissions->expects($this->once())->method('logPermissionDenied')
+			->with('mallory', 'list_business_trips', 'manager_api');
+		$this->tripMapper->expects($this->never())->method('findSubmitted');
+		$r = $this->controller([], true, 'mallory')->index();
+		$this->assertSame(Http::STATUS_FORBIDDEN, $r->getStatus());
+		$this->assertSame('Access denied.', $this->payload($r)['error']);
 	}
 
 	public function testShowForeignTripMatchesMissingIdExactly(): void

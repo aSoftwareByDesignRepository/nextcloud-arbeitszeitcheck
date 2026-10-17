@@ -15,6 +15,14 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 		parent::__construct($db, 'at_entitlement_snapshots', EntitlementComputationSnapshot::class);
 	}
 
+	public function find(int $id): EntitlementComputationSnapshot
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
+		return $this->findEntity($qb);
+	}
+
 	public function findLatestForUserAndPeriod(string $userId, string $periodKey): ?EntitlementComputationSnapshot {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')

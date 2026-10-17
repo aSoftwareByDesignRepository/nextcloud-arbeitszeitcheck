@@ -50,15 +50,15 @@
 }
 
 .cat-swatch--success {
-	background: var(--color-success);
+	background: var(--color-element-success);
 }
 
 .cat-swatch--warning {
-	background: var(--color-warning);
+	background: var(--color-element-warning);
 }
 
 .cat-swatch--error {
-	background: var(--color-error);
+	background: var(--color-element-error);
 }
 
 /* Editor panel */
@@ -117,13 +117,13 @@
 }
 
 .cat-field-error {
-	color: var(--color-error);
+	color: var(--color-error-text, var(--color-error));
 	font-size: 0.85rem;
 	margin: 0.25rem 0 0;
 }
 
 .cat-form-errors {
-	background: color-mix(in srgb, var(--color-error) 12%, var(--color-main-background));
+	background: color-mix(in srgb, var(--color-error-text) 12%, var(--color-main-background));
 	border: 1px solid color-mix(in srgb, var(--color-error) 45%, var(--color-border-maxcontrast));
 	border-radius: var(--border-radius-large, 8px);
 	color: var(--color-error-text, var(--color-error));

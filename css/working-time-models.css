@@ -137,7 +137,7 @@
 }
 
 #app-content.azc-app--admin-working-time-models .wtm-presence-error {
-	color: var(--color-error);
+	color: var(--color-error-text, var(--color-error));
 	font-weight: 600;
 }
 

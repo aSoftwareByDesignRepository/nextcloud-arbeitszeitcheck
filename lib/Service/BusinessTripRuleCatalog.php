@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Service;
 
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSet;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
@@ -24,6 +25,7 @@ final class BusinessTripRuleCatalog
 		private readonly ILockingProvider $lockingProvider,
 		private readonly BusinessTripRuleSetMapper $ruleSets,
 		private readonly BusinessTripRuleConfigValidator $validator,
+		private readonly AuditLogMapper $audit,
 	) {
 	}
 
@@ -49,6 +51,20 @@ final class BusinessTripRuleCatalog
 			}
 			$this->db->beginTransaction();
 			try {
+				// Capture the sibling versions this activation is about to
+				// retire — each one gets its own audit row so the trail is
+				// queryable per rule set, not only via the activated row.
+				$retireQb = $this->db->getQueryBuilder();
+				$retireQb->select('id')
+					->from('at_btrip_ruleset')
+					->where($retireQb->expr()->eq('code', $retireQb->createNamedParameter((string)$target->getCode())))
+					->andWhere($retireQb->expr()->eq('status', $retireQb->createNamedParameter(BusinessTripRuleSet::STATUS_ACTIVE)))
+					->andWhere($retireQb->expr()->neq('id', $retireQb->createNamedParameter($ruleSetId, IQueryBuilder::PARAM_INT)));
+				$retiredIds = array_map(
+					static fn (array $row): int => (int)$row['id'],
+					$retireQb->executeQuery()->fetchAll()
+				);
+
 				$qb = $this->db->getQueryBuilder();
 				$qb->update('at_btrip_ruleset')
 					->set('status', $qb->createNamedParameter(BusinessTripRuleSet::STATUS_RETIRED))
@@ -58,10 +74,27 @@ final class BusinessTripRuleCatalog
 					->andWhere($qb->expr()->neq('id', $qb->createNamedParameter($ruleSetId, IQueryBuilder::PARAM_INT)));
 				$qb->executeStatement();
 
+				$old = $this->auditRuleSet($target);
 				$target->setStatus(BusinessTripRuleSet::STATUS_ACTIVE);
 				$target->setActivatedBy($actor);
 				$target->setActivatedAt(new \DateTime());
 				$saved = $this->ruleSets->update($target);
+				foreach ($retiredIds as $retiredId) {
+					$this->audit->logAction(
+						$actor,
+						'business_trip_rule_set_retired',
+						'business_trip_rule_set',
+						$retiredId,
+						['status' => BusinessTripRuleSet::STATUS_ACTIVE],
+						['status' => BusinessTripRuleSet::STATUS_RETIRED, 'supersededByRuleSetId' => (int)$saved->getId()],
+						$actor,
+					);
+				}
+				$new = $this->auditRuleSet($saved);
+				if ($retiredIds !== []) {
+					$new['retiredRuleSetIds'] = $retiredIds;
+				}
+				$this->audit->logAction($actor, 'business_trip_rule_set_activated', 'business_trip_rule_set', (int)$saved->getId(), $old, $new, $actor);
 				$this->db->commit();
 				return $saved;
 			} catch (\Throwable $e) {
@@ -78,8 +111,8 @@ final class BusinessTripRuleCatalog
 		string $name,
 		string $jurisdiction,
 		string $configJson,
-		?\DateTime $validFrom,
-		?\DateTime $validTo,
+		?\DateTimeInterface $validFrom,
+		?\DateTimeInterface $validTo,
 		string $actor,
 		?array $provenance = null,
 	): BusinessTripRuleSet {
@@ -107,8 +140,8 @@ final class BusinessTripRuleCatalog
 				$set->setName($name);
 				$set->setJurisdiction($jurisdiction);
 				$set->setStatus(BusinessTripRuleSet::STATUS_DRAFT);
-				$set->setValidFrom($validFrom);
-				$set->setValidTo($validTo);
+				$set->setValidFrom($validFrom === null ? null : \DateTime::createFromInterface($validFrom));
+				$set->setValidTo($validTo === null ? null : \DateTime::createFromInterface($validTo));
 				$set->setConfigJson($configJson);
 				$set->setConfigHash(hash('sha256', $configJson));
 				if (is_array($provenance)) {
@@ -119,6 +152,7 @@ final class BusinessTripRuleCatalog
 				$set->setCreatedBy($actor);
 				$set->setCreatedAt(new \DateTime());
 				$saved = $this->ruleSets->insert($set);
+				$this->audit->logAction($actor, 'business_trip_rule_set_created', 'business_trip_rule_set', (int)$saved->getId(), null, $this->auditRuleSet($saved), $actor);
 				$this->db->commit();
 				return $saved;
 			} catch (\Throwable $e) {
@@ -146,9 +180,21 @@ final class BusinessTripRuleCatalog
 		if (!hash_equals((string)$set->getConfigHash(), $configHash)) {
 			throw new BusinessTripException('RULE_REVIEW_STALE', 'The rule set changed since it was reviewed; reload and review the current draft.', 409);
 		}
-		$set->setReviewedAt(new \DateTime());
-		$set->setReviewedBy($actor);
-		return $this->ruleSets->update($set);
+		// Legal review is the §10.5 release gate — mutation + audit row
+		// commit atomically so a review is never effective without its record.
+		$old = $this->auditRuleSet($set);
+		$this->db->beginTransaction();
+		try {
+			$set->setReviewedAt(new \DateTime());
+			$set->setReviewedBy($actor);
+			$saved = $this->ruleSets->update($set);
+			$this->audit->logAction($actor, 'business_trip_rule_set_reviewed', 'business_trip_rule_set', (int)$saved->getId(), $old, $this->auditRuleSet($saved), $actor);
+			$this->db->commit();
+			return $saved;
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
 	}
 
 	/**
@@ -162,6 +208,7 @@ final class BusinessTripRuleCatalog
 		}
 		$this->validator->validate($configJson);
 		$newHash = hash('sha256', $configJson);
+		$old = $this->auditRuleSet($set);
 		// The recorded legal review covers exactly this config hash — editing
 		// the config voids the review and forces a fresh sign-off.
 		if ($newHash !== (string)$set->getConfigHash()) {
@@ -171,6 +218,32 @@ final class BusinessTripRuleCatalog
 		$set->setName($name);
 		$set->setConfigJson($configJson);
 		$set->setConfigHash($newHash);
-		return $this->ruleSets->update($set);
+		$this->db->beginTransaction();
+		try {
+			$saved = $this->ruleSets->update($set);
+			$this->audit->logAction($actor, 'business_trip_rule_set_updated', 'business_trip_rule_set', (int)$saved->getId(), $old, $this->auditRuleSet($saved), $actor);
+			$this->db->commit();
+			return $saved;
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+	}
+
+	/** @return array<string,mixed> */
+	private function auditRuleSet(BusinessTripRuleSet $set): array
+	{
+		return [
+			'code' => (string)$set->getCode(),
+			'version' => (int)$set->getVersion(),
+			'name' => (string)$set->getName(),
+			'jurisdiction' => (string)$set->getJurisdiction(),
+			'status' => (string)$set->getStatus(),
+			'configHash' => (string)$set->getConfigHash(),
+			'validFrom' => $set->getValidFrom()?->format('Y-m-d'),
+			'validTo' => $set->getValidTo()?->format('Y-m-d'),
+			'reviewedBy' => $set->getReviewedBy(),
+			'activatedBy' => $set->getActivatedBy(),
+		];
 	}
 }

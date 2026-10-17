@@ -212,7 +212,7 @@ class UserWorkingTimeModelMapper extends QBMapper
 			));
 		$result = $qb->executeQuery();
 		$count = (int)$result->fetchOne();
-		$result->free();
+		$result->closeCursor();
 		return $count;
 	}
 

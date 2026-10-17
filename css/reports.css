@@ -450,7 +450,7 @@
 }
 
 .report-form .form-required {
-	color: var(--color-error);
+	color: var(--color-error-text, var(--color-error));
 }
 
 .report-form .form-input,
@@ -527,7 +527,7 @@
 .report-success {
 	margin: 0 0 var(--space-4, 1rem);
 	padding: var(--space-3, 0.75rem);
-	background: var(--color-success);
+	background: var(--azc-tint-success);
 	color: var(--color-success-text, var(--color-main-text));
 	border-radius: var(--border-radius);
 	font-weight: 500;
@@ -702,7 +702,7 @@
 
 .datev-export-panel__error {
 	margin: 0 0 var(--azc-space-3, 0.75rem);
-	color: var(--color-error);
+	color: var(--color-error-text, var(--color-error));
 	font-weight: 600;
 	min-height: 1.25rem;
 }

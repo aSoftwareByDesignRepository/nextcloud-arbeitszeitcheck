@@ -36,10 +36,10 @@ class ConcurrentMobileSeatCapacityIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->seats = \OC::$server->get(MobileSeatService::class);
-		$this->users = \OC::$server->get(IUserManager::class);
-		$this->locking = \OC::$server->get(ILockingProvider::class);
-		$this->licenseService = \OC::$server->get(LicenseService::class);
+		$this->seats = \OCP\Server::get(MobileSeatService::class);
+		$this->users = \OCP\Server::get(IUserManager::class);
+		$this->locking = \OCP\Server::get(ILockingProvider::class);
+		$this->licenseService = \OCP\Server::get(LicenseService::class);
 		$this->licenseService->clearLicense();
 		// Seat rows outlive license removal; leftovers from E2E/live state would
 		// inflate getAssignedCount() and make the capacity assertions meaningless.

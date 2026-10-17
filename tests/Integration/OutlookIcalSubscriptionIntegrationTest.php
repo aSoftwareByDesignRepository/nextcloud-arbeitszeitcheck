@@ -39,11 +39,11 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 		// Typed string API: use_app_teams is written typed by AdminController; an
 		// untyped IConfig::setAppValue() write crashes with
 		// AppConfigTypeConflictException once the key exists as VALUE_STRING.
-		$appConfig = \OC::$server->get(IAppConfig::class);
+		$appConfig = \OCP\Server::get(IAppConfig::class);
 		$this->prevUseAppTeams = $appConfig->getValueString('arbeitszeitcheck', 'use_app_teams', '0');
 		$appConfig->setValueString('arbeitszeitcheck', 'use_app_teams', '1');
 
-		$um = \OC::$server->get(IUserManager::class);
+		$um = \OCP\Server::get(IUserManager::class);
 		$this->managerUid = 'azc_oical_mgr_' . bin2hex(random_bytes(3));
 		$this->memberUid = 'azc_oical_mem_' . bin2hex(random_bytes(3));
 		foreach ([$this->managerUid, $this->memberUid] as $uid) {
@@ -53,7 +53,7 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 			$um->createUser($uid, 'Azc-Oical-' . bin2hex(random_bytes(4)) . '!');
 		}
 
-		$teamMapper = \OC::$server->get(TeamMapper::class);
+		$teamMapper = \OCP\Server::get(TeamMapper::class);
 		$team = new Team();
 		$team->setName('Outlook iCal IT ' . bin2hex(random_bytes(2)));
 		$team->setParentId(null);
@@ -62,10 +62,10 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 		$team = $teamMapper->insert($team);
 		$this->teamId = (int)$team->getId();
 
-		$teamManagerMapper = \OC::$server->get(TeamManagerMapper::class);
+		$teamManagerMapper = \OCP\Server::get(TeamManagerMapper::class);
 		$teamManagerMapper->addManager($this->teamId, $this->managerUid);
 
-		$teamMemberMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
+		$teamMemberMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
 		$teamMemberMapper->addMember($this->teamId, $this->memberUid);
 	}
 
@@ -77,9 +77,9 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 
 		if ($this->teamId !== null) {
 			try {
-				$tenantId = (string)\OC::$server->get(IConfig::class)->getSystemValue('instanceid', '');
+				$tenantId = (string)\OCP\Server::get(IConfig::class)->getSystemValue('instanceid', '');
 				if ($tenantId !== '') {
-					$db = \OC::$server->get(\OCP\IDBConnection::class);
+					$db = \OCP\Server::get(\OCP\IDBConnection::class);
 					foreach ([$this->teamId, Constants::OUTLOOK_ICAL_ORG_WIDE_TEAM_ID] as $scopeTeamId) {
 						$qb = $db->getQueryBuilder();
 						$qb->delete('azc_outlook_ical_tokens')
@@ -88,14 +88,14 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 						$qb->executeStatement();
 					}
 				}
-				\OC::$server->get(TeamManagerMapper::class)->removeManager($this->teamId, $this->managerUid);
-				\OC::$server->get(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class)->removeMember($this->teamId, $this->memberUid);
-				\OC::$server->get(TeamMapper::class)->delete(\OC::$server->get(TeamMapper::class)->find($this->teamId));
+				\OCP\Server::get(TeamManagerMapper::class)->removeManager($this->teamId, $this->managerUid);
+				\OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class)->removeMember($this->teamId, $this->memberUid);
+				\OCP\Server::get(TeamMapper::class)->delete(\OCP\Server::get(TeamMapper::class)->find($this->teamId));
 			} catch (\Throwable) {
 			}
 		}
 
-		$um = \OC::$server->get(IUserManager::class);
+		$um = \OCP\Server::get(IUserManager::class);
 		foreach ([$this->managerUid, $this->memberUid] as $uid) {
 			if ($uid === '') {
 				continue;
@@ -108,7 +108,7 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 
 		if ($this->prevUseAppTeams !== null) {
 			try {
-				\OC::$server->get(IAppConfig::class)->setValueString('arbeitszeitcheck', 'use_app_teams', $this->prevUseAppTeams);
+				\OCP\Server::get(IAppConfig::class)->setValueString('arbeitszeitcheck', 'use_app_teams', $this->prevUseAppTeams);
 			} catch (\Throwable) {
 			}
 		}
@@ -116,13 +116,13 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 
 	public function testServiceResolvesFromContainer(): void
 	{
-		$service = \OC::$server->get(OutlookIcalSubscriptionService::class);
+		$service = \OCP\Server::get(OutlookIcalSubscriptionService::class);
 		self::assertInstanceOf(OutlookIcalSubscriptionService::class, $service);
 	}
 
 	public function testControllerResolvesFromContainer(): void
 	{
-		$controller = \OC::$server->query(\OCA\ArbeitszeitCheck\Controller\OutlookIcalSubscriptionController::class);
+		$controller = \OCP\Server::get(\OCA\ArbeitszeitCheck\Controller\OutlookIcalSubscriptionController::class);
 		self::assertInstanceOf(\OCA\ArbeitszeitCheck\Controller\OutlookIcalSubscriptionController::class, $controller);
 	}
 
@@ -130,9 +130,9 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 	{
 		self::assertNotNull($this->teamId);
 
-		$service = \OC::$server->get(OutlookIcalSubscriptionService::class);
-		$tokenMapper = \OC::$server->get(OutlookIcalSubscriptionTokenMapper::class);
-		$tenantId = (string)\OC::$server->get(IConfig::class)->getSystemValue('instanceid', '');
+		$service = \OCP\Server::get(OutlookIcalSubscriptionService::class);
+		$tokenMapper = \OCP\Server::get(OutlookIcalSubscriptionTokenMapper::class);
+		$tenantId = (string)\OCP\Server::get(IConfig::class)->getSystemValue('instanceid', '');
 		self::assertNotSame('', $tenantId);
 
 		$english = $service->createToken($this->managerUid, $this->teamId, 'en');
@@ -161,9 +161,9 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 	{
 		self::assertNotNull($this->teamId);
 
-		$service = \OC::$server->get(OutlookIcalSubscriptionService::class);
-		$tokenMapper = \OC::$server->get(OutlookIcalSubscriptionTokenMapper::class);
-		$tenantId = (string)\OC::$server->get(IConfig::class)->getSystemValue('instanceid', '');
+		$service = \OCP\Server::get(OutlookIcalSubscriptionService::class);
+		$tokenMapper = \OCP\Server::get(OutlookIcalSubscriptionTokenMapper::class);
+		$tenantId = (string)\OCP\Server::get(IConfig::class)->getSystemValue('instanceid', '');
 		self::assertNotSame('', $tenantId);
 
 		$first = $service->createToken($this->managerUid, $this->teamId, 'de');
@@ -192,9 +192,9 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 
 	public function testOrgWideCreateInsertsTeamIdZeroRow(): void
 	{
-		$service = \OC::$server->get(OutlookIcalSubscriptionService::class);
-		$tokenMapper = \OC::$server->get(OutlookIcalSubscriptionTokenMapper::class);
-		$tenantId = (string)\OC::$server->get(IConfig::class)->getSystemValue('instanceid', '');
+		$service = \OCP\Server::get(OutlookIcalSubscriptionService::class);
+		$tokenMapper = \OCP\Server::get(OutlookIcalSubscriptionTokenMapper::class);
+		$tenantId = (string)\OCP\Server::get(IConfig::class)->getSystemValue('instanceid', '');
 		self::assertNotSame('', $tenantId);
 
 		$result = $service->createToken($this->managerUid, Constants::OUTLOOK_ICAL_ORG_WIDE_TEAM_ID, 'de');
@@ -217,7 +217,7 @@ final class OutlookIcalSubscriptionIntegrationTest extends TestCase
 	{
 		self::assertNotNull($this->teamId);
 
-		$service = \OC::$server->get(OutlookIcalSubscriptionService::class);
+		$service = \OCP\Server::get(OutlookIcalSubscriptionService::class);
 		$result = $service->createToken($this->managerUid, $this->teamId, 'de');
 		$feed = $service->buildTokenizedFeed($result['token'], $this->teamId, 'integration.test');
 

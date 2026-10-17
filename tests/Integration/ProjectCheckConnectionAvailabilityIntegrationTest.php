@@ -21,24 +21,24 @@ final class ProjectCheckConnectionAvailabilityIntegrationTest extends TestCase
 	private function liveIntegrationService(): ProjectCheckIntegrationService
 	{
 		$appConfig = new \OC\AppFramework\Services\AppConfig(
-			\OC::$server->get(\OCP\IConfig::class),
-			\OC::$server->get(\OCP\IAppConfig::class),
+			\OCP\Server::get(\OCP\IConfig::class),
+			\OCP\Server::get(\OCP\IAppConfig::class),
 			Application::APP_ID,
 		);
 
 		return new ProjectCheckIntegrationService(
-			\OC::$server->get(IAppManager::class),
+			\OCP\Server::get(IAppManager::class),
 			$appConfig,
-			\OC::$server->get(IDBConnection::class),
-			\OC::$server->get(\OCP\L10N\IFactory::class)->get(Application::APP_ID),
-			\OC::$server->get(LoggerInterface::class),
+			\OCP\Server::get(IDBConnection::class),
+			\OCP\Server::get(\OCP\L10N\IFactory::class)->get(Application::APP_ID),
+			\OCP\Server::get(LoggerInterface::class),
 		);
 	}
 
 	public function testServiceAvailabilityMatchesAppManagerInstall(): void
 	{
 		/** @var IAppManager $apps */
-		$apps = \OC::$server->get(IAppManager::class);
+		$apps = \OCP\Server::get(IAppManager::class);
 		$svc = $this->liveIntegrationService();
 
 		$installed = $apps->isInstalled(Constants::APP_ID_PROJECTCHECK);
@@ -52,7 +52,7 @@ final class ProjectCheckConnectionAvailabilityIntegrationTest extends TestCase
 	public function testGroupRestrictedInstallStillCountsAsAvailable(): void
 	{
 		/** @var IAppManager $apps */
-		$apps = \OC::$server->get(IAppManager::class);
+		$apps = \OCP\Server::get(IAppManager::class);
 		$svc = $this->liveIntegrationService();
 
 		if ($apps->isInstalled(Constants::APP_ID_PROJECTCHECK) !== true) {
@@ -61,7 +61,7 @@ final class ProjectCheckConnectionAvailabilityIntegrationTest extends TestCase
 		}
 
 		$this->assertTrue($svc->isProjectCheckAvailable());
-		$user = \OC::$server->get(\OCP\IUserSession::class)->getUser();
+		$user = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
 		if ($user === null && $apps->isEnabledForUser(Constants::APP_ID_PROJECTCHECK) !== true) {
 			$this->assertFalse($svc->isProjectCheckEnabledForUser(null));
 			$this->assertTrue($svc->isProjectCheckAvailable(), 'CLI/no-user must not hide an installed ProjectCheck');

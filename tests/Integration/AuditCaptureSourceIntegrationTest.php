@@ -27,8 +27,8 @@ class AuditCaptureSourceIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->db = \OC::$server->get(IDBConnection::class);
-		$this->mapper = \OC::$server->get(AuditLogMapper::class);
+		$this->db = \OCP\Server::get(IDBConnection::class);
+		$this->mapper = \OCP\Server::get(AuditLogMapper::class);
 		$this->assertTrue($this->db->tableExists('at_audit'), 'at_audit must exist');
 		$this->assertTrue($this->hasCaptureSourceColumn(), 'Version1046 capture_source must be migrated');
 		$this->cleanup();

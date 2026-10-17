@@ -47,8 +47,8 @@ final class MobileLicenseAbsoluteNoGoIntegrationTest extends TestCase
 			$session,
 			$license,
 			$seats,
-			\OC::$server->get(IFactory::class),
-			\OC::$server->get(LoggerInterface::class),
+			\OCP\Server::get(IFactory::class),
+			\OCP\Server::get(LoggerInterface::class),
 		);
 
 		try {
@@ -94,8 +94,8 @@ final class MobileLicenseAbsoluteNoGoIntegrationTest extends TestCase
 			$session,
 			$license,
 			$seats,
-			\OC::$server->get(IFactory::class),
-			\OC::$server->get(LoggerInterface::class),
+			\OCP\Server::get(IFactory::class),
+			\OCP\Server::get(LoggerInterface::class),
 		);
 
 		$this->expectException(ClientLicenseRequiredException::class);

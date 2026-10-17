@@ -17,8 +17,8 @@ final class UpgradeBackupIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->backupService = \OC::$server->get(UpgradeBackupService::class);
-		$this->db = \OC::$server->get(IDBConnection::class);
+		$this->backupService = \OCP\Server::get(UpgradeBackupService::class);
+		$this->db = \OCP\Server::get(IDBConnection::class);
 	}
 
 	public function testCreateListAndRestoreRoundTrip(): void

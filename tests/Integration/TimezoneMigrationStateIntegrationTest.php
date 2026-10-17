@@ -25,7 +25,7 @@ class TimezoneMigrationStateIntegrationTest extends TestCase
 {
 	public function testMigrationMarkersArePresent(): void
 	{
-		$config = \OC::$server->get(IConfig::class);
+		$config = \OCP\Server::get(IConfig::class);
 
 		$this->assertSame(
 			'1',
@@ -40,7 +40,7 @@ class TimezoneMigrationStateIntegrationTest extends TestCase
 
 	public function testTimeZoneServiceResolvesStorageAndSerialisesWithOffset(): void
 	{
-		$service = \OC::$server->get(TimeZoneService::class);
+		$service = \OCP\Server::get(TimeZoneService::class);
 		$this->assertInstanceOf(TimeZoneService::class, $service);
 
 		$this->assertSame('Europe/Berlin', $service->storageTimeZoneName());
@@ -55,7 +55,7 @@ class TimezoneMigrationStateIntegrationTest extends TestCase
 
 	public function testHydrateNaivePreservesStorageWallClockDigits(): void
 	{
-		$service = \OC::$server->get(TimeZoneService::class);
+		$service = \OCP\Server::get(TimeZoneService::class);
 		// Simulate Entity hydration in a UTC container: digits are Berlin wall clock.
 		$asUtc = new \DateTime('2026-01-15 10:00:00', new \DateTimeZone('UTC'));
 		$hydrated = $service->hydrateNaive($asUtc);
@@ -66,7 +66,7 @@ class TimezoneMigrationStateIntegrationTest extends TestCase
 
 	public function testToIsoEmbedsStorageTimezoneOffset(): void
 	{
-		$service = \OC::$server->get(TimeZoneService::class);
+		$service = \OCP\Server::get(TimeZoneService::class);
 		$asUtc = new \DateTime('2026-01-15 10:00:00', new \DateTimeZone('UTC'));
 		$winter = $service->hydrateNaive($asUtc);
 		$iso = $service->toIso($winter);

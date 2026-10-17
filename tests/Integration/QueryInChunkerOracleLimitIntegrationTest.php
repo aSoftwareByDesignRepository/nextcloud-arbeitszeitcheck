@@ -27,7 +27,7 @@ final class QueryInChunkerOracleLimitIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->db = \OC::$server->get(IDBConnection::class);
+		$this->db = \OCP\Server::get(IDBConnection::class);
 	}
 
 	public function testAbsenceCountWithOverThousandUsersDoesNotTripOracleInLimit(): void

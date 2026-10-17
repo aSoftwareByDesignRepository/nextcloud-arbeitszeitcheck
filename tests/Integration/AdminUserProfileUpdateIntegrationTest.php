@@ -41,11 +41,11 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->userManager = \OC::$server->get(IUserManager::class);
-		$this->service = \OC::$server->get(AdminUserProfileUpdateService::class);
-		$this->wtmMapper = \OC::$server->get(UserWorkingTimeModelMapper::class);
-		$this->policyMapper = \OC::$server->get(UserVacationPolicyAssignmentMapper::class);
-		$this->modelMapper = \OC::$server->get(WorkingTimeModelMapper::class);
+		$this->userManager = \OCP\Server::get(IUserManager::class);
+		$this->service = \OCP\Server::get(AdminUserProfileUpdateService::class);
+		$this->wtmMapper = \OCP\Server::get(UserWorkingTimeModelMapper::class);
+		$this->policyMapper = \OCP\Server::get(UserVacationPolicyAssignmentMapper::class);
+		$this->modelMapper = \OCP\Server::get(WorkingTimeModelMapper::class);
 
 		if (!$this->userManager->userExists(self::TEST_USER)) {
 			$this->userManager->createUser(self::TEST_USER, bin2hex(random_bytes(16)) . 'Aa1!');
@@ -135,9 +135,9 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 			$this->wtmMapper->delete($row);
 		}
 		$this->modelMapper->deletePersonalByUser(self::TEST_USER);
-		$balanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$balanceMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 		$balanceMapper->deleteByUserId(self::TEST_USER);
-		$otBalanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper::class);
+		$otBalanceMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\UserOvertimeYearBalanceMapper::class);
 		$otBalanceMapper->deleteByUserId(self::TEST_USER);
 	}
 
@@ -316,7 +316,7 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 		$seed->setUpdatedAt(new \DateTime());
 		$this->wtmMapper->insert($seed);
 
-		$balanceMapper = \OC::$server->get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
+		$balanceMapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper::class);
 		$this->assertSame(0.0, $balanceMapper->getCarryoverDays(self::TEST_USER, $year));
 
 		$result = $this->service->applyWorkingTimeModel(self::TEST_USER, [
@@ -337,7 +337,7 @@ class AdminUserProfileUpdateIntegrationTest extends TestCase
 	public function testOvertimeOpeningBalancePersistsForNonCurrentYear(): void
 	{
 		$targetYear = (int)date('Y') - 1;
-		$overtime = \OC::$server->get(\OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::class);
+		$overtime = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::class);
 
 		$result = $this->service->applyOvertimeSettings(self::TEST_USER, [
 			'openingBalance' => ['year' => $targetYear, 'hours' => '7.25'],

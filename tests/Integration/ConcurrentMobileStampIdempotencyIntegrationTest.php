@@ -33,8 +33,8 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->idempotency = \OC::$server->get(MobileStampIdempotencyMapper::class);
-		$this->timeTracking = \OC::$server->get(TimeTrackingService::class);
+		$this->idempotency = \OCP\Server::get(MobileStampIdempotencyMapper::class);
+		$this->timeTracking = \OCP\Server::get(TimeTrackingService::class);
 		$this->cleanup();
 	}
 
@@ -76,11 +76,11 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 
 	private function buildReplayService(): MobileStampReplayService
 	{
-		$tzConfig = \OC::$server->get(IConfig::class);
-		$tzDateTime = \OC::$server->get(IDateTimeZone::class);
-		$tzUserSession = \OC::$server->get(IUserSession::class);
+		$tzConfig = \OCP\Server::get(IConfig::class);
+		$tzDateTime = \OCP\Server::get(IDateTimeZone::class);
+		$tzUserSession = \OCP\Server::get(IUserSession::class);
 		$tz = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
-		$timeFactory = \OC::$server->get(ITimeFactory::class);
+		$timeFactory = \OCP\Server::get(ITimeFactory::class);
 
 		return new MobileStampReplayService(
 			$this->timeTracking,
@@ -92,7 +92,7 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 
 	private function countIdemRows(): int
 	{
-		$qb = \OC::$server->get(\OCP\IDBConnection::class)->getQueryBuilder();
+		$qb = \OCP\Server::get(\OCP\IDBConnection::class)->getQueryBuilder();
 		$qb->select($qb->func()->count('*', 'c'))
 			->from(MobileStampIdempotencyMapper::TABLE)
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter(self::TEST_USER)))
@@ -102,7 +102,7 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 
 	private function countActiveRows(): int
 	{
-		$qb = \OC::$server->get(\OCP\IDBConnection::class)->getQueryBuilder();
+		$qb = \OCP\Server::get(\OCP\IDBConnection::class)->getQueryBuilder();
 		$qb->select($qb->func()->count('*', 'c'))
 			->from('at_entries')
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter(self::TEST_USER)))
@@ -113,7 +113,7 @@ class ConcurrentMobileStampIdempotencyIntegrationTest extends TestCase
 	private function cleanup(): void
 	{
 		$this->idempotency->deleteByUserId(self::TEST_USER);
-		$db = \OC::$server->get(\OCP\IDBConnection::class);
+		$db = \OCP\Server::get(\OCP\IDBConnection::class);
 		foreach (['at_audit', 'at_entries'] as $table) {
 			if (!$db->tableExists($table)) {
 				continue;

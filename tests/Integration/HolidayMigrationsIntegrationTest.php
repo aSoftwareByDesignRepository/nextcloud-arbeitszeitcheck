@@ -43,8 +43,8 @@ class HolidayMigrationsIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->db = \OC::$server->get(IDBConnection::class);
-		$this->config = \OC::$server->get(IConfig::class);
+		$this->db = \OCP\Server::get(IDBConnection::class);
+		$this->config = \OCP\Server::get(IConfig::class);
 	}
 
 	private function insertHoliday(string $state, string $date, string $scope): void

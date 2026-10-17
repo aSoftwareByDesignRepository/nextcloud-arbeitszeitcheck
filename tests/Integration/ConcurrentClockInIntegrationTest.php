@@ -31,9 +31,9 @@ class ConcurrentClockInIntegrationTest extends TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
-		$this->timeTracking = \OC::$server->get(TimeTrackingService::class);
-		$this->timeEntryMapper = \OC::$server->get(TimeEntryMapper::class);
-		$this->locking = \OC::$server->get(ILockingProvider::class);
+		$this->timeTracking = \OCP\Server::get(TimeTrackingService::class);
+		$this->timeEntryMapper = \OCP\Server::get(TimeEntryMapper::class);
+		$this->locking = \OCP\Server::get(ILockingProvider::class);
 		$this->cleanupUserRows();
 	}
 
@@ -86,7 +86,7 @@ class ConcurrentClockInIntegrationTest extends TestCase
 
 	private function countActiveRows(): int
 	{
-		$qb = \OC::$server->get(\OCP\IDBConnection::class)->getQueryBuilder();
+		$qb = \OCP\Server::get(\OCP\IDBConnection::class)->getQueryBuilder();
 		$qb->select($qb->func()->count('*', 'c'))
 			->from('at_entries')
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter(self::TEST_USER)))
@@ -103,7 +103,7 @@ class ConcurrentClockInIntegrationTest extends TestCase
 			// no held lock
 		}
 
-		$db = \OC::$server->get(\OCP\IDBConnection::class);
+		$db = \OCP\Server::get(\OCP\IDBConnection::class);
 		foreach (['at_audit', 'at_entries'] as $table) {
 			if (!$db->tableExists($table)) {
 				continue;

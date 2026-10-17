@@ -144,6 +144,7 @@ return [
 		['name' => 'manager#rejectTimeEntryCorrection', 'url' => '/api/manager/time-entries/{timeEntryId}/reject-correction', 'verb' => 'POST', 'requirements' => ['timeEntryId' => '\d+']],
 		['name' => 'manager#correctTimeEntry', 'url' => '/api/manager/time-entries/{timeEntryId}/correct', 'verb' => 'POST', 'requirements' => ['timeEntryId' => '\d+']],
 		['name' => 'manager#getPendingTimeEntryCorrections', 'url' => '/api/manager/pending-time-entry-corrections', 'verb' => 'GET'],
+		['name' => 'manager_bulk_decision#decide', 'url' => '/api/manager/bulk-decision', 'verb' => 'POST'],
 
 		// Substitute (Vertretungs-Freigabe) routes
 		['name' => 'substitute#index', 'url' => '/substitution-requests', 'verb' => 'GET'],

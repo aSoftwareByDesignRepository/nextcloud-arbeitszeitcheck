@@ -570,6 +570,7 @@
 
 	#app-content.azc-app .table.azc-table--responsive tbody td {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: baseline;
 		gap: var(--azc-space-4, 1rem);
@@ -579,7 +580,12 @@
 		max-width: none;
 		overflow: visible;
 		white-space: normal;
+		overflow-wrap: anywhere;
 		text-overflow: clip;
+	}
+
+	#app-content.azc-app .table.azc-table--responsive tbody td > * {
+		min-width: 0;
 	}
 
 	#app-content.azc-app .table.azc-table--responsive tbody td:last-child {

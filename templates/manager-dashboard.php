@@ -113,6 +113,12 @@ $teamMembers = $_['teamMembers'] ?? [];
 					<button type="button" class="pending-approvals-tab pending-approvals-tab--active" role="tab" aria-selected="true" aria-controls="pending-absences-panel" id="tab-absences"><?php p($l->t('Absences')); ?></button>
 					<button type="button" class="pending-approvals-tab" role="tab" aria-selected="false" aria-controls="pending-time-entries-panel" id="tab-time-entries"><?php p($l->t('Time entries')); ?></button>
 				</div>
+				<div id="bulk-decision-toolbar" class="bulk-decision-toolbar visually-hidden" role="toolbar" aria-label="<?php p($l->t('Bulk actions for selected approvals')); ?>" aria-hidden="true">
+					<span id="bulk-decision-count" class="bulk-decision-toolbar__count" role="status"></span>
+					<button type="button" id="bulk-decision-approve" class="azc-btn azc-btn--primary"><?php p($l->t('Approve selected')); ?></button>
+					<button type="button" id="bulk-decision-reject" class="azc-btn azc-btn--secondary"><?php p($l->t('Reject selected')); ?></button>
+					<button type="button" id="bulk-decision-clear" class="azc-btn azc-btn--ghost"><?php p($l->t('Clear selection')); ?></button>
+				</div>
 				<div id="pending-absences-panel" class="pending-approvals-panel" role="tabpanel" aria-labelledby="tab-absences">
 					<div id="pending-approvals-list" class="pending-approvals-list" role="region" aria-live="polite" aria-label="<?php p($l->t('List of pending absence requests')); ?>">
 						<p class="pending-approvals-loading" id="pending-approvals-loading" aria-hidden="false"><?php p($l->t('Loading…')); ?></p>

@@ -220,6 +220,43 @@ final class SpecialEntitlementResolverTest extends TestCase
 		$this->resolver->resolve($this->type(SpecialEntitlementType::PERIOD_SERVICE_YEAR), 'u1', new \DateTimeImmutable('2020-02-28'));
 	}
 
+	public function testHigherPriorityWinsWithinSingleScopeLayer(): void
+	{
+		$this->modelId = 7;
+		$this->policy(1, 'model', '7', 'add', 2.0, 10);
+		$this->policy(2, 'model', '7', 'add', 5.0, 90);
+
+		$resolution = $this->resolver->resolve($this->type(), 'u1', new \DateTimeImmutable('2026-06-01'));
+		self::assertSame(5.0, $resolution['computedAmount']);
+		self::assertSame(2, $resolution['trace']['layers_evaluated'][1]['winner']['policy_id']);
+	}
+
+	public function testDeeperOperationalTeamWinsL2OnPriorityTie(): void
+	{
+		$this->teamIds = [9, 3];
+		$this->teamParents = [9 => 7, 7 => null, 3 => null];
+		$this->policy(1, 'team', '9', 'replace', 9.0, 50);
+		$this->policy(2, 'team', '3', 'replace', 4.0, 50);
+
+		// Team membership is not historically versioned — teamDepths only
+		// resolve for as-of dates >= today.
+		$resolution = $this->resolver->resolve($this->type(), 'u1', new \DateTimeImmutable('2100-06-01'));
+		self::assertSame(9.0, $resolution['computedAmount']);
+		self::assertSame(1, $resolution['trace']['layers_evaluated'][2]['winner']['policy_id']);
+	}
+
+	public function testAddAccumulatesAcrossLayersInsteadOfReplacing(): void
+	{
+		$this->policy(1, 'org', 'org', 'add', 2.0);
+		$this->modelId = 7;
+		$this->policy(2, 'model', '7', 'add', 3.0);
+		$this->policy(3, 'user', 'u1', 'add', 1.0);
+
+		$resolution = $this->resolver->resolve($this->type(), 'u1', new \DateTimeImmutable('2026-06-01'));
+		self::assertSame(6.0, $resolution['computedAmount']);
+		self::assertTrue($resolution['enabled']);
+	}
+
 	public function testNoPolicyIsDisabledAndTraceIsDeterministic(): void
 	{
 		$first = $this->resolver->resolve($this->type(), 'u1', new \DateTimeImmutable('2026-01-15'));

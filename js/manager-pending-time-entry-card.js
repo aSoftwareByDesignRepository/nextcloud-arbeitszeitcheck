@@ -215,6 +215,9 @@
 			+ '" data-request-type="' + escapeHtml(manualCreate ? 'manual_create' : 'correction')
 			+ '" role="article">'
 			+ '  <div class="pending-approval-card__body">'
+			+ '    <input type="checkbox" class="bulk-select-checkbox" data-bulk-type="time_entry" data-bulk-id="'
+				+ escapeHtml(String(id)) + '" aria-label="'
+				+ escapeHtml(t('Select for bulk action', 'Select for bulk action') + ' – ' + (item.displayName || '')) + '">'
 			+ '    <p class="pending-approval-card__title"><strong>' + displayName + '</strong> – ' + escapeHtml(kindLabel) + '</p>'
 			+ '    <p class="pending-approval-card__meta">' + escapeHtml(date) + '</p>'
 			+ bodyHtml

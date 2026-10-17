@@ -98,8 +98,48 @@ function resetLang(userId) {
 	}
 }
 
+/**
+ * Warn when another Playwright run is live on this shared instance — a
+ * sibling agent's suite mutating the same config keys/users produces
+ * "stale read" failures that look like product bugs (observed 2026-10-17:
+ * a sibling settings sweep overwrote hr_notification_recipients between a
+ * POST and its GET re-read). Warn only: detection can't be perfect and the
+ * run may still succeed.
+ */
+function detectSiblingRuns() {
+	try {
+		const out = execFileSync('ps', ['-eo', 'pid=,ppid=,args='], { encoding: 'utf8', timeout: 10_000 })
+		const ppidOf = new Map()
+		const rows = []
+		for (const line of out.split('\n')) {
+			const m = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/)
+			if (m) {
+				ppidOf.set(Number(m[1]), Number(m[2]))
+				rows.push({ pid: Number(m[1]), args: m[3] })
+			}
+		}
+		// Exclude this runner's whole ancestor chain (sh -c, npm exec, etc.).
+		const ancestors = new Set([process.pid])
+		for (let p = process.ppid; p > 1 && ppidOf.has(p); p = ppidOf.get(p)) {
+			ancestors.add(p)
+		}
+		return rows
+			.filter((r) => r.args.includes('playwright test') && !r.args.includes('pgrep') && !ancestors.has(r.pid))
+			.map((r) => `pid ${r.pid}: ${r.args.slice(0, 120)}`)
+	} catch {
+		return []
+	}
+}
+
 export default async function globalSetup() {
 	loadEnv()
+
+	const siblings = detectSiblingRuns()
+	if (siblings.length > 0) {
+		// eslint-disable-next-line no-console
+		console.warn(`[e2e globalSetup] WARNING: ${siblings.length} other playwright run(s) detected on this shared instance — config/user mutations may race:\n${siblings.map((s) => `  ${s.trim()}`).join('\n')}`)
+	}
+
 	if (!dockerReachable()) {
 		// eslint-disable-next-line no-console
 		console.log('[e2e globalSetup] Nextcloud container not reachable — skipping env normalization (non-Docker target)')

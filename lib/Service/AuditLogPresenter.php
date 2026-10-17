@@ -39,6 +39,7 @@ class AuditLogPresenter
 		'compliance_violation_resolved' => 'Compliance issue resolved',
 		'end_break' => 'Break ended',
 		'gdpr_data_deletion_request' => 'Personal data deletion requested',
+		'manager_bulk_decision' => 'Bulk decision applied',
 		'month_closure_pdf_downloaded' => 'Month closure PDF downloaded',
 		'month_closure_reopened' => 'Month closure reopened',
 		'onboarding_completed' => 'Onboarding completed',
@@ -90,6 +91,7 @@ class AuditLogPresenter
 	private const ENTITY_LABELS = [
 		'absence' => 'Absence',
 		'break_policy' => 'Central break rules',
+		'bulk_decision' => 'Bulk decision',
 		'compliance_violation' => 'Compliance issue',
 		'month_closure' => 'Month closure',
 		'overtime_payout' => 'Overtime payout',

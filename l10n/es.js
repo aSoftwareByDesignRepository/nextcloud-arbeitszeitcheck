@@ -5880,7 +5880,30 @@
 		"Enable business trips?" : "Enable business trips?",
 		"I understand the effect and the rollback path." : "I understand the effect and the rollback path.",
 		"Mark reviewed" : "Mark reviewed",
-		"This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration." : "This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration."
+		"This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration." : "This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration.",
+		"%n items approved." : "%n elementos aprobados.",
+		"%n items rejected." : "%n elementos rechazados.",
+		"%n items selected" : "%n elementos seleccionados",
+		"1 item approved." : "1 elemento aprobado.",
+		"1 item rejected." : "1 elemento rechazado.",
+		"1 item selected" : "1 elemento seleccionado",
+		"Approve selected" : "Aprobar selección",
+		"Bulk action failed." : "La acción masiva falló.",
+		"Bulk action failed. No changes were applied." : "La acción masiva falló. No se aplicaron cambios.",
+		"Bulk actions for selected approvals" : "Acciones masivas para las aprobaciones seleccionadas",
+		"Bulk decision requires between 1 and 200 items." : "La decisión masiva requiere entre 1 y 200 elementos.",
+		"Bulk item id must be a positive integer." : "El id del elemento masivo debe ser un entero positivo.",
+		"Each bulk item must be an object with type and id." : "Cada elemento masivo debe ser un objeto con tipo e id.",
+		"Invalid bulk action." : "Acción masiva no válida.",
+		"One or more items were already decided by another manager. The list was reloaded." : "Uno o más elementos ya fueron decididos por otro responsable. La lista se ha recargado.",
+		"Reject %n selected items. Optional reason:" : "Rechazar %n elementos seleccionados. Motivo opcional:",
+		"Reject 1 selected item. Optional reason:" : "Rechazar 1 elemento seleccionado. Motivo opcional:",
+		"Reject selected" : "Rechazar selección",
+		"Select for bulk action" : "Seleccionar para acción masiva",
+		"This item was already decided by another manager." : "Este elemento ya fue decidido por otro responsable.",
+		"Unknown bulk item type." : "Tipo de elemento masivo desconocido.",
+		"Bulk decision" : "Decisión masiva",
+		"Bulk decision applied" : "Decisión masiva aplicada"
 		}
 	);
 	});

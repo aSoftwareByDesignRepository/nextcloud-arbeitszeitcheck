@@ -133,8 +133,182 @@
         return absenceTypeDisplay(typeCode);
     }
 
+    // ===== BULK DECISION =====
+    // Selection survives re-renders; keys are "<type>:<id>" and pruned when
+    // an item disappears from the pending lists.
+    const bulkSelection = new Set();
+    let bulkBusy = false;
+
+    function bulkKey(type, id) {
+        return String(type) + ':' + String(id);
+    }
+
+    function bindBulkCheckboxes(container) {
+        const root = container || document;
+        root.querySelectorAll('.bulk-select-checkbox').forEach(function(cb) {
+            if (cb.dataset.bulkBound === '1') return;
+            cb.dataset.bulkBound = '1';
+            const key = bulkKey(cb.getAttribute('data-bulk-type'), cb.getAttribute('data-bulk-id'));
+            cb.checked = bulkSelection.has(key);
+            cb.addEventListener('change', function() {
+                if (this.checked) {
+                    bulkSelection.add(key);
+                } else {
+                    bulkSelection.delete(key);
+                }
+                const card = this.closest('.pending-approval-card');
+                if (card) card.classList.toggle('pending-approval-card--selected', this.checked);
+                updateBulkToolbar();
+            });
+            const card = cb.closest('.pending-approval-card');
+            if (card) card.classList.toggle('pending-approval-card--selected', cb.checked);
+        });
+    }
+
+    function updateBulkToolbar() {
+        const toolbar = document.getElementById('bulk-decision-toolbar');
+        const count = document.getElementById('bulk-decision-count');
+        if (!toolbar || !count) return;
+        const n = bulkSelection.size;
+        const visible = n > 0 && !bulkBusy;
+        toolbar.classList.toggle('visually-hidden', !visible);
+        toolbar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        count.textContent = tn('1 item selected', '%n items selected', n);
+    }
+
+    function clearBulkSelection() {
+        bulkSelection.clear();
+        document.querySelectorAll('.bulk-select-checkbox').forEach(function(cb) {
+            cb.checked = false;
+            const card = cb.closest('.pending-approval-card');
+            if (card) card.classList.remove('pending-approval-card--selected');
+        });
+        updateBulkToolbar();
+    }
+
+    // Drop keys whose cards no longer exist (decided elsewhere / filtered out).
+    function pruneBulkSelection() {
+        if (bulkSelection.size === 0) {
+            updateBulkToolbar();
+            return;
+        }
+        const present = new Set();
+        document.querySelectorAll('.bulk-select-checkbox').forEach(function(cb) {
+            present.add(bulkKey(cb.getAttribute('data-bulk-type'), cb.getAttribute('data-bulk-id')));
+        });
+        bulkSelection.forEach(function(key) {
+            if (!present.has(key)) bulkSelection.delete(key);
+        });
+        updateBulkToolbar();
+    }
+
+    function setupBulkToolbar() {
+        const approveBtn = document.getElementById('bulk-decision-approve');
+        const rejectBtn = document.getElementById('bulk-decision-reject');
+        const clearBtn = document.getElementById('bulk-decision-clear');
+        if (!approveBtn || !rejectBtn || !clearBtn) return;
+        approveBtn.addEventListener('click', function() { submitBulkDecision('approve', ''); });
+        rejectBtn.addEventListener('click', function() { showBulkRejectModal(); });
+        clearBtn.addEventListener('click', function() { clearBulkSelection(); });
+    }
+
+    function bulkItemsPayload() {
+        const items = [];
+        bulkSelection.forEach(function(key) {
+            const idx = key.indexOf(':');
+            const type = key.slice(0, idx);
+            const id = parseInt(key.slice(idx + 1), 10);
+            if ((type === 'absence' || type === 'time_entry' || type === 'business_trip') && Number.isInteger(id) && id > 0) {
+                items.push({ type: type, id: id });
+            }
+        });
+        return items;
+    }
+
+    function showBulkRejectModal() {
+        if (bulkSelection.size === 0) return;
+        const modalId = 'bulk-reject-modal';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+        const textareaId = 'bulk-reject-reason';
+        const n = bulkSelection.size;
+        const content = [
+            '<p class="reject-modal-desc" id="bulk-reject-desc">' + escapeHtml(
+                tn('Reject 1 selected item. Optional reason:', 'Reject %n selected items. Optional reason:', n)
+            ) + '</p>',
+            '<label for="' + textareaId + '" class="visually-hidden">' + escapeHtml(t('Reason for rejection (optional)', 'Reason for rejection (optional)')) + '</label>',
+            '<textarea id="' + textareaId + '" rows="3" class="reject-modal-textarea" placeholder="' + escapeHtml(t('Enter reason for rejection...', 'Enter reason for rejection...')) + '" maxlength="1000" aria-describedby="bulk-reject-desc"></textarea>',
+            '<div class="reject-modal-actions">',
+            '  <button type="button" class="azc-btn azc-btn--secondary btn-reject-modal-cancel">' + t('Cancel', 'Cancel') + '</button>',
+            '  <button type="button" class="azc-btn azc-btn--primary btn-reject-modal-confirm">' + t('Confirm rejection', 'Confirm rejection') + '</button>',
+            '</div>'
+        ].join('');
+        const modal = Components.createModal({
+            id: modalId,
+            title: t('Reject selected', 'Reject selected'),
+            content: content,
+            size: 'md'
+        });
+        const textarea = modal.querySelector('#' + textareaId);
+        modal.querySelector('.btn-reject-modal-cancel').addEventListener('click', function() { Components.closeModal(modal); });
+        modal.querySelector('.btn-reject-modal-confirm').addEventListener('click', function() {
+            const comment = textarea ? textarea.value.trim() : '';
+            Components.closeModal(modal);
+            submitBulkDecision('reject', comment);
+        });
+        Components.openModal(modalId);
+        if (textarea) setTimeout(function() { textarea.focus(); }, 100);
+    }
+
+    function submitBulkDecision(action, comment) {
+        if (bulkBusy) return;
+        const items = bulkItemsPayload();
+        if (items.length === 0) {
+            updateBulkToolbar();
+            return;
+        }
+        bulkBusy = true;
+        updateBulkToolbar();
+        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/bulk-decision'), {
+            method: 'POST',
+            data: { action: action, items: items, comment: comment || '' },
+            onSuccess: function(data) {
+                bulkBusy = false;
+                if (data && data.success) {
+                    const applied = typeof data.applied === 'number' ? data.applied : items.length;
+                    Messaging.showSuccess(action === 'approve'
+                        ? tn('1 item approved.', '%n items approved.', applied)
+                        : tn('1 item rejected.', '%n items rejected.', applied));
+                    clearBulkSelection();
+                    loadPendingApprovals();
+                    loadPendingTimeEntryCorrections();
+                    loadTeamCompliance();
+                } else {
+                    Messaging.showError((data && data.error) || t('Bulk action failed.', 'Bulk action failed.'));
+                    updateBulkToolbar();
+                }
+            },
+            onError: function(error) {
+                bulkBusy = false;
+                const code = error && error.data ? error.data.error_code : '';
+                if (error && (error.status === 409 || code === 'already_decided')) {
+                    Messaging.showError(
+                        (error.data && error.data.error)
+                            || t('One or more items were already decided by another manager. The list was reloaded.', 'One or more items were already decided by another manager. The list was reloaded.')
+                    );
+                } else {
+                    Messaging.showError(t('Bulk action failed. No changes were applied.', 'Bulk action failed. No changes were applied.'));
+                }
+                clearBulkSelection();
+                loadPendingApprovals();
+                loadPendingTimeEntryCorrections();
+            }
+        });
+    }
+
     function init() {
         setupTabs();
+        setupBulkToolbar();
         loadPendingApprovals();
         loadPendingTimeEntryCorrections();
         loadTeamCompliance();
@@ -222,6 +396,8 @@
                     itemsEl.setAttribute('aria-hidden', 'false');
                     itemsEl.innerHTML = absences.map(function(item) { return renderAbsenceCard(item); }).join('');
                     bindAbsenceButtons();
+                    bindBulkCheckboxes(itemsEl);
+                    pruneBulkSelection();
                 }
             },
             onError: function() {
@@ -261,6 +437,7 @@
         return (
             '<div class="pending-approval-card pending-approval-card--absence" data-absence-id="' + escapeHtml(String(id)) + '" role="article">' +
             '  <div class="pending-approval-card__body">' +
+            '    <input type="checkbox" class="bulk-select-checkbox" data-bulk-type="absence" data-bulk-id="' + escapeHtml(String(id)) + '" aria-label="' + escapeHtml(t('Select for bulk action', 'Select for bulk action') + ' – ' + (item.displayName || '')) + '">' +
             '    <p class="pending-approval-card__title"><strong>' + displayName + '</strong> – ' + typeDisplay + '</p>' +
             '    <p class="pending-approval-card__meta">' + escapeHtml(start) + ' – ' + escapeHtml(end) + durationMeta + '</p>' +
             '    <div class="pending-approval-card__actions">' +
@@ -393,6 +570,8 @@
                     itemsEl.setAttribute('aria-hidden', 'false');
                     itemsEl.innerHTML = timeEntries.map(function(item) { return renderTimeEntryCard(item); }).join('');
                     bindTimeEntryButtons();
+                    bindBulkCheckboxes(itemsEl);
+                    pruneBulkSelection();
                 }
             },
             onError: function() {

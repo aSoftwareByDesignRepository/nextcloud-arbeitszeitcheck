@@ -99,6 +99,9 @@ const STATEFUL_SPECS = [
   // overlap, observed 2026-10-17). The intra-test approve+reject concurrency
   // is preserved; it is inter-test interference that must be removed.
   /concurrent-absence-decision\.spec\.js/,
+  // Bulk decision creates + approves pending absences on the shared employee
+  // — same absence-window/lock class as concurrent-absence-decision.
+  /bulk-decision\.spec\.js/,
 ]
 
 export default defineConfig({

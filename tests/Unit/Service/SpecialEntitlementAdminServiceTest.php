@@ -402,6 +402,36 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		], 'admin');
 	}
 
+	public function testCreateTypeParsesFormEncodedFalseAsFalse(): void
+	{
+		$this->types->method('findByCode')->willReturn(null);
+		$this->types->method('findByAbsenceTypeCode')->willReturn(null);
+		$this->customTypes->method('codeExists')->willReturn(false);
+		$this->customTypes->method('insert')->willReturnCallback(
+			static fn (CustomAbsenceType $row): CustomAbsenceType => $row
+		);
+		$captured = null;
+		$this->types->method('insert')->willReturnCallback(
+			static function (SpecialEntitlementType $row) use (&$captured): SpecialEntitlementType {
+				$captured = $row;
+				return $row;
+			}
+		);
+
+		$this->service->createType([
+			'publicLabel' => 'Recovery Leave',
+			'code' => 'custom_recovery_x',
+			'unit' => 'days',
+			'periodType' => 'calendar_year',
+			'allowNegative' => 'false',
+			'employeeMaySeeConfidentialLabel' => 'false',
+		], 'admin1');
+
+		self::assertNotNull($captured);
+		self::assertFalse($captured->getAllowNegative());
+		self::assertFalse($captured->getEmployeeMaySeeConfidentialLabel());
+	}
+
 	public function testSetTypeActiveActivationWithoutLinkedCustomRowFails(): void
 	{
 		$type = $this->type(false);

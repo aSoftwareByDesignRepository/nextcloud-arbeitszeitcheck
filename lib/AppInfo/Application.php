@@ -622,6 +622,19 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService::class),
 		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService => new \OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService::class),
+			$c->query(AbsenceService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripService::class),
+			$c->query(PermissionService::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
+			$c->query(\OCP\IL10N::class),
+		));
 
 		$context->registerService(InitializeWorkforceSuiteFreshState::class, function ($c): InitializeWorkforceSuiteFreshState {
 			return new InitializeWorkforceSuiteFreshState($c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class));

@@ -5880,7 +5880,30 @@
 		"Enable business trips?" : "Enable business trips?",
 		"I understand the effect and the rollback path." : "I understand the effect and the rollback path.",
 		"Mark reviewed" : "Mark reviewed",
-		"This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration." : "This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration."
+		"This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration." : "This closes the legacy \"business trip\" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration.",
+		"%n items approved." : "%n éléments approuvés.",
+		"%n items rejected." : "%n éléments refusés.",
+		"%n items selected" : "%n éléments sélectionnés",
+		"1 item approved." : "1 élément approuvé.",
+		"1 item rejected." : "1 élément refusé.",
+		"1 item selected" : "1 élément sélectionné",
+		"Approve selected" : "Approuver la sélection",
+		"Bulk action failed." : "L'action groupée a échoué.",
+		"Bulk action failed. No changes were applied." : "L'action groupée a échoué. Aucune modification n'a été appliquée.",
+		"Bulk actions for selected approvals" : "Actions groupées pour les approbations sélectionnées",
+		"Bulk decision requires between 1 and 200 items." : "La décision groupée nécessite entre 1 et 200 éléments.",
+		"Bulk item id must be a positive integer." : "L'identifiant de l'élément groupé doit être un entier positif.",
+		"Each bulk item must be an object with type and id." : "Chaque élément groupé doit être un objet avec un type et un identifiant.",
+		"Invalid bulk action." : "Action groupée non valide.",
+		"One or more items were already decided by another manager. The list was reloaded." : "Un ou plusieurs éléments ont déjà été traités par un autre responsable. La liste a été rechargée.",
+		"Reject %n selected items. Optional reason:" : "Refuser %n éléments sélectionnés. Motif facultatif :",
+		"Reject 1 selected item. Optional reason:" : "Refuser 1 élément sélectionné. Motif facultatif :",
+		"Reject selected" : "Refuser la sélection",
+		"Select for bulk action" : "Sélectionner pour l'action groupée",
+		"This item was already decided by another manager." : "Cet élément a déjà été traité par un autre responsable.",
+		"Unknown bulk item type." : "Type d'élément groupé inconnu.",
+		"Bulk decision" : "Décision groupée",
+		"Bulk decision applied" : "Décision groupée appliquée"
 		}
 	);
 	});

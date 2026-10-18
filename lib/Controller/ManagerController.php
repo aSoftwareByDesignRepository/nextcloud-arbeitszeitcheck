@@ -550,7 +550,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function employeeTimeEntriesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['common/time-pair-matrix', 'time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 		if ($this->workforceSuiteConfig !== null
 			&& $this->workforceSuiteConfig->isEnabled('work_location_catalog_enabled')) {

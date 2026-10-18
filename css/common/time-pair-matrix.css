@@ -1,0 +1,306 @@
+/**
+ * Shared time pair matrix + 24h time input group.
+ *
+ * Structural rules for markup emitted by js/common/time-entry-clock-form.js
+ * (manager create/correction dialogs) and the time-entries page form
+ * (js/time-entry-form.js, js/time-entry-correction.js). Page-scoped overrides
+ * stay in time-entries.css (#app-content.azc-app--time-entries ...).
+ */
+/* Aligned start / end / action columns for work + breaks (WCAG: consistent layout, min 44px touch targets on actions) */
+.time-pair-matrix {
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.time-pair-matrix__intro {
+    margin: 0 0 var(--space-2, 0.5rem);
+    font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-semibold, 600);
+    color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast));
+    letter-spacing: 0.02em;
+}
+
+.time-pair-matrix__intro--breaks {
+    margin-top: var(--space-4, 1rem);
+}
+
+.time-pair-matrix__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(3rem, auto);
+    gap: var(--space-4, 1rem) var(--space-4, 1rem);
+    align-items: start;
+}
+
+.time-pair-matrix__grid--header {
+    margin-bottom: var(--space-2, 0.5rem);
+    padding-bottom: var(--space-2, 0.5rem);
+    border-bottom: 1px solid var(--arbeitszeitcheck-color-border);
+    align-items: end;
+}
+
+.time-pair-matrix__colhead {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.time-pair-matrix__colhead--action {
+    text-align: end;
+    min-width: 5.5rem;
+}
+
+.time-pair-matrix__grid--row {
+    margin-bottom: 0;
+}
+
+.time-pair-matrix__grid--row + .time-pair-matrix__grid--row {
+    margin-top: var(--space-5, 1.25rem);
+    padding-top: var(--space-5, 1.25rem);
+    border-top: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--arbeitszeitcheck-color-border));
+}
+
+.time-pair-matrix--breaks .break-entry + .break-entry {
+    margin-top: var(--space-5, 1.25rem);
+    padding-top: var(--space-5, 1.25rem);
+    border-top: 1px solid var(--arbeitszeitcheck-color-border-secondary, var(--arbeitszeitcheck-color-border));
+}
+
+.time-pair-matrix--breaks .break-entry .time-pair-matrix__grid--row {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.time-pair-matrix__action {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    align-self: stretch;
+    padding-bottom: 0.125rem;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+}
+
+.time-pair-matrix__action--spacer {
+    min-height: 0;
+    padding: 0;
+}
+
+.time-pair-matrix__action .btn-remove-break {
+    min-height: 44px;
+    min-width: 44px;
+    padding-left: var(--space-3, 0.75rem);
+    padding-right: var(--space-3, 0.75rem);
+}
+
+.time-pair-matrix__grid--row--with-note .auto-break-note {
+    grid-column: 1 / -1;
+    margin-top: var(--space-2, 0.5rem);
+    margin-bottom: 0;
+}
+
+.time-pair-matrix .form-group .form-label {
+    min-height: 1.5rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+/* Time pair matrix: narrow screens — stack fields; hide redundant column headers (labels remain on each control) */
+@media (max-width: 639.98px) {
+    .time-pair-matrix__grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-4, 1rem);
+    }
+
+    .time-pair-matrix__grid--header {
+        display: none;
+    }
+
+    .time-pair-matrix__action {
+        justify-content: flex-start;
+        align-items: center;
+        min-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .time-pair-matrix__action .btn-remove-break {
+        width: 100%;
+        max-width: 100%;
+        justify-content: center;
+    }
+
+    .time-pair-matrix--breaks .break-entry {
+        background: var(--arbeitszeitcheck-color-background-hover, var(--color-background-hover));
+        border: 1px solid var(--arbeitszeitcheck-color-border);
+        border-radius: var(--radius-base, 8px);
+        padding: var(--space-3);
+    }
+
+    .time-pair-matrix__grid--row + .time-pair-matrix__grid--row {
+        margin-top: var(--space-4, 1rem);
+        padding-top: var(--space-4, 1rem);
+    }
+}
+/* Time Input Group - Custom 24-hour format selectors */
+.time-input-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    background-color: var(--arbeitszeitcheck-color-form-background);
+    border: 1px solid var(--arbeitszeitcheck-color-form-border);
+    border-radius: var(--radius-base, 8px);
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.time-input-group:focus-within {
+    border-color: var(--arbeitszeitcheck-color-form-border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--arbeitszeitcheck-color-primary) 10%, transparent);
+    outline: none;
+}
+
+.time-input-group .time-hour,
+.time-input-group .time-minute {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2, 0.5rem) var(--space-6, 1.5rem) var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    text-align: center;
+    font-family: var(--arbeitszeitcheck-font-family-mono, 'Courier New', 'Consolas', 'Monaco', monospace);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-medium, 500);
+    color: var(--arbeitszeitcheck-color-text);
+    background-color: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: var(--icon-triangle-s-dark, url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b6b6b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e"));
+    background-position: right var(--space-2, 0.5rem) center;
+    background-repeat: no-repeat;
+    background-size: 1em 1em;
+    transition: background-color 0.15s ease-in-out;
+    height: auto;
+    line-height: 1.5;
+}
+
+.time-input-group .time-hour:hover,
+.time-input-group .time-minute:hover {
+    background-color: var(--arbeitszeitcheck-color-background-hover);
+}
+
+.time-input-group .time-hour:focus,
+.time-input-group .time-minute:focus {
+    background-color: var(--arbeitszeitcheck-color-background-hover);
+    outline: none;
+}
+
+.time-input-group .time-hour::-ms-expand,
+.time-input-group .time-minute::-ms-expand {
+    display: none;
+}
+
+.time-input-group .time-hour option,
+.time-input-group .time-minute option {
+    padding: var(--space-2, 0.5rem);
+    text-align: center;
+    font-family: var(--arbeitszeitcheck-font-family-mono, 'Courier New', 'Consolas', 'Monaco', monospace);
+    font-variant-numeric: tabular-nums;
+}
+
+.time-separator {
+    font-size: var(--arbeitszeitcheck-font-size-xl, 1.25rem);
+    font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
+    color: var(--arbeitszeitcheck-color-text-secondary);
+    margin: 0;
+    line-height: 1;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.time-input-group input[type="hidden"] {
+    display: none;
+}
+
+/* Error state for time input group */
+.time-input-group.error,
+.time-input-group.form-input--error {
+    border-color: var(--arbeitszeitcheck-color-form-border-error);
+}
+
+.time-input-group.error:focus-within,
+.time-input-group.form-input--error:focus-within {
+    border-color: var(--arbeitszeitcheck-color-form-border-error);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--arbeitszeitcheck-color-error) 10%, transparent);
+}
+
+/* Responsive adjustments for time input group */
+@media (max-width: 767.98px) {
+    .time-input-group {
+        gap: var(--space-1, 0.25rem);
+        padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    }
+    
+    .time-input-group .time-hour,
+    .time-input-group .time-minute {
+        padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem) var(--space-2, 0.5rem) var(--space-2, 0.5rem);
+        font-size: 0.95rem;
+    }
+    
+    .time-separator {
+        font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+        margin: 0 var(--space-1, 0.25rem);
+    }
+}
+.time-pair-matrix--breaks .break-entry {
+    margin-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* Dark / high-contrast: keep the transparent-bg selects and their option popup
+   readable on every page that hosts the shared form (was previously only
+   defined scoped to the time-entries page). */
+html[data-theme="dark"] .time-input-group .time-hour,
+html[data-theme="dark"] .time-input-group .time-minute,
+html[data-theme="dark"] .time-input-group .time-hour option,
+html[data-theme="dark"] .time-input-group .time-minute option,
+body[data-theme-dark] .time-input-group .time-hour,
+body[data-theme-dark] .time-input-group .time-minute,
+body[data-theme-dark] .time-input-group .time-hour option,
+body[data-theme-dark] .time-input-group .time-minute option,
+body[data-theme-dark-highcontrast] .time-input-group .time-hour,
+body[data-theme-dark-highcontrast] .time-input-group .time-minute,
+body[data-theme-dark-highcontrast] .time-input-group .time-hour option,
+body[data-theme-dark-highcontrast] .time-input-group .time-minute option {
+	color: var(--color-main-text);
+	background-color: var(--color-main-background);
+}
+
+.time-input-group .time-hour,
+.time-input-group .time-minute {
+	color: var(--color-main-text);
+}
+
+.time-input-group .time-hour option,
+.time-input-group .time-minute option {
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+@media (forced-colors: active) {
+	.time-pair-matrix__colhead,
+	.time-pair-matrix__intro {
+		color: CanvasText;
+	}
+
+	.time-input-group {
+		border-color: CanvasText;
+	}
+}

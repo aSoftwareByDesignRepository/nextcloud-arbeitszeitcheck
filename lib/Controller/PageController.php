@@ -581,7 +581,7 @@ class PageController extends Controller
 	public function timeEntries(): TemplateResponse
 	{
 		$extraScripts = ['time-entry-correction', 'time-entry-form-accessibility'];
-		$extraStyles = ['time-entries', 'time-entry-correction', 'time-entry-form-accessibility', 'common/projectcheck'];
+		$extraStyles = ['common/time-pair-matrix', 'time-entries', 'time-entry-correction', 'time-entry-form-accessibility', 'common/projectcheck'];
 		// time-entry-form.js is loaded only on create/edit via TimeEntryController::registerTimeEntryFormAssets()
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, $extraStyles, [
 			'common/datepicker',

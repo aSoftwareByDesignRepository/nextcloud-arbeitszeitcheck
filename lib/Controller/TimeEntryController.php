@@ -333,6 +333,7 @@ class TimeEntryController extends Controller
 	private function registerTimeEntryFormAssets(): void
 	{
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, [
+			'common/time-pair-matrix',
 			'time-entries',
 			'time-entry-correction',
 			'time-entry-form-accessibility',
@@ -380,6 +381,7 @@ class TimeEntryController extends Controller
 			);
 		}
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, [
+			'common/time-pair-matrix',
 			'time-entries',
 			'time-entry-correction',
 			'time-entry-form-accessibility',

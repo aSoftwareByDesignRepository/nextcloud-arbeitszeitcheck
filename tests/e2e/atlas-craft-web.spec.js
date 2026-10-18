@@ -394,6 +394,32 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			await openCreate.click();
 			const modal = page.locator('.manager-create-dialog[role="dialog"], [id^="manager-create"][role="dialog"], .modal-backdrop [role="dialog"]').first();
 			if (await modal.isVisible({ timeout: 10_000 }).catch(() => false)) {
+				/* Permanent probe (azc-mgr-time-pair-matrix-unstyled): the shared
+				   css/common/time-pair-matrix.css must be registered on this page —
+				   without it the Start/End grid degrades to block layout and the
+				   column headers collapse into contiguous text. */
+				const matrixProbe = await page.evaluate(() => {
+					const header = document.querySelector(
+						'[role="dialog"] .time-pair-matrix__grid--header, .time-pair-matrix__grid--header',
+					);
+					if (!header) {
+						return { found: false, display: '', minGap: -1 };
+					}
+					const rects = [...header.querySelectorAll('.time-pair-matrix__colhead')]
+						.map((el) => el.getBoundingClientRect());
+					let minGap = Infinity;
+					for (let i = 1; i < rects.length; i++) {
+						minGap = Math.min(minGap, rects[i].left - rects[i - 1].right);
+					}
+					return {
+						found: true,
+						display: getComputedStyle(header).display,
+						minGap: rects.length > 1 ? minGap : 1,
+					};
+				});
+				expect(matrixProbe.found, 'time-pair-matrix header grid must render in manager create dialog').toBe(true);
+				expect(matrixProbe.display, 'time-pair-matrix grid must compute to display:grid (common/time-pair-matrix.css loaded)').toBe('grid');
+				expect(matrixProbe.minGap, 'time-pair-matrix column headers must not render contiguous').toBeGreaterThan(0);
 				await shot(page, 'azc-manager-dialog-create-entry.png', { settleMs: 300 });
 				await modal.locator('.btn-mgr-create-cancel, .azc-btn--secondary').first().click()
 					.catch(() => page.keyboard.press('Escape'));

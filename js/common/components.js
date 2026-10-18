@@ -715,9 +715,7 @@ const ArbeitszeitCheckComponents = {
         this._unbindFocusTrap(dialog);
         backdrop.remove();
         this._unlockPageBehindModal();
-        if (previouslyFocused && previouslyFocused.focus) {
-          previouslyFocused.focus();
-        }
+        this._restoreModalFocus(previouslyFocused);
         resolve(result);
       };
 

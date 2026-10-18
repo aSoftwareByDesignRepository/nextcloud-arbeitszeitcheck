@@ -177,7 +177,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 					</div>
 				</div>
 				<footer class="azc-kiosk-modal__footer">
-					<button type="button" id="azc-kiosk-create-close" class="azc-btn" data-azc-modal-close>
+					<button type="button" id="azc-kiosk-create-close" class="azc-btn azc-btn--secondary" data-azc-modal-close>
 						<?php p($l->t('Cancel')); ?>
 					</button>
 					<button type="button" id="azc-kiosk-create-terminal" class="azc-btn azc-btn--primary">

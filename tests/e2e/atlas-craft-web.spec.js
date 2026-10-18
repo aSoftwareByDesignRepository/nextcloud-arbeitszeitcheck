@@ -129,6 +129,7 @@ const ADMIN_VIEWS = [
 	['admin-teams', '/apps/arbeitszeitcheck/admin/teams', '#azc-main-content'],
 	['admin-business-trips', '/apps/arbeitszeitcheck/admin/business-trips', '#bta-root, #azc-main-content'],
 	['admin-special-entitlements', '/apps/arbeitszeitcheck/admin/special-entitlements', '#se-admin-root, #azc-main-content'],
+	['admin-absence-types', '/apps/arbeitszeitcheck/admin/absence-types', '#cat-table, #cat-editor-panel, #azc-main-content'],
 ];
 
 /** Dark + HC re-capture subset (primary views). */

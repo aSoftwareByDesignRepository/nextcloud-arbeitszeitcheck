@@ -145,6 +145,32 @@ describe('ArbeitszeitCheckComponents confirmDialog', () => {
     await promise
   })
 
+  it('confirmDialog restores focus to the trigger, or main content when it detached mid-open', async () => {
+    const Components = window.ArbeitszeitCheckComponents
+
+    // Connected trigger → focus returns to it.
+    const trigger = document.createElement('button')
+    trigger.type = 'button'
+    document.getElementById('azc-main-content').appendChild(trigger)
+    trigger.focus()
+    let promise = Components.confirmDialog({ title: 'T', message: 'M', variant: 'danger' })
+    document.querySelector('.confirm-dialog__cancel')?.click()
+    await expect(promise).resolves.toBe(false)
+    expect(document.activeElement).toBe(trigger)
+
+    // Trigger detached while the dialog is open (list re-render) → the close
+    // must not strand focus on <body> nor leave it on a dead node.
+    const dead = document.createElement('button')
+    dead.type = 'button'
+    document.getElementById('azc-main-content').appendChild(dead)
+    dead.focus()
+    promise = Components.confirmDialog({ title: 'T', message: 'M', variant: 'danger' })
+    dead.remove()
+    document.querySelector('.confirm-dialog__cancel')?.click()
+    await expect(promise).resolves.toBe(false)
+    expect(document.activeElement).toBe(document.getElementById('azc-main-content'))
+  })
+
   it('openModal locks scroll, traps focus, and closeModal restores the page', async () => {
     const Components = window.ArbeitszeitCheckComponents
     const modal = Components.createModal({

@@ -1414,7 +1414,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
     }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
     .page-header-section .header-text h2 {
         font-size: var(--arbeitszeitcheck-font-size-xl);
     }

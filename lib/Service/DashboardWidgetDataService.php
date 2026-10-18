@@ -31,6 +31,7 @@ class DashboardWidgetDataService {
 		private readonly ProjectCheckIntegrationService $projectCheckIntegration,
 		private readonly VacationHoursDebitService $vacationHoursDebitService,
 		private readonly TimeEntryMapper $timeEntryMapper,
+		private readonly ?ExternalStampService $externalStamps = null,
 	) {
 	}
 
@@ -196,9 +197,33 @@ class DashboardWidgetDataService {
 			],
 			// Additive Phase D — null when premiums off (old apps ignore).
 			'premiumSummary'         => $this->buildPremiumSummaryForWidget($userId),
+			// F16/F19b — pending external stamps the worker still has to
+			// confirm/dismiss. Additive: old companions ignore the key.
+			'pendingExternalStamps'  => $this->pendingExternalStamps($userId),
 		];
 
 		return $this->applyVacationUnitAwareClientGate($payload, $vacationUnitAwareClient);
+	}
+
+	/** Same wire shape as PageController::listPendingExternalStamps. */
+	private function pendingExternalStamps(string $userId): array
+	{
+		if ($this->externalStamps === null) {
+			return [];
+		}
+		try {
+			return array_map(static function (\OCA\ArbeitszeitCheck\Db\ExternalStamp $s): array {
+				return [
+					'id' => (int)$s->getId(),
+					'kind' => $s->getKind(),
+					'sourceApp' => $s->getSourceApp(),
+					'startTs' => $s->getStartTs(),
+					'endTs' => $s->getEndTs(),
+				];
+			}, $this->externalStamps->listPending($userId));
+		} catch (\Throwable) {
+			return [];
+		}
 	}
 
 	/**

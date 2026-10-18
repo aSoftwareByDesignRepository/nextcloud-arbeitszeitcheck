@@ -14,3 +14,14 @@ if (!function_exists('p')) {
 		echo htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	}
 }
+
+if (!function_exists('print_unescaped')) {
+	/**
+	 * Trusted-markup escape hatch used for IconCatalog SVG output — mirrors
+	 * Nextcloud's print_unescaped() which echoes without escaping.
+	 * @param mixed $text
+	 */
+	function print_unescaped($text): void {
+		echo (string)$text;
+	}
+}

@@ -132,7 +132,6 @@
 		opts.headers = Object.assign({}, opts.headers, {
 			Accept: 'application/json',
 			requesttoken: requestToken(),
-			'OCS-APIRequest': 'true',
 		});
 		if (opts.json !== undefined) {
 			opts.headers['Content-Type'] = 'application/json';

@@ -1762,10 +1762,15 @@ class ManagerController extends Controller
 				$dh = $payload['durationHours'] ?? $payload['duration_hours'];
 				$data['duration_hours'] = is_array($dh) ? (string)reset($dh) : (string)$dh;
 			}
-			if (!empty($payload['requireDurationHours']) || !empty($payload['require_duration_hours'])) {
+			// Form-encoded "false"/"0" are non-empty strings — never truthy here.
+			$truthy = static function (mixed $v): bool {
+				$v = is_array($v) ? reset($v) : $v;
+				return $v === true || $v === 1 || $v === '1' || $v === 'true' || $v === 'on';
+			};
+			if ($truthy($payload['requireDurationHours'] ?? null) || $truthy($payload['require_duration_hours'] ?? null)) {
 				$data['require_duration_hours'] = true;
 			}
-			if (!empty($payload['serverMayFillHours']) || !empty($payload['server_may_fill_hours'])) {
+			if ($truthy($payload['serverMayFillHours'] ?? null) || $truthy($payload['server_may_fill_hours'] ?? null)) {
 				$data['server_may_fill_hours'] = true;
 			}
 			// day_fraction only (SEC-02): never copy request `days` / `working_days`.

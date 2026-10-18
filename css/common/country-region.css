@@ -84,7 +84,7 @@
 	margin: 0 0 var(--space-3, 0.75rem);
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
 	.azc-country-grid {
 		grid-template-columns: 1fr;
 	}

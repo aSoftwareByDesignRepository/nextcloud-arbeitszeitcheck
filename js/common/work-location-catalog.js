@@ -48,7 +48,7 @@
 		}
 		pending = fetch(url, {
 			method: 'GET',
-			headers: { Accept: 'application/json', 'OCS-APIRequest': 'true' },
+			headers: { Accept: 'application/json' },
 			credentials: 'same-origin',
 		})
 			.then((res) => (res.status === 404 ? null : res.json()))

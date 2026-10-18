@@ -146,7 +146,7 @@
 	}
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
 	#app-content.azc-app--admin-holidays .admin-holidays__filter-grid {
 		grid-template-columns: 1fr;
 	}
@@ -198,7 +198,7 @@
 	line-height: 1.45;
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
 	#app-content.azc-app--admin-holidays .admin-holidays__suggestion {
 		flex-direction: column;
 		align-items: stretch;

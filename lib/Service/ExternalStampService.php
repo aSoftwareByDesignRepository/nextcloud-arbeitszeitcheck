@@ -48,7 +48,6 @@ class ExternalStampService
 		private readonly MobileStampReplayService $stampReplayService,
 		private readonly ComplianceService $complianceService,
 		private readonly MonthClosureGuard $monthClosureGuard,
-		private readonly UserWorkLocationService $userWorkLocationService,
 		private readonly IUserManager $userManager,
 		private readonly IDBConnection $db,
 		private readonly IConfig $config,
@@ -249,7 +248,9 @@ class ExternalStampService
 			$entry->setStartTime(\DateTime::createFromImmutable($start));
 			$entry->setEndTime(\DateTime::createFromImmutable($end));
 			$entry->setDescription($this->sourceLabel($stamp));
-			$entry->setWorkLocation($this->userWorkLocationService->resolveForNewEntry($uid, null, \DateTime::createFromImmutable($start)));
+			// Final class — resolved lazily like other AZC optional services.
+			$wl = \OCP\Server::get(UserWorkLocationService::class);
+			$entry->setWorkLocation($wl->resolveForNewEntry($uid, null, \DateTime::createFromImmutable($start)));
 			$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 			$entry->setIsManualEntry(false);
 			$entry->setJustification('External stamp confirmed by worker');

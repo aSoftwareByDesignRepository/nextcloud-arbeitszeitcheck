@@ -1383,7 +1383,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	}
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
 	.section--form .form-actions {
 		flex-direction: column;
 		align-items: stretch;

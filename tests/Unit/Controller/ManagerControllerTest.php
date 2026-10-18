@@ -1671,6 +1671,51 @@ class ManagerControllerTest extends TestCase
 		$this->assertTrue($response->getData()['success']);
 	}
 
+	public function testCreateEmployeeAbsenceIgnoresFormEncodedFalseFlags(): void
+	{
+		// A form/API client posting "false"/"0" must NOT mark the duration
+		// authoritative — !empty("false") is true and would silently flip it.
+		$managerId = 'manager1';
+		$employeeId = 'employee1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$employee = $this->createMock(IUser::class);
+		$employee->method('isEnabled')->willReturn(true);
+		$this->userManager->method('get')->with($employeeId)->willReturn($employee);
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+
+		$this->request->method('getParams')->willReturn([
+			'userId' => $employeeId,
+			'type' => Absence::TYPE_VACATION,
+			'startDate' => '2026-08-03',
+			'endDate' => '2026-08-04',
+			'durationHours' => 8,
+			'requireDurationHours' => 'false',
+			'serverMayFillHours' => '0',
+		]);
+
+		$absence = new Absence();
+		$absence->setId(11);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+
+		$this->absenceService->expects($this->once())
+			->method('createApprovedAbsenceForEmployeeByManager')
+			->with(
+				$managerId,
+				$employeeId,
+				$this->callback(static function (array $data): bool {
+					return empty($data['require_duration_hours'])
+						&& empty($data['server_may_fill_hours']);
+				})
+			)
+			->willReturn($absence);
+
+		$response = $this->controller->createEmployeeAbsence();
+		$this->assertSame(Http::STATUS_CREATED, $response->getStatus());
+	}
+
 	public function testCreateEmployeeAbsenceRejectsMissingRequiredFields(): void
 	{
 		$user = $this->createMock(IUser::class);

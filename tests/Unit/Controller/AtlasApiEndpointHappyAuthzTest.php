@@ -27,6 +27,7 @@ use OCA\ArbeitszeitCheck\Controller\AdminController;
 use OCA\ArbeitszeitCheck\Controller\ComplianceController;
 use OCA\ArbeitszeitCheck\Controller\DashboardWidgetController;
 use OCA\ArbeitszeitCheck\Controller\ExportController;
+use OCA\ArbeitszeitCheck\Controller\ExternalStampController;
 use OCA\ArbeitszeitCheck\Controller\GdprController;
 use OCA\ArbeitszeitCheck\Controller\HealthController;
 use OCA\ArbeitszeitCheck\Controller\HolidayController;
@@ -102,6 +103,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		OvertimePayoutController::class,
 		OutlookIcalSubscriptionController::class,
 		ExportController::class,
+		ExternalStampController::class,
 		GdprController::class,
 		HealthController::class,
 		MonthClosureController::class,

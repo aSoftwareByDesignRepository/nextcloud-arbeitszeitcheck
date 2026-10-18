@@ -768,7 +768,7 @@
     min-height: 44px;
 }
 
-@media (max-width: 576px) {
+@media (max-width: 575.98px) {
     .month-closure-card.card--elevated {
         padding: var(--space-4, 1rem);
     }

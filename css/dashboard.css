@@ -1595,5 +1595,5 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 }
 
 .azc-ext-stamps__status--error {
-    color: var(--color-error);
+    color: var(--color-error-text, var(--color-error));
 }

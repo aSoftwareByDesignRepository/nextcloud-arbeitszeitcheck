@@ -66,11 +66,6 @@ async function dismissToasts(page) {
 	}).catch(() => {});
 }
 
-/** True when the selector resolves to a visible element. */
-async function visible(page, sel, timeout = 5_000) {
-	return page.locator(sel).first().isVisible({ timeout }).catch(() => false);
-}
-
 /* ------------------------------------------------------------------ */
 /* Surface inventory — every primary web view, keyed by role           */
 /* ------------------------------------------------------------------ */

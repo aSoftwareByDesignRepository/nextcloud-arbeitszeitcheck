@@ -5928,7 +5928,20 @@
 		"Business trip rule assignment" : "Regelset-toewijzing voor zakenreizen",
 		"Business trip rule set" : "Regelset voor zakenreizen",
 		"Feature flag" : "Functievlag",
-		"Business trip profile" : "Zakenreisprofiel"
+		"Business trip profile" : "Zakenreisprofiel",
+		"Suggested stamps" : "Voorgestelde klokregistraties",
+		"Another app noticed work time for you. It only counts once you confirm it." : "Een andere app heeft werktijd voor u geregistreerd. Die telt pas mee als u die bevestigt.",
+		"From %s" : "Van %s",
+		"Stamp suggestion actions" : "Acties voor klokregistratiesuggestie",
+		"Dismiss" : "Verwerpen",
+		"Stamp added to your working time." : "Klokregistratie toegevoegd aan uw werktijd.",
+		"Suggestion dismissed." : "Suggestie verworpen.",
+		"Could not save your choice — please try again." : "Uw keuze kon niet worden opgeslagen — probeer het opnieuw.",
+		"This suggestion was already handled." : "Deze suggestie is al verwerkt.",
+		"Confirmed stamp" : "Bevestigde klokregistratie",
+		"Confirmed stamp from CareCheck" : "Bevestigde klokregistratie uit CareCheck",
+		"Confirmed stamp from TourCheck" : "Bevestigde klokregistratie uit TourCheck",
+		"This suggestion was already decided." : "Deze suggestie is al bevestigd of verworpen."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

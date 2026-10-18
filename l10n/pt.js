@@ -5928,7 +5928,20 @@
 		"Business trip rule assignment" : "Atribuição de regras de viagem de trabalho",
 		"Business trip rule set" : "Conjunto de regras de viagem de trabalho",
 		"Feature flag" : "Indicador de funcionalidade",
-		"Business trip profile" : "Perfil de viagem de trabalho"
+		"Business trip profile" : "Perfil de viagem de trabalho",
+		"Suggested stamps" : "Picagens sugeridas",
+		"Another app noticed work time for you. It only counts once you confirm it." : "Outra aplicação registou tempo de trabalho para si. Só conta depois de o confirmar.",
+		"From %s" : "De %s",
+		"Stamp suggestion actions" : "Ações da sugestão de picagem",
+		"Dismiss" : "Dispensar",
+		"Stamp added to your working time." : "Picagem adicionada ao seu tempo de trabalho.",
+		"Suggestion dismissed." : "Sugestão dispensada.",
+		"Could not save your choice — please try again." : "Não foi possível guardar a sua escolha — tente novamente.",
+		"This suggestion was already handled." : "Esta sugestão já foi tratada.",
+		"Confirmed stamp" : "Picagem confirmada",
+		"Confirmed stamp from CareCheck" : "Picagem confirmada do CareCheck",
+		"Confirmed stamp from TourCheck" : "Picagem confirmada do TourCheck",
+		"This suggestion was already decided." : "Esta sugestão já foi confirmada ou dispensada."
 		},
 		"nplurals=2; plural=(n > 1);"
 	);

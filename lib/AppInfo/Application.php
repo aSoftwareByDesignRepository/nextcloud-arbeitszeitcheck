@@ -1352,6 +1352,26 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		// F19: versioned suite facade — approved-absence status-only reads
+		// for sibling apps. Probed via class_exists + resolved through
+		// Server::get; additive-only contract.
+		$context->registerService(\OCA\ArbeitszeitCheck\Public\ApprovedAbsenceReadFacade::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Public\ApprovedAbsenceReadFacade(
+				$c->query(\OCP\IDBConnection::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+
+		// F16/F19b: versioned suite facade — sibling apps propose pending
+		// stamps the affected worker confirms. Probed via class_exists +
+		// resolved through Server::get; additive-only contract.
+		$context->registerService(\OCA\ArbeitszeitCheck\Public\ExternalStampDraftFacade::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Public\ExternalStampDraftFacade(
+				$c->query(\OCA\ArbeitszeitCheck\Service\ExternalStampService::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+
 		$context->registerDashboardWidget(EmployeeStatusWidget::class);
 		$context->registerDashboardWidget(ManagerTeamStatusWidget::class);
 		$context->registerDashboardWidget(AdminGlobalStatusWidget::class);

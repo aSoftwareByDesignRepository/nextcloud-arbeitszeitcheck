@@ -5913,7 +5913,20 @@
         "Business trip rule assignment": "Attribution de règles de voyage d'affaires",
         "Business trip rule set": "Ensemble de règles de voyage d'affaires",
         "Feature flag": "Indicateur de fonctionnalité",
-        "Business trip profile": "Profil de voyage d'affaires"
+        "Business trip profile": "Profil de voyage d'affaires",
+        "Suggested stamps": "Pointages suggérés",
+        "Another app noticed work time for you. It only counts once you confirm it.": "Une autre application a détecté du temps de travail pour vous. Il ne compte que si vous le confirmez.",
+        "From %s": "De %s",
+        "Stamp suggestion actions": "Actions sur la suggestion de pointage",
+        "Dismiss": "Ignorer",
+        "Stamp added to your working time.": "Pointage ajouté à votre temps de travail.",
+        "Suggestion dismissed.": "Suggestion ignorée.",
+        "Could not save your choice — please try again.": "Impossible d’enregistrer votre choix — veuillez réessayer.",
+        "This suggestion was already handled.": "Cette suggestion a déjà été traitée.",
+        "Confirmed stamp": "Pointage confirmé",
+        "Confirmed stamp from CareCheck": "Pointage confirmé depuis CareCheck",
+        "Confirmed stamp from TourCheck": "Pointage confirmé depuis TourCheck",
+        "This suggestion was already decided.": "Cette suggestion a déjà été confirmée ou rejetée."
     },
     "pluralForm": null
 }

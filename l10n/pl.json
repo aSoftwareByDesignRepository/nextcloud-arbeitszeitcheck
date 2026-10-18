@@ -5916,7 +5916,20 @@
         "Business trip rule assignment": "Przypisanie zestawu reguł podróży służbowych",
         "Business trip rule set": "Zestaw reguł podróży służbowych",
         "Feature flag": "Flaga funkcji",
-        "Business trip profile": "Profil podróży służbowej"
+        "Business trip profile": "Profil podróży służbowej",
+        "Suggested stamps": "Proponowane odbicia",
+        "Another app noticed work time for you. It only counts once you confirm it.": "Inna aplikacja wykryła dla Ciebie czas pracy. Zostanie on naliczony dopiero po Twoim potwierdzeniu.",
+        "From %s": "Od %s",
+        "Stamp suggestion actions": "Akcje propozycji odbicia",
+        "Dismiss": "Odrzuć",
+        "Stamp added to your working time.": "Odbicie dodane do Twojego czasu pracy.",
+        "Suggestion dismissed.": "Propozycja odrzucona.",
+        "Could not save your choice — please try again.": "Nie udało się zapisać Twojego wyboru — spróbuj ponownie.",
+        "This suggestion was already handled.": "Ta propozycja została już obsłużona.",
+        "Confirmed stamp": "Potwierdzone odbicie",
+        "Confirmed stamp from CareCheck": "Potwierdzone odbicie z CareCheck",
+        "Confirmed stamp from TourCheck": "Potwierdzone odbicie z TourCheck",
+        "This suggestion was already decided.": "Ta propozycja została już potwierdzona lub odrzucona."
     },
     "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

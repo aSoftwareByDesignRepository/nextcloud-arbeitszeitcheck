@@ -87,6 +87,11 @@ return [
 		['name' => 'time_entry#cancelCorrection', 'url' => '/api/time-entries/{id}/cancel-correction', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#complete', 'url' => '/api/time-entries/{id}/complete', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
+		// Suite flange F16/F19b — worker-confirmed draft stamps from sibling apps
+		['name' => 'external_stamp#index', 'url' => '/api/ext-stamps', 'verb' => 'GET'],
+		['name' => 'external_stamp#confirm', 'url' => '/api/ext-stamps/{id}/confirm', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'external_stamp#dismiss', 'url' => '/api/ext-stamps/{id}/dismiss', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+
 		// Absence management routes
 		['name' => 'absence#index_api', 'url' => '/api/absences-legacy', 'verb' => 'GET'],
 		['name' => 'absence#create', 'url' => '/absences/create', 'verb' => 'GET'],

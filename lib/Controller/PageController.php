@@ -123,7 +123,8 @@ class PageController extends Controller
 		TimeCaptureMethodService $timeCaptureMethodService,
 		TimeEntryDeletionPolicy $deletionPolicy,
 		IL10N $l10n,
-		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null
+		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\ExternalStampService $externalStamps = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeTrackingService = $timeTrackingService;
@@ -162,6 +163,32 @@ class PageController extends Controller
 			throw new \Exception('User not authenticated');
 		}
 		return $user->getUID();
+	}
+
+	/**
+	 * F16/F19b: pending suite draft stamps for the dashboard card. Fail-closed
+	 * — a broken staging table must never break the dashboard render.
+	 *
+	 * @return list<array{id:int,kind:string,sourceApp:string,startTs:int,endTs:?int}>
+	 */
+	private function listPendingExternalStamps(string $userId): array
+	{
+		if ($this->externalStamps === null) {
+			return [];
+		}
+		try {
+			return array_map(static function (\OCA\ArbeitszeitCheck\Db\ExternalStamp $s): array {
+				return [
+					'id' => (int)$s->getId(),
+					'kind' => $s->getKind(),
+					'sourceApp' => $s->getSourceApp(),
+					'startTs' => $s->getStartTs(),
+					'endTs' => $s->getEndTs(),
+				];
+			}, $this->externalStamps->listPending($userId));
+		} catch (\Throwable) {
+			return [];
+		}
 	}
 
 	private function workLocationChipContext(string $userId, array $status): ?array
@@ -353,7 +380,7 @@ class PageController extends Controller
 			'dashboard-overtime-bank',
 			'dashboard-overtime',
 			'common/projectcheck',
-		]);
+		], ['external-stamps']);
 		if ($this->workLocationCatalogEnabled()) {
 			Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
 		}
@@ -463,6 +490,7 @@ class PageController extends Controller
 				'projectCheckEnabled' => $projectCheckLinkingEnabled,
 				'projectCheckProjects' => $projectCheckLinkingEnabled ? $this->projectCheckIntegration->getAvailableProjects($userId) : [],
 				'workLocation' => $this->workLocationChipContext($userId, $status),
+				'pendingExternalStamps' => $this->listPendingExternalStamps($userId),
 				'timeCapture' => $this->timeCaptureMethodService->getSettings($userId),
 				'stats' => [
 					'total_time_entries' => $timeEntryCount,

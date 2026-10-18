@@ -5913,7 +5913,20 @@
         "Business trip rule assignment": "Dienstreise-Regelwerkzuordnung",
         "Business trip rule set": "Dienstreise-Regelwerk",
         "Feature flag": "Feature-Flag",
-        "Business trip profile": "Dienstreise-Profil"
+        "Business trip profile": "Dienstreise-Profil",
+        "Suggested stamps": "Vorgeschlagene Stempelungen",
+        "Another app noticed work time for you. It only counts once you confirm it.": "Eine andere App hat Arbeitszeit für Sie erkannt. Sie zählt erst, wenn Sie sie bestätigen.",
+        "From %s": "Von %s",
+        "Stamp suggestion actions": "Aktionen für Stempelvorschlag",
+        "Dismiss": "Verwerfen",
+        "Stamp added to your working time.": "Stempelung wurde Ihrer Arbeitszeit hinzugefügt.",
+        "Suggestion dismissed.": "Vorschlag verworfen.",
+        "Could not save your choice — please try again.": "Ihre Auswahl konnte nicht gespeichert werden — bitte versuchen Sie es erneut.",
+        "This suggestion was already handled.": "Dieser Vorschlag wurde bereits bearbeitet.",
+        "Confirmed stamp": "Bestätigte Stempelung",
+        "Confirmed stamp from CareCheck": "Bestätigte Stempelung aus CareCheck",
+        "Confirmed stamp from TourCheck": "Bestätigte Stempelung aus TourCheck",
+        "This suggestion was already decided.": "Dieser Vorschlag wurde bereits bestätigt oder verworfen."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

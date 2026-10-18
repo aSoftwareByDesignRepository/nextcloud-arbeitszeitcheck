@@ -5913,7 +5913,20 @@
         "Business trip rule assignment": "Assegnazione di regole per viaggi di lavoro",
         "Business trip rule set": "Set di regole per viaggi di lavoro",
         "Feature flag": "Flag di funzionalità",
-        "Business trip profile": "Profilo di viaggio di lavoro"
+        "Business trip profile": "Profilo di viaggio di lavoro",
+        "Suggested stamps": "Timbrature suggerite",
+        "Another app noticed work time for you. It only counts once you confirm it.": "Un'altra app ha rilevato orario di lavoro per Lei. Conta solo dopo la Sua conferma.",
+        "From %s": "Da %s",
+        "Stamp suggestion actions": "Azioni sul suggerimento di timbratura",
+        "Dismiss": "Ignora",
+        "Stamp added to your working time.": "Timbratura aggiunta al Suo orario di lavoro.",
+        "Suggestion dismissed.": "Suggerimento ignorato.",
+        "Could not save your choice — please try again.": "Impossibile salvare la Sua scelta — riprovi.",
+        "This suggestion was already handled.": "Questo suggerimento è già stato gestito.",
+        "Confirmed stamp": "Timbratura confermata",
+        "Confirmed stamp from CareCheck": "Timbratura confermata da CareCheck",
+        "Confirmed stamp from TourCheck": "Timbratura confermata da TourCheck",
+        "This suggestion was already decided.": "Questo suggerimento è già stato confermato o ignorato."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

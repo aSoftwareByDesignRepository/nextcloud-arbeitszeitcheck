@@ -1545,3 +1545,55 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
     border-color: var(--color-primary-element);
     box-shadow: inset 0 0 0 1px var(--color-primary-element);
 }
+
+/* F16/F19b: pending suite draft stamps — worker confirm/dismiss card. */
+.azc-ext-stamps__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.azc-ext-stamps__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    background: var(--color-main-background);
+}
+
+.azc-ext-stamps__info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.azc-ext-stamps__source {
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.azc-ext-stamps__when {
+    color: var(--color-text-maxcontrast);
+}
+
+.azc-ext-stamps__actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.azc-ext-stamps__status {
+    margin: var(--space-3) 0 0;
+    color: var(--color-text-maxcontrast);
+}
+
+.azc-ext-stamps__status--error {
+    color: var(--color-error);
+}

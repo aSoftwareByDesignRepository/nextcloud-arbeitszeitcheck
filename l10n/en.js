@@ -5928,7 +5928,20 @@
 		"Business trip rule assignment" : "Business trip rule assignment",
 		"Business trip rule set" : "Business trip rule set",
 		"Feature flag" : "Feature flag",
-		"Business trip profile" : "Business trip profile"
+		"Business trip profile" : "Business trip profile",
+		"Suggested stamps" : "Suggested stamps",
+		"Another app noticed work time for you. It only counts once you confirm it." : "Another app noticed work time for you. It only counts once you confirm it.",
+		"From %s" : "From %s",
+		"Stamp suggestion actions" : "Stamp suggestion actions",
+		"Dismiss" : "Dismiss",
+		"Stamp added to your working time." : "Stamp added to your working time.",
+		"Suggestion dismissed." : "Suggestion dismissed.",
+		"Could not save your choice — please try again." : "Could not save your choice — please try again.",
+		"This suggestion was already handled." : "This suggestion was already handled.",
+		"Confirmed stamp" : "Confirmed stamp",
+		"Confirmed stamp from CareCheck" : "Confirmed stamp from CareCheck",
+		"Confirmed stamp from TourCheck" : "Confirmed stamp from TourCheck",
+		"This suggestion was already decided." : "This suggestion was already decided."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

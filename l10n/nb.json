@@ -5913,7 +5913,20 @@
         "Business trip rule assignment": "Regelsett-tildeling for forretningsreiser",
         "Business trip rule set": "Regelsett for forretningsreiser",
         "Feature flag": "Funksjonsflagg",
-        "Business trip profile": "Forretningsreiseprofil"
+        "Business trip profile": "Forretningsreiseprofil",
+        "Suggested stamps": "Foreslåtte stemplinger",
+        "Another app noticed work time for you. It only counts once you confirm it.": "En annen app har registrert arbeidstid for deg. Den teller først når du bekrefter den.",
+        "From %s": "Fra %s",
+        "Stamp suggestion actions": "Handlinger for stemplingsforslag",
+        "Dismiss": "Avvis",
+        "Stamp added to your working time.": "Stempling lagt til i arbeidstiden din.",
+        "Suggestion dismissed.": "Forslag avvist.",
+        "Could not save your choice — please try again.": "Valget ditt kunne ikke lagres — prøv igjen.",
+        "This suggestion was already handled.": "Dette forslaget er allerede behandlet.",
+        "Confirmed stamp": "Bekreftet stempling",
+        "Confirmed stamp from CareCheck": "Bekræftet stempling fra CareCheck",
+        "Confirmed stamp from TourCheck": "Bekreftet stempling fra TourCheck",
+        "This suggestion was already decided.": "Dette forslaget er allerede bekreftet eller avvist."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

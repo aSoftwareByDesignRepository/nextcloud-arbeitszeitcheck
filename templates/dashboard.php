@@ -490,6 +490,56 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                 </article>
                 <?php endif; ?>
 
+                <?php
+                // F16/F19b: pending suite draft stamps (TourCheck first scan,
+                // CareCheck work log). Nothing counts until the worker confirms.
+                $pendingExternalStamps = is_array($_['pendingExternalStamps'] ?? null) ? $_['pendingExternalStamps'] : [];
+                ?>
+                <?php if ($pendingExternalStamps !== []): ?>
+                <article class="azc-card azc-ext-stamps" id="azc-ext-stamps" aria-labelledby="azc-ext-stamps-title">
+                    <header class="azc-card__header">
+                        <div class="azc-card__header-text">
+                            <h3 id="azc-ext-stamps-title" class="azc-card__title"><?php p($l->t('Suggested stamps')); ?></h3>
+                            <p class="azc-card__lead"><?php p($l->t('Another app noticed work time for you. It only counts once you confirm it.')); ?></p>
+                        </div>
+                    </header>
+                    <div class="azc-card__body">
+                        <ul class="azc-ext-stamps__list" id="azc-ext-stamps-list">
+                        <?php foreach ($pendingExternalStamps as $extStamp): ?>
+                            <?php
+                            $extStart = (new \DateTimeImmutable('@' . (int)$extStamp['startTs']))->setTimezone($arbeitszeitCheckUserDisplayTz);
+                            $extWhen = $l->l('datetime', $extStart);
+                            if ($extStamp['kind'] === 'segment' && $extStamp['endTs'] !== null) {
+                                $extEnd = (new \DateTimeImmutable('@' . (int)$extStamp['endTs']))->setTimezone($arbeitszeitCheckUserDisplayTz);
+                                $extWhen = $l->t('%1$s – %2$s', [$extWhen, $l->l('time', $extEnd)]);
+                            }
+                            $extSource = match ((string)$extStamp['sourceApp']) {
+                                'tourcheck' => 'TourCheck',
+                                'carecheck' => 'CareCheck',
+                                default => (string)$extStamp['sourceApp'],
+                            };
+                            ?>
+                            <li class="azc-ext-stamps__item" data-stamp-id="<?php p((int)$extStamp['id']); ?>">
+                                <div class="azc-ext-stamps__info">
+                                    <span class="azc-ext-stamps__source"><?php p($l->t('From %s', [$extSource])); ?></span>
+                                    <time class="azc-ext-stamps__when" datetime="<?php p($extStart->format(\DateTimeInterface::ATOM)); ?>"><?php p($extWhen); ?></time>
+                                </div>
+                                <div class="azc-ext-stamps__actions" role="group" aria-label="<?php p($l->t('Stamp suggestion actions')); ?>">
+                                    <button type="button" class="azc-btn azc-btn--primary azc-ext-stamps__btn" data-stamp-action="confirm">
+                                        <?php p($l->t('Confirm')); ?>
+                                    </button>
+                                    <button type="button" class="azc-btn azc-btn--secondary azc-ext-stamps__btn" data-stamp-action="dismiss">
+                                        <?php p($l->t('Dismiss')); ?>
+                                    </button>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                        </ul>
+                        <p class="azc-ext-stamps__status" id="azc-ext-stamps-status" role="status" aria-live="polite"></p>
+                    </div>
+                </article>
+                <?php endif; ?>
+
                 <?php if (!$showPunchCard && $manualTimeEntryEnabled): ?>
                 <article class="azc-card azc-dashboard-manual-cta" aria-labelledby="dashboard-manual-cta-heading">
                     <header class="azc-card__header">

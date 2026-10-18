@@ -5928,7 +5928,20 @@
 		"Business trip rule assignment" : "Regelverkstilldelning för tjänsteresor",
 		"Business trip rule set" : "Regelverk för tjänsteresor",
 		"Feature flag" : "Funktionsflagga",
-		"Business trip profile" : "Tjänstereseprofil"
+		"Business trip profile" : "Tjänstereseprofil",
+		"Suggested stamps" : "Föreslagna stämplingar",
+		"Another app noticed work time for you. It only counts once you confirm it." : "En annan app har registrerat arbetstid åt dig. Den räknas först när du bekräftar den.",
+		"From %s" : "Från %s",
+		"Stamp suggestion actions" : "Åtgärder för stämplingsförslag",
+		"Dismiss" : "Avvisa",
+		"Stamp added to your working time." : "Stämpling tillagd i din arbetstid.",
+		"Suggestion dismissed." : "Förslag avvisat.",
+		"Could not save your choice — please try again." : "Ditt val kunde inte sparas — försök igen.",
+		"This suggestion was already handled." : "Det här förslaget har redan hanterats.",
+		"Confirmed stamp" : "Bekräftad stämpling",
+		"Confirmed stamp from CareCheck" : "Bekräftad stämpling från CareCheck",
+		"Confirmed stamp from TourCheck" : "Bekräftad stämpling från TourCheck",
+		"This suggestion was already decided." : "Det här förslaget har redan bekräftats eller avvisats."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

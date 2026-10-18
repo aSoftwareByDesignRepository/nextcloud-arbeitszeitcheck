@@ -142,6 +142,15 @@
     min-width: 0;
 }
 
+/* Grid children without a named area (conditional cards such as
+   .azc-ext-stamps or .azc-dashboard-manual-cta) must span every column —
+   an unplaced item otherwise lands in a ~50px implicit track at >=768px.
+   Declared before the named-area rules so explicit grid-area placements
+   keep winning at equal specificity. */
+#app-content.azc-app--dashboard .azc-dashboard-overview__grid > * {
+    grid-column: 1 / -1;
+}
+
 /* Alerts + welcome above overview */
 #app-content.azc-app--dashboard .azc-dashboard-alerts {
     display: flex;

@@ -102,6 +102,10 @@ const STATEFUL_SPECS = [
   // Bulk decision creates + approves pending absences on the shared employee
   // — same absence-window/lock class as concurrent-absence-decision.
   /bulk-decision\.spec\.js/,
+  // Seeds a pending external stamp on the shared e2e_employee — the
+  // "Suggested stamps" card is visible on that fixture's dashboard for the
+  // probe's duration and must not appear mid-run on a parallel spec.
+  /atlas-ext-stamps-grid\.spec\.js/,
 ]
 
 export default defineConfig({

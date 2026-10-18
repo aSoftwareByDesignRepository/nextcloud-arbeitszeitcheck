@@ -570,7 +570,7 @@
         const teamsUrl = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.adminUsersConfig && window.ArbeitszeitCheck.adminUsersConfig.adminTeamsUrl)
             || buildApiUrl('/apps/arbeitszeitcheck/admin/teams');
         const esc = Utils.escapeHtml ? Utils.escapeHtml.bind(Utils) : function(s) { return String(s); };
-        const today = new Date().toISOString().slice(0, 10);
+        const today = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 
         Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models', {
             method: 'GET',

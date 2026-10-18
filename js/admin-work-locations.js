@@ -156,7 +156,7 @@
 			endGroup.className = 'azc-list__actions';
 			const endDate = document.createElement('input');
 			endDate.type = 'date';
-			endDate.value = new Date().toISOString().slice(0, 10);
+			endDate.value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 			endDate.setAttribute('aria-label', t('Last valid date'));
 			const end = document.createElement('button');
 			end.type = 'button';

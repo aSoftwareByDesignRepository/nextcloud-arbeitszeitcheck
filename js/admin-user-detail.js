@@ -1306,7 +1306,7 @@
             const payload = {
                 userId: user.userId,
                 asOfDate: (startDateEl?.value && previewToISO(startDateEl.value))
-                    || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toISOString().slice(0, 10)),
+                    || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')),
                 employment: readEmploymentDraftFromForm(),
                 draftPolicy: {
                     vacationMode: mode,
@@ -1923,7 +1923,7 @@
         if (window.ArbeitszeitCheckTime && typeof window.ArbeitszeitCheckTime.todayYmd === 'function') {
             return window.ArbeitszeitCheckTime.todayYmd();
         }
-        return new Date().toISOString().slice(0, 10);
+        return new Date().toLocaleDateString('sv-SE');
     }
 
     /**

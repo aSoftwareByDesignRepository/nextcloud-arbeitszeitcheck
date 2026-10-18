@@ -6,6 +6,12 @@ import './time-entry-clock-form.js'
 describe('ArbeitszeitCheckClockForm', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
+    // Production always bootstraps the org display/storage TZ
+    // (templates/common/user-display-timezone.php). Seed it so rendered
+    // instants do not fall back to the process timezone.
+    window.ArbeitszeitCheck = {
+      tz: { display: 'Europe/Berlin', storage: 'Europe/Berlin' },
+    }
   })
 
   it('bindForm prefills date and clock fields from ISO summary data', () => {
@@ -107,6 +113,7 @@ describe('ArbeitszeitCheckClockForm', () => {
 
   it('accepts AZG 10-minute break portions when minBreakMinutes is 10', () => {
     window.ArbeitszeitCheck = {
+      tz: { display: 'Europe/Berlin', storage: 'Europe/Berlin' },
       complianceParams: { minBreakMinutes: 10 },
     }
     const ClockForm = window.ArbeitszeitCheckClockForm
@@ -158,6 +165,7 @@ describe('ArbeitszeitCheckClockForm', () => {
 
   it('rejects 10-minute breaks when floor stays at DE 15', () => {
     window.ArbeitszeitCheck = {
+      tz: { display: 'Europe/Berlin', storage: 'Europe/Berlin' },
       complianceParams: { minBreakMinutes: 15 },
     }
     const ClockForm = window.ArbeitszeitCheckClockForm

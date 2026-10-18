@@ -539,7 +539,7 @@
 		const code = ruleSet ? ruleSet.tariffCode || '' : '';
 		const version = ruleSet ? ruleSet.version || '' : '';
 		const jurisdiction = ruleSet ? ruleSet.jurisdiction || '' : '';
-		const validFrom = ruleSet ? ruleSet.validFrom || new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+		const validFrom = ruleSet ? ruleSet.validFrom || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')) : (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 		const validTo = ruleSet ? ruleSet.validTo || '' : '';
 		const activationMode = ruleSet ? ruleSet.activationMode || 'immediate' : 'immediate';
 		const modules = (ruleSet && Array.isArray(ruleSet.modules) && ruleSet.modules.length)

@@ -135,7 +135,7 @@
 
   function todayYmd() {
     const api = timeApi();
-    return api ? api.todayYmd() : new Date().toISOString().slice(0, 10);
+    return api ? api.todayYmd() : new Date().toLocaleDateString('sv-SE');
   }
 
   function fmtDate(iso) {

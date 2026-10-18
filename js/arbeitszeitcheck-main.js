@@ -2969,7 +2969,9 @@
                 absences: [],
                 holidays: [],
                 modelChanges: {},
-                currentDate: new Date(monthStr + '-01'),
+                // Local-noon anchor — a bare 'YYYY-MM-01' parses as UTC midnight
+                // and lands in the previous month west of UTC.
+                currentDate: parseYmdToLocalDate(monthStr + '-01') || new Date(monthStr + '-01T12:00:00'),
                 currentView: this.config.currentView || 'month'
             };
 
@@ -3601,7 +3603,7 @@
          * Build accessible label for a day cell (for aria-label)
          */
         getDayCellAriaLabel: function(dateKey, dayData) {
-            const d = new Date(dateKey);
+            const d = parseYmdToLocalDate(dateKey) || new Date(dateKey + 'T12:00:00');
             const day = d.getDate();
             const months = this.config.l10n?.months || [];
             const monthName = months[d.getMonth()] || (d.getMonth() + 1);

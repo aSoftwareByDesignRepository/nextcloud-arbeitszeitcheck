@@ -358,7 +358,7 @@
 		document.getElementById('se-type-version').value = '';
 		document.getElementById('se-editor-title').textContent = t('New special leave entitlement');
 		const tomorrow = new Date(Date.now() + 86400000);
-		document.getElementById('se-from').value = tomorrow.toISOString().slice(0, 10);
+		document.getElementById('se-from').value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.ymd(tomorrow) : tomorrow.toLocaleDateString('sv-SE'));
 		editor.hidden = false;
 		detail.hidden = true;
 		loadTargets();
@@ -526,7 +526,7 @@
 		document.getElementById('se-editor-title').textContent = `${t('New rule for')} ${currentType.publicLabel}`;
 		form.reset();
 		const tomorrow = new Date(Date.now() + 86400000);
-		document.getElementById('se-from').value = tomorrow.toISOString().slice(0, 10);
+		document.getElementById('se-from').value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.ymd(tomorrow) : tomorrow.toLocaleDateString('sv-SE'));
 		// Definition fields are read-only for an existing type.
 		['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type'].forEach((id) => {
 			const el = document.getElementById(id);
@@ -554,7 +554,7 @@
 		if (!currentType) return;
 		const out = document.getElementById('se-trace-out');
 		const uid = document.getElementById('se-trace-user').value.trim();
-		const date = document.getElementById('se-trace-date').value || new Date().toISOString().slice(0, 10);
+		const date = document.getElementById('se-trace-date').value || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 		if (!uid) { out.textContent = t('Enter a user id.'); return; }
 		out.textContent = t('Resolving…');
 		try {
@@ -669,7 +669,7 @@
 		fromInput.id = `${prefix}-from`;
 		fromInput.type = 'date';
 		fromInput.required = true;
-		fromInput.value = new Date().toISOString().slice(0, 10);
+		fromInput.value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 		fromWrap.append(fromLabel, fromInput);
 
 		const toWrap = document.createElement('div');
@@ -726,7 +726,7 @@
 					if (m.effectiveTo === null || m.effectiveTo === undefined || m.effectiveTo === '') {
 						const endInput = document.createElement('input');
 						endInput.type = 'date';
-						endInput.value = new Date().toISOString().slice(0, 10);
+						endInput.value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 						endInput.setAttribute('aria-label', `${t('End membership for')} ${m.displayName || m.userId}`);
 						const endBtn = document.createElement('button');
 						endBtn.type = 'button';
@@ -773,7 +773,7 @@
 					}),
 				});
 				memberPicker?.clear();
-				fromInput.value = new Date().toISOString().slice(0, 10);
+				fromInput.value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
 				toInput.value = '';
 				memberStatus.textContent = t('Member added.');
 				await loadMembers();

@@ -553,7 +553,7 @@
 			sub.textContent = a.effectiveFrom + (a.effectiveTo ? ' – ' + a.effectiveTo : ' – ' + t('open-ended')) + (a.priority ? ' · P' + a.priority : '');
 			main.append(title, sub);
 			li.appendChild(main);
-			if (!a.effectiveTo || a.effectiveTo >= new Date().toISOString().slice(0, 10)) {
+			if (!a.effectiveTo || a.effectiveTo >= (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'))) {
 				const end = document.createElement('button');
 				end.type = 'button';
 				end.className = 'azc-btn azc-btn--secondary';
@@ -563,7 +563,7 @@
 					try {
 						await call(tpl('assignmentEndTemplate', a.id), {
 							method: 'POST',
-							json: { revision: a.revision, effectiveTo: new Date().toISOString().slice(0, 10) },
+							json: { revision: a.revision, effectiveTo: (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')) },
 						});
 						await loadAll();
 					} catch (e) {

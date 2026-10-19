@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.4 - 2026-10-19
+
+### Added
+
+- **External stamp synchronisation (suite integration):** approved worklog/absence data can now be exchanged with companion apps — a scheduled `WorkLogPullJob`, an `ExternalStampService` facade, and a dashboard widget surface pending external stamps. The dashboard payload exposes `pendingExternalStamps` additively, so older companion apps keep working unchanged.
+- **Bulk decisions for managers:** `POST /api/manager/bulk-decision` approves or rejects up to 200 pending items atomically — the whole batch is validated and manager-scope-checked before anything mutates, one `manager_bulk_decision` audit row is written per batch, and the manager dashboard gains selection checkboxes on pending approval cards.
+
+### Security
+
+- **Overtime CSV export formula injection:** user-controlled values (display names, user ids) that begin with `=`, `+`, `-`, `@` or control characters are neutralised in the browser-built overtime CSV, so exported files cannot smuggle live spreadsheet formulas into Excel/LibreOffice.
+
+### Fixed
+
+- **Work-locations admin section dead:** a nested `<form>` inside Nextcloud's settings mega-form made the whole section unsubmittable and broke every later admin section; the section now saves correctly and the mega-form integrity is covered by a contract test.
+- **UTC-midnight drift on date defaults:** admin defaults, month navigation and day-cell labels now resolve the local calendar day instead of the UTC date.
+- **Focus lost after modal close (a11y):** focus is restored to the invoking control when dialogs close.
+- Dashboard polish: external-stamps status uses the error-text token, unnamed overview-grid children span the full width, and the manager time-entries view loads the shared time-pair-matrix styles.
+
+### Changed
+
+- Removed usage of private Nextcloud server APIs; audit rounds 13/14 hardening (locks, error mapping, exports, break-policy cache, shared-state serialization); media-query boundary conformance (576px → 575.98px); form-encoded booleans parsed strictly.
+
 ## 1.9.1 - 2026-10-20
 
 ### Added

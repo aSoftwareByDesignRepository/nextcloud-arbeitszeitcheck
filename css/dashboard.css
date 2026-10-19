@@ -178,6 +178,34 @@
     gap: var(--azc-space-3, 0.75rem);
 }
 
+#app-content.azc-app--dashboard .azc-dashboard-welcome__actions .azc-btn {
+    min-height: 44px;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-welcome__step-title,
+#app-content.azc-app--dashboard .azc-dashboard-welcome__step-title strong {
+    margin: 0 0 0.15rem;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-welcome__step-text {
+    margin: 0;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-welcome__steps a {
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-welcome__steps a:focus-visible {
+    outline: 2px solid var(--color-primary-element, var(--color-primary));
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
 #app-content.azc-app--dashboard .azc-dashboard-overview__intro {
     grid-column: 1 / -1;
     margin: 0 0 var(--azc-space-2, 0.5rem);
@@ -222,7 +250,7 @@
     margin-top: 0;
 }
 
-/* Responsive recent-entries table (stacked cards on narrow viewports) */
+/* Narrow viewports: one row under the next, divided by a line, still inside the card. */
 @media (max-width: 767.98px) {
     #app-content.azc-app--dashboard .azc-dashboard-recent__table.azc-table--responsive thead {
         display: none;
@@ -230,15 +258,17 @@
 
     #app-content.azc-app--dashboard .azc-dashboard-recent__table.azc-table--responsive tbody tr {
         display: block;
-        margin-bottom: var(--azc-space-4, 1rem);
-        padding: var(--azc-space-3, 0.75rem);
-        border: 1px solid var(--azc-border, var(--color-border));
-        border-radius: var(--azc-radius-md, 8px);
-        background: var(--azc-bg-card, var(--color-main-background));
+        margin: 0;
+        padding: var(--azc-space-3, 0.75rem) var(--azc-space-5, 1.25rem);
+        border: 0;
+        border-bottom: 1px solid var(--azc-border, var(--color-border));
+        border-radius: 0;
+        background: transparent;
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-recent__table.azc-table--responsive tbody tr:last-child {
         margin-bottom: 0;
+        border-bottom: 0;
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-recent__table.azc-table--responsive td {
@@ -271,14 +301,22 @@
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-recent__body {
-    padding-top: 0;
+    padding: 0;
+    gap: 0;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-recent__table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--azc-border, var(--color-border));
-    border-radius: var(--azc-radius-md, 8px);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-recent__table-wrap:focus-visible {
+    outline: 2px solid var(--color-primary-element, var(--color-primary));
+    outline-offset: -2px;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-recent__table {
@@ -292,13 +330,23 @@
     padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
     text-align: left;
     vertical-align: middle;
+    font-variant-numeric: tabular-nums;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-recent__table thead th {
     font-size: var(--azc-fs-sm, 0.875rem);
-    font-weight: 700;
-    background: var(--azc-bg-soft, var(--color-background-hover));
-    border-bottom: 2px solid var(--azc-border, var(--color-border));
+    font-weight: 600;
+    color: var(--azc-muted, var(--color-text-maxcontrast));
+    background: transparent;
+    border-bottom: 1px solid var(--azc-border, var(--color-border));
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-recent__table tbody td {
+    border-bottom: 1px solid var(--azc-border, var(--color-border));
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-recent__table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-recent__empty {
@@ -322,8 +370,7 @@
         grid-template-columns: repeat(12, minmax(0, 1fr));
         grid-template-areas:
             "punch punch punch punch punch punch punch punch punch punch punch punch"
-            "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics"
-            "overtime overtime overtime overtime vacation vacation vacation vacation sick sick sick sick";
+            "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics";
         gap: var(--azc-space-5, 1.25rem);
         align-items: stretch;
     }
@@ -336,43 +383,24 @@
         grid-area: metrics;
     }
 
-    #app-content.azc-app--dashboard .azc-dashboard-overtime {
-        grid-area: overtime;
-    }
-
-    #app-content.azc-app--dashboard .azc-dashboard-vacation {
-        grid-area: vacation;
-    }
-
-    #app-content.azc-app--dashboard .azc-dashboard-sick {
-        grid-area: sick;
-    }
-
     /* When overtime card is hidden, vacation + sick split the row evenly */
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid:not(:has(.azc-dashboard-overtime)) {
         grid-template-areas:
             "punch punch punch punch punch punch punch punch punch punch punch punch"
-            "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics"
-            "vacation vacation vacation vacation vacation vacation sick sick sick sick sick sick";
+            "metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics metrics";
     }
 }
 
 @media (min-width: 1200px) {
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid {
         grid-template-areas:
-            "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics"
-            "overtime overtime overtime overtime vacation vacation vacation vacation sick sick sick sick";
+            "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics";
         gap: var(--azc-space-6, 1.5rem);
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid:not(:has(.azc-dashboard-overtime)) {
         grid-template-areas:
-            "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics"
-            "vacation vacation vacation vacation vacation vacation sick sick sick sick sick sick";
-    }
-
-    #app-content.azc-app--dashboard .azc-dashboard-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+            "punch punch punch punch punch punch metrics metrics metrics metrics metrics metrics";
     }
 }
 
@@ -470,14 +498,68 @@
     border-color: var(--arbeitszeitcheck-color-info);
 }
 
+#app-content.azc-app--dashboard .azc-dashboard-overview__grid > .azc-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: auto;
+    align-self: stretch;
+    margin: 0;
+}
+
+#app-content.azc-app--dashboard .azc-dashboard-overview__grid > .azc-card > .azc-card__body {
+    flex: 1 1 auto;
+}
+
+/* Overtime, vacation, and sick: one row, equal widths, equal height. */
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--azc-space-5, 1.25rem);
+    width: 100%;
+    margin: 0;
+}
+
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    align-self: stretch;
+    width: 0;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    margin: 0;
+}
+
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-card > .azc-card__header {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    flex: 0 0 5.75rem;
+    height: 5.75rem;
+    min-height: 5.75rem;
+    max-height: 5.75rem;
+    overflow: hidden;
+}
+
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-card > .azc-card__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 /* ===== Metric tiles (hours at a glance) ===== */
 #app-content.azc-app--dashboard .azc-dashboard-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--azc-space-4, 1rem);
     margin: 0;
     padding: 0;
     list-style: none;
+    align-items: stretch;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-metric {
@@ -490,6 +572,8 @@
     background: var(--azc-bg-card, var(--color-main-background));
     box-shadow: var(--azc-shadow-sm);
     min-height: 5.5rem;
+    height: 100%;
+    box-sizing: border-box;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-metric__label {
@@ -524,35 +608,6 @@
     color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
-#app-content.azc-app--dashboard .azc-dashboard-metrics-more {
-    margin-top: var(--azc-space-4, 1rem);
-}
-
-#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary {
-    cursor: pointer;
-    min-height: var(--azc-touch, 44px);
-    display: inline-flex;
-    align-items: center;
-    font-weight: 600;
-    color: var(--azc-text, var(--color-main-text));
-    list-style: none;
-    border-radius: var(--azc-radius-sm, 6px);
-    padding-inline: var(--azc-space-2, 0.5rem);
-}
-
-#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary::-webkit-details-marker {
-    display: none;
-}
-
-#app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary:focus-visible {
-    outline: 3px solid var(--color-primary-element);
-    outline-offset: 2px;
-}
-
-#app-content.azc-app--dashboard .azc-dashboard-metrics-more[open] .azc-dashboard-metrics--more {
-    margin-top: var(--azc-space-3, 0.75rem);
-}
-
 #app-content.azc-app--dashboard .azc-dashboard-manual-cta .azc-card__body {
     display: flex;
     flex-direction: column;
@@ -576,7 +631,6 @@
 }
 
 @media (forced-colors: active) {
-    #app-content.azc-app--dashboard .azc-dashboard-metrics-more__summary:focus-visible,
     #app-content.azc-app--dashboard .azc-dashboard-manual-cta__btn:focus-visible {
         outline: 3px solid CanvasText;
         outline-offset: 2px;
@@ -584,6 +638,7 @@
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-metric__delta {
+    margin-top: auto;
     font-size: var(--azc-fs-sm, 0.875rem);
     font-weight: 600;
     line-height: 1.35;
@@ -614,17 +669,33 @@
     align-self: flex-start;
 }
 
-#app-content.azc-app--dashboard .azc-dashboard-overtime.azc-card,
-#app-content.azc-app--dashboard .azc-dashboard-vacation.azc-card {
+@supports (grid-template-rows: subgrid) {
+    #app-content.azc-app--dashboard .azc-dashboard-metric {
+        display: grid;
+        grid-template-rows: subgrid;
+        grid-row: span 3;
+        row-gap: var(--azc-space-2, 0.5rem);
+        height: auto;
+    }
+
+    #app-content.azc-app--dashboard .azc-dashboard-metric__delta {
+        margin-top: 0;
+    }
+}
+
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-dashboard-overtime.azc-card,
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-dashboard-vacation.azc-card,
+#app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-dashboard-sick.azc-card {
     margin: 0;
-    height: 100%;
 }
 
 #app-content.azc-app--dashboard .azc-dashboard-overtime .azc-card__body,
-#app-content.azc-app--dashboard .azc-dashboard-vacation .azc-card__body {
+#app-content.azc-app--dashboard .azc-dashboard-vacation .azc-card__body,
+#app-content.azc-app--dashboard .azc-dashboard-sick .azc-card__body {
     display: flex;
     flex-direction: column;
     gap: var(--azc-space-4, 1rem);
+    flex: 1 1 auto;
 }
 
 #app-content.azc-app--dashboard .dashboard-overtime-card__balance {
@@ -1321,6 +1392,15 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 
     #app-content.azc-app--dashboard .azc-dashboard-metrics {
         grid-template-columns: 1fr;
+    }
+
+    #app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row {
+        flex-direction: column;
+    }
+
+    #app-content.azc-app.azc-app--dashboard .azc-dashboard-balance-row > .azc-card {
+        flex: 1 1 auto;
+        width: 100%;
     }
 
     #app-content.azc-app--dashboard .azc-dashboard-punch__actions,

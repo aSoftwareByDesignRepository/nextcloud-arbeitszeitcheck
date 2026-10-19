@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Bachus: core employee simplicity after GH #37–#39
- * — glance hierarchy, calendar one-line help, axe on dashboard/calendar.
+ * — glance tiles always visible, calendar one-line help, axe on dashboard/calendar.
  */
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -21,23 +21,18 @@ test.describe('Bachus simplify: dashboard hours hierarchy', () => {
 		await loginAs(page, 'EMPLOYEE');
 	});
 
-	test('J-S1: primary glance shows Today/Week; month/year behind details', async ({ page }) => {
+	test('J-S1: glance shows today, week, month, and year with no disclosure', async ({ page }) => {
 		await gotoApp(page, '/apps/arbeitszeitcheck/dashboard');
 		await page.waitForSelector('#dashboard-metrics-heading', { timeout: 30000 });
 
 		const panel = page.locator('.azc-dashboard-metrics-panel');
 		await expect(panel).toBeVisible();
-		await expect(panel.locator('.azc-card__lead')).toContainText(/Saldo|balance|Überstunden|next card|nächste/i);
+		await expect(page.locator('#dashboard-metrics-heading')).toBeVisible();
 
-		const primaryList = panel.locator('.azc-dashboard-metrics').first();
-		await expect(primaryList.locator('.azc-dashboard-metric')).toHaveCount(2);
-
-		const more = panel.locator('details.azc-dashboard-metrics-more');
-		await expect(more).toHaveCount(1);
-		await expect(more).not.toHaveAttribute('open', '');
-		await more.locator('summary').click();
-		await expect(more).toHaveAttribute('open', '');
-		await expect(more.locator('.azc-dashboard-metric')).toHaveCount(2);
+		const list = panel.locator('.azc-dashboard-metrics');
+		await expect(list).toHaveCount(1);
+		await expect(list.locator('.azc-dashboard-metric')).toHaveCount(4);
+		await expect(panel.locator('.azc-card__lead, details, summary, button, a')).toHaveCount(0);
 	});
 
 	test('J-S2: overtime Saldo card remains the clear year hero', async ({ page }) => {
@@ -45,7 +40,7 @@ test.describe('Bachus simplify: dashboard hours hierarchy', () => {
 		await page.waitForSelector('#dashboard-overtime-balance-value', { timeout: 30000 });
 		await expect(page.locator('#dashboard-overtime-heading')).toBeVisible();
 		await expect(page.locator('#dashboard-overtime-balance-value')).toBeVisible();
-		await expect(page.locator('#dashboard-overtime-formula')).not.toBeEmpty();
+		await expect(page.locator('#dashboard-overtime-formula')).toHaveCount(0);
 	});
 
 	test('J-S3: axe clean on metrics + overtime regions', async ({ page }) => {

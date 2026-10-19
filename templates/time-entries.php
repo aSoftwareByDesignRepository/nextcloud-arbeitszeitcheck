@@ -103,7 +103,11 @@ require __DIR__ . '/common/user-display-timezone.php';
             ?>
             <?php if ($tzMismatchForm): ?>
             <details class="azc-callout azc-callout--info time-entries-page__tz-callout azc-collapsed-callout">
-                <summary class="azc-callout__title"><?php p($l->t('How times are stored')); ?></summary>
+                <summary class="azc-callout__title">
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('How times are stored')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
+                </summary>
                 <div class="azc-callout__body">
                     <p class="azc-callout__text"><?php p($l->t('You enter start and end in your personal timezone (%2$s). The app stores them in the organization timezone (%1$s).', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?></p>
                     <div class="time-entries-page__tz-badges" role="list" aria-label="<?php p($l->t('Time zone summary')); ?>">
@@ -1326,7 +1330,11 @@ require __DIR__ . '/common/user-display-timezone.php';
             ?>
             <?php if ($tzMismatchList): ?>
             <details class="azc-callout azc-callout--info arbeitszeit-check-tz-context azc-collapsed-callout">
-                <summary class="azc-callout__title"><?php p($l->t('Time zones')); ?></summary>
+                <summary class="azc-callout__title">
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('Time zones')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
+                </summary>
                 <div class="arbeitszeit-check-tz-context__body">
                     <p class="azc-callout__text arbeitszeit-check-tz-context__text" id="arbeitszeit-tz-context-desc">
                         <?php p($l->t('Start and end times are shown in your personal timezone (%2$s). Values are stored using the organization timezone (%1$s) so daylight saving time is handled consistently.', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?>
@@ -1345,7 +1353,9 @@ require __DIR__ . '/common/user-display-timezone.php';
 
             <details class="azc-callout azc-callout--info time-entries-page__deletion-guide azc-collapsed-callout">
                 <summary id="time-entries-deletion-guide-title" class="azc-callout__title time-entries-page__deletion-guide-title">
-                    <?php p($l->t('Changing or removing time entries')); ?>
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('Changing or removing time entries')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
                 </summary>
                 <p class="azc-callout__text">
                     <?php p($l->t('For clocked entries less than %d days old: use Edit to change times, or Delete to remove the entry entirely. Older clocked entries: use Request correction. Entries in a finalized month or approved by your manager cannot be deleted here.', [$editWindowDays])); ?>
@@ -1361,6 +1371,7 @@ require __DIR__ . '/common/user-display-timezone.php';
             <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
             <div class="azc-hint" data-hint="time-entries-export-hint">
                 <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
+                    <span class="azc-hint__icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
                     <span class="azc-callout__text">
                         <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
                         <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
@@ -1370,8 +1381,8 @@ require __DIR__ . '/common/user-display-timezone.php';
                         data-hint-dismiss="time-entries-export-hint"
                         aria-expanded="true"
                         aria-controls="time-entries-export-hint"
-                        title="<?php p($l->t('Hide this help text permanently')); ?>">
-                        <?php p($l->t('Hide')); ?>
+                        aria-label="<?php p($l->t('Hide this help text permanently')); ?>">
+                        <?php print_unescaped(IconCatalog::render('x', 'azc-hint__dismiss-icon')); ?>
                     </button>
                 </p>
                 <button type="button"

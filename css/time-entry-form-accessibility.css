@@ -64,17 +64,17 @@
 
 /* ===== COLOR CONTRAST (WCAG 2.1 AAA: 7:1 for normal text, 4.5:1 for large) ===== */
 
-/* Ensure error messages have high contrast (main text on tinted surface; error = left border) */
+/* Error messages use the same ink as required asterisks, on a tinted surface. */
 #time-entry-form .form-error {
-  color: var(--color-main-text);
-  background-color: color-mix(in srgb, var(--color-error-text) 14%, var(--color-main-background));
+  color: var(--color-error-text);
+  background-color: color-mix(in srgb, var(--color-element-error, var(--color-error)) 14%, var(--color-main-background));
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
   border-left: 4px solid var(--color-error);
 }
 
 #time-entry-form .form-error__title {
   font-weight: 600;
-  color: var(--color-main-text);
+  color: var(--color-error-text);
 }
 
 /* Success messages */
@@ -365,7 +365,7 @@
 }
 
 #time-entry-form .compliance-status.violation {
-  background: color-mix(in srgb, var(--color-error-text) 12%, var(--color-main-background));
+  background: color-mix(in srgb, var(--color-element-error, var(--color-error)) 12%, var(--color-main-background));
   color: var(--color-main-text);
   border: 1px solid color-mix(in srgb, var(--color-error) 45%, var(--color-border));
 }

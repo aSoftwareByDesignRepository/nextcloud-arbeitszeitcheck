@@ -66,7 +66,7 @@ svg[class*='__glyph'],
 /* Notification icon fills: common/notification-surfaces.css */
 
 .form-error__icon {
-	color: var(--color-error);
+  color: var(--color-error-text);
 }
 
 /* Confirm dialogs (portaled modals) */

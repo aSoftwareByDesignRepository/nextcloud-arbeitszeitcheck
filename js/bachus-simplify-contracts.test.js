@@ -41,12 +41,16 @@ describe('Bachus simplify source contracts', () => {
     expect(src).toContain('overtimeAdjustHelpShort')
   })
 
-  it('dashboard progressive disclosure for month/year glance tiles', () => {
+  it('dashboard shows month and year glance tiles without a disclosure', () => {
     const src = readFileSync(path.join(root, 'templates/dashboard.php'), 'utf8')
-    expect(src).toContain('azc-dashboard-metrics-more')
-    expect(src).toContain('hoursGlancePrimary')
+    expect(src).not.toContain('azc-dashboard-metrics-more')
+    expect(src).not.toContain('hoursGlancePrimary')
+    expect(src).not.toContain('Worked / target')
+    expect(src).not.toContain('hour balance — not pay')
+    expect(src).not.toContain('Annual leave left (bookable)')
+    expect(src).toContain("t('Annual leave left')")
+    expect(src).toContain('foreach ($hoursGlance as $glanceRow)')
     expect(src).toContain('dashboard-manual-add-entry')
-    expect(src).toContain('Worked / target')
   })
 
   it('calendar day panel uses short help key', () => {

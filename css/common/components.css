@@ -326,17 +326,23 @@ textarea:focus-visible {
 }
 
 .form-required {
-  color: var(--arbeitszeitcheck-color-error);
+  color: var(--color-error-text);
   margin-left: var(--space-1);
   font-weight: var(--arbeitszeitcheck-font-weight-semibold);
 }
 
-/* Legend for required markers — keep inside form header/meta rows */
+/* Legend for required markers — keep inside form header/meta rows.
+   The sentence stays muted; the asterisk does not inherit that grey. */
 #app-content.azc-app .form-required-note {
   margin: 0;
   font-size: var(--azc-fs-sm, 0.875rem);
   line-height: var(--azc-line-base, 1.45);
   color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+#app-content.azc-app .form-required-note .form-required {
+  color: var(--color-error-text);
+  font-weight: var(--arbeitszeitcheck-font-weight-bold, 700);
 }
 
 /* Form Input */
@@ -590,11 +596,11 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   margin-top: var(--space-2);
 }
 
-/* Error surface: tint mixed with page background (not transparent) + main text for WCAG contrast across themes */
+/* Error surface: tint mixed with page background. Ink is --color-error-text (same as required asterisks). */
 .form-error,
 .field-error {
   font-size: var(--arbeitszeitcheck-font-size-sm);
-  color: var(--arbeitszeitcheck-color-main-text);
+  color: var(--color-error-text);
   background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
   border-left: 4px solid var(--color-error);
@@ -629,13 +635,13 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 .form-error__title {
   font-weight: var(--arbeitszeitcheck-font-weight-semibold);
-  color: var(--arbeitszeitcheck-color-main-text);
+  color: var(--color-error-text);
   margin: 0;
 }
 
 .form-error__description {
   margin: 0;
-  color: var(--arbeitszeitcheck-color-text);
+  color: var(--color-error-text);
   line-height: var(--arbeitszeitcheck-line-height-relaxed);
 }
 
@@ -644,7 +650,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   margin-top: var(--space-2);
 }
 
-/* Readable inline error/status text on any theme (tinted surface + main text) */
+/* Inline error text uses the same light-mode ink as required asterisks. */
 .inline-message--error,
 .correction-dialog__status--error,
 .form-help--error,
@@ -657,7 +663,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   font-size: var(--arbeitszeitcheck-font-size-sm);
   line-height: var(--arbeitszeitcheck-line-height-relaxed);
   font-weight: var(--arbeitszeitcheck-font-weight-semibold);
-  color: var(--color-main-text);
+  color: var(--color-error-text);
   background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
   border-left-width: 4px;
@@ -780,7 +786,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 /* .form-help follows .form-help--error in the cascade and would mute error text on tinted surfaces. */
 .form-help.form-help--error {
-  color: var(--color-main-text);
+  color: var(--color-error-text);
   font-weight: var(--arbeitszeitcheck-font-weight-semibold);
   background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
@@ -796,7 +802,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 #app-content.azc-app--admin-overtime-payouts .admin-ot-payouts__live.admin-ot-payouts__live--error,
 #app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__live:not([hidden]),
 .azc-nc-newuser-overtime__status--error:not(:empty) {
-  color: var(--color-main-text);
+  color: var(--color-error-text);
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
   border-left-width: 4px;
   border-left-color: var(--color-error);
@@ -806,7 +812,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 .form-group--error .form-label {
-  color: var(--arbeitszeitcheck-color-error);
+  color: var(--color-error-text);
 }
 
 .form-group--warning .form-label {

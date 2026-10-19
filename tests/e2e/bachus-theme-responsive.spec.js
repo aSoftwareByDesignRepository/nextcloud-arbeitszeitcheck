@@ -80,11 +80,8 @@ test.describe('Bachus theme × viewport: dashboard + calendar', () => {
 
 			const panel = page.locator('.azc-dashboard-metrics-panel')
 			await expect(panel).toBeVisible()
-			const more = panel.locator('details.azc-dashboard-metrics-more')
-			if (await more.count()) {
-				await more.locator('summary').focus()
-				await expect(more.locator('summary')).toBeFocused()
-			}
+			await expect(panel.locator('.azc-dashboard-metric')).toHaveCount(4)
+			await expect(panel.locator('details, summary')).toHaveCount(0)
 
 			for (const vp of viewports) {
 				await page.setViewportSize(vp)

@@ -1793,6 +1793,7 @@
          * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
          * @param {object|null} data - Data to send (null for GET/DELETE)
          * @param {boolean} reloadOnSuccess - Whether to reload page on success (default: true)
+         * GET/HEAD never toggle the punch-button busy state; their labels stay put.
          */
 		callApi: function(endpoint, method = 'POST', data = null, reloadOnSuccess = true) {
             const url = this.resolveRequestUrl(endpoint);
@@ -1822,8 +1823,14 @@
                 options.body = JSON.stringify(payload);
             }
 
-            // Show loading state
-            this.setLoadingState(true);
+            // Background reads (the session timer polls status every few seconds)
+            // must not disable or relabel the punch buttons. A slow poll otherwise
+            // flashes "Loading" on Start break / Clock out, and an overlapping
+            // poll can store that word as the button's original label.
+            const showBusyUi = upper !== 'GET' && upper !== 'HEAD';
+            if (showBusyUi) {
+                this.setLoadingState(true);
+            }
 
             const resolveTransportError = (status, rawText) => {
                 if (window.AzcApi && typeof window.AzcApi.mapApiError === 'function') {
@@ -1904,7 +1911,9 @@
                     return result;
                 })
                 .then(result => {
-                    this.setLoadingState(false);
+                    if (showBusyUi) {
+                        this.setLoadingState(false);
+                    }
 
                     const res = result._response;
                     const okHttp = res && res.ok;
@@ -1939,7 +1948,9 @@
                     }
                 })
                 .catch(error => {
-                    this.setLoadingState(false);
+                    if (showBusyUi) {
+                        this.setLoadingState(false);
+                    }
                     
                     // If error already has response data, keep it
                     if (!error.response) {
@@ -1964,25 +1975,19 @@
         },
 
         /**
-         * Set loading state on buttons and forms (includes clock-in/out/break for double-submit guard)
+         * Disable punch controls while a mutation is in flight (double-submit guard).
+         * Labels stay as rendered — never swap them for a loading string.
          */
         setLoadingState: function(loading) {
             const buttons = document.querySelectorAll(
                 'button[data-api-action], #btn-clock-in, #btn-start-break, #btn-end-break, .btn-clock-out'
             );
             buttons.forEach(button => {
+                button.disabled = !!loading;
                 if (loading) {
-                    button.disabled = true;
                     button.setAttribute('aria-busy', 'true');
-                    button.dataset.originalText = button.textContent;
-                    button.textContent = this.config.l10n?.loading || 'Loading...';
                 } else {
-                    button.disabled = false;
                     button.removeAttribute('aria-busy');
-                    if (button.dataset.originalText) {
-                        button.textContent = button.dataset.originalText;
-                        delete button.dataset.originalText;
-                    }
                 }
             });
         },

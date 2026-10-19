@@ -1114,6 +1114,10 @@
 #app-content.azc-app--time-entries .time-entry-form__required-note .form-required {
 	margin-left: 0;
 	margin-right: var(--azc-space-1, 0.25rem);
+	/* Note text stays muted. The mark uses NC --color-error-text (#8A0000 on
+	   the default light theme). Never --color-error: that token is the pale tint. */
+	color: var(--color-error-text);
+	font-weight: 700;
 }
 
 #app-content.azc-app--time-entries .time-entry-form-fieldset {
@@ -1356,25 +1360,6 @@
 	flex-wrap: wrap;
 	gap: 0.5rem;
 	margin-top: 0.75rem;
-}
-
-/* B-2 dismissible hints */
-#app-content .azc-hint .azc-hint__dismiss {
-	margin-left: 0.75rem;
-	padding: 0.15rem 0.5rem;
-	border: none;
-	border-radius: var(--border-radius);
-	background: transparent;
-	color: var(--color-text-maxcontrast);
-	cursor: pointer;
-	font-size: 0.85em;
-	text-decoration: underline;
-	min-height: 32px;
-}
-
-#app-content .azc-hint .azc-hint__dismiss:hover,
-#app-content .azc-hint .azc-hint__dismiss:focus-visible {
-	color: var(--color-main-text);
 }
 
 #app-content .azc-hint .azc-hint__show {

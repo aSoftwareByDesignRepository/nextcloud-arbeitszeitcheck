@@ -25,6 +25,15 @@ class IconCatalogTest extends TestCase
 		$this->assertStringContainsString('azc-callout__icon-svg', $html);
 	}
 
+	public function testLightbulbAndChevronDownRender(): void
+	{
+		$bulb = IconCatalog::render('lightbulb');
+		$chevron = IconCatalog::render('chevron-down');
+		$this->assertStringContainsString('M15 14c.2-1', $bulb);
+		$this->assertStringContainsString('aria-hidden="true"', $bulb);
+		$this->assertStringContainsString('m6 9 6 6 6-6', $chevron);
+	}
+
 	public function testRenderCalloutWellMapsErrorToDanger(): void
 	{
 		$html = IconCatalog::renderCalloutWell('circle-alert', 'error');

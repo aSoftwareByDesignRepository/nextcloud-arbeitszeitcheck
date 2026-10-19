@@ -148,41 +148,8 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
         ?>
         </div>
 
-        <?php if (($_['isFirstTimeUser'] ?? false) === true): ?>
-            <article class="azc-card azc-dashboard-welcome" role="region" aria-labelledby="welcome-title">
-                <header class="azc-card__header">
-                    <div class="azc-card__header-text">
-                        <h2 id="welcome-title" class="azc-card__title"><?php p($l->t('Welcome to Time Tracking!')); ?></h2>
-                        <p class="azc-card__lead"><?php p($l->t('This app helps you record your work time and follow the configured labour law. Here\'s how to get started:')); ?></p>
-                    </div>
-                </header>
-                <div class="azc-card__body">
-                    <ol class="azc-dashboard-welcome__steps">
-                        <?php if ($clockStampingEnabled): ?>
-                        <li><?php p($l->t('Click the "Clock In" button below when you start work')); ?></li>
-                        <li><?php p($l->t('Click "Clock Out" when you finish work')); ?></li>
-                        <li><?php p($l->t('The system will automatically track your hours and remind you to take breaks')); ?></li>
-                        <?php endif; ?>
-                        <?php if ($manualTimeEntryEnabled): ?>
-                        <li><?php p($l->t('You can add time entries manually under Time entries when you need to record hours by hand')); ?></li>
-                        <?php endif; ?>
-                        <li><?php p($l->t('Request vacation and other absences in the Absences section')); ?></li>
-                    </ol>
-                    <div class="azc-dashboard-welcome__actions">
-                        <?php if ($manualTimeEntryEnabled): ?>
-                        <a href="<?php print_unescaped($urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
-                            class="azc-btn azc-btn--primary"
-                            aria-label="<?php p($l->t('Go to time entries to see how to add entries manually')); ?>">
-                            <?php p($l->t('Learn More About Time Entries')); ?>
-                        </a>
-                        <?php endif; ?>
-                        <button type="button" class="azc-btn azc-btn--secondary" id="dismiss-welcome"
-                            aria-label="<?php p($l->t('Dismiss this welcome message')); ?>">
-                            <?php p($l->t('Got it, thanks!')); ?>
-                        </button>
-                    </div>
-                </div>
-            </article>
+        <?php if (!empty($_['showAdminSetupWelcome']) || (($_['isFirstTimeUser'] ?? false) === true && empty($_['showAdminNav']))): ?>
+            <?php include __DIR__ . '/partials/dashboard-welcome.php'; ?>
         <?php endif; ?>
 
         <section class="azc-dashboard-overview dashboard-key-metrics" aria-labelledby="dashboard-overview-title">
@@ -569,16 +536,6 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
 
                 <?php
                 $hoursGlance = is_array($_['hoursGlance'] ?? null) ? $_['hoursGlance'] : [];
-                $hoursGlancePrimary = [];
-                $hoursGlanceMore = [];
-                foreach ($hoursGlance as $glanceRow) {
-                    $key = (string)($glanceRow['key'] ?? '');
-                    if ($key === 'today' || $key === 'week') {
-                        $hoursGlancePrimary[] = $glanceRow;
-                    } else {
-                        $hoursGlanceMore[] = $glanceRow;
-                    }
-                }
                 $metricOvertimeBalance = round((float)($_['overtimeYtdBalance'] ?? $overtimeTrafficLight['balance'] ?? 0), 2);
                 $bankEnabled = ($overtimeBank['enabled'] ?? false) === true;
                 // Prefer bank effective (includes adjustments); DisplayService YTD matches when bank off.
@@ -623,7 +580,6 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     <header class="azc-card__header">
                         <div class="azc-card__header-text">
                             <h3 id="dashboard-metrics-heading" class="azc-card__title"><?php p($l->t('Hours at a glance')); ?></h3>
-                            <p class="azc-card__lead"><?php p($l->t('Worked / target. Overtime Saldo is in the next card.')); ?></p>
                         </div>
                     </header>
                     <div class="azc-card__body">
@@ -634,17 +590,9 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         <span class="azc-dashboard-metric__value"><?php p($arbeitszeitCheckFormatHours(round((float)($status['working_today_hours'] ?? 0), 2))); ?> <span class="azc-dashboard-metric__unit"><?php p($l->t('hours')); ?></span></span>
                     </div>
                     <?php else: ?>
-                    <?php foreach ($hoursGlancePrimary as $glanceRow) { $renderGlanceTile($glanceRow); } ?>
+                    <?php foreach ($hoursGlance as $glanceRow) { $renderGlanceTile($glanceRow); } ?>
                     <?php endif; ?>
                     </div>
-                    <?php if ($hoursGlanceMore !== []): ?>
-                    <details class="azc-dashboard-metrics-more">
-                        <summary class="azc-dashboard-metrics-more__summary"><?php p($l->t('Month and year')); ?></summary>
-                        <div class="azc-dashboard-metrics azc-dashboard-metrics--more" role="list" aria-label="<?php p($l->t('Month and year')); ?>">
-                            <?php foreach ($hoursGlanceMore as $glanceRow) { $renderGlanceTile($glanceRow); } ?>
-                        </div>
-                    </details>
-                    <?php endif; ?>
                     </div>
                 </article>
 
@@ -675,14 +623,12 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     $thresholds = is_array($overtimeTrafficLight['thresholds'] ?? null) ? $overtimeTrafficLight['thresholds'] : [];
                     $trafficEnabled = $trafficEnabledPreview;
                 ?>
+                <div class="azc-dashboard-balance-row">
                 <?php if ($showOvertimeSection): ?>
                 <article class="azc-card azc-dashboard-overtime dashboard-overtime-card" aria-labelledby="dashboard-overtime-heading">
                     <header class="azc-card__header">
                         <div class="azc-card__header-text">
                             <h3 id="dashboard-overtime-heading" class="azc-card__title"><?php p($l->t('Your overtime balance')); ?></h3>
-                            <p id="dashboard-overtime-formula" class="azc-card__lead dashboard-overtime-card__formula">
-                                <?php p($l->t('Worked hours minus your contract target (this year). This is an hour balance — not pay.')); ?>
-                            </p>
                         </div>
                     </header>
                     <div class="azc-card__body">
@@ -701,7 +647,6 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                 ?></span>
                                 <span class="dashboard-overtime-card__balance-value <?php echo $displayBalance >= 0 ? 'positive' : 'negative'; ?>"
                                     id="dashboard-overtime-balance-value"
-                                    aria-describedby="dashboard-overtime-formula"
                                     aria-label="<?php p($l->t('Balance: %s hours', [$balanceSignPrefix . number_format($displayBalance, 2)])); ?>">
                                     <?php p($balanceSignPrefix . number_format($displayBalance, 2)); ?> <?php p($l->t('h')); ?>
                                 </span>
@@ -722,8 +667,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                 <a id="dashboard-overtime-balance-pdf"
                                    class="azc-btn azc-btn--secondary azc-btn--sm"
                                    href="<?php p($overtimeBalancePdfUrl); ?>"
-                                   download
-                                   aria-describedby="dashboard-overtime-formula">
+                                   download>
                                     <?php p($l->t('Download balance PDF')); ?>
                                 </a>
                             </div>
@@ -912,7 +856,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         </div>
                         <dl class="dashboard-stat-card__breakdown" aria-label="<?php p($l->t('Vacation breakdown')); ?>">
                             <div class="dashboard-stat-card__breakdown-row">
-                                <dt><?php p($l->t('Annual leave left (bookable)')); ?></dt>
+                                <dt><?php p($l->t('Annual leave left')); ?></dt>
                                 <dd><?php p((string)round((float)($dashStats['vacation_annual_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
                             <div class="dashboard-stat-card__breakdown-row">
@@ -981,6 +925,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         </div>
                     </div>
                 </article>
+                </div>
             </div><!-- /.azc-dashboard-overview__grid -->
         </section>
 
@@ -1240,9 +1185,13 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     ? window.ArbeitszeitCheck.apiUrl.onboardingComplete
                     : null;
                 if (completeUrl && window.ArbeitszeitCheckUtils && typeof window.ArbeitszeitCheckUtils.ajax === 'function') {
+                    const payload = { completed: true };
+                    if (welcomeCard.getAttribute('data-welcome') === 'admin') {
+                        payload.scope = 'admin';
+                    }
                     window.ArbeitszeitCheckUtils.ajax(completeUrl, {
                         method: 'POST',
-                        data: { completed: true }
+                        data: payload
                     }).catch(function (err) {
                         const fallback = <?php echo json_encode($l->t('Could not save onboarding status. If this continues, ask an administrator to run the server upgrade.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
                         const msg = (err && err.message) ? String(err.message) : fallback;

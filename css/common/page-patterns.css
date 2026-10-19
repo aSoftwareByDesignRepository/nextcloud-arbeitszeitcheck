@@ -339,6 +339,8 @@
    Actions column: .azc-table-actions-col + .azc-table-actions
    Matrix tables: .azc-table--matrix (admin notification grids)
    Card layout on narrow screens: .azc-table--responsive + data-label on td
+   A table inside .azc-card is not a second box. The card is the frame;
+   the wrap drops its border, radius, and fill.
    ───────────────────────────────────────────────────────────── */
 #app-content.azc-app .table-container,
 #app-content.azc-app .table-responsive,
@@ -358,6 +360,18 @@
 #app-content.azc-app .azc-card__body > .table-responsive,
 #app-content.azc-app .azc-card__body > .azc-table-wrap {
 	margin-block: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+/* Sole content of the card: sit flush under the header, no inner inset. */
+#app-content.azc-app .azc-card__body:has(> .table-container:only-child),
+#app-content.azc-app .azc-card__body:has(> .table-responsive:only-child),
+#app-content.azc-app .azc-card__body:has(> .azc-table-wrap:only-child) {
+	padding: 0;
+	gap: 0;
 }
 
 #app-content.azc-app .table-container .table,

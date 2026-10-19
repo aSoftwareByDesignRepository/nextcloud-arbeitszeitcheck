@@ -315,7 +315,7 @@ header {
 /* Required field indicators */
 .form-label .required,
 .form-required {
-  color: var(--arbeitszeitcheck-color-error);
+  color: var(--color-error-text);
   font-weight: var(--arbeitszeitcheck-font-weight-bold);
 }
 
@@ -328,9 +328,9 @@ header {
   border-width: 2px;
 }
 
-/* Error messages should be associated; body text uses main-text for contrast (accent is border + icon) */
+/* Error messages use the same ink as required asterisks. */
 .form-error[role="alert"] {
-  color: var(--arbeitszeitcheck-color-main-text);
+  color: var(--color-error-text);
   font-weight: var(--arbeitszeitcheck-font-weight-medium);
 }
 

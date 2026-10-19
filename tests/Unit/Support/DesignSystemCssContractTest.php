@@ -300,6 +300,37 @@ final class DesignSystemCssContractTest extends TestCase
 		);
 	}
 
+	public function testRequiredMarkUsesShippedErrorTextNotPaleTint(): void
+	{
+		self::assertDoesNotMatchRegularExpression(
+			'/--color-error-text\s*:/',
+			$this->tokensCss,
+			'Do not redefine --color-error-text. NC 31 --color-error is the pale tint #FFE7E7; mixing it in fails AA. The theme already ships --color-error-text as #8A0000',
+		);
+		self::assertMatchesRegularExpression(
+			'/--azc-tint-danger:\s*color-mix\([^;]*var\(--color-element-error/s',
+			$this->tokensCss,
+			'Under-Soll and other danger surfaces must stay on the element red, not asterisk ink',
+		);
+		self::assertDoesNotMatchRegularExpression(
+			'/--azc-tint-danger:[^;]*--color-error-text/',
+			$this->tokensCss,
+		);
+
+		$timeEntries = (string) file_get_contents($this->appRoot . '/css/time-entries.css');
+		self::assertMatchesRegularExpression(
+			'/\.time-entry-form__required-note \.form-required\s*\{[^}]*color:\s*var\(--color-error-text\)/s',
+			$timeEntries,
+			'The Pflichtfeld legend is muted; its asterisk must set --color-error-text itself',
+		);
+
+		$components = (string) file_get_contents($this->appRoot . '/css/common/components.css');
+		self::assertMatchesRegularExpression(
+			'/\.form-required-note \.form-required\s*\{[^}]*color:\s*var\(--color-error-text\)/s',
+			$components,
+		);
+	}
+
 	public function testAppLayoutUsesNextcloudThemeSurfaces(): void
 	{
 		$layout = (string) file_get_contents($this->appRoot . '/css/common/app-layout.css');
@@ -392,9 +423,15 @@ final class DesignSystemCssContractTest extends TestCase
 			);
 		}
 
-		self::assertMatchesRegularExpression(
-			'/\.azc-dashboard-metrics-more__summary:focus-visible[^{]*\{[^}]*outline:\s*3px solid var\(--color-primary-element\)/s',
+		self::assertDoesNotMatchRegularExpression(
+			'/azc-dashboard-metrics-more/',
 			$dashboard,
+			'Month and year glance tiles stay visible; the disclosure control is gone',
+		);
+		self::assertMatchesRegularExpression(
+			'/#app-content\.azc-app\.azc-app--dashboard \.azc-dashboard-balance-row\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*stretch/s',
+			$dashboard,
+			'Overtime, vacation, and sick must share one stretched row',
 		);
 		self::assertMatchesRegularExpression(
 			'/\.azc-dashboard-manual-cta__btn[^{]*\{[^}]*min-height:\s*var\(--azc-touch-lg/s',

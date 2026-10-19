@@ -426,8 +426,8 @@ class PageController extends Controller
 			$timeEntryCount = $this->timeEntryMapper->countByUser($userId);
 			$absenceCount = $this->absenceMapper->countByUser($userId);
 
-			// Check onboarding state:
-			// welcome card is shown only if there are no time entries and onboarding was not dismissed yet.
+			// Employee welcome: no time entries yet, and not dismissed.
+			// Admin setup card: separate flag, until that admin dismisses it.
 			$onboardingCompleted = false;
 			try {
 				$onboardingSetting = $this->userSettingsMapper->getSetting($userId, 'onboarding_completed');
@@ -435,9 +435,11 @@ class PageController extends Controller
 			} catch (\Throwable $e) {
 				$onboardingCompleted = false;
 			}
-			$isFirstTimeUser = $timeEntryCount === 0 && !$onboardingCompleted;
-
 			$navFlags = $this->getNavigationFlags($userId);
+			$showAdminSetupWelcome = !empty($navFlags['showAdminNav']) && !$this->isAdminSetupWelcomeDismissed($userId);
+			// The employee welcome stays a first visit. The admin setup card stays
+			// until that admin dismisses it, even after they already have time entries.
+			$isFirstTimeUser = $timeEntryCount === 0 && !$onboardingCompleted && !$showAdminSetupWelcome;
 			$pendingCorrectionCount = count($this->timeEntryMapper->findByUserAndStatus(
 				$userId,
 				\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL
@@ -485,6 +487,7 @@ class PageController extends Controller
 				'error' => $overtimeExtras['error'],
 				'recentEntries' => $recentEntries,
 				'isFirstTimeUser' => $isFirstTimeUser,
+				'showAdminSetupWelcome' => $showAdminSetupWelcome,
 				'workingTimeModelMissing' => $workingTimeModelMissing,
 				'projectCheckAvailable' => $this->projectCheckIntegration->isProjectCheckAvailable(),
 				'projectCheckEnabled' => $projectCheckLinkingEnabled,
@@ -545,7 +548,8 @@ class PageController extends Controller
 				'overtimePayoutHistory' => ['items' => [], 'total' => 0],
 				'premiumSummary' => ['enabled' => false, 'buckets' => []],
 				'recentEntries' => [],
-				'isFirstTimeUser' => true,
+				'isFirstTimeUser' => $userId === '' || empty($navFlags['showAdminNav']),
+				'showAdminSetupWelcome' => $userId !== '' && !empty($navFlags['showAdminNav']) && !$this->isAdminSetupWelcomeDismissed($userId),
 				'workingTimeModelMissing' => false,
 				'stats' => [
 					'total_time_entries' => 0,
@@ -1490,6 +1494,20 @@ class PageController extends Controller
 	/**
 	 * Whether the user has no active working time model assignment (W9 dashboard callout).
 	 */
+	private function isAdminSetupWelcomeDismissed(string $userId): bool
+	{
+		if ($userId === '') {
+			return true;
+		}
+		try {
+			$setting = $this->userSettingsMapper->getSetting($userId, 'admin_setup_onboarding_completed');
+
+			return $setting !== null && $setting->getSettingValue() === '1';
+		} catch (\Throwable $e) {
+			return false;
+		}
+	}
+
 	private function isWorkingTimeModelMissing(string $userId): bool
 	{
 		try {

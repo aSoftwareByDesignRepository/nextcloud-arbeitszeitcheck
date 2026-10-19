@@ -313,7 +313,7 @@
   gap: var(--space-2, 0.5rem);
   min-height: 2.75rem;
   padding: var(--space-2, 0.5rem) 0;
-  color: var(--color-primary-element);
+  color: var(--azc-accent-ink, var(--color-primary-element));
   font-weight: 600;
   text-decoration: none;
   border-radius: var(--border-radius, 4px);
@@ -454,7 +454,7 @@
 
 .admin-user-detail__toc-link:hover {
   border-color: var(--color-primary-element);
-  color: var(--color-primary-element);
+  color: var(--azc-accent-ink, var(--color-primary-element));
 }
 
 .admin-user-detail__toc-link:focus-visible {

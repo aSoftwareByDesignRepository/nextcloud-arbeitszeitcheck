@@ -389,7 +389,7 @@
 	background: transparent;
 	border: 0;
 	padding: 0;
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	font-size: 0.8125rem;
 	font-weight: 500;
 	cursor: pointer;
@@ -408,7 +408,7 @@
 	font-size: 0.875rem;
 	font-weight: 600;
 	line-height: 1.25;
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	text-decoration: none;
 	border-radius: var(--radius-xl, 12px);
 	border: 1px solid color-mix(in srgb, var(--color-primary-element) 38%, var(--color-border));
@@ -594,7 +594,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	font-size: 2.25rem;
 	font-weight: 800;
 	line-height: 1.1;
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 }
 .entitlement-explain-dialog__summary-unit {
 	font-size: 1rem;
@@ -654,7 +654,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-element) 25%, transparent);
 }
 .entitlement-explain-dialog__step--applied .entitlement-explain-dialog__step-outcome {
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	font-weight: 700;
 }
 .entitlement-explain-dialog__step-title {
@@ -938,7 +938,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	align-items: center;
 	gap: 0.35rem;
 	font-weight: 700;
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 }
 
 .absence-days-cell__qty {

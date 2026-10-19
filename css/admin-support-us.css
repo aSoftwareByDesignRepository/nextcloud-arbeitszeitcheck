@@ -366,7 +366,7 @@
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	line-height: var(--azc-line-tight, 1.25);
-	color: var(--color-primary-element, var(--azc-text));
+	color: var(--azc-accent-ink, var(--color-primary-element, var(--azc-text)));
 }
 
 .azc-support-us__offer-title {

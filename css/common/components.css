@@ -85,7 +85,7 @@ textarea:focus-visible {
 .btn--tertiary {
   background-color: transparent;
   border-color: transparent;
-  color: var(--color-primary-element);
+  color: var(--azc-accent-ink, var(--color-primary-element));
 }
 
 .btn--tertiary:hover:not(:disabled) {
@@ -2333,7 +2333,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   justify-content: center;
   vertical-align: middle;
   margin-inline-end: var(--space-1, 4px);
-  color: var(--color-primary-element, var(--color-primary));
+  color: var(--azc-accent-ink, var(--color-primary-element, var(--color-primary)));
 }
 
 .time-entry-form-fieldset__legend-icon-svg {

@@ -15,6 +15,7 @@
  * the occ calls (the tests themselves would fail at login, which is the
  * honest signal).
  */
+import { resetE2eUserState } from '../../../_shared/e2e/reset-e2e-user-state.mjs'
 import { execFileSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
@@ -150,6 +151,7 @@ export default async function globalSetup() {
 		// eslint-disable-next-line no-console
 		console.log('[e2e globalSetup] Nextcloud container not reachable — skipping env normalization (non-Docker target)')
 		return
+	resetE2eUserState()
 	}
 
 	preconditionBruteForce()

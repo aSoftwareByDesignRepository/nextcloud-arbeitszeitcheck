@@ -253,7 +253,7 @@
 	height: 56px;
 	border-radius: var(--azc-radius-md);
 	background: var(--azc-tint-info);
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 }
 .azc-page-header__icon-svg {
 	width: 28px;

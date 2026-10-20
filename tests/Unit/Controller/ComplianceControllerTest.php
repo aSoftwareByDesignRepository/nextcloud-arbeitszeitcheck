@@ -74,6 +74,12 @@ class ComplianceControllerTest extends TestCase
 	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 
+	/** @var \OCA\ArbeitszeitCheck\Service\OversightScopeService */
+	private $oversightScopeService;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamResolver;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -94,6 +100,27 @@ class ComplianceControllerTest extends TestCase
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(fn ($s) => $s);
 		$this->request = $this->createMock(IRequest::class);
+		// Compliance/scope access checks uid existence via userManager->get().
+		// Default: every uid resolves to an enabled account.
+		$this->userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			if ($uid === '') {
+				return null;
+			}
+			$stub = $this->createMock(IUser::class);
+			$stub->method('getUID')->willReturn($uid);
+			$stub->method('isEnabled')->willReturn(true);
+			return $stub;
+		});
+		// Real scope service (final — not mockable) wired to the test mocks.
+		$this->teamResolver = $this->createMock(\OCA\ArbeitszeitCheck\Service\TeamResolverService::class);
+		$this->oversightScopeService = new \OCA\ArbeitszeitCheck\Service\OversightScopeService(
+			$this->permissionService,
+			$this->teamResolver,
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Db\TeamManagerMapper::class),
+			$this->userManager,
+		);
 		$localeFormat = $this->createMock(LocaleFormatService::class);
 		$localeFormat->method('clientHints')->willReturn([
 			'locale' => 'en-US',
@@ -116,6 +143,7 @@ class ComplianceControllerTest extends TestCase
 			$this->l10n,
 			$this->createNavigationFlagsService(),
 			$this->createLaborLawProfileFactory(),
+			$this->oversightScopeService,
 		);
 	}
 
@@ -213,6 +241,7 @@ class ComplianceControllerTest extends TestCase
 			$this->l10n,
 			$this->createNavigationFlagsService(),
 			$factory,
+			$this->oversightScopeService,
 		);
 
 		$this->mockAuthenticatedUser('alice');
@@ -515,6 +544,7 @@ class ComplianceControllerTest extends TestCase
 				$this->createMock(IConfig::class),
 			),
 			$this->createLaborLawProfileFactory(),
+			$this->oversightScopeService,
 		);
 
 		$violation = new ComplianceViolation();
@@ -788,6 +818,7 @@ class ComplianceControllerTest extends TestCase
 				$this->createMock(IConfig::class),
 			),
 			$this->createLaborLawProfileFactory(),
+			$this->oversightScopeService,
 		);
 
 		$violation = new ComplianceViolation();
@@ -989,5 +1020,117 @@ class ComplianceControllerTest extends TestCase
 		$response = $this->controller->checkRestPeriod('not-a-datetime');
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testGetViolationsScopeManagedUsesSqlScopeQuery(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$violation = new ComplianceViolation();
+		$violation->setId(1);
+		$violation->setUserId('employee1');
+		$violation->setViolationType(ComplianceViolation::TYPE_MISSING_BREAK);
+		$violation->setSeverity(ComplianceViolation::SEVERITY_WARNING);
+		$violation->setDescription('Missing break');
+		$violation->setDate(new \DateTime('2024-01-01'));
+		$violation->setCreatedAt(new \DateTime());
+
+		// Scoped path must hit the batched multi-user mapper, never the
+		// per-user fallback — that's what keeps the page scoped.
+		$this->violationMapper->expects($this->once())
+			->method('countByUserIdsAndDateRange')
+			->with(['employee1'], null, null, null, null, null)
+			->willReturn(1);
+		$this->violationMapper->expects($this->once())
+			->method('findByUserIdsAndDateRange')
+			->with(['employee1'], null, null, null, null, null, 25, 0)
+			->willReturn([$violation]);
+		$this->violationMapper->expects($this->never())->method('findByUser');
+
+		$response = $this->controller->getViolations(null, null, null, null, null, null, 25, 0, 'managed');
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame('managed', $data['scope']);
+		$this->assertSame(1, $data['total']);
+		$this->assertSame('employee1', $data['violations'][0]['userId']);
+		$this->assertArrayHasKey('displayName', $data['violations'][0]);
+	}
+
+	public function testGetViolationsScopeOrganizationDeniedForManager(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$this->violationMapper->expects($this->never())->method('findByUserIdsAndDateRange');
+
+		$response = $this->controller->getViolations(null, null, null, null, null, null, 25, 0, 'organization');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testGetViolationsScopeOrganizationForAdmin(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('isAdmin')->with('admin1')->willReturn(true);
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['u1', 'u2']);
+
+		$this->violationMapper->expects($this->once())
+			->method('countByUserIdsAndDateRange')
+			->with(['u1', 'u2'], null, null, null, null, null)
+			->willReturn(0);
+		$this->violationMapper->expects($this->once())
+			->method('findByUserIdsAndDateRange')
+			->with(['u1', 'u2'], null, null, null, null, null, 25, 0)
+			->willReturn([]);
+
+		$response = $this->controller->getViolations(null, null, null, null, null, null, 25, 0, 'organization');
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame('organization', $data['scope']);
+		$this->assertSame(0, $data['total']);
+	}
+
+	public function testGetViolationsScopeWithUserIdIsAmbiguous(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->violationMapper->expects($this->never())->method('findByUserIdsAndDateRange');
+
+		$response = $this->controller->getViolations('employee1', null, null, null, null, null, 25, 0, 'managed');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	public function testGetViolationsScopeResolvedFalseParsesStrictly(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		// "false" is a string — must map to resolved=false (unresolved only).
+		$this->violationMapper->expects($this->once())
+			->method('countByUserIdsAndDateRange')
+			->with(['employee1'], null, null, null, null, false)
+			->willReturn(0);
+		$this->violationMapper->expects($this->once())
+			->method('findByUserIdsAndDateRange')
+			->with(['employee1'], null, null, null, null, false, 25, 0)
+			->willReturn([]);
+
+		$response = $this->controller->getViolations(null, null, 'false', null, null, null, 25, 0, 'managed');
+		$this->assertTrue($response->getData()['success']);
 	}
 }

@@ -836,6 +836,49 @@
 				};
 			}
 
+			// Absence & compliance reports accept scope selectors directly
+			// (scope=organization|managed, teamId) — never fall back to the
+			// working-time team report, which would silently preview wrong data.
+			if (reportType === 'absence' || reportType === 'compliance') {
+				const scopedApi = apiMap[reportType] || null;
+				if (A.isAdmin && scope === 'organization') {
+					return {
+						apiUrl: scopedApi,
+						isTeam: false,
+						queryParams: { scope: 'organization' },
+					};
+				}
+				if (A.isAdmin && scope === 'admin_team') {
+					const teamId = adminTeamSelect && adminTeamSelect.value ? adminTeamSelect.value.trim() : '';
+					return {
+						apiUrl: scopedApi,
+						isTeam: false,
+						queryParams: { teamId },
+					};
+				}
+				if (A.isManager && scope === 'manager_team') {
+					return {
+						apiUrl: scopedApi,
+						isTeam: false,
+						queryParams: { scope: 'managed' },
+					};
+				}
+				if (A.isManager && scope === 'manager_single_team') {
+					const teamId = managerTeamSelect && managerTeamSelect.value ? managerTeamSelect.value.trim() : '';
+					return {
+						apiUrl: scopedApi,
+						isTeam: false,
+						queryParams: { teamId },
+					};
+				}
+				// Personal scope → per-user endpoint without selectors.
+				return {
+					apiUrl: scopedApi,
+					isTeam: false,
+					queryParams: {},
+				};
+			}
+
 			// Default: per-user reports (viewer or target user)
 			if (!scope || scope === '') {
 				return {
@@ -1009,13 +1052,16 @@
 			} else {
 				// Per-user and organization-wide reports: use classic per-type endpoints
 				url = buildReportUrl(scopeResolution.apiUrl, reportType, startDate, endDate);
-				// If we explicitly want organization-wide and the API supports userId, include it
-				if (scopeResolution.queryParams && typeof scopeResolution.queryParams.userId !== 'undefined') {
-					const u = new URL(url);
-					// Important: organization scope uses an empty string to mean "all users".
-					u.searchParams.set('userId', String(scopeResolution.queryParams.userId));
-					url = u.toString();
-				}
+				// Append any scope selectors the resolver returned
+				// (userId='' = legacy org, scope=…, teamId=…).
+				Object.keys(scopeResolution.queryParams || {}).forEach((key) => {
+					const val = scopeResolution.queryParams[key];
+					if (val !== undefined && val !== null) {
+						const u = new URL(url, window.location.origin);
+						u.searchParams.set(key, String(val));
+						url = u.toString();
+					}
+				});
 				// Payroll-friendly absence preview: same type-then-date order as CSV export.
 				if (reportType === 'absence') {
 					const u = new URL(url, window.location.origin);
@@ -1070,7 +1116,15 @@
 						const teamScopes = ['admin_team', 'manager_team', 'manager_single_team'];
 						const reportType = reportTypeInput ? reportTypeInput.value : '';
 						const scope = reportScopeInput ? reportScopeInput.value : '';
-						const isTeamScope = teamScopes.includes(scope) || reportType === 'team';
+						// Scoped absence/compliance previews hit their own
+						// endpoints (not the team report) — only working-time
+						// team previews use the aggregated team endpoint.
+						const isAggregatedTeamPreview =
+							teamScopes.includes(scope) &&
+							reportType !== 'absence' &&
+							reportType !== 'compliance' &&
+							reportType !== 'premium';
+						const isTeamScope = isAggregatedTeamPreview || reportType === 'team';
 						const isOrganizationScope = scope === 'organization';
 						const orgUserIds =
 							isOrganizationScope && data.report && Array.isArray(data.report.users)
@@ -1110,10 +1164,11 @@
 									'Team file download is only available for the working time export.',
 								)}</p>`;
 							}
-						} else if (isOrganizationScope) {
+						} else if (isOrganizationScope
+							&& ['monthly', 'premium', 'absence', 'compliance'].indexOf(reportType) === -1) {
 							html += `<p class="report-info" role="status">${esc(
 								(A.l10n && A.l10n.exportOrganizationScopeNotice) ||
-								'For organization scope, download is available for working time export.',
+								'For this report type, organization scope is preview-only. The working time, absence, compliance and hour-premium exports can be downloaded.',
 							)}</p>`;
 						}
 						html += renderReportHtml(data.report);
@@ -1292,6 +1347,61 @@
 					document.body.removeChild(a);
 				} catch (e) {
 					// no-op
+				}
+				return;
+			}
+
+			// Scoped absence/compliance downloads go through the dedicated export
+			// endpoints with the same scope selectors the preview used.
+			if ((reportType === 'absence' || reportType === 'compliance') && scope !== '') {
+				const exportKey = reportType === 'absence' ? 'absences' : 'compliance';
+				const exportBase =
+					A.exportUrl && Object.prototype.hasOwnProperty.call(A.exportUrl, exportKey)
+						? A.exportUrl[exportKey]
+						: null;
+				if (!exportBase) {
+					return;
+				}
+				try {
+					const urlObj = new URL(toDownloadHref(exportBase));
+					urlObj.searchParams.set('startDate', startIso);
+					urlObj.searchParams.set('endDate', endIso);
+					if (format) {
+						urlObj.searchParams.set('format', format);
+					}
+					if (reportType === 'absence') {
+						urlObj.searchParams.set('sort', 'type');
+					}
+					if (scope === 'organization') {
+						urlObj.searchParams.set('scope', 'organization');
+					} else if (scope === 'admin_team') {
+						const adminTeamSelect = document.getElementById('admin-team-select');
+						const teamId = adminTeamSelect && adminTeamSelect.value ? adminTeamSelect.value.trim() : '';
+						if (!teamId) {
+							showDownloadError((A.l10n && A.l10n.teamRequired) || 'Please select a team.');
+							return;
+						}
+						urlObj.searchParams.set('teamId', teamId);
+					} else if (scope === 'manager_team') {
+						urlObj.searchParams.set('scope', 'managed');
+					} else if (scope === 'manager_single_team') {
+						const managerTeamSelect = document.getElementById('manager-team-select');
+						const teamId = managerTeamSelect && managerTeamSelect.value ? managerTeamSelect.value.trim() : '';
+						if (!teamId) {
+							showDownloadError((A.l10n && A.l10n.teamRequired) || 'Please select a team.');
+							return;
+						}
+						urlObj.searchParams.set('teamId', teamId);
+					}
+					const a = document.createElement('a');
+					a.href = urlObj.toString();
+					a.style.display = 'none';
+					a.setAttribute('download', '');
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+				} catch (e) {
+					// no-op — preview already surfaced the data; download is best-effort
 				}
 				return;
 			}

@@ -10,6 +10,7 @@
 
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
+    let employeePicker = null;
 
     function cvT(msg) {
         const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.complianceViolationsL10n;
@@ -17,6 +18,18 @@
             return map[msg];
         }
         return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', msg) : msg);
+    }
+
+    function scopeCfg() {
+        return (window.ArbeitszeitCheck && window.ArbeitszeitCheck.complianceViolationsScope) || {};
+    }
+
+    function canSeeScope() {
+        return !!scopeCfg().canSeeScope;
+    }
+
+    function colCount() {
+        return Number(scopeCfg().columns) || (canSeeScope() ? 6 : 5);
     }
 
     /**
@@ -29,10 +42,35 @@
     }
 
     function init() {
+        initEmployeePicker();
         bindEvents();
+        // Reload only when a pre-filtered single-user view is active; the
+        // server-rendered rows already match the default (scope or self).
         if (getFilterUserId()) {
             loadViolations();
         }
+    }
+
+    function initEmployeePicker() {
+        const initPicker = window.ArbeitszeitCheck?.initManagerScopedEmployeePicker;
+        if (!initPicker || !document.getElementById('violations-employee-filter-search')) {
+            return;
+        }
+        employeePicker = initPicker({
+            hiddenSelector: '#violations-employee-filter-id',
+            searchSelector: '#violations-employee-filter-search',
+            listSelector: '#violations-employee-filter-listbox',
+            wrapSelector: '#violations-employee-filter-wrap',
+            statusSelector: '#violations-employee-filter-status',
+            clearButtonSelector: '#violations-employee-filter-clear',
+            idPrefix: 'violations-employee-filter',
+            allowAll: true,
+            onChange: function () {
+                // A picked employee narrows the view immediately — no separate
+                // Apply step needed for the person filter.
+                loadViolations();
+            },
+        });
     }
 
     /**
@@ -43,9 +81,24 @@
         if (applyBtn) {
             Utils.on(applyBtn, 'click', loadViolations);
         }
+        const scopeSelect = Utils.$('#scope-filter');
+        if (scopeSelect) {
+            scopeSelect.addEventListener('change', loadViolations);
+        }
         document.querySelectorAll('[id^="btn-resolve-violation-"]').forEach((btn) => {
             btn.addEventListener('click', () => resolveViolation(btn.getAttribute('data-violation-id')));
         });
+    }
+
+    function selectedEmployeeId() {
+        if (employeePicker && typeof employeePicker.getUserId === 'function') {
+            const id = String(employeePicker.getUserId() || '').trim();
+            if (id !== '') {
+                return id;
+            }
+        }
+        const hidden = document.getElementById('violations-employee-filter-id');
+        return hidden ? String(hidden.value || '').trim() : '';
     }
 
     /**
@@ -62,15 +115,22 @@
         if (startDate) params.append('start_date', startDate);
         if (endDate) params.append('end_date', endDate);
         if (severity) params.append('severity', severity);
-        const filterUserId = getFilterUserId();
-        if (filterUserId) {
-            params.append('userId', filterUserId);
+
+        // Selector precedence: a picked employee wins; otherwise the scope
+        // select decides between the whole oversight scope and own-only.
+        const pickedUserId = selectedEmployeeId() || getFilterUserId();
+        const scopeSelect = Utils.$('#scope-filter');
+        const scopeChoice = scopeSelect ? scopeSelect.value : '';
+        if (pickedUserId) {
+            params.append('userId', pickedUserId);
+        } else if (canSeeScope() && scopeChoice === 'scope') {
+            params.append('scope', String(scopeCfg().scopeValue || 'managed'));
         }
 
         const tbody = Utils.$('#violations-tbody');
         if (tbody) {
             const loadingMsg = cvT('Loading...');
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(loadingMsg) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(loadingMsg) + '</td></tr>';
         }
 
         Utils.ajax('/apps/arbeitszeitcheck/api/compliance/violations?' + params.toString(), {
@@ -79,15 +139,20 @@
                 if (data.success && data.violations) {
                     renderViolations(data.violations);
                 } else {
-                    const errorMsg = cvT('Error loading violations');
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                    const errorMsg = (data && data.error) ? data.error : cvT('Error loading violations');
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 }
             },
-            onError: function (_error) {
-                const errorMsg = cvT('Error loading violations');
-                if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+            onError: function (error) {
+                window.ArbeitszeitCheck?.handleManagerListApiError?.(error, {
+                    picker: employeePicker,
+                    searchSelector: '#violations-employee-filter-search',
+                    clearButtonSelector: '#violations-employee-filter-clear',
+                });
+                const errorMsg = (error && error.error) ? error.error : cvT('Error loading violations');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
                 if (Messaging && Messaging.showError) {
-                    const failMsg = cvT('Failed to load violations. Please try again.');
+                    const failMsg = (error && error.error) ? error.error : cvT('Failed to load violations. Please try again.');
                     Messaging.showError(failMsg);
                 }
             }
@@ -102,12 +167,13 @@
         if (!tbody) return;
 
         if (violations.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + cvT('No violations found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + cvT('No violations found') + '</td></tr>';
             return;
         }
 
         const resolvedLabel = cvT('Resolved');
         const unresolvedLabel = cvT('Unresolved');
+        const showEmployee = canSeeScope();
 
         const typeLabels = {
             missing_break: cvT('Missing break'),
@@ -135,8 +201,12 @@
             const td = (label, html) => Utils.responsiveTd
                 ? Utils.responsiveTd(label, html)
                 : `<td>${html}</td>`;
+            const employeeCell = showEmployee
+                ? td(cvT('Employee'), Utils.escapeHtml(v.displayName || v.userId || '-'))
+                : '';
             return `
             <tr>
+                ${employeeCell}
                 ${td(cvT('Problem Type'), Utils.escapeHtml(typeLabels[v.type] || v.type))}
                 ${td(cvT('How Serious'), `<span class="badge badge--${Utils.badgeVariantForComplianceSeverity ? Utils.badgeVariantForComplianceSeverity(v.severity) : (v.severity === 'error' ? 'error' : (v.severity === 'warning' ? 'warning' : 'primary'))}">
                         ${Utils.escapeHtml(severityLabels[v.severity] || v.severity)}

@@ -16,6 +16,10 @@ $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
 
 $violations = $_['violations'] ?? [];
 $total = $_['total'] ?? 0;
+$canSeeScope = !empty($_['canSeeScope']);
+$showWholeScope = !empty($_['wholeScope']);
+$scopeValue = (string)($_['scopeValue'] ?? 'managed');
+$colCount = $canSeeScope ? 6 : 5;
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -40,6 +44,26 @@ $total = $_['total'] ?? 0;
             <!-- Filters -->
             <div class="section-content mb-3 compliance-violations__filters">
                 <div class="compliance-violations__filters-grid" role="group" aria-label="<?php p($l->t('Filter options')); ?>">
+                    <?php if ($canSeeScope): ?>
+                    <div class="compliance-violations__filter-field">
+                        <span id="violations-scope-label" class="compliance-violations__filter-label"><?php p($l->t('Show violations for')); ?></span>
+                        <select id="scope-filter" class="form-select" aria-labelledby="violations-scope-label">
+                            <option value="scope" <?php p($showWholeScope ? 'selected' : ''); ?>><?php p($scopeValue === 'organization' ? $l->t('Everyone in the organization') : $l->t('Everyone in my team')); ?></option>
+                            <option value="mine" <?php p($showWholeScope ? '' : 'selected'); ?>><?php p($l->t('Only me')); ?></option>
+                        </select>
+                    </div>
+                    <div class="compliance-violations__filter-field">
+                        <label for="violations-employee-filter-search" class="compliance-violations__filter-label"><?php p($l->t('Employee')); ?></label>
+                        <?php
+                        $scopePickerId = 'violations-employee-filter';
+                        $scopePickerName = 'employee_id';
+                        $scopePickerAllowAll = true;
+                        $scopePickerRequired = false;
+                        $scopePickerCompact = true;
+                        include __DIR__ . '/common/scoped-employee-picker-field.php';
+                        ?>
+                    </div>
+                    <?php endif; ?>
                     <div class="compliance-violations__filter-field">
                         <label for="start-date" class="compliance-violations__filter-label"><?php p($l->t('Start Date')); ?></label>
                         <input type="text" id="start-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly aria-label="<?php p($l->t('Start date for filter')); ?>">
@@ -70,6 +94,7 @@ $total = $_['total'] ?? 0;
                 <table class="table table--hover azc-table--responsive" id="violations-table" role="table" aria-label="<?php p($l->t('Compliance violations list')); ?>">
                     <thead>
                         <tr>
+                            <?php if ($canSeeScope): ?><th scope="col"><?php p($l->t('Employee')); ?></th><?php endif; ?>
                             <th scope="col"><?php p($l->t('Problem Type')); ?></th>
                             <th scope="col"><?php p($l->t('How Serious')); ?></th>
                             <th scope="col"><?php p($l->t('Date')); ?></th>
@@ -80,7 +105,7 @@ $total = $_['total'] ?? 0;
                     <tbody id="violations-tbody">
                         <?php if (empty($violations)): ?>
                             <tr>
-                                <td colspan="5" class="empty-state">
+                                <td colspan="<?php p($colCount); ?>" class="empty-state">
                                     <div class="empty-state">
                                         <h3 class="empty-state__title"><?php p($l->t('No problems found')); ?></h3>
                                         <p class="empty-state__description">
@@ -120,6 +145,9 @@ $total = $_['total'] ?? 0;
                                 };
                                 ?>
                                 <tr>
+                                    <?php if ($canSeeScope): ?>
+                                    <td data-label="<?php p($l->t('Employee')); ?>"><?php p($violation['displayName'] ?? $violation['userId'] ?? '-'); ?></td>
+                                    <?php endif; ?>
                                     <td data-label="<?php p($l->t('Problem Type')); ?>"><?php p($typeLabel); ?></td>
                                     <td data-label="<?php p($l->t('How Serious')); ?>">
                                         <span class="badge badge--<?php p($severityBadge); ?>">
@@ -155,6 +183,14 @@ $complianceViolationsL10n = [
 	'Error loading violations' => $l->t('Error loading violations'),
 	'Failed to load violations. Please try again.' => $l->t('Failed to load violations. Please try again.'),
 	'No violations found' => $l->t('No violations found'),
+	'Employee' => $l->t('Employee'),
+	'Type at least 2 characters to search.' => $l->t('Type at least 2 characters to search.'),
+	'Employee search failed.' => $l->t('Employee search failed.'),
+	'No matching employees found.' => $l->t('No matching employees found.'),
+	'%s results' => \OCA\ArbeitszeitCheck\Util\TemplateL10n::translate($l, '%s results'),
+	'Selected: %s' => \OCA\ArbeitszeitCheck\Util\TemplateL10n::translate($l, 'Selected: %s'),
+	'All in my scope' => $l->t('All in my scope'),
+	'Select an employee from the list, or clear the search field to include everyone in your scope.' => $l->t('Select an employee from the list, or clear the search field to include everyone in your scope.'),
 	'Resolved' => $l->t('Resolved'),
 	'Unresolved' => $l->t('Unresolved'),
 	'Missing break' => $l->t('Missing break'),
@@ -176,10 +212,31 @@ $complianceViolationsL10n = [
 	'Mark as fixed' => $l->t('Mark as fixed'),
 ];
 ?>
+<?php
+$violationsPickerL10n = [
+	'pickerTypeToSearch' => $l->t('Type at least 2 characters to search.'),
+	'pickerMinSearchHint' => $l->t('Type at least 2 characters to search.'),
+	'pickerLoading' => $l->t('Loading...'),
+	'pickerSearchError' => $l->t('Employee search failed.'),
+	'pickerNoUsersFound' => $l->t('No matching employees found.'),
+	'pickerResultsCount' => \OCA\ArbeitszeitCheck\Util\TemplateL10n::translate($l, '%s results'),
+	'pickerEmployeeSelected' => \OCA\ArbeitszeitCheck\Util\TemplateL10n::translate($l, 'Selected: %s'),
+	'allInMyScope' => $l->t('All in my scope'),
+	'pickerIncompleteSelection' => $l->t('Select an employee from the list, or clear the search field to include everyone in your scope.'),
+];
+?>
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
+window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
+Object.assign(window.ArbeitszeitCheck.l10n, <?php echo json_encode($violationsPickerL10n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>);
 window.ArbeitszeitCheck.complianceViolationsL10n = <?php echo json_encode($complianceViolationsL10n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 window.ArbeitszeitCheck.complianceFilterUserId = <?php echo json_encode($_['filterUserId'] ?? null, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+window.ArbeitszeitCheck.complianceViolationsScope = {
+	canSeeScope: <?php echo $canSeeScope ? 'true' : 'false'; ?>,
+	wholeScope: <?php echo $showWholeScope ? 'true' : 'false'; ?>,
+	scopeValue: <?php echo json_encode($scopeValue, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>,
+	columns: <?php echo (int)$colCount; ?>
+};
 </script>
 
 </div><!-- /.azc-page-stack -->

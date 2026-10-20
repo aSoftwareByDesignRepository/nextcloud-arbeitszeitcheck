@@ -44,6 +44,7 @@ use OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
+use OCA\ArbeitszeitCheck\Service\OversightScopeService;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Support\PeopleSearchQuery;
 use OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder;
@@ -133,6 +134,8 @@ class ManagerController extends Controller
 		LocaleFormatService $localeFormat,
 		NavigationFlagsService $navigationFlags,
 		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null,
+		private readonly ?OversightScopeService $oversightScope = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper $complianceViolationMapper = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->absenceService = $absenceService;
@@ -276,15 +279,26 @@ class ManagerController extends Controller
 		return $user->getUID();
 	}
 
+	private function oversightScope(): OversightScopeService
+	{
+		return $this->oversightScope ?? \OCP\Server::get(OversightScopeService::class);
+	}
+
 	/**
-	 * Get team member user IDs for a manager (shared group membership).
+	 * User IDs the actor oversees on manager read surfaces.
+	 *
+	 * Delegates to {@see OversightScopeService}: managers get their managed
+	 * team members, admins get the whole (door-filtered, enabled)
+	 * organization — previously every call site here returned an empty list
+	 * for admins managing no team, which left pending queues, overviews and
+	 * team exports permanently empty for admin/HR users.
 	 *
 	 * @param string $managerId
 	 * @return array Array of user IDs
 	 */
 	private function getTeamMemberIds(string $managerId): array
 	{
-		return $this->teamResolver->getTeamMemberIds($managerId);
+		return $this->oversightScope()->managedUserIds($managerId);
 	}
 
 	/**
@@ -658,6 +672,66 @@ class ManagerController extends Controller
 				'manager-absences',
 				$this->l10n->t('Employee absences'),
 				$this->l10n->t('Review and manage absence requests for employees in your scope.'),
+				$navFlags,
+			) + [
+				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			]);
+			return $this->configureCSP($response);
+		}
+	}
+
+	/**
+	 * People overview page — per-employee vacation balance, approved future
+	 * vacation, overtime and open compliance issues for the actor's scope
+	 * (managers: their team, admins: the whole organization).
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function peoplePage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
+	{
+		$this->registerFrontEndAssets('manager-people', 'manager-people', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+
+		try {
+			$actorUserId = $this->getUserId();
+			if (!$this->permissionService->isAdmin($actorUserId) && !$this->permissionService->canAccessManagerDashboard($actorUserId)) {
+				$redirect = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index');
+				return new \OCP\AppFramework\Http\RedirectResponse($redirect);
+			}
+
+			$navFlags = $this->getNavigationFlags($actorUserId);
+			$vacationUnitService = new \OCA\ArbeitszeitCheck\Service\VacationUnitService($this->config);
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-people', array_merge(
+				$this->buildManagerShellParams(
+					'manager-people',
+					$this->l10n->t('People overview'),
+					$this->l10n->t('Vacation balances, overtime and open compliance issues for the employees in your scope.'),
+					$navFlags,
+				),
+				[
+					'monthClosureEnabled' => $this->monthClosureEnabledParam(),
+					'isAdminScope' => $this->permissionService->isAdmin($actorUserId),
+					'vacationUnit' => $vacationUnitService->getUnit(),
+					'vacationHoursPerDay' => $vacationUnitService->getHoursPerDay(),
+					'peopleOverviewUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.manager.getPeopleOverview'),
+					'employeeAbsencesUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.manager.employeeAbsencesPage'),
+					'violationsUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.compliance.violations'),
+					'adminUserUrl' => $this->permissionService->isAdmin($actorUserId)
+						? $this->urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => '__UID__'])
+						: '',
+				]
+			));
+			return $this->configureCSP($response);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::peoplePage',
+				['exception' => $e]
+			);
+			$navFlags = $this->getNavigationFlagsForSession();
+			$response = new TemplateResponse('arbeitszeitcheck', 'manager-people', $this->buildManagerShellParams(
+				'manager-people',
+				$this->l10n->t('People overview'),
+				$this->l10n->t('Vacation balances, overtime and open compliance issues for the employees in your scope.'),
 				$navFlags,
 			) + [
 				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
@@ -1090,6 +1164,233 @@ class ManagerController extends Controller
 	}
 
 	/**
+	 * People overview API — per-employee vacation balance (projected: future
+	 * approved vacation already deducted), approved upcoming vacation days,
+	 * overtime snapshot, unresolved compliance violations and pending
+	 * absence requests for every employee in the actor's scope.
+	 *
+	 * Scope: managers see their managed team, admins the whole
+	 * (door-filtered, enabled) organization — one resolver
+	 * ({@see OversightScopeService}) for every mirrored surface.
+	 *
+	 * Read-only. Per-user stat failures degrade to null fields and are
+	 * counted in `partialErrors` instead of failing the whole page.
+	 *
+	 * @param string|null $employeeId Optional single-employee filter (scope-checked)
+	 * @param int|null $year Vacation balance year (default: current year)
+	 */
+	#[NoAdminRequired]
+	public function getPeopleOverview(
+		?string $employeeId = null,
+		?int $year = null,
+		?int $limit = Constants::DEFAULT_LIST_LIMIT,
+		?int $offset = 0,
+	): JSONResponse {
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'view_people_overview');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			$limit = $this->normalizeLimit($limit);
+			$offset = $this->normalizeOffset($offset);
+
+			if ($year === null) {
+				$year = (int)(new \DateTime())->format('Y');
+			} elseif ($year < 1970 || $year > 2100) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid year.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			// Only live accounts carry balances; stale/deleted member rows are excluded.
+			$scopeUserIds = $this->oversightScope()->managedEnabledUserIds($actorUserId);
+
+			$employeeId = $employeeId !== null ? trim($employeeId) : '';
+			if ($employeeId !== '') {
+				if (!in_array($employeeId, $scopeUserIds, true)) {
+					$this->permissionService->logPermissionDenied($actorUserId, 'view_people_overview_user_filter', 'user', $employeeId);
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Access denied. You can only view employees in your scope.'),
+					], Http::STATUS_FORBIDDEN);
+				}
+				$scopeUserIds = [$employeeId];
+			}
+
+			// Display order: display name (falling back to uid), deterministic.
+			usort($scopeUserIds, function (string $a, string $b) {
+				return strcasecmp($this->getDisplayName($a), $this->getDisplayName($b)) ?: strcmp($a, $b);
+			});
+
+			$total = count($scopeUserIds);
+			$pageUserIds = array_slice($scopeUserIds, $offset, $limit);
+
+			// Batched per-user aggregates — no N+1 counting inside the loop.
+			$unresolvedByUser = [];
+			$pendingByUser = [];
+			$upcomingVacationByUser = [];
+			if ($pageUserIds !== []) {
+				try {
+					$unresolvedByUser = $this->complianceViolationMapper()->countUnresolvedByUserIds($pageUserIds);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: unresolved violation counts failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+				try {
+					foreach ($this->absenceMapper->findPendingForUsers($pageUserIds) as $pendingAbsence) {
+						$uid = $pendingAbsence->getUserId();
+						$pendingByUser[$uid] = ($pendingByUser[$uid] ?? 0) + 1;
+					}
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: pending absence counts failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+				try {
+					$upcomingVacationByUser = $this->approvedUpcomingVacationByUser($pageUserIds);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: upcoming vacation aggregation failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+			}
+
+			$employees = [];
+			$partialErrors = 0;
+			foreach ($pageUserIds as $userId) {
+				$row = [
+					'userId' => $userId,
+					'displayName' => $this->getDisplayName($userId),
+					'vacation' => null,
+					'overtime' => null,
+					'openViolations' => (int)($unresolvedByUser[$userId] ?? 0),
+					'pendingAbsences' => (int)($pendingByUser[$userId] ?? 0),
+				];
+
+				try {
+					$stats = $this->absenceService->getVacationStats($userId, $year);
+					// Bound the upcoming-vacation sum to this user's displayed
+					// balance window (anniversary mode has per-user windows).
+					$yearEndInclusive = !empty($stats['vacation_year_end_inclusive'])
+						? (string)$stats['vacation_year_end_inclusive']
+						: sprintf('%04d-12-31', (int)($stats['year'] ?? $year));
+					$approvedUpcoming = 0.0;
+					$tomorrowYmd = (new \DateTime('tomorrow'))->format('Y-m-d');
+					foreach ($upcomingVacationByUser[$userId] ?? [] as $absence) {
+						$start = $absence->getStartDate();
+						// Strictly future starts only — the batch query uses
+						// overlap semantics and would otherwise count an
+						// absence spanning today, days already consumed included.
+						if ($start !== null && $start->format('Y-m-d') >= $tomorrowYmd && $start->format('Y-m-d') <= $yearEndInclusive) {
+							$approvedUpcoming += (float)($absence->getDays() ?? 0.0);
+						}
+					}
+					$row['vacation'] = [
+						'year' => $stats['year'] ?? $year,
+						'yearLabel' => $stats['vacation_year_label'] ?? null,
+						'entitlement' => $stats['entitlement'] ?? null,
+						'carryoverDays' => $stats['carryover_days'] ?? null,
+						'totalAvailable' => $stats['total_available'] ?? null,
+						'used' => $stats['used'] ?? null,
+						'remaining' => $stats['remaining'] ?? null,
+						'approvedUpcoming' => round($approvedUpcoming, 2),
+						'unit' => $stats['vacation_unit'] ?? \OCA\ArbeitszeitCheck\Constants::VACATION_UNIT_DAYS,
+						'hoursPerDay' => $stats['vacation_hours_per_day'] ?? null,
+						'error' => $stats['vacation_year_error'] ?? null,
+					];
+				} catch (\Throwable $e) {
+					$partialErrors++;
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: vacation stats failed for one employee: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+
+				try {
+					$snapshot = $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
+					$row['overtime'] = [
+						'balance' => $snapshot['balance'] ?? null,
+						'needsAttention' => (bool)($snapshot['needs_attention'] ?? false),
+						'trafficLightState' => $snapshot['traffic_light_state'] ?? null,
+						'bankState' => $snapshot['bank_state'] ?? null,
+						'payoutEligibleHours' => $snapshot['payout_eligible_hours'] ?? null,
+					];
+				} catch (\Throwable $e) {
+					$partialErrors++;
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: overtime snapshot failed for one employee: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+
+				$employees[] = $row;
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'scope' => $this->permissionService->isAdmin($actorUserId) ? 'organization' : 'managed',
+				'year' => $year,
+				'employees' => $employees,
+				'total' => $total,
+				'limit' => $limit,
+				'offset' => $offset,
+				'partialErrors' => $partialErrors,
+			]);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::getPeopleOverview',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Approved vacation days starting after today, per user — the
+	 * "future approved vacation already deducted" figure.
+	 *
+	 * One batched query for the whole page slice; per user the sum is
+	 * bounded to absences that start inside the displayed balance window
+	 * (anniversary-mode per-user windows are not SQL-able, so the filter is
+	 * applied in PHP).
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, list<\OCA\ArbeitszeitCheck\Db\Absence>> userId => upcoming approved vacation absences
+	 */
+	private function approvedUpcomingVacationByUser(array $userIds): array
+	{
+		$tomorrow = new \DateTime('tomorrow');
+		$tomorrow->setTime(0, 0, 0);
+		$outerBound = (clone $tomorrow)->modify('+2 years');
+		$absences = $this->absenceMapper->findByUsersAndDateRange(
+			$userIds,
+			$tomorrow,
+			$outerBound,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
+			\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION
+		);
+		$grouped = [];
+		foreach ($absences as $absence) {
+			$grouped[$absence->getUserId()][] = $absence;
+		}
+		return $grouped;
+	}
+
+	private function complianceViolationMapper(): \OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper
+	{
+		return $this->complianceViolationMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper::class);
+	}
+
+	/**
 	 * Lightweight employee search within the actor's manager scope (combobox pickers).
 	 */
 	#[NoAdminRequired]
@@ -1133,6 +1434,12 @@ class ManagerController extends Controller
 				);
 				foreach ($result['users'] as $user) {
 					$uid = (string)$user->getUID();
+					// Picker surface must match the admin oversight scope
+					// (door-filtered org) — offering door-blocked users that can
+					// never appear in scoped lists would be an oracle + a trap.
+					if (!$this->permissionService->isUserAllowedByAccessGroups($uid)) {
+						continue;
+					}
 					$usersData[] = [
 						'userId' => $uid,
 						'displayName' => (string)$user->getDisplayName(),
@@ -1299,7 +1606,7 @@ class ManagerController extends Controller
 			$statusFilter = ($status !== null && $status !== '' && in_array($status, $allowedStatuses, true)) ? $status : null;
 
 			$scopedUserIds = $isAdmin
-				? array_values(array_map(static fn ($u) => $u->getUID(), $this->userManager->search('', Constants::MAX_LIST_LIMIT, 0)))
+				? $this->permissionService->listAppAccessUserIds()
 				: $this->getTeamMemberIds($actorUserId);
 			sort($scopedUserIds);
 
@@ -1459,7 +1766,7 @@ class ManagerController extends Controller
 			$typeFilter = ($type !== null && $type !== '' && in_array($type, $allowedTypes, true)) ? $type : null;
 
 			$scopedUserIds = $isAdmin
-				? array_values(array_map(static fn ($u) => $u->getUID(), $this->userManager->search('', Constants::MAX_LIST_LIMIT, 0)))
+				? $this->permissionService->listAppAccessUserIds()
 				: $this->getTeamMemberIds($actorUserId);
 			sort($scopedUserIds);
 

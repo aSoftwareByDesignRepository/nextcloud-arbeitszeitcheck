@@ -71,6 +71,7 @@ class ComplianceController extends Controller
 		IL10N $l10n,
 		NavigationFlagsService $navigationFlags,
 		LaborLawProfileFactory $laborLawProfileFactory,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\OversightScopeService $oversightScope = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->complianceService = $complianceService;
@@ -125,13 +126,92 @@ class ComplianceController extends Controller
 	 * Ensure current user may access compliance data for the given target user.
 	 * Allowed: own user, team members (manager), or admin.
 	 */
+	/**
+	 * @param \OCA\ArbeitszeitCheck\Db\ComplianceViolation[] $violations
+	 * @return list<array<string, mixed>>
+	 */
+	private function summarizeViolations(array $violations, string $currentUserId): array
+	{
+		$violationSummaries = [];
+		foreach ($violations as $violation) {
+			try {
+				$summary = $violation->getSummary();
+				$summary['type'] = $summary['violationType'] ?? $violation->getViolationType();
+				$summary['displayName'] = $this->userManager->getDisplayName($violation->getUserId())
+					?: $violation->getUserId();
+				$summary['can_resolve'] = !$violation->getResolved()
+					&& $this->permissionService->canResolveViolation($currentUserId, $violation->getUserId());
+				$violationSummaries[] = $summary;
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary for violation ' . $violation->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
+				continue;
+			}
+		}
+		return $violationSummaries;
+	}
+
 	private function ensureCanAccessUserCompliance(string $currentUserId, string $targetUserId): void
 	{
+		// Existence leg first — deleted users leave stale member rows, so a
+		// membership-only check would accept ghost uids. Nonexistent and
+		// out-of-scope collapse into the same denial (no existence oracle).
+		if ($this->userManager->get($targetUserId) === null) {
+			$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $targetUserId);
+			throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+		}
 		if ($this->permissionService->canViewUserCompliance($currentUserId, $targetUserId)) {
 			return;
 		}
 		$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $targetUserId);
 		throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+	}
+
+	private function oversightScope(): \OCA\ArbeitszeitCheck\Service\OversightScopeService
+	{
+		return $this->oversightScope ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OversightScopeService::class);
+	}
+
+	/**
+	 * Generic error response for failed scope-selector resolution:
+	 * denials collapse to a uniform 403 (no existence oracle), malformed
+	 * input to 400.
+	 */
+	private function scopeErrorResponse(string $code): JSONResponse
+	{
+		if ($code === \OCA\ArbeitszeitCheck\Service\OversightScopeService::ERR_DENIED) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'),
+			], Http::STATUS_FORBIDDEN);
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('Invalid scope parameters.'),
+		], Http::STATUS_BAD_REQUEST);
+	}
+
+	/**
+	 * Strict form-encoded boolean parsing ("1"/"true"/"0"/"false");
+	 * returns [ok, value] — ok=false means reject with 400.
+	 *
+	 * @return array{0: bool, 1: ?bool}
+	 */
+	private function parseBoolParam(mixed $raw): array
+	{
+		if ($raw === null || $raw === '' ) {
+			return [true, null];
+		}
+		if (is_bool($raw)) {
+			return [true, $raw];
+		}
+		$norm = strtolower(trim((string)$raw));
+		if ($norm === '1' || $norm === 'true') {
+			return [true, true];
+		}
+		if ($norm === '0' || $norm === 'false') {
+			return [true, false];
+		}
+		return [false, null];
 	}
 
 	/**
@@ -238,24 +318,49 @@ class ComplianceController extends Controller
 
 		try {
 			$currentUserId = $this->getUserId();
+			$isAdmin = $this->permissionService->isAdmin($currentUserId);
+			// Managers and admins may look beyond their own violations —
+			// they get the scoped-employee picker + a "who" column.
+			$canSeeScope = $isAdmin || $this->permissionService->canAccessManagerDashboard($currentUserId);
+			if ($canSeeScope) {
+				Util::addScript('arbeitszeitcheck', 'common/admin-user-picker');
+				Util::addScript('arbeitszeitcheck', 'common/manager-scoped-employee-picker');
+			}
 			$filterUserId = trim((string)($this->request->getParam('userId') ?? ''));
+			$filterScope = trim((string)($this->request->getParam('scope') ?? ''));
 			$targetUserId = $currentUserId;
 			$filterDisplayName = null;
+			$showWholeScope = false;
 			if ($filterUserId !== '' && $filterUserId !== $currentUserId) {
 				$this->ensureCanAccessUserCompliance($currentUserId, $filterUserId);
 				$targetUserId = $filterUserId;
 				$user = $this->userManager->get($filterUserId);
 				$filterDisplayName = $user ? $user->getDisplayName() : $filterUserId;
+			} elseif ($canSeeScope && ($filterScope === '' || $filterScope === 'managed' || $filterScope === 'organization')) {
+				// Default for managers/admins: the whole oversight scope — the
+				// discovery path the HR request asked for. `scope=self` or an
+				// explicit userId narrows back down.
+				$showWholeScope = $filterScope !== 'self';
 			}
 
 			// Initial view; filters and date range are handled via the API (getViolations).
-			$violations = $this->violationMapper->findByUser($targetUserId, null);
-			$violations = array_slice($violations, 0, 50);
+			if ($showWholeScope) {
+				$scopeIds = $this->oversightScope()->managedUserIds($currentUserId);
+				$violations = $this->violationMapper->findByUserIdsAndDateRange(
+					$scopeIds, null, null, null, null, null, 50, 0
+				);
+			} else {
+				$violations = $this->violationMapper->findByUser($targetUserId, null);
+				$violations = array_slice($violations, 0, 50);
+			}
 
 			$violationsData = [];
 			foreach ($violations as $violation) {
 				$violationsData[] = [
 					'id' => $violation->getId(),
+					'userId' => $violation->getUserId(),
+					'displayName' => $this->userManager->getDisplayName($violation->getUserId())
+						?: $violation->getUserId(),
 					'type' => $violation->getViolationType(),
 					'severity' => $violation->getSeverity(),
 					'date' => $violation->getDate() ? $violation->getDate()->format('Y-m-d') : null,
@@ -278,6 +383,9 @@ class ComplianceController extends Controller
 				'total' => count($violations),
 				'filterUserId' => $filterUserId !== '' && $filterUserId !== $currentUserId ? $filterUserId : null,
 				'filterDisplayName' => $filterDisplayName,
+				'canSeeScope' => $canSeeScope,
+				'wholeScope' => $showWholeScope,
+				'scopeValue' => $isAdmin ? 'organization' : 'managed',
 			]);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
@@ -442,35 +550,84 @@ class ComplianceController extends Controller
 	public function getViolations(
 		?string $userId = null,
 		?string $violationType = null,
-		?bool $resolved = null,
+		?string $resolved = null,
 		?string $severity = null,
 		?string $startDate = null,
 		?string $endDate = null,
 		?int $limit = Constants::DEFAULT_LIST_LIMIT,
-		?int $offset = 0
+		?int $offset = 0,
+		?string $scope = null,
 	): JSONResponse {
 		try {
 			$currentUserId = $this->getUserId();
-			$targetUserId = $userId ?? $currentUserId;
-			$this->ensureCanAccessUserCompliance($currentUserId, $targetUserId);
 			$limit = $this->normalizeLimit($limit);
 			$offset = $this->normalizeOffset($offset);
+
+			// Strict form-encoded boolean parsing — `?resolved=false` must
+			// not collapse to "resolved" via PHP string truthiness.
+			[$resolvedOk, $resolvedFilter] = $this->parseBoolParam($resolved);
+			if (!$resolvedOk) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid resolved filter.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
 
 			// Parse and validate date params (Y-m-d format)
 			$startDt = $this->parseDateParam($startDate, 'start_date');
 			$endDt = $this->parseDateParam($endDate, 'end_date');
-
-			// Build filters
-			$filters = [];
-			if ($startDt) {
-				$filters['start_date'] = $startDt;
-			}
+			$endExclusive = null;
 			if ($endDt) {
-				$endDateTime = clone $endDt;
-				$endDateTime->setTime(23, 59, 59);
-				$endDateTime->modify('+1 day'); // Make exclusive for date range query
-				$filters['end_date'] = $endDateTime;
+				$endExclusive = clone $endDt;
+				$endExclusive->setTime(0, 0, 0);
+				$endExclusive->modify('+1 day'); // inclusive end date → exclusive upper bound
 			}
+
+			// Scoped listing (manager scope / organization scope for admins).
+			$scopeParam = $scope !== null ? trim($scope) : '';
+			if ($scopeParam !== '') {
+				if ($userId !== null && trim($userId) !== '') {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid scope parameters.'),
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$resolution = $this->oversightScope()->resolveRequestedScope(
+					$currentUserId, null, null, null, $scopeParam
+				);
+				if (!$resolution['ok']) {
+					return $this->scopeErrorResponse($resolution['code'] ?? '');
+				}
+				$scopeUserIds = $resolution['userIds'];
+
+				// Filters applied in SQL on the scoped set — no PHP post-filter.
+				$totalCount = $this->violationMapper->countByUserIdsAndDateRange(
+					$scopeUserIds, $startDt, $endExclusive,
+					$violationType !== null && trim($violationType) !== '' ? trim($violationType) : null,
+					$severity !== null && trim($severity) !== '' ? trim($severity) : null,
+					$resolvedFilter
+				);
+				$violations = $this->violationMapper->findByUserIdsAndDateRange(
+					$scopeUserIds, $startDt, $endExclusive,
+					$violationType !== null && trim($violationType) !== '' ? trim($violationType) : null,
+					$severity !== null && trim($severity) !== '' ? trim($severity) : null,
+					$resolvedFilter,
+					$limit,
+					$offset
+				);
+
+				$violationSummaries = $this->summarizeViolations($violations, $currentUserId);
+
+				return new JSONResponse([
+					'success' => true,
+					'violations' => $violationSummaries,
+					'total' => $totalCount,
+					'scope' => $resolution['scope'],
+				]);
+			}
+
+			$targetUserId = $userId ?? $currentUserId;
+			$this->ensureCanAccessUserCompliance($currentUserId, $targetUserId);
 
 			// Get violations using mapper methods
 			if ($startDt || $endDt) {
@@ -479,9 +636,9 @@ class ComplianceController extends Controller
 				$end = $endDt ? clone $endDt : new \DateTime('2099-12-31');
 				$end->setTime(0, 0, 0);
 				$end->modify('+1 day'); // Exclusive upper bound: next day midnight
-				$allViolations = $this->violationMapper->findByDateRange($start, $end, $targetUserId, $resolved);
+				$allViolations = $this->violationMapper->findByDateRange($start, $end, $targetUserId, $resolvedFilter);
 			} else {
-				$allViolations = $this->violationMapper->findByUser($targetUserId, $resolved);
+				$allViolations = $this->violationMapper->findByUser($targetUserId, $resolvedFilter);
 			}
 
 			// Apply additional filters in PHP (violation type, severity)
@@ -506,20 +663,7 @@ class ComplianceController extends Controller
 			// Apply pagination
 			$violations = array_slice($allViolations, $offset, $limit);
 
-			// Safely map violations to summaries
-			$violationSummaries = [];
-			foreach ($violations as $violation) {
-				try {
-					$summary = $violation->getSummary();
-					$summary['type'] = $summary['violationType'] ?? $violation->getViolationType();
-					$summary['can_resolve'] = !$violation->getResolved()
-						&& $this->permissionService->canResolveViolation($currentUserId, $violation->getUserId());
-					$violationSummaries[] = $summary;
-				} catch (\Throwable $e) {
-					\OCP\Log\logger('arbeitszeitcheck')->error('Error getting summary for violation ' . $violation->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
-					continue;
-				}
-			}
+			$violationSummaries = $this->summarizeViolations($violations, $currentUserId);
 
 			return new JSONResponse([
 				'success' => true,
@@ -700,19 +844,49 @@ class ComplianceController extends Controller
 	 * @return JSONResponse
 	 */
 	#[NoAdminRequired]
-	public function getReport(?string $startDate = null, ?string $endDate = null, ?string $userId = null): JSONResponse
-	{
+	public function getReport(
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $userId = null,
+		?string $userIds = null,
+		?string $teamId = null,
+		?string $scope = null,
+	): JSONResponse {
 		try {
 			$currentUserId = $this->getUserId();
 			$targetUserId = null;
+			$targetUserIds = null;
+
+			$hasScopeSelector = ($scope !== null && trim($scope) !== '')
+				|| ($userIds !== null && trim($userIds) !== '')
+				|| ($teamId !== null && trim($teamId) !== '');
 
 			// Special case: organization scope for admins is expressed as an empty string (`userId=`).
-			// We treat `userId=""` as "all users" and require admin privileges.
-			if ($userId === '') {
-				if (!$this->permissionService->isAdmin($currentUserId)) {
-					throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+			// Resolved through the same OversightScopeService so the preview/export
+			// boundary matches the door-filtered organization everywhere.
+			if ($userId === '' || $hasScopeSelector) {
+				if ($userId !== null && trim($userId) !== '' && $hasScopeSelector) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid scope parameters.'),
+					], Http::STATUS_BAD_REQUEST);
 				}
-				$targetUserId = null;
+				$effectiveScope = $userId === '' && !$hasScopeSelector
+					? \OCA\ArbeitszeitCheck\Service\OversightScopeService::SCOPE_ORGANIZATION
+					: ($scope !== null ? trim($scope) : null);
+				$resolution = $this->oversightScope()->resolveRequestedScope(
+					$currentUserId, null, $userIds, $teamId, $effectiveScope
+				);
+				if (!$resolution['ok']) {
+					return $this->scopeErrorResponse($resolution['code'] ?? '');
+				}
+				if ($resolution['userIds'] === null) {
+					$targetUserId = $currentUserId;
+				} elseif (count($resolution['userIds']) === 1 && $resolution['userIds'][0] === $currentUserId) {
+					$targetUserId = $currentUserId; // legacy self-report shape
+				} else {
+					$targetUserIds = $resolution['userIds'];
+				}
 			} else {
 				// Default: current user (or an explicitly provided userId if a legacy caller passes it).
 				$targetUserId = $userId ?? $currentUserId;
@@ -742,7 +916,7 @@ class ComplianceController extends Controller
 				));
 			}
 
-			$report = $this->complianceService->generateComplianceReport($start, $end, $targetUserId);
+			$report = $this->complianceService->generateComplianceReport($start, $end, $targetUserId, $targetUserIds);
 
 			return new JSONResponse([
 				'success' => true,

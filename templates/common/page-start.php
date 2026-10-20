@@ -42,6 +42,7 @@ $pageIcons = [
 	'manager-dashboard' => 'users',
 	'manager-time-entries' => 'clock',
 	'manager-absences' => 'calendar-off',
+	'manager-people' => 'users',
 	'manager-month-closures' => 'file-down',
 	'admin-dashboard' => 'layout-grid',
 	'admin-notifications' => 'bell',

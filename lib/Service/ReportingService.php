@@ -531,17 +531,23 @@ class ReportingService
 	 * @param string|null $userId User ID (null for all users)
 	 * @param string $sort Row order inside each user block: `date` (default, chronological)
 	 *                    or `type` (absence type, then start date) for payroll handoff.
+	 * @param list<string>|null $userIds Explicit multi-user scope (already
+	 *                    authorization-resolved by the caller); takes
+	 *                    precedence over $userId when provided.
 	 * @return array Report data
 	 */
 	public function generateAbsenceReport(
 		\DateTime $startDate,
 		\DateTime $endDate,
 		?string $userId = null,
-		string $sort = 'date'
+		string $sort = 'date',
+		?array $userIds = null
 	): array {
-		$absences = $userId
-			? $this->absenceMapper->findByUserAndDateRange($userId, $startDate, $endDate)
-			: $this->absenceMapper->findByDateRange($startDate, $endDate);
+		$absences = $userIds !== null
+			? $this->absenceMapper->findByUsersAndDateRange($userIds, $startDate, $endDate)
+			: ($userId
+				? $this->absenceMapper->findByUserAndDateRange($userId, $startDate, $endDate)
+				: $this->absenceMapper->findByDateRange($startDate, $endDate));
 
 		$sortMode = strtolower(trim($sort));
 		if ($sortMode !== 'type') {

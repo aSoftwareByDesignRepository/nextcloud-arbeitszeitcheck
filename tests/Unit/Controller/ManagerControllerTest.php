@@ -57,6 +57,21 @@ class ManagerControllerTest extends TestCase
 	private bool $isAdminAccess = false;
 	private bool $canAccessManagerDashboard = true;
 
+	/** @var array<string,bool> uid => true when the account must look deleted */
+	private array $missingUsers = [];
+
+	/** @var array<string,bool> uid => true when the account is disabled */
+	private array $disabledUsers = [];
+
+	/** @var \OCA\ArbeitszeitCheck\Db\TeamMemberMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamMemberMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\OversightScopeService */
+	private $oversightScopeService;
+
+	/** @var \OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $complianceViolationMapper;
+
 	/** @var ManagerController */
 	private $controller;
 
@@ -129,6 +144,12 @@ class ManagerControllerTest extends TestCase
 	/** @var \OCA\ArbeitszeitCheck\Service\OvertimeDisplayService|\PHPUnit\Framework\MockObject\MockObject */
 	private $overtimeDisplayService;
 
+	/** @var TimeZoneService */
+	private $timeZoneService;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\LocaleFormatService|\PHPUnit\Framework\MockObject\MockObject */
+	private $localeFormatService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -148,6 +169,31 @@ class ManagerControllerTest extends TestCase
 		$this->l10n->method('t')->willReturnCallback(fn ($s) => $s);
 		$this->request = $this->createMock(IRequest::class);
 		$this->teamManagerMapper = $this->createMock(TeamManagerMapper::class);
+		$this->teamMemberMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
+		$this->complianceViolationMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper::class);
+		// Oversight scope checks uid existence/enabled state via
+		// userManager->get(). Default: every uid resolves to an enabled
+		// account — tests mark deleted/disabled uids via the maps.
+		$this->userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			if ($uid === '' || isset($this->missingUsers[$uid])) {
+				return null;
+			}
+			$stub = $this->createMock(IUser::class);
+			$stub->method('getUID')->willReturn($uid);
+			$stub->method('isEnabled')->willReturn(!isset($this->disabledUsers[$uid]));
+			$stub->method('getDisplayName')->willReturn($uid);
+			return $stub;
+		});
+		// The real scope service (final class — not mockable) wired to the
+		// same mocks exercises the production delegation path end-to-end.
+		$this->oversightScopeService = new \OCA\ArbeitszeitCheck\Service\OversightScopeService(
+			$this->permissionService,
+			$this->teamResolver,
+			$this->teamMapper,
+			$this->teamMemberMapper,
+			$this->teamManagerMapper,
+			$this->userManager,
+		);
 		$this->overtimeService = $this->createMock(OvertimeService::class);
 		$this->overtimeDisplayService = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeDisplayService::class);
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
@@ -191,8 +237,9 @@ class ManagerControllerTest extends TestCase
 		$tzDateTime->method('getTimeZone')->willReturn(new \DateTimeZone('Europe/Berlin'));
 		$tzUserSession = $this->createMock(IUserSession::class);
 		$tzUserSession->method('getUser')->willReturn(null);
-		$timeZoneService = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
+		$this->timeZoneService = new TimeZoneService($tzConfig, $tzDateTime, $tzUserSession, new NullLogger());
 		$localeFormat = $this->createMock(\OCA\ArbeitszeitCheck\Service\LocaleFormatService::class);
+		$this->localeFormatService = $localeFormat;
 		$localeFormat->method('clientHints')->willReturn([
 			'locale' => 'en-US',
 			'htmlLang' => 'en-US',
@@ -225,7 +272,7 @@ class ManagerControllerTest extends TestCase
 			$this->config,
 			$this->monthClosureGuard,
 			$this->monthClosureService,
-			$timeZoneService,
+			$this->timeZoneService,
 			$this->correctionService,
 			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
 			$localeFormat,
@@ -234,6 +281,9 @@ class ManagerControllerTest extends TestCase
 				$this->permissionService,
 				$this->config
 			),
+			null,
+			$this->oversightScopeService,
+			$this->complianceViolationMapper,
 		);
 	}
 
@@ -1821,9 +1871,7 @@ class ManagerControllerTest extends TestCase
 			'endDate' => '2026-07-29',
 		]);
 		$this->permissionService->method('canManageEmployee')->willReturn(true);
-		$employee = $this->createMock(IUser::class);
-		$employee->method('isEnabled')->willReturn(false);
-		$this->userManager->method('get')->with('employee1')->willReturn($employee);
+		$this->disabledUsers['employee1'] = true;
 		$this->absenceService->expects($this->never())->method('createApprovedAbsenceForEmployeeByManager');
 
 		$response = $this->controller->createEmployeeAbsence();
@@ -2467,5 +2515,385 @@ class ManagerControllerTest extends TestCase
 			$this->controller->exportTeamAbsencesCsv('2024-12-31', '2024-01-01')->getStatus());
 		$this->assertSame(Http::STATUS_BAD_REQUEST,
 			$this->controller->exportTeamAbsencesCsv('2024-13-45', '2024-01-01')->getStatus());
+	}
+
+	/**
+	 * Wire the happy-path collaborators the people overview aggregates from.
+	 *
+	 * @param list<string> $memberIds
+	 */
+	private function stubPeopleOverviewMembers(array $memberIds): void
+	{
+		$this->teamResolver->method('getTeamMemberIds')->willReturn($memberIds);
+		$this->complianceViolationMapper->method('countUnresolvedByUserIds')->willReturn([]);
+		$this->absenceMapper->method('findPendingForUsers')->willReturn([]);
+		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([]);
+		$this->absenceService->method('getVacationStats')->willReturnCallback(static fn (string $uid, int $year): array => [
+			'year' => $year,
+			'vacation_year_label' => (string)$year,
+			'entitlement' => 30.0,
+			'carryover_days' => 0.0,
+			'total_available' => 30.0,
+			'used' => 10.0,
+			'remaining' => 20.0,
+			'vacation_unit' => Constants::VACATION_UNIT_DAYS,
+			'vacation_hours_per_day' => 8.0,
+			'vacation_year_error' => null,
+		]);
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturnCallback(static fn (string $uid): array => [
+			'balance' => 2.5,
+			'needs_attention' => false,
+			'traffic_light_state' => 'green',
+			'bank_state' => null,
+			'payout_eligible_hours' => null,
+		]);
+		$this->userManager->method('getDisplayName')->willReturnCallback(static fn (string $uid): string => 'Name ' . $uid);
+	}
+
+	public function testPeopleOverviewRequiresManagerAccess(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('employee1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = false;
+
+		$response = $this->controller->getPeopleOverview();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testPeopleOverviewRejectsInvalidYear(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+
+		foreach ([1800, 2200] as $badYear) {
+			$response = $this->controller->getPeopleOverview(null, $badYear);
+			$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus(), "year=$badYear must be rejected");
+			$this->assertFalse($response->getData()['success']);
+		}
+	}
+
+	public function testPeopleOverviewManagerSeesTeamMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['zulu', 'alpha']);
+
+		$response = $this->controller->getPeopleOverview(null, 2026);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertSame('managed', $data['scope']);
+		$this->assertSame(2026, $data['year']);
+		$this->assertSame(2, $data['total']);
+		$this->assertSame(0, $data['partialErrors']);
+		// Sorted by display name: 'Name alpha' before 'Name zulu'.
+		$this->assertSame(['alpha', 'zulu'], array_column($data['employees'], 'userId'));
+		$row = $data['employees'][0];
+		$this->assertSame(20.0, $row['vacation']['remaining']);
+		$this->assertSame('days', $row['vacation']['unit']);
+		$this->assertSame(2.5, $row['overtime']['balance']);
+		$this->assertSame(0, $row['openViolations']);
+		$this->assertSame(0, $row['pendingAbsences']);
+	}
+
+	public function testPeopleOverviewAdminGetsOrganizationScope(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->isAdminAccess = true;
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['orguser1', 'orguser2']);
+		$this->stubPeopleOverviewMembers([]); // manager path must NOT be consulted
+		$this->teamResolver->expects($this->never())->method('getTeamMemberIds');
+
+		$response = $this->controller->getPeopleOverview(null, 2026);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame('organization', $data['scope']);
+		$this->assertSame(2, $data['total']);
+		$this->assertSame(['orguser1', 'orguser2'], array_column($data['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewExcludesDisabledAndDeletedMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		// Ghost member row (deleted user) + disabled member must be excluded.
+		$this->stubPeopleOverviewMembers(['employee1', 'ghost', 'offboarded']);
+		$this->missingUsers['ghost'] = true;
+		$this->disabledUsers['offboarded'] = true;
+
+		$response = $this->controller->getPeopleOverview(null, 2026);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(['employee1'], array_column($data['employees'], 'userId'));
+		$this->assertSame(1, $data['total']);
+	}
+
+	public function testPeopleOverviewEmployeeFilterInScope(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1', 'employee2']);
+
+		$response = $this->controller->getPeopleOverview('employee2', 2026);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(1, $data['total']);
+		$this->assertSame(['employee2'], array_column($data['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewEmployeeFilterOutOfScopeDenied(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+		$this->permissionService->expects($this->once())
+			->method('logPermissionDenied')
+			->with('manager1', 'view_people_overview_user_filter', 'user', 'foreign-user');
+
+		$response = $this->controller->getPeopleOverview('foreign-user', 2026);
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testPeopleOverviewEmployeeFilterGhostUserDenied(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		// 'ghost' is a stale member row (deleted account): excluded from the
+		// enabled scope, so the filter must fail closed like any foreign uid.
+		$this->stubPeopleOverviewMembers(['employee1', 'ghost']);
+		$this->missingUsers['ghost'] = true;
+
+		$response = $this->controller->getPeopleOverview('ghost', 2026);
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testPeopleOverviewPaginationSlicesAndClamps(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['u-b', 'u-a', 'u-c']);
+
+		// limit beyond MAX_LIST_LIMIT clamps; offset slices the sorted set.
+		$response = $this->controller->getPeopleOverview(null, 2026, 1, 1);
+		$data = $response->getData();
+
+		$this->assertSame(3, $data['total']);
+		$this->assertSame(1, $data['limit']);
+		$this->assertSame(1, $data['offset']);
+		$this->assertSame(['u-b'], array_column($data['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewCountsViolationsAndPendingAbsences(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+
+		$this->complianceViolationMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper::class);
+		$this->complianceViolationMapper->method('countUnresolvedByUserIds')
+			->willReturn(['employee1' => 2]);
+
+		$pending = new Absence();
+		$pending->setUserId('employee1');
+		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
+		$this->absenceMapper->method('findPendingForUsers')->willReturn([$pending]);
+		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([]);
+
+		$controller = new ManagerController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->absenceService,
+			$this->timeTrackingService,
+			$this->complianceService,
+			$this->absenceMapper,
+			$this->teamResolver,
+			$this->permissionService,
+			$this->teamMapper,
+			$this->userSession,
+			$this->userManager,
+			$this->cspService,
+			$this->l10n,
+			$this->teamManagerMapper,
+			$this->overtimeService,
+			$this->overtimeDisplayService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeTrafficLightService::class),
+			$this->auditLogMapper,
+			$this->notificationService,
+			$this->timeEntryMapper,
+			$this->urlGenerator,
+			$this->config,
+			$this->monthClosureGuard,
+			$this->monthClosureService,
+			$this->timeZoneService,
+			$this->correctionService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\LocaleFormatService::class),
+			new NavigationFlagsService(
+			$this->absenceMapper,
+			$this->permissionService,
+			$this->config
+		),
+			null,
+			$this->oversightScopeService,
+			$this->complianceViolationMapper,
+		);
+
+		$response = $controller->getPeopleOverview(null, 2026);
+		$row = $response->getData()['employees'][0];
+
+		$this->assertSame(2, $row['openViolations']);
+		$this->assertSame(1, $row['pendingAbsences']);
+	}
+
+	public function testPeopleOverviewPartialErrorsKeepRowHonest(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+		$this->absenceService = $this->createMock(AbsenceService::class);
+		$this->absenceService->method('getVacationStats')->willThrowException(new \RuntimeException('boom'));
+		$this->overtimeDisplayService = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeDisplayService::class);
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')
+			->willThrowException(new \RuntimeException('boom'));
+
+		$controller = new ManagerController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->absenceService,
+			$this->timeTrackingService,
+			$this->complianceService,
+			$this->absenceMapper,
+			$this->teamResolver,
+			$this->permissionService,
+			$this->teamMapper,
+			$this->userSession,
+			$this->userManager,
+			$this->cspService,
+			$this->l10n,
+			$this->teamManagerMapper,
+			$this->overtimeService,
+			$this->overtimeDisplayService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeTrafficLightService::class),
+			$this->auditLogMapper,
+			$this->notificationService,
+			$this->timeEntryMapper,
+			$this->urlGenerator,
+			$this->config,
+			$this->monthClosureGuard,
+			$this->monthClosureService,
+			$this->timeZoneService,
+			$this->correctionService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\LocaleFormatService::class),
+			new NavigationFlagsService(
+			$this->absenceMapper,
+			$this->permissionService,
+			$this->config
+		),
+			null,
+			$this->oversightScopeService,
+			$this->complianceViolationMapper,
+		);
+
+		$response = $controller->getPeopleOverview(null, 2026);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertSame(2, $data['partialErrors']);
+		$this->assertNull($data['employees'][0]['vacation']);
+		$this->assertNull($data['employees'][0]['overtime']);
+	}
+
+	public function testPeopleOverviewCountsApprovedUpcomingVacation(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+
+		$future = new Absence();
+		$future->setUserId('employee1');
+		$future->setStartDate(new \DateTime('tomorrow +5 days'));
+		$future->setDays(3.0);
+		// An absence spanning today is returned by the overlap query but must
+		// NOT count as upcoming (days already consumed are not "future").
+		$spanning = new Absence();
+		$spanning->setUserId('employee1');
+		$spanning->setStartDate(new \DateTime('yesterday'));
+		$spanning->setDays(9.0);
+
+		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
+		$this->absenceMapper->method('findPendingForUsers')->willReturn([]);
+		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([$future, $spanning]);
+
+		$controller = new ManagerController(
+			'arbeitszeitcheck',
+			$this->request,
+			$this->absenceService,
+			$this->timeTrackingService,
+			$this->complianceService,
+			$this->absenceMapper,
+			$this->teamResolver,
+			$this->permissionService,
+			$this->teamMapper,
+			$this->userSession,
+			$this->userManager,
+			$this->cspService,
+			$this->l10n,
+			$this->teamManagerMapper,
+			$this->overtimeService,
+			$this->overtimeDisplayService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeBankService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeTrafficLightService::class),
+			$this->auditLogMapper,
+			$this->notificationService,
+			$this->timeEntryMapper,
+			$this->urlGenerator,
+			$this->config,
+			$this->monthClosureGuard,
+			$this->monthClosureService,
+			$this->timeZoneService,
+			$this->correctionService,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\LocaleFormatService::class),
+			new NavigationFlagsService(
+			$this->absenceMapper,
+			$this->permissionService,
+			$this->config
+		),
+			null,
+			$this->oversightScopeService,
+			$this->complianceViolationMapper,
+		);
+
+		$response = $controller->getPeopleOverview(null, 2026);
+		$row = $response->getData()['employees'][0];
+
+		$this->assertSame(3.0, $row['vacation']['approvedUpcoming']);
 	}
 }

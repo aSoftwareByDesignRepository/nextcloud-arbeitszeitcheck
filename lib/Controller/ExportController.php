@@ -114,7 +114,9 @@ class ExportController extends Controller
 		IL10N $l10n,
 		IConfig $config,
 		PermissionService $permissionService,
-		?IUserManager $userManager = null
+		?IUserManager $userManager = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\OversightScopeService $oversightScope = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Db\AuditLogMapper $auditLogMapper = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -127,6 +129,16 @@ class ExportController extends Controller
 		$this->config = $config;
 		$this->permissionService = $permissionService;
 		$this->userManager = $userManager;
+	}
+
+	private function oversightScope(): \OCA\ArbeitszeitCheck\Service\OversightScopeService
+	{
+		return $this->oversightScope ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OversightScopeService::class);
+	}
+
+	private function auditLogMapper(): ?\OCA\ArbeitszeitCheck\Db\AuditLogMapper
+	{
+		return $this->auditLogMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
 	}
 
 	/**
@@ -252,15 +264,25 @@ class ExportController extends Controller
 	/**
 	 * @return DataDownloadResponse|JSONResponse
 	 */
-	public function absences(string $format = 'csv', ?string $startDate = null, ?string $endDate = null, ?string $sort = null): DataDownloadResponse|JSONResponse
-	{
+	public function absences(
+		string $format = 'csv',
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $sort = null,
+		?string $userId = null,
+		?string $userIds = null,
+		?string $teamId = null,
+		?string $scope = null,
+		?string $status = null,
+		?string $type = null,
+	): DataDownloadResponse|JSONResponse {
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
 				throw new \Exception($this->l10n->t('User not authenticated'));
 			}
 
-			$userId = $user->getUID();
+			$actorUid = $user->getUID();
 
 		// Determine date range (default to last year if not specified)
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
@@ -285,8 +307,73 @@ class ExportController extends Controller
 			));
 		}
 
+		// Scope selectors (userId / userIds / teamId / scope) — resolved through
+		// the single OversightScopeService. No selector → legacy self export.
+		$scopeResolution = $this->oversightScope()->resolveRequestedScope($actorUid, $userId, $userIds, $teamId, $scope);
+		if (!$scopeResolution['ok']) {
+			return $this->scopeErrorResponse($scopeResolution['code'] ?? '');
+		}
+		$scopeUserIds = $scopeResolution['userIds']; // null → self export
+		$isSelfExport = $scopeUserIds === null;
+		$scopeUserIds ??= [$actorUid];
+
+		// Optional row filters (validated strictly — unknown values are rejected).
+		$status = $status !== null ? trim($status) : '';
+		if ($status !== '' && !in_array($status, [
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_PENDING,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_DECLINED,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_REJECTED,
+			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_CANCELLED,
+		], true)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid status filter.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$type = $type !== null ? trim($type) : '';
+		if ($type !== '' && !\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isValid($type)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid absence type.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+
 			// Get absences from database
-			$absences = $this->absenceMapper->findByUserAndDateRange($userId, $start, $end);
+			if ($isSelfExport) {
+				// Legacy path: single-user mapper call, unchanged output columns.
+				$absences = $this->absenceMapper->findByUserAndDateRange($actorUid, $start, $end);
+				if ($status !== '' || $type !== '') {
+					$absences = array_values(array_filter($absences, static function ($a) use ($status, $type): bool {
+						return ($status === '' || $a->getStatus() === $status)
+							&& ($type === '' || $a->getType() === $type);
+					}));
+				}
+			} else {
+				// Scoped export: fail loud instead of silently truncating payroll data.
+				$rowCount = $this->absenceMapper->countByUsersAndDateRange(
+					$scopeUserIds, $start, $end, $status !== '' ? $status : null, $type !== '' ? $type : null
+				);
+				if ($rowCount > Constants::MAX_EXPORT_ROWS) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Too many rows (%d). Please narrow the date range or selection.', [$rowCount]),
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$absences = $this->absenceMapper->findByUsersAndDateRange(
+					$scopeUserIds, $start, $end, $status !== '' ? $status : null, $type !== '' ? $type : null
+				);
+			}
+
+			$displayNameByUid = [];
+			$displayName = function (string $uid) use (&$displayNameByUid): string {
+				if (!array_key_exists($uid, $displayNameByUid)) {
+					$u = $this->userManager?->get($uid);
+					$displayNameByUid[$uid] = ($u !== null && $u->getDisplayName() !== '') ? $u->getDisplayName() : $uid;
+				}
+				return $displayNameByUid[$uid];
+			};
 
 			// Convert to array format
 			$data = [];
@@ -295,7 +382,7 @@ class ExportController extends Controller
 					$startDateRow = $absence->getStartDate();
 					$endDateRow = $absence->getEndDate();
 					$createdAt = $absence->getCreatedAt();
-					$data[] = [
+					$row = [
 						'id' => $absence->getId(),
 						'type' => $absence->getType(),
 						'start_date' => $startDateRow ? $startDateRow->format('Y-m-d') : '',
@@ -307,11 +394,18 @@ class ExportController extends Controller
 						'approved_at' => $absence->getApprovedAt() ? $absence->getApprovedAt()->format('Y-m-d H:i:s') : '',
 						'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : ''
 					];
+					if (!$isSelfExport) {
+						// Scoped exports carry the employee identity columns.
+						$row = ['user_id' => $absence->getUserId(), 'display_name' => $displayName($absence->getUserId())] + $row;
+					}
+					$data[] = $row;
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->error('Error processing absence ' . $absence->getId() . ' in export: ' . $e->getMessage(), ["exception" => $e]);
 					continue;
 				}
 			}
+
+			$this->logExportAudit($actorUid, 'absence_export', $scopeResolution['scope'] !== '' ? $scopeResolution['scope'] : 'self', $scopeUserIds, $start, $end, count($data));
 
 			$sortMode = strtolower(trim((string)($sort ?? $this->request->getParam('sort') ?? 'date')));
 			if ($sortMode === 'type') {
@@ -416,15 +510,25 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function compliance(string $format = 'csv', ?string $startDate = null, ?string $endDate = null): DataDownloadResponse|JSONResponse
-	{
+	public function compliance(
+		string $format = 'csv',
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $userId = null,
+		?string $userIds = null,
+		?string $teamId = null,
+		?string $scope = null,
+		?string $severity = null,
+		?string $violationType = null,
+		?string $resolved = null,
+	): DataDownloadResponse|JSONResponse {
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
 				throw new \Exception($this->l10n->t('User not authenticated'));
 			}
 
-			$userId = $user->getUID();
+			$actorUid = $user->getUID();
 
 		// Determine date range (default to last 30 days if not specified)
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
@@ -449,8 +553,80 @@ class ExportController extends Controller
 			));
 		}
 
-		// Get compliance violations for user from database
-			$violations = $this->violationMapper->findByDateRange($start, $end, $userId);
+		// Scope selectors — same resolver as the absence export.
+		$scopeResolution = $this->oversightScope()->resolveRequestedScope($actorUid, $userId, $userIds, $teamId, $scope);
+		if (!$scopeResolution['ok']) {
+			return $this->scopeErrorResponse($scopeResolution['code'] ?? '');
+		}
+		$scopeUserIds = $scopeResolution['userIds'];
+		$isSelfExport = $scopeUserIds === null;
+		$scopeUserIds ??= [$actorUid];
+
+		$severity = $severity !== null ? trim($severity) : '';
+		if ($severity !== '' && !in_array($severity, [
+			\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_INFO,
+			\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_WARNING,
+			\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_ERROR,
+		], true)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid severity filter.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$violationType = $violationType !== null ? trim($violationType) : '';
+		// Form-encoded booleans arrive as strings — parse strictly.
+		$resolvedFilter = null;
+		if ($resolved !== null && trim($resolved) !== '') {
+			$resolved = strtolower(trim($resolved));
+			if ($resolved === '1' || $resolved === 'true') {
+				$resolvedFilter = true;
+			} elseif ($resolved === '0' || $resolved === 'false') {
+				$resolvedFilter = false;
+			} else {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid resolved filter.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+		}
+
+		// Violation `date` is day-grained; the request end date is inclusive,
+		// so the exclusive upper bound is end+1 day. (Deliberate fix: the
+		// legacy self export dropped violations on the end date itself.)
+		$endExclusive = (clone $end)->modify('+1 day');
+
+		// Get compliance violations from database
+			if ($isSelfExport && $severity === '' && $violationType === '' && $resolvedFilter === null) {
+				$violations = $this->violationMapper->findByDateRange($start, $endExclusive, $actorUid);
+			} else {
+				$rowCount = $this->violationMapper->countByUserIdsAndDateRange(
+					$scopeUserIds, $start, $endExclusive,
+					$violationType !== '' ? $violationType : null,
+					$severity !== '' ? $severity : null,
+					$resolvedFilter
+				);
+				if ($rowCount > Constants::MAX_EXPORT_ROWS) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Too many rows (%d). Please narrow the date range or selection.', [$rowCount]),
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$violations = $this->violationMapper->findByUserIdsAndDateRange(
+					$scopeUserIds, $start, $endExclusive,
+					$violationType !== '' ? $violationType : null,
+					$severity !== '' ? $severity : null,
+					$resolvedFilter
+				);
+			}
+
+			$displayNameByUid = [];
+			$displayName = function (string $uid) use (&$displayNameByUid): string {
+				if (!array_key_exists($uid, $displayNameByUid)) {
+					$u = $this->userManager?->get($uid);
+					$displayNameByUid[$uid] = ($u !== null && $u->getDisplayName() !== '') ? $u->getDisplayName() : $uid;
+				}
+				return $displayNameByUid[$uid];
+			};
 
 			// Convert to array format
 			$data = [];
@@ -460,7 +636,7 @@ class ExportController extends Controller
 					if (!$date) {
 						continue; // Skip violations with no date
 					}
-					$data[] = [
+					$row = [
 						'id' => $violation->getId(),
 						'date' => $date->format('Y-m-d'),
 						'violation_type' => $violation->getViolationType(),
@@ -470,11 +646,17 @@ class ExportController extends Controller
 						'resolved_at' => $violation->getResolvedAt() ? $violation->getResolvedAt()->format('Y-m-d H:i:s') : '',
 						'time_entry_id' => $violation->getTimeEntryId()
 					];
+					if (!$isSelfExport) {
+						$row = ['user_id' => $violation->getUserId(), 'display_name' => $displayName($violation->getUserId())] + $row;
+					}
+					$data[] = $row;
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->error('Error processing violation ' . $violation->getId() . ' in export: ' . $e->getMessage(), ["exception" => $e]);
 					continue;
 				}
 			}
+
+			$this->logExportAudit($actorUid, 'compliance_export', $scopeResolution['scope'] !== '' ? $scopeResolution['scope'] : 'self', $scopeUserIds, $start, $end, count($data));
 
 			$filename = 'compliance-report-' . date('Y-m-d') . '.' . $format;
 
@@ -495,6 +677,65 @@ class ExportController extends Controller
 			// Return error as CSV with error message
 			$errorData = [['error' => $this->safeExportErrorMessage($e)]];
 			return $this->exportAsCsv($errorData, 'compliance-export-error-' . date('Y-m-d') . '.csv', $this->getExportTimezone());
+		}
+	}
+
+	/**
+	 * Uniform error response for scope-selector failures: authorization
+	 * denials and unknown/foreign ids collapse to one generic message
+	 * (no existence oracle); malformed input is a 400.
+	 */
+	private function scopeErrorResponse(string $code): JSONResponse
+	{
+		if ($code === \OCA\ArbeitszeitCheck\Service\OversightScopeService::ERR_DENIED) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Access denied'),
+			], Http::STATUS_FORBIDDEN);
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('Invalid scope parameters.'),
+		], Http::STATUS_BAD_REQUEST);
+	}
+
+	/**
+	 * Audit record for every sensitive HR data download (actor, scope,
+	 * user count, row count, window). Failures are logged but never block
+	 * the download itself — an audit outage must not break exports.
+	 *
+	 * @param list<string> $scopeUserIds
+	 */
+	private function logExportAudit(
+		string $actorUid,
+		string $entityType,
+		string $scopeLabel,
+		array $scopeUserIds,
+		\DateTime $start,
+		\DateTime $end,
+		int $rowCount,
+	): void {
+		try {
+			$this->auditLogMapper()?->logAction(
+				$actorUid,
+				'export_download',
+				$entityType,
+				null,
+				null,
+				[
+					'scope' => $scopeLabel,
+					'user_count' => count($scopeUserIds),
+					'row_count' => $rowCount,
+					'start_date' => $start->format('Y-m-d'),
+					'end_date' => $end->format('Y-m-d'),
+				],
+				$actorUid,
+			);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Export audit logging failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
 		}
 	}
 

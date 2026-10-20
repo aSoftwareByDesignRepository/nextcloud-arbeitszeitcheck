@@ -123,6 +123,8 @@ return [
 		['name' => 'manager#dashboard', 'url' => '/manager', 'verb' => 'GET'],
 		['name' => 'manager#employeeTimeEntriesPage', 'url' => '/manager/time-entries', 'verb' => 'GET'],
 		['name' => 'manager#employeeAbsencesPage', 'url' => '/manager/absences', 'verb' => 'GET'],
+		['name' => 'manager#peoplePage', 'url' => '/manager/people', 'verb' => 'GET'],
+		['name' => 'manager#getPeopleOverview', 'url' => '/api/manager/people-overview', 'verb' => 'GET'],
 		['name' => 'manager#monthClosuresPage', 'url' => '/manager/month-closures', 'verb' => 'GET'],
 		['name' => 'manager#revisionPdfUsers', 'url' => '/api/manager/revision-pdf/users', 'verb' => 'GET'],
 		['name' => 'manager#revisionPdfAvailableMonths', 'url' => '/api/manager/revision-pdf/available-months', 'verb' => 'GET'],

@@ -88,6 +88,12 @@ class ReportControllerTest extends TestCase
 	/** @var \OCA\ArbeitszeitCheck\Service\PremiumSurchargeService|\PHPUnit\Framework\MockObject\MockObject */
 	private $premiumSurchargeService;
 
+	/** @var \OCA\ArbeitszeitCheck\Db\TeamMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\OversightScopeService */
+	private $oversightScopeService;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -127,6 +133,27 @@ class ReportControllerTest extends TestCase
 			return $default;
 		});
 		$this->userManager = $this->createMock(IUserManager::class);
+		// Oversight/report access checks uid existence via userManager->get().
+		// Default: every uid resolves to an enabled account.
+		$this->userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			if ($uid === '') {
+				return null;
+			}
+			$stub = $this->createMock(IUser::class);
+			$stub->method('getUID')->willReturn($uid);
+			$stub->method('isEnabled')->willReturn(true);
+			return $stub;
+		});
+		$this->teamMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMapper::class);
+		// Real scope service (final — not mockable) wired to the test mocks.
+		$this->oversightScopeService = new \OCA\ArbeitszeitCheck\Service\OversightScopeService(
+			$this->permissionService,
+			$this->teamResolver,
+			$this->teamMapper,
+			$this->teamMemberMapper,
+			$this->teamManagerMapper,
+			$this->userManager,
+		);
 		$this->monthClosureService = $this->createMock(MonthClosureService::class);
 		$this->premiumSurchargeService = $this->createMock(\OCA\ArbeitszeitCheck\Service\PremiumSurchargeService::class);
 
@@ -145,7 +172,8 @@ class ReportControllerTest extends TestCase
 			$this->userSession,
 			$this->l10n,
 			$this->monthClosureService,
-			$this->premiumSurchargeService
+			$this->premiumSurchargeService,
+			$this->oversightScopeService
 		);
 	}
 
@@ -547,10 +575,12 @@ class ReportControllerTest extends TestCase
 				$this->callback(function ($date) {
 					return $date instanceof \DateTime && $date->format('Y-m-d') === '2024-06-01';
 				}),
-				// Controller passes an exclusive upper bound: midnight of the day after the
-				// requested end date, so that DB queries using strict < include all of June 30.
+				// Absence mappers use inclusive-end overlap semantics
+				// (start_date <= end AND end_date >= start), so the controller
+				// passes the requested end date itself — NOT end+1 day, which
+				// would incorrectly include absences starting July 1st.
 				$this->callback(function ($date) {
-					return $date instanceof \DateTime && $date->format('Y-m-d') === '2024-07-01';
+					return $date instanceof \DateTime && $date->format('Y-m-d') === '2024-06-30';
 				}),
 				$userId
 			)
@@ -824,7 +854,8 @@ class ReportControllerTest extends TestCase
 			$this->userSession,
 			$this->l10n,
 			$this->monthClosureService,
-			$this->premiumSurchargeService
+			$this->premiumSurchargeService,
+			$this->oversightScopeService
 		);
 
 		$reportData = [
@@ -889,7 +920,8 @@ class ReportControllerTest extends TestCase
 			$this->userSession,
 			$this->l10n,
 			$this->monthClosureService,
-			$this->premiumSurchargeService
+			$this->premiumSurchargeService,
+			$this->oversightScopeService
 		);
 
 		$userId = 'manager1';
@@ -1138,7 +1170,8 @@ class ReportControllerTest extends TestCase
 			$this->userSession,
 			$this->l10n,
 			$this->monthClosureService,
-			$this->premiumSurchargeService
+			$this->premiumSurchargeService,
+			$this->oversightScopeService
 		);
 
 		$response = $this->controller->premium('2026-08-01', '2026-08-31');
@@ -1255,6 +1288,194 @@ class ReportControllerTest extends TestCase
 			->willReturn(['type' => 'premium', 'users' => []]);
 
 		$d = $this->controller->premium('2026-08-01', '2026-08-31', '')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testAbsenceReportScopeOrganizationForAdmin(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->isAdminHook = static fn ($uid) => $uid === 'admin1';
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['u1', 'u2']);
+
+		$this->reportingService->expects($this->once())
+			->method('generateAbsenceReport')
+			->with(
+				$this->anything(),
+				$this->anything(),
+				null,          // userId — multi-user reports use the userIds arm
+				$this->anything(),
+				['u1', 'u2']   // userIds — organization scope
+			)
+			->willReturn(['type' => 'absence']);
+
+		$d = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, null, 'organization')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testAbsenceReportScopeOrganizationDeniedForManager(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, null, 'organization');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testAbsenceReportScopeManagedResolvesTeamMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1', 'employee2']);
+
+		$this->reportingService->expects($this->once())
+			->method('generateAbsenceReport')
+			->with(
+				$this->anything(),
+				$this->anything(),
+				null,
+				$this->anything(),
+				['employee1', 'employee2']
+			)
+			->willReturn(['type' => 'absence']);
+
+		$d = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, null, 'managed')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testAbsenceReportUserIdsAtomicDenialOnForeignUid(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		// One out-of-scope uid inside the list rejects the whole request.
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, 'employee1,foreign-user');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testAbsenceReportUserIdsAcceptsManagedMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1', 'employee2']);
+
+		$this->reportingService->expects($this->once())
+			->method('generateAbsenceReport')
+			->with($this->anything(), $this->anything(), null, $this->anything(), ['employee1', 'employee2'])
+			->willReturn(['type' => 'absence']);
+
+		$d = $this->controller->absence('2026-01-01', '2026-01-31', null, null, 'employee1, employee2')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testAbsenceReportTeamIdManagedResolvesMembers(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamManagerMapper->method('getTeamIdsForManager')->with('manager1')->willReturn([7]);
+		$this->teamMapper->method('getIdsWithDescendants')->with(7)->willReturn([7]);
+		$this->teamMemberMapper->method('getMemberUserIdsByTeamIds')->with([7])->willReturn(['employee1']);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->reportingService->expects($this->once())
+			->method('generateAbsenceReport')
+			->with($this->anything(), $this->anything(), null, $this->anything(), ['employee1'])
+			->willReturn(['type' => 'absence']);
+
+		$d = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, '7')->getData();
+		$this->assertTrue($d['success']);
+	}
+
+	public function testAbsenceReportTeamIdForeignDeniedWithoutExistenceLeak(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamManagerMapper->method('getTeamIdsForManager')->with('manager1')->willReturn([7]);
+		$this->teamMapper->method('getIdsWithDescendants')->with(7)->willReturn([7]);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		// Foreign team 99 collapses to the same generic denial as a
+		// nonexistent team — no existence oracle.
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, '99');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testAbsenceReportInvalidTeamIdRejected(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, 'abc');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testAbsenceReportAmbiguousSelectorsRejected(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		// userId combined with scope/teamId/userIds is ambiguous → 400.
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', 'employee1', null, null, null, 'managed');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testAbsenceReportUnknownScopeValueRejected(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
+
+		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, null, 'bogus_scope');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testAbsenceReportLegacyEmptyUserIdStillMeansOrgScope(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->isAdminHook = static fn ($uid) => $uid === 'admin1';
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['u1']);
+
+		$this->reportingService->expects($this->once())
+			->method('generateAbsenceReport')
+			->with($this->anything(), $this->anything(), null, $this->anything(), ['u1'])
+			->willReturn(['type' => 'absence']);
+
+		// userId='' is the legacy org-scope selector (self-scope compat).
+		$d = $this->controller->absence('2026-01-01', '2026-01-31', '')->getData();
 		$this->assertTrue($d['success']);
 	}
 }

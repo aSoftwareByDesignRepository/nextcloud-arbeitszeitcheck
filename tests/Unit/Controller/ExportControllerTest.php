@@ -65,6 +65,30 @@ class ExportControllerTest extends TestCase
 	/** @var PermissionService|\PHPUnit\Framework\MockObject\MockObject */
 	private $permissionService;
 
+	/** @var \OCP\IUserManager|\PHPUnit\Framework\MockObject\MockObject */
+	private $userManager;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\TeamResolverService|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamResolver;
+
+	/** @var \OCA\ArbeitszeitCheck\Db\TeamMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Db\TeamMemberMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamMemberMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Db\TeamManagerMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $teamManagerMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Db\AuditLogMapper|\PHPUnit\Framework\MockObject\MockObject */
+	private $auditLogMapper;
+
+	/** @var \OCA\ArbeitszeitCheck\Service\OversightScopeService */
+	private $oversightScopeService;
+
+	/** @var array<string,bool> uid => true when the account must look deleted */
+	private array $missingUsers = [];
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -97,6 +121,34 @@ class ExportControllerTest extends TestCase
 			return $default ?? '';
 		});
 
+		// Scope checks uid existence via userManager->get(); default: every
+		// uid resolves to an enabled account (see missingUsers overrides).
+		$this->userManager = $this->createMock(\OCP\IUserManager::class);
+		$this->userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			if ($uid === '' || isset($this->missingUsers[$uid])) {
+				return null;
+			}
+			$stub = $this->createMock(IUser::class);
+			$stub->method('getUID')->willReturn($uid);
+			$stub->method('isEnabled')->willReturn(true);
+			$stub->method('getDisplayName')->willReturn($uid);
+			return $stub;
+		});
+		$this->teamResolver = $this->createMock(\OCA\ArbeitszeitCheck\Service\TeamResolverService::class);
+		$this->teamMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMapper::class);
+		$this->teamMemberMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMemberMapper::class);
+		$this->teamManagerMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamManagerMapper::class);
+		$this->auditLogMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class);
+		// Real scope service (final — not mockable) wired to the test mocks.
+		$this->oversightScopeService = new \OCA\ArbeitszeitCheck\Service\OversightScopeService(
+			$this->permissionService,
+			$this->teamResolver,
+			$this->teamMapper,
+			$this->teamMemberMapper,
+			$this->teamManagerMapper,
+			$this->userManager,
+		);
+
 		$this->controller = new ExportController(
 			'arbeitszeitcheck',
 			$this->request,
@@ -108,7 +160,10 @@ class ExportControllerTest extends TestCase
 			$this->userSession,
 			$this->l10n,
 			$this->config,
-			$this->permissionService
+			$this->permissionService,
+			$this->userManager,
+			$this->oversightScopeService,
+			$this->auditLogMapper
 		);
 	}
 
@@ -1067,5 +1122,181 @@ class ExportControllerTest extends TestCase
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 		$content = $response->render();
 		$this->assertStringContainsString('No data available', $content);
+	}
+
+	/**
+	 * Build an absence entity for scoped-export tests.
+	 */
+	private function makeScopedAbsence(string $uid): Absence
+	{
+		$absence = new Absence();
+		$absence->setId(1);
+		$absence->setUserId($uid);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-02'));
+		$absence->setDays(2);
+		$absence->setReason('Trip');
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setApproverComment(null);
+		$absence->setApprovedAt(null);
+		$absence->setCreatedAt(new \DateTime('2024-05-01'));
+		$absence->setUpdatedAt(new \DateTime('2024-05-01'));
+		return $absence;
+	}
+
+	private function asUser(string $uid): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($uid);
+		$this->userSession->method('getUser')->willReturn($user);
+	}
+
+	public function testAbsencesScopedExportManagerTeamIncludesIdentityColumns(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->absenceMapper->method('countByUsersAndDateRange')->willReturn(1);
+		$this->absenceMapper->expects($this->once())
+			->method('findByUsersAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), null, null)
+			->willReturn([$this->makeScopedAbsence('employee1')]);
+
+		// Self-scope legacy mapper must not run for scoped exports.
+		$this->absenceMapper->expects($this->never())->method('findByUserAndDateRange');
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed');
+
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = (string)$response->render();
+		$this->assertStringContainsString('user_id', $content);
+		$this->assertStringContainsString('employee1', $content);
+	}
+
+	public function testAbsencesScopedExportForeignUidDenied(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->absenceMapper->expects($this->never())->method('findByUsersAndDateRange');
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, 'employee1,foreign');
+		$this->assertSame(403, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testAbsencesScopedExportGhostUidDenied(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1', 'ghost']);
+		$this->missingUsers['ghost'] = true; // deleted account, stale member row
+
+		$this->absenceMapper->expects($this->never())->method('findByUsersAndDateRange');
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, 'ghost');
+		$this->assertSame(403, $response->getStatus());
+	}
+
+	public function testAbsencesOrgScopeRequiresAdmin(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'organization');
+		$this->assertSame(403, $response->getStatus());
+	}
+
+	public function testAbsencesOrgScopeAdminExportsDoorFilteredUsers(): void
+	{
+		$this->asUser('admin1');
+		$this->permissionService->method('isAdmin')->with('admin1')->willReturn(true);
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['orguser1']);
+
+		$this->absenceMapper->method('countByUsersAndDateRange')->willReturn(1);
+		$this->absenceMapper->expects($this->once())
+			->method('findByUsersAndDateRange')
+			->with(['orguser1'], $this->anything(), $this->anything(), null, null)
+			->willReturn([$this->makeScopedAbsence('orguser1')]);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'organization');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$this->assertStringContainsString('orguser1', (string)$response->render());
+	}
+
+	public function testAbsencesScopedExportAmbiguousSelectorsRejected(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, 'employee1', 'employee2');
+		$this->assertSame(400, $response->getStatus());
+	}
+
+	public function testAbsencesScopedExportFailsLoudOnRowCap(): void
+	{
+		$this->asUser('admin1');
+		$this->permissionService->method('isAdmin')->with('admin1')->willReturn(true);
+		$this->permissionService->method('listAppAccessUserIds')->willReturn(['u1']);
+
+		$this->absenceMapper->method('countByUsersAndDateRange')->willReturn(50001);
+		$this->absenceMapper->expects($this->never())->method('findByUsersAndDateRange');
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'organization');
+		$this->assertSame(400, $response->getStatus());
+		$this->assertStringContainsString('Too many rows', $response->getData()['error']);
+	}
+
+	public function testComplianceScopedExportParsesResolvedStringStrictly(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		// "false" must parse to false — not truthy — so only UNRESOLVED
+		// violations are exported.
+		$this->violationMapper->expects($this->once())
+			->method('countByUserIdsAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), null, null, false)
+			->willReturn(0);
+		$this->violationMapper->expects($this->once())
+			->method('findByUserIdsAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), null, null, false)
+			->willReturn([]);
+
+		$response = $this->controller->compliance('csv', '2024-06-01', '2024-06-30', null, null, null, 'managed', null, null, 'false');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+	}
+
+	public function testComplianceScopedExportRejectsBogusResolved(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$response = $this->controller->compliance('csv', '2024-06-01', '2024-06-30', null, null, null, 'managed', null, null, 'maybe');
+		$this->assertSame(400, $response->getStatus());
+	}
+
+	public function testComplianceScopedExportAuditLogged(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->violationMapper->method('countByUserIdsAndDateRange')->willReturn(0);
+		$this->violationMapper->method('findByUserIdsAndDateRange')->willReturn([]);
+
+		$this->auditLogMapper->expects($this->once())
+			->method('logAction')
+			->with('manager1', 'export_download', 'compliance_export', null, null, $this->callback(
+				static fn ($ctx): bool => is_array($ctx) && ($ctx['scope'] ?? '') === 'managed' && ($ctx['user_count'] ?? 0) === 1
+			));
+
+		$response = $this->controller->compliance('csv', '2024-06-01', '2024-06-30', null, null, null, 'managed');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 	}
 }

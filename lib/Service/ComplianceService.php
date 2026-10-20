@@ -2115,9 +2115,21 @@ class ComplianceService
      * @param string|null $userId
      * @return array
      */
-    public function generateComplianceReport(\DateTime $startDate, \DateTime $endDate, ?string $userId = null): array
+    public function generateComplianceReport(\DateTime $startDate, \DateTime $endDate, ?string $userId = null, ?array $userIds = null): array
     {
-        $violations = $this->violationMapper->findByDateRange($startDate, $endDate, $userId);
+        // The request/report end date is inclusive; `date` is day-grained, so
+        // the exclusive upper bound is end + 1 day.
+        $endExclusive = (clone $endDate)->modify('+1 day');
+        if ($userIds !== null) {
+            // Scoped multi-user report (manager scope / org / explicit list).
+            $violations = $this->violationMapper->findByUserIdsAndDateRange(
+                $userIds,
+                $startDate,
+                $endExclusive
+            );
+        } else {
+            $violations = $this->violationMapper->findByDateRange($startDate, $endExclusive, $userId);
+        }
 
         $report = [
             'period' => [

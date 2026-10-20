@@ -1,0 +1,119 @@
+/**
+ * Manager people overview page.
+ */
+
+#app-content.azc-app--manager-people .manager-scope-page {
+	width: 100%;
+	min-width: 0;
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__results .azc-card__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-4, 1rem);
+}
+
+#app-content.azc-app--manager-people .manager-people__employee {
+	min-width: 10rem;
+}
+
+#app-content.azc-app--manager-people .manager-people__name,
+#app-content.azc-app--manager-people .manager-people__name-link {
+	display: block;
+	font-weight: 600;
+}
+
+#app-content.azc-app--manager-people .manager-people__uid {
+	display: block;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	color: var(--color-text-maxcontrast, #767676);
+	word-break: break-all;
+}
+
+#app-content.azc-app--manager-people .manager-people__value {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+#app-content.azc-app--manager-people .manager-people__value--warn {
+	color: var(--color-element-error, #e9322d);
+}
+
+#app-content.azc-app--manager-people .manager-people__muted {
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+#app-content.azc-app--manager-people .manager-people__cell-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app--manager-people .manager-people__action {
+	min-height: 36px;
+}
+
+/* Responsive results table: card layout with labeled cells */
+@media (max-width: 767.98px) {
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive,
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody,
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tr,
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive td {
+		display: block;
+		width: 100%;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody tr {
+		padding: var(--azc-space-4, 1rem);
+		box-shadow: 0 1px 2px color-mix(in srgb, var(--color-main-text) 6%, transparent);
+		border-radius: var(--azc-radius-md, 0.5rem);
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--azc-space-3, 0.75rem);
+		padding: var(--azc-space-2, 0.5rem) 0;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td::before {
+		content: attr(data-cell);
+		font-size: var(--azc-fs-sm, 0.875rem);
+		font-weight: 600;
+		min-width: 7.5rem;
+		max-width: 45%;
+		padding-top: 0.1rem;
+		color: var(--color-text-maxcontrast, #767676);
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell::before {
+		max-width: none;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-table-actions,
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn {
+		width: 100%;
+		justify-content: center;
+		min-height: 44px;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__pagination .azc-btn {
+		width: 100%;
+		min-height: 46px;
+	}
+}

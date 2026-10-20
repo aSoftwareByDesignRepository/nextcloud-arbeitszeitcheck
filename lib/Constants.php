@@ -157,6 +157,13 @@ final class Constants
 	 */
 	public const MAX_EXPORT_DATE_RANGE_DAYS = 365;
 
+	/**
+	 * Hard cap on rows in scoped (multi-user) exports. Exceeding it returns
+	 * an explicit 400 so callers narrow the selection — silent truncation of
+	 * payroll/HR data is not acceptable.
+	 */
+	public const MAX_EXPORT_ROWS = 50000;
+
 	/** Rolling calendar subscription: months of history included on each refresh. */
 	public const SUBSCRIPTION_ROLLING_PAST_MONTHS = 3;
 

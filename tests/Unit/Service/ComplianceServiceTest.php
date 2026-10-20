@@ -1315,9 +1315,13 @@ class ComplianceServiceTest extends TestCase
 		$violation2->setViolationType(ComplianceViolation::TYPE_EXCESSIVE_WORKING_HOURS);
 		$violation2->setSeverity(ComplianceViolation::SEVERITY_WARNING);
 
+		// The mapper's upper bound is exclusive (date < endDate), so the service
+		// must pass end + 1 day to include violations on the requested end date.
+		$endExclusive = (clone $endDate)->modify('+1 day');
+
 		$this->violationMapper->expects($this->once())
 			->method('findByDateRange')
-			->with($startDate, $endDate, $userId)
+			->with($startDate, $endExclusive, $userId)
 			->willReturn([$violation1, $violation2]);
 
 		$report = $this->service->generateComplianceReport($startDate, $endDate, $userId);

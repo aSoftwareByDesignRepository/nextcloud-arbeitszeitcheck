@@ -67,7 +67,8 @@ class ReportController extends Controller
 		IUserSession $userSession,
 		IL10N $l10n,
 		MonthClosureService $monthClosureService,
-		PremiumSurchargeService $premiumSurchargeService
+		PremiumSurchargeService $premiumSurchargeService,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\OversightScopeService $oversightScope = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->reportingService = $reportingService;
@@ -89,8 +90,20 @@ class ReportController extends Controller
 	 * Ensure current user may access reports for the given target user.
 	 * Allowed: own user, team members (manager), or admin.
 	 */
+	private function oversightScope(): \OCA\ArbeitszeitCheck\Service\OversightScopeService
+	{
+		return $this->oversightScope ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\OversightScopeService::class);
+	}
+
 	private function ensureCanAccessUserReport(string $currentUserId, string $targetUserId): void
 	{
+		// Existence leg first — deleted users leave stale member rows, so a
+		// membership-only check would accept ghost uids. Nonexistent and
+		// out-of-scope collapse into the same denial (no existence oracle).
+		if ($this->userManager->get($targetUserId) === null) {
+			$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $targetUserId);
+			throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+		}
 		if ($this->permissionService->canViewUserReport($currentUserId, $targetUserId)) {
 			return;
 		}
@@ -522,15 +535,43 @@ class ReportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function absence(?string $startDate = null, ?string $endDate = null, ?string $userId = null, ?string $sort = null): JSONResponse
-	{
+	public function absence(
+		?string $startDate = null,
+		?string $endDate = null,
+		?string $userId = null,
+		?string $sort = null,
+		?string $userIds = null,
+		?string $teamId = null,
+		?string $scope = null,
+	): JSONResponse {
 		try {
 			$currentUserId = $this->getUserId();
-			// Special case: admin organization scope (userId="") -> report for all enabled users.
+			// Special case: admin organization scope (userId="") -> report for all
+			// door-filtered, enabled users. Explicit selectors (userIds / teamId /
+			// scope) resolve through the single OversightScopeService.
 			$reportUserId = null;
-			if ($userId === '') {
-				if (!$this->permissionService->isAdmin($currentUserId)) {
+			$reportUserIds = null;
+			$hasScopeSelector = ($userIds !== null && trim($userIds) !== '')
+				|| ($teamId !== null && trim($teamId) !== '')
+				|| ($scope !== null && trim($scope) !== '');
+			if ($userId === '' || $hasScopeSelector) {
+				if ($userId !== null && trim($userId) !== '' && $hasScopeSelector) {
+					throw new \Exception($this->l10n->t('Invalid scope parameters.'));
+				}
+				$effectiveScope = $userId === '' && !$hasScopeSelector
+					? \OCA\ArbeitszeitCheck\Service\OversightScopeService::SCOPE_ORGANIZATION
+					: ($scope !== null ? trim($scope) : null);
+				$resolution = $this->oversightScope()->resolveRequestedScope(
+					$currentUserId, null, $userIds, $teamId, $effectiveScope
+				);
+				if (!$resolution['ok']) {
+					$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $resolution['code'] ?? 'scope');
 					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				}
+				if ($resolution['userIds'] !== null) {
+					$reportUserIds = $resolution['userIds'];
+				} else {
+					$reportUserId = $currentUserId;
 				}
 			} else {
 				$reportUserId = $userId ?? $currentUserId;
@@ -548,10 +589,13 @@ class ReportController extends Controller
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
 			throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
 		}
-		$endExclusive = (clone $end)->modify('+1 day');
+		// Absence date-range mappers use inclusive-end overlap semantics; the
+		// request end date is the last included day (deliberate fix: passing
+		// end+1 day used to include absences starting the day after the range).
+		$endInclusive = $end;
 
 		$sortMode = strtolower(trim((string)($sort ?? $this->request->getParam('sort') ?? 'date')));
-		$report = $this->reportingService->generateAbsenceReport($start, $endExclusive, $reportUserId, $sortMode);
+		$report = $this->reportingService->generateAbsenceReport($start, $endInclusive, $reportUserId, $sortMode, $reportUserIds);
 
 			return new JSONResponse([
 				'success' => true,

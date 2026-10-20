@@ -47,6 +47,7 @@ trait PageShellTrait
 		'manager-dashboard',
 		'manager-time-entries',
 		'manager-absences',
+		'manager-people',
 		'manager-month-closures',
 		'admin-dashboard',
 		'admin-users',

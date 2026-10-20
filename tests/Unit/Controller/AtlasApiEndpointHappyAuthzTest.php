@@ -437,6 +437,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::getStateHolidays' => ['state' => 'NW', 'year' => 2026],
 		'AdminController::getHolidaySuggestions' => ['state' => 'NW', 'year' => 2026],
 		'AdminController::saveStateHoliday' => ['state' => 'NW', 'year' => 2026],
+		'ManagerController::getPeopleOverview' => ['year' => 2026, 'employeeId' => null],
 		'AdminController::settingsSection' => ['section' => 'access'],
 	];
 

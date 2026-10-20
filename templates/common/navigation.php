@@ -63,16 +63,18 @@ $isGetTheApp = $pageId === 'get-the-app'
 $isManagerDashboard = $pageId === 'manager-dashboard';
 $isManagerTimeEntries = $pageId === 'manager-time-entries';
 $isManagerAbsences = $pageId === 'manager-absences';
+$isManagerPeople = $pageId === 'manager-people';
 $isManagerMonthClosures = $pageId === 'manager-month-closures';
 $isManagerBusinessTrips = $pageId === 'manager-business-trips';
-$isManagerPage = $isManagerDashboard || $isManagerTimeEntries || $isManagerAbsences || $isManagerMonthClosures || $isManagerBusinessTrips
+$isManagerPage = $isManagerDashboard || $isManagerTimeEntries || $isManagerAbsences || $isManagerPeople || $isManagerMonthClosures || $isManagerBusinessTrips
 	|| ($pageId === '' && strpos($currentPage, '/manager') !== false);
 if ($pageId === '' && $isManagerPage) {
 	$isManagerTimeEntries = strpos($currentPage, '/manager/time-entries') !== false;
 	$isManagerAbsences = strpos($currentPage, '/manager/absences') !== false;
+	$isManagerPeople = strpos($currentPage, '/manager/people') !== false;
 	$isManagerMonthClosures = strpos($currentPage, '/manager/month-closures') !== false;
 	$isManagerBusinessTrips = strpos($currentPage, '/manager/business-trips') !== false;
-	$isManagerDashboard = $isManagerPage && !$isManagerTimeEntries && !$isManagerAbsences && !$isManagerMonthClosures && !$isManagerBusinessTrips;
+	$isManagerDashboard = $isManagerPage && !$isManagerTimeEntries && !$isManagerAbsences && !$isManagerPeople && !$isManagerMonthClosures && !$isManagerBusinessTrips;
 }
 $isBusinessTrips = $pageId === 'business-trips'
 	|| ($pageId === '' && strpos($currentPage, '/business-trips') !== false);
@@ -409,6 +411,13 @@ $businessTripsEnabledNav = array_key_exists('businessTripsEnabled', $_)
                                 title="<?php p($l->t('Manager: Approve absences and time-entry corrections, view team overview')); ?>"
                                 aria-label="<?php p($l->t('Go to manager dashboard to approve requests and view your team')); ?>">
                                 <span><?php p($l->t('Overview')); ?></span>
+                            </a>
+                        </li>
+                        <li class="<?php p($isManagerPeople ? 'active' : ''); ?>" <?php p($isManagerPeople ? 'aria-current="page"' : ''); ?>>
+                            <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.peoplePage')); ?>"
+                                title="<?php p($l->t('Vacation balances, overtime and open issues for employees in your scope')); ?>"
+                                aria-label="<?php p($l->t('Open the people overview')); ?>">
+                                <span><?php p($l->t('People')); ?></span>
                             </a>
                         </li>
                         <li class="<?php p($isManagerTimeEntries ? 'active' : ''); ?>" <?php p($isManagerTimeEntries ? 'aria-current="page"' : ''); ?>>

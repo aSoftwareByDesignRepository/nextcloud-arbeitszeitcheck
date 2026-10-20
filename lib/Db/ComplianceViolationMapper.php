@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -227,6 +228,135 @@ class ComplianceViolationMapper extends QBMapper
 		}
 
 		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Find violations for a set of users, optionally bounded by violation
+	 * date and filtered by type / severity / resolved state.
+	 *
+	 * Multi-user variant of {@see findByDateRange()} used by scoped
+	 * manager/HR surfaces and exports. Date bounds are inclusive-start /
+	 * exclusive-end, matching findByDateRange semantics. Large user sets
+	 * are chunked via QueryInChunker for portable IN() handling.
+	 *
+	 * @param list<string> $userIds
+	 * @param \DateTimeInterface|null $startDate Inclusive lower bound on `date`
+	 * @param \DateTimeInterface|null $endDateExclusive Exclusive upper bound on `date`
+	 * @param string|null $violationType
+	 * @param string|null $severity
+	 * @param bool|null $resolved
+	 * @return ComplianceViolation[]
+	 */
+	public function findByUserIdsAndDateRange(
+		array $userIds,
+		?\DateTimeInterface $startDate = null,
+		?\DateTimeInterface $endDateExclusive = null,
+		?string $violationType = null,
+		?string $severity = null,
+		?bool $resolved = null,
+		?int $limit = null,
+		?int $offset = null,
+	): array {
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->buildUserIdsDateRangeQuery($userIds, $startDate, $endDateExclusive, $violationType, $severity, $resolved);
+		$qb->select('*')
+			->orderBy('date', 'DESC')
+			->addOrderBy('id', 'DESC');
+		if ($limit !== null) {
+			$qb->setMaxResults($limit);
+		}
+		if ($offset !== null) {
+			$qb->setFirstResult($offset);
+		}
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Count variant of {@see findByUserIdsAndDateRange()}.
+	 *
+	 * @param list<string> $userIds
+	 */
+	public function countByUserIdsAndDateRange(
+		array $userIds,
+		?\DateTimeInterface $startDate = null,
+		?\DateTimeInterface $endDateExclusive = null,
+		?string $violationType = null,
+		?string $severity = null,
+		?bool $resolved = null,
+	): int {
+		if (empty($userIds)) {
+			return 0;
+		}
+
+		$qb = $this->buildUserIdsDateRangeQuery($userIds, $startDate, $endDateExclusive, $violationType, $severity, $resolved);
+		$qb->select($qb->createFunction('COUNT(*)'));
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
+	 * Per-user unresolved-violation counts for a set of users — one query,
+	 * grouped. Used by the people overview to avoid N+1 counting.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, int> userId => unresolved count (users without
+	 *         violations are absent from the map)
+	 */
+	public function countUnresolvedByUserIds(array $userIds): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id', $qb->createFunction('COUNT(*) AS cnt'))
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->eq('resolved', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+			->groupBy('user_id');
+
+		$counts = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$counts[(string)$row['user_id']] = (int)$row['cnt'];
+		}
+		$result->closeCursor();
+		return $counts;
+	}
+
+	/**
+	 * @param list<string> $userIds
+	 */
+	private function buildUserIdsDateRangeQuery(
+		array $userIds,
+		?\DateTimeInterface $startDate,
+		?\DateTimeInterface $endDateExclusive,
+		?string $violationType,
+		?string $severity,
+		?bool $resolved,
+	): IQueryBuilder {
+		$qb = $this->db->getQueryBuilder();
+		$qb->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY));
+
+		if ($startDate !== null) {
+			$qb->andWhere($qb->expr()->gte('date', $qb->createNamedParameter($startDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($endDateExclusive !== null) {
+			$qb->andWhere($qb->expr()->lt('date', $qb->createNamedParameter($endDateExclusive->format('Y-m-d'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($violationType !== null && $violationType !== '') {
+			$qb->andWhere($qb->expr()->eq('violation_type', $qb->createNamedParameter($violationType)));
+		}
+		if ($severity !== null && $severity !== '') {
+			$qb->andWhere($qb->expr()->eq('severity', $qb->createNamedParameter($severity)));
+		}
+		if ($resolved !== null) {
+			$qb->andWhere($qb->expr()->eq('resolved', $qb->createNamedParameter($resolved, IQueryBuilder::PARAM_BOOL)));
+		}
+		return $qb;
 	}
 
 	/**

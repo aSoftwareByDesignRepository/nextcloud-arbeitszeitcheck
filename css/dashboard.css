@@ -1295,6 +1295,12 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 
 .dashboard-stat-card__breakdown dt {
     margin: 0;
+    /* NC core apps.scss pins dl dt to a fixed 130px + nowrap + text-align:end;
+       the breakdown rows are flex labels, so they must size to content. */
+    width: auto;
+    min-width: 0;
+    white-space: normal;
+    text-align: start;
     font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
     font-weight: 600;
     color: var(--arbeitszeitcheck-color-text-secondary);

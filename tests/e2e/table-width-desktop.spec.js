@@ -1,6 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv } from './helpers/auth.js'
+import { api } from './helpers/api.js'
 import { assertDesktopTableMetrics, collectDesktopTableMetrics } from './helpers/table-layout.js'
 
 /** Wide desktop — matches issue #12 reports (Firefox on Windows, full browser width). */
@@ -98,6 +99,28 @@ test.describe('Desktop table width (#12)', () => {
 		expect(scopeMetrics.maxWidthNotCapped).toBe(true)
 
 		// Results table is injected after "Show" — scope width is the #12 fix for manager pages.
+		// Seed a completed entry inside the default range first: the docker seed only
+		// backdates stale sessions (rest-period probe) and ambient data ages out of the
+		// 30-day window, which would leave the results wrap permanently hidden.
+		const seedEmployee = process.env.NC_EMPLOYEE_USER || 'e2e_employee'
+		const day = new Date(Date.now() - 86400000)
+		const seedDate = `${String(day.getDate()).padStart(2, '0')}.${String(day.getMonth() + 1).padStart(2, '0')}.${day.getFullYear()}`
+		try {
+			await api(page, 'POST', '/apps/arbeitszeitcheck/api/manager/employee-time-entries', {
+				data: {
+					userId: seedEmployee,
+					date: seedDate,
+					startTime: '08:00',
+					endTime: '12:00',
+					reason: 'E2E table-width seed entry',
+				},
+			})
+		} catch (err) {
+			// Seed via API may legitimately fail (approval workflows, overlap) — the
+			// empty-state path below still verifies scope width without row data.
+			console.warn(`table-width seed skipped: ${err}`)
+		}
+
 		const showBtn = page.locator('#employee-time-entries-submit')
 		if (await showBtn.isVisible()) {
 			await showBtn.click()

@@ -429,6 +429,18 @@
 	justify-content: flex-end;
 }
 
+/* Data cells wrap — core table nowrap would keep long content on one
+   unbreakable line and push the actions column behind the overflow-x wrap
+   (clipped_control_text_at_screen_edge). Action cells keep their own nowrap
+   rule below so button labels never split mid-word. */
+#app-content.azc-app .grid-table td,
+#app-content.azc-app .arbeitszeitcheck-table td,
+#app-content.azc-app .absences-table td,
+#app-content.azc-app .report-table td,
+#app-content.azc-app .trace-table td {
+	white-space: normal;
+}
+
 /* Actions column: never shrink below button labels (avoid width:1% clipping) */
 #app-content.azc-app .table th.azc-table-actions-col,
 #app-content.azc-app .table th.actions-col,

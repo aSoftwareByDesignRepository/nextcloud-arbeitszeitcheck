@@ -183,7 +183,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'exportTeamOvertimeCsv', 'getTeamCompliance', 'getTeamHoursSummary',
 			'approveAbsence', 'rejectAbsence', 'approveTimeEntryCorrection',
 			'rejectTimeEntryCorrection', 'correctTimeEntry', 'getPendingTimeEntryCorrections',
-			'getTeamAbsenceCalendar',
+			'getTeamAbsenceCalendar', 'getPeopleOverview',
 		],
 		MonthClosureController::class => [
 			// isAdmin gate

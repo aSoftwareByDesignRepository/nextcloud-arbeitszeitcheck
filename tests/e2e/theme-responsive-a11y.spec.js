@@ -54,6 +54,7 @@ const employeeRoutes = [
 
 const managerRoutes = [
 	{ id: 'manager-business-trips', path: '/apps/arbeitszeitcheck/manager/business-trips', ready: '#mbt-root' },
+	{ id: 'manager-people', path: '/apps/arbeitszeitcheck/manager/people', ready: '#manager-people-body tr:first-of-type' },
 ]
 
 const overflowViewports = [

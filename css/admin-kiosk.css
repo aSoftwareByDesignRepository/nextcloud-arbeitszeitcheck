@@ -422,7 +422,7 @@
 	border: 1px solid var(--azc-border, var(--color-border));
 	border-radius: var(--azc-radius-sm, 8px);
 	background: var(--color-main-background);
-	box-shadow: 0 0.35rem 1.25rem rgba(0, 0, 0, 0.12);
+	box-shadow: 0 0.35rem 1.25rem color-mix(in srgb, var(--color-main-text) 12%, transparent);
 }
 
 #app-content.azc-app .azc-kiosk-search__option {
@@ -685,8 +685,8 @@
 	border-radius: var(--azc-radius-lg, 12px);
 	background: var(--azc-bg-card, var(--color-main-background));
 	box-shadow:
-		0 0.25rem 0.75rem rgba(0, 0, 0, 0.08),
-		0 1rem 2.5rem rgba(0, 0, 0, 0.16);
+		0 0.25rem 0.75rem color-mix(in srgb, var(--color-main-text) 8%, transparent),
+		0 1rem 2.5rem color-mix(in srgb, var(--color-main-text) 16%, transparent);
 	color: var(--color-main-text);
 }
 

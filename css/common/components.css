@@ -1886,9 +1886,18 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 .bulk-select-checkbox {
   align-self: flex-start;
   margin-top: var(--space-1);
-  min-width: var(--arbeitszeitcheck-tap-target-min, 24px);
-  min-height: var(--arbeitszeitcheck-tap-target-min, 24px);
+  min-width: 24px;
+  min-height: 24px;
   accent-color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+}
+
+/* <768px: this checkbox is the card's only selection control — pad it to the
+   44px touch floor. Padding grows the clickable box without scaling the glyph. */
+@media (max-width: 767.98px) {
+  .bulk-select-checkbox {
+    box-sizing: content-box;
+    padding: 10px;
+  }
 }
 
 .pending-approval-card--selected {

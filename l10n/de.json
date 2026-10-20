@@ -5475,7 +5475,7 @@
         "This work location is still referenced and cannot be removed.": "Dieser Arbeitsort wird noch referenziert und kann nicht entfernt werden.",
         "This work location still has active default policies. End them first.": "Für diesen Arbeitsort existieren noch aktive Standardrichtlinien. Beenden Sie diese zuerst.",
         "Today: %s": "Heute: %s",
-        "Unit": "Unit",
+        "Unit": "Einheit",
         "Work location saved.": "Arbeitsort gespeichert.",
         "Work locations": "Arbeitsorte",
         "Working-time model": "Arbeitszeitmodell",

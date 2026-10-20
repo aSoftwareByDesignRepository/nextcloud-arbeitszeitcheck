@@ -1348,7 +1348,7 @@
 
 /* Inline break-policy warning after save — replaces auto-redirect (no lost info). */
 #app-content.azc-app--time-entries .time-entry-form__break-warning {
-	margin: var(--azc-spacing-md, 1rem) 0;
+	margin: var(--azc-space-4, 1rem) 0;
 }
 
 #app-content.azc-app--time-entries .azc-break-warning__actions {
@@ -1378,5 +1378,5 @@
 }
 
 #app-content .azc-hint .azc-hint__show {
-	margin: 0 0 var(--azc-spacing-sm, 0.5rem);
+	margin: 0 0 var(--azc-space-2, 0.5rem);
 }

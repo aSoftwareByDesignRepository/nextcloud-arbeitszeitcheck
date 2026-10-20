@@ -3653,15 +3653,7 @@ class AdminController extends Controller
 	 */
 	private function getAllowedAccessGroupsFromConfig(): array
 	{
-		$raw = trim($this->appConfig->getAppValueString(Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, ''));
-		if ($raw !== '') {
-			$decoded = json_decode($raw, true);
-			if (is_array($decoded)) {
-				return $this->normalizeExistingGroupIds($decoded);
-			}
-		}
-
-		return $this->normalizeExistingGroupIds($this->appManager->getAppRestriction('arbeitszeitcheck'));
+		return $this->normalizeExistingGroupIds($this->permissionService->getAllowedAccessGroups());
 	}
 
 	/**
@@ -3680,16 +3672,7 @@ class AdminController extends Controller
 
 	private function isAccessRestrictionEnabledFromConfig(): bool
 	{
-		$raw = trim($this->appConfig->getAppValueString(Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, ''));
-		if ($raw === '0') {
-			return false;
-		}
-		if ($raw === '1') {
-			return true;
-		}
-
-		return $this->getAllowedAccessGroupsFromConfig() !== []
-			|| $this->getConfiguredAccessAllowedUserIds() !== [];
+		return $this->permissionService->isAccessRestrictionEnabled();
 	}
 
 	private function toBool(mixed $value): bool

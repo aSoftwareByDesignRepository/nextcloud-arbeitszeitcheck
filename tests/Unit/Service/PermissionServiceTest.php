@@ -182,6 +182,10 @@ class PermissionServiceTest extends TestCase
 		$groupManager->method('isInGroup')->willReturnCallback(static function (string $uid, string $gid): bool {
 			return $uid === 'grouped' && $gid === 'hr';
 		});
+		// In production the app mirrors the stored group allowlist into the NC
+		// app restriction on every save — the NC restriction is authoritative.
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppRestriction')->with(Application::APP_ID)->willReturn(['hr']);
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = '') {
 			return match ($key) {
@@ -193,12 +197,129 @@ class PermissionServiceTest extends TestCase
 			};
 		});
 		$teamResolver = $this->createMock(TeamResolverService::class);
-		$service = $this->createService($groupManager, $teamResolver, null, $config);
+		$service = $this->createService($groupManager, $teamResolver, $appManager, $config);
 
 		$this->assertTrue($service->isAccessRestrictionEnabled());
 		$this->assertTrue($service->isUserAllowedByAccessGroups('alice'));
 		$this->assertTrue($service->isUserAllowedByAccessGroups('grouped'));
 		$this->assertFalse($service->isUserAllowedByAccessGroups('stranger'));
+	}
+
+	public function testNcRestrictionAddedOutOfBandWidensTheDoor(): void
+	{
+		// Issue #46: admin limited the app to one group, later added a second
+		// group via Nextcloud's native "Limit to groups" — the stored app
+		// config still holds the old list and must not shadow the change.
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$groupManager->method('isInGroup')->willReturnCallback(static function (string $uid, string $gid): bool {
+			return ($uid === 'old_member' && $gid === 'admins')
+				|| ($uid === 'new_member' && $gid === 'staff');
+		});
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppRestriction')->with(Application::APP_ID)->willReturn(['admins', 'staff']);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = '') {
+			return match ($key) {
+				Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '1',
+				Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+				Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '["admins"]',
+				Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+				default => $default,
+			};
+		});
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver, $appManager, $config);
+
+		$this->assertSame(['admins', 'staff'], $service->getAllowedAccessGroups());
+		$this->assertTrue($service->isUserAllowedByAccessGroups('old_member'));
+		$this->assertTrue($service->isUserAllowedByAccessGroups('new_member'));
+		$this->assertFalse($service->isUserAllowedByAccessGroups('stranger'));
+	}
+
+	public function testNcRestrictionRemovedOutOfBandNarrowsTheDoor(): void
+	{
+		// Mirror case: admin removes a group via "Limit to groups" — the door
+		// must follow the narrower NC restriction, not the stale wider config.
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$groupManager->method('isInGroup')->willReturnCallback(static function (string $uid, string $gid): bool {
+			return ($uid === 'admin_member' && $gid === 'admins')
+				|| ($uid === 'staff_member' && $gid === 'staff');
+		});
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppRestriction')->with(Application::APP_ID)->willReturn(['admins']);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = '') {
+			return match ($key) {
+				Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '1',
+				Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+				Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '["admins","staff"]',
+				Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+				default => $default,
+			};
+		});
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver, $appManager, $config);
+
+		$this->assertSame(['admins'], $service->getAllowedAccessGroups());
+		$this->assertFalse($service->isUserAllowedByAccessGroups('staff_member'));
+	}
+
+	public function testNcRestrictionNarrowsOpenFlagToRestricted(): void
+	{
+		// Stored flag says Open, but the platform restricted the app
+		// out-of-band: the door must fail closed, not stay open.
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$groupManager->method('isInGroup')->willReturnCallback(
+			static fn (string $uid, string $gid): bool => $uid === 'member' && $gid === 'staff',
+		);
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppRestriction')->with(Application::APP_ID)->willReturn(['staff']);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = '') {
+			return match ($key) {
+				Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '0',
+				Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+				Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '[]',
+				Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+				default => $default,
+			};
+		});
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver, $appManager, $config);
+
+		$this->assertTrue($service->isAccessRestrictionEnabled());
+		$this->assertTrue($service->isUserAllowedByAccessGroups('member'));
+		$this->assertFalse($service->isUserAllowedByAccessGroups('stranger'));
+	}
+
+	public function testExternallyClearedRestrictionKeepsFailClosedDoor(): void
+	{
+		// Restricted mode + stored groups, then the NC restriction was cleared
+		// out-of-band: group list collapses to empty and the door fails closed
+		// (allow-listed users + admins only) rather than silently opening.
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppRestriction')->with(Application::APP_ID)->willReturn([]);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, string $default = '') {
+			return match ($key) {
+				Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '1',
+				Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+				Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '["admins"]',
+				Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+				default => $default,
+			};
+		});
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver, $appManager, $config);
+
+		$this->assertSame([], $service->getAllowedAccessGroups());
+		$this->assertTrue($service->isAccessRestrictionEnabled());
+		$this->assertFalse($service->isUserAllowedByAccessGroups('any_employee'));
 	}
 
 	public function testRestrictedEmptyAllowlistsFailClosed(): void

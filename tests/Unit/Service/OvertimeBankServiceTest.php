@@ -41,7 +41,7 @@ class OvertimeBankServiceTest extends TestCase
 		]);
 
 		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
-		$payoutMapper->method('sumHoursPaidForYearThroughMonth')->willReturn(0.0);
+		$payoutMapper->method('sumHoursPaidForYearThroughMonthForUsers')->willReturn([]);
 
 		$service = new OvertimeBankService($config, $overtime, $payoutMapper);
 		$status = $service->getBankStatus('user1');
@@ -70,7 +70,7 @@ class OvertimeBankServiceTest extends TestCase
 		]);
 
 		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
-		$payoutMapper->method('sumHoursPaidForYearThroughMonth')->willReturn(10.0);
+		$payoutMapper->method('sumHoursPaidForYearThroughMonthForUsers')->willReturn(['user1' => 10.0]);
 
 		$service = new OvertimeBankService($config, $overtime, $payoutMapper);
 		$status = $service->getBankStatus('user1');
@@ -96,10 +96,10 @@ class OvertimeBankServiceTest extends TestCase
 		]);
 
 		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
-		$payoutMapper->method('sumHoursPaidForYearThroughMonth')->willReturn(5.0);
+		$payoutMapper->method('sumHoursPaidForYearThroughMonthForUsers')->willReturn(['user1' => 5.0]);
 
 		$adjMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class);
-		$adjMapper->method('sumHoursDeltaForYearThroughDate')->willReturn(-4.0);
+		$adjMapper->method('sumHoursDeltaForYearThroughDateForUsers')->willReturn(['user1' => -4.0]);
 
 		$service = new OvertimeBankService($config, $overtime, $payoutMapper, $adjMapper);
 		$status = $service->getBankStatus('user1');
@@ -222,6 +222,63 @@ class OvertimeBankServiceTest extends TestCase
 			$this->createMock(OvertimePayoutMapper::class),
 		);
 		$this->assertNull($service->buildClosureAuditBlock('u1', 2026, 3));
+	}
+
+	public function testGetBankStatusForUsersBatchesSideQueries(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_ENABLED, '0', '1'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_MAX_HOURS, (string)OvertimeBankService::DEFAULT_BANK_MAX_HOURS, '100'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_YELLOW_PERCENT, '80', '80'],
+			['arbeitszeitcheck', Constants::CONFIG_OVERTIME_BANK_RED_PERCENT, '95', '95'],
+		]);
+
+		$overtime = $this->createMock(OvertimeService::class);
+		$overtime->method('calculateOvertime')->willReturnCallback(static fn (string $uid): array => [
+			'cumulative_balance' => $uid === 'u1' ? 110.0 : 50.0,
+		]);
+
+		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
+		$payoutMapper->expects($this->once())
+			->method('sumHoursPaidForYearThroughMonthForUsers')
+			->with(['u1', 'u2'])
+			->willReturn(['u1' => 20.0]);
+		$payoutMapper->expects($this->once())
+			->method('findLatestForUsersInYear')
+			->willReturn([]);
+		// The per-user paths must not be hit — the batch is the only source.
+		$payoutMapper->expects($this->never())->method('sumHoursPaidForYearThroughMonth');
+		$payoutMapper->expects($this->never())->method('findLatestForUserInYear');
+
+		$adjMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper::class);
+		$adjMapper->expects($this->once())
+			->method('sumHoursDeltaForYearThroughDateForUsers')
+			->willReturn(['u2' => -5.0]);
+		$adjMapper->expects($this->never())->method('sumHoursDeltaForYearThroughDate');
+
+		$service = new OvertimeBankService($config, $overtime, $payoutMapper, $adjMapper);
+		$statuses = $service->getBankStatusForUsers(['u1', 'u2']);
+
+		$this->assertSame(['u1', 'u2'], array_keys($statuses));
+		// u1: 110 - 20 = 90 effective, all banked.
+		$this->assertSame(90.0, $statuses['u1']['effective_balance']);
+		$this->assertSame(20.0, $statuses['u1']['total_payouts_ytd']);
+		$this->assertSame(0.0, $statuses['u1']['total_adjustments_ytd']);
+		// u2: 50 + (-5) = 45 effective.
+		$this->assertSame(45.0, $statuses['u2']['effective_balance']);
+		$this->assertSame(-5.0, $statuses['u2']['total_adjustments_ytd']);
+	}
+
+	public function testGetBankStatusForUsersEmptyInputDoesNotQuery(): void
+	{
+		$payoutMapper = $this->createMock(OvertimePayoutMapper::class);
+		$payoutMapper->expects($this->never())->method('sumHoursPaidForYearThroughMonthForUsers');
+		$overtime = $this->createMock(OvertimeService::class);
+		$overtime->expects($this->never())->method('calculateOvertime');
+
+		$service = new OvertimeBankService($this->configFor(true), $overtime, $payoutMapper);
+		$this->assertSame([], $service->getBankStatusForUsers([]));
 	}
 
 	public function testBuildClosureAuditBlockIncludesPayoutRecord(): void

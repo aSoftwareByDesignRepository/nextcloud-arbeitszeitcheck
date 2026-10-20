@@ -347,14 +347,18 @@ class ManagerControllerTest extends TestCase
 		$this->userManager->method('get')->with($teamMemberId)->willReturn($teamMember);
 		$this->userManager->method('getDisplayName')->with($teamMemberId)->willReturn('Employee One');
 
-		$this->timeTrackingService->method('getTodayHours')->willReturn(8.0);
+		$this->timeTrackingService->method('getWorkingHoursForUsersInPeriod')
+			->willReturn([$teamMemberId => 8.0]);
+		// Batched paths cover the whole page — per-row fallbacks must not fire.
+		$this->timeTrackingService->expects($this->never())->method('getTodayHours');
 		$this->timeTrackingService->method('getStatus')->willReturn(['status' => 'clocked_out']);
 
-		$this->absenceService->method('getAbsencesByUser')
+		$this->absenceMapper->method('countPendingApprovalByUser')
 			->willReturn([]);
+		$this->absenceService->expects($this->never())->method('getAbsencesByUser');
 
-		$this->complianceService->method('getComplianceStatus')
-			->willReturn(['compliant' => true]);
+		$this->complianceService->method('getComplianceStatusForUsers')
+			->willReturn([$teamMemberId => ['compliant' => true]]);
 
 		$this->overtimeService->method('calculateOvertime')->willReturn([
 			'total_hours_worked' => 40.0,
@@ -583,14 +587,19 @@ class ManagerControllerTest extends TestCase
 		$this->userManager->method('get')->with($managerId)->willReturn($user);
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
 
-		$this->complianceService->method('getComplianceStatus')
+		$this->complianceService->method('getComplianceStatusForUsers')
 			->willReturn([
-				'compliant' => true,
-				'critical_violations' => 0,
-				'warning_violations' => 0,
-				'violation_count' => 0,
-				'score' => 100,
+				$teamMemberId => [
+					'compliant' => true,
+					'critical_violations' => 0,
+					'warning_violations' => 0,
+					'violation_count' => 0,
+					'score' => 100,
+				],
 			]);
+		// The batched map covers every scoped uid — a per-user fallback call
+		// here would mean the N+1 regression is back.
+		$this->complianceService->expects($this->never())->method('getComplianceStatus');
 		$this->userManager->method('getDisplayName')->with($teamMemberId)->willReturn('Employee One');
 		$this->urlGenerator->method('linkToRoute')
 			->with('arbeitszeitcheck.compliance.violations', ['userId' => $teamMemberId])
@@ -631,7 +640,9 @@ class ManagerControllerTest extends TestCase
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
 		$this->userManager->method('getDisplayName')->willReturn('Employee One');
 
-		$this->timeTrackingService->method('getTodayHours')->willReturn(8.0);
+		$this->timeTrackingService->method('getWorkingHoursForUsersInPeriod')->willReturn([$teamMemberId => 8.0]);
+		$this->timeTrackingService->expects($this->never())->method('getTodayHours');
+		$this->timeTrackingService->expects($this->never())->method('getWorkingHoursForPeriod');
 		$this->overtimeService->method('getDailyOvertime')->willReturn(['overtime_hours' => 0.0]);
 
 		$response = $this->controller->getTeamHoursSummary('today');
@@ -1145,7 +1156,7 @@ class ManagerControllerTest extends TestCase
 		$absence->setCreatedAt(new \DateTime());
 		$absence->setUpdatedAt(new \DateTime());
 
-		$this->absenceMapper->method('findByUserAndDateRange')
+		$this->absenceMapper->method('findByUsersAndDateRange')
 			->willReturn([$absence]);
 
 		$response = $this->controller->getTeamAbsenceCalendar('2024-06-01', '2024-06-30');
@@ -2363,15 +2374,18 @@ class ManagerControllerTest extends TestCase
 
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn(['employee1']);
 		$this->userManager->method('getDisplayName')->with('employee1')->willReturn('Employee One');
-		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->with('employee1')->willReturn([
-			'balance' => 3.5,
-			'balance_label' => 'credit',
-			'traffic_light_state' => 'green',
-			'bank_state' => 'active',
-			'bank_fill_percent' => 12.5,
-			'payout_eligible_hours' => 1.0,
-			'needs_attention' => false,
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')->with(['employee1'])->willReturn([
+			'employee1' => [
+				'balance' => 3.5,
+				'balance_label' => 'credit',
+				'traffic_light_state' => 'green',
+				'bank_state' => 'active',
+				'bank_fill_percent' => 12.5,
+				'payout_eligible_hours' => 1.0,
+				'needs_attention' => false,
+			],
 		]);
+		$this->overtimeDisplayService->expects($this->never())->method('buildManagerMemberSnapshot');
 
 		$response = $this->controller->exportTeamOvertimeCsv();
 		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
@@ -2396,10 +2410,12 @@ class ManagerControllerTest extends TestCase
 
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn(['employee1']);
 		$this->userManager->method('getDisplayName')->willReturn('Emp');
-		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturn([
-			'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
-			'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
-			'needs_attention' => false,
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')->willReturn([
+			'employee1' => [
+				'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
+				'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
+				'needs_attention' => false,
+			],
 		]);
 
 		$deltaCalls = 0;
@@ -2428,10 +2444,12 @@ class ManagerControllerTest extends TestCase
 		$this->canAccessManagerDashboard = true;
 
 		$this->teamResolver->method('getTeamMemberIds')->willReturn(['employee1']);
-		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturn([
-			'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
-			'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
-			'needs_attention' => false,
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')->willReturn([
+			'employee1' => [
+				'balance' => 0.0, 'balance_label' => '', 'traffic_light_state' => 'green',
+				'bank_state' => '', 'bank_fill_percent' => null, 'payout_eligible_hours' => null,
+				'needs_attention' => false,
+			],
 		]);
 		$this->overtimeService->method('getCumulativeWorkDelta')->willReturn(0.0);
 
@@ -2526,7 +2544,7 @@ class ManagerControllerTest extends TestCase
 	{
 		$this->teamResolver->method('getTeamMemberIds')->willReturn($memberIds);
 		$this->complianceViolationMapper->method('countUnresolvedByUserIds')->willReturn([]);
-		$this->absenceMapper->method('findPendingForUsers')->willReturn([]);
+		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn([]);
 		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([]);
 		$this->absenceService->method('getVacationStats')->willReturnCallback(static fn (string $uid, int $year): array => [
 			'year' => $year,
@@ -2540,13 +2558,17 @@ class ManagerControllerTest extends TestCase
 			'vacation_hours_per_day' => 8.0,
 			'vacation_year_error' => null,
 		]);
-		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')->willReturnCallback(static fn (string $uid): array => [
-			'balance' => 2.5,
-			'needs_attention' => false,
-			'traffic_light_state' => 'green',
-			'bank_state' => null,
-			'payout_eligible_hours' => null,
-		]);
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')->willReturnCallback(
+			static fn (array $uids): array => array_fill_keys($uids, [
+				'balance' => 2.5,
+				'needs_attention' => false,
+				'traffic_light_state' => 'green',
+				'bank_state' => null,
+				'payout_eligible_hours' => null,
+			])
+		);
+		// Happy path is fully batched — a reverted per-row loop must fail loudly.
+		$this->overtimeDisplayService->expects($this->never())->method('buildManagerMemberSnapshot');
 		$this->userManager->method('getDisplayName')->willReturnCallback(static fn (string $uid): string => 'Name ' . $uid);
 	}
 
@@ -2714,10 +2736,8 @@ class ManagerControllerTest extends TestCase
 		$this->complianceViolationMapper->method('countUnresolvedByUserIds')
 			->willReturn(['employee1' => 2]);
 
-		$pending = new Absence();
-		$pending->setUserId('employee1');
 		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
-		$this->absenceMapper->method('findPendingForUsers')->willReturn([$pending]);
+		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn(['employee1' => 1]);
 		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([]);
 
 		$controller = new ManagerController(
@@ -2776,6 +2796,8 @@ class ManagerControllerTest extends TestCase
 		$this->absenceService = $this->createMock(AbsenceService::class);
 		$this->absenceService->method('getVacationStats')->willThrowException(new \RuntimeException('boom'));
 		$this->overtimeDisplayService = $this->createMock(\OCA\ArbeitszeitCheck\Service\OvertimeDisplayService::class);
+		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')
+			->willThrowException(new \RuntimeException('boom'));
 		$this->overtimeDisplayService->method('buildManagerMemberSnapshot')
 			->willThrowException(new \RuntimeException('boom'));
 
@@ -2848,7 +2870,7 @@ class ManagerControllerTest extends TestCase
 		$spanning->setDays(9.0);
 
 		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
-		$this->absenceMapper->method('findPendingForUsers')->willReturn([]);
+		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn([]);
 		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([$future, $spanning]);
 
 		$controller = new ManagerController(

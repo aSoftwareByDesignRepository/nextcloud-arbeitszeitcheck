@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -41,6 +42,37 @@ class OvertimeAdjustmentMapper extends QBMapper
 		$result->closeCursor();
 
 		return round((float)($row['total'] ?? 0), 2);
+	}
+
+	/**
+	 * Per-user adjustment sums for a set of users — one grouped query.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, float> userId => sum (users without rows are absent)
+	 */
+	public function sumHoursDeltaForYearThroughDateForUsers(array $userIds, int $year, \DateTimeInterface $throughInclusive): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$through = \DateTime::createFromInterface($throughInclusive)->format('Y-m-d');
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id')
+			->selectAlias($qb->func()->sum('hours_delta'), 'total')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->eq('calendar_year', $qb->createNamedParameter($year, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('effective_on', $qb->createNamedParameter($through, IQueryBuilder::PARAM_STR)))
+			->groupBy('user_id');
+
+		$sums = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$sums[(string)$row['user_id']] = round((float)$row['total'], 2);
+		}
+		$result->closeCursor();
+		return $sums;
 	}
 
 	public function sumHoursDeltaForYear(string $userId, int $year): float

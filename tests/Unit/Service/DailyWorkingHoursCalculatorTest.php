@@ -321,6 +321,94 @@ class DailyWorkingHoursCalculatorTest extends TestCase
 		$this->assertSame([30], $portions, '10-minute morning break is below the DE floor; afternoon 30 minutes counts.');
 	}
 
+	public function testSumWorkingHoursForUsersInRangeMatchesPerDayPathPerUser(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+
+		$overnightA = new TimeEntry();
+		$overnightA->setId(10);
+		$overnightA->setUserId('a');
+		$overnightA->setStatus(TimeEntry::STATUS_COMPLETED);
+		$overnightA->setStartTime(new \DateTime('2026-05-19 22:00:00', $tz));
+		$overnightA->setEndTime(new \DateTime('2026-05-20 08:00:00', $tz));
+		$overnightA->setBreaks(json_encode([]));
+
+		$dayShiftB = new TimeEntry();
+		$dayShiftB->setId(11);
+		$dayShiftB->setUserId('b');
+		$dayShiftB->setStatus(TimeEntry::STATUS_COMPLETED);
+		$dayShiftB->setStartTime(new \DateTime('2026-05-20 09:00:00', $tz));
+		$dayShiftB->setEndTime(new \DateTime('2026-05-20 17:00:00', $tz));
+		$dayShiftB->setBreaks(json_encode([
+			['start' => '2026-05-20T12:00:00+02:00', 'end' => '2026-05-20T12:30:00+02:00'],
+		]));
+
+		$this->timeEntryMapper->method('findOverlappingForUsers')->willReturn([
+			'a' => [$overnightA],
+			'b' => [$dayShiftB],
+		]);
+		$this->timeEntryMapper->method('findOverlapping')->willReturnCallback(
+			static fn (string $uid): array => $uid === 'a' ? [$overnightA] : [$dayShiftB]
+		);
+
+		$rangeStart = new \DateTime('2026-05-19 00:00:00', $tz);
+		$rangeEnd = new \DateTime('2026-05-21 00:00:00', $tz);
+
+		$totals = $this->calculator->sumWorkingHoursForUsersInRange(['a', 'b', 'c'], $rangeStart, $rangeEnd);
+
+		// a: 2h on 19th + 8h on 20th; b: 8h - 0.5h break; c: no entries → 0.
+		$this->assertEqualsWithDelta(10.0, $totals['a'], 0.05);
+		$this->assertEqualsWithDelta(7.5, $totals['b'], 0.05);
+		$this->assertSame(0.0, $totals['c']);
+
+		// Parity: identical to the per-user-per-day path.
+		$this->assertEqualsWithDelta(
+			$this->calculator->sumWorkingHoursForCalendarDaysInRange('a', $rangeStart, $rangeEnd),
+			$totals['a'],
+			0.001
+		);
+		$this->assertEqualsWithDelta(
+			$this->calculator->sumWorkingHoursForCalendarDaysInRange('b', $rangeStart, $rangeEnd),
+			$totals['b'],
+			0.001
+		);
+	}
+
+	public function testSumWorkingHoursForUsersInRangeEmptyAndInvertedRange(): void
+	{
+		$this->timeEntryMapper->expects($this->never())->method('findOverlappingForUsers');
+		$this->assertSame([], $this->calculator->sumWorkingHoursForUsersInRange(
+			[], new \DateTime('2026-05-19'), new \DateTime('2026-05-20')));
+
+		$totals = $this->calculator->sumWorkingHoursForUsersInRange(
+			['a'], new \DateTime('2026-05-20'), new \DateTime('2026-05-19'));
+		$this->assertSame(['a' => 0.0], $totals);
+	}
+
+	public function testSumWorkingHoursForUsersInRangeLiveEntryCountsOnceAcrossDays(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+
+		// Active overnight session — must clip per day and never double count.
+		$active = new TimeEntry();
+		$active->setId(20);
+		$active->setUserId('a');
+		$active->setStatus(TimeEntry::STATUS_ACTIVE);
+		$active->setStartTime(new \DateTime('2026-05-19 22:00:00', $tz));
+		$active->setBreaks(json_encode([]));
+
+		$this->timeEntryMapper->method('findOverlappingForUsers')->willReturn(['a' => [$active]]);
+
+		$rangeStart = new \DateTime('2026-05-19 00:00:00', $tz);
+		$rangeEnd = new \DateTime('2026-05-21 00:00:00', $tz);
+		$totals = $this->calculator->sumWorkingHoursForUsersInRange(['a'], $rangeStart, $rangeEnd);
+
+		// 2h on the 19th + (now - 00:00 on the 20th, capped at 24h) — whatever
+		// "now" is, the total must be ≥ 2h and the per-day clip holds.
+		$this->assertGreaterThanOrEqual(2.0, $totals['a']);
+		$this->assertLessThanOrEqual(26.0, $totals['a']);
+	}
+
 	public function testGetLiveSessionSecondsOnCalendarDay(): void
 	{
 		// active session started 2h ago -> ~7200s

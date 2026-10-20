@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -83,6 +84,69 @@ class OvertimePayoutMapper extends QBMapper
 		$result->closeCursor();
 
 		return round((float)($row['total'] ?? 0), 2);
+	}
+
+	/**
+	 * Per-user payout totals for a set of users — one grouped query.
+	 * Used by scoped overview surfaces to avoid N+1 summing.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, float> userId => sum (users without payouts are absent)
+	 */
+	public function sumHoursPaidForYearThroughMonthForUsers(array $userIds, int $year, int $throughMonth): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id')
+			->selectAlias($qb->func()->sum('hours_paid'), 'total')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->eq('calendar_year', $qb->createNamedParameter($year, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('calendar_month', $qb->createNamedParameter($throughMonth, IQueryBuilder::PARAM_INT)))
+			->groupBy('user_id');
+
+		$sums = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$sums[(string)$row['user_id']] = round((float)$row['total'], 2);
+		}
+		$result->closeCursor();
+		return $sums;
+	}
+
+	/**
+	 * Latest payout per user for a set of users — one query, PHP-side pick.
+	 * Payout rows are bounded (~1/month/user) so the full set is safe to reduce
+	 * in memory; ordered newest-first, first row per user wins.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, OvertimePayout>
+	 */
+	public function findLatestForUsersInYear(array $userIds, int $year): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->eq('calendar_year', $qb->createNamedParameter($year, IQueryBuilder::PARAM_INT)))
+			->orderBy('calendar_month', 'DESC')
+			->addOrderBy('id', 'DESC');
+
+		$latest = [];
+		foreach ($this->findEntities($qb) as $payout) {
+			$uid = (string)$payout->getUserId();
+			if (!isset($latest[$uid])) {
+				$latest[$uid] = $payout;
+			}
+		}
+		return $latest;
 	}
 
 	/**

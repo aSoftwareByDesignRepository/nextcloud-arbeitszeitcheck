@@ -60,21 +60,9 @@ class DailyWorkingHoursCalculator
 		}
 
 		$now = $liveEnd ?? $this->timeZoneService->nowInStorage();
-		$periods = [];
 
 		$overlapping = $this->timeEntryMapper->findOverlapping($userId, $dayStart, $dayEnd) ?? [];
-		foreach ($overlapping as $entry) {
-			if ($excludeEntryId !== null && $entry->getId() === $excludeEntryId) {
-				continue;
-			}
-			if ($liveEntry !== null && $entry->getId() === $liveEntry->getId()) {
-				continue;
-			}
-			$period = $this->buildClippedPeriod($entry, $dayStartTs, $dayEndTs, $now);
-			if ($period !== null) {
-				$periods[] = $period;
-			}
-		}
+		$periods = $this->buildClippedPeriods($overlapping, $dayStartTs, $dayEndTs, $now, $excludeEntryId, $liveEntry?->getId());
 
 		if ($liveEntry !== null) {
 			$period = $this->buildClippedPeriod($liveEntry, $dayStartTs, $dayEndTs, $now);
@@ -84,6 +72,37 @@ class DailyWorkingHoursCalculator
 		}
 
 		return $this->mergeNonOverlappingWorkingHours($periods);
+	}
+
+	/**
+	 * Clip a set of candidate entries to [dayStartTs, dayEndTs) — the shared
+	 * per-day inner loop for the single-day and batched range paths.
+	 *
+	 * @param list<TimeEntry> $entries
+	 * @return list<array{start: int, end: int, breakHours: float}>
+	 */
+	private function buildClippedPeriods(
+		array $entries,
+		int $dayStartTs,
+		int $dayEndTs,
+		\DateTime $now,
+		?int $excludeEntryId = null,
+		?int $skipEntryId = null,
+	): array {
+		$periods = [];
+		foreach ($entries as $entry) {
+			if ($excludeEntryId !== null && $entry->getId() === $excludeEntryId) {
+				continue;
+			}
+			if ($skipEntryId !== null && $entry->getId() === $skipEntryId) {
+				continue;
+			}
+			$period = $this->buildClippedPeriod($entry, $dayStartTs, $dayEndTs, $now);
+			if ($period !== null) {
+				$periods[] = $period;
+			}
+		}
+		return $periods;
 	}
 
 	/**
@@ -340,6 +359,57 @@ class DailyWorkingHoursCalculator
 		}
 
 		return $total;
+	}
+
+	/**
+	 * Working hours summed per calendar day for a set of users — one batched
+	 * entry fetch instead of a per-user-per-day query loop. The per-day clip
+	 * and merge semantics are identical to getWorkingHoursForCalendarDay().
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, float> userId => hours (every requested user present)
+	 */
+	public function sumWorkingHoursForUsersInRange(
+		array $userIds,
+		\DateTime $rangeStart,
+		\DateTime $rangeEndExclusive,
+	): array {
+		$userIds = array_values(array_unique($userIds));
+		$totals = array_fill_keys($userIds, 0.0);
+		if (empty($userIds) || $rangeEndExclusive <= $rangeStart) {
+			return $totals;
+		}
+
+		$now = $this->timeZoneService->nowInStorage();
+		$entriesByUser = $this->timeEntryMapper->findOverlappingForUsers($userIds, $rangeStart, $rangeEndExclusive);
+
+		$dayCursor = $this->timeZoneService->dayWindowInStorage($rangeStart)[0];
+		$lastInstant = (clone $rangeEndExclusive)->modify('-1 second');
+		if ($lastInstant < $rangeStart) {
+			return $totals;
+		}
+		$lastDay = $this->timeZoneService->dayWindowInStorage($lastInstant)[0];
+
+		while ($dayCursor <= $lastDay) {
+			[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($dayCursor);
+			if ($dayEnd > $rangeStart && $dayStart < $rangeEndExclusive) {
+				$dayStartTs = $dayStart->getTimestamp();
+				$dayEndTs = $dayEnd->getTimestamp();
+				foreach ($userIds as $userId) {
+					$entries = $entriesByUser[$userId] ?? null;
+					if ($entries === null) {
+						continue;
+					}
+					$periods = $this->buildClippedPeriods($entries, $dayStartTs, $dayEndTs, $now);
+					if ($periods !== []) {
+						$totals[$userId] += $this->mergeNonOverlappingWorkingHours($periods);
+					}
+				}
+			}
+			$dayCursor = (clone $dayCursor)->modify('+1 day');
+		}
+
+		return $totals;
 	}
 
 	/**

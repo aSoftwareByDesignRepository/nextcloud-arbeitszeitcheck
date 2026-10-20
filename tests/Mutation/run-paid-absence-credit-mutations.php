@@ -51,9 +51,12 @@ $mutations = [
 		'to' => "if (\$userId === '') {\n\t\t\treturn ['hours' => 0.0, 'days_credited' => 0];\n\t\t}",
 	],
 	[
-		'label' => 'credit_unpaid_leave',
-		'from' => "public const CREDITABLE_TYPES = [\n\t\tAbsence::TYPE_SICK_LEAVE,\n\t];",
-		'to' => "public const CREDITABLE_TYPES = [\n\t\tAbsence::TYPE_SICK_LEAVE,\n\t\tAbsence::TYPE_UNPAID_LEAVE,\n\t];",
+		// The creditable-type gate lives in AbsenceTypeCatalog::isSollCreditable
+		// (built-ins + custom soll_credit flag) — mutating the call site proves
+		// the gate is what stops unpaid/pending leave from being credited.
+		'label' => 'drop_soll_creditable_gate',
+		'from' => "if (!AbsenceTypeCatalog::isSollCreditable(\$absence->getType())) {",
+		'to' => "if (false && !AbsenceTypeCatalog::isSollCreditable(\$absence->getType())) {",
 	],
 	[
 		'label' => 'ignore_double_count_guard',

@@ -1106,9 +1106,24 @@ class ManagerController extends Controller
 			$weekStart = clone $today;
 			$weekStart->modify('-' . (int)$today->format('w') . ' days')->setTime(0, 0, 0);
 
+			// Batched compliance status for the page — two queries total instead
+			// of two per row.
+			$complianceByUser = $this->complianceService->getComplianceStatusForUsers($paginatedUserIds);
+			// Batched today-hours + pending-absence counts — one query each
+			// instead of one per row. Same storage-TZ today window as
+			// getTodayHours; pending covers pending + substitute_pending,
+			// matching the per-row getAbsencesByUser(status=pending) filter.
+			[$todayStartStorage, $todayEndStorage] = $this->timeZoneService->todayWindowInStorage();
+			$todayHoursByUser = $this->timeTrackingService->getWorkingHoursForUsersInPeriod(
+				$paginatedUserIds,
+				$todayStartStorage,
+				$todayEndStorage
+			);
+			$pendingByUser = $this->absenceMapper->countPendingApprovalByUser($paginatedUserIds);
+
 			foreach ($paginatedUserIds as $userId) {
 				// Get today's hours
-				$todayHours = $this->timeTrackingService->getTodayHours($userId);
+				$todayHours = $todayHoursByUser[$userId] ?? 0.0;
 
 				// Get week's hours using injected OvertimeService
 			$weekEnd = clone $weekStart;
@@ -1123,11 +1138,11 @@ class ManagerController extends Controller
 				$currentStatus = $status['status'] ?? 'clocked_out';
 
 				// Get pending absences count
-				$pendingAbsences = $this->absenceService->getAbsencesByUser($userId, ['status' => 'pending']);
-				$pendingAbsencesCount = count($pendingAbsences);
+				$pendingAbsencesCount = $pendingByUser[$userId] ?? 0;
 
 				// Get compliance status
-				$complianceStatus = $this->complianceService->getComplianceStatus($userId);
+				$complianceStatus = $complianceByUser[$userId]
+					?? $this->complianceService->getComplianceStatus($userId);
 				$complianceStatusText = $complianceStatus['compliant'] ? 'good' : 'warning';
 
 				// Calculate overtime using injected OvertimeService
@@ -1231,6 +1246,7 @@ class ManagerController extends Controller
 			$unresolvedByUser = [];
 			$pendingByUser = [];
 			$upcomingVacationByUser = [];
+			$overtimeSnapshots = [];
 			if ($pageUserIds !== []) {
 				try {
 					$unresolvedByUser = $this->complianceViolationMapper()->countUnresolvedByUserIds($pageUserIds);
@@ -1241,10 +1257,9 @@ class ManagerController extends Controller
 					);
 				}
 				try {
-					foreach ($this->absenceMapper->findPendingForUsers($pageUserIds) as $pendingAbsence) {
-						$uid = $pendingAbsence->getUserId();
-						$pendingByUser[$uid] = ($pendingByUser[$uid] ?? 0) + 1;
-					}
+					// pending + substitute_pending — same "awaiting any approval"
+					// definition the team overview row count uses.
+					$pendingByUser = $this->absenceMapper->countPendingApprovalByUser($pageUserIds);
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->warning(
 						'getPeopleOverview: pending absence counts failed: ' . $e->getMessage(),
@@ -1256,6 +1271,16 @@ class ManagerController extends Controller
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->warning(
 						'getPeopleOverview: upcoming vacation aggregation failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+				try {
+					$overtimeSnapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($pageUserIds);
+				} catch (\Throwable $e) {
+					// Batch failed — per-user fallback below preserves partial results.
+					$overtimeSnapshots = [];
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: overtime snapshot batch failed: ' . $e->getMessage(),
 						['exception' => $e]
 					);
 				}
@@ -1313,7 +1338,8 @@ class ManagerController extends Controller
 				}
 
 				try {
-					$snapshot = $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
+					$snapshot = $overtimeSnapshots[$userId]
+						?? $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
 					$row['overtime'] = [
 						'balance' => $snapshot['balance'] ?? null,
 						'needsAttention' => (bool)($snapshot['needs_attention'] ?? false),
@@ -2488,10 +2514,11 @@ class ManagerController extends Controller
 			}
 
 			$teamUserIds = $this->getTeamMemberIds($managerId);
+			$snapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($teamUserIds);
 			$members = [];
 			foreach ($teamUserIds as $userId) {
-				$snapshot = $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
-				if (!$snapshot['needs_attention']) {
+				$snapshot = $snapshots[$userId] ?? null;
+				if ($snapshot === null || !$snapshot['needs_attention']) {
 					continue;
 				}
 				$members[] = array_merge([
@@ -2561,9 +2588,10 @@ class ManagerController extends Controller
 				$header .= ';delta_' . $w['label'] . '_h';
 			}
 			$teamUserIds = $this->getTeamMemberIds($managerId);
+			$snapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($teamUserIds);
 			$lines = [$header . "\n"];
 			foreach ($teamUserIds as $userId) {
-				$snapshot = $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
+				$snapshot = $snapshots[$userId] ?? [];
 				$row = [
 					$this->csvEscape($userId),
 					$this->csvEscape($this->getDisplayName($userId)),
@@ -2752,8 +2780,9 @@ class ManagerController extends Controller
 				'members' => [],
 			];
 
+			$statusByUser = $this->complianceService->getComplianceStatusForUsers($teamUserIds);
 			foreach ($teamUserIds as $userId) {
-				$status = $this->complianceService->getComplianceStatus($userId);
+				$status = $statusByUser[$userId] ?? $this->complianceService->getComplianceStatus($userId);
 
 				$bucket = 'compliant';
 				if (!$status['compliant']) {
@@ -2876,12 +2905,15 @@ class ManagerController extends Controller
 				[$start, $end] = $this->timeZoneService->monthWindowInStorage($year, $month);
 			}
 
+			// Batched hours fetch — one entry query for the whole scope instead
+			// of a per-user-per-day loop.
+			$hoursByUser = $this->timeTrackingService->getWorkingHoursForUsersInPeriod($teamUserIds, $start, $end);
+
 			foreach ($teamUserIds as $userId) {
+				$hours = $hoursByUser[$userId] ?? 0.0;
 				if ($period === 'today') {
-					$hours = $this->timeTrackingService->getTodayHours($userId);
 					$overtimeData = $this->overtimeService->getDailyOvertime($userId);
 				} else {
-					$hours = $this->timeTrackingService->getWorkingHoursForPeriod($userId, $start, $end);
 					$overtimeData = $this->overtimeService->calculateOvertime($userId, $start, $end, false);
 				}
 				$overtime = $overtimeData['overtime_hours'];
@@ -3426,41 +3458,36 @@ class ManagerController extends Controller
 
 			$corrections = [];
 
-			foreach ($teamUserIds as $userId) {
-				// Get pending approval entries for this user
-				$pendingEntries = $this->timeEntryMapper->findByUserAndStatus(
-					$userId,
-					\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL
-				);
+			// Batched IN() — org-wide admin scope must not loop per user.
+			$pendingEntries = $this->timeEntryMapper->findPendingApprovalForUsers($teamUserIds);
 
-				foreach ($pendingEntries as $entry) {
-					try {
-						// Parse justification to get correction details
-						$justificationData = json_decode($entry->getJustification() ?? '{}', true);
-						
-						$requestType = (($justificationData['type'] ?? '') === 'manual_create')
-							? 'manual_create'
-							: 'correction';
-						$corrections[] = [
-							'id' => $entry->getId(),
-							'userId' => $entry->getUserId(),
-							'displayName' => $this->getDisplayName($entry->getUserId()),
-							'startTime' => ($startTime = $entry->getStartTime()) ? $startTime->format('c') : null,
-							'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format('c') : null,
-							'durationHours' => $entry->getDurationHours(),
-							'description' => $entry->getDescription(),
-							'status' => $entry->getStatus(),
-							'justification' => $justificationData['justification'] ?? '',
-							'requestType' => $requestType,
-							'original' => $justificationData['original'] ?? [],
-							'proposed' => $justificationData['proposed'] ?? [],
-							'requestedAt' => $justificationData['requested_at'] ?? null,
-							'summary' => $entry->getSummary()
-						];
-					} catch (\Throwable $e) {
-						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing time entry correction ' . $entry->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
-						continue;
-					}
+			foreach ($pendingEntries as $entry) {
+				try {
+					// Parse justification to get correction details
+					$justificationData = json_decode($entry->getJustification() ?? '{}', true);
+
+					$requestType = (($justificationData['type'] ?? '') === 'manual_create')
+						? 'manual_create'
+						: 'correction';
+					$corrections[] = [
+						'id' => $entry->getId(),
+						'userId' => $entry->getUserId(),
+						'displayName' => $this->getDisplayName($entry->getUserId()),
+						'startTime' => ($startTime = $entry->getStartTime()) ? $startTime->format('c') : null,
+						'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format('c') : null,
+						'durationHours' => $entry->getDurationHours(),
+						'description' => $entry->getDescription(),
+						'status' => $entry->getStatus(),
+						'justification' => $justificationData['justification'] ?? '',
+						'requestType' => $requestType,
+						'original' => $justificationData['original'] ?? [],
+						'proposed' => $justificationData['proposed'] ?? [],
+						'requestedAt' => $justificationData['requested_at'] ?? null,
+						'summary' => $entry->getSummary()
+					];
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->error('Error processing time entry correction ' . $entry->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
+					continue;
 				}
 			}
 
@@ -3524,27 +3551,25 @@ class ManagerController extends Controller
 
 			$calendarData = [];
 
-			foreach ($teamUserIds as $userId) {
-				// Get absences for user in date range using mapper directly
-				$absences = $this->absenceMapper->findByUserAndDateRange($userId, $start, $end);
+			// Batched IN() — org-wide admin scope must not loop per user.
+			$absences = $this->absenceMapper->findByUsersAndDateRange($teamUserIds, $start, $end);
 
-				foreach ($absences as $absence) {
-					try {
-						$calendarData[] = [
-							'id' => $absence->getId(),
-							'userId' => $absence->getUserId(),
-							'displayName' => $this->getDisplayName($absence->getUserId()),
-							'type' => $absence->getType(),
-							'startDate' => ($startDate = $absence->getStartDate()) ? $startDate->format('Y-m-d') : null,
-							'endDate' => ($endDate = $absence->getEndDate()) ? $endDate->format('Y-m-d') : null,
-							'days' => $absence->getDays(),
-							'status' => $absence->getStatus(),
-							'summary' => $absence->getSummary()
-						];
-					} catch (\Throwable $e) {
-						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing absence ' . $absence->getId() . ' in calendar data: ' . $e->getMessage(), ["exception" => $e]);
-						continue;
-					}
+			foreach ($absences as $absence) {
+				try {
+					$calendarData[] = [
+						'id' => $absence->getId(),
+						'userId' => $absence->getUserId(),
+						'displayName' => $this->getDisplayName($absence->getUserId()),
+						'type' => $absence->getType(),
+						'startDate' => ($absenceStart = $absence->getStartDate()) ? $absenceStart->format('Y-m-d') : null,
+						'endDate' => ($absenceEnd = $absence->getEndDate()) ? $absenceEnd->format('Y-m-d') : null,
+						'days' => $absence->getDays(),
+						'status' => $absence->getStatus(),
+						'summary' => $absence->getSummary()
+					];
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->error('Error processing absence ' . $absence->getId() . ' in calendar data: ' . $e->getMessage(), ["exception" => $e]);
+					continue;
 				}
 			}
 

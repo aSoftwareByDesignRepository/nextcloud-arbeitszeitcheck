@@ -2062,7 +2062,47 @@ class ComplianceService
     public function getComplianceStatus(string $userId): array
     {
         $unresolvedViolations = $this->violationMapper->findByUser($userId, false);
+        $hasData = $this->timeEntryMapper->countByUser($userId) > 0;
 
+        return $this->buildComplianceStatus($unresolvedViolations, $hasData);
+    }
+
+    /**
+     * Compliance status for a set of users — two batched queries total
+     * (violations + entry counts) instead of two queries per user.
+     *
+     * @param list<string> $userIds
+     * @return array<string, array> userId => status (same shape as getComplianceStatus)
+     */
+    public function getComplianceStatusForUsers(array $userIds): array
+    {
+        $userIds = array_values(array_unique($userIds));
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $violationsByUser = [];
+        foreach ($this->violationMapper->findByUserIdsAndDateRange($userIds, null, null, null, null, false) as $violation) {
+            $violationsByUser[$violation->getUserId()][] = $violation;
+        }
+
+        $entryCounts = $this->timeEntryMapper->countByUserIds($userIds);
+
+        $statuses = [];
+        foreach ($userIds as $userId) {
+            $statuses[$userId] = $this->buildComplianceStatus(
+                $violationsByUser[$userId] ?? [],
+                ($entryCounts[$userId] ?? 0) > 0
+            );
+        }
+        return $statuses;
+    }
+
+    /**
+     * @param ComplianceViolation[] $unresolvedViolations
+     */
+    private function buildComplianceStatus(array $unresolvedViolations, bool $hasData): array
+    {
         $critical = 0;
         $warning = 0;
         $info = 0;
@@ -2090,10 +2130,6 @@ class ComplianceService
 			+ ($warning * \OCA\ArbeitszeitCheck\Constants::COMPLIANCE_SCORE_WARNING_WEIGHT)
 			+ ($info * \OCA\ArbeitszeitCheck\Constants::COMPLIANCE_SCORE_INFO_WEIGHT)
 		);
-
-        // Check if we have analyzable data (time entries exist)
-        $timeEntryCount = $this->timeEntryMapper->countByUser($userId);
-        $hasData = $timeEntryCount > 0;
 
         return [
             'compliant' => $compliant,

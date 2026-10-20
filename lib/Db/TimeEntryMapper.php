@@ -500,6 +500,34 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Per-user entry counts for a set of users — one grouped query.
+	 * Used by scoped overview surfaces to avoid N+1 counting.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, int> userId => count (users without entries are absent)
+	 */
+	public function countByUserIds(array $userIds): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id', $qb->createFunction('COUNT(*) AS cnt'))
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->groupBy('user_id');
+
+		$counts = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$counts[(string)$row['user_id']] = (int)$row['cnt'];
+		}
+		$result->closeCursor();
+		return $counts;
+	}
+
+	/**
 	 * Get time entries with project information (for integration with ProjectCheck)
 	 *
 	 * @param array $filters
@@ -921,6 +949,91 @@ class TimeEntryMapper extends QBMapper
 		}
 
 		return $overlapping;
+	}
+
+	/**
+	 * Overlapping entries for a set of users — the batched analogue of
+	 * {@see findOverlapping()}. Same semantics: ±1-day padded range fetch plus
+	 * live rows (active / on-break / pending open correction) whose start may
+	 * lie outside the window, deduplicated, filtered by occupancy overlap.
+	 * Returns entries grouped per user so callers can iterate days per user
+	 * without re-querying.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, list<TimeEntry>>
+	 */
+	public function findOverlappingForUsers(array $userIds, \DateTime $startTime, \DateTime $endTime): array
+	{
+		$userIds = QueryInChunker::normalizeValues($userIds);
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$entryDateStart = clone $startTime;
+		$entryDateStart->setTime(0, 0, 0);
+		$entryDateEnd = clone $endTime;
+		$entryDateEnd->setTime(23, 59, 59);
+		$entryDateStart->modify('-1 day');
+		$entryDateEnd->modify('+1 day');
+
+		$allEntries = $this->findByUsersAndDateRange($userIds, $entryDateStart, $entryDateEnd);
+
+		// Live rows whose start_time predates the window (long-running or stale
+		// open sessions) — the union mirrors findOverlapping's three finders.
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->in('status', $qb->createNamedParameter(
+					[TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK], IQueryBuilder::PARAM_STR_ARRAY
+				)),
+				$qb->expr()->andX(
+					$qb->expr()->eq('status', $qb->createNamedParameter(TimeEntry::STATUS_PENDING_APPROVAL)),
+					$qb->expr()->isNull('end_time')
+				)
+			));
+		foreach ($this->findEntities($qb) as $live) {
+			$allEntries[] = $live;
+		}
+
+		$seenIds = [];
+		$newStartTs = $startTime->getTimestamp();
+		$newEndTs = $endTime->getTimestamp();
+		$now = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
+		$nowTs = $now->getTimestamp();
+
+		$byUser = [];
+		foreach ($allEntries as $entry) {
+			$id = (int)$entry->getId();
+			if (isset($seenIds[$id])) {
+				continue;
+			}
+			$seenIds[$id] = true;
+
+			$status = $entry->getStatus();
+			$entryStart = $entry->getStartTime();
+			if (!$entryStart) {
+				continue;
+			}
+
+			$effectiveEnd = $entry->occupancyEnd($now);
+			if ($effectiveEnd === null) {
+				continue;
+			}
+
+			$entryStartTs = $entryStart->getTimestamp();
+			$entryEndTs = max($entryStartTs, $effectiveEnd->getTimestamp());
+			if (in_array($status, [TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK], true)) {
+				$entryEndTs = max($entryEndTs, $nowTs);
+			}
+
+			if ($newStartTs < $entryEndTs && $newEndTs > $entryStartTs) {
+				$byUser[(string)$entry->getUserId()][] = $entry;
+			}
+		}
+
+		return $byUser;
 	}
 
 	/**

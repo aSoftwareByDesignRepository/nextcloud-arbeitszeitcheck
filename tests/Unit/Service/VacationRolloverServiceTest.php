@@ -234,6 +234,21 @@ final class VacationRolloverServiceTest extends TestCase
 		$this->assertSame(4.0, $out['amount']);
 	}
 
+	public function testProcessUserForFromYearHoursModeWritesCarryoverHoursWithoutClearing(): void
+	{
+		$this->appValues[Constants::CONFIG_VACATION_UNIT] = Constants::VACATION_UNIT_HOURS;
+		// Hours mode: amount lands in carryover_hours AND carryover_days,
+		// clear flag stays off — the hours column is the live balance.
+		$this->balanceMapper->expects($this->once())->method('upsert')
+			->with('alice', 2025, 4.0, 4.0, false);
+		$this->logMapper->expects($this->once())->method('insertLog')
+			->with('alice', 2024, 2025, 4.0);
+
+		$out = $this->service->processUserForFromYear('alice', 2024, false, false, false);
+		$this->assertSame('applied', $out['action']);
+		$this->assertSame(4.0, $out['amount']);
+	}
+
 	public function testProcessUserForFromYearForceDeletesLogAndRewrites(): void
 	{
 		$this->logExists = true;

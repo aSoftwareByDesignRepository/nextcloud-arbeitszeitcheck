@@ -108,7 +108,11 @@ $mutations = [
 			: round($val / $hoursPerDay, 2, PHP_ROUND_HALF_UP);
 		$capMax = $toHours ? 4000.0 : 366.0;
 		$new = max(0.0, min($capMax, $new));
-		$this->config->setAppValue(
+		// This key is also written via the typed string API by AdminController
+		// (setAppValueString) — untyped writes then throw
+		// AppConfigTypeConflictException (NC >= 34); fall back typed.
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(
+			$this->config,
 			\'arbeitszeitcheck\',
 			Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
 			(string)$new
@@ -601,7 +605,10 @@ $mutations = [
 				$hoursMode ? $amount : null,
 				!$hoursMode
 			);',
-		'filters' => ['VacationRolloverServiceTest::testHoursModeUpsertWritesCarryoverHoursAndDoesNotClearDaysColumnAsDaysMode'],
+		'filters' => [
+			'VacationRolloverServiceTest::testProcessUserForFromYearHoursModeWritesCarryoverHoursWithoutClearing',
+			'VacationRolloverServiceTest::testProcessUserForFromYearAppliesWritePath',
+		],
 	],
 	[
 		'name' => 'rollover_skips_migrate_idle_assert',
@@ -611,12 +618,9 @@ $mutations = [
 		}
 
 		return $write();',
-		'to' => 'if (false && $this->vacationUnitMigrationService !== null) {
-			return $this->vacationUnitMigrationService->withIdleShared($write);
-		}
-
+		'to' => '// mutated: forgot the migrate-idle guard entirely
 		return $write();',
-		'filters' => ['VacationRolloverServiceTest::testProcessBlocksWhenVacationUnitMigrationInProgress'],
+		'filters' => ['AbsenceVacationUnitMigrateIdleCallSitesTest::testRolloverAndImportGuardMigrateIdle'],
 	],
 	[
 		'name' => 'absence_shared_idle_releases_immediately',

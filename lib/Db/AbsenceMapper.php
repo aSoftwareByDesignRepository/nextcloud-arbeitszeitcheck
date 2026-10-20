@@ -276,6 +276,43 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
+	 * Per-user count of absences awaiting ANY approval — both
+	 * STATUS_PENDING and STATUS_SUBSTITUTE_PENDING, matching the
+	 * "pending" filter semantics of
+	 * {@see \OCA\ArbeitszeitCheck\Service\AbsenceService::getAbsencesByUser()}.
+	 * One grouped query; used by scoped overview surfaces to avoid N+1.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, int> userId => count (users without pending rows are absent)
+	 */
+	public function countPendingApprovalByUser(array $userIds): array
+	{
+		$userIds = QueryInChunker::normalizeValues($userIds);
+		if ($userIds === []) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id')
+			->selectAlias($qb->createFunction('COUNT(*)'), 'cnt')
+			->from($this->getTableName())
+			->where($qb->expr()->in('status', $qb->createNamedParameter(
+				[Absence::STATUS_PENDING, Absence::STATUS_SUBSTITUTE_PENDING],
+				IQueryBuilder::PARAM_STR_ARRAY
+			)))
+			->andWhere(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->groupBy('user_id');
+
+		$counts = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$counts[(string)$row['user_id']] = (int)$row['cnt'];
+		}
+		$result->closeCursor();
+		return $counts;
+	}
+
+	/**
 	 * Count pending absences for the full team (not a preview slice).
 	 *
 	 * @param list<string> $userIds

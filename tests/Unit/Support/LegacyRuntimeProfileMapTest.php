@@ -49,6 +49,16 @@ final class LegacyRuntimeProfileMapTest extends TestCase
 		$this->expectMapFailure($data, 'malformed or selects an unsupported server image');
 	}
 
+	public function testRejectsTagsNotCoveringTheMatrix(): void
+	{
+		// Well-formed profile whose tag list does not match the
+		// authoritative matrix — must hit the coverage guard, not an
+		// earlier structural check.
+		$data = self::data();
+		$data['profiles'][0]['tags'] = ['other-tag'];
+		$this->expectMapFailure($data, 'authoritative upgrade matrix');
+	}
+
 	private static function map(): LegacyRuntimeProfileMap
 	{
 		return LegacyRuntimeProfileMap::load(self::MAP, LegacyUpgradeMatrix::load(self::MATRIX));

@@ -40,7 +40,17 @@ class PaidAbsenceCreditAdminGateContractTest extends TestCase
 		$src = (string)file_get_contents(
 			dirname(__DIR__, 3) . '/lib/Service/PaidAbsencePlannedHoursCreditService.php'
 		);
-		$this->assertStringContainsString('TYPE_SICK_LEAVE', $src);
-		$this->assertStringNotContainsString('TYPE_UNPAID_LEAVE,', $src);
+		$this->assertStringContainsString('AbsenceTypeCatalog::isSollCreditable', $src);
+
+		// The creditable-type whitelist lives in isSollCreditable — sick and
+		// sick-child are creditable, unpaid leave must never join them.
+		$catalog = (string)file_get_contents(
+			dirname(__DIR__, 3) . '/lib/Support/AbsenceTypeCatalog.php'
+		);
+		$pos = strpos($catalog, 'function isSollCreditable');
+		$this->assertNotFalse($pos);
+		$body = substr($catalog, $pos, 1200);
+		$this->assertStringContainsString('TYPE_SICK_LEAVE', $body);
+		$this->assertStringNotContainsString('TYPE_UNPAID_LEAVE', $body);
 	}
 }

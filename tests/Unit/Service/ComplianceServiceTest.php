@@ -2230,4 +2230,72 @@ class ComplianceServiceTest extends TestCase
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
 		$this->assertSame([], $service->evaluatePresenceForDay('u1', new \DateTime('2026-10-06 12:00:00', new \DateTimeZone('Europe/Berlin'))));
 	}
+
+	private function violation(string $userId, string $severity): ComplianceViolation
+	{
+		$v = new ComplianceViolation();
+		$v->setUserId($userId);
+		$v->setSeverity($severity);
+		$v->setResolved(false);
+		return $v;
+	}
+
+	public function testGetComplianceStatusForUsersMatchesSingleUserSemantics(): void
+	{
+		$this->violationMapper->method('findByUserIdsAndDateRange')
+			->willReturn([
+				$this->violation('u1', ComplianceViolation::SEVERITY_ERROR),
+				$this->violation('u1', ComplianceViolation::SEVERITY_WARNING),
+				$this->violation('u2', ComplianceViolation::SEVERITY_INFO),
+			]);
+		$this->timeEntryMapper->method('countByUserIds')
+			->willReturn(['u1' => 5]);
+
+		$statuses = $this->service->getComplianceStatusForUsers(['u1', 'u2', 'u3']);
+
+		$this->assertSame(['u1', 'u2', 'u3'], array_keys($statuses));
+
+		$u1 = $statuses['u1'];
+		$this->assertFalse($u1['compliant']);
+		$this->assertSame(2, $u1['violation_count']);
+		$this->assertSame(1, $u1['critical_violations']);
+		$this->assertSame(1, $u1['warning_violations']);
+		$this->assertSame(0, $u1['info_violations']);
+		// 100 - (1*25 + 1*10) = 65
+		$this->assertSame(65, $u1['score']);
+		$this->assertTrue($u1['has_data']);
+
+		$u2 = $statuses['u2'];
+		$this->assertFalse($u2['compliant']);
+		$this->assertSame(1, $u2['violation_count']);
+		$this->assertSame(1, $u2['info_violations']);
+		$this->assertSame(95, $u2['score']);
+		$this->assertFalse($u2['has_data']);
+
+		// No violations and no entries → compliant, perfect score, no data.
+		$u3 = $statuses['u3'];
+		$this->assertTrue($u3['compliant']);
+		$this->assertSame(100, $u3['score']);
+		$this->assertSame(0, $u3['violation_count']);
+		$this->assertFalse($u3['has_data']);
+	}
+
+	public function testGetComplianceStatusForUsersEmptyInputDoesNotQuery(): void
+	{
+		$this->violationMapper->expects($this->never())->method('findByUserIdsAndDateRange');
+		$this->timeEntryMapper->expects($this->never())->method('countByUserIds');
+		$this->assertSame([], $this->service->getComplianceStatusForUsers([]));
+	}
+
+	public function testGetComplianceStatusForUsersDedupesInputIds(): void
+	{
+		$this->violationMapper->expects($this->once())
+			->method('findByUserIdsAndDateRange')
+			->with($this->callback(static fn (array $ids): bool => $ids === ['u1']))
+			->willReturn([]);
+		$this->timeEntryMapper->method('countByUserIds')->willReturn([]);
+
+		$statuses = $this->service->getComplianceStatusForUsers(['u1', 'u1']);
+		$this->assertSame(['u1'], array_keys($statuses));
+	}
 }

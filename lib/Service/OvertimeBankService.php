@@ -86,6 +86,26 @@ class OvertimeBankService
 	 */
 	public function getBankStatus(string $userId, ?\DateTimeInterface $asOf = null): array
 	{
+		$statuses = $this->getBankStatusForUsers([$userId], $asOf);
+		return $statuses[$userId] ?? $this->emptyBankStatus($asOf);
+	}
+
+	/**
+	 * Bank status for a set of users. Batches the payout sum, adjustment sum and
+	 * latest-payout lookups (grouped queries) so overview surfaces do not issue
+	 * them per user. The overtime calculation itself stays per-user — the Saldo
+	 * formula must remain single-source.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, array> userId => status (same shape as getBankStatus)
+	 */
+	public function getBankStatusForUsers(array $userIds, ?\DateTimeInterface $asOf = null): array
+	{
+		$userIds = array_values(array_unique($userIds));
+		if (empty($userIds)) {
+			return [];
+		}
+
 		$bankMax = $this->getBankMaxHours();
 		$enabled = $this->isEnabled();
 
@@ -96,19 +116,51 @@ class OvertimeBankService
 
 		$year = (int)$asOfDt->format('Y');
 		$yearStart = new \DateTime(sprintf('%04d-01-01 00:00:00', $year));
-		$rawData = $this->overtimeService->calculateOvertime($userId, $yearStart, $asOfDt);
-		$rawBalance = (float)($rawData['cumulative_balance'] ?? 0.0);
+		$throughMonth = (int)$asOfDt->format('n');
 
-		$totalPayoutsYtd = $this->payoutMapper->sumHoursPaidForYearThroughMonth(
-			$userId,
-			$year,
-			(int)$asOfDt->format('n')
-		);
+		$payoutsByUser = $this->payoutMapper->sumHoursPaidForYearThroughMonthForUsers($userIds, $year, $throughMonth);
+		$adjustmentsByUser = $this->sumAdjustmentsThroughForUsers($userIds, $year, $asOfDt);
+		$latestPayoutByUser = $enabled
+			? $this->payoutMapper->findLatestForUsersInYear($userIds, $year)
+			: [];
+
+		$statuses = [];
+		foreach ($userIds as $userId) {
+			$rawData = $this->overtimeService->calculateOvertime($userId, $yearStart, $asOfDt);
+			$lastPayout = null;
+			if (isset($latestPayoutByUser[$userId])) {
+				$lastPayout = $this->payoutEntityToAuditArray($latestPayoutByUser[$userId]);
+			}
+			$statuses[$userId] = $this->assembleBankStatus(
+				$enabled,
+				$bankMax,
+				$asOfDt,
+				(float)($rawData['cumulative_balance'] ?? 0.0),
+				(float)($payoutsByUser[$userId] ?? 0.0),
+				(float)($adjustmentsByUser[$userId] ?? 0.0),
+				$lastPayout
+			);
+		}
+		return $statuses;
+	}
+
+	/**
+	 * Shared Saldo assembly for the single-user and batched paths — keeps the
+	 * formula single-source.
+	 */
+	private function assembleBankStatus(
+		bool $enabled,
+		float $bankMax,
+		\DateTime $asOfDt,
+		float $rawBalance,
+		float $totalPayoutsYtd,
+		float $totalAdjustmentsYtd,
+		?array $lastPayout
+	): array {
 		// Legacy-safe: when the bank feature is off, payouts are not applied to the
 		// displayed Saldo (same as pre-adjustment behaviour). Adjustments always apply
 		// so admin Nullung works with or without the bank.
 		$payoutsApplied = $enabled ? $totalPayoutsYtd : 0.0;
-		$totalAdjustmentsYtd = $this->sumAdjustmentsThrough($userId, $year, $asOfDt);
 		$effectiveBalance = round($rawBalance - $payoutsApplied + $totalAdjustmentsYtd, 2);
 
 		$bankedHours = 0.0;
@@ -127,14 +179,6 @@ class OvertimeBankService
 			$bankState = $this->classifyBankFill($fillPercent, $payoutEligible, $effectiveBalance);
 		}
 
-		$lastPayout = null;
-		if ($enabled) {
-			$latest = $this->payoutMapper->findLatestForUserInYear($userId, $year);
-			if ($latest !== null) {
-				$lastPayout = $this->payoutEntityToAuditArray($latest);
-			}
-		}
-
 		return [
 			'enabled' => $enabled,
 			'bank_max_hours' => $bankMax,
@@ -150,6 +194,15 @@ class OvertimeBankService
 			'as_of_date' => $asOfDt->format('Y-m-d'),
 			'last_payout' => $lastPayout,
 		];
+	}
+
+	private function emptyBankStatus(?\DateTimeInterface $asOf): array
+	{
+		$asOfDt = $asOf !== null
+			? \DateTime::createFromInterface($asOf)
+			: new \DateTime();
+		$asOfDt->setTime(23, 59, 59);
+		return $this->assembleBankStatus($this->isEnabled(), $this->getBankMaxHours(), $asOfDt, 0.0, 0.0, 0.0, null);
 	}
 
 	/**
@@ -204,6 +257,27 @@ class OvertimeBankService
 				['exception' => $e]
 			);
 			return 0.0;
+		}
+	}
+
+	/**
+	 * @param list<string> $userIds
+	 * @return array<string, float>
+	 */
+	private function sumAdjustmentsThroughForUsers(array $userIds, int $year, \DateTimeInterface $through): array
+	{
+		if ($this->adjustmentMapper === null) {
+			return [];
+		}
+		try {
+			return $this->adjustmentMapper->sumHoursDeltaForYearThroughDateForUsers($userIds, $year, $through);
+		} catch (\Throwable $e) {
+			// Table may not exist yet during upgrade — keep Saldo readable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Overtime adjustments batch sum failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return [];
 		}
 	}
 

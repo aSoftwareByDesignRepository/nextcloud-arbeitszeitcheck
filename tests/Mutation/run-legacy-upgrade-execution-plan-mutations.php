@@ -27,7 +27,7 @@ $mutations = [
 		'\'schemaFamily\' => $family[\'key\'],' => '\'schemaFamily\' => \'\',',
 	],
 	'server image omitted' => [
-		'\'serverImage\' => $runtime[\'serverImage\'],' => '\'serverImage\' => \'\',',
+		'\'serverImage\' => $serverImage,' => '\'serverImage\' => \'\',',
 	],
 	'compiled seed hash omitted' => [
 		'\'seedHash\' => $compiledSeed[\'hash\'],' => '\'seedHash\' => \'\',',

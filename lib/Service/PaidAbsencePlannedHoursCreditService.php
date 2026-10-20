@@ -30,14 +30,6 @@ use OCP\IConfig;
 
 class PaidAbsencePlannedHoursCreditService
 {
-	/** @var list<string> */
-	public const CREDITABLE_TYPES = [
-		Absence::TYPE_SICK_LEAVE,
-		// Carer's absence for a sick child is a paid excused absence like sick
-		// leave (§45 SGB V territory): the planned hours must not create Minusstunden.
-		Absence::TYPE_CHILD_SICK,
-	];
-
 	public function __construct(
 		private readonly IConfig $config,
 		private readonly AbsenceMapper $absenceMapper,

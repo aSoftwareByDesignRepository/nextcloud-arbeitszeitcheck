@@ -1115,6 +1115,26 @@ class TimeTrackingService
 	}
 
 	/**
+	 * Working hours per user for a set of users — one batched fetch instead of a
+	 * per-user day loop. Same calendar-day clip/merge semantics as
+	 * {@see getWorkingHoursForPeriod()}.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, float> userId => hours (every requested user present)
+	 */
+	public function getWorkingHoursForUsersInPeriod(
+		array $userIds,
+		\DateTime $rangeStart,
+		\DateTime $rangeEndExclusive,
+	): array {
+		return $this->dailyWorkingHoursCalculator->sumWorkingHoursForUsersInRange(
+			$userIds,
+			$rangeStart,
+			$rangeEndExclusive,
+		);
+	}
+
+	/**
 	 * Check compliance rules before clocking in
 	 *
 	 * @param string $userId

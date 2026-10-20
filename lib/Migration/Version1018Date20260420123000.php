@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Migration;
 
 use Closure;
-use OCA\ArbeitszeitCheck\Constants;
 use OCP\DB\ISchemaWrapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -40,7 +39,7 @@ class Version1018Date20260420123000 extends SimpleMigrationStep {
 				$insertQb->insert('at_user_vacation_policies')
 					->values([
 						'user_id' => $insertQb->createNamedParameter((string)$row['user_id']),
-						'vacation_mode' => $insertQb->createNamedParameter(Constants::VACATION_MODE_MANUAL_FIXED),
+						'vacation_mode' => $insertQb->createNamedParameter('manual_fixed'),
 						'manual_days' => $insertQb->createNamedParameter((float)$row['vacation_days_per_year']),
 						'tariff_rule_set_id' => $insertQb->createNamedParameter(null, IQueryBuilder::PARAM_NULL),
 						'override_reason' => $insertQb->createNamedParameter(null, IQueryBuilder::PARAM_NULL),

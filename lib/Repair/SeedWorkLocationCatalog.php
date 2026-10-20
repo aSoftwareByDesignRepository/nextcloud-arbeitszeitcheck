@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Repair;
 
-use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicy;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper;
@@ -23,10 +22,17 @@ use OCP\Migration\IRepairStep;
  * setting is converted only when that user has no user-scope policy at all.
  * The legacy setting is intentionally left in place — during the transition
  * the resolver still reads it as a fallback for users the migration skipped.
+ *
+ * The legacy setting key is inlined on purpose: repair steps run during the
+ * in-request app update while the previously installed `Constants` class is
+ * still loaded, so referencing constants added in the same release fatals
+ * with "Undefined constant" and leaves the instance in maintenance mode
+ * (GH #45, 1.9.4).
  */
 final class SeedWorkLocationCatalog implements IRepairStep
 {
 	private const LEGACY_EFFECTIVE_FROM = '1970-01-01';
+	private const LEGACY_SETTING_KEY = 'work_location_default';
 
 	public function __construct(
 		private readonly WorkLocationDefinitionMapper $definitionMapper,
@@ -64,11 +70,11 @@ final class SeedWorkLocationCatalog implements IRepairStep
 		}
 
 		$migrated = 0;
-		foreach ($this->userSettingsMapper->findUserIdsWithNonEmptySetting(Constants::SETTING_WORK_LOCATION_DEFAULT) as $userId) {
+		foreach ($this->userSettingsMapper->findUserIdsWithNonEmptySetting(self::LEGACY_SETTING_KEY) as $userId) {
 			if ($this->policyMapper->findByScope(WorkLocationDefaultPolicy::SCOPE_USER, $userId) !== []) {
 				continue;
 			}
-			$code = trim($this->userSettingsMapper->getStringSetting($userId, Constants::SETTING_WORK_LOCATION_DEFAULT, ''));
+			$code = trim($this->userSettingsMapper->getStringSetting($userId, self::LEGACY_SETTING_KEY, ''));
 			if ($code === '' || !$this->definitionMapper->codeExists($code)) {
 				continue;
 			}

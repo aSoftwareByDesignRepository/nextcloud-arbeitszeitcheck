@@ -6,8 +6,11 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
+use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
+use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
+use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
 use OCA\ArbeitszeitCheck\Repair\BackupBeforeUpdate;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
@@ -25,6 +28,9 @@ class UpgradeRepairIntegrationTest extends TestCase
 	{
 		foreach ([
 			EnsureArbeitszeitCheckSchema::class,
+			InitializeWorkforceSuiteFreshState::class,
+			InitializeWorkforceSuiteUpgradeState::class,
+			SeedWorkLocationCatalog::class,
 			BackfillAbsenceDays::class,
 			ReleaseStuckPendingAbsences::class,
 			RepairOrphanedPausedEntries::class,
@@ -119,6 +125,22 @@ class UpgradeRepairIntegrationTest extends TestCase
 			}
 			self::assertTrue($db->tableExists($table), 'table must be restored even on failure');
 		}
+	}
+
+	/**
+	 * GH #45 regression: the step that fataled the 1.9.4 web update must run
+	 * cleanly through the real container and database. Idempotent by design —
+	 * seeds only missing codes and skips users that already have a policy.
+	 */
+	public function testSeedWorkLocationCatalogRunsWithoutFatal(): void
+	{
+		/** @var SeedWorkLocationCatalog $step */
+		$step = \OCP\Server::get(SeedWorkLocationCatalog::class);
+		$output = $this->createMock(IOutput::class);
+		$output->method('info');
+
+		$step->run($output);
+		$this->addToAssertionCount(1);
 	}
 
 	public function testBackfillAbsenceDaysRunsWithoutFatal(): void

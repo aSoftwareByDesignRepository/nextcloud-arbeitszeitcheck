@@ -17,7 +17,6 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Migration;
 
 use Closure;
-use OCA\ArbeitszeitCheck\Constants;
 use OCP\DB\ISchemaWrapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\DB\Types;
@@ -117,7 +116,7 @@ class Version1046Date20260921120000 extends SimpleMigrationStep
 
 			$update = $this->db->getQueryBuilder();
 			$update->update('at_audit')
-				->set(self::COLUMN, $update->createNamedParameter(Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC))
+				->set(self::COLUMN, $update->createNamedParameter('offline_sync'))
 				->where($update->expr()->in(
 					'id',
 					$update->createNamedParameter($ids, IQueryBuilder::PARAM_INT_ARRAY)

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.6 - 2026-10-20
+
+### Fixed
+
+- **Group restriction changes made outside the app were ignored (GH #46):** the app kept its own snapshot of the allowed-group list and preferred it over Nextcloud's app restriction. Groups added later via the Apps page ("Limit to groups") or `occ app:enable -g` never took effect — Administration → Mitarbeitende stayed limited to the originally saved group. The Nextcloud restriction is now the single source of truth: group changes apply immediately no matter where they are made, and clearing the restriction externally still fails closed (only admins and explicitly allowed users keep access).
+
 ## 1.9.5 - 2026-10-20
 
 ### Fixed

@@ -16,7 +16,6 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Migration;
 
 use Closure;
-use OCA\ArbeitszeitCheck\Constants;
 use OCP\DB\ISchemaWrapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IConfig;
@@ -39,7 +38,10 @@ class Version1030Date20260603150000 extends SimpleMigrationStep
 
 	public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void
 	{
-		$key = Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED;
+		// Stored key/default inlined: migrations run during the in-request app
+		// update while the previously installed Constants class may still be
+		// loaded — referencing it can fatal with "Undefined constant" (GH #45).
+		$key = 'projectcheck_integration_enabled';
 		$existing = $this->config->getAppValue('arbeitszeitcheck', $key, '');
 		if ($existing !== '') {
 			return;
@@ -47,7 +49,7 @@ class Version1030Date20260603150000 extends SimpleMigrationStep
 
 		$value = $this->hasLinkedTimeEntries()
 			? '1'
-			: Constants::CONFIG_PROJECTCHECK_INTEGRATION_DEFAULT;
+			: '0';
 
 		$this->config->setAppValue('arbeitszeitcheck', $key, $value);
 		$output->info(sprintf(

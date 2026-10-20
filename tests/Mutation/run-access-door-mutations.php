@@ -74,12 +74,15 @@ function kill(string $label, callable $assert): void
 	}
 }
 
-function makeService(array $configMap, ?callable $inGroup = null): PermissionService
+function makeService(array $configMap, ?callable $inGroup = null, array $ncRestriction = []): PermissionService
 {
 	global $mockContext;
 	$groupManager = $mockContext->mock(IGroupManager::class);
 	$groupManager->method('isAdmin')->willReturn(false);
 	$groupManager->method('isInGroup')->willReturnCallback($inGroup ?? static fn (): bool => false);
+
+	$appManager = $mockContext->mock(IAppManager::class);
+	$appManager->method('getAppRestriction')->willReturn($ncRestriction);
 
 	$config = $mockContext->mock(IConfig::class);
 	$config->method('getAppValue')->willReturnCallback(
@@ -90,7 +93,7 @@ function makeService(array $configMap, ?callable $inGroup = null): PermissionSer
 
 	return new PermissionService(
 		$groupManager,
-		$mockContext->mock(IAppManager::class),
+		$appManager,
 		$config,
 		$mockContext->mock(IUserManager::class),
 		$mockContext->mock(TeamResolverService::class),
@@ -134,6 +137,43 @@ kill('restricted-user-allowlist', static function (): void {
 	]);
 	if (!$svc->isUserAllowedByAccessGroups('alice') || $svc->isUserAllowedByAccessGroups('bob')) {
 		throw new RuntimeException('User allowlist broken');
+	}
+});
+
+// Mutant: stored group snapshot shadows out-of-band NC restriction (issue #46)
+kill('nc-restriction-widened-out-of-band', static function (): void {
+	$svc = makeService(
+		[
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '1',
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '["admins"]',
+			Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+		],
+		static fn (string $uid, string $gid): bool => $uid === 'new_member' && $gid === 'staff',
+		['admins', 'staff'],
+	);
+	if (!$svc->isUserAllowedByAccessGroups('new_member')) {
+		throw new RuntimeException('Out-of-band NC group additions must widen the door');
+	}
+});
+
+// Mutant: stored Open flag overrides out-of-band NC restriction (fail-open)
+kill('nc-restriction-narrows-open-flag', static function (): void {
+	$svc = makeService(
+		[
+			Constants::CONFIG_ACCESS_RESTRICTION_ENABLED => '0',
+			Constants::CONFIG_ACCESS_ALLOWED_USER_IDS => '[]',
+			Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS => '[]',
+			Constants::CONFIG_APP_ADMIN_USER_IDS => '[]',
+		],
+		static fn (string $uid, string $gid): bool => $uid === 'member' && $gid === 'staff',
+		['staff'],
+	);
+	if (!$svc->isAccessRestrictionEnabled() || $svc->isUserAllowedByAccessGroups('stranger')) {
+		throw new RuntimeException('Out-of-band NC restriction must narrow an Open door');
+	}
+	if (!$svc->isUserAllowedByAccessGroups('member')) {
+		throw new RuntimeException('Restricted group member must pass the door');
 	}
 });
 

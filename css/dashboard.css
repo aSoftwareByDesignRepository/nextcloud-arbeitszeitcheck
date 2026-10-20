@@ -1572,7 +1572,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-primary-element, var(--color-primary));
+    color: var(--azc-accent-ink, var(--color-primary-element, var(--color-primary)));
     flex: 0 0 auto;
 }
 

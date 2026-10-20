@@ -54,7 +54,7 @@ class AdminSettingsDachParityTest extends TestCase
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRoute')->willReturn('/apps/arbeitszeitcheck/admin/settings');
 
-		return new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $this->createMock(\OCP\IUserManager::class));
+		return new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $this->createMock(\OCP\IUserManager::class), $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class));
 	}
 
 	public function testSwissFiftyHourCapSurvivesNcAdminSettingsPayload(): void
@@ -170,6 +170,7 @@ class AdminSettingsDachParityTest extends TestCase
 			$appManager,
 			$urlGenerator,
 			$this->createMock(\OCP\IUserManager::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class),
 		);
 		$params = $settings->getForm()->getParams();
 		$this->assertTrue($params['projectCheckAvailable']);

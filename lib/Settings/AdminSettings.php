@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\Settings;
 
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Service\FrontEndAssetService;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCP\App\IAppManager;
@@ -33,6 +34,7 @@ class AdminSettings implements ISettings
 	private IAppManager $appManager;
 	private IURLGenerator $urlGenerator;
 	private IUserManager $userManager;
+	private PermissionService $permissionService;
 
 	public function __construct(
 		IAppConfig $appConfig,
@@ -41,6 +43,7 @@ class AdminSettings implements ISettings
 		IAppManager $appManager,
 		IURLGenerator $urlGenerator,
 		IUserManager $userManager,
+		PermissionService $permissionService,
 	) {
 		$this->appConfig = $appConfig;
 		$this->l10n = $l10n;
@@ -48,6 +51,7 @@ class AdminSettings implements ISettings
 		$this->appManager = $appManager;
 		$this->urlGenerator = $urlGenerator;
 		$this->userManager = $userManager;
+		$this->permissionService = $permissionService;
 	}
 
 	/**
@@ -258,33 +262,12 @@ class AdminSettings implements ISettings
 	 */
 	private function readAccessAllowedGroups(): array
 	{
-		$raw = trim($this->appConfig->getAppValueString(Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, ''));
-		if ($raw !== '') {
-			$decoded = json_decode($raw, true);
-			if (is_array($decoded)) {
-				$out = [];
-				foreach ($decoded as $groupId) {
-					$candidate = trim((string)$groupId);
-					if ($candidate === '' || isset($out[$candidate])) {
-						continue;
-					}
-					if ($this->groupManager->get($candidate) === null) {
-						continue;
-					}
-					$out[$candidate] = true;
-				}
-				return array_keys($out);
-			}
-		}
-
-		$decoded = $this->appManager->getAppRestriction('arbeitszeitcheck');
 		$out = [];
-		foreach ($decoded as $groupId) {
-			$candidate = trim((string)$groupId);
-			if ($candidate === '') {
+		foreach ($this->permissionService->getAllowedAccessGroups() as $groupId) {
+			if ($this->groupManager->get($groupId) === null) {
 				continue;
 			}
-			$out[$candidate] = true;
+			$out[$groupId] = true;
 		}
 		return array_keys($out);
 	}
@@ -318,16 +301,7 @@ class AdminSettings implements ISettings
 
 	private function isAccessRestrictionEnabledFromSettings(): bool
 	{
-		$raw = trim($this->appConfig->getAppValueString(Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, ''));
-		if ($raw === '0') {
-			return false;
-		}
-		if ($raw === '1') {
-			return true;
-		}
-
-		return $this->readAccessAllowedGroups() !== []
-			|| $this->readConfiguredAccessAllowedUserIds() !== [];
+		return $this->permissionService->isAccessRestrictionEnabled();
 	}
 
 	/**

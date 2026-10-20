@@ -460,7 +460,7 @@
     box-shadow: none;
     position: relative;
     z-index: 1;
-    color: var(--color-primary-element);
+    color: var(--azc-accent-ink, var(--color-primary-element));
 }
 
 .app-icon .lucide-icon,

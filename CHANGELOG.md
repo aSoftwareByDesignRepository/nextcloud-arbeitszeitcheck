@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.6 - 2026-10-20
+
+### Fixed
+
+- **Group restriction changes made outside the app were ignored (GH #46):** the app kept its own snapshot of the allowed-group list and preferred it over Nextcloud's app restriction. Groups added later via the Apps page ("Limit to groups") or `occ app:enable -g` never took effect — Administration → Mitarbeitende stayed limited to the originally saved group. The Nextcloud restriction is now the single source of truth: group changes apply immediately no matter where they are made, and clearing the restriction externally still fails closed (only admins and explicitly allowed users keep access).
+
+## 1.9.5 - 2026-10-20
+
+### Fixed
+
+- **Update to 1.9.4 stalls in maintenance mode (GH #45):** the `SeedWorkLocationCatalog` repair step referenced `Constants::SETTING_WORK_LOCATION_DEFAULT`, a constant that only exists in 1.9.4. During the in-request app update the previously installed `Constants` class is still loaded, so the reference threw `Error: Undefined constant` and aborted the upgrade mid-flight. The legacy setting key is now inlined in the repair step, and all `Constants` references are removed from `lib/Repair` and `lib/Migration` (`Version1018`, `Version1030`, `Version1046` had the same latent pattern). A new `UpgradePathConstantsSafetyTest` keeps upgrade-path code free of shared-constant references.
+
 ## 1.9.4 - 2026-10-19
 
 ### Added

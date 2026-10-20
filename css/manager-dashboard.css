@@ -42,7 +42,7 @@
 
 #app-content.azc-app--manager-dashboard .pending-approvals-tab[aria-selected='true'],
 #app-content.azc-app--manager-dashboard .pending-approvals-tab--active {
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	border-bottom-color: var(--color-primary-element);
 	font-weight: 600;
 }

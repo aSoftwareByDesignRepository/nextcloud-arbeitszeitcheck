@@ -33,35 +33,26 @@ class PermissionService
 	}
 
 	/**
-	 * Returns configured allowlist group IDs (portfolio door).
+	 * Effective allowlist group IDs (portfolio door).
 	 *
-	 * Prefers app-config {@see Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS}; falls
-	 * back to Nextcloud app restriction for installs that have not saved yet.
+	 * Nextcloud's native app restriction ("Limit to groups") is authoritative:
+	 * every app-side settings save mirrors
+	 * {@see Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS} into it via
+	 * {@see \OCA\ArbeitszeitCheck\Controller\AdminController::applyAppRestrictionGroups()},
+	 * so a divergence between the stored config and the NC restriction always
+	 * means the admin changed the restriction out-of-band (Apps page or
+	 * `occ app:enable -g`). That newer signal must win — reading the stored
+	 * snapshot instead would freeze the door on the first group list forever.
 	 *
 	 * @return list<string>
 	 */
 	public function getAllowedAccessGroups(): array
 	{
-		$raw = trim($this->config->getAppValue(Application::APP_ID, Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, ''));
-		if ($raw !== '') {
-			$decoded = json_decode($raw, true);
-			if (is_array($decoded)) {
-				$groups = [];
-				foreach ($decoded as $groupId) {
-					$candidate = trim((string)$groupId);
-					if ($candidate === '' || isset($groups[$candidate])) {
-						continue;
-					}
-					$groups[$candidate] = true;
-				}
-				return array_keys($groups);
-			}
-		}
-
+		$restriction = $this->appManager->getAppRestriction(Application::APP_ID);
 		$groups = [];
-		foreach ($this->appManager->getAppRestriction(Application::APP_ID) as $groupId) {
+		foreach (is_array($restriction) ? $restriction : [] as $groupId) {
 			$candidate = trim((string)$groupId);
-			if ($candidate === '') {
+			if ($candidate === '' || isset($groups[$candidate])) {
 				continue;
 			}
 			$groups[$candidate] = true;
@@ -100,6 +91,12 @@ class PermissionService
 	 */
 	public function isAccessRestrictionEnabled(): bool
 	{
+		// A platform-side app restriction always narrows the door, even when
+		// the stored flag was saved as Open — an out-of-band "Limit to groups"
+		// change is the newer signal and must not be shadowed by the flag.
+		if ($this->getAllowedAccessGroups() !== []) {
+			return true;
+		}
 		$raw = trim($this->config->getAppValue(Application::APP_ID, Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, ''));
 		if ($raw === '0') {
 			return false;
@@ -107,8 +104,8 @@ class PermissionService
 		if ($raw === '1') {
 			return true;
 		}
-		// Legacy: NC / stored group allowlist non-empty ⇒ Restricted.
-		return $this->getAllowedAccessGroups() !== [] || $this->getAllowedAccessUserIds() !== [];
+		// Legacy: user allowlist non-empty ⇒ Restricted.
+		return $this->getAllowedAccessUserIds() !== [];
 	}
 
 	/**

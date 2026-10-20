@@ -74,7 +74,7 @@
 }
 
 .azc-projectcheck-picker-empty a {
-	color: var(--color-primary-element, var(--color-primary));
+	color: var(--azc-accent-ink, var(--color-primary-element, var(--color-primary)));
 	font-weight: 600;
 }
 

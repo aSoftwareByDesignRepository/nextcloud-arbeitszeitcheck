@@ -541,7 +541,7 @@ dialog.layer-dialog::backdrop {
 .layer-sim__days {
   font-size: 2.25rem;
   font-weight: 700;
-  color: var(--color-primary-element);
+  color: var(--azc-accent-ink, var(--color-primary-element));
   line-height: 1;
 }
 .layer-sim__sub {
@@ -634,7 +634,7 @@ dialog.layer-dialog::backdrop {
   font-size: 2.5rem;
   font-weight: 700;
   line-height: 1;
-  color: var(--color-primary-element);
+  color: var(--azc-accent-ink, var(--color-primary-element));
 }
 .layer-sim__summary-text {
   flex: 1 1 16rem;

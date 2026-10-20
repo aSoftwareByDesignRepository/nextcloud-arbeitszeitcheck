@@ -160,7 +160,7 @@
 }
 
 #app-content.azc-app--admin-teams .admin-teams__tab[aria-selected='true'] {
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	border-bottom-color: var(--color-primary-element);
 	font-weight: 600;
 }

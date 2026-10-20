@@ -72,7 +72,7 @@ class SettingsCoverageTest extends TestCase
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRoute')->willReturn('/apps/arbeitszeitcheck/admin/settings');
 
-		return new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $userManager);
+		return new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $userManager, $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class));
 	}
 
 	private function allowedUserIds(array $store, array $users): array
@@ -156,7 +156,7 @@ class SettingsCoverageTest extends TestCase
 			return '/apps/x';
 		});
 
-		$s = new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $um);
+		$s = new AdminSettings($appConfig, $l10n, $groupManager, $appManager, $urlGenerator, $um, $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class));
 		$this->assertSame('', $s->getForm()->getParams()['projectCheckAppsUrl']);
 	}
 }

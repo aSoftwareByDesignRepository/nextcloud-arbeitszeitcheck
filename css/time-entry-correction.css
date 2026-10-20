@@ -387,7 +387,7 @@
 }
 
 .manager-correction-diff__prop {
-	color: var(--color-primary-element);
+	color: var(--azc-accent-ink, var(--color-primary-element));
 	font-weight: 500;
 }
 

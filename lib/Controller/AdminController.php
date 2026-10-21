@@ -210,6 +210,7 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService $overtimeAdjustmentService = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null,
+		?\OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -256,7 +257,16 @@ class AdminController extends Controller
 		$this->overtimeAdjustmentService = $overtimeAdjustmentService;
 		$this->breakPolicyResolver = $breakPolicyResolver;
 		$this->breakPolicyStore = $breakPolicyStore;
+		$this->timeZoneService = $timeZoneService;
 		$this->setCspService($cspService);
+	}
+
+	private function timeZoneService(): \OCA\ArbeitszeitCheck\Service\TimeZoneService
+	{
+		if ($this->timeZoneService === null) {
+			$this->timeZoneService = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class);
+		}
+		return $this->timeZoneService;
 	}
 
 	private function batchMutationService(): \OCA\ArbeitszeitCheck\Service\AdminBatchMutationService
@@ -716,7 +726,7 @@ class AdminController extends Controller
 				$totalUsers = 0;
 			}
 
-			$today = new \DateTime();
+			$today = $this->timeZoneService()->nowInStorage();
 			$activeUsersToday = $this->timeEntryMapper->countDistinctUsersByDate($today);
 			$unresolvedCount = $this->violationMapper->count(['resolved' => false]);
 
@@ -1314,7 +1324,7 @@ class AdminController extends Controller
 			}
 		}
 
-		$today = new \DateTime();
+		$today = $this->timeZoneService()->nowInStorage();
 		$today->setTime(0, 0, 0);
 		$hasTimeEntriesToday = $this->timeEntryMapper->hasEntriesOnDate($userId, $today);
 
@@ -1846,7 +1856,7 @@ class AdminController extends Controller
 				}
 			}
 			if ($holiday->getCreatedAt() === null) {
-				$holiday->setCreatedAt(new \DateTime());
+				$holiday->setCreatedAt($this->timeZoneService()->nowInStorage());
 			}
 
 			$holiday->setState($state);
@@ -1855,7 +1865,7 @@ class AdminController extends Controller
 			$holiday->setKind($kind);
 			$holiday->setScope($scope);
 			$holiday->setSource(Holiday::SOURCE_MANUAL);
-			$holiday->setUpdatedAt(new \DateTime());
+			$holiday->setUpdatedAt($this->timeZoneService()->nowInStorage());
 
 			if (!$holiday->isValid()) {
 				return new JSONResponse([
@@ -2006,7 +2016,7 @@ class AdminController extends Controller
 			// organisation-wide, i.e. applied to every German Bundesland.
 			$states = array_keys(RegionRegistry::regionsForCountry(RegionRegistry::COUNTRY_DE));
 
-			$now = new \DateTime();
+			$now = $this->timeZoneService()->nowInStorage();
 
 			foreach ($items as $item) {
 				if (!is_array($item)) {
@@ -2149,7 +2159,7 @@ class AdminController extends Controller
 	{
 		$this->registerFrontEndAssets('audit-log-viewer', 'audit-log', [], ['common/datepicker', 'common/admin-user-picker']);
 
-		$endDate = new \DateTime();
+		$endDate = $this->timeZoneService()->nowInStorage();
 		$endDate->setTime(23, 59, 59);
 		$startDate = clone $endDate;
 		$startDate->modify('-30 days');
@@ -2218,7 +2228,7 @@ class AdminController extends Controller
 		}
 
 		if ($startDate === null && $endDate === null) {
-			$endDate = new \DateTime();
+			$endDate = $this->timeZoneService()->nowInStorage();
 			$endDate->setTime(23, 59, 59);
 			$startDate = clone $endDate;
 			$startDate->modify('-30 days');
@@ -3861,6 +3871,7 @@ class AdminController extends Controller
 
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null;
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null;
+	private ?\OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService = null;
 
 	private function breakPolicyResolver(): ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver
 	{
@@ -4372,7 +4383,7 @@ class AdminController extends Controller
 			}
 
 			// Get active users today (users with time entries today)
-			$today = new \DateTime();
+			$today = $this->timeZoneService()->nowInStorage();
 			$activeUsersToday = $this->timeEntryMapper->countDistinctUsersByDate($today);
 
 			// Get system compliance status (unresolved violations count)
@@ -4478,7 +4489,7 @@ class AdminController extends Controller
 				$search = mb_substr($search, 0, self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH);
 			}
 
-			$today = new \DateTime();
+			$today = $this->timeZoneService()->nowInStorage();
 			$today->setTime(0, 0, 0);
 			$activeTodayIds = $this->timeEntryMapper->findDistinctUserIdsByDate($today);
 			$activeTodayLookup = array_fill_keys($activeTodayIds, true);
@@ -5131,8 +5142,8 @@ class AdminController extends Controller
 			$model->setDailyHours($this->parseDecimalInput($params['dailyHours'] ?? null, $defaultDaily));
 			$model->setWorkDaysPerWeek($this->parseDecimalInput($params['workDaysPerWeek'] ?? null, 5.0));
 			$model->setIsDefault(isset($params['isDefault']) ? filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN) : false);
-			$model->setCreatedAt(new \DateTime());
-			$model->setUpdatedAt(new \DateTime());
+			$model->setCreatedAt($this->timeZoneService()->nowInStorage());
+			$model->setUpdatedAt($this->timeZoneService()->nowInStorage());
 
 			// Handle break rules and overtime rules if provided
 			if (isset($params['breakRules']) && is_array($params['breakRules'])) {
@@ -5252,7 +5263,7 @@ class AdminController extends Controller
 				$model->setOvertimeRulesArray($params['overtimeRules']);
 			}
 
-			$model->setUpdatedAt(new \DateTime());
+			$model->setUpdatedAt($this->timeZoneService()->nowInStorage());
 
 			// Validate
 			$errors = $model->validate();
@@ -5612,7 +5623,7 @@ class AdminController extends Controller
 					$dateErrors['validTo'] = 'Valid to must be a valid date';
 				}
 			}
-			$ruleSet->setValidFrom($validFrom ?? new \DateTime(date('Y-01-01')));
+			$ruleSet->setValidFrom($validFrom ?? new \DateTime($this->timeZoneService()->nowInStorage()->format('Y-01-01')));
 			$ruleSet->setValidTo($validTo);
 			$ruleSet->setActivationMode((string)($params['activationMode'] ?? 'immediate'));
 			// New rule sets are always created as drafts. Status transitions are
@@ -5620,8 +5631,8 @@ class AdminController extends Controller
 			// overlapping-active-set handling cannot be bypassed via POST.
 			$ruleSet->setStatus(Constants::TARIFF_RULE_SET_STATUS_DRAFT);
 			$ruleSet->setReferenceModel(isset($params['referenceModel']) ? json_encode($params['referenceModel']) : null);
-			$ruleSet->setCreatedAt(new \DateTime());
-			$ruleSet->setUpdatedAt(new \DateTime());
+			$ruleSet->setCreatedAt($this->timeZoneService()->nowInStorage());
+			$ruleSet->setUpdatedAt($this->timeZoneService()->nowInStorage());
 			$errors = $ruleSet->validate();
 			$modules = $this->normalizeTariffModulesPayload(is_array($params['modules'] ?? null) ? $params['modules'] : []);
 			$moduleErrors = TariffRuleModuleValidator::validateList($modules);
@@ -5732,7 +5743,7 @@ class AdminController extends Controller
 				$jurisdiction = $this->normalizeTariffIdentity((string)$params['jurisdiction']);
 				$ruleSet->setJurisdiction($jurisdiction !== '' ? $jurisdiction : null);
 			}
-			$ruleSet->setUpdatedAt(new \DateTime());
+			$ruleSet->setUpdatedAt($this->timeZoneService()->nowInStorage());
 			$errors = $ruleSet->validate();
 			$replaceModules = isset($params['modules']) && is_array($params['modules']);
 			$modules = [];
@@ -5845,14 +5856,14 @@ class AdminController extends Controller
 						} else {
 							$activeRuleSet->setValidTo(new \DateTime($endBeforeActivation->format('Y-m-d')));
 						}
-						$activeRuleSet->setUpdatedAt(new \DateTime());
+						$activeRuleSet->setUpdatedAt($this->timeZoneService()->nowInStorage());
 						$this->tariffRuleSetMapper->update($activeRuleSet);
 					}
 				}
 
 				$oldValues = $this->tariffRuleSetToAuditValues($ruleSet);
 				$ruleSet->setStatus(Constants::TARIFF_RULE_SET_STATUS_ACTIVE);
-				$ruleSet->setUpdatedAt(new \DateTime());
+				$ruleSet->setUpdatedAt($this->timeZoneService()->nowInStorage());
 				$this->tariffRuleSetMapper->update($ruleSet);
 				$performedBy = $this->getPerformedBy();
 				$this->auditLogMapper->logAction(
@@ -5887,7 +5898,7 @@ class AdminController extends Controller
 			}
 			$oldValues = $this->tariffRuleSetToAuditValues($ruleSet);
 			$ruleSet->setStatus(Constants::TARIFF_RULE_SET_STATUS_RETIRED);
-			$ruleSet->setUpdatedAt(new \DateTime());
+			$ruleSet->setUpdatedAt($this->timeZoneService()->nowInStorage());
 			$this->atomic(function () use ($ruleSet, $oldValues): void {
 				$this->tariffRuleSetMapper->update($ruleSet);
 				$performedBy = $this->getPerformedBy();
@@ -6162,8 +6173,8 @@ class AdminController extends Controller
 					$policy->setEffectiveFrom($asOfDate);
 					$policy->setEffectiveTo(null);
 					$policy->setCreatedBy('simulation');
-					$policy->setCreatedAt(new \DateTime());
-					$policy->setUpdatedAt(new \DateTime());
+					$policy->setCreatedAt($this->timeZoneService()->nowInStorage());
+					$policy->setUpdatedAt($this->timeZoneService()->nowInStorage());
 					$errors = $policy->validate();
 					if (!empty($errors)) {
 						$translatedErrors = [];
@@ -6532,8 +6543,8 @@ class AdminController extends Controller
 			$entity->setModuleType((string)$module['moduleType']);
 			$entity->setConfig(is_array($module['config'] ?? null) ? $module['config'] : []);
 			$entity->setSortOrder($sort++);
-			$entity->setCreatedAt(new \DateTime());
-			$entity->setUpdatedAt(new \DateTime());
+			$entity->setCreatedAt($this->timeZoneService()->nowInStorage());
+			$entity->setUpdatedAt($this->timeZoneService()->nowInStorage());
 			$this->tariffRuleModuleMapper->insert($entity);
 			$moduleSnapshot[] = [
 				'moduleType' => $entity->getModuleType(),
@@ -7159,7 +7170,7 @@ class AdminController extends Controller
 			$team->setName($name);
 			$team->setParentId($parentId);
 			$team->setSortOrder($sortOrder);
-			$team->setCreatedAt(new \DateTime());
+			$team->setCreatedAt($this->timeZoneService()->nowInStorage());
 			$inserted = $this->teamMapper->insert($team);
 			$performedBy = $this->getPerformedBy();
 			$this->auditLogMapper->logAction(

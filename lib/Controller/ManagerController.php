@@ -472,9 +472,6 @@ class ManagerController extends Controller
 			$teamUserIds = $this->getTeamMemberIds($managerId);
 
 			// Get team statistics
-			$today = new \DateTime();
-			$today->setTime(0, 0, 0);
-			
 			$teamStats = [
 				'total_members' => count($teamUserIds),
 				'active_today' => 0,
@@ -1101,7 +1098,7 @@ class ManagerController extends Controller
 			$paginatedUserIds = array_slice($teamUserIds, $offset, $limit);
 
 			$teamMembers = [];
-			$today = new \DateTime();
+			$today = $this->timeZoneService->nowInStorage();
 			$today->setTime(0, 0, 0);
 			$weekStart = clone $today;
 			$weekStart->modify('-' . (int)$today->format('w') . ' days')->setTime(0, 0, 0);
@@ -1211,7 +1208,7 @@ class ManagerController extends Controller
 			$offset = $this->normalizeOffset($offset);
 
 			if ($year === null) {
-				$year = (int)(new \DateTime())->format('Y');
+				$year = (int)$this->timeZoneService->nowInStorage()->format('Y');
 			} elseif ($year < 1970 || $year > 2100) {
 				return new JSONResponse([
 					'success' => false,
@@ -1306,7 +1303,7 @@ class ManagerController extends Controller
 						? (string)$stats['vacation_year_end_inclusive']
 						: sprintf('%04d-12-31', (int)($stats['year'] ?? $year));
 					$approvedUpcoming = 0.0;
-					$tomorrowYmd = (new \DateTime('tomorrow'))->format('Y-m-d');
+					$tomorrowYmd = $this->timeZoneService->nowInStorage()->modify('+1 day')->format('Y-m-d');
 					foreach ($upcomingVacationByUser[$userId] ?? [] as $absence) {
 						$start = $absence->getStartDate();
 						// Strictly future starts only — the batch query uses
@@ -1394,8 +1391,8 @@ class ManagerController extends Controller
 	 */
 	private function approvedUpcomingVacationByUser(array $userIds): array
 	{
-		$tomorrow = new \DateTime('tomorrow');
-		$tomorrow->setTime(0, 0, 0);
+		$tomorrow = $this->timeZoneService->nowInStorage();
+		$tomorrow->modify('+1 day')->setTime(0, 0, 0);
 		$outerBound = (clone $tomorrow)->modify('+2 years');
 		$absences = $this->absenceMapper->findByUsersAndDateRange(
 			$userIds,
@@ -2567,14 +2564,14 @@ class ManagerController extends Controller
 			$monthWindows = [];
 			$monthsCount = $months !== null ? min(24, max(0, $months)) : 0;
 			if ($monthsCount > 0) {
-				$cursor = new \DateTime('first day of this month');
-				$cursor->setTime(0, 0, 0);
+				$cursor = $this->timeZoneService->nowInStorage();
+				$cursor->modify('first day of this month')->setTime(0, 0, 0);
 				for ($i = 0; $i < $monthsCount; $i++) {
 					$monthStart = clone $cursor;
 					$monthEnd = (clone $cursor)->modify('+1 month');
 					// Current month: only count up to now (a full-month window
 					// would project future required hours into the delta).
-					$now = new \DateTime();
+					$now = $this->timeZoneService->nowInStorage();
 					if ($i === 0 && $monthEnd > $now) {
 						$monthEnd = $now;
 					}
@@ -2651,8 +2648,8 @@ class ManagerController extends Controller
 				return $accessResponse;
 			}
 
-			$start = $this->parseReportDate($start_date, new \DateTime('first day of january this year'));
-			$end = $this->parseReportDate($end_date, new \DateTime('last day of december this year'));
+			$start = $this->parseReportDate($start_date, $this->timeZoneService->nowInStorage()->modify('first day of january this year'));
+			$end = $this->parseReportDate($end_date, $this->timeZoneService->nowInStorage()->modify('last day of december this year'));
 			if ($start === null || $end === null || $start > $end) {
 				return new JSONResponse([
 					'success' => false,
@@ -3543,7 +3540,7 @@ class ManagerController extends Controller
 			}
 
 			// Determine date range (default to current month)
-			$end = $endDate ? new \DateTime($endDate) : new \DateTime();
+			$end = $endDate ? new \DateTime($endDate) : $this->timeZoneService->nowInStorage();
 			$start = $startDate ? new \DateTime($startDate) : clone $end;
 			if (!$startDate) {
 				$start->modify('first day of this month')->setTime(0, 0, 0);

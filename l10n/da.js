@@ -5974,7 +5974,15 @@
 		"Vacation balance unavailable for this employee." : "Ferietilgodehavende ikke tilgængeligt for denne medarbejder.",
 		"Overtime balance unavailable for this employee." : "Overtidssaldo ikke tilgængelig for denne medarbejder.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Ugyldigt år. Vælg et år mellem 1970 og 2100.",
-		"Some values could not be loaded. Try reloading the page." : "Nogle værdier kunne ikke indlæses. Prøv at genindlæse siden."
+		"Some values could not be loaded. Try reloading the page." : "Nogle værdier kunne ikke indlæses. Prøv at genindlæse siden.",
+		"Invalid sort." : "Invalid sort.",
+		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
+		"Most overtime" : "Most overtime",
+		"Most vacation" : "Most vacation",
+		"Name or user ID" : "Name or user ID",
+		"Needs attention" : "Needs attention",
+		"Open issues first" : "Open issues first",
+		"Sort by" : "Sort by"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

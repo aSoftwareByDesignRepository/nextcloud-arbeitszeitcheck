@@ -5974,7 +5974,15 @@
 		"Vacation balance unavailable for this employee." : "Saldo ferie non disponibile per questo dipendente.",
 		"Overtime balance unavailable for this employee." : "Saldo straordinari non disponibile per questo dipendente.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Anno non valido. Scegli un anno tra il 1970 e il 2100.",
-		"Some values could not be loaded. Try reloading the page." : "Alcuni valori non sono stati caricati. Prova a ricaricare la pagina."
+		"Some values could not be loaded. Try reloading the page." : "Alcuni valori non sono stati caricati. Prova a ricaricare la pagina.",
+		"Invalid sort." : "Invalid sort.",
+		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
+		"Most overtime" : "Most overtime",
+		"Most vacation" : "Most vacation",
+		"Name or user ID" : "Name or user ID",
+		"Needs attention" : "Needs attention",
+		"Open issues first" : "Open issues first",
+		"Sort by" : "Sort by"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

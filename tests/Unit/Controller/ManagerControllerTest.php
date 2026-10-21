@@ -2540,26 +2540,33 @@ class ManagerControllerTest extends TestCase
 	 *
 	 * @param list<string> $memberIds
 	 */
-	private function stubPeopleOverviewMembers(array $memberIds): void
-	{
+	private function stubPeopleOverviewMembers(
+		array $memberIds,
+		array $violationsSev = [],
+		array $pending = [],
+		?callable $statsFn = null,
+		?callable $snapshotFn = null,
+	): void {
 		$this->teamResolver->method('getTeamMemberIds')->willReturn($memberIds);
-		$this->complianceViolationMapper->method('countUnresolvedByUserIds')->willReturn([]);
-		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn([]);
+		$this->complianceViolationMapper->method('countUnresolvedByUserIdsPerSeverity')->willReturn($violationsSev);
+		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn($pending);
 		$this->absenceMapper->method('findByUsersAndDateRange')->willReturn([]);
-		$this->absenceService->method('getVacationStats')->willReturnCallback(static fn (string $uid, int $year): array => [
-			'year' => $year,
-			'vacation_year_label' => (string)$year,
-			'entitlement' => 30.0,
-			'carryover_days' => 0.0,
-			'total_available' => 30.0,
-			'used' => 10.0,
-			'remaining' => 20.0,
-			'vacation_unit' => Constants::VACATION_UNIT_DAYS,
-			'vacation_hours_per_day' => 8.0,
-			'vacation_year_error' => null,
-		]);
+		$this->absenceService->method('getVacationStats')->willReturnCallback(
+			$statsFn ?? static fn (string $uid, int $year): array => [
+				'year' => $year,
+				'vacation_year_label' => (string)$year,
+				'entitlement' => 30.0,
+				'carryover_days' => 0.0,
+				'total_available' => 30.0,
+				'used' => 10.0,
+				'remaining' => 20.0,
+				'vacation_unit' => Constants::VACATION_UNIT_DAYS,
+				'vacation_hours_per_day' => 8.0,
+				'vacation_year_error' => null,
+			]
+		);
 		$this->overtimeDisplayService->method('buildManagerMemberSnapshots')->willReturnCallback(
-			static fn (array $uids): array => array_fill_keys($uids, [
+			$snapshotFn ?? static fn (array $uids): array => array_fill_keys($uids, [
 				'balance' => 2.5,
 				'needs_attention' => false,
 				'traffic_light_state' => 'green',
@@ -2733,8 +2740,8 @@ class ManagerControllerTest extends TestCase
 		$this->stubPeopleOverviewMembers(['employee1']);
 
 		$this->complianceViolationMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper::class);
-		$this->complianceViolationMapper->method('countUnresolvedByUserIds')
-			->willReturn(['employee1' => 2]);
+		$this->complianceViolationMapper->method('countUnresolvedByUserIdsPerSeverity')
+			->willReturn(['employee1' => ['warning' => 2, 'error' => 1]]);
 
 		$this->absenceMapper = $this->createMock(AbsenceMapper::class);
 		$this->absenceMapper->method('countPendingApprovalByUser')->willReturn(['employee1' => 1]);
@@ -2783,7 +2790,8 @@ class ManagerControllerTest extends TestCase
 		$response = $controller->getPeopleOverview(null, 2026);
 		$row = $response->getData()['employees'][0];
 
-		$this->assertSame(2, $row['openViolations']);
+		$this->assertSame(3, $row['openViolations']);
+		$this->assertSame(1, $row['criticalViolations']);
 		$this->assertSame(1, $row['pendingAbsences']);
 	}
 
@@ -2917,5 +2925,202 @@ class ManagerControllerTest extends TestCase
 		$row = $response->getData()['employees'][0];
 
 		$this->assertSame(3.0, $row['vacation']['approvedUpcoming']);
+	}
+
+	public function testPeopleOverviewRejectsInvalidFilterAndSort(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['employee1']);
+
+		foreach (['bogus', 'NEEDS_ATTENTION ', 'all;drop'] as $i => $bad) {
+			// 'NEEDS_ATTENTION ' normalizes to a valid value — only true
+			// garbage must 400.
+			if ($bad === 'NEEDS_ATTENTION ') {
+				continue;
+			}
+			$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, $bad);
+			$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus(), "filter=$bad must be rejected");
+		}
+		foreach (['bogus', 'Violations!!'] as $bad) {
+			$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, null, $bad);
+			$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus(), "sort=$bad must be rejected");
+		}
+		// Case-insensitive + trimmed enums are accepted.
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, ' NEEDS_ATTENTION ', 'Violations');
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('needs_attention', $data['filter']);
+		$this->assertSame('violations', $data['sort']);
+	}
+
+	public function testPeopleOverviewSearchMatchesNameAndUidCaseInsensitive(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['hupr01', 'schmi02', 'hupx77']);
+		// display names are 'Name <uid>' — search 'hup' hits uids only.
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, 'HUP');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(2, $data['total']);
+		$this->assertSame(['hupr01', 'hupx77'], array_column($data['employees'], 'userId'));
+		$this->assertSame('HUP', $data['search']);
+
+		// Display-name leg is case-insensitive too: 'name' (lowercase)
+		// matches every stubbed display name 'Name <uid>'.
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, 'name');
+		$this->assertSame(3, $response->getData()['total']);
+
+		// Search can never surface out-of-scope rows.
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, 'foreign');
+		$this->assertSame(0, $response->getData()['total']);
+	}
+
+	public function testPeopleOverviewFilterPendingAbsences(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(
+			['a1', 'a2', 'a3'],
+			[],
+			['a2' => 1, 'a3' => 2]
+		);
+
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, 'pending_absences');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(2, $data['total']);
+		$this->assertSame(['a2', 'a3'], array_column($data['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewFilterNeedsAttention(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(
+			['clean', 'viol', 'ot', 'vacerr'],
+			['viol' => ['warning' => 1]],
+			[],
+			static function (string $uid, int $year): array {
+				return [
+					'year' => $year,
+					'vacation_year_label' => (string)$year,
+					'entitlement' => 30.0,
+					'total_available' => 30.0,
+					'used' => 10.0,
+					'remaining' => 20.0,
+					'vacation_unit' => Constants::VACATION_UNIT_DAYS,
+					// Only 'vacerr' carries a config error.
+					'vacation_year_error' => $uid === 'vacerr' ? 'missing_hire_date' : null,
+				];
+			},
+			static function (array $uids): array {
+				$map = [];
+				foreach ($uids as $uid) {
+					$map[$uid] = [
+						'balance' => 2.5,
+						// Only 'ot' trips the traffic light.
+						'needs_attention' => $uid === 'ot',
+						'traffic_light_state' => 'green',
+						'bank_state' => null,
+						'payout_eligible_hours' => null,
+					];
+				}
+				return $map;
+			}
+		);
+
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, 'needs_attention');
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(3, $data['total']);
+		$this->assertSame(['viol', 'ot', 'vacerr'], array_column($data['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewSortViolationsDefaultAndExplicit(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(
+			['aa', 'bb', 'cc'],
+			['cc' => ['error' => 2], 'aa' => ['info' => 1]],
+		);
+		// Names: 'Name aa' < 'Name bb' < 'Name cc'.
+
+		// Default sort = violations desc, then name asc.
+		$response = $this->controller->getPeopleOverview(null, 2026);
+		$this->assertSame(['cc', 'aa', 'bb'], array_column($response->getData()['employees'], 'userId'));
+
+		// Explicit name sort.
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, null, 'name');
+		$this->assertSame(['aa', 'bb', 'cc'], array_column($response->getData()['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewSortVacationAndOvertimeNullsLast(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(
+			['low', 'high', 'none'],
+			[],
+			[],
+			static function (string $uid, int $year): array {
+				return [
+					'year' => $year,
+					'vacation_year_label' => (string)$year,
+					'entitlement' => 30.0,
+					'total_available' => 30.0,
+					'used' => 10.0,
+					// 'none' has no remaining (unconfigured) — must sort last.
+					'remaining' => $uid === 'high' ? 25.0 : ($uid === 'low' ? 5.0 : null),
+					'vacation_unit' => Constants::VACATION_UNIT_DAYS,
+					'vacation_year_error' => null,
+				];
+			},
+			static function (array $uids): array {
+				$map = [];
+				foreach ($uids as $uid) {
+					$map[$uid] = [
+						'balance' => $uid === 'high' ? 9.0 : ($uid === 'low' ? 1.0 : null),
+						'needs_attention' => false,
+						'traffic_light_state' => 'green',
+						'bank_state' => null,
+						'payout_eligible_hours' => null,
+					];
+				}
+				return $map;
+			}
+		);
+
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, null, 'vacation');
+		$this->assertSame(['high', 'low', 'none'], array_column($response->getData()['employees'], 'userId'));
+
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, null, null, 'overtime');
+		$this->assertSame(['high', 'low', 'none'], array_column($response->getData()['employees'], 'userId'));
+	}
+
+	public function testPeopleOverviewSearchIsClampedAndTotalReflectsFilteredSet(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubPeopleOverviewMembers(['a1', 'a2']);
+
+		$long = str_repeat('x', 250) . 'a1';
+		$response = $this->controller->getPeopleOverview(null, 2026, null, null, $long);
+		$data = $response->getData();
+		// Clamped to 200 chars — the trailing 'a1' needle is cut, no match.
+		$this->assertSame(200, strlen($data['search']));
+		$this->assertSame(0, $data['total']);
 	}
 }

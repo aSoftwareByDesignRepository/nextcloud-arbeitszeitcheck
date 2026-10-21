@@ -327,6 +327,39 @@ class ComplianceViolationMapper extends QBMapper
 	}
 
 	/**
+	 * Per-user unresolved-violation counts broken down by severity — one
+	 * grouped query, same scope as {@see countUnresolvedByUserIds()}. The
+	 * people overview needs the critical (error-severity) count alongside
+	 * the total for its severity-colored badge.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, array<string, int>> userId => severity => count
+	 *         (users without unresolved violations are absent from the map)
+	 */
+	public function countUnresolvedByUserIdsPerSeverity(array $userIds): array
+	{
+		if (empty($userIds)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id', 'severity', $qb->createFunction('COUNT(*) AS cnt'))
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->eq('resolved', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+			->groupBy('user_id')
+			->addGroupBy('severity');
+
+		$counts = [];
+		$result = $qb->executeQuery();
+		while ($row = $result->fetch()) {
+			$counts[(string)$row['user_id']][(string)$row['severity']] = (int)$row['cnt'];
+		}
+		$result->closeCursor();
+		return $counts;
+	}
+
+	/**
 	 * @param list<string> $userIds
 	 */
 	private function buildUserIdsDateRangeQuery(

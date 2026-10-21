@@ -1197,6 +1197,9 @@ class ManagerController extends Controller
 		?int $year = null,
 		?int $limit = Constants::DEFAULT_LIST_LIMIT,
 		?int $offset = 0,
+		?string $search = null,
+		?string $filter = null,
+		?string $sort = null,
 	): JSONResponse {
 		try {
 			$actorUserId = $this->getUserId();
@@ -1216,6 +1219,25 @@ class ManagerController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			$search = $search !== null ? trim($search) : '';
+			if (mb_strlen($search) > 200) {
+				$search = mb_substr($search, 0, 200);
+			}
+			$filter = $filter !== null ? strtolower(trim($filter)) : 'all';
+			if (!in_array($filter, ['all', 'needs_attention', 'pending_absences'], true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid filter.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$sort = $sort !== null ? strtolower(trim($sort)) : 'violations';
+			if (!in_array($sort, ['violations', 'name', 'vacation', 'overtime'], true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Invalid sort.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
 			// Only live accounts carry balances; stale/deleted member rows are excluded.
 			$scopeUserIds = $this->oversightScope()->managedEnabledUserIds($actorUserId);
 
@@ -1231,22 +1253,31 @@ class ManagerController extends Controller
 				$scopeUserIds = [$employeeId];
 			}
 
-			// Display order: display name (falling back to uid), deterministic.
-			usort($scopeUserIds, function (string $a, string $b) {
-				return strcasecmp($this->getDisplayName($a), $this->getDisplayName($b)) ?: strcmp($a, $b);
-			});
+			// Display names once — reused by substring search, sort and rows.
+			$displayNames = [];
+			foreach ($scopeUserIds as $uid) {
+				$displayNames[$uid] = $this->getDisplayName($uid);
+			}
 
-			$total = count($scopeUserIds);
-			$pageUserIds = array_slice($scopeUserIds, $offset, $limit);
+			// Case-insensitive substring match on display name OR uid — never
+			// widens the resolved scope (post-scope filtering, no oracle).
+			if ($search !== '') {
+				$scopeUserIds = array_values(array_filter(
+					$scopeUserIds,
+					static function (string $uid) use ($search, $displayNames): bool {
+						return mb_stripos($displayNames[$uid] ?? '', $search) !== false
+							|| mb_stripos($uid, $search) !== false;
+					}
+				));
+			}
 
-			// Batched per-user aggregates — no N+1 counting inside the loop.
-			$unresolvedByUser = [];
+			// Scope-wide batched aggregates — one grouped query each, so
+			// filter and sort never introduce N+1 counting.
+			$unresolvedSevByUser = [];
 			$pendingByUser = [];
-			$upcomingVacationByUser = [];
-			$overtimeSnapshots = [];
-			if ($pageUserIds !== []) {
+			if ($scopeUserIds !== []) {
 				try {
-					$unresolvedByUser = $this->complianceViolationMapper()->countUnresolvedByUserIds($pageUserIds);
+					$unresolvedSevByUser = $this->complianceViolationMapper()->countUnresolvedByUserIdsPerSeverity($scopeUserIds);
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->warning(
 						'getPeopleOverview: unresolved violation counts failed: ' . $e->getMessage(),
@@ -1256,13 +1287,135 @@ class ManagerController extends Controller
 				try {
 					// pending + substitute_pending — same "awaiting any approval"
 					// definition the team overview row count uses.
-					$pendingByUser = $this->absenceMapper->countPendingApprovalByUser($pageUserIds);
+					$pendingByUser = $this->absenceMapper->countPendingApprovalByUser($scopeUserIds);
 				} catch (\Throwable $e) {
 					\OCP\Log\logger('arbeitszeitcheck')->warning(
 						'getPeopleOverview: pending absence counts failed: ' . $e->getMessage(),
 						['exception' => $e]
 					);
 				}
+			}
+			$openByUser = [];
+			$criticalByUser = [];
+			foreach ($unresolvedSevByUser as $uid => $sevMap) {
+				$openByUser[$uid] = array_sum($sevMap);
+				$criticalByUser[$uid] = (int)($sevMap[\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_ERROR] ?? 0);
+			}
+
+			// Per-user stat cache — vacation stats have no batch API, so the
+			// default path computes them lazily for the rendered page only.
+			// The needs_attention filter and the vacation/overtime sorts are
+			// defined over the whole scope; computing them there is bounded
+			// by the (door-filtered, enabled) scope size.
+			$statCache = [];
+			$overtimeSnapshots = [];
+			$needsFullScopeStats = $filter === 'needs_attention'
+				|| $sort === 'vacation'
+				|| $sort === 'overtime';
+			if ($needsFullScopeStats && $scopeUserIds !== []) {
+				try {
+					$overtimeSnapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($scopeUserIds);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'getPeopleOverview: overtime snapshot batch failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+			}
+			$ensureStats = function (string $uid) use (&$statCache, &$overtimeSnapshots, $year): array {
+				if (!isset($statCache[$uid])) {
+					$entry = ['stats' => null, 'snapshot' => null, 'errors' => 0];
+					try {
+						$entry['stats'] = $this->absenceService->getVacationStats($uid, $year);
+					} catch (\Throwable $e) {
+						$entry['errors']++;
+						\OCP\Log\logger('arbeitszeitcheck')->warning(
+							'getPeopleOverview: vacation stats failed for one employee: ' . $e->getMessage(),
+							['exception' => $e]
+						);
+					}
+					if (array_key_exists($uid, $overtimeSnapshots)) {
+						$entry['snapshot'] = $overtimeSnapshots[$uid];
+					} else {
+						try {
+							$entry['snapshot'] = $this->overtimeDisplayService->buildManagerMemberSnapshot($uid);
+						} catch (\Throwable $e) {
+							$entry['errors']++;
+							\OCP\Log\logger('arbeitszeitcheck')->warning(
+								'getPeopleOverview: overtime snapshot failed for one employee: ' . $e->getMessage(),
+								['exception' => $e]
+							);
+						}
+					}
+					$statCache[$uid] = $entry;
+				}
+				return $statCache[$uid];
+			};
+
+			if ($filter === 'pending_absences') {
+				$scopeUserIds = array_values(array_filter(
+					$scopeUserIds,
+					static fn (string $uid): bool => (int)($pendingByUser[$uid] ?? 0) > 0
+				));
+			} elseif ($filter === 'needs_attention') {
+				$scopeUserIds = array_values(array_filter(
+					$scopeUserIds,
+					static function (string $uid) use ($openByUser, $ensureStats): bool {
+						if ((int)($openByUser[$uid] ?? 0) > 0) {
+							return true;
+						}
+						$entry = $ensureStats($uid);
+						return (bool)($entry['snapshot']['needs_attention'] ?? false)
+							|| ($entry['stats'] !== null && ($entry['stats']['vacation_year_error'] ?? null) !== null);
+					}
+				));
+			}
+
+			$nameCmp = static function (string $a, string $b) use ($displayNames): int {
+				return strcasecmp($displayNames[$a] ?? $a, $displayNames[$b] ?? $b) ?: strcmp($a, $b);
+			};
+			if ($sort === 'violations') {
+				// HR triage order: most open violations first, then name.
+				usort($scopeUserIds, static function (string $a, string $b) use ($openByUser, $nameCmp): int {
+					return ((int)($openByUser[$b] ?? 0) <=> (int)($openByUser[$a] ?? 0)) ?: $nameCmp($a, $b);
+				});
+			} elseif ($sort === 'name') {
+				usort($scopeUserIds, $nameCmp);
+			} elseif ($sort === 'vacation' || $sort === 'overtime') {
+				$metric = static function (string $uid) use ($sort, $ensureStats): ?float {
+					$entry = $ensureStats($uid);
+					if ($sort === 'vacation') {
+						$v = $entry['stats']['remaining'] ?? null;
+					} else {
+						$v = $entry['snapshot']['balance'] ?? null;
+					}
+					return $v === null ? null : (float)$v;
+				};
+				// Highest value first ("most vacation/overtime" for HR triage);
+				// unavailable values sink to the end deterministically.
+				usort($scopeUserIds, static function (string $a, string $b) use ($metric, $nameCmp): int {
+					$ma = $metric($a);
+					$mb = $metric($b);
+					if ($ma === null && $mb === null) {
+						return $nameCmp($a, $b);
+					}
+					if ($ma === null) {
+						return 1;
+					}
+					if ($mb === null) {
+						return -1;
+					}
+					return ($mb <=> $ma) ?: $nameCmp($a, $b);
+				});
+			}
+
+			$total = count($scopeUserIds);
+			$pageUserIds = array_slice($scopeUserIds, $offset, $limit);
+
+			// Page-scoped batches — upcoming vacation and (for the light
+			// path) overtime snapshots are only needed for rendered rows.
+			$upcomingVacationByUser = [];
+			if ($pageUserIds !== []) {
 				try {
 					$upcomingVacationByUser = $this->approvedUpcomingVacationByUser($pageUserIds);
 				} catch (\Throwable $e) {
@@ -1271,32 +1424,37 @@ class ManagerController extends Controller
 						['exception' => $e]
 					);
 				}
-				try {
-					$overtimeSnapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($pageUserIds);
-				} catch (\Throwable $e) {
-					// Batch failed — per-user fallback below preserves partial results.
-					$overtimeSnapshots = [];
-					\OCP\Log\logger('arbeitszeitcheck')->warning(
-						'getPeopleOverview: overtime snapshot batch failed: ' . $e->getMessage(),
-						['exception' => $e]
-					);
+				if (!$needsFullScopeStats) {
+					try {
+						$overtimeSnapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($pageUserIds);
+					} catch (\Throwable $e) {
+						// Batch failed — per-user fallback below preserves partial results.
+						$overtimeSnapshots = [];
+						\OCP\Log\logger('arbeitszeitcheck')->warning(
+							'getPeopleOverview: overtime snapshot batch failed: ' . $e->getMessage(),
+							['exception' => $e]
+						);
+					}
 				}
 			}
 
 			$employees = [];
 			$partialErrors = 0;
 			foreach ($pageUserIds as $userId) {
+				$entry = $ensureStats($userId);
+				$partialErrors += $entry['errors'];
 				$row = [
 					'userId' => $userId,
-					'displayName' => $this->getDisplayName($userId),
+					'displayName' => $displayNames[$userId] ?? $this->getDisplayName($userId),
 					'vacation' => null,
 					'overtime' => null,
-					'openViolations' => (int)($unresolvedByUser[$userId] ?? 0),
+					'openViolations' => (int)($openByUser[$userId] ?? 0),
+					'criticalViolations' => (int)($criticalByUser[$userId] ?? 0),
 					'pendingAbsences' => (int)($pendingByUser[$userId] ?? 0),
 				];
 
-				try {
-					$stats = $this->absenceService->getVacationStats($userId, $year);
+				$stats = $entry['stats'];
+				if ($stats !== null) {
 					// Bound the upcoming-vacation sum to this user's displayed
 					// balance window (anniversary mode has per-user windows).
 					$yearEndInclusive = !empty($stats['vacation_year_end_inclusive'])
@@ -1326,17 +1484,10 @@ class ManagerController extends Controller
 						'hoursPerDay' => $stats['vacation_hours_per_day'] ?? null,
 						'error' => $stats['vacation_year_error'] ?? null,
 					];
-				} catch (\Throwable $e) {
-					$partialErrors++;
-					\OCP\Log\logger('arbeitszeitcheck')->warning(
-						'getPeopleOverview: vacation stats failed for one employee: ' . $e->getMessage(),
-						['exception' => $e]
-					);
 				}
 
-				try {
-					$snapshot = $overtimeSnapshots[$userId]
-						?? $this->overtimeDisplayService->buildManagerMemberSnapshot($userId);
+				$snapshot = $entry['snapshot'];
+				if ($snapshot !== null) {
 					$row['overtime'] = [
 						'balance' => $snapshot['balance'] ?? null,
 						'needsAttention' => (bool)($snapshot['needs_attention'] ?? false),
@@ -1344,12 +1495,6 @@ class ManagerController extends Controller
 						'bankState' => $snapshot['bank_state'] ?? null,
 						'payoutEligibleHours' => $snapshot['payout_eligible_hours'] ?? null,
 					];
-				} catch (\Throwable $e) {
-					$partialErrors++;
-					\OCP\Log\logger('arbeitszeitcheck')->warning(
-						'getPeopleOverview: overtime snapshot failed for one employee: ' . $e->getMessage(),
-						['exception' => $e]
-					);
 				}
 
 				$employees[] = $row;
@@ -1363,6 +1508,9 @@ class ManagerController extends Controller
 				'total' => $total,
 				'limit' => $limit,
 				'offset' => $offset,
+				'search' => $search,
+				'filter' => $filter,
+				'sort' => $sort,
 				'partialErrors' => $partialErrors,
 			]);
 		} catch (\Throwable $e) {

@@ -130,10 +130,43 @@ class ComplianceViolationMapperIntegrationTest extends TestCase
 		$this->assertArrayNotHasKey('__nobody__', $counts);
 	}
 
+	public function testCountUnresolvedByUserIdsPerSeverityGroupsPerUserAndSeverity(): void
+	{
+		$this->mapper->createViolation(
+			self::TEST_USER, 'test_break_missing', 'u1 warn',
+			new \DateTime('2026-10-05'), null,
+			\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_WARNING
+		);
+		$this->mapper->createViolation(
+			self::TEST_USER, 'test_break_missing', 'u1 err',
+			new \DateTime('2026-10-06'), null,
+			\OCA\ArbeitszeitCheck\Db\ComplianceViolation::SEVERITY_ERROR
+		);
+		$resolved = $this->mapper->createViolation(
+			self::TEST_USER_B, 'test_break_missing', 'u2 resolved',
+			new \DateTime('2026-10-05')
+		);
+		$resolved->setResolved(true);
+		$resolved->setResolvedAt(new \DateTime());
+		$this->mapper->update($resolved);
+
+		$counts = $this->mapper->countUnresolvedByUserIdsPerSeverity(
+			[self::TEST_USER, self::TEST_USER_B, '__nobody__']
+		);
+
+		$this->assertSame(1, $counts[self::TEST_USER]['warning'] ?? null);
+		$this->assertSame(1, $counts[self::TEST_USER]['error'] ?? null);
+		$this->assertSame(2, array_sum($counts[self::TEST_USER]));
+		$this->assertArrayNotHasKey(self::TEST_USER_B, $counts);
+		$this->assertArrayNotHasKey('__nobody__', $counts);
+		$this->assertSame([], $this->mapper->countUnresolvedByUserIdsPerSeverity([]));
+	}
+
 	public function testFindByUserIdsAndDateRangeEmptySetReturnsNothing(): void
 	{
 		$this->assertSame([], $this->mapper->findByUserIdsAndDateRange([]));
 		$this->assertSame(0, $this->mapper->countByUserIdsAndDateRange([]));
 		$this->assertSame([], $this->mapper->countUnresolvedByUserIds([]));
+		$this->assertSame([], $this->mapper->countUnresolvedByUserIdsPerSeverity([]));
 	}
 }

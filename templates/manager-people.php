@@ -35,6 +35,20 @@ $currentYear = (int)(new \DateTime())->format('Y');
 				<p id="manager-people-count" class="azc-badge azc-badge--neutral" role="status" aria-live="polite"></p>
 			</header>
 			<div class="azc-card__body">
+				<div class="manager-people-quick-filters" id="manager-people-quick-filters" role="group" aria-labelledby="manager-people-quick-filters-label">
+					<p class="manager-people-quick-filters__label" id="manager-people-quick-filters-label"><?php p($l->t('Show')); ?></p>
+					<div class="manager-people-quick-filters__bar" role="radiogroup" aria-labelledby="manager-people-quick-filters-label">
+						<button type="button" class="manager-people-pill" data-value="all" aria-pressed="true">
+							<?php p($l->t('Everyone')); ?>
+						</button>
+						<button type="button" class="manager-people-pill" data-value="needs_attention" aria-pressed="false" tabindex="-1">
+							<?php p($l->t('Needs attention')); ?>
+						</button>
+						<button type="button" class="manager-people-pill" data-value="pending_absences" aria-pressed="false" tabindex="-1">
+							<?php p($l->t('Pending requests')); ?>
+						</button>
+					</div>
+				</div>
 				<div class="manager-scope-page__toolbar" role="search" aria-label="<?php p($l->t('Filter people overview')); ?>">
 					<form
 						id="manager-people-filter-form"
@@ -43,6 +57,22 @@ $currentYear = (int)(new \DateTime())->format('Y');
 						aria-describedby="manager-people-filter-error"
 					>
 						<div class="manager-scope-filter" role="group" aria-label="<?php p($l->t('Filter options')); ?>">
+							<div class="azc-filter-field azc-filter-field--search">
+								<label for="manager-people-search" class="azc-filter-field__label"><?php p($l->t('Search')); ?></label>
+								<div class="azc-filter-field__control">
+									<input
+										id="manager-people-search"
+										name="search"
+										type="search"
+										class="form-input"
+										maxlength="200"
+										autocomplete="off"
+										placeholder="<?php p($l->t('Name or user ID')); ?>"
+									/>
+								</div>
+								<p class="form-help"><?php p($l->t('Matches everyone whose name contains the text.')); ?></p>
+							</div>
+
 							<div class="azc-filter-field azc-filter-field--employee">
 								<label for="manager-people-employee-filter-search" class="azc-filter-field__label"><?php p($l->t('Employee')); ?></label>
 								<div class="azc-filter-field__control">
@@ -74,6 +104,18 @@ $currentYear = (int)(new \DateTime())->format('Y');
 									/>
 								</div>
 								<p class="form-help"><?php p($l->t('The year the balances are calculated for.')); ?></p>
+							</div>
+
+							<div class="azc-filter-field azc-filter-field--sort">
+								<label for="manager-people-sort" class="azc-filter-field__label"><?php p($l->t('Sort by')); ?></label>
+								<div class="azc-filter-field__control">
+									<select id="manager-people-sort" name="sort" class="form-select">
+										<option value="violations" selected><?php p($l->t('Open issues first')); ?></option>
+										<option value="name"><?php p($l->t('Name')); ?></option>
+										<option value="vacation"><?php p($l->t('Most vacation')); ?></option>
+										<option value="overtime"><?php p($l->t('Most overtime')); ?></option>
+									</select>
+								</div>
 							</div>
 
 							<div class="azc-filter-field azc-filter-field--actions">

@@ -5974,7 +5974,15 @@
 		"Vacation balance unavailable for this employee." : "Vakantiesaldo niet beschikbaar voor deze medewerker.",
 		"Overtime balance unavailable for this employee." : "Overwerksaldo niet beschikbaar voor deze medewerker.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Ongeldig jaar. Kies een jaar tussen 1970 en 2100.",
-		"Some values could not be loaded. Try reloading the page." : "Sommige waarden konden niet worden geladen. Probeer de pagina te herladen."
+		"Some values could not be loaded. Try reloading the page." : "Sommige waarden konden niet worden geladen. Probeer de pagina te herladen.",
+		"Invalid sort." : "Invalid sort.",
+		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
+		"Most overtime" : "Most overtime",
+		"Most vacation" : "Most vacation",
+		"Name or user ID" : "Name or user ID",
+		"Needs attention" : "Needs attention",
+		"Open issues first" : "Open issues first",
+		"Sort by" : "Sort by"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

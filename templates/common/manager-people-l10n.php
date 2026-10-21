@@ -33,6 +33,8 @@ $messageIds = [
 	'Pending requests',
 	'Details',
 	'Not available',
+	'Not configured',
+	'critical',
 	'needs attention',
 	'days',
 	'hours',

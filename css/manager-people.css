@@ -54,6 +54,57 @@
 	min-height: 36px;
 }
 
+/* Quick-filter pills — design-system recipe B (labeled, mutual-exclusive,
+ * roving tabindex). Pill chrome matches the family view-components pack. */
+#app-content.azc-app--manager-people .manager-people-quick-filters {
+	display: flex;
+	align-items: center;
+	gap: var(--azc-space-3, 12px);
+	flex-wrap: wrap;
+	margin: 0;
+}
+
+#app-content.azc-app--manager-people .manager-people-quick-filters__label {
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 600;
+	color: var(--azc-muted, var(--color-text-maxcontrast, #767676));
+	margin: 0;
+}
+
+#app-content.azc-app--manager-people .manager-people-quick-filters__bar {
+	display: flex;
+	gap: var(--azc-space-1, 4px);
+	flex-wrap: wrap;
+}
+
+#app-content.azc-app--manager-people .manager-people-pill {
+	min-height: var(--azc-touch, 44px);
+	padding: var(--azc-space-1, 4px) var(--azc-space-3, 12px);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast, #767676));
+	border-radius: var(--azc-radius-pill, 999px);
+	background: var(--azc-bg-card, var(--color-main-background));
+	color: var(--azc-text, var(--color-main-text));
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 500;
+	cursor: pointer;
+}
+
+#app-content.azc-app--manager-people .manager-people-pill:hover {
+	background: var(--color-background-hover);
+}
+
+#app-content.azc-app--manager-people .manager-people-pill:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+#app-content.azc-app--manager-people .manager-people-pill[aria-pressed='true'] {
+	background: var(--azc-tint-info, var(--color-primary-element-light));
+	border-color: var(--color-primary-element);
+	color: var(--azc-text, var(--color-main-text));
+	font-weight: 600;
+}
+
 /* Responsive results table: card layout with labeled cells */
 @media (max-width: 767.98px) {
 	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive thead {

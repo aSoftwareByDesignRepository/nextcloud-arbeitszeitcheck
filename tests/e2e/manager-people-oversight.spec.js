@@ -121,6 +121,91 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		expect(org.status).toBe(403)
 	})
 
+	test('people overview API honors search, filter and sort params', async ({ page }) => {
+		await login(page, credsFromEnv('MANAGER'))
+		await page.goto('/apps/arbeitszeitcheck/manager/people')
+		await assertArbeitszeitcheckLoaded(page)
+
+		// search narrows by name/uid substring inside scope.
+		const searched = await api(page, 'GET', `${PEOPLE_API}?search=e2e_empl`)
+		expect(searched.success).toBe(true)
+		for (const e of searched.employees) {
+			expect(e.userId).toContain('e2e_empl')
+		}
+		expect(searched.total).toBeGreaterThanOrEqual(1)
+
+		// sort=name orders display names ascending.
+		const byName = await api(page, 'GET', `${PEOPLE_API}?sort=name`)
+		expect(byName.success).toBe(true)
+		const names = byName.employees.map((e) => String(e.displayName || e.userId).toLowerCase())
+		const sorted = [...names].sort((a, b) => a.localeCompare(b))
+		expect(names).toEqual(sorted)
+
+		// default sort = open violations desc (triage order).
+		const triage = await api(page, 'GET', PEOPLE_API)
+		const counts = triage.employees.map((e) => Number(e.openViolations) || 0)
+		for (let i = 1; i < counts.length; i++) {
+			expect(counts[i - 1]).toBeGreaterThanOrEqual(counts[i])
+		}
+
+		// rows expose the critical-violation count for the severity badge.
+		for (const e of triage.employees) {
+			expect(e).toHaveProperty('criticalViolations')
+			expect(Number(e.criticalViolations)).toBeLessThanOrEqual(Number(e.openViolations))
+		}
+
+		// invalid enums fail closed with 400, not a silent default.
+		const badFilter = await apiAllowFailure(page, 'GET', `${PEOPLE_API}?filter=bogus`)
+		expect(badFilter.status).toBe(400)
+		const badSort = await apiAllowFailure(page, 'GET', `${PEOPLE_API}?sort=bogus`)
+		expect(badSort.status).toBe(400)
+
+		// filter pills values are accepted; pending_absences only returns
+		// rows with pending counts.
+		const pending = await api(page, 'GET', `${PEOPLE_API}?filter=pending_absences`)
+		expect(pending.success).toBe(true)
+		for (const e of pending.employees) {
+			expect(Number(e.pendingAbsences)).toBeGreaterThan(0)
+		}
+		const attention = await api(page, 'GET', `${PEOPLE_API}?filter=needs_attention`)
+		expect(attention.success).toBe(true)
+	})
+
+	test('people page wires quick-filter pills, search and sort controls', async ({ page }) => {
+		await login(page, credsFromEnv('MANAGER'))
+		await page.goto('/apps/arbeitszeitcheck/manager/people')
+		await assertArbeitszeitcheckLoaded(page)
+		await expect(page.locator('#manager-people-table-wrap')).not.toHaveClass(/visually-hidden/, { timeout: 30000 })
+
+		// Recipe-B pill bar: labeled radiogroup with aria-pressed state.
+		const pills = page.locator('#manager-people-quick-filters .manager-people-pill')
+		await expect(pills).toHaveCount(3)
+		await expect(pills.nth(0)).toHaveAttribute('aria-pressed', 'true')
+
+		// Clicking "Pending requests" switches aria-pressed and reloads.
+		await pills.nth(2).click()
+		await expect(pills.nth(2)).toHaveAttribute('aria-pressed', 'true')
+		await expect(pills.nth(0)).toHaveAttribute('aria-pressed', 'false')
+		// Roving tabindex: only the active pill is in the tab order.
+		await expect(pills.nth(2)).toHaveAttribute('tabindex', '0')
+		await expect(pills.nth(0)).toHaveAttribute('tabindex', '-1')
+
+		// Search + sort controls exist and are labeled.
+		await expect(page.locator('#manager-people-search')).toBeVisible()
+		await expect(page.locator('#manager-people-sort')).toBeVisible()
+
+		// Search applies on submit.
+		await page.locator('#manager-people-search').fill('e2e_employee')
+		await page.locator('#manager-people-submit').click()
+		await page.waitForLoadState('networkidle')
+		const rows = page.locator('#manager-people-body tr')
+		const count = await rows.count()
+		expect(count).toBeGreaterThanOrEqual(1)
+		for (let i = 0; i < count; i++) {
+			await expect(rows.nth(i)).toContainText('e2e_employee')
+		}
+	})
+
 	test('people page is axe-clean (WCAG 2.1 A/AA)', async ({ page }) => {
 		await login(page, credsFromEnv('MANAGER'))
 		await page.goto('/apps/arbeitszeitcheck/manager/people')

@@ -5974,7 +5974,15 @@
 		"Vacation balance unavailable for this employee." : "Semestersaldo inte tillgängligt för denna medarbetare.",
 		"Overtime balance unavailable for this employee." : "Övertidssaldo inte tillgängligt för denna medarbetare.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Ogiltigt år. Välj ett år mellan 1970 och 2100.",
-		"Some values could not be loaded. Try reloading the page." : "Vissa värden kunde inte laddas. Försök ladda om sidan."
+		"Some values could not be loaded. Try reloading the page." : "Vissa värden kunde inte laddas. Försök ladda om sidan.",
+		"Invalid sort." : "Invalid sort.",
+		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
+		"Most overtime" : "Most overtime",
+		"Most vacation" : "Most vacation",
+		"Name or user ID" : "Name or user ID",
+		"Needs attention" : "Needs attention",
+		"Open issues first" : "Open issues first",
+		"Sort by" : "Sort by"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

@@ -1138,12 +1138,6 @@
 						let html = `<p class="report-success">${esc(
 							(A.l10n && A.l10n.reportReady) || 'Report generated successfully.',
 						)}</p>`;
-						if (isTeamScope && (reportType === 'absence' || reportType === 'compliance')) {
-							html += `<p class="report-info" role="status">${esc(
-								(A.l10n && A.l10n.teamPreviewWorkingTimeOnly) ||
-								'With team scope, this preview shows the team working time summary, not absence or compliance.',
-							)}</p>`;
-						}
 						if (isTeamScope) {
 							if (reportType === 'monthly') {
 								const teamVar = teamVariantSelect ? teamVariantSelect.value : 'summary';

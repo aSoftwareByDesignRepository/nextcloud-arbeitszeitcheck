@@ -1518,6 +1518,7 @@
 		"Export for organization scope is not yet available. Use Preview to view the report." : "For organization scope, download is available for working time export after preview.",
 		"Export for team or organization scope is not yet available. Use Preview to view the report." : "The download will contain one row per team member matching this preview.",
 		"Export labor law compliance violations and severity details." : "Export labor law compliance violations and severity details.",
+		"Export of night-shift entries that cross midnight" : "Export of night-shift entries that cross midnight",
 		"Export or permanently delete your personal ArbeitszeitCheck data in accordance with GDPR." : "Export or permanently delete your personal ArbeitszeitCheck data in accordance with GDPR.",
 		"Export or permanently delete your personal ArbeitszeitCheck data." : "Export or permanently delete your personal ArbeitszeitCheck data.",
 		"Export started" : "Export started",

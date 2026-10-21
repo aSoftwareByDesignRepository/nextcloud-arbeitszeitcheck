@@ -955,7 +955,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <th scope="col"><?php p($l->t('Duration')); ?></th>
                             <th scope="col"><?php p($l->t('Break')); ?></th>
                             <th scope="col"><?php p($l->t('Status')); ?></th>
-                            <th scope="col"><?php p($l->t('Actions')); ?></th>
+                            <th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1104,7 +1104,8 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                             ?>
                                         </span>
                                     </td>
-                                    <td data-label="<?php p($l->t('Actions')); ?>">
+                                    <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
+                                        <div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
                                         <?php
                                         $canEdit = $entry->canEdit(\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS);
                                         if ($canEdit):
@@ -1117,6 +1118,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                                 <?php p($l->t('Edit')); ?>
                                             </button>
                                         <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

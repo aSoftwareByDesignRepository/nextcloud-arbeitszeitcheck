@@ -2217,10 +2217,6 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   .substitution-request-card { transition: none; }
 }
 
-.substitution-request-card:focus-within {
-  box-shadow: 0 0 0 2px var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
-}
-
 .substitution-request-card__body {
   display: flex;
   flex-direction: column;

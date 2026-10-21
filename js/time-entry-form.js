@@ -11,7 +11,8 @@
 	const Utils = window.ArbeitszeitCheckUtils || {};
 
 	function t(key, fallback) {
-		const bundle = cfg.l10n || {};
+		const live = window.ArbeitszeitCheck && window.ArbeitszeitCheck.l10n;
+		const bundle = live || cfg.l10n || {};
 		const value = bundle[key];
 		return value !== undefined && value !== '' ? value : (fallback || key);
 	}
@@ -51,11 +52,7 @@ class TimeEntryFormManager {
 		const stepRaw = parseInt(this.formConfig.minuteStep, 10);
 		this.minuteStep = (!isNaN(stepRaw) && stepRaw >= 1 && stepRaw <= 30) ? stepRaw : 5;
 		this.form = document.getElementById('time-entry-form');
-		this.startTimeHour = document.getElementById('entry-start-time-hour');
-		this.startTimeMinute = document.getElementById('entry-start-time-minute');
 		this.startTimeHidden = document.getElementById('entry-start-time');
-		this.endTimeHour = document.getElementById('entry-end-time-hour');
-		this.endTimeMinute = document.getElementById('entry-end-time-minute');
 		this.endTimeHidden = document.getElementById('entry-end-time');
 		this.breaksContainer = document.getElementById('breaks-container');
 		this.btnAddBreak = document.getElementById('btn-add-break');
@@ -68,8 +65,6 @@ class TimeEntryFormManager {
 		this.justificationTextarea = document.getElementById('entry-justification');
 		this.justificationCount = document.getElementById('entry-justification-count');
 		this.justificationError = document.getElementById('entry-justification-error');
-		this.breakRequirementIndicator = document.getElementById('break-requirement-indicator');
-		this.breakRequirementText = document.getElementById('break-requirement-text');
 		this.autoBreakToggle = document.getElementById('auto-break-enabled');
 		this.autoBreakToggleState = document.getElementById('auto-break-toggle-state');
 		this.autoBreakPanel = document.querySelector('.auto-break-panel');
@@ -356,173 +351,73 @@ class TimeEntryFormManager {
 	}
 
 	setupTimeInputs() {
-		// Main time inputs with auto-break calculation
-		if (this.startTimeHour && this.startTimeMinute && this.startTimeHidden) {
-			this.bindTimeInputs(this.startTimeHour, this.startTimeMinute, this.startTimeHidden, true);
-			this.bindFreeTypeInput(
-				document.getElementById('entry-start-time-type'),
-				this.startTimeHour,
-				this.startTimeMinute,
-				this.startTimeHidden,
-				true
-			);
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && typeof TP.initInRoot === 'function' && this.form) {
+			TP.initInRoot(this.form);
 		}
-		if (this.endTimeHour && this.endTimeMinute && this.endTimeHidden) {
-			this.bindTimeInputs(this.endTimeHour, this.endTimeMinute, this.endTimeHidden, true);
-			this.bindFreeTypeInput(
-				document.getElementById('entry-end-time-type'),
-				this.endTimeHour,
-				this.endTimeMinute,
-				this.endTimeHidden,
-				true
-			);
-		}
+		this.bindHiddenTime(this.startTimeHidden, true);
+		this.bindHiddenTime(this.endTimeHidden, true);
 	}
 
-	ensureMinuteOption(minuteSelect, minutePadded) {
-		if (!minuteSelect || minutePadded === '' || minutePadded === '--') {
+	bindHiddenTime(hiddenInput, enableAutoBreak) {
+		if (!hiddenInput || hiddenInput.getAttribute('data-bound') === '1') {
 			return;
 		}
-		const exists = Array.from(minuteSelect.options).some((o) => o.value === minutePadded);
-		if (!exists) {
-			const opt = document.createElement('option');
-			opt.value = minutePadded;
-			opt.textContent = minutePadded;
-			minuteSelect.appendChild(opt);
-			const values = Array.from(minuteSelect.options)
-				.filter((o) => o.value !== '')
-				.map((o) => o.value)
-				.sort();
-			const keepEmpty = minuteSelect.querySelector('option[value=""]');
-			minuteSelect.innerHTML = '';
-			if (keepEmpty) {
-				minuteSelect.appendChild(keepEmpty);
-			}
-			values.forEach((v) => {
-				const o = document.createElement('option');
-				o.value = v;
-				o.textContent = v;
-				minuteSelect.appendChild(o);
-			});
-		}
-	}
-
-	bindFreeTypeInput(typeInput, hourSelect, minuteSelect, hiddenInput, enableAutoBreak = false) {
-		if (!typeInput || !hourSelect || !minuteSelect || !hiddenInput) {
-			return;
-		}
-		if (typeInput.hasAttribute('data-bound')) {
-			return;
-		}
-		typeInput.setAttribute('data-bound', 'true');
-
-		const syncFromSelects = () => {
-			const hour = hourSelect.value;
-			const minute = minuteSelect.value;
-			if (!hour || hour === '--' || !minute || minute === '--') {
-				return;
-			}
-			typeInput.value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-		};
-
-		const applyTyped = () => {
-			const raw = String(typeInput.value || '').trim().replace('.', ':');
-			const match = raw.match(/^(\d{1,2}):(\d{1,2})$/);
-			if (!match) {
-				if (raw !== '') {
-					typeInput.setAttribute('aria-invalid', 'true');
-				}
-				return;
-			}
-			const hourNum = parseInt(match[1], 10);
-			const minuteNum = parseInt(match[2], 10);
-			if (isNaN(hourNum) || hourNum < 0 || hourNum > 23 || isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
-				typeInput.setAttribute('aria-invalid', 'true');
-				return;
-			}
-			typeInput.setAttribute('aria-invalid', 'false');
-			const hour = String(hourNum).padStart(2, '0');
-			const minute = String(minuteNum).padStart(2, '0');
-			hourSelect.value = hour;
-			this.ensureMinuteOption(minuteSelect, minute);
-			minuteSelect.value = minute;
-			hiddenInput.value = `${hour}:${minute}`;
-			typeInput.value = `${hour}:${minute}`;
-			hourSelect.dispatchEvent(new Event('change', { bubbles: true }));
-			if (enableAutoBreak) {
-				this.handleAutoBreakCalculation({ notify: false });
-			}
-			this.updateTimeSummary();
-		};
-
-		hourSelect.addEventListener('change', syncFromSelects);
-		minuteSelect.addEventListener('change', syncFromSelects);
-		typeInput.addEventListener('change', applyTyped);
-		typeInput.addEventListener('blur', applyTyped);
-		// Apply as soon as a complete HH:MM is present (Playwright fill / paste / IME
-		// often never synthesise a reliable change+blur pair on Chromium).
-		typeInput.addEventListener('input', () => {
-			const raw = String(typeInput.value || '').trim().replace('.', ':');
-			if (/^\d{1,2}:\d{2}$/.test(raw)) {
-				applyTyped();
-			}
-		});
-		typeInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				applyTyped();
-			}
-		});
-		syncFromSelects();
-	}
-
-	bindTimeInputs(hourSelect, minuteSelect, hiddenInput, enableAutoBreak = false) {
-		if (!hourSelect || !minuteSelect || !hiddenInput) return;
-
-		// Prevent duplicate binding
-		if (hourSelect.hasAttribute('data-bound')) return;
-		hourSelect.setAttribute('data-bound', 'true');
-
-		const updateValue = () => {
+		hiddenInput.setAttribute('data-bound', '1');
+		hiddenInput.addEventListener('change', () => {
 			try {
-				// Validate inputs
-				const hour = hourSelect.value;
-				const minute = minuteSelect.value;
-
-				// Handle empty/invalid values
-				if (!hour || hour === '--' || !minute || minute === '--') {
-					hiddenInput.value = '';
-					return;
-				}
-
-				// Ensure valid hour (0-23) and minute (0-59)
-				const hourNum = parseInt(hour, 10);
-				const minuteNum = parseInt(minute, 10);
-
-				if (isNaN(hourNum) || hourNum < 0 || hourNum > 23 ||
-					isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
-					console.warn('Invalid time values:', hour, minute);
-					hiddenInput.value = '';
-					return;
-				}
-
-				hiddenInput.value = `${String(hourNum).padStart(2, '0')}:${String(minuteNum).padStart(2, '0')}`;
-
 				if (enableAutoBreak) {
 					this.handleAutoBreakCalculation({ notify: false });
 				}
 				this.updateTimeSummary();
-			} catch (error) {
-				console.error('Error updating time input:', error);
-				hiddenInput.value = '';
+			} finally {
+				this.syncRemoveBreakButtons();
 			}
-		};
+		});
+	}
 
-		hourSelect.addEventListener('change', updateValue);
-		minuteSelect.addEventListener('change', updateValue);
+	isCompleteTime(value) {
+		return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || ''));
+	}
 
-		// Initial update
-		updateValue();
+	timeHost(hidden) {
+		return hidden && hidden.closest ? hidden.closest('[data-azc-timepicker]') : null;
+	}
+
+	showTimeError(hiddenId, message, focus = true) {
+		const hidden = document.getElementById(hiddenId);
+		const host = this.timeHost(hidden);
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && host && typeof TP.setInvalid === 'function') {
+			TP.setInvalid(host, true);
+		}
+		const errorContainer = document.getElementById(hiddenId + '-error');
+		if (errorContainer) {
+			errorContainer.style.display = 'block';
+			errorContainer.textContent = '';
+			const strong = document.createElement('strong');
+			strong.textContent = String(message);
+			errorContainer.appendChild(strong);
+		}
+		const hour = host && host.querySelector('[data-section="hour"]');
+		if (focus && hour && typeof hour.focus === 'function') {
+			hour.focus();
+		}
+		return false;
+	}
+
+	clearTimeError(hiddenId) {
+		const hidden = document.getElementById(hiddenId);
+		const host = this.timeHost(hidden);
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && host && typeof TP.setInvalid === 'function') {
+			TP.setInvalid(host, false);
+		}
+		const errorContainer = document.getElementById(hiddenId + '-error');
+		if (errorContainer) {
+			errorContainer.style.display = 'none';
+			errorContainer.textContent = '';
+		}
 	}
 
 	/**
@@ -579,7 +474,6 @@ class TimeEntryFormManager {
 
 			if (requiredBreakMinutes === 0) {
 				this.removeAutoAddedBreaks();
-				this.updateBreakRequirementIndicator(netWorkingHours);
 				return;
 			}
 
@@ -590,8 +484,6 @@ class TimeEntryFormManager {
 			if (shortfallMinutes > 0) {
 				this.addAutomaticBreak(startDateTime, endDateTime, shortfallMinutes, notify);
 			}
-
-			this.updateBreakRequirementIndicator(netWorkingHours);
 		} catch (error) {
 			console.warn('Error in auto-break calculation:', error);
 		}
@@ -769,28 +661,24 @@ class TimeEntryFormManager {
 
 		const startHidden = breakEntry.querySelector('input.break-start-time[data-break-index="' + index + '"]');
 		const endHidden = breakEntry.querySelector('input.break-end-time[data-break-index="' + index + '"]');
-		const startHourSelect = breakEntry.querySelector('.break-start-time-hour');
-		const startMinuteSelect = breakEntry.querySelector('.break-start-time-minute');
-		const endHourSelect = breakEntry.querySelector('.break-end-time-hour');
-		const endMinuteSelect = breakEntry.querySelector('.break-end-time-minute');
 
 		const startHour = String(breakStartTime.getHours()).padStart(2, '0');
 		const startMinute = String(breakStartTime.getMinutes()).padStart(2, '0');
 		const endTime = new Date(breakStartTime.getTime() + breakMinutes * 60 * 1000);
 		const endHour = String(endTime.getHours()).padStart(2, '0');
 		const endMinute = String(endTime.getMinutes()).padStart(2, '0');
+		const TP = window.ArbeitszeitCheckTimePicker;
 
-		if (startHourSelect) startHourSelect.value = startHour;
-		if (startMinuteSelect) startMinuteSelect.value = startMinute;
-		if (endHourSelect) endHourSelect.value = endHour;
-		if (endMinuteSelect) endMinuteSelect.value = endMinute;
-
-		if (startHidden) startHidden.value = `${startHour}:${startMinute}`;
-		if (endHidden) endHidden.value = `${endHour}:${endMinute}`;
-
-		// Trigger change events so any listeners update summaries/validation
-		if (startHourSelect) startHourSelect.dispatchEvent(new Event('change', { bubbles: true }));
-		if (endHourSelect) endHourSelect.dispatchEvent(new Event('change', { bubbles: true }));
+		if (TP && startHidden) {
+			TP.setValue(startHidden, `${startHour}:${startMinute}`);
+		} else if (startHidden) {
+			startHidden.value = `${startHour}:${startMinute}`;
+		}
+		if (TP && endHidden) {
+			TP.setValue(endHidden, `${endHour}:${endMinute}`);
+		} else if (endHidden) {
+			endHidden.value = `${endHour}:${endMinute}`;
+		}
 
 		// Mark as auto-generated
 		breakEntry.setAttribute('data-auto-break', 'true');
@@ -816,6 +704,11 @@ class TimeEntryFormManager {
 		if (!this.breaksContainer) return;
 		const autoBreaks = this.breaksContainer.querySelectorAll('.break-entry[data-auto-break]');
 		autoBreaks.forEach((entry) => entry.remove());
+		// Turning auto breaks off deletes the row it filled. The empty pickers
+		// must come back so a manual break can still be entered.
+		if (this.breaksContainer.querySelectorAll('.break-entry').length === 0) {
+			this.addBreakEntry();
+		}
 		this.updateTimeSummary();
 	}
 
@@ -898,9 +791,6 @@ class TimeEntryFormManager {
 			const breakEntry = this.createBreakEntryElement(this.breakIndex);
 			this.breaksContainer.appendChild(breakEntry);
 
-			// Bind time inputs for the new break
-			this.bindBreakTimeInputs(breakEntry);
-
 			this.breakIndex++;
 			this.updateTimeSummary();
 		} catch (error) {
@@ -923,118 +813,51 @@ class TimeEntryFormManager {
 		const startLabel = document.createElement('label');
 		startLabel.className = 'form-label time-pair-matrix__row-label';
 		startLabel.id = 'break-' + index + '-start-label';
-		const startIcon = document.createElement('span');
-		startIcon.className = 'form-label-icon';
-		startIcon.setAttribute('aria-hidden', 'true');
-		if (typeof window.AzcCatalog !== 'undefined' && typeof window.AzcCatalog.render === 'function') {
-			startIcon.innerHTML = window.AzcCatalog.render('coffee', 'form-label-icon__svg');
-		}
 		const startSr = document.createElement('span');
 		startSr.className = 'sr-only';
 		startSr.textContent = formatBreakRowLabel(
 			t('breakRowStartLabel', 'Break %1$s start'),
 			index
 		);
-		startLabel.appendChild(startIcon);
+		startLabel.htmlFor = 'break-' + index + '-start-hour';
 		startLabel.appendChild(startSr);
-
-		const startTimeGroup = document.createElement('div');
-		startTimeGroup.className = 'time-input-group';
-		startTimeGroup.setAttribute('role', 'group');
-		startTimeGroup.setAttribute('aria-labelledby', startLabel.id);
-
-		const startHourSelect = document.createElement('select');
-		startHourSelect.className = 'form-input time-hour break-start-time-hour';
-		startHourSelect.setAttribute('data-break-index', index);
-		startHourSelect.setAttribute('aria-label', t('breakStartHour'));
-
-		const startMinuteSelect = document.createElement('select');
-		startMinuteSelect.className = 'form-input time-minute break-start-time-minute';
-		startMinuteSelect.setAttribute('data-break-index', index);
-		startMinuteSelect.setAttribute('aria-label', t('breakStartMinute'));
-
-		const startHidden = document.createElement('input');
-		startHidden.type = 'hidden';
-		startHidden.className = 'break-start-time';
-		startHidden.setAttribute('data-break-index', index);
-		startHidden.name = `breaks[${index}][start]`;
-		startHidden.value = '';
-
-		// Add options
-		this.addTimeOptions(startHourSelect, startMinuteSelect);
-
-		const startSeparator = document.createElement('span');
-		startSeparator.className = 'time-separator';
-		startSeparator.setAttribute('aria-hidden', 'true');
-		startSeparator.textContent = ':';
-
-		startTimeGroup.appendChild(startHourSelect);
-		startTimeGroup.appendChild(startSeparator);
-		startTimeGroup.appendChild(startMinuteSelect);
-		startTimeGroup.appendChild(startHidden);
-
 		startGroup.appendChild(startLabel);
-		startGroup.appendChild(startTimeGroup);
+		this.mountBreakPicker(startGroup, {
+			id: 'break-' + index + '-start',
+			name: 'breaks[' + index + '][start]',
+			hiddenClass: 'break-start-time',
+			breakIndex: index,
+			labelId: startLabel.id,
+			hourLabel: t('breakStartHour', 'Break start hour'),
+			minuteLabel: t('breakStartMinute', 'Break start minute'),
+			openLabel: t('chooseBreakStartTime', 'Choose break start time'),
+		});
 
-		// End time group
 		const endGroup = document.createElement('div');
 		endGroup.className = 'form-group';
 
 		const endLabel = document.createElement('label');
 		endLabel.className = 'form-label time-pair-matrix__row-label';
 		endLabel.id = 'break-' + index + '-end-label';
-		const endIcon = document.createElement('span');
-		endIcon.className = 'form-label-icon';
-		endIcon.setAttribute('aria-hidden', 'true');
-		if (typeof window.AzcCatalog !== 'undefined' && typeof window.AzcCatalog.render === 'function') {
-			endIcon.innerHTML = window.AzcCatalog.render('coffee', 'form-label-icon__svg');
-		}
+		endLabel.htmlFor = 'break-' + index + '-end-hour';
 		const endSr = document.createElement('span');
 		endSr.className = 'sr-only';
 		endSr.textContent = formatBreakRowLabel(
 			t('breakRowEndLabel', 'Break %1$s end'),
 			index
 		);
-		endLabel.appendChild(endIcon);
 		endLabel.appendChild(endSr);
-
-		const endTimeGroup = document.createElement('div');
-		endTimeGroup.className = 'time-input-group';
-		endTimeGroup.setAttribute('role', 'group');
-		endTimeGroup.setAttribute('aria-labelledby', endLabel.id);
-
-		const endHourSelect = document.createElement('select');
-		endHourSelect.className = 'form-input time-hour break-end-time-hour';
-		endHourSelect.setAttribute('data-break-index', index);
-		endHourSelect.setAttribute('aria-label', t('breakEndHour'));
-
-		const endMinuteSelect = document.createElement('select');
-		endMinuteSelect.className = 'form-input time-minute break-end-time-minute';
-		endMinuteSelect.setAttribute('data-break-index', index);
-		endMinuteSelect.setAttribute('aria-label', t('breakEndMinute'));
-
-		const endHidden = document.createElement('input');
-		endHidden.type = 'hidden';
-		endHidden.className = 'break-end-time';
-		endHidden.setAttribute('data-break-index', index);
-		endHidden.name = `breaks[${index}][end]`;
-		endHidden.value = '';
-
-		// Add options
-		this.addTimeOptions(endHourSelect, endMinuteSelect);
-
-		const endSeparator = document.createElement('span');
-		endSeparator.className = 'time-separator';
-		endSeparator.setAttribute('aria-hidden', 'true');
-		endSeparator.textContent = ':';
-
-		endTimeGroup.appendChild(endHourSelect);
-		endTimeGroup.appendChild(endSeparator);
-		endTimeGroup.appendChild(endMinuteSelect);
-		endTimeGroup.appendChild(endHidden);
-
 		endGroup.appendChild(endLabel);
-		endGroup.appendChild(endTimeGroup);
+		this.mountBreakPicker(endGroup, {
+			id: 'break-' + index + '-end',
+			name: 'breaks[' + index + '][end]',
+			hiddenClass: 'break-end-time',
+			breakIndex: index,
+			labelId: endLabel.id,
+			hourLabel: t('breakEndHour', 'Break end hour'),
+			minuteLabel: t('breakEndMinute', 'Break end minute'),
+			openLabel: t('chooseBreakEndTime', 'Choose break end time'),
+		});
 
 		const actionCell = document.createElement('div');
 		actionCell.className = 'time-pair-matrix__action';
@@ -1045,64 +868,58 @@ class TimeEntryFormManager {
 		removeBtn.title = t('removeBreak');
 		removeBtn.setAttribute('aria-label', t('removeThisBreak'));
 		removeBtn.textContent = t('remove');
+		removeBtn.disabled = true;
 		actionCell.appendChild(removeBtn);
 
 		formGrid.appendChild(startGroup);
 		formGrid.appendChild(endGroup);
 		formGrid.appendChild(actionCell);
 		breakEntry.appendChild(formGrid);
-
+		this.bindBreakTimeInputs(breakEntry);
 		return breakEntry;
 	}
 
-	addTimeOptions(hourSelect, minuteSelect) {
-		// Empty option
-		const emptyOption = document.createElement('option');
-		emptyOption.value = '';
-		emptyOption.textContent = '--';
-
-		hourSelect.appendChild(emptyOption.cloneNode(true));
-		minuteSelect.appendChild(emptyOption.cloneNode(true));
-
-		// Hours
-		for (let h = 0; h < 24; h++) {
-			const option = document.createElement('option');
-			option.value = String(h).padStart(2, '0');
-			option.textContent = String(h).padStart(2, '0');
-			hourSelect.appendChild(option);
+	mountBreakPicker(parent, spec) {
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (!TP || typeof TP.create !== 'function') {
+			throw new Error('Time picker is not loaded');
 		}
-
-		// Minutes (5-minute steps by default; odd values added via ensureMinuteOption)
-		const step = this.minuteStep || 5;
-		for (let m = 0; m < 60; m += step) {
-			const option = document.createElement('option');
-			option.value = String(m).padStart(2, '0');
-			option.textContent = String(m).padStart(2, '0');
-			minuteSelect.appendChild(option);
-		}
+		TP.create({
+			parent: parent,
+			id: spec.id,
+			name: spec.name,
+			value: '',
+			hiddenClass: spec.hiddenClass,
+			breakIndex: spec.breakIndex,
+			labelId: spec.labelId,
+			hourLabel: spec.hourLabel,
+			minuteLabel: spec.minuteLabel,
+			openLabel: spec.openLabel,
+			hoursLabel: t('timeHours', 'Hours'),
+			minutesLabel: t('timeMinutes', 'Minutes'),
+			doneLabel: t('timeDone', 'Done'),
+			notSetLabel: t('timeNotSet', 'Not set'),
+			clearLabel: t('clearTime', 'Clear time'),
+			allowEmpty: true,
+			minuteStep: this.minuteStep,
+		});
 	}
 
 	bindBreakTimeInputs(breakEntry) {
 		const index = breakEntry.getAttribute('data-break-index');
-		if (!index) return;
-
-		const startHour = breakEntry.querySelector('.break-start-time-hour');
-		const startMinute = breakEntry.querySelector('.break-start-time-minute');
-		const startHidden = breakEntry.querySelector(`input.break-start-time[data-break-index="${index}"]`);
-
-		const endHour = breakEntry.querySelector('.break-end-time-hour');
-		const endMinute = breakEntry.querySelector('.break-end-time-minute');
-		const endHidden = breakEntry.querySelector(`input.break-end-time[data-break-index="${index}"]`);
-
-		if (startHour && startMinute && startHidden) {
-			this.bindTimeInputs(startHour, startMinute, startHidden, false); // Don't trigger auto-break for break inputs
+		if (!index) {
+			return;
 		}
-		if (endHour && endMinute && endHidden) {
-			this.bindTimeInputs(endHour, endMinute, endHidden, false); // Don't trigger auto-break for break inputs
-		}
+		const startHidden = breakEntry.querySelector('input.break-start-time[data-break-index="' + index + '"]');
+		const endHidden = breakEntry.querySelector('input.break-end-time[data-break-index="' + index + '"]');
+		this.bindHiddenTime(startHidden, false);
+		this.bindHiddenTime(endHidden, false);
 	}
 
 	removeBreakEntry(button) {
+		if (!button || button.disabled) {
+			return;
+		}
 		const index = button.getAttribute('data-break-index');
 		const breakEntry = this.breaksContainer.querySelector(`[data-break-index="${index}"]`);
 		if (!breakEntry) {
@@ -1258,7 +1075,30 @@ class TimeEntryFormManager {
 		return result;
 	}
 
+	/**
+	 * Remove stays off on a single empty break row. A filled time, or a second
+	 * row the user added, turns it on so an extra empty row can still be deleted.
+	 */
+	syncRemoveBreakButtons() {
+		if (!this.breaksContainer) {
+			return;
+		}
+		const entries = this.breaksContainer.querySelectorAll('.break-entry');
+		const multiple = entries.length > 1;
+		entries.forEach((entry) => {
+			const btn = entry.querySelector('.btn-remove-break');
+			if (!btn) {
+				return;
+			}
+			const start = entry.querySelector('input.break-start-time');
+			const end = entry.querySelector('input.break-end-time');
+			const hasTime = (start && start.value.trim() !== '') || (end && end.value.trim() !== '');
+			btn.disabled = !hasTime && !multiple;
+		});
+	}
+
 	updateTimeSummary() {
+		this.syncRemoveBreakButtons();
 		if (!this.timeSummary) {
 			return;
 		}
@@ -1275,7 +1115,6 @@ class TimeEntryFormManager {
 				this.complianceStatus.className = 'compliance-status warning';
 				this.complianceStatus.textContent = message;
 			}
-			this.updateBreakRequirementIndicator(0);
 		};
 
 		if (!this.hasFormData()) {
@@ -1392,9 +1231,6 @@ class TimeEntryFormManager {
 			}
 			// Update compliance status (sum + AZG split patterns when configured)
 			this.updateComplianceStatus(workingDurationHours, breakDurationHours, this.collectBreakPortionMinutes(dateStr));
-
-			// Update break requirement indicator
-			this.updateBreakRequirementIndicator(workingDurationHours);
 
 		} catch (error) {
 			console.warn('Error updating time summary:', error);
@@ -1528,41 +1364,9 @@ class TimeEntryFormManager {
 	}
 
 	validateTimes() {
-		// Update break time hidden inputs before validation
-		if (this.breaksContainer) {
-			const breakEntries = this.breaksContainer.querySelectorAll('.break-entry');
-				breakEntries.forEach((breakEntry) => {
-					const breakIndex = breakEntry.getAttribute('data-break-index');
-					if (breakIndex === null) return;
-					
-					const breakStartHour = breakEntry.querySelector('.break-start-time-hour');
-					const breakStartMinute = breakEntry.querySelector('.break-start-time-minute');
-					const breakStartHidden = breakEntry.querySelector('input.break-start-time[data-break-index="' + breakIndex + '"]');
-					
-					const breakEndHour = breakEntry.querySelector('.break-end-time-hour');
-					const breakEndMinute = breakEntry.querySelector('.break-end-time-minute');
-					const breakEndHidden = breakEntry.querySelector('input.break-end-time[data-break-index="' + breakIndex + '"]');
-					
-					if (breakStartHour && breakStartMinute && breakStartHidden) {
-						const startHour = breakStartHour.value || '';
-						const startMinute = breakStartMinute.value || '';
-						if (startHour && startMinute) {
-							breakStartHidden.value = `${startHour}:${startMinute}`;
-						} else {
-							breakStartHidden.value = '';
-						}
-					}
-					
-					if (breakEndHour && breakEndMinute && breakEndHidden) {
-						const endHour = breakEndHour.value || '';
-						const endMinute = breakEndMinute.value || '';
-						if (endHour && endMinute) {
-							breakEndHidden.value = `${endHour}:${endMinute}`;
-						} else {
-							breakEndHidden.value = '';
-						}
-					}
-				});
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && typeof TP.commitAll === 'function') {
+			TP.commitAll(this.form || document);
 		}
 	}
 
@@ -1584,57 +1388,45 @@ class TimeEntryFormManager {
 			return false;
 		}
 
+		// The visible sections own the value. Flush them before any check so a
+		// half-typed hour is what gets validated and submitted.
+		this.validateTimes();
+
 		// Always start with a clean validation state
 		this.clearValidationErrors();
 
 		// If auto-breaks are enabled, ensure they're created before validation
 		if (this.shouldRunAutoBreakCalculation()) {
 			this.handleAutoBreakCalculation({ notify: false });
-			
-			// Clear any previous validation errors on break fields
+			const TP = window.ArbeitszeitCheckTimePicker;
 			const breakEntries = this.breaksContainer ? this.breaksContainer.querySelectorAll('.break-entry') : [];
 			breakEntries.forEach((breakEntry) => {
-				// Only clear validation on manual break entries (not auto-generated ones)
-				if (!breakEntry.hasAttribute('data-auto-break')) {
-					const startHour = breakEntry.querySelector('.break-start-time-hour');
-					const startMinute = breakEntry.querySelector('.break-start-time-minute');
-					const endHour = breakEntry.querySelector('.break-end-time-hour');
-					const endMinute = breakEntry.querySelector('.break-end-time-minute');
-					
-					[startHour, startMinute, endHour, endMinute].forEach((field) => {
-						if (field) {
-							field.setCustomValidity('');
-						}
-					});
+				if (breakEntry.hasAttribute('data-auto-break') || !TP) {
+					return;
 				}
+				breakEntry.querySelectorAll('[data-azc-timepicker]').forEach((host) => {
+					TP.setInvalid(host, false);
+				});
 			});
 		}
 
-		// Only validate the absolute minimum required fields
 		let isValid = true;
+		let focusedError = false;
 
-		// Validate date
 		if (!this.validateDate()) {
 			isValid = false;
+			focusedError = true;
 		}
 
-		// Validate start time (must have hour and minute)
-		if (!this.startTimeHour?.value || !this.startTimeMinute?.value ||
-			this.startTimeHour.value === '--' || this.startTimeMinute.value === '--') {
-			if (this.startTimeHour) {
-				this.startTimeHour.setCustomValidity(t('startTimeRequired'));
-				this.startTimeHour.reportValidity();
-			}
+		if (!this.isCompleteTime(this.startTimeHidden && this.startTimeHidden.value)) {
+			this.showTimeError('entry-start-time', t('startTimeRequired'), !focusedError);
+			focusedError = true;
 			isValid = false;
 		}
 
-		// Validate end time (must have hour and minute)
-		if (!this.endTimeHour?.value || !this.endTimeMinute?.value ||
-			this.endTimeHour.value === '--' || this.endTimeMinute.value === '--') {
-			if (this.endTimeHour) {
-				this.endTimeHour.setCustomValidity(t('endTimeRequired'));
-				this.endTimeHour.reportValidity();
-			}
+		if (!this.isCompleteTime(this.endTimeHidden && this.endTimeHidden.value)) {
+			this.showTimeError('entry-end-time', t('endTimeRequired'), !focusedError);
+			focusedError = true;
 			isValid = false;
 		}
 
@@ -1685,30 +1477,19 @@ class TimeEntryFormManager {
 			const workDurationMs = endDateTime - startDateTime;
 
 			if (workDurationMs <= 0) {
-				if (this.endTimeHour) {
-					this.endTimeHour.setCustomValidity(t('endAfterStart'));
-					this.endTimeHour.reportValidity();
-				}
+				this.showTimeError('entry-end-time', t('endAfterStart'));
 				return false;
 			}
 
-			// Check for unreasonably short work periods (less than 15 minutes)
-			const minWorkDurationMs = 15 * 60 * 1000; // 15 minutes
+			const minWorkDurationMs = 15 * 60 * 1000;
 			if (workDurationMs < minWorkDurationMs) {
-				if (this.endTimeHour) {
-					this.endTimeHour.setCustomValidity(t('workMin15'));
-					this.endTimeHour.reportValidity();
-				}
+				this.showTimeError('entry-end-time', t('workMin15'));
 				return false;
 			}
 
-			// Check for unreasonably long work periods (more than 16 hours)
-			const maxWorkDurationMs = 16 * 60 * 60 * 1000; // 16 hours
+			const maxWorkDurationMs = 16 * 60 * 60 * 1000;
 			if (workDurationMs > maxWorkDurationMs) {
-				if (this.endTimeHour) {
-					this.endTimeHour.setCustomValidity(t('workMax16'));
-					this.endTimeHour.reportValidity();
-				}
+				this.showTimeError('entry-end-time', t('workMax16'));
 				return false;
 			}
 
@@ -1733,10 +1514,7 @@ class TimeEntryFormManager {
 			});
 
 			if (totalBreakMs >= workDurationMs) {
-				if (this.startTimeHour) {
-					this.startTimeHour.setCustomValidity(t('breaksExceedWork'));
-					this.startTimeHour.reportValidity();
-				}
+				this.showTimeError('entry-start-time', t('breaksExceedWork'));
 				return false;
 			}
 
@@ -1746,17 +1524,13 @@ class TimeEntryFormManager {
 				const portions = this.collectBreakPortionMinutes(dateStr);
 				const evalResult = Validation.evaluateBreakCompliance(portions, netWorkingHours);
 				if (!evalResult.ok) {
+					const requiredMinutes = Math.round(Number(evalResult.requiredMinutes) || 0);
 					const msg = evalResult.splitInvalid
 						? (t('complianceBreakSplitInvalid') || evalResult.message)
-						: (t('complianceBreakNotMet') || evalResult.message);
-					const firstBreakSelect = this.breaksContainer
-						? this.breaksContainer.querySelector('.break-entry select')
-						: null;
-					const target = firstBreakSelect || this.startTimeHour;
-					if (target) {
-						target.setCustomValidity(String(msg));
-						target.reportValidity();
-					}
+						: (requiredMinutes > 0
+							? t('breakRequired' + requiredMinutes, requiredMinutes + ' minutes break required')
+							: (t('complianceBreakNotMet') || evalResult.message));
+					this.showBreakSubmitError(msg);
 					return false;
 				}
 			}
@@ -1776,44 +1550,46 @@ class TimeEntryFormManager {
 		return true;
 	}
 
-	updateBreakRequirementIndicator(workingHours) {
-		if (!this.breakRequirementIndicator || !this.breakRequirementText) return;
-
-		if (workingHours <= 0) {
-			this.breakRequirementIndicator.hidden = true;
-			return;
+	showBreakSubmitError(message) {
+		const error = document.getElementById('break-submit-error');
+		if (error) {
+			error.hidden = false;
+			error.textContent = String(message || '');
 		}
-
-		const requiredMinutes = this.resolveRequiredBreakMinutes(workingHours);
-
-		let requirementText = '';
-		if (requiredMinutes <= 0) {
-			requirementText = t('breakRequiredNone');
-		} else {
-			requirementText = t('breakRequired' + requiredMinutes)
-				|| (requiredMinutes + ' minutes break required');
+		const host = this.breaksContainer
+			? this.breaksContainer.querySelector('.break-entry [data-azc-timepicker]')
+			: null;
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && host && typeof TP.setInvalid === 'function') {
+			TP.setInvalid(host, true);
 		}
-
-		if (requirementText) {
-			this.breakRequirementText.textContent = requirementText;
-			this.breakRequirementIndicator.hidden = false;
-		} else {
-			this.breakRequirementIndicator.hidden = true;
+		const hour = host && host.querySelector('[data-section="hour"]');
+		if (hour && typeof hour.focus === 'function') {
+			hour.focus();
 		}
 	}
 
 	clearValidationErrors() {
-		// Clear validation on break inputs
-		if (this.breaksContainer) {
-			const breakSelects = this.breaksContainer.querySelectorAll('select');
-			breakSelects.forEach(select => {
-				select.setCustomValidity('');
+		const breakError = document.getElementById('break-submit-error');
+		if (breakError) {
+			breakError.hidden = true;
+			breakError.textContent = '';
+		}
+		this.clearTimeError('entry-start-time');
+		this.clearTimeError('entry-end-time');
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (this.breaksContainer && TP) {
+			this.breaksContainer.querySelectorAll('[data-azc-timepicker]').forEach((host) => {
+				TP.setInvalid(host, false);
 			});
 		}
+	}
 
-		// Clear hidden input validation
-		if (this.startTimeHidden) this.startTimeHidden.setCustomValidity('');
-		if (this.endTimeHidden) this.endTimeHidden.setCustomValidity('');
+	updateAllHiddenInputs() {
+		const TP = window.ArbeitszeitCheckTimePicker;
+		if (TP && typeof TP.commitAll === 'function') {
+			TP.commitAll(this.form || document);
+		}
 	}
 
 	async submitForm() {
@@ -2059,50 +1835,6 @@ class TimeEntryFormManager {
 		// Announce via role=alert without stealing focus (keyboard users keep
 		// their place on the submit button / next control).
 		return true;
-	}
-
-	updateAllHiddenInputs() {
-		// Ensure all hidden time inputs are updated from their select elements
-		if (this.startTimeHour && this.startTimeMinute && this.startTimeHidden) {
-			const startHour = this.startTimeHour.value || '00';
-			const startMinute = this.startTimeMinute.value || '00';
-			this.startTimeHidden.value = `${startHour}:${startMinute}`;
-		}
-
-		if (this.endTimeHour && this.endTimeMinute && this.endTimeHidden) {
-			const endHour = this.endTimeHour.value || '00';
-			const endMinute = this.endTimeMinute.value || '00';
-			this.endTimeHidden.value = `${endHour}:${endMinute}`;
-		}
-
-		// Update break hidden inputs
-		if (this.breaksContainer) {
-			const breakEntries = this.breaksContainer.querySelectorAll('.break-entry');
-			breakEntries.forEach((breakEntry) => {
-				const breakIndex = breakEntry.getAttribute('data-break-index');
-				if (!breakIndex) return;
-
-				const startHour = breakEntry.querySelector('.break-start-time-hour');
-				const startMinute = breakEntry.querySelector('.break-start-time-minute');
-				const startHidden = breakEntry.querySelector(`input.break-start-time[data-break-index="${breakIndex}"]`);
-
-				const endHour = breakEntry.querySelector('.break-end-time-hour');
-				const endMinute = breakEntry.querySelector('.break-end-time-minute');
-				const endHidden = breakEntry.querySelector(`input.break-end-time[data-break-index="${breakIndex}"]`);
-
-				if (startHour && startMinute && startHidden) {
-					const hour = startHour.value || '00';
-					const minute = startMinute.value || '00';
-					startHidden.value = `${hour}:${minute}`;
-				}
-
-				if (endHour && endMinute && endHidden) {
-					const hour = endHour.value || '00';
-					const minute = endMinute.value || '00';
-					endHidden.value = `${hour}:${minute}`;
-				}
-			});
-		}
 	}
 
 	ensureAutoBreaksForSubmission() {

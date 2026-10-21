@@ -28,6 +28,72 @@ const ArbeitszeitCheckComponents = {
     this.initModals();
     this.initToasts();
     this.relocatePageActions();
+    this.initRowActionReveal();
+  },
+
+  /**
+   * Wide tables reveal row actions on hover or focus. Escape hides that
+   * overlay without removing the buttons from the tab order (WCAG 1.4.13).
+   * A later pointer move, or focusing an action again, shows them.
+   * Open modals and native dialogs keep Escape for themselves.
+   */
+  initRowActionReveal() {
+    if (this._rowActionRevealBound) {
+      return;
+    }
+    this._rowActionRevealBound = true;
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
+        return;
+      }
+      if (document.querySelector('dialog[open]')) {
+        return;
+      }
+      if (this._getVisibleModalBackdrops().length > 0) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const row = target.closest('tr');
+      if (!row || row.classList.contains('azc-row-actions-dismissed')) {
+        return;
+      }
+      if (!row.querySelector('.azc-table-actions')) {
+        return;
+      }
+      event.preventDefault();
+      row.classList.add('azc-row-actions-dismissed');
+      if (!row.hasAttribute('tabindex')) {
+        row.setAttribute('tabindex', '-1');
+        row.dataset.azcRowTabindexAdded = 'true';
+      }
+      row.focus();
+    });
+
+    document.addEventListener('pointerover', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const row = target.closest('tr.azc-row-actions-dismissed');
+      if (row) {
+        row.classList.remove('azc-row-actions-dismissed');
+      }
+    });
+
+    document.addEventListener('focusin', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('.azc-table-actions')) {
+        return;
+      }
+      const row = target.closest('tr.azc-row-actions-dismissed');
+      if (row) {
+        row.classList.remove('azc-row-actions-dismissed');
+      }
+    });
   },
 
   // ===== MODAL COMPONENTS =====

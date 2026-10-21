@@ -1518,6 +1518,7 @@
 		"Export for organization scope is not yet available. Use Preview to view the report." : "Für den Organisationsbereich ist der Download für den Arbeitszeit-Export nach der Vorschau verfügbar.",
 		"Export for team or organization scope is not yet available. Use Preview to view the report." : "Der Download enthält eine Zeile pro Teammitglied, das in der Vorschau angezeigt wird.",
 		"Export labor law compliance violations and severity details." : "Exportieren Sie Verstöße gegen arbeitsrechtliche Vorgaben inklusive Schweregraddetails.",
+		"Export of night-shift entries that cross midnight" : "Export von Einträgen aus Nachtschichten mit Tageswechsel",
 		"Export or permanently delete your personal ArbeitszeitCheck data in accordance with GDPR." : "Exportieren oder dauerhaft löschen Sie Ihre persönlichen ArbeitszeitCheck-Daten gemäß DSGVO.",
 		"Export or permanently delete your personal ArbeitszeitCheck data." : "Exportieren oder dauerhaft löschen Sie Ihre persönlichen ArbeitszeitCheck-Daten.",
 		"Export started" : "Export gestartet",

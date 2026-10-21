@@ -128,7 +128,11 @@
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody tr,
 	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody tr {
 		padding: var(--azc-space-4, 1rem);
-		box-shadow: 0 1px 2px color-mix(in srgb, var(--color-main-text) 6%, transparent);
+		border: 0;
+		border-bottom: 1px solid var(--azc-border, var(--color-border));
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td,

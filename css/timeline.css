@@ -79,12 +79,6 @@
 	color: var(--arbeitszeitcheck-color-primary, var(--color-primary));
 }
 
-.timeline-filters__option:focus-within {
-	outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary));
-	outline-offset: 2px;
-	border-radius: var(--radius-base, 4px);
-}
-
 .timeline-filters__checkbox {
 	width: 1.25rem;
 	height: 1.25rem;

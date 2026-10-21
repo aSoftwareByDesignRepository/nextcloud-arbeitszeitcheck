@@ -334,11 +334,14 @@ class TimeEntryController extends Controller
 	{
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, [
 			'common/time-pair-matrix',
+			'common/timepicker',
 			'time-entries',
 			'time-entry-correction',
 			'time-entry-form-accessibility',
 		], [
 			'common/datepicker',
+			'common/timepicker-logic',
+			'common/timepicker',
 			'common/validation',
 		]);
 		\OCP\Util::addScript('arbeitszeitcheck', 'time-entry-correction');

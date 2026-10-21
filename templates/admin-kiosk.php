@@ -215,7 +215,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<th scope="col"><?php p($l->t('Label')); ?></th>
 							<th scope="col"><?php p($l->t('Status')); ?></th>
 							<th scope="col"><?php p($l->t('Last seen')); ?></th>
-							<th scope="col"><?php p($l->t('Actions')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
 						</tr>
 					</thead>
 					<tbody id="azc-kiosk-terminals-body">
@@ -239,12 +239,14 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<td data-label="<?php p($l->t('Last seen')); ?>" class="azc-kiosk-last-seen" data-iso="<?php p($lastSeen); ?>">
 								<?php p($lastSeen !== '' ? $lastSeen : (string)($i18n['neverSeen'] ?? $l->t('Never'))); ?>
 							</td>
-							<td data-label="<?php p($l->t('Actions')); ?>">
+							<td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
 								<?php if ($canRevoke): ?>
-								<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-revoke-terminal"
-									data-terminal-id="<?php p($tid); ?>">
-									<?php p($l->t('Revoke')); ?>
-								</button>
+								<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
+									<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-revoke-terminal"
+										data-terminal-id="<?php p($tid); ?>">
+										<?php p($l->t('Revoke')); ?>
+									</button>
+								</div>
 								<?php else: ?>
 								<span class="azc-kiosk-no-action" aria-hidden="true">—</span>
 								<?php endif; ?>
@@ -445,7 +447,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<th scope="col"><?php p($l->t('Employee')); ?></th>
 							<th scope="col"><?php p($l->t('Credentials')); ?></th>
 							<th scope="col"><?php p($l->t('Kiosk allowed')); ?></th>
-							<th scope="col"><?php p($l->t('Actions')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
 						</tr>
 					</thead>
 					<tbody id="azc-kiosk-creds-body"></tbody>

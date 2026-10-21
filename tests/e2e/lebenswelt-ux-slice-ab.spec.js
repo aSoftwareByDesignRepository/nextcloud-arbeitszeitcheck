@@ -8,6 +8,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { login, credsFromEnv, hasCreds } from './helpers/auth.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
+import { setAzcTime } from './helpers/timepicker.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixtureUrl = 'file://' + path.resolve(__dirname, 'fixtures/lebenswelt-ux-slice-ab.html')
@@ -20,7 +21,7 @@ test.describe('Slice A/B Lebenswelt UX (fixture a11y)', () => {
 		const primaryBox = await primary.boundingBox()
 		const summaryBox = await summary.boundingBox()
 		expect(primaryBox.y).toBeLessThan(summaryBox.y)
-		await expect(page.locator('#entry-start-time-type')).toBeVisible()
+		await expect(page.locator('#entry-start-time-hour')).toBeVisible()
 		await expect(page.locator('#dashboard-overtime-balance-pdf')).toHaveAttribute('href', /balance-pdf/)
 
 		const results = await new AxeBuilder({ page })
@@ -55,8 +56,9 @@ test.describe('Slice A/B Lebenswelt UX (live)', () => {
 			const cfg = window.ArbeitszeitCheck?.timeEntryForm
 			return cfg && typeof cfg.minuteStep === 'number' ? cfg.minuteStep : 5
 		})
-		const minuteValues = await page.locator('#entry-start-time-minute option').evaluateAll(
-			(opts) => opts.map((o) => o.value).filter(Boolean)
+		await page.locator('#entry-start-time-open').click()
+		const minuteValues = await page.locator('[data-column="minute"] .azc-timepicker__option').evaluateAll(
+			(opts) => opts.map((o) => o.textContent || '')
 		)
 		expect(minuteValues).toContain('00')
 		if (minuteStep === 1) {
@@ -66,10 +68,9 @@ test.describe('Slice A/B Lebenswelt UX (live)', () => {
 			expect(minuteValues).toContain(String(minuteStep).padStart(2, '0'))
 			expect(minuteValues).not.toContain('01')
 		}
+		await page.keyboard.press('Escape')
 
-		await page.locator('#entry-start-time-type').fill('08:07')
-		await page.locator('#entry-start-time-type').blur()
-		await expect(page.locator('#entry-start-time')).toHaveValue('08:07')
+		await setAzcTime(page, 'entry-start-time', '08:07')
 		await expect(page.locator('#entry-start-time-minute')).toHaveValue('07')
 
 		const results = await new AxeBuilder({ page })

@@ -197,3 +197,97 @@ describe('ArbeitszeitCheckComponents confirmDialog', () => {
     expect(Components._modalLockDepth).toBe(0)
   })
 })
+
+describe('row action reveal', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = `
+      <div id="app-content">
+        <table class="table">
+          <tbody>
+            <tr id="entry-row">
+              <td>09:00</td>
+              <td class="actions-cell">
+                <div class="azc-table-actions">
+                  <button type="button" id="edit-entry">Edit</button>
+                </div>
+              </td>
+            </tr>
+            <tr id="plain-row">
+              <td><button type="button" id="plain-button">Open</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`
+    vi.resetModules()
+    await import('./components.js')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  function escapeOn(target) {
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  }
+
+  it('Escape hides that row until the pointer or an action is focused again', () => {
+    const row = document.getElementById('entry-row')
+    const edit = document.getElementById('edit-entry')
+
+    const first = escapeOn(edit)
+    expect(first.defaultPrevented).toBe(true)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(true)
+    expect(row.getAttribute('tabindex')).toBe('-1')
+    expect(row.dataset.azcRowTabindexAdded).toBe('true')
+    expect(document.activeElement).toBe(row)
+
+    const second = escapeOn(edit)
+    expect(second.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(true)
+
+    edit.focus()
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+
+    row.classList.add('azc-row-actions-dismissed')
+    row.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+  })
+
+  it('leaves rows without actions, existing tabindex, modals, and dialogs alone', () => {
+    const plain = document.getElementById('plain-row')
+    plain.setAttribute('tabindex', '0')
+    const plainEvent = escapeOn(document.getElementById('plain-button'))
+    expect(plainEvent.defaultPrevented).toBe(false)
+    expect(plain.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    expect(plain.getAttribute('tabindex')).toBe('0')
+
+    const row = document.getElementById('entry-row')
+    row.setAttribute('tabindex', '0')
+    escapeOn(document.getElementById('edit-entry'))
+    expect(row.getAttribute('tabindex')).toBe('0')
+    expect(row.dataset.azcRowTabindexAdded).toBeUndefined()
+    row.classList.remove('azc-row-actions-dismissed')
+
+    const backdrop = document.createElement('div')
+    backdrop.className = 'modal-backdrop'
+    backdrop.style.display = 'flex'
+    document.body.appendChild(backdrop)
+    const modalEvent = escapeOn(document.getElementById('edit-entry'))
+    expect(modalEvent.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    backdrop.remove()
+
+    const dialog = document.createElement('dialog')
+    dialog.open = true
+    document.body.appendChild(dialog)
+    const dialogEvent = escapeOn(document.getElementById('edit-entry'))
+    expect(dialogEvent.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    dialog.remove()
+
+    const onDocument = escapeOn(document)
+    expect(onDocument.defaultPrevented).toBe(false)
+  })
+})

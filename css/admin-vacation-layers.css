@@ -346,10 +346,6 @@ dialog.layer-dialog::backdrop {
   line-height: 1.35;
   color: var(--color-main-text);
 }
-.layer-form__fieldset:focus-within {
-  border-color: color-mix(in srgb, var(--color-primary-element) 40%, var(--color-border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-element) 22%, transparent);
-}
 .layer-form__hint {
   margin: 0.35rem 0 0;
   font-size: 0.875rem;
@@ -563,10 +559,9 @@ dialog.layer-dialog::backdrop {
   vertical-align: top;
 }
 .trace-table thead th {
-  background: var(--color-background-dark);
+  background: transparent;
   font-size: .8125rem;
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  font-weight: 600;
   color: var(--color-text-maxcontrast);
 }
 .trace-table tr[data-matched="true"] {
@@ -773,10 +768,15 @@ dialog.layer-dialog::backdrop {
   .trace-table tr,
   .trace-table td { display: block; width: 100%; }
   .trace-table tr {
-    margin-bottom: .75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius, 6px);
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background: transparent;
     padding: .5rem .75rem;
+  }
+  .trace-table tr:last-child {
+    border-bottom: 0;
   }
   .trace-table tr[data-matched="true"] td:first-child { border-left: 0; }
   .trace-table td {

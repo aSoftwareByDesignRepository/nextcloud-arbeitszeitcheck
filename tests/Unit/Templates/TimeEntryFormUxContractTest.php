@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Template contract: manual form fields precede day summary; 5-min picker + free type.
+ * Template contract: manual form fields precede day summary; clock-style time picker.
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later
@@ -32,16 +32,15 @@ class TimeEntryFormUxContractTest extends TestCase
 		$this->assertLessThan($summary, $primary, 'Day summary must come after primary date/time fields');
 	}
 
-	public function testMinuteOptionsUseTimePickerHelper(): void
+	public function testCreateFormUsesTheTimePicker(): void
 	{
-		$this->assertStringContainsString('TimePickerMinutes::options', $this->template);
-		$this->assertStringNotContainsString('for ($m = 0; $m < 60; $m += 1)', $this->template);
-	}
-
-	public function testFreeTypeInputsPresent(): void
-	{
-		$this->assertStringContainsString('id="entry-start-time-type"', $this->template);
-		$this->assertStringContainsString('id="entry-end-time-type"', $this->template);
+		$this->assertStringContainsString('TimePickerField::render', $this->template);
+		$this->assertStringContainsString("'name' => 'startTime'", $this->template);
+		$this->assertStringContainsString("'name' => 'endTime'", $this->template);
+		$this->assertStringContainsString('Choose start time', $this->template);
+		$this->assertStringContainsString('Choose end time', $this->template);
+		$this->assertStringNotContainsString('id="entry-start-time-type"', $this->template);
+		$this->assertStringNotContainsString('TimePickerMinutes::options', $this->template);
 	}
 
 	public function testCriticalFieldHelpIsAlwaysVisible(): void

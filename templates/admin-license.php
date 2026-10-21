@@ -327,9 +327,11 @@ $licenseContactActions = static function (\OCP\IL10N $l) use ($licenseRenewMailt
 							<td data-label="<?php p($l->t('User ID')); ?>"><code class="azc-license-user-id"><?php p((string)($seat['userId'] ?? '')); ?></code></td>
 							<td data-label="<?php p($l->t('Assigned')); ?>"><?php p($formatAssignedAt((string)($seat['assignedAt'] ?? ''))); ?></td>
 							<td data-label="<?php p($l->t('Actions')); ?>" class="actions-cell">
-								<button type="button" class="azc-btn azc-btn--secondary azc-btn--small azc-seat-remove" data-user-id="<?php p((string)($seat['userId'] ?? '')); ?>">
-									<?php p($l->t('Remove')); ?>
-								</button>
+								<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
+									<button type="button" class="azc-btn azc-btn--secondary azc-btn--small azc-seat-remove" data-user-id="<?php p((string)($seat['userId'] ?? '')); ?>">
+										<?php p($l->t('Remove')); ?>
+									</button>
+								</div>
 							</td>
 						</tr>
 					<?php endforeach; ?>

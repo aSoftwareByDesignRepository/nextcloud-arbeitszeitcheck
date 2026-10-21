@@ -453,11 +453,6 @@
 
 
 
-/* Break requirement: layout only — colors in common/semantic-surfaces.css */
-.break-requirement-indicator:not([hidden]) {
-    animation: fadeIn 0.3s ease-in-out forwards;
-}
-
 /* Break entry styling - Specific to time entries page */
 .break-entry {
     margin-bottom: var(--space-4, 1rem);
@@ -506,26 +501,15 @@
     font-size: 0.85em;
 }
 
-/* Auto-break panel — high-contrast card (theme overrides under #app-content.azc-app--time-entries) */
 .auto-break-panel {
-    margin-top: var(--space-4, 1rem);
-    margin-bottom: var(--space-4, 1rem);
-}
-
-.auto-break-panel__body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4, 1rem);
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.auto-break-panel__title {
+    gap: var(--azc-space-2, 0.5rem);
     margin: 0;
-    font-size: 1.0625rem;
-    font-weight: 700;
-    line-height: 1.35;
-    color: var(--color-main-text);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .auto-break-panel__control {
@@ -535,24 +519,17 @@
     gap: var(--space-4, 1rem);
 }
 
+.auto-break-panel .form-toggle {
+    padding-inline-start: calc(52px + 2rem);
+    flex: 0 1 auto;
+}
+
 .auto-break-panel__help {
     margin: 0;
-    font-size: 1rem;
-    line-height: 1.5;
-    color: var(--color-main-text);
     max-width: 65ch;
 }
 
 /* Status pills: css/common/badges.css (.auto-break-toggle__status) */
-
-.break-requirement-indicator {
-    margin-bottom: var(--space-4, 1rem);
-}
-
-.break-requirement-indicator__text {
-    margin: 0;
-    font-weight: 600;
-}
 
 .form-toggle {
     position: relative;
@@ -790,17 +767,6 @@
     }
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 /* Time zone context (list view): explains organization vs personal display time */
 .arbeitszeit-check-tz-context__body {
     display: flex;
@@ -890,12 +856,8 @@
     margin: 0;
 }
 
-#app-content.azc-app--time-entries .time-entries-page__deletion-guide-title {
-    margin: 0 0 var(--azc-space-2, 0.5rem);
-    font-size: var(--azc-fs-base, 1rem);
-}
-
-/* Row actions: full button row on desktop; collapsible menu on small screens. */
+/* Row actions: hover/focus reveal from 768px (page-patterns.css).
+   Below that, one Actions toggle opens this row's buttons. */
 #app-content.azc-app--time-entries .azc-row-actions {
     display: flex;
     flex-direction: column;
@@ -910,7 +872,9 @@
 
 #app-content.azc-app--time-entries .azc-row-actions__panel {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: var(--azc-space-2, 0.5rem);
 }
 
@@ -1034,23 +998,8 @@
 	overflow-x: auto;
 }
 
-/* Keep row actions reachable while horizontally scrolling wide tables (#12).
-   Skip below the card/mobile breakpoint where the Actions toggle takes over. */
-@media (min-width: 48rem) {
-	#app-content.azc-app--time-entries #time-entries-table th.azc-table-actions-col,
-	#app-content.azc-app--time-entries #time-entries-table td.actions-cell {
-		position: sticky;
-		right: 0;
-		z-index: 2;
-		background: var(--azc-bg-card, var(--arbeitszeitcheck-color-background-elevated, var(--color-main-background)));
-		box-shadow: -6px 0 8px -6px color-mix(in srgb, var(--color-main-text) 18%, transparent);
-	}
-
-	#app-content.azc-app--time-entries #time-entries-table thead th.azc-table-actions-col {
-		z-index: 3;
-		background: var(--arbeitszeitcheck-color-background-dark, var(--color-background-dark, var(--azc-bg-card)));
-	}
-}
+/* Row actions: shared hover/focus reveal in page-patterns.css.
+   A sticky actions column covered the row and forced sideways scrolling. */
 
 #app-content.azc-app--time-entries #paused-entries-banner,
 #app-content.azc-app--time-entries .pending-correction-banner {
@@ -1090,21 +1039,31 @@
 	margin-top: var(--azc-space-3, 0.75rem);
 }
 
+#app-content.azc-app--time-entries .azc-page-header {
+	gap: var(--azc-space-2, 0.5rem);
+	margin-bottom: var(--azc-space-3, 0.75rem);
+}
+
 #app-content.azc-app--time-entries .time-entries-page__form .azc-card__body {
 	display: flex;
 	flex-direction: column;
-	gap: var(--azc-space-5, 1.25rem);
+	gap: var(--azc-space-3, 0.75rem);
+	padding: var(--azc-space-4, 1rem);
 }
 
 #app-content.azc-app--time-entries .time-entry-request-form {
 	display: flex;
 	flex-direction: column;
-	gap: var(--azc-space-8, 2rem);
+	gap: var(--azc-space-4, 1rem);
+}
+
+#app-content.azc-app--time-entries #time-entry-form .form-group {
+	margin-bottom: 0;
 }
 
 #app-content.azc-app--time-entries .time-entry-form__required-note {
 	margin: 0;
-	padding-bottom: var(--azc-space-4, 1rem);
+	padding-bottom: var(--azc-space-2, 0.5rem);
 	border-bottom: 1px solid var(--azc-border, var(--color-border));
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: var(--azc-line-base, 1.45);
@@ -1127,7 +1086,7 @@
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: var(--azc-space-5, 1.25rem);
+	gap: var(--azc-space-3, 0.75rem);
 }
 
 #app-content.azc-app--time-entries .time-entry-form-fieldset__legend {
@@ -1135,31 +1094,121 @@
 	font-weight: 700;
 	color: var(--color-main-text, var(--arbeitszeitcheck-color-main-text));
 	padding: 0;
-	margin: 0 0 var(--azc-space-2, 0.5rem);
+	margin: 0;
 	line-height: 1.35;
 	width: 100%;
-	border-bottom: 1px solid var(--azc-border, var(--color-border));
-	padding-bottom: var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app--time-entries .time-entry-request-form > .time-entry-form-fieldset {
+	margin-top: calc(3em - var(--azc-space-4, 1rem));
+}
+
+/* A container cannot query itself, so the fieldset is the size container. */
+#app-content.azc-app--time-entries .time-entry-form-fieldset:has(> .time-entry-form__when) {
+	container-type: inline-size;
+	container-name: azc-when;
+}
+
+/* 11.25rem is the time picker: hour, minute, and clock button. Gap is 1rem. */
+#app-content.azc-app--time-entries .time-entry-form__when {
+	display: grid;
+	width: 100%;
+	min-width: 0;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-bottom: 0;
+}
+
+/* Date on its own row; start and end stay on the next. */
+@container azc-when (max-width: 35.75rem) {
+	#app-content.azc-app--time-entries .time-entry-form__when {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	#app-content.azc-app--time-entries .time-entry-form__when > .form-group:first-child {
+		grid-column: 1 / -1;
+	}
+}
+
+@container azc-when (max-width: 23.5rem) {
+	#app-content.azc-app--time-entries .time-entry-form__when {
+		grid-template-columns: 1fr;
+	}
+}
+
+#app-content.azc-app--time-entries .time-entry-form__when > .form-group,
+#app-content.azc-app--time-entries .time-entry-form__when .azc-datepicker-host,
+#app-content.azc-app--time-entries .time-entry-form__when .datepicker-input {
+	min-width: 0;
 }
 
 #app-content.azc-app--time-entries .time-entry-form-fieldset--breaks {
-	padding: var(--azc-space-5, 1.25rem);
-	border-radius: var(--azc-radius-base, 8px);
-	border: 1px solid var(--azc-border, var(--color-border));
-	background: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 6%, var(--color-main-background));
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
 }
 
-#app-content.azc-app--time-entries .time-entry-form__break-intro {
+#app-content.azc-app--time-entries .time-entry-form__break-hint {
 	margin: 0;
+}
+
+/* .form-error is display:flex, which would show this before submit. */
+#app-content.azc-app--time-entries #break-submit-error[hidden] {
+	display: none;
+}
+
+#app-content.azc-app--time-entries .time-pair-matrix--breaks .time-pair-matrix__intro--breaks {
+	margin-top: var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app--time-entries .time-pair-matrix--breaks .time-pair-matrix__grid--row {
+	align-items: center;
+}
+
+#app-content.azc-app--time-entries .time-pair-matrix--breaks .time-pair-matrix__action {
+	align-items: center;
+	align-self: center;
+	min-height: 0;
+	padding-bottom: 0;
+}
+
+/* Row names stay available to assistive tech. They must not reserve a line
+   above the pickers, or Remove sits below the fields. */
+#app-content.azc-app--time-entries .time-pair-matrix--breaks .form-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+	min-height: 0;
+}
+
+#app-content.azc-app--time-entries .btn-remove-break:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
 }
 
 #app-content.azc-app--time-entries .time-entry-form__add-break {
 	margin-top: var(--azc-space-2, 0.5rem);
 }
 
+#app-content.azc-app--time-entries .auto-break-panel {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+#app-content.azc-app--time-entries #time-entry-form .time-summary-card,
+#app-content.azc-app--time-entries #time-entry-form #time-summary {
+	margin: 0;
+}
+
 #app-content.azc-app--time-entries .time-entry-form__actions {
 	margin-top: 0;
-	padding-top: var(--azc-space-6, 1.5rem);
+	padding-top: var(--azc-space-4, 1rem);
 	border-top: 1px solid var(--azc-border, var(--color-border));
 	display: flex;
 	flex-wrap: wrap;
@@ -1310,7 +1359,6 @@
 	#app-content.azc-app--time-entries .time-entry-form-fieldset,
 	#app-content.azc-app--time-entries .time-entry-form-fieldset--breaks,
 	#app-content.azc-app--time-entries .auto-break-panel,
-	#app-content.azc-app--time-entries .break-requirement-indicator,
 	#app-content.azc-app--time-entries .time-summary-card,
 	#app-content.azc-app--time-entries #time-summary {
 		border-color: CanvasText;

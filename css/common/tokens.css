@@ -12,6 +12,8 @@
 	--azc-space-6: 32px;
 	--azc-space-7: 48px;
 	--azc-space-8: 64px;
+	/* Clear space under the last block on every page. 5rem matches 5em at the root size. */
+	--azc-page-end: 5rem;
 
 	--azc-radius-sm: 6px;
 	--azc-radius-md: 12px;

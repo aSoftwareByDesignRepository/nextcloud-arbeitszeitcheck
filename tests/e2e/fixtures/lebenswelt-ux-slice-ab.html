@@ -19,17 +19,12 @@
 			<div class="time-entry-form__primary">
 				<label for="entry-date">Date</label>
 				<input id="entry-date" name="date" value="04.09.2026" />
-				<label for="entry-start-time-hour">Start</label>
-				<div class="time-input-group time-input-group--with-type">
-					<select id="entry-start-time-hour" aria-label="Start hour">
-						<option value="08" selected>08</option>
-					</select>
-					<select id="entry-start-time-minute" aria-label="Start minute">
-						<option value="00" selected>00</option>
-						<option value="05">05</option>
-						<option value="10">10</option>
-					</select>
-					<input id="entry-start-time-type" class="time-input-group__type" aria-label="Or type start time as HH:MM" value="08:00" />
+				<label id="entry-start-time-label" for="entry-start-time-hour">Start</label>
+				<div class="azc-timepicker" role="group" aria-labelledby="entry-start-time-label">
+					<input id="entry-start-time-hour" aria-label="Start hour" role="spinbutton" aria-valuemin="0" aria-valuemax="23" aria-valuenow="8" aria-valuetext="08" value="08" />
+					<span aria-hidden="true">:</span>
+					<input id="entry-start-time-minute" aria-label="Start minute" role="spinbutton" aria-valuemin="0" aria-valuemax="59" aria-valuenow="0" aria-valuetext="00" value="00" />
+					<button type="button" id="entry-start-time-open" aria-label="Choose start time" aria-haspopup="dialog" aria-expanded="false">Choose start time</button>
 					<input type="hidden" id="entry-start-time" value="08:00" />
 				</div>
 			</div>

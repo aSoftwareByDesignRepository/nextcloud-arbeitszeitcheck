@@ -120,26 +120,6 @@
   height: 1.125rem;
 }
 
-/* ===== TEXT RESIZING (WCAG 2.1 AAA: must work at 200% zoom) ===== */
-
-/* Ensure form remains usable at 200% zoom */
-@media screen and (min-resolution: 192dpi) {
-  #time-entry-form {
-    max-width: 100%;
-  }
-  
-  #time-entry-form .form-grid {
-    display: flex;
-    flex-wrap: wrap;
-  }
-  
-  #time-entry-form .time-input-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-}
-
 /* ===== HIGH CONTRAST MODE ===== */
 
 @media (prefers-contrast: high) {

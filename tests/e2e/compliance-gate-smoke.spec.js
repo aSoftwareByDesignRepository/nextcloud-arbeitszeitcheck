@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { login, credsFromEnv } from './helpers/auth.js'
 import { apiAllowFailure, getRequestToken } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
+import { setAzcTime } from './helpers/timepicker.js'
 
 test.use({ trace: 'off' }) // extra pages/contexts race Playwright's trace-chunk flush on close (ENOENT *.trace/*.network, upstream #23387) — screenshots/video still retained on failure
 
@@ -47,10 +48,8 @@ test.describe('Compliance gate smoke (Docker dev)', () => {
 		await assertArbeitszeitcheckLoaded(page)
 		await page.waitForSelector('#time-entry-form', { timeout: 30000 })
 
-		await page.locator('#entry-start-time-hour').selectOption('08')
-		await page.locator('#entry-start-time-minute').selectOption('00')
-		await page.locator('#entry-end-time-hour').selectOption('16')
-		await page.locator('#entry-end-time-minute').selectOption('00')
+		await setAzcTime(page, 'entry-start-time', '08:00')
+		await setAzcTime(page, 'entry-end-time', '16:00')
 
 		await expect(page.locator('#summary-working-hours')).not.toHaveText('0.00')
 		await expect(page.locator('#compliance-status')).not.toContainText(/Please enter both start and end time|Bitte.*Start.*End/i)
@@ -216,10 +215,8 @@ test.describe('Compliance gate smoke (Docker dev)', () => {
 		await assertArbeitszeitcheckLoaded(page)
 		await page.waitForSelector('#time-entry-form', { timeout: 30000 })
 
-		await page.locator('#entry-start-time-hour').selectOption('08')
-		await page.locator('#entry-start-time-minute').selectOption('00')
-		await page.locator('#entry-end-time-hour').selectOption('14')
-		await page.locator('#entry-end-time-minute').selectOption('00')
+		await setAzcTime(page, 'entry-start-time', '08:00')
+		await setAzcTime(page, 'entry-end-time', '14:00')
 
 		await expect(page.locator('#summary-working-hours')).toHaveText('6.00')
 		const status = page.locator('#compliance-status')

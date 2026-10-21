@@ -50,7 +50,14 @@ class DashboardRecentTableContractTest extends TestCase
 		$this->assertStringContainsString('border: 0;', $flush);
 		$this->assertStringContainsString('background: transparent;', $flush);
 		$this->assertStringContainsString('box-shadow: none;', $flush);
+		$this->assertStringContainsString('#app-content.azc-app .azc-card .azc-table-wrap', $css);
+		$this->assertStringContainsString('#app-content.azc-app .section .table-container', $css);
+		$this->assertStringContainsString('.azc-dialog .table-container', $css);
 		$this->assertStringContainsString('.azc-card__body:has(> .azc-table-wrap:only-child)', $css);
+
+		$narrow = $this->ruleBody($css, '#app-content.azc-app .table.azc-table--responsive tbody tr,');
+		$this->assertStringContainsString('border-bottom: 1px solid', $narrow);
+		$this->assertStringNotContainsString('border-radius: var(', $narrow);
 	}
 
 	private function ruleBody(string $css, string $needle): string

@@ -474,15 +474,13 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.azc-support-us__option:hover,
-.azc-support-us__option:focus-within {
+.azc-support-us__option:hover {
 	border-color: color-mix(in srgb, var(--color-primary-element) 45%, var(--azc-border, var(--color-border)));
 	box-shadow: var(--azc-shadow-md);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.azc-support-us__option:hover,
-	.azc-support-us__option:focus-within {
+	.azc-support-us__option:hover {
 		transform: translateY(-2px);
 	}
 }

@@ -27,6 +27,7 @@ use OCA\ArbeitszeitCheck\Support\ApiError;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -54,6 +55,7 @@ class WorkLocationController extends Controller
 	 * default for today (day override or resolved policy chain).
 	 */
 	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): JSONResponse
 	{
 		if (!$this->suiteConfig->isEnabled('work_location_catalog_enabled')) {

@@ -142,9 +142,13 @@
 		if (!badge) {
 			return;
 		}
-		badge.textContent = state.total > 0
-			? t('{count} employees', '{count} employees', { count: state.total })
-			: '';
+		if (state.total > 0) {
+			badge.textContent = t('{count} employees', '{count} employees', { count: state.total });
+			badge.classList.remove('visually-hidden');
+		} else {
+			badge.textContent = '';
+			badge.classList.add('visually-hidden');
+		}
 	}
 
 	function updatePagination() {
@@ -307,15 +311,15 @@
 			const absencesLink = pendingAbsences > 0 && absencesBase
 				? buildUrl(absencesBase, { employee_id: uid, status: 'pending' }) : '';
 			return '<tr>'
-				+ '<td data-cell="' + escapeHtml(t('Employee', 'Employee')) + '" class="manager-people__employee">' + employeeNameCell(employee) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Vacation remaining', 'Vacation remaining')) + '">' + vacationCell(employee) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Approved upcoming', 'Approved upcoming')) + '">' + upcomingCell(employee) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Overtime', 'Overtime')) + '">' + overtimeCell(employee) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Open issues', 'Open issues')) + '">'
+				+ '<td data-label="' + escapeHtml(t('Employee', 'Employee')) + '" class="manager-people__employee">' + employeeNameCell(employee) + '</td>'
+				+ '<td data-label="' + escapeHtml(t('Vacation remaining', 'Vacation remaining')) + '">' + vacationCell(employee) + '</td>'
+				+ '<td data-label="' + escapeHtml(t('Approved upcoming', 'Approved upcoming')) + '">' + upcomingCell(employee) + '</td>'
+				+ '<td data-label="' + escapeHtml(t('Overtime', 'Overtime')) + '">' + overtimeCell(employee) + '</td>'
+				+ '<td data-label="' + escapeHtml(t('Open issues', 'Open issues')) + '">'
 					+ violationsBadgeCell(openViolations, criticalViolations, violationsLink, t('Violations', 'Violations')) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Pending requests', 'Pending requests')) + '">'
+				+ '<td data-label="' + escapeHtml(t('Pending requests', 'Pending requests')) + '">'
 					+ countBadgeCell(pendingAbsences, absencesLink, t('Absences', 'Absences')) + '</td>'
-				+ '<td data-cell="' + escapeHtml(t('Details', 'Details')) + '" class="actions-cell">' + detailsCell(employee) + '</td>'
+				+ '<td data-label="' + escapeHtml(t('Details', 'Details')) + '" class="actions-cell">' + detailsCell(employee) + '</td>'
 				+ '</tr>';
 		});
 		body.innerHTML = rows.join('');
@@ -483,52 +487,21 @@
 			});
 		}
 
-		// Quick-filter pills — mutual-exclusive radiogroup with roving
-		// tabindex (design-system recipe B keyboard contract).
+		// Quick-filter pills — design-system recipe B via the synced
+		// view-components pack (radiogroup + roving tabindex + arrow keys).
 		const pillsWrap = el('manager-people-quick-filters');
-		const pillButtons = pillsWrap
-			? Array.prototype.slice.call(pillsWrap.querySelectorAll('.manager-people-pill'))
-			: [];
-		function activatePill(btn, focus) {
-			pillButtons.forEach((b) => {
-				b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
-				b.tabIndex = b === btn ? 0 : -1;
-			});
-			if (focus) {
-				btn.focus();
-			}
-			state.filter = btn.dataset.value || 'all';
-			state.offset = 0;
-			load();
-		}
-		if (pillsWrap) {
-			pillsWrap.addEventListener('click', (event) => {
-				const btn = event.target.closest('.manager-people-pill');
-				if (btn && pillButtons.includes(btn)) {
-					activatePill(btn, false);
-				}
-			});
-			pillsWrap.addEventListener('keydown', (event) => {
-				const cur = pillButtons.indexOf(document.activeElement);
-				if (cur < 0) {
+		let pillInitPending = true;
+		const pillGroup = window.CheckViewComponents
+			? window.CheckViewComponents.pillGroup(pillsWrap, (value) => {
+				state.filter = value || 'all';
+				state.offset = 0;
+				if (pillInitPending) {
+					pillInitPending = false;
 					return;
 				}
-				let next = null;
-				if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-					next = pillButtons[(cur + 1) % pillButtons.length];
-				} else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-					next = pillButtons[(cur - 1 + pillButtons.length) % pillButtons.length];
-				} else if (event.key === 'Home') {
-					next = pillButtons[0];
-				} else if (event.key === 'End') {
-					next = pillButtons[pillButtons.length - 1];
-				}
-				if (next) {
-					event.preventDefault();
-					activatePill(next, true);
-				}
-			});
-		}
+				load();
+			})
+			: null;
 
 		const form = el('manager-people-filter-form');
 		if (form) {
@@ -560,17 +533,14 @@
 				if (year) {
 					year.value = String(new Date().getFullYear());
 				}
-				state.filter = 'all';
-				const allPill = pillButtons.filter((b) => b.dataset.value === 'all')[0] || pillButtons[0];
-				if (allPill) {
-					pillButtons.forEach((b) => {
-						b.setAttribute('aria-pressed', b === allPill ? 'true' : 'false');
-						b.tabIndex = b === allPill ? 0 : -1;
-					});
-				}
-				state.offset = 0;
 				setFilterError('');
-				load();
+				if (pillGroup && pillsWrap) {
+					pillGroup.select('all');
+				} else {
+					state.filter = 'all';
+					state.offset = 0;
+					load();
+				}
 			});
 		}
 		const prev = el('manager-people-prev');

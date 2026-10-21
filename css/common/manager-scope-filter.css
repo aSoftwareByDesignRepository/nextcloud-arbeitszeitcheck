@@ -1,9 +1,10 @@
 /**
- * Manager scope list filter bars (time entries + absences).
+ * Manager scope list filter bars (time entries, absences, people overview).
  * Isolated from global .azc-filter-grid / subgrid rules in page-patterns.css.
  */
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar {
 	--azc-manager-filter-label-h: calc(var(--azc-fs-sm, 0.875rem) * var(--azc-line-tight, 1.25));
 	--azc-manager-filter-label-gap: var(--azc-space-2, 0.5rem);
@@ -16,6 +17,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__filter-form,
+#app-content.azc-app--manager-people .manager-scope-page__filter-form,
 #app-content.azc-app--manager-absences .manager-scope-page__filter-form {
 	display: flex;
 	flex-direction: column;
@@ -25,6 +27,7 @@
 
 /* ── Filter grid (row 1: criteria + actions, row 2: date range) ─── */
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .manager-scope-filter {
 	display: grid;
 	align-items: stretch;
@@ -81,6 +84,7 @@
 
 /* Override global subgrid on .azc-filter-field (page-patterns.css) */
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field {
 	display: grid;
 	grid-template-rows: auto minmax(44px, auto);
@@ -96,6 +100,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-field__label,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field__label,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-field__label {
 	font-size: var(--azc-fs-sm, 0.875rem);
 	font-weight: 600;
@@ -105,6 +110,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-field__control,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field__control,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-field__control {
 	position: relative;
 	display: block;
@@ -115,6 +121,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control {
 	display: flex;
 	align-items: center;
@@ -123,8 +130,10 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .form-input,
-#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .form-select,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .form-input,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .form-input,
+#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .form-select,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .form-select,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .form-select {
 	min-height: 44px;
 	width: 100%;
@@ -210,11 +219,13 @@
 
 /* Employee picker in toolbar */
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker {
 	width: 100%;
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__control,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__control,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__control {
 	position: relative;
 	display: block;
@@ -222,12 +233,14 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__search,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__search,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__search {
 	width: 100%;
 	padding-inline-end: calc(var(--azc-space-7, 2.75rem) + var(--azc-space-2, 0.5rem));
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__clear,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__clear,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__clear {
 	position: absolute;
 	inset-inline-end: var(--azc-space-2, 0.5rem);
@@ -250,20 +263,24 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__clear:hover,
-#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__clear:focus-visible,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__clear:hover,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__clear:hover,
+#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__clear:focus-visible,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__clear:focus-visible,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__clear:focus-visible {
 	background: var(--color-background-hover, var(--azc-bg-soft));
 	color: var(--azc-text, var(--color-main-text));
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__clear:focus-visible,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__clear:focus-visible,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__clear:focus-visible {
 	outline: 2px solid var(--color-primary-element);
 	outline-offset: 2px;
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .user-picker__list,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .user-picker__list,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .user-picker__list {
 	inset-inline: 0;
 	top: 100%;
@@ -271,6 +288,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .form-help,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .form-help,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .form-help {
 	position: absolute;
 	width: 1px;
@@ -285,6 +303,7 @@
 
 /* Reset global .azc-filter-actions grid-row when used as control wrapper */
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-field__control.azc-filter-actions,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field__control.azc-filter-actions,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-field__control.azc-filter-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -296,6 +315,7 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn {
 	flex: 0 1 auto;
 	min-width: 6.75rem;
@@ -303,17 +323,72 @@
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar-feedback,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar-feedback,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar-feedback {
 	margin: 0;
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar-footnote,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar-footnote,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar-footnote {
 	margin: 0;
 	max-width: 72ch;
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: var(--azc-line-base, 1.45);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+/* ── People overview filter: search / employee / year / sort / actions ── */
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
+	grid-template-columns:
+		minmax(0, 1.1fr)
+		minmax(0, 1.4fr)
+		minmax(0, 0.6fr)
+		minmax(0, 0.9fr)
+		minmax(0, auto);
+	grid-template-areas: 'search employee year sort actions';
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--search {
+	grid-area: search;
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--employee {
+	grid-area: employee;
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--year {
+	grid-area: year;
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--sort {
+	grid-area: sort;
+}
+
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--actions {
+	grid-area: actions;
+}
+
+@media (max-width: 1100px) {
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-areas:
+			'search employee'
+			'year sort'
+			'actions actions';
+	}
+}
+
+@media (max-width: 767.98px) {
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
+		grid-template-columns: 1fr;
+		grid-template-areas:
+			'search'
+			'employee'
+			'year'
+			'sort'
+			'actions';
+	}
 }
 
 @media (max-width: 1100px) {
@@ -370,17 +445,20 @@
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control,
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-field--actions .azc-filter-field__control {
 		margin-top: 0;
 		min-height: 0;
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions,
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions {
 		width: 100%;
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn {
 		flex: 1 1 calc(50% - 0.5rem);
 		justify-content: center;
@@ -388,6 +466,7 @@
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn--primary,
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn--primary,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn--primary {
 		flex: 1 1 100%;
 	}
@@ -395,6 +474,7 @@
 
 @media (forced-colors: active) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar,
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar,
 	#app-content.azc-app--manager-absences .manager-scope-page__toolbar {
 		border-bottom-color: CanvasText;
 	}

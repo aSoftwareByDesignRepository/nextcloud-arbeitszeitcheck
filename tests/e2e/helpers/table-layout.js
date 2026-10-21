@@ -31,7 +31,7 @@ export async function collectDesktopTableMetrics(page, tableSelector) {
 		// display:none above the card breakpoint (otherwise metrics always fail).
 		const actionCandidates = [
 			...table.querySelectorAll(
-				'td.actions-cell .azc-table-actions .btn, td.azc-table-actions-col .btn, .azc-table-actions .btn, td.actions-cell .btn',
+				'td.actions-cell .azc-table-actions .btn, td.actions-cell .azc-table-actions .azc-btn, td.azc-table-actions-col .btn, td.azc-table-actions-col .azc-btn, .azc-table-actions .btn, .azc-table-actions .azc-btn, td.actions-cell .btn, td.actions-cell .azc-btn',
 			),
 		]
 		const isLaidOut = (el) => {

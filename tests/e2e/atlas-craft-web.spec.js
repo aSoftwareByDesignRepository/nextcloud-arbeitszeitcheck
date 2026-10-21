@@ -97,6 +97,7 @@ const MANAGER_VIEWS = [
 	['manager-absences', '/apps/arbeitszeitcheck/manager/absences', '#azc-main-content'],
 	['manager-month-closures', '/apps/arbeitszeitcheck/manager/month-closures', '#azc-main-content'],
 	['manager-business-trips', '/apps/arbeitszeitcheck/manager/business-trips', '#mbt-root, #azc-main-content'],
+	['manager-people', '/apps/arbeitszeitcheck/manager/people', '#manager-people-body tr'],
 ];
 
 const ADMIN_SETTINGS_SECTIONS = [
@@ -144,6 +145,7 @@ const ADMIN_THEME_VIEWS = [
 
 const MANAGER_THEME_VIEWS = [
 	['manager', '/apps/arbeitszeitcheck/manager', '#azc-main-content'],
+	['manager-people', '/apps/arbeitszeitcheck/manager/people', '#manager-people-body tr'],
 ];
 
 test.describe.configure({ mode: 'serial' });
@@ -385,6 +387,65 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			await dismissToasts(page);
 			await shot(page, `azc-${id}.png`, { waitFor: ready, settleMs: 800 });
 		}
+
+		/* --- people overview: filter-error + mobile card craft, geometry probe ---
+		   Permanent probe (azc-vis-people-* cluster): the Details column is the
+		   rows' only control — at the 1280 critic-repro width it must render
+		   inside the card, and the filter grid must compute display:grid
+		   (manager-scope-filter.css whitelist covers --manager-people). */
+		await gotoApp(page, '/apps/arbeitszeitcheck/manager/people');
+		await page.waitForSelector('#manager-people-body tr', { timeout: 30_000 });
+		const peopleGeo = await page.evaluate(() => {
+			const wrap = document.querySelector('#manager-people-table-wrap');
+			const filter = document.querySelector('.manager-scope-filter');
+			const card = document.querySelector('.manager-scope-page__results .azc-card__body, .manager-scope-page__results')
+				|| wrap;
+			const actionsTd = document.querySelector('#manager-people-body td.actions-cell');
+			const cardRect = card.getBoundingClientRect();
+			const tdRect = actionsTd ? actionsTd.getBoundingClientRect() : null;
+			const badge = document.querySelector('#manager-people-count');
+			return {
+				filterDisplay: filter ? getComputedStyle(filter).display : '',
+				wrapClientW: wrap ? wrap.clientWidth : 0,
+				wrapScrollW: wrap ? wrap.scrollWidth : 0,
+				cardRight: cardRect.right,
+				actionsRight: tdRect ? tdRect.right : -1,
+				badgeHidden: badge ? badge.classList.contains('visually-hidden') : null,
+				badgeText: badge ? badge.textContent : null,
+			};
+		});
+		expect(peopleGeo.filterDisplay, 'people filter must compute grid (whitelist covers --manager-people)').toBe('grid');
+		expect(
+			peopleGeo.wrapScrollW,
+			`table must fit card at 1280 (scrollW ${peopleGeo.wrapScrollW} > clientW ${peopleGeo.wrapClientW})`,
+		).toBeLessThanOrEqual(peopleGeo.wrapClientW + 2);
+		expect(
+			peopleGeo.actionsRight,
+			'Details/actions column must render inside the card',
+		).toBeLessThanOrEqual(peopleGeo.cardRight + 2);
+		expect(peopleGeo.badgeHidden, 'count badge must not render as empty dot').toBe(false);
+		expect(peopleGeo.badgeText, 'populated table must show an employee count').toBeTruthy();
+		await shot(page, 'azc-manager-people-desktop-1280.png', { settleMs: 400 });
+
+		/* error state: invalid year → inline callout + honest empty state */
+		await page.locator('#manager-people-year').fill('1800');
+		await page.locator('#manager-people-submit').click();
+		await expect(page.locator('#manager-people-filter-error')).toBeVisible({ timeout: 10_000 });
+		await shot(page, 'azc-manager-people-filter-error.png', { settleMs: 300 });
+		await page.locator('#manager-people-clear').click();
+		await page.waitForSelector('#manager-people-body tr', { timeout: 30_000 });
+
+		/* mobile cards: 375 viewport → responsive card reflow, no page h-scroll */
+		await page.setViewportSize({ width: 375, height: 800 });
+		await gotoApp(page, '/apps/arbeitszeitcheck/manager/people');
+		await page.waitForSelector('#manager-people-body tr', { timeout: 30_000 });
+		const mobileGeo = await page.evaluate(() => ({
+			docW: document.documentElement.clientWidth,
+			scrollW: document.documentElement.scrollWidth,
+		}));
+		expect(mobileGeo.scrollW, 'no horizontal page scroll at 375').toBeLessThanOrEqual(mobileGeo.docW + 1);
+		await shot(page, 'azc-manager-people-mobile-cards.png', { settleMs: 400 });
+		await page.setViewportSize({ width: 1280, height: 720 });
 
 		/* --- manager create-time-entry dialog (open + cancel) --- */
 		await gotoApp(page, '/apps/arbeitszeitcheck/manager/time-entries');

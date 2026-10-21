@@ -39,6 +39,7 @@ const SURFACES = [
 	['/apps/arbeitszeitcheck/admin/settings/regional', 'admin settings regional', 'ADMIN'],
 	['/apps/arbeitszeitcheck/admin/vacation-rules', 'admin vacation rules', 'ADMIN'],
 	['/apps/arbeitszeitcheck/admin/overtime-settings', 'admin overtime settings', 'ADMIN'],
+	['/apps/arbeitszeitcheck/manager/people', 'manager people overview', 'MANAGER'],
 ];
 
 /**

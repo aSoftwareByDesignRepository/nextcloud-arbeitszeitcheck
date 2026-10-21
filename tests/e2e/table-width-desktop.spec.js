@@ -69,6 +69,28 @@ test.describe('Desktop table width (#12)', () => {
 		expect(metrics.needsHorizontalScroll, 'overflow-x scroll region when columns exceed width').toBe(true)
 	})
 
+	/**
+	 * Manager → People overview at 1280 (azc-vis-people-actions-column-clipped-1280):
+	 * the Details column is the rows' only interactive control — it must render
+	 * fully inside the card at the critic-repro width, not behind overflow-x.
+	 */
+	test('Manager → People overview: actions column visible at 1280', async ({ page }) => {
+		test.skip(!process.env.NC_MANAGER_USER, 'Requires NC_MANAGER_USER / NC_MANAGER_PASS')
+
+		await page.setViewportSize({ width: 1280, height: 900 })
+		await login(page, credsFromEnv('MANAGER'))
+		await page.goto('/apps/arbeitszeitcheck/manager/people')
+		await page.waitForSelector('#azc-main-content', { timeout: 30000 })
+
+		await expect(page.locator('#app-content-wrapper')).toHaveClass(/azc-shell--wide/)
+		await expect(page.locator('#manager-people-body tr').first()).toBeVisible({ timeout: 30000 })
+
+		assertDesktopTableMetrics(
+			expect,
+			await collectDesktopTableMetrics(page, '.manager-scope-page__results-table'),
+		)
+	})
+
 	test('Manager → Employee time entries: no narrow page cap', async ({ page }) => {
 		test.skip(!process.env.NC_MANAGER_USER, 'Requires NC_MANAGER_USER / NC_MANAGER_PASS')
 

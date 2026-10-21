@@ -32,19 +32,19 @@ $currentYear = (int)(new \DateTime())->format('Y');
 						} ?>
 					</p>
 				</div>
-				<p id="manager-people-count" class="azc-badge azc-badge--neutral" role="status" aria-live="polite"></p>
+				<p id="manager-people-count" class="azc-badge azc-badge--neutral visually-hidden" role="status" aria-live="polite"></p>
 			</header>
 			<div class="azc-card__body">
-				<div class="manager-people-quick-filters" id="manager-people-quick-filters" role="group" aria-labelledby="manager-people-quick-filters-label">
-					<p class="manager-people-quick-filters__label" id="manager-people-quick-filters-label"><?php p($l->t('Show')); ?></p>
-					<div class="manager-people-quick-filters__bar" role="radiogroup" aria-labelledby="manager-people-quick-filters-label">
-						<button type="button" class="manager-people-pill" data-value="all" aria-pressed="true">
+				<div class="azc-quick-filters" id="manager-people-quick-filters" role="group" aria-labelledby="manager-people-quick-filters-label">
+					<p class="azc-quick-filters__label" id="manager-people-quick-filters-label"><?php p($l->t('Show')); ?></p>
+					<div class="azc-filter-bar" role="radiogroup" aria-labelledby="manager-people-quick-filters-label">
+						<button type="button" class="azc-filter" data-value="all" aria-pressed="true">
 							<?php p($l->t('Everyone')); ?>
 						</button>
-						<button type="button" class="manager-people-pill" data-value="needs_attention" aria-pressed="false" tabindex="-1">
+						<button type="button" class="azc-filter" data-value="needs_attention" aria-pressed="false" tabindex="-1">
 							<?php p($l->t('Needs attention')); ?>
 						</button>
-						<button type="button" class="manager-people-pill" data-value="pending_absences" aria-pressed="false" tabindex="-1">
+						<button type="button" class="azc-filter" data-value="pending_absences" aria-pressed="false" tabindex="-1">
 							<?php p($l->t('Pending requests')); ?>
 						</button>
 					</div>

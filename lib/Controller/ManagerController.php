@@ -687,7 +687,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function peoplePage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-people', 'manager-people', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+		$this->registerFrontEndAssets('manager-people', 'manager-people', [], ['common/view-components', 'common/admin-user-picker', 'common/manager-scoped-employee-picker']);
 
 		try {
 			$actorUserId = $this->getUserId();

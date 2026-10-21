@@ -178,7 +178,7 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		await expect(page.locator('#manager-people-table-wrap')).not.toHaveClass(/visually-hidden/, { timeout: 30000 })
 
 		// Recipe-B pill bar: labeled radiogroup with aria-pressed state.
-		const pills = page.locator('#manager-people-quick-filters .manager-people-pill')
+		const pills = page.locator('#manager-people-quick-filters .azc-filter')
 		await expect(pills).toHaveCount(3)
 		await expect(pills.nth(0)).toHaveAttribute('aria-pressed', 'true')
 

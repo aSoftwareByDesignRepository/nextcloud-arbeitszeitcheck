@@ -98,7 +98,7 @@ $managerEmployeeListL10n['dateRangeTooLong'] = TemplateL10n::translate(
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
 window.ArbeitszeitCheck.l10n = window.ArbeitszeitCheck.l10n || {};
-window.ArbeitszeitCheck.dateLocale = <?php echo json_encode($l->getLanguageCode(), TemplateL10n::JSON_ENCODE_FLAGS); ?>;
+window.ArbeitszeitCheck.dateLocale = <?php echo json_encode(str_replace('_', '-', $l->getLanguageCode()), TemplateL10n::JSON_ENCODE_FLAGS); ?>;
 window.ArbeitszeitCheck.maxManagerListDateRangeDays = <?php echo $maxDays; ?>;
 window.ArbeitszeitCheck.projectCheckEnabled = <?php echo $projectCheckEnabled ? 'true' : 'false'; ?>;
 Object.assign(window.ArbeitszeitCheck.l10n, <?php echo json_encode($managerEmployeeListL10n, TemplateL10n::JSON_ENCODE_FLAGS); ?>);

@@ -33,6 +33,14 @@ const adminRoutes = [
 	{ id: 'admin-overtime', path: '/apps/arbeitszeitcheck/admin/overtime-settings', ready: '#admin-overtime-settings-form' },
 ]
 
+// Manager oversight surface — the quick-filter pills + sort/search labels
+// must survive long-string locales and the 375px card layout.
+const managerRoutes = [
+	{ id: 'manager-people', path: '/apps/arbeitszeitcheck/manager/people', ready: '#manager-people-body tr:first-of-type' },
+	{ id: 'manager-time-entries', path: '/apps/arbeitszeitcheck/manager/time-entries', ready: '#employee-time-entries-filter-form' },
+	{ id: 'manager-absences', path: '/apps/arbeitszeitcheck/manager/absences', ready: '#employee-absences-filter-form' },
+]
+
 const viewports = [
 	{ width: 1280, height: 800, label: 'desktop' },
 	{ width: 375, height: 812, label: 'mobile' },
@@ -102,11 +110,13 @@ test.beforeAll(() => {
 	// Start from a known-language baseline so other specs are not affected.
 	resetRoleLanguage('EMPLOYEE')
 	resetRoleLanguage('ADMIN')
+	resetRoleLanguage('MANAGER')
 })
 
 test.afterAll(() => {
 	resetRoleLanguage('EMPLOYEE')
 	resetRoleLanguage('ADMIN')
+	resetRoleLanguage('MANAGER')
 })
 
 test.describe('ArbeitszeitCheck locale matrix (employee surfaces)', () => {
@@ -184,6 +194,45 @@ test.describe('ArbeitszeitCheck locale matrix (admin policy surfaces)', () => {
 
 	test('reset admin language', async ({ page }) => {
 		await login(page, credsFromEnv('ADMIN'))
+		const userId = await getCurrentUserId(page)
+		resetUserLanguage(userId)
+	})
+})
+
+test.describe('ArbeitszeitCheck locale matrix (manager oversight surfaces)', () => {
+	test.setTimeout(300_000)
+	test.skip(!process.env.NC_MANAGER_USER, 'Requires NC_MANAGER_USER / NC_MANAGER_PASS')
+
+	for (const locale of SUPPORTED_LOCALES) {
+		test(`${locale}: manager pages render without raw keys or overflow`, async ({ page }) => {
+			await login(page, credsFromEnv('MANAGER'))
+			const userId = await getCurrentUserId(page)
+			// Same leak guard as the employee matrix (see above).
+			try {
+				setUserLanguage(userId, locale)
+
+				for (const route of managerRoutes) {
+					await page.goto(route.path, { waitUntil: 'domcontentloaded' })
+					await assertArbeitszeitcheckLoaded(page)
+					await expect(page.locator(route.ready)).toBeVisible({ timeout: 30_000 })
+
+					const lang = await page.evaluate(() => document.documentElement.lang || '')
+					expect(lang.toLowerCase(), `html lang for ${locale}`).toContain(expectedHtmlLangPrefix(locale))
+
+					for (const viewport of viewports) {
+						await page.setViewportSize(viewport)
+						await expectNoHorizontalOverflow(page, `${locale}/${route.id}@${viewport.label}`)
+					}
+					await expectNoRawKeys(page)
+				}
+			} finally {
+				resetUserLanguage(userId)
+			}
+		})
+	}
+
+	test('reset manager language', async ({ page }) => {
+		await login(page, credsFromEnv('MANAGER'))
 		const userId = await getCurrentUserId(page)
 		resetUserLanguage(userId)
 	})

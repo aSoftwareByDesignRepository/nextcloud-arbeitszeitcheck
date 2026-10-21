@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.7 - 2026-10-20
+
+### Fixed
+
+- **False integrity-check warning on CHANGELOG.md (GH #47):** the 1.9.6 release package was signed while the changelog file was unreadable to the signing process, so some servers reported "Ergebnis der Code-Integritätsprüfung hat sich geändert / INVALID_HASH: CHANGELOG.md". The file content itself was always intact; this release ships a correctly generated signature. No functional changes.
+
 ## 1.9.6 - 2026-10-20
 
 ### Fixed

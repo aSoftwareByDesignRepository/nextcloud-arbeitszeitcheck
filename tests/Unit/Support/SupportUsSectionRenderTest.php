@@ -40,7 +40,9 @@ final class SupportUsSectionRenderTest extends TestCase {
 		self::assertStringContainsString('noopener noreferrer', $html);
 		self::assertStringNotContainsString('Official mobile & terminal licenses', $html);
 		self::assertStringContainsString('bookable help on an invoice, choose an option below', $html);
+		self::assertStringContainsString('ArbeitszeitCheck stays free', $html);
 		self::assertStringNotContainsString('official mobile licenses', $html);
+		self::assertStringNotContainsString('%s', $html);
 		self::assertStringNotContainsString('490', $html);
 		self::assertStringNotContainsString('<script', $html);
 	}
@@ -61,6 +63,7 @@ final class SupportUsSectionRenderTest extends TestCase {
 		self::assertStringContainsString(rawurlencode('ArbeitszeitCheck: Partner / Care Retainer'), $html);
 		self::assertStringContainsString('official mobile licenses', $html);
 		self::assertStringNotContainsString('bookable help on an invoice, choose an option below', $html);
+		self::assertStringNotContainsString('%s', $html);
 	}
 
 	public function testRenderUsesGermanIntroViaL10nCallback(): void {
@@ -69,6 +72,8 @@ final class SupportUsSectionRenderTest extends TestCase {
 			'de',
 			[
 				'Support & us' => 'Hilfe & Support',
+				'%s stays free (AGPL) on your Nextcloud. Bug reports and ideas on GitHub stay welcome — that is free open-source care. If your organisation needs bookable help on an invoice, choose an option below:' =>
+					'%s ist auf Ihrer Nextcloud kostenlos (AGPL). Fehler und Ideen über GitHub bleiben willkommen — das gehört zur kostenlosen Open-Source-Pflege. Wenn Ihre Organisation planbare Hilfe mit Rechnung braucht, wählen Sie unten eine Option:',
 				'Ask for a partner offer' => 'Partner-Angebot anfragen',
 				'Check Partner' => 'Check Partner',
 				'Annual hour packs — Small, Standard, or Premium — with priority email for your organisation. This is invoiceable service — not a donation. See packages on our support page.' =>
@@ -78,6 +83,8 @@ final class SupportUsSectionRenderTest extends TestCase {
 		self::assertStringContainsString('Hilfe &amp; Support', $html);
 		self::assertStringContainsString('Partner-Angebot anfragen', $html);
 		self::assertStringContainsString('Verrechenbare Leistung', $html);
+		self::assertStringContainsString('ArbeitszeitCheck ist auf Ihrer Nextcloud kostenlos', $html);
+		self::assertStringNotContainsString('%s', $html);
 	}
 
 	/**

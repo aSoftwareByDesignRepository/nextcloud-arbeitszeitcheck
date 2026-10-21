@@ -5975,14 +5975,14 @@
 		"Overtime balance unavailable for this employee." : "Saldo straordinari non disponibile per questo dipendente.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Anno non valido. Scegli un anno tra il 1970 e il 2100.",
 		"Some values could not be loaded. Try reloading the page." : "Alcuni valori non sono stati caricati. Prova a ricaricare la pagina.",
-		"Invalid sort." : "Invalid sort.",
-		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
-		"Most overtime" : "Most overtime",
-		"Most vacation" : "Most vacation",
-		"Name or user ID" : "Name or user ID",
-		"Needs attention" : "Needs attention",
-		"Open issues first" : "Open issues first",
-		"Sort by" : "Sort by"
+		"Invalid sort." : "Ordinamento non valido.",
+		"Matches everyone whose name contains the text." : "Corrisponde a tutte le persone il cui nome contiene il testo.",
+		"Most overtime" : "Più straordinari",
+		"Most vacation" : "Più ferie",
+		"Name or user ID" : "Nome o ID utente",
+		"Needs attention" : "Richiede attenzione",
+		"Open issues first" : "Problemi aperti per primi",
+		"Sort by" : "Ordina per"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

@@ -2804,7 +2804,7 @@
         "Pending approvals": "Oczekujące zatwierdzenia",
         "Pending corrections": "Oczekujące korekty",
         "Pending pairing": "Oczekujące parowanie",
-        "Pending requests": "Oczekujący requests",
+        "Pending requests": "Oczekujące wnioski",
         "Pending rows can be paid out individually. Paid rows are locked for audit.": "Oczekujące wiersze można wypłacać pojedynczo. Wypłacone wiersze są zablokowane do audytu.",
         "Pending substitution requests": "Oczekujące wnioski o zastępstwo",
         "People": "Osoby",
@@ -5963,14 +5963,14 @@
         "Overtime balance unavailable for this employee.": "Saldo nadgodzin niedostępne dla tego pracownika.",
         "Invalid year. Please choose a year between 1970 and 2100.": "Nieprawidłowy rok. Wybierz rok między 1970 a 2100.",
         "Some values could not be loaded. Try reloading the page.": "Niektórych wartości nie można było załadować. Spróbuj odświeżyć stronę.",
-        "Invalid sort.": "Invalid sort.",
-        "Matches everyone whose name contains the text.": "Matches everyone whose name contains the text.",
-        "Most overtime": "Most overtime",
-        "Most vacation": "Most vacation",
-        "Name or user ID": "Name or user ID",
-        "Needs attention": "Needs attention",
-        "Open issues first": "Open issues first",
-        "Sort by": "Sort by"
+        "Invalid sort.": "Nieprawidłowe sortowanie.",
+        "Matches everyone whose name contains the text.": "Dopasowuje wszystkich, których nazwa zawiera tekst.",
+        "Most overtime": "Najwięcej nadgodzin",
+        "Most vacation": "Najwięcej urlopu",
+        "Name or user ID": "Nazwa lub ID użytkownika",
+        "Needs attention": "Wymaga uwagi",
+        "Open issues first": "Otwarte problemy najpierw",
+        "Sort by": "Sortuj według"
     },
     "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

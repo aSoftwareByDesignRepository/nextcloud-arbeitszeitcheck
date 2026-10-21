@@ -5975,14 +5975,14 @@
 		"Overtime balance unavailable for this employee." : "Solde d’heures supplémentaires indisponible pour cet employé.",
 		"Invalid year. Please choose a year between 1970 and 2100." : "Année non valide. Veuillez choisir une année entre 1970 et 2100.",
 		"Some values could not be loaded. Try reloading the page." : "Certaines valeurs n’ont pas pu être chargées. Essayez de recharger la page.",
-		"Invalid sort." : "Invalid sort.",
-		"Matches everyone whose name contains the text." : "Matches everyone whose name contains the text.",
-		"Most overtime" : "Most overtime",
-		"Most vacation" : "Most vacation",
-		"Name or user ID" : "Name or user ID",
-		"Needs attention" : "Needs attention",
-		"Open issues first" : "Open issues first",
-		"Sort by" : "Sort by"
+		"Invalid sort." : "Tri non valide.",
+		"Matches everyone whose name contains the text." : "Correspond à toutes les personnes dont le nom contient le texte.",
+		"Most overtime" : "Le plus d’heures supplémentaires",
+		"Most vacation" : "Le plus de congés",
+		"Name or user ID" : "Nom ou ID utilisateur",
+		"Needs attention" : "Nécessite une attention",
+		"Open issues first" : "Problèmes ouverts d’abord",
+		"Sort by" : "Trier par"
 		}
 	);
 	});

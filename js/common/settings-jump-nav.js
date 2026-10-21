@@ -76,9 +76,19 @@
 			activateForId(window.location.hash.slice(1));
 		}
 
-		window.addEventListener('hashchange', () => {
-			if (window.location.hash) {
-				activateForId(window.location.hash.slice(1));
+		window.addEventListener('hashchange', (ev) => {
+			// Prefer the event's target URL: a deferred write elsewhere may
+			// already have rewritten location.hash before this listener ran.
+			let href = window.location.hash;
+			try {
+				if (ev && typeof ev.newURL === 'string' && ev.newURL !== '' && typeof URL === 'function') {
+					href = new URL(ev.newURL).hash;
+				}
+			} catch (e) {
+				/* fall back to location.hash */
+			}
+			if (href) {
+				activateForId(href.slice(1));
 			}
 		});
 

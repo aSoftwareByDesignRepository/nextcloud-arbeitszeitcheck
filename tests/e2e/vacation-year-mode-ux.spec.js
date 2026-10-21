@@ -115,8 +115,8 @@ test.describe('Phase B: absences carryover Q2 fixture', () => {
 		await expect(page.locator('#stat-carryover-usable')).toBeVisible();
 		await expect(page.locator('#stat-carryover-usable')).toContainText(/Carryover ended/i);
 		await expect(page.locator('#stats-carryover-deadline-notice')).toBeVisible();
-		await page.locator('#vacation-stats-details summary').click();
-		await expect(page.locator('#vacation-stats-details')).toHaveAttribute('open', '');
+		await expect(page.locator('#vacation-stats-details')).toHaveCount(0);
+		await expect(page.locator('#stat-carryover-pool-label')).toHaveText('Resturlaub');
 	});
 
 	test('J-A2: axe clean on simplified absences stats', async ({ page }) => {

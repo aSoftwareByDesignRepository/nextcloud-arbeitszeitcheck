@@ -27,7 +27,7 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		expect(box.height).toBeGreaterThanOrEqual(44);
 		expect(box.width).toBeGreaterThanOrEqual(44);
 
-		await page.locator('#btn-half-day-today').click();
+		await halfFace.click();
 		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
 		await expect(page.locator('#absence-day-fraction-preview')).toContainText(/0\.5|0,5/);
 
@@ -42,8 +42,12 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		await expect(group).toBeVisible();
 		await expect(page.locator('#absence-multi-day-half-tip')).toBeHidden();
 
-		await page.locator('#absence-type').selectOption('sick_leave');
+		await page.locator('#btn-report-sick-today').click();
+		await expect(page.locator('#absence-type')).toHaveValue('sick_leave');
+		await expect(page.locator('#absence-start-date')).toHaveValue('12.08.2026');
+		await expect(page.locator('#absence-end-date')).toHaveValue('12.08.2026');
 		await expect(group).toBeHidden();
+		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
 
 		const results = await new AxeBuilder({ page })
 			.include('#absences-days-half-create')
@@ -119,6 +123,20 @@ test.describe('Bachus: half-day days-mode live create', () => {
 		test.skip(hoursMode === '1', 'Hours mode uses presets instead of day_fraction');
 		await expect(page.locator('#absence-day-fraction-group')).toBeVisible();
 		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
+	});
+
+	test('sick today link prefills sick leave for today and does not select half day', async ({ page }) => {
+		const today = new Date();
+		const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+		const display = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+		await page.goto(`/apps/arbeitszeitcheck/absences/create?start=${ymd}&end=${ymd}&type=sick_leave`);
+		await page.waitForSelector('#absence-form', { timeout: 30000 });
+		await expect(page.locator('#absence-type')).toHaveValue('sick_leave');
+		await expect(page.locator('#absence-start-date')).toHaveValue(display);
+		await expect(page.locator('#absence-end-date')).toHaveValue(display);
+		await expect(page.locator('#absence-day-fraction-group')).toBeHidden();
+		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
+		await expect(page.locator('#absence-reason')).toHaveValue('');
 	});
 
 	test('J-H3: live create adapts to Nextcloud theme variables when days mode is active', async ({ page }) => {

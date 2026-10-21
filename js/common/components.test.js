@@ -291,3 +291,85 @@ describe('row action reveal', () => {
     expect(onDocument.defaultPrevented).toBe(false)
   })
 })
+
+describe('relocatePageActions', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = `
+      <div id="azc-page-actions" class="azc-page-header__actions"></div>
+      <main>
+        <div class="header-actions azc-page-actions-source">
+          <button id="act-a" type="button">Request</button>
+          <button id="act-b" type="button">Filter</button>
+          <button id="act-c" type="button">Download</button>
+        </div>
+        <div class="azc-card__header-actions">
+          <button id="act-card" type="button">Refresh</button>
+        </div>
+      </main>`
+    vi.resetModules()
+    await import('./components.js')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('moves a leftover group into the header in order and leaves card actions alone', () => {
+    const target = document.getElementById('azc-page-actions')
+    expect([...target.querySelectorAll('button')].map((button) => button.id)).toEqual(['act-a', 'act-b', 'act-c'])
+    expect(document.querySelector('main .header-actions')).toBeNull()
+    const card = document.getElementById('act-card')
+    expect(card.parentElement.className).toBe('azc-card__header-actions')
+    expect(target.contains(card)).toBe(false)
+  })
+
+  it('appends one document fragment, not one node per button', () => {
+    const target = document.getElementById('azc-page-actions')
+    target.replaceChildren()
+    const source = document.createElement('div')
+    source.className = 'azc-page-actions-source'
+    source.innerHTML = '<button id="n1" type="button">One</button><button id="n2" type="button">Two</button>'
+    document.body.appendChild(source)
+    const appended = []
+    const original = target.appendChild.bind(target)
+    target.appendChild = (node) => {
+      appended.push(node)
+      return original(node)
+    }
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(appended).toHaveLength(1)
+    expect(appended[0].nodeType).toBe(Node.DOCUMENT_FRAGMENT_NODE)
+    expect([...target.children].map((el) => el.id)).toEqual(['n1', 'n2'])
+    expect(source.isConnected).toBe(false)
+  })
+
+  it('does not unwrap controls that already sit in the header slot', () => {
+    const target = document.getElementById('azc-page-actions')
+    target.innerHTML = '<div class="header-actions"><button id="keep" type="button">Keep</button></div>'
+    const wrap = target.querySelector('.header-actions')
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(document.getElementById('keep').parentElement).toBe(wrap)
+    expect(wrap.isConnected).toBe(true)
+  })
+
+  it('does nothing when the header slot is missing', () => {
+    document.getElementById('azc-page-actions').remove()
+    const source = document.createElement('div')
+    source.className = 'header-actions'
+    source.innerHTML = '<button id="stay" type="button">Stay</button>'
+    document.body.appendChild(source)
+    expect(() => window.ArbeitszeitCheckComponents.relocatePageActions()).not.toThrow()
+    expect(document.getElementById('stay').parentElement).toBe(source)
+  })
+
+  it('removes an empty leftover source without adding a node', () => {
+    const target = document.getElementById('azc-page-actions')
+    const before = target.childNodes.length
+    const source = document.createElement('div')
+    source.className = 'header-actions'
+    document.body.appendChild(source)
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(source.isConnected).toBe(false)
+    expect(target.childNodes.length).toBe(before)
+  })
+})

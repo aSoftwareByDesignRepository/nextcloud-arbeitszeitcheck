@@ -366,16 +366,16 @@
 .dz-workspace .azc-btn--secondary,
 .dz-workspace .btn-secondary,
 .dz-workspace .btn--secondary {
-	background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;
-	border-color: var(--azc-form-border) !important;
+	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
+	border-color: var(--color-primary-element) !important;
 	color: var(--color-main-text) !important;
 }
 
 .dz-workspace .azc-btn--secondary:hover:not(:disabled),
 .dz-workspace .btn-secondary:hover:not(:disabled),
 .dz-workspace .btn--secondary:hover:not(:disabled) {
-	background-color: color-mix(in srgb, var(--color-main-background) 70%, var(--color-main-text) 30%) !important;
-	border-color: var(--color-primary-element, var(--azc-form-border)) !important;
+	background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover)) !important;
+	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--color-main-text) !important;
 }
 

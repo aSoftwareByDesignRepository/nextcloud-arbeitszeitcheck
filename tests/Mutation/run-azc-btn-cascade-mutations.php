@@ -14,9 +14,15 @@ declare(strict_types=1);
  */
 
 $appRoot = dirname(__DIR__, 2);
-$phpunit = $appRoot . '/vendor/bin/phpunit';
-if (!is_file($phpunit)) {
-	$phpunit = 'phpunit';
+$phpunit = 'phpunit';
+foreach ([
+	$appRoot . '/vendor/bin/phpunit',
+	dirname($appRoot) . '/budgetcheck/vendor/bin/phpunit',
+] as $candidate) {
+	if (is_file($candidate)) {
+		$phpunit = $candidate;
+		break;
+	}
 }
 
 /**
@@ -121,6 +127,46 @@ $mutations = [
 		'to' => ".azc-btn--tiny",
 		'filters' => [
 			'AzcBtnCascadeContractTest::testSmallAliasMirrorsSmSizing',
+		],
+	],
+	'revert_secondary_fill_to_grey' => [
+		'file' => 'css/app.css',
+		'from' => "background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;\n\tborder-color: var(--color-primary-element) !important;\n\tcolor: var(--azc-text, var(--color-main-text)) !important;",
+		'to' => "background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;\n\tborder-color: var(--color-border) !important;\n\tcolor: var(--color-primary-element-light-text) !important;",
+		'filters' => [
+			'AzcBtnCascadeContractTest::testSecondaryFillIsPrimaryLightOnEverySurface',
+		],
+	],
+	'drop_dialog_secondary_scope' => [
+		'file' => 'css/app.css',
+		'from' => '.azc-modal-backdrop .btn--secondary,',
+		'to' => '.azc-modal-backdrop .btn--second,',
+		'filters' => [
+			'AzcBtnCascadeContractTest::testSecondaryFillIsPrimaryLightOnEverySurface',
+		],
+	],
+	'revert_desklet_secondary_fill' => [
+		'file' => 'css/dashboard-widgets.css',
+		'from' => "background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;\n\tborder-color: var(--color-primary-element) !important;",
+		'to' => "background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;\n\tborder-color: var(--azc-form-border) !important;",
+		'filters' => [
+			'AzcBtnCascadeContractTest::testSecondaryFillIsPrimaryLightOnEverySurface',
+		],
+	],
+	'revert_support_us_secondary_fill' => [
+		'file' => 'css/admin-support-us.css',
+		'from' => "a.azc-support-us__cta.azc-btn--secondary {\n\tbackground-color: var(--color-primary-element-light, var(--color-primary-light)) !important;",
+		'to' => "a.azc-support-us__cta.azc-btn--secondary {\n\tbackground-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;",
+		'filters' => [
+			'AzcBtnCascadeContractTest::testSecondaryFillIsPrimaryLightOnEverySurface',
+		],
+	],
+	'revert_component_library_secondary_fill' => [
+		'file' => 'css/common/components.css',
+		'from' => ".btn--secondary {\n  background-color: var(--color-primary-element-light, var(--color-primary-light));",
+		'to' => ".btn--secondary {\n  background-color: var(--color-background-dark);",
+		'filters' => [
+			'AzcBtnCascadeContractTest::testSecondaryFillIsPrimaryLightOnEverySurface',
 		],
 	],
 ];

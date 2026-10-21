@@ -67,19 +67,19 @@ textarea:focus-visible {
 }
 
 .btn--secondary {
-  background-color: var(--color-background-dark);
-  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+  background-color: var(--color-primary-element-light, var(--color-primary-light));
+  border-color: var(--color-primary-element);
   color: var(--color-main-text);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background-color: var(--color-background-hover);
-  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+  background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover));
+  border-color: var(--color-primary-element-hover, var(--color-primary-element));
 }
 
 .btn--secondary:active:not(:disabled) {
-  background-color: var(--color-background-hover);
-  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+  background-color: var(--color-primary-element-light, var(--color-primary-light));
+  border-color: var(--color-primary-element);
 }
 
 .btn--tertiary {
@@ -225,14 +225,15 @@ textarea:focus-visible {
 
 .button.secondary,
 .btn-secondary {
-  background-color: var(--color-background-dark);
-  border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+  background-color: var(--color-primary-element-light, var(--color-primary-light));
+  border-color: var(--color-primary-element);
   color: var(--color-main-text);
 }
 
 .button.secondary:hover:not(:disabled),
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--color-background-hover);
+  background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover));
+  border-color: var(--color-primary-element-hover, var(--color-primary-element));
 }
 
 .button.error,
@@ -1556,7 +1557,9 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 .tooltip:hover::after,
-.tooltip:hover::before {
+.tooltip:hover::before,
+.tooltip:focus-visible::after,
+.tooltip:focus-visible::before {
   opacity: 1;
   visibility: visible;
 }

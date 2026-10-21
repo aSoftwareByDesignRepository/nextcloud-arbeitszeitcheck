@@ -21,7 +21,6 @@ $total = $_['total'] ?? 0;
 <?php include __DIR__ . '/common/page-start.php'; ?>
 
                 <div class="azc-page-stack">
-                <?php include __DIR__ . '/common/compliance-tabs.php'; ?>
 
 <div class="section">
 <?php if (!empty($_['filterUserId'])): ?>
@@ -30,7 +29,7 @@ $total = $_['total'] ?? 0;
                     <?php p($l->t('Showing violations for %s.', [$_['filterDisplayName'] ?? $_['filterUserId']])); ?>
                 </p>
                 <p class="callout__actions">
-                    <a class="azc-btn azc-btn--secondary azc-btn--sm" href="<?php p($_['urlGenerator']->linkToRoute('arbeitszeitcheck.compliance.violations')); ?>">
+                    <a class="azc-btn azc-btn--secondary azc-btn--sm" href="<?php p($_['urlGenerator']->linkToRoute('arbeitszeitcheck.compliance.dashboard')); ?>">
                         <?php p($l->t('Show all my visible violations')); ?>
                     </a>
                 </p>

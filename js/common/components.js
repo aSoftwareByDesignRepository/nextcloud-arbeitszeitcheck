@@ -867,7 +867,11 @@ const ArbeitszeitCheckComponents = {
   },
 
   /**
-   * Move legacy .header-actions / .azc-page-actions-source buttons into #azc-page-actions.
+   * Move a leftover .header-actions / .azc-page-actions-source into #azc-page-actions.
+   * Current pages already render those controls in the slot, so this is a no-op
+   * for them. Unwrapping a source that is already in the slot would change the
+   * flex line and shift the buttons after paint.
+   * Children move in one fragment: one append, one reflow, same order.
    */
   relocatePageActions() {
     const target = document.getElementById('azc-page-actions');
@@ -875,9 +879,14 @@ const ArbeitszeitCheckComponents = {
       return;
     }
     document.querySelectorAll('.azc-page-actions-source, .header-actions').forEach((source) => {
-      while (source.firstChild) {
-        target.appendChild(source.firstChild);
+      if (source === target || target.contains(source)) {
+        return;
       }
+      const fragment = document.createDocumentFragment();
+      while (source.firstChild) {
+        fragment.appendChild(source.firstChild);
+      }
+      target.appendChild(fragment);
       source.remove();
     });
   }

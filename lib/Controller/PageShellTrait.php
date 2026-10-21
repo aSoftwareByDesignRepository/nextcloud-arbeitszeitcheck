@@ -40,6 +40,7 @@ trait PageShellTrait
 		'timeline',
 		'reports',
 		'substitution-requests',
+		'compliance',
 		'compliance-dashboard',
 		'compliance-violations',
 		'compliance-reports',

@@ -34,7 +34,7 @@
 <body>
 <main id="absences-days-half-create" aria-labelledby="create-title">
 	<div class="list-actions" aria-label="Quick actions">
-		<a id="btn-half-day-today" class="azc-btn" href="#half-prefill">Half day today</a>
+		<a id="btn-report-sick-today" class="azc-btn" href="#sick-prefill">Report sick today</a>
 		<button type="button" class="azc-btn azc-btn--primary" id="btn-request-absence">Request Time Off</button>
 	</div>
 	<h1 id="create-title">Request time off</h1>
@@ -83,7 +83,7 @@
 	const typeEl = document.getElementById('absence-type');
 	const startEl = document.getElementById('absence-start-date');
 	const endEl = document.getElementById('absence-end-date');
-	const halfToday = document.getElementById('btn-half-day-today');
+	const sickToday = document.getElementById('btn-report-sick-today');
 
 	function sync() {
 		const single = startEl.value === endEl.value;
@@ -104,16 +104,16 @@
 			: 'This request uses 1 vacation day.';
 	}
 
-	if (halfToday) {
-		halfToday.addEventListener('click', function (e) {
+	if (sickToday) {
+		sickToday.addEventListener('click', function (e) {
 			e.preventDefault();
-			typeEl.value = 'vacation';
-			half.checked = true;
-			full.checked = false;
+			typeEl.value = 'sick_leave';
+			full.checked = true;
+			half.checked = false;
 			startEl.value = '12.08.2026';
 			endEl.value = '12.08.2026';
 			sync();
-			half.focus();
+			typeEl.focus();
 		});
 	}
 

@@ -891,7 +891,12 @@ class TimeEntryController extends Controller
 					$statusPart = $statusLabels[$entry->getStatus()] ?? $entry->getStatus();
 					$desc = trim((string)($entry->getDescription() ?? ''));
 
-					$line = $datePart . '  ' . $timePart . '  ·  ' . $hoursPart . ' (' . $breakPart . ')  ·  ' . $statusPart;
+					$locationCode = $entry->getWorkLocation();
+					$locationPart = $this->l10n->t('Work location') . ': ' . $this->workLocationExportLabel(
+						is_string($locationCode) ? $locationCode : null
+					);
+					$line = $datePart . '  ' . $timePart . '  ·  ' . $hoursPart . ' (' . $breakPart . ')  ·  ' . $statusPart
+						. '  ·  ' . $locationPart;
 					if ($desc !== '') {
 						$line .= '  ·  ' . mb_substr($desc, 0, 120);
 					}
@@ -920,6 +925,37 @@ class TimeEntryController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Display label for one PDF row. Built-in codes use the same strings as the
+	 * time-entry list; catalog codes use their stored label; an empty mark is
+	 * explicit so a missing location is not a blank gap in the line.
+	 */
+	private function workLocationExportLabel(?string $code): string
+	{
+		if ($code === null || $code === '') {
+			return (string)$this->l10n->t('Not specified');
+		}
+		$builtin = match ($code) {
+			WorkLocation::OFFICE => (string)$this->l10n->t('Office'),
+			WorkLocation::HOME => (string)$this->l10n->t('Home office'),
+			WorkLocation::EXTERNAL => (string)$this->l10n->t('External appointment'),
+			default => null,
+		};
+		if ($builtin !== null) {
+			return $builtin;
+		}
+		try {
+			$label = trim(\OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkLocationCatalog::class)
+				->labelFor($code, $this->l10n->getLanguageCode()));
+			if ($label !== '') {
+				return mb_substr($label, 0, 80);
+			}
+		} catch (\Throwable) {
+			// Catalog unavailable: the stored code still names the place.
+		}
+		return $code;
 	}
 
 	/**

@@ -40,19 +40,10 @@ $timeCapture = is_array($_['timeCapture'] ?? null) ? $_['timeCapture'] : [];
 $manualTimeEntryEnabled = (bool)($timeCapture['manualTimeEntryEnabled'] ?? true);
 require __DIR__ . '/common/user-display-timezone.php';
 /** @var \DateTimeZone $arbeitszeitCheckUserDisplayTz */
-?>
-
-<?php include __DIR__ . '/common/page-start.php'; ?>
-
-        <div class="azc-page-stack time-entries-page">
-        <?php if ($mode === 'list' && $error): ?>
-            <div class="azc-callout azc-callout--danger time-entries-page__list-error" role="alert">
-                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('alert-triangle', 'azc-callout__icon-svg')); ?></span>
-                <p class="azc-callout__text"><?php p($error); ?></p>
-            </div>
-        <?php endif; ?>
-        <?php if ($mode === 'list'): ?>
-            <div class="header-actions azc-page-actions-source">
+$pageHeaderActions = '';
+if ($mode === 'list') {
+	ob_start();
+	?>
                 <?php if ($manualTimeEntryEnabled): ?>
                 <button id="btn-add-entry"
                     class="azc-btn azc-btn--primary"
@@ -66,7 +57,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                     class="azc-btn azc-btn--secondary"
                     type="button"
                     aria-label="<?php p($l->t('Filter time entries by date or status')); ?>"
-                    title="<?php p($l->t('Click to show options for filtering your time entries. You can filter by date range or status.')); ?>">
+                    title="<?php p($l->t('Click to show options for filtering your time entries. You can filter by date range, work location, or status.')); ?>">
                     <?php p($l->t('Filter')); ?>
                 </button>
                 <button id="btn-export"
@@ -83,8 +74,23 @@ require __DIR__ . '/common/user-display-timezone.php';
                     title="<?php p($l->t('Downloads the currently filtered list as a PDF. Without a filter, the last 30 days are exported.')); ?>">
                     <?php p($l->t('Download PDF')); ?>
                 </button>
+	<?php
+	$captured = ob_get_clean();
+	$compact = preg_replace('/>\s+</', '><', $captured);
+	$pageHeaderActions = is_string($compact) ? $compact : $captured;
+}
+?>
+
+<?php include __DIR__ . '/common/page-start.php'; ?>
+
+        <div class="azc-page-stack time-entries-page">
+        <?php if ($mode === 'list' && $error): ?>
+            <div class="azc-callout azc-callout--danger time-entries-page__list-error" role="alert">
+                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('alert-triangle', 'azc-callout__icon-svg')); ?></span>
+                <p class="azc-callout__text"><?php p($error); ?></p>
             </div>
-            <?php if ($mode === 'list' && !$manualTimeEntryEnabled): ?>
+        <?php endif; ?>
+        <?php if ($mode === 'list' && !$manualTimeEntryEnabled): ?>
             <div class="azc-callout azc-callout--info time-entries-page__capture-disabled" role="status">
                 <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('info', 'azc-callout__icon-svg')); ?></span>
                 <div class="azc-callout__body">
@@ -92,7 +98,6 @@ require __DIR__ . '/common/user-display-timezone.php';
                     <p class="azc-callout__text"><?php p($l->t('Your administrator disabled adding hours by hand. You can still view entries and request corrections if something is wrong.')); ?></p>
                 </div>
             </div>
-            <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($mode === 'create' || $mode === 'edit'): ?>
@@ -676,11 +681,26 @@ require __DIR__ . '/common/user-display-timezone.php';
             $filterStartDate = $_['filterStartDate'] ?? '';
             $filterEndDate = $_['filterEndDate'] ?? '';
             $filterStatus = $_['filterStatus'] ?? '';
+            $filterWorkLocation = $_['filterWorkLocation'] ?? '';
+            $azcListFiltered = $filterStartDate !== '' || $filterEndDate !== '' || $filterStatus !== '' || $filterWorkLocation !== '';
+            $azcFilterLocations = is_array($workLocationOptions ?? null) ? $workLocationOptions : [
+                ['code' => 'office', 'label' => $l->t('Office')],
+                ['code' => 'home', 'label' => $l->t('Home office')],
+                ['code' => 'external', 'label' => $l->t('External appointment')],
+            ];
+            $azcFilterLocationCodes = [];
+            foreach ($azcFilterLocations as $azcFilterLocation) {
+                if (is_array($azcFilterLocation) && isset($azcFilterLocation['code'])) {
+                    $azcFilterLocationCodes[] = (string)$azcFilterLocation['code'];
+                }
+            }
+            if ($filterWorkLocation !== '' && !in_array($filterWorkLocation, $azcFilterLocationCodes, true)) {
+                $azcFilterLocations[] = ['code' => $filterWorkLocation, 'label' => $filterWorkLocation];
+            }
             ?>
-            <section id="filter-section" class="azc-card azc-filter-panel time-entries-page__filter" style="display: none;" aria-labelledby="time-entries-filter-title">
+            <section id="filter-section" class="azc-card azc-filter-panel time-entries-page__filter<?php if ($azcListFiltered): ?> is-open<?php endif; ?>"<?php if (!$azcListFiltered): ?> style="display: none;"<?php endif; ?> aria-labelledby="time-entries-filter-title">
                 <header class="azc-filter-panel__head">
                     <h2 id="time-entries-filter-title"><?php p($l->t('Filter')); ?></h2>
-                    <p class="azc-filter-panel__intro"><?php p($l->t('Narrow the list by date range or status, then click Apply.')); ?></p>
                 </header>
                 <div class="azc-filter-panel__body">
                     <form class="azc-filter-panel__form" novalidate>
@@ -698,6 +718,18 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 </div>
                             </div>
                             <div class="azc-filter-field">
+                                <label for="filter-work-location" class="azc-filter-field__label"><?php p($l->t('Work location')); ?></label>
+                                <div class="azc-filter-field__control">
+                                    <select id="filter-work-location" name="work_location" class="form-select">
+                                        <option value="" <?php echo $filterWorkLocation === '' ? 'selected' : ''; ?>><?php p($l->t('All')); ?></option>
+                                        <?php foreach ($azcFilterLocations as $azcFilterLocation): ?>
+                                            <?php if (!is_array($azcFilterLocation) || !isset($azcFilterLocation['code'], $azcFilterLocation['label'])) { continue; } ?>
+                                            <option value="<?php p((string)$azcFilterLocation['code']); ?>" <?php echo $filterWorkLocation === (string)$azcFilterLocation['code'] ? 'selected' : ''; ?>><?php p((string)$azcFilterLocation['label']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="azc-filter-field">
                                 <label for="filter-status" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
                                 <div class="azc-filter-field__control">
                                     <select id="filter-status" name="status" class="form-select">
@@ -711,9 +743,15 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                             <div class="azc-filter-field azc-filter-field--actions">
                                 <span class="azc-filter-field__label" aria-hidden="true">&nbsp;</span>
-                                <div class="azc-filter-field__control azc-filter-field__control--actions">
+                                <div class="azc-filter-field__control azc-filter-field__control--actions time-entries-page__filter-actions">
                                     <button id="btn-apply-filter" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Apply')); ?></button>
-                                    <button id="btn-clear-filter" class="azc-btn azc-btn--secondary" type="button"><?php p($l->t('Clear')); ?></button>
+                                    <button id="btn-clear-filter"
+                                        class="azc-btn azc-btn--secondary time-entries-page__filter-reset"
+                                        type="button"
+                                        title="<?php p($l->t('Clear')); ?>"
+                                        aria-label="<?php p($l->t('Clear')); ?>">
+                                        <?php print_unescaped(IconCatalog::render('rotate', 'azc-btn__icon')); ?>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -721,8 +759,8 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </section>
 
-            <section class="azc-card time-entries-page__list" aria-label="<?php p($l->t('Time entries list')); ?>" role="region">
-                <div class="azc-card__body time-entries-page__list-body">
+            <section class="time-entries-page__list" aria-label="<?php p($l->t('Time entries list')); ?>" role="region">
+                <div class="time-entries-page__list-body">
                 <?php
                 $pausedEntriesCount = 0;
                 foreach (($entries ?? []) as $pausedCheckEntry) {
@@ -769,7 +807,25 @@ require __DIR__ . '/common/user-display-timezone.php';
                     include __DIR__ . '/common/alert-callout.php';
                 endif;
                 ?>
+                <?php
+                $entryPager = is_array($_['entryPager'] ?? null) ? $_['entryPager'] : \OCA\ArbeitszeitCheck\Support\TablePager::state(is_array($entries ?? null) ? count($entries) : 0, null, null);
+                $entryPagerTotal = (int)($entryPager['total'] ?? 0);
+                $entryPagerPage = (int)($entryPager['page'] ?? 1);
+                $entryPagerPages = (int)($entryPager['pages'] ?? 1);
+                $entryPagerPerPage = (int)($entryPager['perPage'] ?? \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE);
+                $entryPagerOffset = (int)($entryPager['offset'] ?? 0);
+                $entryPagerItems = is_array($entryPager['items'] ?? null) ? $entryPager['items'] : [1];
+                $entryPagerFilters = is_array($entryPager['filters'] ?? null) ? $entryPager['filters'] : [];
+                $entryListLoaded = (int)($_['entryListLoaded'] ?? $entryPagerTotal);
+                $entryListTotal = (int)($_['entryListTotal'] ?? $entryListLoaded);
+                $entryListUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries');
+                $entryRowIndex = 0;
+                ?>
+                <?php if ($entryListTotal > $entryListLoaded): ?>
+                    <p class="form-help"><?php p($l->t('Showing the latest %1$s of %2$s entries.', [(string)$entryListLoaded, (string)$entryListTotal])); ?></p>
+                <?php endif; ?>
                 <div class="table-container">
+                    <div class="azc-table-scroll">
                     <table class="table table--hover azc-table--responsive" id="time-entries-table" role="table" aria-label="<?php p($l->t('Time entries list')); ?>">
                         <thead>
                             <tr>
@@ -797,13 +853,16 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     // through the request dialog and the manager approval UI.
                                     $rowDisplayStart = $entry->getStartTime() ? (clone $entry->getStartTime())->setTimezone($arbeitszeitCheckUserDisplayTz) : null;
                                     $rowDisplayEnd = $entry->getEndTime() ? (clone $entry->getEndTime())->setTimezone($arbeitszeitCheckUserDisplayTz) : null;
+                                    $hideEntryRow = $entryPagerTotal > $entryPagerPerPage
+                                    	&& ($entryRowIndex < $entryPagerOffset || $entryRowIndex >= $entryPagerOffset + $entryPagerPerPage);
+                                    $entryRowIndex++;
                                     $entrySummaryJson = htmlspecialchars(
                                         (string)json_encode($entrySummary, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE),
                                         ENT_QUOTES,
                                         'UTF-8'
                                     );
                                     ?>
-                                    <tr data-entry-id="<?php p($entry->getId()); ?>" class="<?php echo $isPendingRow ? 'time-entry-row--pending' : ''; ?>">
+                                    <tr data-azc-row data-entry-id="<?php p($entry->getId()); ?>" class="<?php echo $isPendingRow ? 'time-entry-row--pending' : ''; ?>"<?php echo $hideEntryRow ? ' hidden' : ''; ?>>
                                         <td data-label="<?php p($l->t('Date')); ?>"><?php if ($rowDisplayStart) { p($rowDisplayStart->format('d.m.Y')); } else { p('-'); } ?></td>
                                         <td data-label="<?php p($l->t('Start Time')); ?>"><?php if ($rowDisplayStart) { p($rowDisplayStart->format('H:i')); } else { p('-'); } ?></td>
                                         <td data-label="<?php p($l->t('End Time')); ?>"><?php
@@ -1082,12 +1141,11 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <?php else: ?>
                                 <tr>
                                     <td colspan="10">
-                                        <?php $azcListFiltered = ($filterStartDate ?? '') !== '' || ($filterEndDate ?? '') !== '' || ($filterStatus ?? '') !== ''; ?>
                                         <div class="azc-empty-state">
                                             <?php if ($azcListFiltered): ?>
                                                 <h3 class="azc-empty-state__title"><?php p($l->t('No entries match this filter')); ?></h3>
                                                 <p class="azc-empty-state__text">
-                                                    <?php p($l->t('Try a wider date range or a different status, or clear the filter to see all entries again.')); ?>
+                                                    <?php p($l->t('Try a wider date range, another work location, or a different status, or clear the filter to see all entries again.')); ?>
                                                 </p>
                                                 <a id="btn-clear-filter-empty"
                                                     class="azc-btn azc-btn--secondary"
@@ -1118,41 +1176,47 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <?php endif; ?>
                         </tbody>
                     </table>
+                    </div>
+                    <?php
+                    $azcTablePager = [
+                    	'id' => 'time-entries-table-pager',
+                    	'tableId' => 'time-entries-table',
+                    	'label' => $l->t('Time entries pagination'),
+                    	'base' => $entryListUrl,
+                    	'filters' => $entryPagerFilters,
+                    	'allow' => ['start_date', 'end_date', 'status', 'work_location'],
+                    	'state' => [
+                    		'total' => $entryPagerTotal,
+                    		'page' => $entryPagerPage,
+                    		'pages' => $entryPagerPages,
+                    		'perPage' => $entryPagerPerPage,
+                    		'items' => $entryPagerItems,
+                    	],
+                    	'pageParam' => 'page',
+                    	'sizeParam' => 'per_page',
+                    	'mode' => 'navigate',
+                    ];
+                    include __DIR__ . '/partials/table-pager.php';
+                    ?>
                 </div>
-
-                <?php if (!empty($entries) && count($entries) > 0): ?>
-                    <nav class="time-entries-page__pagination" aria-label="<?php p($l->t('Time entries pagination')); ?>">
-                        <button id="btn-prev-page" class="azc-btn azc-btn--secondary" type="button" disabled>
-                            <?php p($l->t('Previous')); ?>
-                        </button>
-                        <span class="time-entries-page__pagination-info">
-                            <span id="current-page">1</span> / <span id="total-pages">1</span>
-                        </span>
-                        <button id="btn-next-page" class="azc-btn azc-btn--secondary" type="button" disabled>
-                            <?php p($l->t('Next')); ?>
-                        </button>
-                    </nav>
-                <?php endif; ?>
                 </div>
             </section>
 
             <?php /* Overview + help material below the list (LWS request: primary content first). */ ?>
             <?php if (!empty($stats)): ?>
-                <section class="azc-card time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
-                    <div class="azc-card__body">
-                        <div class="stats-grid time-entries-page__stats-grid">
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
-                                <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('This Month')); ?></span>
-                                <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
-                                <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
-                            </div>
+                <section class="time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
+                    <div class="stats-grid time-entries-page__stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
+                            <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('This Month')); ?></span>
+                            <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
+                            <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
                         </div>
                     </div>
                 </section>

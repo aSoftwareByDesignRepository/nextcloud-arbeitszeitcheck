@@ -976,26 +976,116 @@
 	border: none;
 }
 
-#app-content.azc-app--time-entries .time-entries-page__filter-grid {
-	grid-template-columns:
-		minmax(0, 1fr)
-		minmax(0, 1fr)
-		minmax(0, 1fr)
-		auto;
+/* Stay on one row until a field would be narrower than its text, then wrap.
+   Apply and the reset icon never stack. */
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-grid {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	column-gap: var(--azc-space-5, 1.25rem);
+	row-gap: var(--azc-space-3, 0.75rem);
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-grid > .azc-filter-field {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 12.5rem;
+	min-width: min(100%, 12.5rem);
+	max-width: 100%;
+	grid-row: auto;
+	grid-template-rows: none;
+	gap: var(--azc-space-2, 0.5rem);
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-grid > .azc-filter-field--actions {
+	flex: 0 0 auto;
+	min-width: max-content;
+	max-width: none;
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-grid .form-input,
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-grid .form-select {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-actions {
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--azc-space-2, 0.5rem);
+	min-height: var(--azc-touch, 44px);
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter-reset {
+	width: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	padding: 0;
+}
+
+/* Headline only. The shared head keeps room for an intro line. */
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter .azc-filter-panel__head {
+	padding-block: var(--azc-space-3, 12px);
+	padding-inline: var(--azc-space-5, 24px);
+}
+
+#app-content.azc-app.azc-app--time-entries .time-entries-page__filter .azc-filter-panel__head h2 {
+	margin: 0;
+}
+
+/* Closed filters keep the 4em above the table. Open filters use half of that. */
+#app-content.azc-app--time-entries .time-entries-page__filter.is-open + .time-entries-page__list .table-container {
+	margin-top: 2em;
 }
 
 #app-content.azc-app--time-entries .time-entries-page__list-body {
 	display: flex;
 	flex-direction: column;
-	gap: var(--azc-space-4, 1rem);
+	gap: 0;
 	min-width: 0;
 }
 
+#app-content.azc-app--time-entries .time-entries-page__list,
+#app-content.azc-app--time-entries .time-entries-page__stats {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	padding: 0;
+}
+
 #app-content.azc-app--time-entries .time-entries-page__list .table-container {
-	margin: 0;
+	display: flex;
+	flex-direction: column;
+	margin: 4em 0;
 	max-width: 100%;
 	min-width: 0;
+	overflow: hidden;
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--azc-bg-card, var(--color-main-background));
+}
+
+#app-content.azc-app--time-entries .time-entries-page__list .azc-table-scroll {
 	overflow-x: auto;
+	min-width: 0;
+}
+
+/* The page stack already inserts its own gap. Cancel it where the 4em
+   margin is the space above the table or below the pager. */
+#app-content.azc-app--time-entries .time-entries-page__list:not(:has(> .time-entries-page__list-body > :first-child:not(.table-container))) {
+	margin-top: calc(-1 * var(--azc-space-5, 1.5rem));
+}
+
+#app-content.azc-app--time-entries .time-entries-page__list:not(:has(> .time-entries-page__list-body > :last-child:not(.table-container))) {
+	margin-bottom: calc(-1 * var(--azc-space-5, 1.5rem));
+}
+
+#app-content.azc-app--time-entries .time-entries-page__list .table thead,
+#app-content.azc-app--time-entries .time-entries-page__list .table thead th {
+	background-color: var(--azc-bg-soft);
 }
 
 /* Row actions: shared hover/focus reveal in page-patterns.css.
@@ -1006,21 +1096,6 @@
 	margin: 0;
 }
 
-#app-content.azc-app--time-entries .time-entries-page__pagination {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: center;
-	gap: var(--azc-space-3, 0.75rem);
-	margin: 0;
-	padding-top: var(--azc-space-4, 1rem);
-	border-top: 1px solid var(--azc-border, var(--color-border));
-}
-
-#app-content.azc-app--time-entries .time-entries-page__pagination-info {
-	font-size: var(--azc-fs-sm, 0.875rem);
-	color: var(--azc-muted, var(--color-text-maxcontrast));
-}
 
 #app-content.azc-app--time-entries .time-entries-page__form-inner {
 	min-width: 0;
@@ -1310,10 +1385,6 @@
 }
 
 @media (max-width: 767.98px) {
-	#app-content.azc-app--time-entries .time-entries-page__filter-grid {
-		grid-template-columns: 1fr;
-	}
-
 	#app-content.azc-app--time-entries .time-entries-page__stats-grid {
 		grid-template-columns: 1fr;
 	}

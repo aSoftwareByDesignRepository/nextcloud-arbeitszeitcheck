@@ -22,7 +22,6 @@ $endDate = $_['endDate'] ?? date('Y-m-d');
 <?php include __DIR__ . '/common/page-start.php'; ?>
 
                 <div class="azc-page-stack">
-                <?php include __DIR__ . '/common/compliance-tabs.php'; ?>
 
         <p class="azc-callout azc-callout--info" role="note">
             <?php p($l->t('Managers and administrators use Reports in the main menu for team exports. This page shows your personal compliance summary.')); ?>

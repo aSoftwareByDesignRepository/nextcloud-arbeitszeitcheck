@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Service\IconCatalog;
 use OCA\ArbeitszeitCheck\Support\BadgeVariant;
-use OCA\ArbeitszeitCheck\Util\HalfDayVacationShortcut;
 use OCA\ArbeitszeitCheck\Util\TemplateL10n;
 
 /**
@@ -34,6 +34,7 @@ $useAppTeams = $_['useAppTeams'] ?? false;
 $prefillStart = $_['prefillStart'] ?? null;
 $prefillEnd = $_['prefillEnd'] ?? null;
 $prefillHalf = !empty($_['prefillHalf']);
+$prefillType = is_string($_['prefillType'] ?? null) ? $_['prefillType'] : '';
 $today = new \DateTimeImmutable('today');
 $entitlementTraceUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.absence.entitlementTrace');
 if (preg_match('#^https?://[^/]+(/.*)$#', $entitlementTraceUrl, $entitlementTraceMatch)) {
@@ -53,24 +54,18 @@ if ($mode === 'create' && !$isVacationHours && $absenceFormStartDisplay === '' &
 	$absenceFormStartDisplay = $todayDisplay;
 	$absenceFormEndDisplay = $todayDisplay;
 }
-$halfDayTodayUrl = '';
-$halfDayShortcutLabel = $l->t('Half day today');
-$halfDayShortcutAria = $l->t('Request a half day of vacation for today');
-if ($mode === 'list' && !$isVacationHours) {
-	$halfAnchor = HalfDayVacationShortcut::anchorDate($today);
-	$halfDayTodayUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.absence.create', [
-		'start' => $halfAnchor->format('Y-m-d'),
-		'end' => $halfAnchor->format('Y-m-d'),
-		'half' => '1',
+$reportSickTodayUrl = '';
+if ($mode === 'list') {
+	$reportSickTodayUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.absence.create', [
+		'start' => $today->format('Y-m-d'),
+		'end' => $today->format('Y-m-d'),
+		'type' => Absence::TYPE_SICK_LEAVE,
 	]);
-	if (!HalfDayVacationShortcut::isSameCalendarDay($halfAnchor, $today)) {
-		$halfDayShortcutLabel = $l->t('Half day (next workday)');
-		$halfDayShortcutAria = $l->t('Request a half day of vacation for the next workday');
-	}
 }
-// Half-day deep link and create form default to Vacation (one less decision).
+// No type in the query: create still opens on Vacation (first option).
+// A prefill such as sick leave must not also reveal the vacation half-day control.
 $typeIsVacation = ($absence && $absence->getType() === 'vacation')
-	|| ($mode === 'create' && !$absence);
+	|| ($mode === 'create' && !$absence && ($prefillType === '' || $prefillType === Absence::TYPE_VACATION));
 $editIsHalf = $absence
 	&& $absence->getType() === 'vacation'
 	&& !$isVacationHours
@@ -79,7 +74,12 @@ $editIsHalf = $absence
 	&& $absence->getStartDate()
 	&& $absence->getEndDate()
 	&& $absence->getStartDate()->format('Y-m-d') === $absence->getEndDate()->format('Y-m-d');
-$halfSelected = $editIsHalf || ($mode === 'create' && $prefillHalf && !$isVacationHours);
+$halfSelected = $editIsHalf || (
+	$mode === 'create'
+	&& $prefillHalf
+	&& !$isVacationHours
+	&& ($prefillType === '' || $prefillType === Absence::TYPE_VACATION)
+);
 $showDayFractionInitially = !$isVacationHours
 	&& in_array($mode, ['create', 'edit'], true)
 	&& $typeIsVacation
@@ -110,6 +110,34 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
 		$absenceDurationHoursPrefill = (string)round((float)$dh, 2);
 	}
 }
+$pageHeaderActions = '';
+if ($mode === 'list') {
+	ob_start();
+	?>
+            <button id="btn-request-absence"
+                    class="azc-btn azc-btn--primary"
+                    type="button"
+                    aria-label="<?php p($l->t('Request time off for vacation or sick leave')); ?>">
+                <?php p($l->t('Request Time Off')); ?>
+            </button>
+            <?php if ($reportSickTodayUrl !== ''): ?>
+            <a id="btn-report-sick-today"
+               class="azc-btn azc-btn--secondary"
+               href="<?php p($reportSickTodayUrl); ?>">
+                <?php p($l->t('Report sick today')); ?>
+            </a>
+            <?php endif; ?>
+            <button id="btn-filter"
+                    class="azc-btn azc-btn--secondary"
+                    type="button"
+                    aria-label="<?php p($l->t('Filter absence requests by date or status')); ?>">
+                <?php p($l->t('Filter')); ?>
+            </button>
+	<?php
+	$captured = ob_get_clean();
+	$compact = preg_replace('/>\s+</', '><', $captured);
+	$pageHeaderActions = is_string($compact) ? $compact : $captured;
+}
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -121,31 +149,6 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                 <p class="azc-callout__text"><?php p($error); ?></p>
             </div>
         <?php endif; ?>
-        <?php if ($mode === 'list'): ?>
-        <div class="header-actions azc-page-actions-source">
-            <button id="btn-request-absence"
-                    class="azc-btn azc-btn--primary"
-                    type="button"
-                    aria-label="<?php p($l->t('Request time off for vacation or sick leave')); ?>">
-                <?php p($l->t('Request Time Off')); ?>
-            </button>
-            <?php if ($halfDayTodayUrl !== ''): ?>
-            <a id="btn-half-day-today"
-               class="azc-btn azc-btn--secondary"
-               href="<?php p($halfDayTodayUrl); ?>"
-               aria-label="<?php p($halfDayShortcutAria); ?>">
-                <?php p($halfDayShortcutLabel); ?>
-            </a>
-            <?php endif; ?>
-            <button id="btn-filter"
-                    class="azc-btn azc-btn--secondary"
-                    type="button"
-                    aria-label="<?php p($l->t('Filter absence requests by date or status')); ?>">
-                <?php p($l->t('Filter')); ?>
-            </button>
-        </div>
-        <?php endif; ?>
-
         <?php if (in_array($mode, ['create', 'edit'], true) && $useAppTeams): ?>
             <?php if (!$employeeHasAssignableManager): ?>
             <div class="azc-callout azc-callout--info absence-request-callout" role="status" aria-live="polite" aria-labelledby="approval-hint-title">
@@ -197,11 +200,13 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
             $filterStartDate = $_['filterStartDate'] ?? '';
             $filterEndDate = $_['filterEndDate'] ?? '';
             $filterStatus = $_['filterStatus'] ?? '';
+            $filterType = is_string($_['filterType'] ?? null) ? $_['filterType'] : '';
+            $absenceFilterTypes = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::creatableLabels($l);
+            $azcListFiltered = $filterStartDate !== '' || $filterEndDate !== '' || $filterStatus !== '' || $filterType !== '';
             ?>
-            <section id="filter-section" class="azc-card azc-filter-panel absences-page__filter" style="display: none;" aria-labelledby="absences-filter-title">
+            <section id="filter-section" class="azc-card azc-filter-panel absences-page__filter<?php if ($azcListFiltered): ?> is-open<?php endif; ?>"<?php if (!$azcListFiltered): ?> style="display: none;"<?php endif; ?> aria-labelledby="absences-filter-title">
                 <header class="azc-filter-panel__head">
                     <h2 id="absences-filter-title"><?php p($l->t('Filter')); ?></h2>
-                    <p class="azc-filter-panel__intro"><?php p($l->t('Narrow the list by date range or status, then click Apply.')); ?></p>
                 </header>
                 <div class="azc-filter-panel__body">
                     <form class="azc-filter-panel__form" novalidate>
@@ -219,6 +224,17 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                                 </div>
                             </div>
                             <div class="azc-filter-field">
+                                <label for="filter-type" class="azc-filter-field__label"><?php p($l->t('Type')); ?></label>
+                                <div class="azc-filter-field__control">
+                                    <select id="filter-type" name="type" class="form-select">
+                                        <option value="" <?php echo $filterType === '' ? 'selected' : ''; ?>><?php p($l->t('All')); ?></option>
+                                        <?php foreach ($absenceFilterTypes as $typeKey => $typeLabel): ?>
+                                            <option value="<?php p((string)$typeKey); ?>" <?php echo $filterType === (string)$typeKey ? 'selected' : ''; ?>><?php p((string)$typeLabel); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="azc-filter-field">
                                 <label for="filter-status" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
                                 <div class="azc-filter-field__control">
                                     <select id="filter-status" name="status" class="form-select">
@@ -232,9 +248,15 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                             </div>
                             <div class="azc-filter-field azc-filter-field--actions">
                                 <span class="azc-filter-field__label" aria-hidden="true">&nbsp;</span>
-                                <div class="azc-filter-field__control azc-filter-field__control--actions">
-                                    <button type="button" id="btn-apply-filter" class="azc-btn azc-btn--primary"><?php p($l->t('Apply')); ?></button>
-                                    <button type="button" id="btn-clear-filter" class="azc-btn azc-btn--secondary"><?php p($l->t('Clear')); ?></button>
+                                <div class="azc-filter-field__control azc-filter-field__control--actions absences-page__filter-actions">
+                                    <button id="btn-apply-filter" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Apply')); ?></button>
+                                    <button id="btn-clear-filter"
+                                        class="azc-btn azc-btn--secondary absences-page__filter-reset"
+                                        type="button"
+                                        title="<?php p($l->t('Clear')); ?>"
+                                        aria-label="<?php p($l->t('Clear')); ?>">
+                                        <?php print_unescaped(IconCatalog::render('rotate', 'azc-btn__icon')); ?>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -244,19 +266,7 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
         <?php endif; ?>
 
         <?php if ($mode === 'create' || $mode === 'edit'): ?>
-            <section class="azc-card absence-request-card" aria-labelledby="form-title" aria-describedby="form-desc">
-                <header class="azc-card__header">
-                    <div class="azc-card__header-text">
-                        <h2 id="form-title" class="azc-card__title"><?php
-                            if ($mode === 'create') {
-                                p($l->t('Request time off'));
-                            } else {
-                                p($l->t('Edit absence request'));
-                            }
-                        ?></h2>
-                        <p id="form-desc" class="azc-card__lead"><?php p($l->t('Fill in the type, dates, and optional reason and substitute.')); ?></p>
-                    </div>
-                </header>
+            <section class="azc-card absence-request-card" aria-labelledby="azc-page-title">
                 <div class="azc-card__body">
                 <p class="form-required-note">
                     <span class="form-required" aria-hidden="true">*</span>
@@ -279,14 +289,6 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                     <fieldset class="absence-form-fieldset" id="absence-form-details-fieldset">
                         <legend class="absence-form-fieldset__legend"><?php p($l->t('Request details')); ?></legend>
 
-                    <div class="azc-callout azc-callout--info absence-past-entry-hint" role="note" aria-labelledby="absence-past-entry-title">
-                        <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('calendar', 'azc-callout__icon-svg')); ?></span>
-                        <div class="azc-callout__body">
-                            <p id="absence-past-entry-title" class="azc-callout__title"><?php p($l->t('Past absences are allowed')); ?></p>
-                            <p class="azc-callout__text"><?php p($l->t('Use the same form for old vacation, sick leave, migration records, and future requests. Closed months stay protected and cannot be changed unless an administrator reopens them.')); ?></p>
-                        </div>
-                    </div>
-
                     <div class="form-group">
                         <label for="absence-type" class="form-label">
                             <?php p($l->t('Type')); ?> <span class="form-required" aria-hidden="true">*</span>
@@ -303,7 +305,7 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                                 ? \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($l)
                                 : \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::creatableLabels($l);
                             foreach ($absenceTypeOptions as $typeKey => $typeLabel): ?>
-                            <option value="<?php p($typeKey); ?>" <?php echo ($absence && $absence->getType() === $typeKey) ? 'selected' : ''; ?>>
+                            <option value="<?php p($typeKey); ?>" <?php echo (($absence && $absence->getType() === $typeKey) || (!$absence && $prefillType !== '' && $prefillType === $typeKey)) ? 'selected' : ''; ?>>
                                 <?php p($typeLabel); ?>
                             </option>
                             <?php endforeach; ?>
@@ -477,7 +479,7 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
 
                     <div class="form-group">
                         <label for="absence-reason" class="form-label">
-                            <?php p($l->t('Reason')); ?> <span class="form-optional"><?php p($l->t('(optional)')); ?></span>
+                            <?php p($l->t('Note (optional)')); ?>
                         </label>
                         <textarea id="absence-reason"
                                   name="reason"
@@ -524,6 +526,36 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                         </a>
                     </div>
                 </form>
+                <?php
+                $azcDismissedHints = is_array($_['dismissedHints'] ?? null) ? $_['dismissedHints'] : [];
+                $azcPastEntryHintDismissed = in_array('absence-past-entry-hint', $azcDismissedHints, true);
+                ?>
+                <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); ?></script>
+                <div class="azc-hint absence-past-entry-hint" data-hint="absence-past-entry-hint">
+                    <div class="azc-callout azc-callout--neutral azc-hint__body" id="absence-past-entry-hint" role="note" aria-labelledby="absence-past-entry-title"<?php echo $azcPastEntryHintDismissed ? ' hidden' : ''; ?>>
+                        <div class="azc-hint__header">
+                            <span class="azc-hint__icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                            <p class="azc-callout__title azc-hint__title" id="absence-past-entry-title"><?php p($l->t('Past absences are allowed')); ?></p>
+                            <button type="button"
+                                class="azc-hint__dismiss"
+                                data-hint-dismiss="absence-past-entry-hint"
+                                aria-expanded="true"
+                                aria-controls="absence-past-entry-hint"
+                                aria-label="<?php p($l->t('Hide this help text permanently')); ?>">
+                                <?php print_unescaped(IconCatalog::render('x', 'azc-hint__dismiss-icon')); ?>
+                            </button>
+                        </div>
+                        <p class="azc-callout__text"><?php p($l->t('Use the same form for old vacation, sick leave, migration records, and future requests. Closed months stay protected and cannot be changed unless an administrator reopens them.')); ?></p>
+                    </div>
+                    <button type="button"
+                        class="azc-hint__show azc-btn azc-btn--tertiary azc-btn--small"
+                        data-hint-show="absence-past-entry-hint"
+                        aria-expanded="false"
+                        aria-controls="absence-past-entry-hint"
+                        <?php echo $azcPastEntryHintDismissed ? '' : 'hidden'; ?>>
+                        <?php p($l->t('Show hint')); ?>
+                    </button>
+                </div>
                 </div>
             </section>
         <?php elseif ($mode === 'view' && $absence): ?>
@@ -774,130 +806,23 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                 </div>
             </section>
         <?php else: ?>
-            <!-- Stats Cards: Vacation only (sick leave etc. excluded) -->
-            <section class="section section--stats vacation-stats" aria-labelledby="stats-title">
-                <?php
-                // Unit labels computed once at top of template ($isVacationHours, $unitWord, …).
-                ?>
-                <h2 id="stats-title" class="section__title stats-section-title">
-                    <?php
-                    $vyLabel = (string)($stats['vacation_year_label'] ?? ($stats['vacation_year'] ?? date('Y')));
-                    p($l->t('Vacation balance') . ' ' . $vyLabel);
-                    ?>
-                </h2>
-                <?php if (!empty($stats['vacation_year_error'])) { ?>
-                <p class="azc-callout azc-callout--warning" role="status" id="absences-vacation-year-error">
-                    <?php p($l->t('Your vacation year uses hire anniversary, but no employment start date is set. Ask your admin to set it under Employees.')); ?>
-                </p>
-                <?php } ?>
-                <p id="stats-desc" class="stats-section-desc visually-hidden">
-                    <?php
-                    echo $isVacationHours
-                        ? $l->t('Remaining vacation hours for this year (annual entitlement plus carryover minus approved vacation). Sick leave and other absences are not deducted.')
-                        : $l->t('Remaining vacation days for this year (annual entitlement plus carryover minus approved vacation). Sick leave and other absences are not deducted.');
-                    ?>
-                </p>
-                <?php
-                $carryoverExpiresOn = $stats['vacation_carryover_expires_on'] ?? null;
-                $carryoverExpiresFmt = '';
-                if ($carryoverExpiresOn) {
-                    try {
-                        $carryoverExpiresFmt = (new \DateTimeImmutable((string)$carryoverExpiresOn))->format('d.m.Y');
-                    } catch (\Throwable $e) {
-                        $carryoverExpiresFmt = (string)$carryoverExpiresOn;
-                    }
-                }
-                $carryoverLockedAfterDeadline = !empty($stats['vacation_carryover_locked_after_deadline']);
-                ?>
-                <?php if (!empty($stats)): ?>
-                    <p class="stats-section__intro" id="stats-intro">
-                        <?php
-                        echo $isVacationHours
-                            ? $l->t('These numbers only count approved vacation. Amounts are in hours. Carryover must be used on or before the expiry date; after that, new requests use your regular annual entitlement first.')
-                            : $l->t('These numbers only count approved vacation. Carryover days must be used for vacation days on or before the expiry date; after that, new requests use your regular annual entitlement first.');
-                        ?>
-                        <?php if ($carryoverExpiresFmt !== '' && (float)($stats['vacation_carryover_days'] ?? 0) > 0.0001) { ?>
-                            <?php p(' ' . $l->t('Carryover expiry this year: %s.', [$carryoverExpiresFmt])); ?>
-                        <?php } ?>
-                        <?php if (isset($stats['vacation_carryover_max_cap']) && $stats['vacation_carryover_max_cap'] !== null && $stats['vacation_carryover_max_cap'] !== '') { ?>
-                            <?php p(' ' . $l->t('Admin cap on opening carryover: %s %s.', [(string)round((float)$stats['vacation_carryover_max_cap'], 1), $unitWord])); ?>
-                        <?php } ?>
-                    </p>
-                    <?php if ($carryoverLockedAfterDeadline && $carryoverExpiresFmt !== '') { ?>
-					<div class="vacation-stats__notice vacation-stats__notice--deadline" role="status" aria-live="polite" id="stats-carryover-deadline-notice">
-                        <p class="vacation-stats__notice-text"><?php
-                            echo $isVacationHours
-                                ? $l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining hours. The opening balance above is your HR record; approved vacation already reduced it.', [$carryoverExpiresFmt])
-                                : $l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining days. The opening balance above is your HR record; approved vacation already reduced it.', [$carryoverExpiresFmt]);
-                        ?></p>
-                        <p class="vacation-stats__notice-text vacation-stats__notice-text--secondary"><?php
-                            echo $isVacationHours
-                                ? $l->t('You still have hours left on paper, but they can no longer be booked as carryover—use your regular annual entitlement for new requests.')
-                                : $l->t('You still have days left on paper, but they can no longer be booked as carryover—use your regular annual entitlement for new requests.');
-                        ?></p>
-                    </div>
-                    <?php } ?>
-                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc stats-intro<?php echo $carryoverLockedAfterDeadline ? ' stats-carryover-deadline-notice' : ''; ?>">
-                        <div class="stat-card stat-card--remaining stat-card--hero">
-                            <span class="stat-label" id="stat-remaining-label"><?php p($l->t('Remaining')); ?></span>
-                            <span class="stat-value stat-value--hero" aria-labelledby="stat-remaining-label"><?php p((string)round($stats['vacation_days_remaining'] ?? 0, 1)); ?></span>
-                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
-                            <?php if ((float)($stats['vacation_carryover_usable'] ?? 0) > 0.0001 && $carryoverExpiresFmt !== '') { ?>
-                            <span class="stat-card__meta" id="stat-carryover-usable"><?php p($l->t('Of which %1$s %2$s carryover until %3$s', [
-								(string)round((float)($stats['vacation_carryover_usable'] ?? 0), 1),
-								$unitWord,
-								$carryoverExpiresFmt,
-							])); ?></span>
-                            <?php } elseif ($carryoverLockedAfterDeadline && $carryoverExpiresFmt !== '') { ?>
-                            <span class="stat-card__meta" id="stat-carryover-usable"><?php p($l->t('Carryover ended %s — book from annual leave only', [$carryoverExpiresFmt])); ?></span>
-                            <?php } ?>
-                        </div>
-                        <div class="stat-card stat-card--entitlement">
-                            <span class="stat-label" id="stat-entitlement-label"><?php p($l->t('Annual entitlement')); ?></span>
-                            <span class="stat-value" aria-labelledby="stat-entitlement-label"><?php p((string)round($stats['vacation_annual_entitlement'] ?? 0, 1)); ?></span>
-                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
-                            <button type="button" id="entitlement-explain" class="stat-card__action stat-card__action--explain"
-                                    aria-haspopup="dialog" aria-controls="entitlement-explain-dialog"
-                                    aria-label="<?php p($l->t('Show how my vacation entitlement was calculated')); ?>"><?php p($l->t('How is this calculated?')); ?></button>
-                        </div>
-                        <div class="stat-card stat-card--used">
-                            <span class="stat-label" id="stat-used-label"><?php p($l->t('Used this year')); ?></span>
-                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-used-label"><?php p((string)round($stats['vacation_days_used_this_year'] ?? 0, 1)); ?></span>
-                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
-                        </div>
-                        <div class="stat-card stat-card--pending">
-                            <span class="stat-label" id="stat-pending-label"><?php p($l->t('Pending requests')); ?></span>
-                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-pending-label"><?php p((string)($stats['pending_requests'] ?? 0)); ?></span>
-                            <span class="stat-sublabel"><?php p($l->t('awaiting approval')); ?></span>
-                        </div>
-                    </div>
-					<details class="vacation-stats__details" id="vacation-stats-details">
-						<summary><?php p($l->t('More balance details')); ?></summary>
-						<div class="stats-grid stats-grid--compact" role="group" aria-label="<?php p($l->t('Detailed vacation pools')); ?>">
-							<div class="stat-card stat-card--carryover<?php echo $carryoverLockedAfterDeadline ? ' stat-card--carryover-locked' : ''; ?>">
-								<span class="stat-label" id="stat-carryover-label"><?php p($l->t('Carryover (opening balance)')); ?></span>
-								<span class="stat-value" aria-labelledby="stat-carryover-label"><?php p((string)round($stats['vacation_carryover_days'] ?? 0, 1)); ?></span>
-								<span class="stat-sublabel"><?php p($unitSublabel); ?></span>
-							</div>
-							<div class="stat-card stat-card--annual-left">
-								<span class="stat-label" id="stat-annual-left-label"><?php p($l->t('Annual leave left')); ?></span>
-								<span class="stat-value" aria-labelledby="stat-annual-left-label"><?php p((string)round((float)($stats['vacation_annual_remaining'] ?? 0), 1)); ?></span>
-								<span class="stat-sublabel"><?php p($l->t('after approved absences')); ?></span>
-							</div>
-							<div class="stat-card stat-card--carryover-pool">
-								<span class="stat-label" id="stat-carryover-pool-label"><?php p($l->t('Carryover pool left')); ?></span>
-								<span class="stat-value" aria-labelledby="stat-carryover-pool-label"><?php p((string)round((float)($stats['vacation_carryover_remaining'] ?? 0), 1)); ?></span>
-								<span class="stat-sublabel"><?php p($l->t('after approved absences')); ?></span>
-							</div>
-						</div>
-					</details>
-                <?php endif; ?>
-            </section>
-
+            <?php
+            $absencePager = is_array($_['absencePager'] ?? null) ? $_['absencePager'] : null;
+            $absencePagerTotal = (int)($absencePager['total'] ?? 0);
+            $absencePagerPage = (int)($absencePager['page'] ?? 1);
+            $absencePagerPages = (int)($absencePager['pages'] ?? 1);
+            $absencePagerPerPage = (int)($absencePager['perPage'] ?? \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE);
+            $absencePagerOffset = (int)($absencePager['offset'] ?? 0);
+            $absencePagerItems = is_array($absencePager['items'] ?? null) ? $absencePager['items'] : [1];
+            $absencePagerFilters = is_array($absencePager['filters'] ?? null) ? $absencePager['filters'] : [];
+            $absenceListUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.page.absences');
+            $absenceRowIndex = 0;
+            ?>
             <!-- Absences List -->
             <section class="section section--list" aria-labelledby="list-title">
                 <h2 id="list-title" class="section__title visually-hidden"><?php p($l->t('Your absence requests')); ?></h2>
                 <div class="table-container">
+                    <div class="absences-table-scroll">
                     <table class="table table--hover absences-table azc-table--responsive" id="absences-table" role="table" aria-labelledby="list-title">
                         <thead>
                             <tr>
@@ -913,8 +838,13 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                         <tbody>
                             <?php if (!empty($absences)): ?>
                                 <?php foreach (($absences ?? []) as $absence): ?>
-                                    <?php $isPastAbsence = $absence->getEndDate() < $today; ?>
-                                    <tr data-absence-id="<?php p($absence->getId()); ?>" data-status="<?php p($absence->getStatus()); ?>">
+                                    <?php
+                                    $isPastAbsence = $absence->getEndDate() < $today;
+                                    $hideAbsenceRow = $absencePagerTotal > $absencePagerPerPage
+                                    	&& ($absenceRowIndex < $absencePagerOffset || $absenceRowIndex >= $absencePagerOffset + $absencePagerPerPage);
+                                    $absenceRowIndex++;
+                                    ?>
+                                    <tr data-azc-row data-absence-id="<?php p($absence->getId()); ?>" data-status="<?php p($absence->getStatus()); ?>"<?php echo $hideAbsenceRow ? ' hidden' : ''; ?>>
                                         <td data-label="<?php p($l->t('Type')); ?>">
                                             <span class="absence-type-badges">
                                                 <span class="absence-type-badge type-<?php p($absence->getType()); ?>">
@@ -1020,10 +950,10 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="7" class="empty-state">
-                                        <div class="empty-state">
-                                            <h3 class="empty-state__title"><?php p($l->t('No absences yet')); ?></h3>
-                                            <p class="empty-state__description">
+                                    <td colspan="7" class="azc-table-empty">
+                                        <div class="azc-empty-state">
+                                            <h3 class="azc-empty-state__title"><?php p($l->t('No absences yet')); ?></h3>
+                                            <p class="azc-empty-state__text">
                                                 <?php p($l->t('You have not requested any absences yet. Use the button below to request vacation, sick leave, or other time off.')); ?>
                                             </p>
                                             <div class="absence-empty-actions">
@@ -1033,12 +963,11 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                                                 aria-label="<?php p($l->t('Request your first absence')); ?>">
                                                 <?php p($l->t('Request Time Off')); ?>
                                             </button>
-                                            <?php if ($halfDayTodayUrl !== ''): ?>
-                                            <a id="btn-half-day-today-empty"
+                                            <?php if ($reportSickTodayUrl !== ''): ?>
+                                            <a id="btn-report-sick-today-empty"
                                                class="azc-btn azc-btn--secondary"
-                                               href="<?php p($halfDayTodayUrl); ?>"
-                                               aria-label="<?php p($halfDayShortcutAria); ?>">
-                                                <?php p($halfDayShortcutLabel); ?>
+                                               href="<?php p($reportSickTodayUrl); ?>">
+                                                <?php p($l->t('Report sick today')); ?>
                                             </a>
                                             <?php endif; ?>
                                             </div>
@@ -1048,8 +977,127 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
                             <?php endif; ?>
                         </tbody>
                     </table>
+                    </div>
+                <?php
+                $azcTablePager = [
+                	'id' => 'absences-table-pager',
+                	'tableId' => 'absences-table',
+                	'label' => $l->t('Absences pagination'),
+                	'base' => $absenceListUrl,
+                	'filters' => $absencePagerFilters,
+                	'allow' => ['start_date', 'end_date', 'type', 'status'],
+                	'state' => [
+                		'total' => $absencePagerTotal,
+                		'page' => $absencePagerPage,
+                		'pages' => $absencePagerPages,
+                		'perPage' => $absencePagerPerPage,
+                		'items' => $absencePagerItems,
+                	],
+                	'pageParam' => 'page',
+                	'sizeParam' => 'per_page',
+                	'mode' => 'navigate',
+                ];
+                include __DIR__ . '/partials/table-pager.php';
+                ?>
                 </div>
             </section>
+
+            <!-- Stats Cards: Vacation only (sick leave etc. excluded) -->
+            <section class="section section--stats vacation-stats" aria-labelledby="stats-title">
+                <?php
+                // Unit labels computed once at top of template ($isVacationHours, $unitWord, …).
+                ?>
+                <div class="stats-section-heading">
+                    <h2 id="stats-title" class="section__title stats-section-title">
+                        <?php
+                        $vyLabel = (string)($stats['vacation_year_label'] ?? ($stats['vacation_year'] ?? date('Y')));
+                        p($l->t('Vacation balance') . ' ' . $vyLabel);
+                        ?>
+                        <?php $balanceHelpLabel = $l->t('How this balance is calculated'); ?>
+                        <button type="button" id="entitlement-explain"
+                                class="stats-balance-help button-vue tooltip tooltip--below"
+                                aria-haspopup="dialog" aria-controls="entitlement-explain-dialog"
+                                aria-label="<?php p($balanceHelpLabel); ?>"
+                                data-tooltip="<?php p($balanceHelpLabel); ?>">
+                            <span class="stats-balance-help__mark" aria-hidden="true">?</span>
+                        </button>
+                    </h2>
+                </div>
+                <?php if (!empty($stats['vacation_year_error'])) { ?>
+                <p class="azc-callout azc-callout--warning" role="status" id="absences-vacation-year-error">
+                    <?php p($l->t('Your vacation year uses hire anniversary, but no employment start date is set. Ask your admin to set it under Employees.')); ?>
+                </p>
+                <?php } ?>
+                <p id="stats-desc" class="stats-section-desc visually-hidden">
+                    <?php
+                    echo $isVacationHours
+                        ? $l->t('Remaining vacation hours for this year (annual entitlement plus carryover minus approved vacation). Sick leave and other absences are not deducted.')
+                        : $l->t('Remaining vacation days for this year (annual entitlement plus carryover minus approved vacation). Sick leave and other absences are not deducted.');
+                    ?>
+                </p>
+                <?php
+                $carryoverExpiresOn = $stats['vacation_carryover_expires_on'] ?? null;
+                $carryoverExpiresFmt = '';
+                if ($carryoverExpiresOn) {
+                    try {
+                        $carryoverExpiresFmt = (new \DateTimeImmutable((string)$carryoverExpiresOn))->format('d.m.Y');
+                    } catch (\Throwable $e) {
+                        $carryoverExpiresFmt = (string)$carryoverExpiresOn;
+                    }
+                }
+                $carryoverLockedAfterDeadline = !empty($stats['vacation_carryover_locked_after_deadline']);
+                ?>
+                <?php if (!empty($stats)): ?>
+                    <?php if ($carryoverLockedAfterDeadline && $carryoverExpiresFmt !== '') { ?>
+					<div class="vacation-stats__notice vacation-stats__notice--deadline" role="status" aria-live="polite" id="stats-carryover-deadline-notice">
+                        <p class="vacation-stats__notice-text"><?php
+                            echo $isVacationHours
+                                ? $l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining hours. The opening balance above is your HR record; approved vacation already reduced it.', [$carryoverExpiresFmt])
+                                : $l->t('Carryover deadline has passed (%1$s). New requests can no longer use last year’s remaining days. The opening balance above is your HR record; approved vacation already reduced it.', [$carryoverExpiresFmt]);
+                        ?></p>
+                        <p class="vacation-stats__notice-text vacation-stats__notice-text--secondary"><?php
+                            echo $isVacationHours
+                                ? $l->t('You still have hours left on paper, but they can no longer be booked as carryover—use your regular annual entitlement for new requests.')
+                                : $l->t('You still have days left on paper, but they can no longer be booked as carryover—use your regular annual entitlement for new requests.');
+                        ?></p>
+                    </div>
+                    <?php } ?>
+                    <div class="stats-grid" role="group" aria-labelledby="stats-title" aria-describedby="stats-desc<?php echo $carryoverLockedAfterDeadline ? ' stats-carryover-deadline-notice' : ''; ?>">
+                        <div class="stat-card stat-card--entitlement">
+                            <span class="stat-label" id="stat-entitlement-label"><?php p($l->t('Annual entitlement')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-entitlement-label"><?php p((string)round($stats['vacation_annual_entitlement'] ?? 0, 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
+                        </div>
+                        <div class="stat-card stat-card--carryover-pool<?php echo $carryoverLockedAfterDeadline ? ' stat-card--carryover-locked' : ''; ?>">
+                            <span class="stat-label" id="stat-carryover-pool-label"><?php p($l->t('Resturlaub')); ?></span>
+                            <span class="stat-value" aria-labelledby="stat-carryover-pool-label"><?php p((string)round((float)($stats['vacation_carryover_remaining'] ?? 0), 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
+                            <ul class="stat-card__facts">
+                                <li id="stat-carryover-opening"><?php p($l->t('Opening balance at year start: %s', [(string)round((float)($stats['vacation_carryover_days'] ?? 0), 1)])); ?></li>
+                                <?php if ($carryoverExpiresFmt !== '') { ?>
+                                <li id="stat-carryover-expiry"><?php p($l->t('Expiry date: %s', [$carryoverExpiresFmt])); ?></li>
+                                <?php } ?>
+                            </ul>
+                        </div>
+                        <div class="stat-card stat-card--used">
+                            <span class="stat-label" id="stat-used-label"><?php p($l->t('Used this year')); ?></span>
+                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-used-label"><?php p((string)round($stats['vacation_days_used_this_year'] ?? 0, 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
+                        </div>
+                        <div class="stat-card stat-card--remaining stat-card--hero">
+                            <span class="stat-label" id="stat-remaining-label"><?php p($l->t('Remaining')); ?></span>
+                            <span class="stat-value stat-value--hero" aria-labelledby="stat-remaining-label"><?php p((string)round($stats['vacation_days_remaining'] ?? 0, 1)); ?></span>
+                            <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
+                        </div>
+                        <div class="stat-card stat-card--pending">
+                            <span class="stat-label" id="stat-pending-label"><?php p($l->t('Pending requests')); ?></span>
+                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-pending-label"><?php p((string)($stats['pending_requests'] ?? 0)); ?></span>
+                            <span class="stat-sublabel"><?php p($l->t('awaiting approval')); ?></span>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </section>
+
         <?php endif; ?>
 
 </div><!-- /.azc-page-stack -->
@@ -1084,11 +1132,6 @@ if ($absence && method_exists($absence, 'getDurationHours')) {
             <button type="button" id="entitlement-explain-retry" class="btn btn--secondary" hidden>
                 <?php p($l->t('Try again')); ?>
             </button>
-            <form method="dialog" class="entitlement-explain-dialog__close-form">
-                <button type="submit" id="entitlement-explain-close" class="btn btn--primary">
-                    <?php p($l->t('Close')); ?>
-                </button>
-            </form>
         </div>
     </div>
 </dialog>

@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Calendar-day anchor for the employee "half day" one-click shortcut.
+ * Calendar-day anchor for a half-day vacation deep link.
  *
- * Weekends are skipped so the create URL does not land on a day that always
- * fails VAC_HALF_DAY_NON_WORKING. Public holidays are still validated on submit.
+ * The absences list no longer offers this as a button. Weekends are skipped so
+ * a half-vacation URL does not land on a day that always fails
+ * VAC_HALF_DAY_NON_WORKING. Public holidays are still validated on submit.
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later

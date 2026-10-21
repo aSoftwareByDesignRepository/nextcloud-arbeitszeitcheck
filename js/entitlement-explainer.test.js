@@ -35,9 +35,6 @@ function mountDialog() {
         <button type="button" id="entitlement-explain-dismiss" aria-label="Close">X</button>
         <motion id="entitlement-explain-body"></motion>
         <button type="button" id="entitlement-explain-retry" hidden>Retry</button>
-        <form method="dialog">
-          <button type="submit" id="entitlement-explain-close">Close</button>
-        </form>
       </motion>
     </dialog>
     <script id="entitlement-explainer-bootstrap" type="application/json">${JSON.stringify(BOOTSTRAP)}</script>
@@ -155,5 +152,46 @@ describe('entitlement-explainer', () => {
     })
     const retry = document.getElementById('entitlement-explain-retry')
     expect(retry.hidden).toBe(false)
+  })
+
+  it('omits the safety-default warning when the applied layer is the organisation default', async () => {
+    window.ArbeitszeitCheckUtils.ajax.mockResolvedValue({
+      success: true,
+      effectiveEntitlementDays: 30,
+      matchedLayer: 'L0',
+      trace: {
+        degraded: true,
+        layers_evaluated: [
+          { layer: 'L1', matched: false },
+          { layer: 'L0', matched: true }
+        ]
+      }
+    })
+
+    document.getElementById('entitlement-explain').click()
+    await vi.waitFor(() => {
+      const body = document.getElementById('entitlement-explain-body')
+      expect(body.innerHTML).toContain('Organisation default')
+      expect(body.querySelector('.entitlement-explain-dialog__banner--warn')).toBeNull()
+    })
+  })
+
+  it('keeps the safety-default warning when a non-standard layer is degraded', async () => {
+    window.ArbeitszeitCheckUtils.ajax.mockResolvedValue({
+      success: true,
+      effectiveEntitlementDays: 20,
+      matchedLayer: 'L1',
+      trace: {
+        degraded: true,
+        layers_evaluated: [{ layer: 'L1', matched: true }]
+      }
+    })
+
+    document.getElementById('entitlement-explain').click()
+    await vi.waitFor(() => {
+      const body = document.getElementById('entitlement-explain-body')
+      expect(body.querySelector('.entitlement-explain-dialog__banner--warn')).toBeTruthy()
+      expect(body.innerHTML).toContain('degraded')
+    })
   })
 })

@@ -166,7 +166,10 @@
     }).join('');
 
     let bannerHtml = '';
-    if (trace && trace.degraded) {
+    // L0 / legacy already appear in the chain as the applied layer. The
+    // yellow "safety default" banner only repeats that.
+    const standardLayer = matched === 'L0' || matched === 'legacy';
+    if (trace && trace.degraded && !standardLayer) {
       bannerHtml += '<p class="entitlement-explain-dialog__banner entitlement-explain-dialog__banner--warn" role="alert">'
         + escapeHtml(tt('degradedBanner'))
         + '</p>';

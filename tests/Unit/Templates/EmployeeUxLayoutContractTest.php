@@ -83,6 +83,38 @@ class EmployeeUxLayoutContractTest extends TestCase
 		}
 		// Primary controls stay on top.
 		$this->assertLessThan($listPos, strpos($content, 'btn-add-entry'));
+		// The list and the three summary columns are their own frames.
+		// An outer card around either one is a second box.
+		$this->assertDoesNotMatchRegularExpression(
+			'/class="[^"]*azc-card[^"]*time-entries-page__list/',
+			$content
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/class="[^"]*azc-card[^"]*time-entries-page__stats/',
+			$content
+		);
+		$this->assertSame(3, substr_count($content, 'class="stat-card"'));
+	}
+
+	public function testTimeEntriesTableHeaderIsLightAndSpaced(): void
+	{
+		$css = self::src(__DIR__ . '/../../../css/time-entries.css');
+
+		$this->assertMatchesRegularExpression(
+			'/time-entries-page__list \.table thead th\s*\{[^}]*background-color:\s*var\(--azc-bg-soft\)/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/time-entries-page__list \.table-container\s*\{[^}]*margin:\s*4em 0;/s',
+			$css
+		);
+		$pagerCss = self::src(__DIR__ . '/../../../css/common/table-pager.css');
+		$this->assertStringContainsString('.table-container > .azc-table-pager', $pagerCss);
+		$content = self::src(self::$timeEntries);
+		$this->assertStringContainsString("'id' => 'time-entries-table-pager'", $content);
+		$this->assertStringContainsString('data-azc-row', $content);
+		$this->assertStringNotContainsString('id="btn-prev-page"', $content);
+		$this->assertStringNotContainsString('id="btn-next-page"', $content);
 	}
 
 	public function testCreateFormShowsWorkflowNoticesAboveSubmit(): void
@@ -99,6 +131,57 @@ class EmployeeUxLayoutContractTest extends TestCase
 		$this->assertGreaterThan($calloutPos, $actionsPos, 'workflow callouts sit above the submit row');
 	}
 
+	public function testTimeEntriesFilterKeepsWorkLocationAndResetOnOneRow(): void
+	{
+		$content = self::src(self::$timeEntries);
+		$css = self::src(__DIR__ . '/../../../css/time-entries.css');
+		$js = self::src(__DIR__ . '/../../../js/arbeitszeitcheck-main.js');
+
+		$this->assertStringContainsString('id="filter-work-location"', $content);
+		$this->assertStringContainsString('name="work_location"', $content);
+		$this->assertStringContainsString("IconCatalog::render('rotate'", $content);
+		$this->assertStringContainsString('time-entries-page__filter-reset', $content);
+		$this->assertStringContainsString("title=\"<?php p(\$l->t('Clear')); ?>\"", $content);
+		// The reset control is the icon. The word stays on the tooltip and the accessible name.
+		$this->assertDoesNotMatchRegularExpression(
+			'/id="btn-clear-filter"[\s\S]*?\>\s*<\?php p\(\$l->t\(\'Clear\'\)\); \?>/',
+			$content
+		);
+		$this->assertStringNotContainsString('azc-app--time-entries .azc-btn--secondary', $css);
+		$this->assertStringContainsString('flex-wrap: nowrap', $css);
+		$this->assertStringContainsString('flex-direction: row', $css);
+		$this->assertStringContainsString("params.append('work_location', workLocation)", $js);
+		$this->assertStringNotContainsString('azc-filter-panel__intro', $content);
+		$this->assertStringContainsString('time-entries-page__filter.is-open + .time-entries-page__list .table-container', $css);
+		$this->assertMatchesRegularExpression(
+			'/time-entries-page__filter\.is-open \+ \.time-entries-page__list \.table-container\s*\{[^}]*margin-top:\s*2em/s',
+			$css
+		);
+	}
+
+	public function testAbsencesFilterMatchesTimeEntriesRow(): void
+	{
+		$content = self::src(__DIR__ . '/../../../templates/absences.php');
+		$css = self::src(__DIR__ . '/../../../css/absences.css');
+		$js = self::src(__DIR__ . '/../../../js/arbeitszeitcheck-main.js');
+
+		$this->assertStringContainsString("IconCatalog::render('rotate'", $content);
+		$this->assertStringContainsString('id="filter-type"', $content);
+		$this->assertStringContainsString('AbsenceTypeCatalog::creatableLabels($l)', $content);
+		$this->assertStringContainsString('absences-page__filter-reset', $content);
+		$this->assertStringContainsString("title=\"<?php p(\$l->t('Clear')); ?>\"", $content);
+		$this->assertDoesNotMatchRegularExpression(
+			'/id="btn-clear-filter"[\s\S]*?\>\s*<\?php p\(\$l->t\(\'Clear\'\)\); \?>/',
+			$content
+		);
+		$this->assertStringNotContainsString('azc-filter-panel__intro', $content);
+		$this->assertStringContainsString('flex-wrap: nowrap', $css);
+		$this->assertStringContainsString('flex-direction: row', $css);
+		$this->assertStringContainsString('absences-page__filter.is-open + .section--list .table-container', $css);
+		$this->assertStringContainsString("filterSection.classList.toggle('is-open', visible)", $js);
+		$this->assertStringContainsString("params.append('type', type)", $js);
+	}
+
 	public function testStatCardBlockIsSharedBetweenVacationAndSick(): void
 	{
 		$content = self::src(self::$dashboard);
@@ -107,7 +190,7 @@ class EmployeeUxLayoutContractTest extends TestCase
 		$this->assertStringContainsString('azc-dashboard-sick dashboard-stat-card', $content);
 		$this->assertStringContainsString('azc-dashboard-vacation dashboard-stat-card', $content);
 		$this->assertStringNotContainsString('dashboard-vacation-card__', $content);
-		$this->assertStringContainsString('grid-area: sick', $css);
-		$this->assertStringContainsString('sick sick sick sick', $css);
+		$this->assertStringContainsString('.azc-dashboard-balance-row > .azc-card', $css);
+		$this->assertStringContainsString('.azc-dashboard-sick.azc-card', $css);
 	}
 }

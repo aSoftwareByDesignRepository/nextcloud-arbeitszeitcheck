@@ -31,8 +31,10 @@ use OCA\ArbeitszeitCheck\Service\OvertimeBankService;
 use OCA\ArbeitszeitCheck\Service\OvertimePayoutService;
 use OCA\ArbeitszeitCheck\Service\EmployeeSettingsSectionCatalog;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfile;
+use OCA\ArbeitszeitCheck\Support\TablePager;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\MobileAppLinks;
+use OCA\ArbeitszeitCheck\Support\WorkLocation;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -590,6 +592,7 @@ class PageController extends Controller
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', null, $extraStyles, [
 			'common/datepicker',
 			'common/validation',
+			'common/table-pager',
 		]);
 		foreach ($extraScripts as $script) {
 			\OCP\Util::addScript('arbeitszeitcheck', $script);
@@ -632,8 +635,9 @@ class PageController extends Controller
 			$filterStatus = (!empty($statusParam) && in_array($statusParam, $allowedStatuses, true))
 				? $statusParam
 				: '';
-			if ($filterStartDt !== null || $filterStatus !== '') {
-				$entries = array_values(array_filter($entries, function ($entry) use ($filterStartDt, $filterEndDt, $filterStatus) {
+			$filterWorkLocation = $this->normalizeWorkLocationFilter($this->request->getParam('work_location'));
+			if ($filterStartDt !== null || $filterStatus !== '' || $filterWorkLocation !== '') {
+				$entries = array_values(array_filter($entries, function ($entry) use ($filterStartDt, $filterEndDt, $filterStatus, $filterWorkLocation) {
 					if ($filterStartDt !== null) {
 						$start = $entry->getStartTime();
 						if (!$start || $start < $filterStartDt || $start > $filterEndDt) {
@@ -641,6 +645,9 @@ class PageController extends Controller
 						}
 					}
 					if ($filterStatus !== '' && $entry->getStatus() !== $filterStatus) {
+						return false;
+					}
+					if ($filterWorkLocation !== '' && $entry->getWorkLocation() !== $filterWorkLocation) {
 						return false;
 					}
 					return true;
@@ -669,13 +676,35 @@ class PageController extends Controller
 				$deletionEligibility[$entry->getId()] = $this->deletionPolicy->evaluate($entry);
 			}
 
+			$entryPagerFilters = [];
+			if ($filterStartDt !== null && $filterEndDt !== null) {
+				$entryPagerFilters['start_date'] = $filterStartDt->format('Y-m-d');
+				$entryPagerFilters['end_date'] = $filterEndDt->format('Y-m-d');
+			}
+			if ($filterStatus !== '') {
+				$entryPagerFilters['status'] = $filterStatus;
+			}
+			if ($filterWorkLocation !== '') {
+				$entryPagerFilters['work_location'] = $filterWorkLocation;
+			}
+			$entryPager = TablePager::state(
+				count($entries),
+				$this->request->getParam('page'),
+				$this->request->getParam('per_page'),
+			);
+			$entryPager['filters'] = $entryPagerFilters;
+
 			$params = $this->buildTimeEntriesShellParams('list', $navFlags) + [
 				'entries' => $entries,
+				'entryPager' => $entryPager,
+				'entryListLoaded' => count($allEntries),
+				'entryListTotal' => $timeEntryCount,
 				'deletionEligibility' => $deletionEligibility,
 				'mode' => 'list',
 				'filterStartDate' => $filterStartDate,
 				'filterEndDate' => $filterEndDate,
 				'filterStatus' => $filterStatus,
+				'filterWorkLocation' => $filterWorkLocation,
 				// Stats stay global (full list) — filtering must not zero the KPI
 				// cards, which would look like a load failure (dishonest empty).
 				'stats' => [
@@ -727,7 +756,7 @@ class PageController extends Controller
 	#[NoCSRFRequired]
 	public function absences(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker']);
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker', 'common/table-pager']);
 		Util::addScript('arbeitszeitcheck', 'entitlement-explainer');
 		if ($this->specialEntitlementsEnabled()) {
 			Util::addScript('arbeitszeitcheck', 'absence-entitlements');
@@ -736,10 +765,14 @@ class PageController extends Controller
 		try {
 			$userId = $this->getUserId();
 
-		// Read filter params (query string: start_date, end_date, status)
+		// Read filter params (query string: start_date, end_date, status, type)
 		$startDateParam = $this->request->getParam('start_date');
 		$endDateParam = $this->request->getParam('end_date');
 		$statusParam = $this->request->getParam('status');
+		$typeParam = trim((string)$this->request->getParam('type', ''));
+		$filterType = ($typeParam !== '' && \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isCreatable($typeParam))
+			? $typeParam
+			: '';
 
 		$filters = [];
 		$filterStartDt = null;
@@ -767,6 +800,16 @@ class PageController extends Controller
 			}
 		} else {
 			$absences = $this->absenceMapper->findByUser($userId);
+		}
+		if ($filterType !== '') {
+			$absences = array_values(array_filter($absences, static function ($absence) use ($filterType): bool {
+				$rowType = (string)$absence->getType();
+				if ($rowType === $filterType) {
+					return true;
+				}
+				// Older rows stored sick leave as "sick".
+				return $filterType === \OCA\ArbeitszeitCheck\Db\Absence::TYPE_SICK_LEAVE && $rowType === 'sick';
+			}));
 		}
 
 		// Get stats for sidebar (always from full list for consistent sidebar numbers)
@@ -807,7 +850,7 @@ class PageController extends Controller
 		$useAppTeams = $this->teamResolver->useAppTeams();
 
 		// Pending requests count: must use full list so filter doesn't affect stats
-		$absencesForStats = empty($filters) ? $absences : $this->absenceMapper->findByUser($userId);
+		$absencesForStats = ($filters === [] && $filterType === '') ? $absences : $this->absenceMapper->findByUser($userId);
 		$pendingCount = count(array_filter($absencesForStats, function ($a) {
 			return in_array($a->getStatus(), ['pending', 'substitute_pending'], true);
 		}));
@@ -823,6 +866,24 @@ class PageController extends Controller
 			}
 		}
 
+		$absencePagerFilters = [];
+		if ($filterStartDt && $filterEndDt) {
+			$absencePagerFilters['start_date'] = $filterStartDt->format('Y-m-d');
+			$absencePagerFilters['end_date'] = $filterEndDt->format('Y-m-d');
+		}
+		if ($filterType !== '') {
+			$absencePagerFilters['type'] = $filterType;
+		}
+		if (isset($filters['status']) && is_string($filters['status']) && $filters['status'] !== '') {
+			$absencePagerFilters['status'] = $filters['status'];
+		}
+		$absencePager = TablePager::state(
+			count($absences),
+			$this->request->getParam('page'),
+			$this->request->getParam('per_page'),
+		);
+		$absencePager['filters'] = $absencePagerFilters;
+
 		$params = $this->buildShellParams(
 			'absences',
 			$this->l10n->t('Absences'),
@@ -830,12 +891,14 @@ class PageController extends Controller
 			$navFlags,
 		) + [
 			'absences' => $absences,
+			'absencePager' => $absencePager,
 			'computedWorkingDays' => $computedWorkingDays,
 			'hasColleagues' => $hasColleagues,
 			'requireSubstituteTypes' => $requireSubstituteTypes,
 			'filterStartDate' => $filterStartDate,
 			'filterEndDate' => $filterEndDate,
 			'filterStatus' => $statusParam ?? '',
+			'filterType' => $filterType,
 			'stats' => [
 				'total_time_entries' => $timeEntryCount,
 				'total_absences' => $absenceCount,
@@ -881,6 +944,7 @@ class PageController extends Controller
 				'filterStartDate' => '',
 				'filterEndDate' => '',
 				'filterStatus' => '',
+				'filterType' => '',
 				'error' => $errorMessage,
 				'stats' => ['total_time_entries' => 0, 'total_absences' => 0, 'vacation_days_remaining' => 0, 'vacation_days_used_this_year' => 0, 'vacation_carryover_days' => 0, 'vacation_carryover_usable' => 0, 'vacation_carryover_expires_on' => null, 'vacation_carryover_locked_after_deadline' => false, 'vacation_annual_remaining' => 0, 'vacation_carryover_remaining' => 0, 'vacation_carryover_max_cap' => null, 'vacation_annual_entitlement' => 0, 'vacation_year' => (int)date('Y'), 'pending_requests' => 0],
 				'employeeHasAssignableManager' => true,
@@ -960,6 +1024,22 @@ class PageController extends Controller
 			return $this->workforceSuiteConfig->isEnabled('special_entitlements_enabled');
 		}
 		return $this->config->getAppValue('arbeitszeitcheck', 'special_entitlements_enabled', '0') === '1';
+	}
+
+	/**
+	 * Query value for the Zeiteinträge work-location filter.
+	 * Unknown or non-string input is ignored so a crafted param cannot 500 the page.
+	 */
+	private function normalizeWorkLocationFilter(mixed $raw): string
+	{
+		if (!is_string($raw) || $raw === '') {
+			return '';
+		}
+		try {
+			return WorkLocation::normalize($raw) ?? '';
+		} catch (\InvalidArgumentException) {
+			return '';
+		}
 	}
 
 	private function workLocationCatalogEnabled(): bool

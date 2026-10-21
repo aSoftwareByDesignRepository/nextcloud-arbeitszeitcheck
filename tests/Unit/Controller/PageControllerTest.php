@@ -260,6 +260,86 @@ class PageControllerTest extends TestCase
 		$this->assertEquals('absences', $response->getTemplateName());
 	}
 
+	public function testAbsencesFiltersByTypeIncludingLegacySick(): void
+	{
+		$vacation = $this->absenceOfType(1, 'vacation', \OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING);
+		$sick = $this->absenceOfType(2, 'sick_leave');
+		$legacySick = $this->absenceOfType(3, 'sick');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('findByUser')->willReturn([$vacation, $sick, $legacySick]);
+		$mapper->method('countByUser')->willReturn(3);
+		$this->setControllerProperty('absenceMapper', $mapper);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParam')->willReturnCallback(
+			static fn (string $key, mixed $default = null) => $key === 'type' ? 'sick_leave' : $default
+		);
+		$this->setControllerProperty('request', $request);
+		$config = $this->readControllerProperty('config');
+		$config->method('getAppValue')->willReturn('[]');
+
+		$params = $this->controller->absences()->getParams();
+		$this->assertArrayNotHasKey('error', $params, (string)($params['error'] ?? ''));
+		$this->assertSame('sick_leave', $params['filterType']);
+		$ids = array_map(static fn ($absence) => $absence->getId(), $params['absences']);
+		$this->assertEqualsCanonicalizing([2, 3], $ids);
+		// Pending count stays on the unfiltered list.
+		$this->assertSame(1, $params['stats']['pending_requests']);
+	}
+
+	public function testAbsencesIgnoresUnknownTypeFilter(): void
+	{
+		$vacation = $this->absenceOfType(1, 'vacation');
+		$sick = $this->absenceOfType(2, 'sick_leave');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('findByUser')->willReturn([$vacation, $sick]);
+		$mapper->method('countByUser')->willReturn(2);
+		$this->setControllerProperty('absenceMapper', $mapper);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParam')->willReturnCallback(
+			static fn (string $key, mixed $default = null) => $key === 'type' ? 'not-a-type' : $default
+		);
+		$this->setControllerProperty('request', $request);
+		$config = $this->readControllerProperty('config');
+		$config->method('getAppValue')->willReturn('[]');
+
+		$params = $this->controller->absences()->getParams();
+		$this->assertArrayNotHasKey('error', $params, (string)($params['error'] ?? ''));
+		$this->assertSame('', $params['filterType']);
+		$this->assertCount(2, $params['absences']);
+	}
+
+	public function testAbsencesPagerUsesTheRequestedPageAndSize(): void
+	{
+		$rows = [];
+		for ($id = 1; $id <= 30; $id++) {
+			$rows[] = $this->absenceOfType($id, 'vacation');
+		}
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('findByUser')->willReturn($rows);
+		$mapper->method('countByUser')->willReturn(30);
+		$this->setControllerProperty('absenceMapper', $mapper);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParam')->willReturnCallback(
+			static fn (string $key, mixed $default = null) => match ($key) {
+				'page' => '2',
+				'per_page' => '10',
+				'type' => '',
+				default => $default,
+			}
+		);
+		$this->setControllerProperty('request', $request);
+		$config = $this->readControllerProperty('config');
+		$config->method('getAppValue')->willReturn('[]');
+
+		$params = $this->controller->absences()->getParams();
+		$this->assertArrayNotHasKey('error', $params, (string)($params['error'] ?? ''));
+		$this->assertSame(30, $params['absencePager']['total']);
+		$this->assertSame(2, $params['absencePager']['page']);
+		$this->assertSame(10, $params['absencePager']['perPage']);
+		$this->assertSame(10, $params['absencePager']['offset']);
+		$this->assertSame(3, $params['absencePager']['pages']);
+	}
+
 	public function testOvertimeBalancePdfReturnsDownloadOrJson(): void
 	{
 		$ref = new \ReflectionClass($this->controller);
@@ -318,5 +398,140 @@ class PageControllerTest extends TestCase
 		$params = $this->controller->dashboard()->getParams();
 		$this->assertFalse($params['timeCapture']['clockStampingEnabled']);
 		$this->assertFalse($params['timeCapture']['manualTimeEntryEnabled']);
+	}
+
+	public function testTimeEntriesFiltersByWorkLocation(): void
+	{
+		$home = $this->entryWithLocation(1, 'home');
+		$office = $this->entryWithLocation(2, 'office');
+		$this->useTimeEntryList([$home, $office], ['work_location' => 'home']);
+
+		$params = $this->controller->timeEntries()->getParams();
+		$this->assertArrayNotHasKey('error', $params);
+		$this->assertSame('home', $params['filterWorkLocation']);
+		$this->assertCount(1, $params['entries']);
+		$this->assertSame('home', $params['entries'][0]->getWorkLocation());
+		// KPI stays on the unfiltered set.
+		$this->assertSame(2, $params['stats']['total_time_entries']);
+		$this->assertSame(1, $params['entryPager']['total']);
+		$this->assertSame('home', $params['entryPager']['filters']['work_location']);
+	}
+
+	public function testTimeEntriesPagerUsesTheRequestedPageAndSize(): void
+	{
+		$rows = [];
+		for ($id = 1; $id <= 30; $id++) {
+			$rows[] = $this->entryWithLocation($id, 'office');
+		}
+		$this->useTimeEntryList($rows, ['page' => '2', 'per_page' => '10']);
+
+		$params = $this->controller->timeEntries()->getParams();
+		$this->assertArrayNotHasKey('error', $params);
+		$this->assertSame(30, $params['entryPager']['total']);
+		$this->assertSame(2, $params['entryPager']['page']);
+		$this->assertSame(10, $params['entryPager']['perPage']);
+		$this->assertSame(10, $params['entryPager']['offset']);
+		$this->assertSame(3, $params['entryPager']['pages']);
+		$this->assertSame([], $params['entryPager']['filters']);
+	}
+
+	public function testTimeEntriesIgnoresUnknownWorkLocation(): void
+	{
+		$home = $this->entryWithLocation(1, 'home');
+		$office = $this->entryWithLocation(2, 'office');
+		$this->useTimeEntryList([$home, $office], ['work_location' => 'not-a-place']);
+
+		$params = $this->controller->timeEntries()->getParams();
+		$this->assertArrayNotHasKey('error', $params);
+		$this->assertSame('', $params['filterWorkLocation']);
+		$this->assertCount(2, $params['entries']);
+	}
+
+	public function testTimeEntriesWorkLocationCombinesWithStatus(): void
+	{
+		$homeDone = $this->entryWithLocation(1, 'home', \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$homeOpen = $this->entryWithLocation(2, 'home', \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_ACTIVE);
+		$officeDone = $this->entryWithLocation(3, 'office', \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
+		$this->useTimeEntryList([$homeDone, $homeOpen, $officeDone], [
+			'work_location' => 'HOME',
+			'status' => 'completed',
+		]);
+
+		$params = $this->controller->timeEntries()->getParams();
+		$this->assertSame('home', $params['filterWorkLocation']);
+		$this->assertSame('completed', $params['filterStatus']);
+		$this->assertCount(1, $params['entries']);
+		$this->assertSame(1, $params['entries'][0]->getId());
+	}
+
+	/**
+	 * @param list<\OCA\ArbeitszeitCheck\Db\TimeEntry> $entries
+	 * @param array<string, string> $query
+	 */
+	private function useTimeEntryList(array $entries, array $query): void
+	{
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('findByUser')->willReturn($entries);
+		$mapper->method('findByUserAndStatus')->willReturn([]);
+		$mapper->method('countByUser')->willReturn(count($entries));
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParam')->willReturnCallback(
+			static fn (string $key) => $query[$key] ?? null
+		);
+		$this->setControllerProperty('timeEntryMapper', $mapper);
+		$this->setControllerProperty('request', $request);
+		$config = $this->readControllerProperty('config');
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, mixed $default = ''): string {
+				return is_string($default) ? $default : '';
+			}
+		);
+	}
+
+	private function readControllerProperty(string $name): mixed
+	{
+		$ref = new \ReflectionClass($this->controller);
+		while ($ref !== false && !$ref->hasProperty($name)) {
+			$ref = $ref->getParentClass();
+		}
+		self::assertNotFalse($ref);
+		$prop = $ref->getProperty($name);
+		$prop->setAccessible(true);
+		return $prop->getValue($this->controller);
+	}
+
+	private function absenceOfType(int $id, string $type, string $status = \OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED): \OCA\ArbeitszeitCheck\Db\Absence
+	{
+		$absence = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$absence->setId($id);
+		$absence->setUserId('test-user');
+		$absence->setType($type);
+		$absence->setStatus($status);
+		$absence->setDays(1.0);
+		return $absence;
+	}
+
+	private function entryWithLocation(int $id, string $location, string $status = \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED): \OCA\ArbeitszeitCheck\Db\TimeEntry
+	{
+		$entry = new \OCA\ArbeitszeitCheck\Db\TimeEntry();
+		$entry->setId($id);
+		$entry->setUserId('test-user');
+		$entry->setStatus($status);
+		$entry->setWorkLocation($location);
+		$entry->setStartTime(new \DateTime('2026-10-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2026-10-01 17:00:00'));
+		return $entry;
+	}
+
+	private function setControllerProperty(string $name, mixed $value): void
+	{
+		$ref = new \ReflectionClass($this->controller);
+		while ($ref !== false && !$ref->hasProperty($name)) {
+			$ref = $ref->getParentClass();
+		}
+		self::assertNotFalse($ref);
+		$prop = $ref->getProperty($name);
+		$prop->setAccessible(true);
+		$prop->setValue($this->controller, $value);
 	}
 }

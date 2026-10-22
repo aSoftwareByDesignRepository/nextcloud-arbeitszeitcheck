@@ -129,7 +129,7 @@ final class SupportUsSectionContractTest extends TestCase {
 		self::assertStringContainsString('forced-colors', $css);
 		self::assertStringContainsString('min-height: 44px', $css);
 		self::assertStringContainsString('minmax(min(100%, 16rem)', $css);
-		self::assertStringContainsString('@media (max-width: 767.98px)', $css);
+		self::assertStringContainsString('@media (max-width: 768.98px)', $css);
 		self::assertStringContainsString('support-us__option', $css);
 		self::assertStringContainsString('support-us__options', $css);
 		self::assertStringContainsString('support-us__benefit', $css);

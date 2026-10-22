@@ -595,7 +595,7 @@
 	text-underline-offset: 0.15em;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.azc-support-us-page__hero {
 		padding: var(--azc-space-5, 1.25rem) var(--azc-space-4, 1rem);
 	}

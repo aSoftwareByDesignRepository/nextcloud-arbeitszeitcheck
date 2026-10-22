@@ -17,7 +17,7 @@ class RowActionsRevealContractTest extends TestCase
 		$css = (string)file_get_contents(dirname(__DIR__, 3) . '/css/common/page-patterns.css');
 		$marker = strpos($css, 'Wide tables: the actions column');
 		$this->assertNotFalse($marker);
-		$layout = $this->mediaBody($css, '@media (min-width: 768px) {', $marker);
+		$layout = $this->mediaBody($css, '@media (min-width: 769px) {', $marker);
 
 		$this->assertStringContainsString(':is(#app-content.azc-app, .azc-dialog)', $layout);
 		$this->assertStringContainsString(':is(.table, .azc-table)', $layout);
@@ -42,7 +42,7 @@ class RowActionsRevealContractTest extends TestCase
 	public function testHoverRevealKeepsKeyboardFocusAndEscapeDismiss(): void
 	{
 		$css = (string)file_get_contents(dirname(__DIR__, 3) . '/css/common/page-patterns.css');
-		$hover = $this->mediaBody($css, '@media (min-width: 768px) and (hover: hover)');
+		$hover = $this->mediaBody($css, '@media (min-width: 769px) and (hover: hover)');
 
 		$this->assertStringContainsString('opacity: 0;', $hover);
 		$this->assertStringContainsString('pointer-events: none;', $hover);

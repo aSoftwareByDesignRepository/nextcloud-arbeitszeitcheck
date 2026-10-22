@@ -263,7 +263,7 @@
 	cursor: pointer;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--admin-teams .teams-tree__item {
 		flex-wrap: wrap;
 	}

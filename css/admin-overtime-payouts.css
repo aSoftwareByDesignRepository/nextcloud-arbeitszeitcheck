@@ -111,7 +111,7 @@
 	background-color: color-mix(in srgb, var(--color-success-text) 14%, var(--color-main-background));
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--admin-overtime-payouts .admin-ot-payouts__period {
 		flex-direction: column;
 		align-items: stretch;

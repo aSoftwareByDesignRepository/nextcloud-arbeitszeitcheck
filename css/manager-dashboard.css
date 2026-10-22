@@ -185,7 +185,7 @@
 	color: var(--color-success-text, var(--color-success));
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--manager-dashboard .pending-approvals-tabs {
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;

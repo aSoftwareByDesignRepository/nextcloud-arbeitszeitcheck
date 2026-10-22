@@ -249,7 +249,7 @@
 	opacity: 0.85;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__toolbar {
 		width: 100%;
 		justify-content: stretch;

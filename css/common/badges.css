@@ -350,7 +350,7 @@
 }
 
 /* ── Responsive: touch-friendly on phones ───────────────────── */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#content.app-arbeitszeitcheck .badge,
 	#app-content.azc-app .badge,
 	.azc-badge,

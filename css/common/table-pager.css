@@ -124,7 +124,7 @@
 	border-bottom: 0;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app .table-container:has(> .azc-table-pager) .azc-table--responsive tbody tr:last-child,
 	#app-content.azc-app .table-container:has(> .azc-table-pager) .azc-table--responsive tbody tr:not([hidden]):has(+ tr[hidden]),
 	#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) .azc-table--responsive tbody tr:last-child,

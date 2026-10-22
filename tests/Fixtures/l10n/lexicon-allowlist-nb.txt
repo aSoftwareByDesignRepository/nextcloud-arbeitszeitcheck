@@ -1,0 +1,90 @@
+# nb target-lexicon allowlist — reviewed 2026-10-22
+# Legit Bokmål words the flat nb_NO wordlist misses plus reviewed
+# loans/proper nouns/abbrevs. Markers: shared|loanword|proper|abbrev.
+arbeitszeitcheck # proper — product name
+badget # shared — badge definite, legit loan inflection
+badgekoder # shared — badge + koder compound
+check-apper # shared — Check-appene compound
+chipnummer # shared — tech compound
+csv # abbrev
+dags # shared — 'i dags' genitive
+des # abbrev — December
+feeden # loanword — feed definite
+feeder # loanword — feeds
+fots # shared — 'til fots'
+fre # abbrev — Friday
+fraværs # shared — fravær genitive compound stem
+formiddags # shared — formiddag genitive
+identifikatoren # shared — legit Bokmål coverage gap
+josefs # proper — saint's day
+kalenderårs # shared — kalenderår genitive
+kvadrilliontedel # shared — ordinal fraction form
+kvintilliontedel # shared
+leopolds # proper
+lørdags # shared — lørdag genitive
+marias # proper
+minutters # shared — '30 minutters pause' genitive compound
+måneds # shared — måned genitive stem
+måneders # shared — '6-måneders'
+ons # abbrev — Wednesday
+persons # shared — person genitive
+ruperts # proper
+saldoår # shared — saldo+år compound
+sekstilliontedel # shared
+septillionte # shared
+sexdeciljonte # shared
+snapshot # loanword
+søn # abbrev — Sunday
+søndags # shared
+timers # shared — '24-timers'
+timeout # loanword
+tredeciljonte # shared
+url # abbrev
+url-en # abbrev — URL definite
+widgeten # loanword — widget definite
+års # shared — år genitive
+årsvinduer # shared — årsvindu plural
+årets # shared — året genitive
+deciljonte # shared
+duodeciljonte # shared
+kärntens # proper — Austrian state
+florians # proper — saint's day
+deaktiver # shared — deaktivere imperative
+deaktiverer # shared — present
+deaktiveres # shared — passive
+deaktivering # shared — gerund
+deaktiverte # shared — participle
+bedrifts # shared — bedrift genitive
+overtidssporings # shared — compound stem
+com # abbrev — '.com'
+nfc # abbrev
+leverandørsigneringsnøkkelen # shared — leverandør+signerings+nøkkel
+kalenderfeeden # shared — kalender+feed definite
+kalenderabonnements # shared — compound stem
+underteams # shared — under+teams
+månedsavslutnings # shared — måned+avslutning genitive stem
+kioskbadges # shared — kiosk+badges
+arbeidslovs # shared — arbeidslov genitive stem
+arbeidstidsreglerne # shared — definite plural (fixed values use -ene; retained where legit)
+avvelg # shared — avvelge imperative
+åpningssaldoåret # shared — compound
+årsrett # shared — årsrett compound
+etterlevelsetjenestens # shared — etterlevelsestjeneste genitive
+etterlevelsestjenestekontroll # shared — compound
+etterlevelselsadvarsler # shared — compound
+etterlevelsessektionen # shared — compound (seksjon)
+etterlevelsessektioner # shared
+etterlevelsessproblemer # shared
+gjennomsnitlig # shared — gjennomsnittlig variant
+id'er # shared — plural style
+korreksjonsforespørselsflyten # shared — compound
+pdf'er # shared — plural style
+pdf'en # shared — definite style
+reservløsning # shared — reserve solution
+sifret # shared — sifret adjective
+stedfortrederforespørseler # shared — stedfortreder compound
+tilstedeværelsesunntaksperiode # shared — compound
+utstemplet # shared — participle
+utstempling # shared — gerund
+legemsfest # shared — 'Kristi legemsfest' proper feast name
+seksdeciljonte # shared — seks+deciljonte ordinal

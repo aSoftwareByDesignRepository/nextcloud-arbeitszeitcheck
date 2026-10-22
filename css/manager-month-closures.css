@@ -197,7 +197,7 @@
 	display: none !important;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--manager-month-closures .manager-mc-step__body {
 		padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
 	}

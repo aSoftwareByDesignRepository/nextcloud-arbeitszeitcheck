@@ -176,7 +176,7 @@
   }
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .admin-users-filter-panel .azc-filter-grid--search {
     grid-template-columns: 1fr;
   }
@@ -844,7 +844,7 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   margin-top: var(--space-2, 0.5rem);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .admin-user-detail .user-edit-section__body,
   .admin-user-detail__identity,
   .admin-user-detail__howto-body {
@@ -920,7 +920,7 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
 }
 
 /* ≤768px: reset CTA full width for thumb reach */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .user-overtime-adjust__primary .azc-btn {
     width: 100%;
     justify-content: center;

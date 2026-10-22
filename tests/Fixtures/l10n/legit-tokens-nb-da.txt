@@ -270,6 +270,7 @@ erstatning
 erstatte
 erstatter
 erstattes
+estimerer
 etage
 ethvert
 etiketten
@@ -350,6 +351,7 @@ fjortende
 flagges
 fleksibel
 fleksibelt
+flekstidssaldoen
 flere
 flest
 fleste
@@ -673,8 +675,8 @@ kontorets
 kontos
 kontrakt
 kontrakten
-kontrakttimer
 kontraktsmål
+kontrakttimer
 kontroller
 kontrollere
 kontrollerer
@@ -1335,6 +1337,7 @@ territorium
 testkonto
 tiden
 tider
+tidlig
 tidligere
 tidligt
 tidsformat
@@ -1489,6 +1492,7 @@ vurderes
 webappen
 yngre
 zürich
+årets
 årlig
 årlige
 årsdag
@@ -1499,4 +1503,3 @@ zürich
 ønsker
 øverst
 øverste
-årets

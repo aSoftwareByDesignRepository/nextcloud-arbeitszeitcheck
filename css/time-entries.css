@@ -383,7 +383,7 @@
 }
 
 /* Responsive */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
     .section {
         padding: var(--space-4, 1rem);
     }
@@ -775,7 +775,7 @@
     align-items: flex-start;
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 48.0625rem) {
     .arbeitszeit-check-tz-context__body {
         flex-direction: row;
         flex-wrap: wrap;
@@ -878,7 +878,7 @@
     gap: var(--azc-space-2, 0.5rem);
 }
 
-@media (max-width: 47.99875rem) {
+@media (max-width: 48.06125rem) {
     #app-content.azc-app--time-entries .azc-row-actions__toggle {
         display: inline-flex;
         width: 100%;
@@ -910,7 +910,7 @@
    2.5.5 (Target Size, AA) minimum of 44x44 px on touch surfaces.
    The responsive media query in common/responsive.css already handles
    `.btn--sm`; this rule is a defensive backstop. */
-@media (max-width: 47.99875rem) {
+@media (max-width: 48.06125rem) {
     .actions-cell .btn-complete-entry {
         min-height: 44px;
     }
@@ -941,7 +941,7 @@
 	align-items: flex-start;
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 48.0625rem) {
 	#app-content.azc-app--time-entries .arbeitszeit-check-tz-context__body {
 		flex-direction: row;
 		flex-wrap: wrap;
@@ -1384,7 +1384,7 @@
 	padding-bottom: var(--azc-space-5, 1.25rem);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--time-entries .time-entries-page__stats-grid {
 		grid-template-columns: 1fr;
 	}

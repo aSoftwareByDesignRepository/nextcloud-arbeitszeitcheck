@@ -730,7 +730,7 @@
 }
 
 /* Desktop: make room beside the drawer so the calendar is not covered */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
 	body.azc-day-panel-open .calendar-section {
 		margin-inline-end: min(26rem, 100%);
 		transition: margin-inline-end 0.2s ease;
@@ -888,7 +888,7 @@
 }
 
 /* Responsive — NC tablet/phone: stack chrome; keep month grid fluid (≤768px) */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.section {
 		padding: var(--space-4, 1rem);
 		max-width: 100%;

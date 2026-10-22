@@ -403,7 +403,7 @@
 	margin-block-start: 0;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
 	/* Tablet/desktop: restore compact checkbox alignment (pre-GH#40 parity). */
 	#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox,
 	#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox,
@@ -566,7 +566,7 @@
 }
 
 /* ── Responsive ─────────────────────────────────────────────── */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	
 	#app-content.azc-app--admin-notifications .form-row--inline,
 	#app-content.azc-app--admin-notifications .form-row--thresholds,

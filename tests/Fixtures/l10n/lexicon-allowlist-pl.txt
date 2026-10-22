@@ -1,0 +1,10 @@
+# pl target-lexicon allowlist — reviewed 2026-10-22
+arbeitszeitcheck # proper — product name
+source # loanword — standard Polish 'open source'
+migrowany # shared — participle
+nextcloudzie # shared — Nextcloud locative
+ogólnoorganizacyjne # shared — compound adjective
+zafinalizować # shared — verb
+zafinalizowane # shared — participle
+zaokrągl # shared — zaokrąglij stem
+zliczalna # shared — adjective

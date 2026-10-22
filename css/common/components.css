@@ -1075,7 +1075,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Table Responsive */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .table-responsive,
   .table-container,
   .azc-table-wrap {
@@ -1170,7 +1170,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Modal Responsive */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .modal {
     max-width: 95vw;
     max-height: 95vh;
@@ -1752,7 +1752,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Responsive Components */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .form--horizontal,
   .form--inline {
     flex-direction: column;
@@ -1902,7 +1902,7 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 
 /* <768px: this checkbox is the card's only selection control — pad it to the
    44px touch floor. Padding grows the clickable box without scaling the glyph. */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
   .bulk-select-checkbox {
     box-sizing: content-box;
     padding: 10px;

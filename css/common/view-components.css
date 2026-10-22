@@ -113,7 +113,7 @@ button.azc-stat-tile:hover, button.azc-stat-tile:focus-visible {
 	min-height: var(--azc-touch, 44px);
 	border-color: var(--azc-form-border, var(--color-border-maxcontrast));
 }
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.azc-filter-grid--search { grid-template-columns: 1fr; }
 	.azc-filter-field--actions { flex-direction: column; align-items: stretch; }
 	.azc-filter-field--actions > * { width: 100%; }
@@ -256,7 +256,7 @@ button.azc-stat-tile:hover, button.azc-stat-tile:focus-visible {
  * Cells without data-cell (action columns) render label-free.
  * The table keeps its normal scroll wrap; on desktop the modifier
  * changes nothing. */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.azc-table--cards thead {
 		position: absolute;
 		width: 1px; height: 1px;

@@ -101,7 +101,7 @@ class OutlookIcalSubscriptionLayoutContractTest extends TestCase
 		$end = strpos($src, '/* === support-us:azc start ===', $start);
 		$this->assertNotFalse($end);
 		$block = substr($src, $start, $end - $start);
-		$this->assertStringContainsString('@media (min-width: 768px)', $block);
+		$this->assertStringContainsString('@media (min-width: 769px)', $block);
 		$this->assertStringContainsString('@media (min-width: 1024px)', $block);
 		$this->assertDoesNotMatchRegularExpression(
 			'/#outlook-ical-subscription[^{]*\{[^}]*\}[^@]*@media\s*\(\s*max-width/s',

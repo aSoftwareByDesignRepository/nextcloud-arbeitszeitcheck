@@ -621,7 +621,7 @@
 }
 
 /* ========== Responsive ========== */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.reports-section {
 		padding-left: max(var(--space-4, 1rem), env(safe-area-inset-left));
 		padding-right: max(var(--space-4, 1rem), env(safe-area-inset-right));

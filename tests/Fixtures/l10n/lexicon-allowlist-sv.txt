@@ -1,0 +1,61 @@
+# sv target-lexicon allowlist — reviewed 2026-10-22
+arbets # shared — arbete compound stem ('arbets-/rastperiod')
+at # abbrev — Austria
+csv # abbrev
+datan # shared — colloquial 'the data', legit Swedish
+fre # abbrev — Friday
+hr # abbrev — Human Resources
+inkl # abbrev — inklusive
+kalendervy # shared — kalender+vy compound
+kärntens # proper — Austrian state
+open # loanword — 'open source' domain term
+source # loanword — 'open source'
+tis # abbrev — Tuesday
+token # loanword
+vilo # shared — vila compound stem ('Vilo-/privat')
+ruperts # proper — saint's day
+saldoår # shared — saldo+år
+deciljonte # shared — ordinal fraction form
+duodeciljonte # shared
+tredeciljonte # shared
+sexdeciljonte # shared
+chipnummer # shared — tech compound
+kv # abbrev — kollektivavtal
+nfc # abbrev
+ons # abbrev — Wednesday
+administrationsvy # shared — administration+vy
+adminändringar # shared — admin compound
+adminbehörigheter # shared
+admingräns # shared
+admininställningar # shared
+adminområde # shared
+adminområdet # shared
+adminplats # shared
+adminrettigheter # shared
+adminrollen # shared
+adminverktyg # shared
+autogodkänd # shared — auto compound
+batchbearbetning # shared
+bricka # shared — RFID-bricka (key fob)
+brickkoder # shared
+cest # abbrev — timezone
+chefsdashboarden # shared — chef+dashboard
+chefsvy # shared
+dashboarddata # shared — loan compound
+dashboardet # shared
+engångs # shared — engångs- stem
+inskick # shared — inskickandet stem
+lör # abbrev — Saturday
+månadsslutföring # shared
+månadsvy # shared
+mappade # shared — participle
+ouppdelade # shared — ouppdelade (undivided)
+saldets # shared — saldo genitive
+siffrig # shared — siffrig (numeric)
+tarifexempel # shared
+tokeniserad # shared — tokeniserad participle
+utfasat # shared — utfasad
+vecko # shared — vecka compound stem
+veckovy # shared — veckovy compound
+ärv # shared — ärva imperative
+åååå # format — year placeholder

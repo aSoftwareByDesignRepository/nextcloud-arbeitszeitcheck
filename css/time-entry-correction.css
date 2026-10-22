@@ -320,7 +320,7 @@
 	outline-offset: 2px;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#time-entry-correction-modal .modal-body,
 	.azc-manager-correction-modal .modal-body,
 	#time-entry-correction-modal > .modal-footer,

@@ -267,7 +267,7 @@
   }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .md\:grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
   .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -415,14 +415,14 @@
   .sm\:grid { display: grid; }
 }
 
-@media (min-width: 640px) and (max-width: 767.98px) {
+@media (min-width: 640px) and (max-width: 768.98px) {
   .md\:hidden { display: none; }
   .md\:block { display: block; }
   .md\:flex { display: flex; }
   .md\:grid { display: grid; }
 }
 
-@media (min-width: 768px) and (max-width: 1023.98px) {
+@media (min-width: 769px) and (max-width: 1023.98px) {
   .lg\:hidden { display: none; }
   .lg\:block { display: block; }
   .lg\:flex { display: flex; }

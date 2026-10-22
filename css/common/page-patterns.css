@@ -57,7 +57,7 @@
 	min-width: 0;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app .azc-page-grid {
 		grid-template-columns: 1fr;
 	}
@@ -225,7 +225,7 @@
 	}
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app .azc-filter-grid,
 	#app-content.azc-app .azc-filter-grid--extended,
 	#app-content.azc-app .azc-filter-grid--record {
@@ -398,7 +398,7 @@
 }
 
 /* Desktop: fill available width; scroll horizontally only when columns need more space */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
 	#app-content.azc-app .table-container .table:not(.azc-table--matrix),
 	#app-content.azc-app .table-container .grid-table:not(.azc-table--matrix),
 	#app-content.azc-app .table-container .arbeitszeitcheck-table:not(.azc-table--matrix),
@@ -527,7 +527,7 @@
  * cluster visible, pinned to the inline end, so it is tappable without a
  * sideways scroll. Dialogs live on document.body, so .azc-dialog is included.
  */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) th.azc-table-actions-col,
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) th.actions-col,
 	:is(#app-content.azc-app, .azc-dialog) .grid-table th.azc-table-actions-col {
@@ -616,7 +616,7 @@
 	}
 }
 
-@media (min-width: 768px) and (hover: hover) {
+@media (min-width: 769px) and (hover: hover) {
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions,
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.azc-table-actions-col .azc-table-actions,
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-ot-audit__actions .azc-table-actions,
@@ -650,7 +650,7 @@
 	}
 }
 
-@media (min-width: 768px) and (hover: hover) and (prefers-reduced-motion: reduce) {
+@media (min-width: 769px) and (hover: hover) and (prefers-reduced-motion: reduce) {
 	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions,
 	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions {
 		transition: none;
@@ -704,7 +704,7 @@
 	box-shadow: none;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	/* Dense list tables without card reflow: horizontal scroll */
 	#app-content.azc-app .table-container .table:not(.azc-table--matrix):not(.azc-table--responsive),
 	#app-content.azc-app .table-container .grid-table:not(.azc-table--matrix):not(.azc-table--responsive) {

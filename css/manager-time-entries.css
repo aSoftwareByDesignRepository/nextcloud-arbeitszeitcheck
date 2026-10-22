@@ -109,7 +109,7 @@
 	margin-inline-start: 0;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
 	#app-content.azc-app--manager-absences .manager-scope-page__pagination {
 		flex-direction: column;
@@ -124,7 +124,7 @@
 }
 
 /* Responsive results tables: card layout with readable long text columns */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody tr,
 	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody tr {
 		padding: var(--azc-space-4, 1rem);

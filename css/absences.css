@@ -51,7 +51,7 @@
 
 /* Type was absorbing the spare width. Cap it at the badges; the other
    columns share what's left. 24rem fits a type label plus "Past record". */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
 	#app-content.azc-app.azc-app--absences .section--list .absences-table {
 		table-layout: fixed;
 		min-width: 0;
@@ -1159,7 +1159,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	text-align: center;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	#app-content.azc-app--absences #absences-table.azc-table--responsive tbody td.azc-table-empty {
 		display: flex;
 		flex-direction: column;
@@ -1602,7 +1602,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 
 /* Responsive: table as cards on small screens, stats stack vertically */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
 	.section--form {
 		padding: var(--space-6, 1.5rem);
 	}

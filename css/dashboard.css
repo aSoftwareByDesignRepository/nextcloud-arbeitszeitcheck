@@ -251,7 +251,7 @@
 }
 
 /* Narrow viewports: one row under the next, divided by a line, still inside the card. */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
     #app-content.azc-app--dashboard .azc-dashboard-recent__table.azc-table--responsive thead {
         display: none;
     }
@@ -365,7 +365,7 @@
     transform: none;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     #app-content.azc-app--dashboard .azc-dashboard-overview__grid {
         grid-template-columns: repeat(12, minmax(0, 1fr));
         grid-template-areas:
@@ -624,7 +624,7 @@
 }
 
 /* <768px: manual CTA spans content column — no side-by-side squeeze */
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
     #app-content.azc-app--dashboard .azc-dashboard-manual-cta__btn {
         max-width: none;
     }
@@ -1384,7 +1384,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
     color: var(--arbeitszeitcheck-color-text);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 768.98px) {
     .section {
         padding: var(--space-5);
         margin-bottom: var(--space-8);
@@ -1494,7 +1494,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 }
 
 /* Compact breakpoint: from 480px upward the dashboard metric tiles can share two columns safely. */
-@media (min-width: 480px) and (max-width: 767.98px) {
+@media (min-width: 480px) and (max-width: 768.98px) {
     #app-content.azc-app--dashboard .azc-dashboard-metrics {
         grid-template-columns: 1fr 1fr;
     }
@@ -1546,7 +1546,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 
 /* Make sure the "Complete session" button on the dashboard meets the WCAG
    2.5.5 target-size recommendation on touch devices. */
-@media (max-width: 47.99875rem) {
+@media (max-width: 48.06125rem) {
     .btn-complete-entry {
         min-height: 44px;
     }

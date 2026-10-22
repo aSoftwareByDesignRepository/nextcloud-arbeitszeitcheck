@@ -431,7 +431,7 @@
   .sm\:grid { display: grid; }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .md\:block { display: block; }
   .md\:hidden { display: none; }
   .md\:flex { display: flex; }

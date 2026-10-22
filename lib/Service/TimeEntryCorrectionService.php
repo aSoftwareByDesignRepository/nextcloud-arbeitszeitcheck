@@ -313,7 +313,7 @@ class TimeEntryCorrectionService
 
 		$updated = $this->persistPendingDecision($entry);
 		$this->runComplianceIfEnabled($updated);
-		$this->syncProjectCheckBilling($updated, $managerId);
+		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
 		return $updated;
 	}
@@ -351,7 +351,7 @@ class TimeEntryCorrectionService
 
 		$updated = $this->persistPendingDecision($entry);
 		$this->runComplianceIfEnabled($updated);
-		$this->syncProjectCheckBilling($updated, 'system');
+		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, 'system'));
 
 		return $updated;
 	}
@@ -474,7 +474,7 @@ class TimeEntryCorrectionService
 
 		$updated = $this->timeEntryMapper->update($entry);
 		$this->runComplianceIfEnabled($updated);
-		$this->syncProjectCheckBilling($updated, $managerId);
+		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
 		return $updated;
 	}
@@ -515,7 +515,7 @@ class TimeEntryCorrectionService
 
 		$inserted = $this->timeEntryMapper->insert($entry);
 		$this->runComplianceIfEnabled($inserted);
-		$this->syncProjectCheckBilling($inserted, $managerId);
+		$inserted->setBillingSyncWarning($this->syncProjectCheckBilling($inserted, $managerId));
 
 		return $inserted;
 	}

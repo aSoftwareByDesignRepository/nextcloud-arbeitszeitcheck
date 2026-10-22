@@ -179,7 +179,11 @@ class AdminSettings implements ISettings
 		try {
 			$resolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
 			return $resolver->adminPayload();
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'AdminSettings::breakPolicyPayload degraded to empty policy: ' . $e->getMessage(),
+				['exception' => $e]
+			);
 			return [
 				'policy' => [
 					'version' => 1,

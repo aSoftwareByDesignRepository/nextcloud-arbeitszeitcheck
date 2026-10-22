@@ -389,6 +389,7 @@ class ComplianceController extends Controller
 			]);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('ComplianceController::violations failed: ' . $e->getMessage(), ['exception' => $e]);
 			$navFlags = $this->getNavigationFlagsForSession();
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-violations', $this->buildShellParams(
 				'compliance-violations',
@@ -457,6 +458,7 @@ class ComplianceController extends Controller
 			);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('ComplianceController::reports failed: ' . $e->getMessage(), ['exception' => $e]);
 			$navFlags = $this->getNavigationFlagsForSession();
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', $this->buildShellParams(
 				'compliance-reports',
@@ -681,7 +683,7 @@ class ComplianceController extends Controller
 				$status = Http::STATUS_FORBIDDEN;
 			} else {
 				$errorMessage = $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
-				$status = Http::STATUS_BAD_REQUEST;
+				$status = Http::STATUS_INTERNAL_SERVER_ERROR;
 			}
 			return new JSONResponse([
 				'success' => false,
@@ -732,7 +734,7 @@ class ComplianceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_BAD_REQUEST);
+			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -762,12 +764,15 @@ class ComplianceController extends Controller
 			if ($violation->getResolved()) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $this->l10n->t('Violation is already resolved')
-				], Http::STATUS_BAD_REQUEST);
+					'error' => $this->l10n->t('Violation is already resolved'),
+					'error_code' => 'ALREADY_RESOLVED'
+				], Http::STATUS_CONFLICT);
 			}
 
 			$oldValues = $violation->getSummary();
 
+			// Atomic CAS in the mapper: a concurrent resolve that won the race
+			// between the read above and this write throws ConcurrentDecisionException.
 			$updatedViolation = $this->violationMapper->resolveViolation($id, $userId);
 
 			$newValues = $updatedViolation->getSummary();
@@ -790,16 +795,24 @@ class ComplianceController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('Violation not found')
 			], Http::STATUS_NOT_FOUND);
+		} catch (\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException $e) {
+			// Lost the resolve race — the first resolver's attribution stands.
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Violation is already resolved'),
+				'error_code' => 'ALREADY_RESOLVED'
+			], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
 			$raw = $e->getMessage();
-			$errorMessage = strpos($raw, 'User not authenticated') !== false
+			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
+			$errorMessage = $isUnauthenticated
 				? $this->l10n->t('User not authenticated')
 				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], Http::STATUS_BAD_REQUEST);
+			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -830,7 +843,7 @@ class ComplianceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_BAD_REQUEST);
+			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -933,7 +946,7 @@ class ComplianceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_BAD_REQUEST);
+			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -1012,13 +1025,14 @@ class ComplianceController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
 			// Check if it's an authentication error
 			$raw = $e->getMessage();
-			$errorMessage = strpos($raw, 'User not authenticated') !== false
+			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
+			$errorMessage = $isUnauthenticated
 				? $this->l10n->t('User not authenticated')
 				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], Http::STATUS_BAD_REQUEST);
+			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 }

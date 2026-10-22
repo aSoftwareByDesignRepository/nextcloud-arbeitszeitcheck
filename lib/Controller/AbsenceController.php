@@ -282,9 +282,49 @@ class AbsenceController extends Controller
 		}
 		return null;
 	}
+	private function genericUnexpectedErrorMessage(): string
+	{
+		return $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+	}
+
+	/**
+	 * HTTP status for a sanitised error message: when getSafeErrorMessage()
+	 * collapsed to the generic fallback the throwable was NOT a business
+	 * rule — surfacing it as a client error (400) hides server faults.
+	 */
+	private function safeErrorStatus(string $safeMessage): int
+	{
+		if ($safeMessage === $this->genericUnexpectedErrorMessage()) {
+			return Http::STATUS_INTERNAL_SERVER_ERROR;
+		}
+		if (stripos($safeMessage, 'not authenticated') !== false) {
+			return Http::STATUS_UNAUTHORIZED;
+		}
+		return Http::STATUS_BAD_REQUEST;
+	}
+
+	/**
+	 * Sanitised JSON error for a throwable that escaped the endpoint's
+	 * business logic. Auth failures collapse to 401; everything else is an
+	 * internal fault (500) — never a client error.
+	 */
+	private function unexpectedJsonResponse(\Throwable $e): JSONResponse
+	{
+		if (stripos((string)$e->getMessage(), 'not authenticated') !== false) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('User not authenticated')
+			], Http::STATUS_UNAUTHORIZED);
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->genericUnexpectedErrorMessage()
+		], Http::STATUS_INTERNAL_SERVER_ERROR);
+	}
+
 	private function getSafeErrorMessage(\Throwable $e): string
 	{
-		$generic = $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+		$generic = $this->genericUnexpectedErrorMessage();
 		$forwardUserMessage = (get_class($e) === \Exception::class) || ($e instanceof BusinessRuleException);
 		if (!$forwardUserMessage) {
 			return $generic;
@@ -424,10 +464,8 @@ class AbsenceController extends Controller
 				'absence' => $absence->getSummary()
 			]);
 		} catch (\Throwable $e) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_BAD_REQUEST);
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::apiShow failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->unexpectedJsonResponse($e);
 		}
 	}
 
@@ -533,6 +571,7 @@ class AbsenceController extends Controller
 				'error' => $msg
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::cancel failed: ' . $e->getMessage(), ['exception' => $e]);
 			$msg = $this->getSafeErrorMessage($e);
 			if (!$this->wantsJson()) {
 				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?error=' . rawurlencode($msg);
@@ -541,7 +580,7 @@ class AbsenceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $msg
-			], Http::STATUS_BAD_REQUEST);
+			], $this->safeErrorStatus($msg));
 		}
 	}
 
@@ -586,10 +625,12 @@ class AbsenceController extends Controller
 				'error' => $this->l10n->t('Absence not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::shorten failed: ' . $e->getMessage(), ['exception' => $e]);
+			$msg = $this->getSafeErrorMessage($e);
 			return new JSONResponse([
 				'success' => false,
-				'error' => $this->getSafeErrorMessage($e)
-			], Http::STATUS_BAD_REQUEST);
+				'error' => $msg
+			], $this->safeErrorStatus($msg));
 		}
 	}
 
@@ -619,6 +660,7 @@ class AbsenceController extends Controller
 			$msg = $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.');
 			return new RedirectResponse($url . '?shorten_error=' . rawurlencode($msg), Http::STATUS_SEE_OTHER);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::shortenForm failed: ' . $e->getMessage(), ['exception' => $e]);
 			$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.show', ['id' => $id]);
 			return new RedirectResponse($url . '?shorten_error=' . rawurlencode($this->getSafeErrorMessage($e)), Http::STATUS_SEE_OTHER);
 		}
@@ -783,10 +825,8 @@ class AbsenceController extends Controller
 				'absences' => $absenceSummaries
 			]);
 		} catch (\Throwable $e) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_BAD_REQUEST);
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::index failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->unexpectedJsonResponse($e);
 		}
 	}
 
@@ -1172,7 +1212,7 @@ class AbsenceController extends Controller
 				$payload['code'] = $code;
 				$payload['error_code'] = $code;
 			}
-			return new JSONResponse($payload, Http::STATUS_BAD_REQUEST);
+			return new JSONResponse($payload, $this->safeErrorStatus($msg));
 		}
 	}
 
@@ -1327,16 +1367,17 @@ class AbsenceController extends Controller
 			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AbsenceController::update: ' . $e->getMessage(), ['exception' => $e]);
+			$msg = $this->getSafeErrorMessage($e);
 			$payload = [
 				'success' => false,
-				'error' => $this->getSafeErrorMessage($e),
+				'error' => $msg,
 			];
 			$code = $this->getErrorCode($e);
 			if ($code !== null) {
 				$payload['code'] = $code;
 				$payload['error_code'] = $code;
 			}
-			return new JSONResponse($payload, Http::STATUS_BAD_REQUEST);
+			return new JSONResponse($payload, $this->safeErrorStatus($msg));
 		}
 	}
 
@@ -1396,6 +1437,7 @@ class AbsenceController extends Controller
 			try {
 				$this->absenceService->deleteAbsence($id, $userId);
 			} catch (\Exception $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::delete failed: ' . $e->getMessage(), ['exception' => $e]);
 				$message = trim($e->getMessage());
 				// Map known state-related messages to 409 Conflict to signal that the
 				// resource exists but is not deletable in its current state.
@@ -1406,21 +1448,20 @@ class AbsenceController extends Controller
 					], Http::STATUS_CONFLICT);
 				}
 
-				// Fallback: bad request with the service's message.
+				// Fallback: bad request with the service's message; an empty
+				// message is an internal fault, not a client error.
 				return new JSONResponse([
 					'success' => false,
-					'error' => $message !== '' ? $message : $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-				], Http::STATUS_BAD_REQUEST);
+					'error' => $message !== '' ? $message : $this->genericUnexpectedErrorMessage()
+				], $message !== '' ? Http::STATUS_BAD_REQUEST : Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
 			return new JSONResponse([
 				'success' => true
 			]);
 		} catch (\Throwable $e) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_BAD_REQUEST);
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::delete failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->unexpectedJsonResponse($e);
 		}
 	}
 
@@ -1479,10 +1520,8 @@ class AbsenceController extends Controller
 				'error' => $this->l10n->t('Absence not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_BAD_REQUEST);
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::approve failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->unexpectedJsonResponse($e);
 		}
 	}
 
@@ -1539,10 +1578,8 @@ class AbsenceController extends Controller
 				'error' => $this->l10n->t('Absence not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
-			return new JSONResponse([
-				'success' => false,
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
-			], Http::STATUS_BAD_REQUEST);
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::reject failed: ' . $e->getMessage(), ['exception' => $e]);
+			return $this->unexpectedJsonResponse($e);
 		}
 	}
 

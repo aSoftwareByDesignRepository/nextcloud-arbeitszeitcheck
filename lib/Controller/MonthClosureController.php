@@ -154,8 +154,10 @@ class MonthClosureController extends Controller
 			if ($e->getMessage() === 'not_logged_in') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Authentication required')], Http::STATUS_UNAUTHORIZED);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::periods failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::periods failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -234,8 +236,10 @@ class MonthClosureController extends Controller
 			if ($e->getMessage() === 'not_logged_in') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Authentication required')], Http::STATUS_UNAUTHORIZED);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::status failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::status failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -270,6 +274,7 @@ class MonthClosureController extends Controller
 			if (isset($map[$code])) {
 				return new JSONResponse(['success' => false, 'error' => $map[$code][1]], $map[$code][0]);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::finalize failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Could not finalize month')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -300,8 +305,10 @@ class MonthClosureController extends Controller
 			if ($e->getMessage() === 'not_logged_in') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Authentication required')], Http::STATUS_UNAUTHORIZED);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::finalizedMonths failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::finalizedMonths failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -365,8 +372,10 @@ class MonthClosureController extends Controller
 			if ($e->getMessage() === 'not_finalized') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Month is not finalized.')], Http::STATUS_NOT_FOUND);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::pdf failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::pdf failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -403,6 +412,7 @@ class MonthClosureController extends Controller
 			if ($code === 'not_finalized') {
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Month is not finalized.')], Http::STATUS_NOT_FOUND);
 			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('MonthClosureController::reopen failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Error')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}

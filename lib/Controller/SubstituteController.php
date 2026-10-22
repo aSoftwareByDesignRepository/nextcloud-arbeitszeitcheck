@@ -182,6 +182,7 @@ class SubstituteController extends Controller
 			]);
 			return $this->configureCSP($response);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('SubstituteController::index failed: ' . $e->getMessage(), ['exception' => $e]);
 			$navFlags = $this->getNavigationFlagsForSession();
 			$user = $this->userSession->getUser();
 			$errorMessage = $user === null

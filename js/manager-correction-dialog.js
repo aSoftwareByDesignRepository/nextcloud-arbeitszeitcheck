@@ -323,6 +323,9 @@
 					if (data.success) {
 						Components.closeModal(modal);
 						Messaging.showSuccess(data.message || t('Time entry corrected successfully.', 'Time entry corrected successfully.'));
+						if (data.billing_warning && Messaging.showWarning) {
+							Messaging.showWarning(data.billing_warning);
+						}
 						document.dispatchEvent(new CustomEvent('arbeitszeitcheck:manager-entry-corrected'));
 					} else {
 						Messaging.showError(data.error || t('Correction failed.', 'Correction failed.'));

@@ -551,18 +551,41 @@ class ComplianceViolationMapper extends QBMapper
 	}
 
 	/**
-	 * Mark violation as resolved
+	 * Mark violation as resolved.
+	 *
+	 * Atomic compare-and-set: the UPDATE only lands while `resolved` is still
+	 * false. A concurrent resolve that lost the race gets zero affected rows,
+	 * so `resolved_by` attribution can never be silently overwritten and the
+	 * resolver cannot produce duplicate transitions.
 	 *
 	 * @param int $id
 	 * @param string $resolvedBy Nextcloud user ID of the resolver
 	 * @return ComplianceViolation
+	 * @throws \OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException The row was already resolved by a concurrent request
 	 * @throws \Exception
 	 */
 	public function resolveViolation(int $id, string $resolvedBy): ComplianceViolation
 	{
-		$violation = $this->find($id);
-		$violation->markAsResolved($resolvedBy);
+		$now = new \DateTime();
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('resolved', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
+			->set('resolved_by', $qb->createNamedParameter($resolvedBy))
+			->set('resolved_at', $qb->createNamedParameter($now->format('Y-m-d H:i:s')))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('resolved', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)));
 
-		return $this->update($violation);
+		if ($qb->executeStatement() === 0) {
+			// Zero rows: either the id does not exist or someone else resolved
+			// first — re-read to distinguish so the controller can answer 409.
+			$existing = $this->find($id); // throws DoesNotExistException when gone
+			if ($existing->getResolved()) {
+				throw new \OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException('Violation is already resolved');
+			}
+			// Unresolved but unaffected — a true driver-level anomaly.
+			throw new \RuntimeException('Resolve race: row unchanged without being resolved.');
+		}
+
+		return $this->find($id);
 	}
 }

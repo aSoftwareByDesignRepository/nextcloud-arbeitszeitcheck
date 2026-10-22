@@ -249,6 +249,9 @@
 						if (data.warning) {
 							Messaging.showWarning(data.warning);
 						}
+						if (data.billing_warning) {
+							Messaging.showWarning(data.billing_warning);
+						}
 						Components.closeModal(modal);
 						document.dispatchEvent(new CustomEvent('arbeitszeitcheck:manager-entry-created'));
 					},

@@ -649,10 +649,87 @@ class AbsenceControllerTest extends TestCase
 
 		$response = $this->controller->index();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
+		$this->assertEquals('User not authenticated', $data['error']);
+	}
+
+	/**
+	 * Internal failures must surface as 500, never as client errors (400).
+	 * Regression: generic catches previously returned 400 for any throwable.
+	 */
+	public function testIndexReturns500OnInternalError(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->absenceService->expects($this->once())
+			->method('getAbsencesByUser')
+			->willThrowException(new \RuntimeException('DB connection lost'));
+
+		$response = $this->controller->index();
+
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		// Internal detail must stay in the logs, not on the wire.
+		$this->assertStringNotContainsString('DB connection lost', (string)$data['error']);
+	}
+
+	/**
+	 * Same contract for a single-record endpoint: infrastructure faults
+	 * are 500, while DoesNotExistException stays mapped to 404.
+	 */
+	public function testApiShowReturns500OnInternalError(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->absenceService->expects($this->once())
+			->method('getAbsence')
+			->willThrowException(new \RuntimeException('DB connection lost'));
+
+		$response = $this->controller->apiShow(1);
+
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertStringNotContainsString('DB connection lost', (string)$data['error']);
+	}
+
+	public function testApproveReturns401WhenNotAuthenticated(): void
+	{
+		$this->userSession->method('getUser')->willReturn(null);
+
+		$response = $this->controller->approve(1, 'ok');
+
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+	}
+
+	public function testApproveReturns500OnInternalError(): void
+	{
+		$userId = 'manager';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->willThrowException(new \RuntimeException('DB connection lost'));
+
+		$response = $this->controller->approve(1, 'ok');
+
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertStringNotContainsString('DB connection lost', (string)$data['error']);
 	}
 
 	/**
@@ -666,7 +743,7 @@ class AbsenceControllerTest extends TestCase
 
 		$response = $this->controller->store('vacation', '2024-06-01', '2024-06-05');
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 	}

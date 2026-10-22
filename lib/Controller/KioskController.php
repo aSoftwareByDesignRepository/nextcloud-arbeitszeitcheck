@@ -170,6 +170,7 @@ class KioskController extends Controller
 
 	#[PublicPage]
 	#[NoCSRFRequired]
+	#[BruteForceProtection(action: 'arbeitszeitcheck_kiosk_stamp')]
 	public function stamp(
 		string $method = '',
 		string $rfidUid = '',
@@ -195,7 +196,9 @@ class KioskController extends Controller
 		} catch (StampReplayException $e) {
 			return $this->stampReplayErrorResponse($e);
 		} catch (KioskException $e) {
-			return $this->kioskError($e, 'arbeitszeitcheck_kiosk_identify');
+			// Own throttle bucket: unthrottled RFID enumeration must neither
+			// run free nor inflate the identify bucket into a PIN-user lockout DoS.
+			return $this->kioskError($e, 'arbeitszeitcheck_kiosk_stamp');
 		} catch (\Throwable $e) {
 			$this->logger->error('Kiosk stamp failed: ' . $e->getMessage(), ['exception' => $e]);
 			return $this->kioskError(new KioskException('KIOSK_INTERNAL_ERROR'));

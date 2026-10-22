@@ -33,7 +33,7 @@
 #app-content.azc-app .azc-table-pager__size select {
 	min-height: 2rem;
 	padding: 0.15rem 1.75rem 0.15rem 0.65rem;
-	border: 1px solid var(--azc-border, var(--color-border));
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 	border-radius: var(--azc-radius-sm, 6px);
 	background-color: var(--azc-bg-card, var(--color-main-background));
 	color: var(--color-main-text);

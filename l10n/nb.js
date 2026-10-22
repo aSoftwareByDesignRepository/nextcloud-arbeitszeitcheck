@@ -3393,7 +3393,7 @@
 		"Select tablet…" : "Velg nettbrett…",
 		"Select team" : "Velg team",
 		"Select terminal…" : "Velg terminal…",
-		"Select the German state where your organization is located. This ensures the system follows the correct labor laws for that state." : "Velg den tyske stat, hvor organisasjonen din er plassert. Dette sikrer, at systemet følger den korrekte arbeidslovgivning for den gjeldende stat.",
+		"Select the German state where your organization is located. This ensures the system follows the correct labor laws for that state." : "Velg den tyske delstaten der organisasjonen din ligger. Dette sikrer at systemet følger riktig arbeidsrett for denne delstaten.",
 		"Select the completed calendar month." : "Velg den avsluttede kalendermåneden.",
 		"Select the corrected date" : "Velg den korrigerte datoen",
 		"Select the date for the daily report" : "Velg datoen for den daglige rapport",

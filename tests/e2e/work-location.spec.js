@@ -87,8 +87,11 @@ test.describe('Work location marking (GH #43)', () => {
 
 			// The list renders only the 100 most recent entries (findByUser($uid, 100),
 			// newest first) — the badge must be scoped to this entry's row or it can
-			// match a badge belonging to a different entry.
-			await page.goto('/apps/arbeitszeitcheck/time-entries')
+			// match a badge belonging to a different entry. The server-side pager marks
+			// rows outside the current page window `hidden`, so on a fixture user with
+			// accumulated rows the seeded (recent-days) entry can sit beyond page 1 —
+			// the work_location filter narrows the result set so it lands inside it.
+			await page.goto('/apps/arbeitszeitcheck/time-entries?work_location=home')
 			await assertArbeitszeitcheckLoaded(page)
 			const badge = page.locator(`tr[data-entry-id="${id}"] .azc-work-location-badge`)
 			await expect(badge).toBeVisible()

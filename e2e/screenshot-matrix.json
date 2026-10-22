@@ -1,0 +1,30 @@
+{
+	"prefix": "azc",
+	"outDir": "craft/web",
+	"viewports": [
+		{ "name": "mobile", "width": 320, "height": 800 },
+		{ "name": "tablet", "width": 768, "height": 800 },
+		{ "name": "desktop", "width": 1280, "height": 800 }
+	],
+	"surfaces": [
+		{ "id": "dashboard", "path": "/dashboard", "role": "EMPLOYEE", "states": ["current"], "dark": true },
+		{ "id": "time-entries", "path": "/time-entries", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "absences", "path": "/absences", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "calendar", "path": "/calendar", "role": "EMPLOYEE", "states": ["current"], "dark": true },
+		{ "id": "timeline", "path": "/timeline", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "reports", "path": "/reports", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "compliance", "path": "/compliance", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "business-trips", "path": "/business-trips", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "settings", "path": "/settings", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "get-the-app", "path": "/get-the-app", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "manager-dashboard", "path": "/manager", "role": "MANAGER", "states": ["current"] },
+		{ "id": "manager-time-entries", "path": "/manager/time-entries", "role": "MANAGER", "states": ["populated"] },
+		{ "id": "manager-absences", "path": "/manager/absences", "role": "MANAGER", "states": ["populated"] },
+		{ "id": "manager-people", "path": "/manager/people", "role": "MANAGER", "states": ["populated", "empty"], "dark": true },
+		{ "id": "manager-month-closures", "path": "/manager/month-closures", "role": "MANAGER", "states": ["current"] },
+		{ "id": "compliance-violations", "path": "/compliance/violations", "role": "MANAGER", "states": ["current"] },
+		{ "id": "admin-settings", "path": "/admin/settings", "role": "ADMIN", "states": ["current"], "dark": true },
+		{ "id": "admin-users", "path": "/admin/users", "role": "ADMIN", "states": ["populated"] },
+		{ "id": "admin-audit-log", "path": "/admin/audit-log", "role": "ADMIN", "states": ["current"] }
+	]
+}

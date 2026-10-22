@@ -149,6 +149,16 @@ export default defineConfig({
       testMatch: match,
       dependencies: [i === 0 ? 'chromium' : `stateful-${i - 1}`],
     })),
+    // Screenshot-matrix capture lives at e2e/ (gate contract: check-
+    // screenshot-matrix.py looks for e2e/screenshot-matrix.json + spec).
+    // Opt-in only — run with `--project=screenshot-matrix`; it is not part
+    // of the default suite and never gates a regular test run.
+    {
+      name: 'screenshot-matrix',
+      testDir: 'e2e',
+      testMatch: 'capture-screenshot-matrix.spec.js',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 })
 

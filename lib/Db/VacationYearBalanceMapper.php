@@ -12,9 +12,39 @@ use OCP\IDBConnection;
 
 class VacationYearBalanceMapper extends QBMapper
 {
+	private ?\OCP\ICache $statsCache = null;
+
 	public function __construct(IDBConnection $db)
 	{
 		parent::__construct($db, 'at_vacation_year_balance', VacationYearBalance::class);
+	}
+
+	/**
+	 * Carryover is a direct input of AbsenceService::getVacationStats, which
+	 * is cached per user behind a version key. Every write through this
+	 * mapper (admin edit, rollover, import, unit migration) must orphan the
+	 * user's cached stats. Call this AFTER the write statement: bumping the
+	 * version beforehand lets a concurrent reader cache pre-write data under
+	 * the new token. Callers inside an outer transaction must additionally
+	 * invalidate post-commit (see AdminUserProfileUpdateService) — the bump
+	 * here only orders correctly against autocommit readers.
+	 */
+	private function invalidateStatsCache(string $userId): void
+	{
+		try {
+			$this->statsCache ??= \OCP\Server::get(\OCP\ICacheFactory::class)
+				->createDistributed('azc_vacation_stats');
+			// Fresh version token orphans every cached stats entry — see
+			// AbsenceService::invalidateVacationStatsCache for why a remove()
+			// would resurrect the very entries it means to drop.
+			$this->statsCache->set(
+				\OCA\ArbeitszeitCheck\Service\AbsenceService::VACATION_STATS_VERSION_PREFIX . $userId,
+				bin2hex(random_bytes(8)),
+				\OCA\ArbeitszeitCheck\Service\AbsenceService::VACATION_STATS_VERSION_TTL
+			);
+		} catch (\Throwable) {
+			// A cache-backend hiccup must never break a balance write.
+		}
 	}
 
 	public function findByUserAndYear(string $userId, int $year): VacationYearBalance
@@ -86,7 +116,7 @@ class VacationYearBalanceMapper extends QBMapper
 				$entity->setCarryoverHours($normalizedHours);
 			}
 			$entity->setUpdatedAt($now);
-			return $this->update($entity);
+			$saved = $this->update($entity);
 		} catch (DoesNotExistException $e) {
 			$entity = new VacationYearBalance();
 			$entity->setUserId($userId);
@@ -100,7 +130,7 @@ class VacationYearBalanceMapper extends QBMapper
 			$entity->setCreatedAt($now);
 			$entity->setUpdatedAt($now);
 			try {
-				return $this->insert($entity);
+				$saved = $this->insert($entity);
 			} catch (UniqueConstraintViolationException) {
 				$existing = $this->findByUserAndYear($userId, $year);
 				$existing->setCarryoverDays($normalized);
@@ -110,9 +140,11 @@ class VacationYearBalanceMapper extends QBMapper
 					$existing->setCarryoverHours($normalizedHours);
 				}
 				$existing->setUpdatedAt($now);
-				return $this->update($existing);
+				$saved = $this->update($existing);
 			}
 		}
+		$this->invalidateStatsCache($userId);
+		return $saved;
 	}
 
 	/**
@@ -124,5 +156,6 @@ class VacationYearBalanceMapper extends QBMapper
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)));
 		$qb->executeStatement();
+		$this->invalidateStatsCache($userId);
 	}
 }

@@ -266,14 +266,18 @@
     }
 
     function buildEntitlementPreviewHtml(entitlementPreview, t) {
-        const days = entitlementPreview ? formatPreviewDays(entitlementPreview.days) : '';
-        const valueText = entitlementPreview
+        // The server may answer `{unavailable: true}` when the engine could
+        // not resolve an entitlement (e.g. corrupted policy references the
+        // controller could not recover) — render it like a missing preview.
+        const available = entitlementPreview && !entitlementPreview.unavailable;
+        const days = available ? formatPreviewDays(entitlementPreview.days) : '';
+        const valueText = available
             ? auN('1 vacation day', '%n vacation days', Number(days))
             : t('notAvailable', 'Not available');
-        const metaText = entitlementPreview
+        const metaText = available
             ? localizedEntitlementSourceLabel(entitlementPreview.source, t)
             : '';
-        const trace = entitlementPreview?.calculationTrace || null;
+        const trace = available ? (entitlementPreview.calculationTrace || null) : null;
         const summaryText = buildEntitlementPreviewSummary(trace, t);
         const technicalJson = buildEntitlementPreviewTechnical(trace);
         const detailsBlock = technicalJson
@@ -285,7 +289,7 @@
 
         return `<p class="entitlement-preview__value">${Utils.escapeHtml(valueText)}</p>
             <p class="entitlement-preview__meta">${Utils.escapeHtml(metaText)}</p>
-            ${buildProrationNoteHtml(entitlementPreview, t)}
+            ${buildProrationNoteHtml(available ? entitlementPreview : null, t)}
             <p class="entitlement-preview__summary"${summaryText ? '' : ' hidden'}>${Utils.escapeHtml(summaryText)}</p>
             ${detailsBlock}`;
     }

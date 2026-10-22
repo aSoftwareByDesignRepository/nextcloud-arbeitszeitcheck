@@ -161,7 +161,7 @@ class ReportController extends Controller
 	{
 		$raw = $e->getMessage();
 		if (strpos($raw, 'User not authenticated') !== false) {
-			return ['status' => Http::STATUS_BAD_REQUEST, 'error' => $this->l10n->t('User not authenticated')];
+			return ['status' => Http::STATUS_UNAUTHORIZED, 'error' => $this->l10n->t('User not authenticated')];
 		}
 		if (strpos($raw, 'Access denied') !== false) {
 			return ['status' => Http::STATUS_FORBIDDEN, 'error' => $this->l10n->t('Access denied')];
@@ -175,7 +175,7 @@ class ReportController extends Controller
 		}
 
 		return [
-			'status' => Http::STATUS_BAD_REQUEST,
+			'status' => Http::STATUS_INTERNAL_SERVER_ERROR,
 			'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 		];
 	}

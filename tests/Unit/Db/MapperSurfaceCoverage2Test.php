@@ -132,6 +132,9 @@ class MapperSurfaceCoverage2Test extends TestCase
 			] : []),
 		);
 		$qb->method('executeQuery')->willReturn($result);
+		// Writes report "one row affected" so CAS-guarded mutators take their
+		// success arm; failure arms are driven by newQbThrowingOnWrite.
+		$qb->method('executeStatement')->willReturn(1);
 		return $qb;
 	}
 

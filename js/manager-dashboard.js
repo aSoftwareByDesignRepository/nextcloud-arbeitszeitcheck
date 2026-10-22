@@ -279,6 +279,15 @@
                     Messaging.showSuccess(action === 'approve'
                         ? tn('1 item approved.', '%n items approved.', applied)
                         : tn('1 item rejected.', '%n items rejected.', applied));
+                    if (Messaging.showWarning && Array.isArray(data.results)) {
+                        const warnings = [];
+                        data.results.forEach(function(r) {
+                            if (r && r.billing_warning && warnings.indexOf(r.billing_warning) === -1) {
+                                warnings.push(r.billing_warning);
+                            }
+                        });
+                        warnings.forEach(function(w) { Messaging.showWarning(w); });
+                    }
                     clearBulkSelection();
                     loadPendingApprovals();
                     loadPendingTimeEntryCorrections();
@@ -657,6 +666,9 @@
                     Messaging.showSuccess(isManualCreate
                         ? t('Manual time entry approved.', 'Manual time entry approved.')
                         : t('Time entry correction approved successfully', 'Time entry correction approved successfully'));
+                    if (data.billing_warning && Messaging.showWarning) {
+                        Messaging.showWarning(data.billing_warning);
+                    }
                     removeTimeEntryCard(timeEntryId);
                     loadPendingTimeEntryCorrections();
                     loadTeamCompliance();

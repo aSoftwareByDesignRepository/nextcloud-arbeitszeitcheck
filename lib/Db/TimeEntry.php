@@ -161,6 +161,23 @@ class TimeEntry extends Entity
 	private ?int $countableMinBreakMinutes = null;
 
 	/**
+	 * Not persisted. Human-readable warning set by write paths when the entry
+	 * saved but the ProjectCheck billing sync failed — surfaced to the caller
+	 * in the API response instead of being silently dropped.
+	 */
+	private ?string $billingSyncWarning = null;
+
+	public function setBillingSyncWarning(?string $warning): void
+	{
+		$this->billingSyncWarning = ($warning === null || $warning === '') ? null : $warning;
+	}
+
+	public function getBillingSyncWarning(): ?string
+	{
+		return $this->billingSyncWarning;
+	}
+
+	/**
 	 * TimeEntry constructor
 	 */
 	public function __construct()

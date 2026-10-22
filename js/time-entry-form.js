@@ -1730,9 +1730,10 @@ class TimeEntryFormManager {
 					});
 				}
 
-				// Policy break warning: surface inline with actions instead of
-				// a blink-and-gone redirect toast (warning never blocks).
-				if (result.break_warning && this.showBreakWarningNotice(result)) {
+				// Post-save warnings (break policy, billing sync): surface inline
+				// with actions instead of a blink-and-gone redirect toast
+				// (warnings never block).
+				if ((result.break_warning || result.billing_warning) && this.showPostSaveNotice(result)) {
 					this.resetSubmitButton(submitBtn, originalText);
 					return;
 				}
@@ -1778,12 +1779,12 @@ class TimeEntryFormManager {
 	}
 
 	/**
-	 * Render the org break-policy warning inline. Replaces the auto-redirect:
-	 * the entry is saved, the user can jump straight to the saved entry to
-	 * add the missing break, or continue to the list. Returns true when the
-	 * notice was shown.
+	 * Render post-save warnings inline (break policy and/or billing sync).
+	 * Replaces the auto-redirect so the notice actually stays readable: the
+	 * entry is saved, the user can jump straight to the saved entry (break
+	 * warnings only), or continue to the list. Returns true when shown.
 	 */
-	showBreakWarningNotice(result) {
+	showPostSaveNotice(result) {
 		const box = document.getElementById('entry-break-warning');
 		const text = document.getElementById('entry-break-warning-text');
 		const editLink = document.getElementById('entry-break-warning-edit');
@@ -1792,6 +1793,7 @@ class TimeEntryFormManager {
 			return false;
 		}
 		const warning = result.break_warning || {};
+		const hasBreakWarning = Boolean(result.break_warning);
 		const parts = [];
 
 		if (warning.window && warning.window.start && warning.window.end) {
@@ -1808,11 +1810,14 @@ class TimeEntryFormManager {
 				|| `Required break: ${warning.required} min — recorded: ${warning.actual} min.`
 			);
 		}
-		if (parts.length === 0) {
+		if (hasBreakWarning && parts.length === 0) {
 			parts.push(
 				(window.t ? window.t('arbeitszeitcheck', 'This entry does not fully meet the break rules.') : null)
 				|| 'This entry does not fully meet the break rules.'
 			);
+		}
+		if (typeof result.billing_warning === 'string' && result.billing_warning !== '') {
+			parts.push(result.billing_warning);
 		}
 		parts.push(
 			(window.t ? window.t('arbeitszeitcheck', 'The entry was saved.') : null)
@@ -1822,7 +1827,9 @@ class TimeEntryFormManager {
 
 		const entryId = result && result.entry ? result.entry.id : null;
 		const editTemplate = this.formConfig.editUrlTemplate || '';
-		if (editLink && entryId && editTemplate) {
+		// The "add the missing break" action only makes sense for a break
+		// warning — a billing-sync failure has nothing the employee can edit.
+		if (editLink && hasBreakWarning && entryId && editTemplate) {
 			editLink.href = editTemplate.replace('__ENTRY_ID__', encodeURIComponent(String(entryId)));
 			editLink.hidden = false;
 		} else if (editLink) {

@@ -290,6 +290,9 @@
             },
             onError: function () {
                 Messaging.showError?.(cvT('Could not update violation.'));
+                // A 409 means another manager resolved it first — refresh so the
+                // stale resolve button disappears (mobile invalidates on settle too).
+                loadViolations();
             },
         });
     }

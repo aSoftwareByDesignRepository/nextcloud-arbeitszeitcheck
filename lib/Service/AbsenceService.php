@@ -61,6 +61,8 @@ class AbsenceService
 	private ?ManagerPendingApprovalMailService $managerPendingApprovalMailService;
 	private ?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper;
 	private ?SpecialEntitlementService $specialEntitlementService;
+	private ?PostCommitEffectQueue $postCommitEffectQueue;
+	private ?\OCP\ICacheFactory $cacheFactory;
 	/** Shared migrate-idle lock held for the duration of a vacation mutation (anti-TOCTOU). */
 	private ?string $heldVacationUnitMigrateSharedLock = null;
 	/** Shared year-mode lock — blocks exclusive mode flip mid-mutation (lock order: year → migrate). */
@@ -91,6 +93,8 @@ class AbsenceService
 		?ManagerPendingApprovalMailService $managerPendingApprovalMailService = null,
 		?\OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper = null,
 		?SpecialEntitlementService $specialEntitlementService = null,
+		?PostCommitEffectQueue $postCommitEffectQueue = null,
+		?\OCP\ICacheFactory $cacheFactory = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -119,6 +123,23 @@ class AbsenceService
 		$this->specialEntitlementService = $specialEntitlementService;
 		// Same pattern as timeZoneService: never silently skip the worked-day guard.
 		$this->timeEntryMapper = $timeEntryMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$this->postCommitEffectQueue = $postCommitEffectQueue;
+		$this->cacheFactory = $cacheFactory;
+	}
+
+	/**
+	 * Route a non-rollbackable side effect (SMTP mail) through the post-commit
+	 * queue. When a caller (e.g. ManagerBulkDecisionService) has an outer
+	 * transaction open, this method's own commit is not final — the effect is
+	 * deferred until that outer commit succeeds. Without an outer transaction
+	 * the effect runs inline, preserving prior behavior.
+	 *
+	 * @param callable():void $effect
+	 */
+	private function runPostCommitEffect(callable $effect): void
+	{
+		$this->postCommitEffectQueue ??= \OCP\Server::get(PostCommitEffectQueue::class);
+		$this->postCommitEffectQueue->runAfterCurrentCommit($effect);
 	}
 
 	/** Calendar "today" at 00:00 in organisation storage TZ. */
@@ -264,6 +285,8 @@ class AbsenceService
 				$this->specialEntitlementService->consumeForAbsence($savedAbsence, $userId);
 			}
 
+				$this->invalidateVacationStatsAfterCommit($savedAbsence->getUserId());
+
 				$this->db->commit();
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
@@ -281,11 +304,11 @@ class AbsenceService
 				);
 			}
 			if ($this->absenceIcalMailService) {
-				$this->absenceIcalMailService->sendIcalForApprovedAbsence($savedAbsence);
+				$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalForApprovedAbsence($savedAbsence));
 			}
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
-				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'manager_approved', $userId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($savedAbsence, 'request_created', $userId));
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($savedAbsence, 'manager_approved', $userId));
 			}
 		} elseif ($substituteUserId) {
 			if ($this->notificationService) {
@@ -304,16 +327,16 @@ class AbsenceService
 				);
 			}
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($savedAbsence);
-				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendSubstitutionRequestToSubstitute($savedAbsence));
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($savedAbsence, 'request_created', $userId));
 			}
 		} else {
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'request_created', $userId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($savedAbsence, 'request_created', $userId));
 			}
 			// Direct manager approval (no substitute): email team managers when enabled.
 			if ($savedAbsence->getStatus() === Absence::STATUS_PENDING) {
-				$this->managerPendingApprovalMailService?->notifyPendingAbsence($savedAbsence);
+				$this->runPostCommitEffect(fn () => $this->managerPendingApprovalMailService?->notifyPendingAbsence($savedAbsence));
 			}
 		}
 
@@ -434,6 +457,8 @@ class AbsenceService
 					$managerUserId
 				);
 
+				$this->invalidateVacationStatsAfterCommit($savedAbsence->getUserId());
+
 				$this->db->commit();
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
@@ -447,10 +472,10 @@ class AbsenceService
 				);
 			}
 			if ($this->absenceIcalMailService) {
-				$this->absenceIcalMailService->sendIcalForApprovedAbsence($savedAbsence);
+				$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalForApprovedAbsence($savedAbsence));
 			}
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendHrOfficeNotification($savedAbsence, 'manager_approved', $managerUserId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($savedAbsence, 'manager_approved', $managerUserId));
 			}
 
 			return $savedAbsence;
@@ -626,6 +651,8 @@ class AbsenceService
 				$updatedAbsence->getSummary()
 			);
 
+			$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -649,8 +676,8 @@ class AbsenceService
 			);
 		}
 		if ($substituteChanged && $newSubstituteId && $this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendSubstitutionRequestToSubstitute($updatedAbsence);
-			$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'request_created', $userId);
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendSubstitutionRequestToSubstitute($updatedAbsence));
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'request_created', $userId));
 		}
 
 			return $updatedAbsence;
@@ -700,6 +727,8 @@ class AbsenceService
 					$absence->getSummary(),
 					null
 				);
+
+				$this->invalidateVacationStatsAfterCommit($absence->getUserId());
 
 				$this->db->commit();
 			} catch (\Throwable $e) {
@@ -782,6 +811,8 @@ class AbsenceService
 					$updatedAbsence->getSummary()
 				);
 
+				$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 				$this->db->commit();
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
@@ -792,7 +823,7 @@ class AbsenceService
 		}
 
 		if ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'employee_cancelled', $userId);
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'employee_cancelled', $userId));
 		}
 
 		return $updatedAbsence;
@@ -908,6 +939,8 @@ class AbsenceService
 					$updatedAbsence->getSummary()
 				);
 
+				$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 				$this->db->commit();
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
@@ -1001,6 +1034,8 @@ class AbsenceService
 				$approverId
 			);
 
+			$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -1018,10 +1053,10 @@ class AbsenceService
 		}
 
 		if ($this->absenceIcalMailService) {
-			$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
+			$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalForApprovedAbsence($updatedAbsence));
 		}
 		if ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'manager_approved', $approverId);
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'manager_approved', $approverId));
 		}
 
 		return $updatedAbsence;
@@ -1084,6 +1119,8 @@ class AbsenceService
 				$approverId
 			);
 
+			$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -1105,7 +1142,7 @@ class AbsenceService
 			], $comment);
 		}
 		if ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'manager_rejected', $approverId);
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'manager_rejected', $approverId));
 		}
 		return $updatedAbsence;
 	}
@@ -1230,6 +1267,8 @@ class AbsenceService
 				$wasAutoApproved = true;
 			}
 
+			$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -1245,11 +1284,11 @@ class AbsenceService
 				);
 			}
 			if ($this->absenceIcalMailService) {
-				$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
+				$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalForApprovedAbsence($updatedAbsence));
 			}
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'substitute_approved', $substituteUserId);
-				$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'manager_approved', $substituteUserId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'substitute_approved', $substituteUserId));
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'manager_approved', $substituteUserId));
 			}
 		} else {
 			// Employee has manager: notify about substitute approval and that manager approval is pending
@@ -1270,13 +1309,13 @@ class AbsenceService
 			}
 
 			if ($this->absenceNotificationMailService) {
-				$this->absenceNotificationMailService->sendSubstituteApprovedToEmployee($updatedAbsence);
-				$this->absenceNotificationMailService->sendSubstituteApprovedToManagers($updatedAbsence);
-				$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'substitute_approved', $substituteUserId);
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendSubstituteApprovedToEmployee($updatedAbsence));
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendSubstituteApprovedToManagers($updatedAbsence));
+				$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'substitute_approved', $substituteUserId));
 			}
 
 			if ($this->absenceIcalMailService) {
-				$this->absenceIcalMailService->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence);
+				$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalToSubstituteOnSubstitutionApproval($updatedAbsence));
 			}
 		}
 			return $updatedAbsence;
@@ -1343,6 +1382,8 @@ class AbsenceService
 				$substituteUserId
 			);
 
+			$this->invalidateVacationStatsAfterCommit($updatedAbsence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -1367,7 +1408,7 @@ class AbsenceService
 			);
 		}
 		if ($this->absenceNotificationMailService) {
-			$this->absenceNotificationMailService->sendHrOfficeNotification($updatedAbsence, 'substitute_declined', $substituteUserId);
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'substitute_declined', $substituteUserId));
 		}
 			return $updatedAbsence;
 		} finally {
@@ -1591,6 +1632,102 @@ class AbsenceService
 	}
 
 	/**
+	 * TTL (seconds) for cached vacation stats. Bounds residual staleness for
+	 * mutation paths that do not flow through AbsenceService (admin-side
+	 * policy/carryover/model writes), while absence mutations invalidate
+	 * precisely via `invalidateVacationStatsAfterCommit()`.
+	 */
+	private const VACATION_STATS_CACHE_TTL = 300;
+
+	/**
+	 * Version-key prefix in the `azc_vacation_stats` cache. Shared with write
+	 * funnels outside this service (e.g. VacationYearBalanceMapper::upsert)
+	 * so any vacation-input mutation can orphan a user's cached stats.
+	 */
+	public const VACATION_STATS_VERSION_PREFIX = 'vsver_';
+
+	/**
+	 * TTL for the per-user version token. Must comfortably exceed the stats
+	 * entry TTL so a token can never expire before entries stamped with it.
+	 * Shared with write funnels outside this service (VacationYearBalanceMapper).
+	 */
+	public const VACATION_STATS_VERSION_TTL = self::VACATION_STATS_CACHE_TTL * 4;
+
+	private ?\OCP\ICache $vacationStatsCache = null;
+
+	private function vacationStatsCache(): ?\OCP\ICache
+	{
+		// Opt-in via injected factory only — production always injects it
+		// (Application.php), while legacy test constructions must not share a
+		// real distributed-cache backend and leak stats between test cases.
+		if ($this->vacationStatsCache === null) {
+			if ($this->cacheFactory === null) {
+				return null;
+			}
+			try {
+				$this->vacationStatsCache = $this->cacheFactory->createDistributed('azc_vacation_stats');
+			} catch (\Throwable) {
+				return null;
+			}
+		}
+		return $this->vacationStatsCache;
+	}
+
+	private function vacationStatsCacheKey(string $userId, int $year): ?string
+	{
+		$cache = $this->vacationStatsCache();
+		if ($cache === null) {
+			return null;
+		}
+		try {
+			$version = $cache->get(self::VACATION_STATS_VERSION_PREFIX . $userId);
+			$version = is_string($version) && $version !== '' ? $version : '0';
+			$unit = $this->vacationUnitService?->isHoursMode() === true ? 'h' : 'd';
+			return 'vs_' . $userId . '_' . $version . '_' . $unit . '_' . $year . '_' . gmdate('Ymd');
+		} catch (\Throwable) {
+			return null;
+		}
+	}
+
+	/**
+	 * Drops the version key so every cached stats entry for the user becomes
+	 * unreachable, once the surrounding mutation actually commits. Deferred
+	 * through the post-commit queue so a rolled-back transaction never
+	 * invalidates a still-valid entry.
+	 */
+	private function invalidateVacationStatsAfterCommit(string $userId): void
+	{
+		$this->runPostCommitEffect(function () use ($userId): void {
+			$this->invalidateVacationStatsCache($userId);
+		});
+	}
+
+	/**
+	 * Drops the version key so every cached stats entry for the user becomes
+	 * unreachable. Public so services that mutate vacation inputs outside the
+	 * absence lifecycle (carryover, policy or working-time-model edits) can
+	 * keep the overview consistent instead of relying on the TTL.
+	 */
+	public function invalidateVacationStatsCache(string $userId): void
+	{
+		try {
+			// Bump the keyspace with a fresh token — every previously cached
+			// entry for the user becomes unreachable and expires via TTL.
+			// A plain remove() would reset the version to the default "0"
+			// keyspace and resurrect the very entries it orphaned. The token
+			// TTL comfortably exceeds the stats TTL so a version can never
+			// expire before the entries stamped with it.
+			$this->vacationStatsCache()?->set(
+				self::VACATION_STATS_VERSION_PREFIX . $userId,
+				bin2hex(random_bytes(8)),
+				self::VACATION_STATS_VERSION_TTL
+			);
+		} catch (\Throwable) {
+			// A cache-backend hiccup must never break a committed mutation.
+		}
+	}
+
+	/**
 	 * Get vacation statistics for a user
 	 *
 	 * @param string $userId User ID
@@ -1599,6 +1736,28 @@ class AbsenceService
 	 */
 	public function getVacationStats(string $userId, int $year): array
 	{
+		// Read-through cache: the manager people-overview fans this call out
+		// once per in-scope employee, and each uncached call costs several
+		// mapper queries plus a full layered entitlement resolution. Entries
+		// live behind a per-user version key (`vsver_<uid>`) which mutating
+		// writes remove post-commit — a removal orphans every cached entry
+		// (orphans expire via TTL), so mutations can never serve stale data.
+		$cache = $this->vacationStatsCache();
+		$cacheKey = $this->vacationStatsCacheKey($userId, $year);
+		if ($cache !== null && $cacheKey !== null) {
+			try {
+				$hit = $cache->get($cacheKey);
+				if (is_string($hit) && $hit !== '') {
+					$decoded = json_decode($hit, true);
+					if (is_array($decoded)) {
+						return $decoded;
+					}
+				}
+			} catch (\Throwable) {
+				$cache = null;
+			}
+		}
+
 		$sickDays = 0.0;
 		try {
 			$sickDays = $this->absenceMapper->getSickLeaveDays($userId, $year);
@@ -1629,7 +1788,7 @@ class AbsenceService
 				&& !$this->vacationAllocationService->isCarryoverUsableForNewRequests($allocYear, $today, $userId);
 			$cap = $this->vacationAllocationService->getMaxCarryoverOpeningCap();
 
-			return [
+			$result = [
 				'year' => (int)($alloc['year'] ?? $allocYear),
 				'entitlement' => round($totalEntitlement, 2),
 				'entitlement_source' => (string)($alloc['entitlement_source'] ?? 'manual'),
@@ -1654,6 +1813,16 @@ class AbsenceService
 				'vacation_year_end_inclusive' => $alloc['vacation_year_end_inclusive'] ?? null,
 				'vacation_year_error' => $alloc['vacation_year_error'] ?? null,
 			];
+
+			if ($cache !== null && $cacheKey !== null) {
+				try {
+					$cache->set($cacheKey, json_encode($result), self::VACATION_STATS_CACHE_TTL);
+				} catch (\Throwable) {
+					// Cache-write failure only costs the next read its speed.
+				}
+			}
+
+			return $result;
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->warning('Error getting vacation stats (using fallback): ' . $e->getMessage(), ['exception' => $e]);
 			return [
@@ -2273,6 +2442,8 @@ class AbsenceService
 		try {
 			$updatedAbsence = $this->doAutoApproveDbWork($absence);
 			$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
+			$this->invalidateVacationStatsAfterCommit($absence->getUserId());
+
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
@@ -2287,7 +2458,7 @@ class AbsenceService
 		}
 
 		if ($this->absenceIcalMailService) {
-			$this->absenceIcalMailService->sendIcalForApprovedAbsence($updatedAbsence);
+			$this->runPostCommitEffect(fn () => $this->absenceIcalMailService?->sendIcalForApprovedAbsence($updatedAbsence));
 		}
 
 		return $updatedAbsence;

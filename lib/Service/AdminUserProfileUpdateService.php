@@ -59,11 +59,21 @@ class AdminUserProfileUpdateService
 		private readonly ?VacationUnitService $vacationUnitService = null,
 		private readonly ?VacationUnitMigrationService $vacationUnitMigrationService = null,
 		private readonly ?\OCP\Lock\ILockingProvider $lockingProvider = null,
+		private readonly ?AbsenceService $absenceService = null,
 	) {
 	}
 
 	/** @var array<string, true> request-scoped: profile locks this instance holds. */
 	private array $heldUserProfileLocks = [];
+
+	/**
+	 * True while updateProfile()'s outer transaction is open. The section
+	 * apply-wrappers skip their own stats-cache invalidation then — dropping
+	 * the version mid-transaction would let a concurrent reader cache
+	 * pre-commit state under the fresh key. updateProfile() invalidates once,
+	 * after its atomic block commits.
+	 */
+	private bool $withinCompositeProfileUpdate = false;
 
 	/**
 	 * Serialize the whole profile write for one employee. Without it two
@@ -177,7 +187,9 @@ class AdminUserProfileUpdateService
 		$this->preflightEmployment($userId, $employment);
 		$this->preflightDatev($datev);
 
-		return $this->withUserProfileLock($userId, fn (): array => $this->atomic(function () use ($userId, $workingTimeModel, $vacationPolicy, $timeCapture, $overtime, $employment, $datev, $performedBy): array {
+		$this->withinCompositeProfileUpdate = true;
+		try {
+			$result = $this->withUserProfileLock($userId, fn (): array => $this->atomic(function () use ($userId, $workingTimeModel, $vacationPolicy, $timeCapture, $overtime, $employment, $datev, $performedBy): array {
 			$result = ['success' => true];
 			// Empty sections must be skipped: applyVacationPolicy() on an empty
 			// payload would fabricate a manual_fixed policy with null days and
@@ -206,6 +218,16 @@ class AdminUserProfileUpdateService
 
 			return $result;
 		}, $this->db));
+		} finally {
+			$this->withinCompositeProfileUpdate = false;
+		}
+
+		// Any saved section can shift vacation-stats inputs (policy, model,
+		// carryover, employment dates) — drop the cached version so manager
+		// overviews and dashboards recompute instead of serving stale numbers.
+		$this->absenceService?->invalidateVacationStatsCache($userId);
+
+		return $result;
 	}
 
 	/**
@@ -234,12 +256,18 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyWorkingTimeModel(string $userId, array $params, string $performedBy): array
 	{
-		return $this->withUserProfileLock(
+		$result = $this->withUserProfileLock(
 			$userId,
 			fn (): array => $this->withSharedModelCatalogLock(
 				fn (): array => $this->applyWorkingTimeModelLocked($userId, $params, $performedBy)
 			)
 		);
+		// Mid-transaction invalidation inside updateProfile() must wait for the
+		// outer commit — see $withinCompositeProfileUpdate.
+		if (!$this->withinCompositeProfileUpdate) {
+			$this->absenceService?->invalidateVacationStatsCache($userId);
+		}
+		return $result;
 	}
 
 	/**
@@ -519,7 +547,11 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyVacationPolicy(string $userId, array $params, string $performedBy): array
 	{
-		return $this->withUserProfileLock($userId, fn (): array => $this->applyVacationPolicyLocked($userId, $params, $performedBy));
+		$result = $this->withUserProfileLock($userId, fn (): array => $this->applyVacationPolicyLocked($userId, $params, $performedBy));
+		if (!$this->withinCompositeProfileUpdate) {
+			$this->absenceService?->invalidateVacationStatsCache($userId);
+		}
+		return $result;
 	}
 
 	private function applyVacationPolicyLocked(string $userId, array $params, string $performedBy): array

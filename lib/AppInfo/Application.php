@@ -284,6 +284,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService::class),
 				$c->query(\OCP\Lock\ILockingProvider::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\AbsenceService::class),
 			);
 		});
 
@@ -635,6 +636,10 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripDayCalculationMapper::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripSnapshotService::class),
 		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue::class, fn ($c): \OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue => new \OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue(
+			$c->query(\OCP\IDBConnection::class),
+			$c->query(\Psr\Log\LoggerInterface::class),
+		));
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService::class, fn ($c): \OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService => new \OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService(
 			$c->query(\OCP\IDBConnection::class),
 			$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
@@ -647,6 +652,7 @@ class Application extends App implements IBootstrap {
 			$c->query(PermissionService::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig::class),
 			$c->query(\OCP\IL10N::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue::class),
 		));
 
 		$context->registerService(InitializeWorkforceSuiteFreshState::class, function ($c): InitializeWorkforceSuiteFreshState {
@@ -858,6 +864,8 @@ class Application extends App implements IBootstrap {
 				$c->query(ManagerPendingApprovalMailService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue::class),
+				$c->query(\OCP\ICacheFactory::class),
 			);
 		});
 

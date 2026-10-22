@@ -810,6 +810,7 @@ class ExportController extends Controller
 
 			return new DataDownloadResponse($content, $filename, 'text/plain; charset=iso-8859-1');
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('ExportController::exportAsDatev failed: ' . $e->getMessage(), ['exception' => $e]);
 			$errorData = [['error' => $this->safeExportErrorMessage($e)]];
 			return $this->exportAsCsv($errorData, 'datev-export-error-' . date('Y-m-d') . '.csv', $this->getExportTimezone());
 		}
@@ -913,6 +914,7 @@ class ExportController extends Controller
 				'config' => $status
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('ExportController::datevConfig failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->safeExportErrorMessage($e)

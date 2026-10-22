@@ -2482,6 +2482,7 @@ class ManagerController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $saved->getSummary(),
+				'billing_warning' => $saved->getBillingSyncWarning(),
 				'message' => $this->l10n->t('Time entry recorded for the employee.'),
 			], Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
@@ -3316,6 +3317,7 @@ class ManagerController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
+				'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 				'message' => $this->l10n->t('Time entry correction approved successfully')
 			]);
 		} catch (DoesNotExistException $e) {
@@ -3567,6 +3569,7 @@ class ManagerController extends Controller
 			return new JSONResponse([
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
+				'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 				'message' => $this->l10n->t('Time entry corrected successfully.')
 			]);
 		} catch (DoesNotExistException $e) {

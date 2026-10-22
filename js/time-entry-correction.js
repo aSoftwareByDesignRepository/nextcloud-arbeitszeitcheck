@@ -910,12 +910,19 @@
 				data: body,
 				onSuccess: (data) => {
 					if (data.success) {
+						const postSaveWarnings = [];
 						if (data.break_warning) {
-							// Saved with a policy warning: keep the dialog open,
+							postSaveWarnings.push(formatBreakWarning(data.break_warning));
+						}
+						if (typeof data.billing_warning === 'string' && data.billing_warning !== '') {
+							postSaveWarnings.push(data.billing_warning);
+						}
+						if (postSaveWarnings.length > 0) {
+							// Saved with a warning: keep the dialog open,
 							// announce inline (role=status), reload on close so the
 							// list reflects the new state. Never a dead end.
 							correctionReloadOnClose = true;
-							setStatus(statusEl, t('correctionSubmitSuccess') + ' ' + formatBreakWarning(data.break_warning), false);
+							setStatus(statusEl, t('correctionSubmitSuccess') + ' ' + postSaveWarnings.join(' '), false);
 							Messaging.showSuccess(t('correctionSubmitSuccess'));
 							if (btnSubmit) {
 								btnSubmit.disabled = true;

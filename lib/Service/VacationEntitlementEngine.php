@@ -64,6 +64,8 @@ use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignment;
 use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignmentMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Exception\TariffRuleSetUnavailableException;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 
 class VacationEntitlementEngine {
@@ -142,18 +144,38 @@ class VacationEntitlementEngine {
 
 		$layered = $this->isLayeredEnabled();
 		$layersEvaluated = [];
+		// True once any higher layer matched a policy row it could not deliver
+		// (tariff mode with a NULL/dangling rule-set reference). Feeds the
+		// top-level `degraded` flag on whichever lower layer ends up winning.
+		$undeliverableLayers = false;
 
 		// L3: explicit individual policy that does NOT defer to lower layers.
 		if ($policy !== null && !$policy->isInherit()) {
-			$resolved = $this->resolveFromPolicy($userId, $policy, $asOfDateOnly);
-			$layersEvaluated[] = [
-				'layer' => 'L3',
-				'matched' => true,
-				'policy_id' => $policy->getId(),
-				'mode' => $policy->getVacationMode(),
-				'days' => $resolved['days'],
-			];
-			return $this->finalise($resolved, 'L3', $asOfDateOnly, $layersEvaluated, false);
+			try {
+				$resolved = $this->resolveFromPolicy($userId, $policy, $asOfDateOnly);
+				$layersEvaluated[] = [
+					'layer' => 'L3',
+					'matched' => true,
+					'policy_id' => $policy->getId(),
+					'mode' => $policy->getVacationMode(),
+					'days' => $resolved['days'],
+				];
+				return $this->finalise($resolved, 'L3', $asOfDateOnly, $layersEvaluated, false);
+			} catch (TariffRuleSetUnavailableException $e) {
+				// The L3 row demands tariff resolution but its rule set is
+				// gone. Degrade to the lower layers like an `inherit` row
+				// instead of fataling every surface that resolves this user.
+				$undeliverableLayers = true;
+				$this->logUndeliverableTariff('L3', $userId, $e);
+				$layersEvaluated[] = [
+					'layer' => 'L3',
+					'matched' => false,
+					'reason' => 'tariff_rule_set_unavailable',
+					'policy_id' => $policy->getId(),
+					'mode' => $policy->getVacationMode(),
+					'rule_set_id' => $e->getRuleSetId(),
+				];
+			}
 		}
 
 		if ($policy !== null && $policy->isInherit()) {
@@ -163,7 +185,9 @@ class VacationEntitlementEngine {
 				'reason' => 'inherit',
 				'policy_id' => $policy->getId(),
 			];
-		} else {
+		} elseif ($policy === null) {
+			// An undeliverable non-inherit policy already produced its own
+			// L3 row above — do not double-record it as 'no_policy'.
 			$layersEvaluated[] = [
 				'layer' => 'L3',
 				'matched' => false,
@@ -179,7 +203,7 @@ class VacationEntitlementEngine {
 				'reason' => 'layered_disabled',
 				'days' => $legacy['days'],
 			];
-			return $this->finalise($legacy, 'legacy', $asOfDateOnly, $layersEvaluated, false);
+			return $this->finalise($legacy, 'legacy', $asOfDateOnly, $layersEvaluated, $undeliverableLayers);
 		}
 
 		// L2: team-attached policy. Tie-break by depth → priority → id.
@@ -190,6 +214,20 @@ class VacationEntitlementEngine {
 		// pretending the membership reflected history.
 		$partialHistory = $this->asOfPredatesMembershipHistory($asOfDateOnly);
 		$teamResolution = $this->resolveTeamLayer($userId, $asOfDateOnly);
+		$teamLayerUndeliverable = false;
+		if ($teamResolution !== null && !empty($teamResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$teamLayerUndeliverable = true;
+			$layersEvaluated[] = [
+				'layer' => 'L2',
+				'matched' => false,
+				'reason' => 'tariff_rule_set_unavailable',
+				'team_id' => $teamResolution['team_id'],
+				'policy_id' => $teamResolution['policy_id'],
+				'candidates' => $teamResolution['candidates'],
+			];
+			$teamResolution = null;
+		}
 		if ($teamResolution !== null) {
 			$row = [
 				'layer' => 'L2',
@@ -219,20 +257,35 @@ class VacationEntitlementEngine {
 			if (!empty($teamResolution['hypothetical'])) {
 				$winnerExtra['hypothetical'] = true;
 			}
-			return $this->finalise($teamResolution['resolved'], 'L2', $asOfDateOnly, $layersEvaluated, false, $winnerExtra);
+			return $this->finalise($teamResolution['resolved'], 'L2', $asOfDateOnly, $layersEvaluated, $undeliverableLayers, $winnerExtra);
 		}
 		// REQ-WF-05: when an L2 lookup was attempted with a hypothetical
 		// team override and produced no match, surface that explicitly in
 		// the trace so the simulator UI can disambiguate "no team match"
-		// from "team match suppressed by hypothetical override".
-		$noMatchRow = ['layer' => 'L2', 'matched' => false, 'reason' => 'no_team_match'];
-		if (array_key_exists($userId, $this->hypotheticalTeams)) {
-			$noMatchRow['hypothetical'] = true;
+		// from "team match suppressed by hypothetical override". An
+		// undeliverable winner was already recorded with its own reason —
+		// do not mislabel it 'no_team_match'.
+		if (!$teamLayerUndeliverable) {
+			$noMatchRow = ['layer' => 'L2', 'matched' => false, 'reason' => 'no_team_match'];
+			if (array_key_exists($userId, $this->hypotheticalTeams)) {
+				$noMatchRow['hypothetical'] = true;
+			}
+			$layersEvaluated[] = $noMatchRow;
 		}
-		$layersEvaluated[] = $noMatchRow;
 
 		// L1: model-attached default for user's active model on date.
 		$modelResolution = $this->resolveModelLayer($userId, $asOfDateOnly);
+		if ($modelResolution !== null && !empty($modelResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$layersEvaluated[] = [
+				'layer' => 'L1',
+				'matched' => false,
+				'reason' => 'tariff_rule_set_unavailable',
+				'working_time_model_id' => $modelResolution['working_time_model_id'],
+				'default_id' => $modelResolution['default_id'],
+			];
+			$modelResolution = null;
+		}
 		if ($modelResolution !== null) {
 			$layersEvaluated[] = [
 				'layer' => 'L1',
@@ -242,7 +295,7 @@ class VacationEntitlementEngine {
 				'mode' => $modelResolution['resolved']['source'],
 				'days' => $modelResolution['resolved']['days'],
 			];
-			return $this->finalise($modelResolution['resolved'], 'L1', $asOfDateOnly, $layersEvaluated, false, [
+			return $this->finalise($modelResolution['resolved'], 'L1', $asOfDateOnly, $layersEvaluated, $undeliverableLayers, [
 				'working_time_model_id' => $modelResolution['working_time_model_id'],
 				'default_id' => $modelResolution['default_id'],
 			]);
@@ -251,6 +304,16 @@ class VacationEntitlementEngine {
 
 		// L0: organisation default.
 		$orgResolution = $this->resolveOrgLayer($userId, $asOfDateOnly);
+		if ($orgResolution !== null && !empty($orgResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$layersEvaluated[] = [
+				'layer' => 'L0',
+				'matched' => false,
+				'reason' => 'tariff_rule_set_unavailable',
+				'default_id' => $orgResolution['default_id'],
+			];
+			$orgResolution = null;
+		}
 		if ($orgResolution !== null) {
 			$row = [
 				'layer' => 'L0',
@@ -267,7 +330,7 @@ class VacationEntitlementEngine {
 			if ($orgResolution['collision']) {
 				$winnerExtra['degraded_org_default_collision'] = true;
 			}
-			return $this->finalise($orgResolution['resolved'], 'L0', $asOfDateOnly, $layersEvaluated, $orgResolution['collision'], $winnerExtra);
+			return $this->finalise($orgResolution['resolved'], 'L0', $asOfDateOnly, $layersEvaluated, $orgResolution['collision'] || $undeliverableLayers, $winnerExtra);
 		}
 		$layersEvaluated[] = ['layer' => 'L0', 'matched' => false, 'reason' => 'no_org_default'];
 
@@ -298,15 +361,24 @@ class VacationEntitlementEngine {
 	 */
 	public function computeForPolicy(string $userId, UserVacationPolicyAssignment $policy, \DateTimeInterface $asOfDate): array {
 		$asOfDateOnly = new \DateTimeImmutable($asOfDate->format('Y-m-d'));
+		$undeliverableLayers = false;
 		if (!$policy->isInherit()) {
-			$resolved = $this->resolveFromPolicy($userId, $policy, $asOfDateOnly);
-			return $this->finalise($resolved, 'L3', $asOfDateOnly, [
-				['layer' => 'L3', 'matched' => true, 'mode' => $policy->getVacationMode(), 'days' => $resolved['days'], 'simulated' => true],
-			], false);
+			try {
+				$resolved = $this->resolveFromPolicy($userId, $policy, $asOfDateOnly);
+				return $this->finalise($resolved, 'L3', $asOfDateOnly, [
+					['layer' => 'L3', 'matched' => true, 'mode' => $policy->getVacationMode(), 'days' => $resolved['days'], 'simulated' => true],
+				], false);
+			} catch (TariffRuleSetUnavailableException $e) {
+				// Simulated tariff draft references a deleted rule set — walk
+				// the lower layers like an inherit draft instead of fataling.
+				$undeliverableLayers = true;
+				$this->logUndeliverableTariff('L3', $userId, $e);
+			}
 		}
-		// Inherit-simulation: continue down the chain just like computeForDate would.
+		// Inherit-simulation (or an undeliverable draft): continue down the
+		// chain just like computeForDate would.
 		$layersEvaluated = [
-			['layer' => 'L3', 'matched' => false, 'reason' => 'inherit', 'simulated' => true],
+			['layer' => 'L3', 'matched' => false, 'reason' => $policy->isInherit() ? 'inherit' : 'tariff_rule_set_unavailable', 'simulated' => true],
 		];
 		if (!$this->isLayeredEnabled()) {
 			$legacy = $this->legacyFallback($userId, $asOfDateOnly);
@@ -316,10 +388,14 @@ class VacationEntitlementEngine {
 				'reason' => 'layered_disabled',
 				'days' => $legacy['days'],
 			];
-			return $this->finalise($legacy, 'legacy', $asOfDateOnly, $layersEvaluated, false);
+			return $this->finalise($legacy, 'legacy', $asOfDateOnly, $layersEvaluated, $undeliverableLayers);
 		}
 		$partialHistory = $this->asOfPredatesMembershipHistory($asOfDateOnly);
 		$teamResolution = $this->resolveTeamLayer($userId, $asOfDateOnly);
+		if ($teamResolution !== null && !empty($teamResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$teamResolution = null;
+		}
 		if ($teamResolution !== null) {
 			$row = [
 				'layer' => 'L2',
@@ -346,9 +422,13 @@ class VacationEntitlementEngine {
 			if (!empty($teamResolution['hypothetical'])) {
 				$winnerExtra['hypothetical'] = true;
 			}
-			return $this->finalise($teamResolution['resolved'], 'L2', $asOfDateOnly, $layersEvaluated, false, $winnerExtra);
+			return $this->finalise($teamResolution['resolved'], 'L2', $asOfDateOnly, $layersEvaluated, $undeliverableLayers, $winnerExtra);
 		}
 		$modelResolution = $this->resolveModelLayer($userId, $asOfDateOnly);
+		if ($modelResolution !== null && !empty($modelResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$modelResolution = null;
+		}
 		if ($modelResolution !== null) {
 			$layersEvaluated[] = [
 				'layer' => 'L1',
@@ -356,9 +436,13 @@ class VacationEntitlementEngine {
 				'working_time_model_id' => $modelResolution['working_time_model_id'],
 				'days' => $modelResolution['resolved']['days'],
 			];
-			return $this->finalise($modelResolution['resolved'], 'L1', $asOfDateOnly, $layersEvaluated, false);
+			return $this->finalise($modelResolution['resolved'], 'L1', $asOfDateOnly, $layersEvaluated, $undeliverableLayers);
 		}
 		$orgResolution = $this->resolveOrgLayer($userId, $asOfDateOnly);
+		if ($orgResolution !== null && !empty($orgResolution['undeliverable'])) {
+			$undeliverableLayers = true;
+			$orgResolution = null;
+		}
 		if ($orgResolution !== null) {
 			$layersEvaluated[] = [
 				'layer' => 'L0',
@@ -366,7 +450,7 @@ class VacationEntitlementEngine {
 				'days' => $orgResolution['resolved']['days'],
 				'simulated' => true,
 			] + ($orgResolution['collision'] ? ['degraded_org_default_collision' => true] : []);
-			return $this->finalise($orgResolution['resolved'], 'L0', $asOfDateOnly, $layersEvaluated, $orgResolution['collision']);
+			return $this->finalise($orgResolution['resolved'], 'L0', $asOfDateOnly, $layersEvaluated, $orgResolution['collision'] || $undeliverableLayers);
 		}
 		$legacy = $this->legacyFallback($userId, $asOfDateOnly);
 		$layersEvaluated[] = ['layer' => 'legacy', 'matched' => true, 'days' => $legacy['days']];
@@ -533,13 +617,23 @@ class VacationEntitlementEngine {
 
 	/**
 	 * @return array{days: float, source: string, ruleSetId: int|null, trace: array}
+	 * @throws TariffRuleSetUnavailableException when the policy's rule set
+	 *         reference is NULL or dangling (no FK on the column — a deleted
+	 *         rule set leaves a live reference behind). Callers must catch it
+	 *         and degrade to the next layer; letting it escape fatals every
+	 *         surface that resolves this user's entitlement (admin user
+	 *         detail, absence preview, allocation writes).
 	 */
 	private function resolveTariff(string $userId, ?int $ruleSetId, \DateTimeImmutable $asOfDate, string $mode): array
 	{
 		if ($ruleSetId === null) {
-			throw new \RuntimeException('Tariff mode requires an assigned rule set');
+			throw new TariffRuleSetUnavailableException(null, 'Tariff mode requires an assigned rule set');
 		}
-		$ruleSet = $this->ruleSetMapper->find($ruleSetId);
+		try {
+			$ruleSet = $this->ruleSetMapper->find($ruleSetId);
+		} catch (DoesNotExistException $e) {
+			throw new TariffRuleSetUnavailableException($ruleSetId, 'Tariff rule set no longer exists', $e);
+		}
 		$modules = $this->ruleModuleMapper->findByRuleSetId($ruleSetId);
 		$baseDays = 30.0;
 		$referenceWeekDays = 5.0;
@@ -643,6 +737,26 @@ class VacationEntitlementEngine {
 	}
 
 	/**
+	 * A layer matched a tariff-mode row whose rule set is unavailable.
+	 * Logged at error level — this is a payroll-relevant misconfiguration
+	 * the admin must repair (re-assign a live rule set or switch the layer
+	 * to manual/simple). The layer is skipped and resolution continues
+	 * down the chain; the trace carries `tariff_rule_set_unavailable`.
+	 */
+	private function logUndeliverableTariff(string $layer, string $userId, TariffRuleSetUnavailableException $e): void
+	{
+		\OCP\Log\logger('arbeitszeitcheck')->error(
+			sprintf(
+				'VacationEntitlementEngine: %s row for user %s selects tariff mode but rule set %s is unavailable — degrading to lower layers.',
+				$layer,
+				$userId,
+				$e->getRuleSetId() === null ? '(null)' : '#' . $e->getRuleSetId(),
+			),
+			['app' => 'arbeitszeitcheck', 'exception' => $e]
+		);
+	}
+
+	/**
 	 * Resolve via L2. Returns null when the user is in no team with an
 	 * active policy on `asOfDate`.
 	 *
@@ -711,7 +825,6 @@ class VacationEntitlementEngine {
 		}
 		/** @var TeamVacationPolicy $winningPolicy */
 		$winningPolicy = $winnerCandidate->value;
-		$resolved = $this->resolveFromLayerRow($userId, $winningPolicy->getVacationMode(), $winningPolicy->getManualDays(), $winningPolicy->getTariffRuleSetId(), $asOfDate);
 		$candList = array_map(static function (\OCA\ArbeitszeitCheck\Policy\PolicyCandidate $c) use ($teamDepths): array {
 			/** @var TeamVacationPolicy $p */
 			$p = $c->value;
@@ -722,6 +835,20 @@ class VacationEntitlementEngine {
 				'policy_id' => (int)$p->getId(),
 			];
 		}, $resolution->eligible);
+		try {
+			$resolved = $this->resolveFromLayerRow($userId, $winningPolicy->getVacationMode(), $winningPolicy->getManualDays(), $winningPolicy->getTariffRuleSetId(), $asOfDate);
+		} catch (TariffRuleSetUnavailableException $e) {
+			$this->logUndeliverableTariff('L2', $userId, $e);
+			return [
+				'undeliverable' => true,
+				'team_id' => (int)$winnerCandidate->scopeId,
+				'team_depth' => $teamDepths[$winnerCandidate->scopeId] ?? $winnerCandidate->depth,
+				'priority' => $winnerCandidate->priority,
+				'policy_id' => (int)$winningPolicy->getId(),
+				'candidates' => $candList,
+				'hypothetical' => $hypothetical,
+			];
+		}
 		return [
 			'team_id' => (int)$winnerCandidate->scopeId,
 			'team_depth' => $teamDepths[$winnerCandidate->scopeId] ?? $winnerCandidate->depth,
@@ -747,7 +874,16 @@ class VacationEntitlementEngine {
 		if ($default === null) {
 			return null;
 		}
-		$resolved = $this->resolveFromLayerRow($userId, $default->getVacationMode(), $default->getManualDays(), $default->getTariffRuleSetId(), $asOfDate);
+		try {
+			$resolved = $this->resolveFromLayerRow($userId, $default->getVacationMode(), $default->getManualDays(), $default->getTariffRuleSetId(), $asOfDate);
+		} catch (TariffRuleSetUnavailableException $e) {
+			$this->logUndeliverableTariff('L1', $userId, $e);
+			return [
+				'undeliverable' => true,
+				'working_time_model_id' => $modelId,
+				'default_id' => (int)$default->getId(),
+			];
+		}
 		return [
 			'working_time_model_id' => $modelId,
 			'default_id' => (int)$default->getId(),
@@ -789,7 +925,16 @@ class VacationEntitlementEngine {
 		} catch (\Throwable) {
 			// countActiveByDate is best-effort: never block resolution on diag.
 		}
-		$resolved = $this->resolveFromLayerRow($userId, $default->getVacationMode(), $default->getManualDays(), $default->getTariffRuleSetId(), $asOfDate);
+		try {
+			$resolved = $this->resolveFromLayerRow($userId, $default->getVacationMode(), $default->getManualDays(), $default->getTariffRuleSetId(), $asOfDate);
+		} catch (TariffRuleSetUnavailableException $e) {
+			$this->logUndeliverableTariff('L0', $userId, $e);
+			return [
+				'undeliverable' => true,
+				'default_id' => (int)$default->getId(),
+				'collision' => $collision,
+			];
+		}
 		return [
 			'default_id' => (int)$default->getId(),
 			'collision' => $collision,

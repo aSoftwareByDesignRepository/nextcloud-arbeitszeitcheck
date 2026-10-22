@@ -40,6 +40,7 @@ use OCA\ArbeitszeitCheck\Service\BusinessTripTimelineValidator;
 use OCA\ArbeitszeitCheck\Service\ManagerBulkDecisionService;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue;
 use OCA\ArbeitszeitCheck\Service\PolicyCohortResolver;
 use OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService;
 use OCA\ArbeitszeitCheck\Service\TravelComplianceClassifier;
@@ -63,6 +64,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	private AbsenceService $absenceService;
 	private PermissionService $permissionService;
 	private IL10N $l10n;
+	private PostCommitEffectQueue $effectQueue;
 	private bool $tripsEnabled = true;
 
 	protected function setUp(): void
@@ -77,6 +79,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(static fn (string $s): string => $s);
+		$this->effectQueue = new PostCommitEffectQueue($this->db, $this->createMock(\Psr\Log\LoggerInterface::class));
 	}
 
 	private function service(): ManagerBulkDecisionService
@@ -129,6 +132,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 			$this->permissionService,
 			$config,
 			$this->l10n,
+			$this->effectQueue,
 		);
 	}
 
@@ -280,6 +284,21 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 		}
 	}
 
+	public function testApproveTimeEntrySurfacesBillingWarningPerItem(): void
+	{
+		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->correctionService->method('approve')->willReturnCallback(static function (TimeEntry $e): TimeEntry {
+			$e->setBillingSyncWarning('billing sync failed');
+			return $e;
+		});
+
+		$results = $this->service()->decide('manager', 'approve', [['type' => 'time_entry', 'id' => 11]], 'ok');
+
+		$this->assertSame('approved', $results[0]['status']);
+		$this->assertSame('billing sync failed', $results[0]['billing_warning'] ?? null);
+	}
+
 	public function testRejectRoutesToRejectServices(): void
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(5));
@@ -289,6 +308,75 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 
 		$results = $this->service()->decide('manager', 'reject', [['type' => 'time_entry', 'id' => 5]], 'nope');
 		$this->assertSame('rejected', $results[0]['status']);
+	}
+
+	public function testDeferredExternalEffectsRunOnlyAfterCommit(): void
+	{
+		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
+		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		// Once the outer transaction is open, post-commit effects defer.
+		$this->db->method('inTransaction')->willReturn(true);
+
+		$order = [];
+		$this->correctionService->method('approve')->willReturnCallback(static function (TimeEntry $e): TimeEntry {
+			return $e;
+		});
+		// Simulate AbsenceService's post-commit mail routing through the queue.
+		$this->absenceService->method('approveAbsence')->willReturnCallback(function (int $id) use (&$order): Absence {
+			$this->effectQueue->runAfterCurrentCommit(static function () use (&$order): void {
+				$order[] = 'external-effect';
+			});
+			return $this->pendingAbsence($id);
+		});
+		$this->db->method('commit')->willReturnCallback(static function () use (&$order): void {
+			$order[] = 'commit';
+		});
+
+		$this->service()->decide('manager', 'approve', [
+			['type' => 'time_entry', 'id' => 11],
+			['type' => 'absence', 'id' => 22],
+		]);
+
+		$this->assertSame(
+			['commit', 'external-effect'],
+			$order,
+			'external side effects must fire only after the batch commit succeeded'
+		);
+		$this->assertSame(0, $this->effectQueue->pendingCount());
+	}
+
+	public function testRolledBackBatchDiscardsDeferredExternalEffects(): void
+	{
+		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
+		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->db->method('inTransaction')->willReturn(true);
+
+		$effectRan = false;
+		$this->correctionService->method('approve')->willReturnCallback(function (TimeEntry $e) use (&$effectRan): TimeEntry {
+			$this->effectQueue->runAfterCurrentCommit(static function () use (&$effectRan): void {
+				$effectRan = true;
+			});
+			return $e;
+		});
+		$this->absenceService->method('approveAbsence')
+			->willThrowException(new ConcurrentDecisionException('lost the race'));
+
+		$this->db->expects($this->once())->method('rollBack');
+		$this->db->expects($this->never())->method('commit');
+
+		try {
+			$this->service()->decide('manager', 'approve', [
+				['type' => 'time_entry', 'id' => 11],
+				['type' => 'absence', 'id' => 22],
+			]);
+			$this->fail('expected BulkDecisionException');
+		} catch (BulkDecisionException) {
+		}
+
+		$this->assertFalse($effectRan, 'an external effect queued before a batch failure must never fire');
+		$this->assertSame(0, $this->effectQueue->pendingCount());
 	}
 
 	public function testBusinessTripItemRequiresEnabledFeature(): void

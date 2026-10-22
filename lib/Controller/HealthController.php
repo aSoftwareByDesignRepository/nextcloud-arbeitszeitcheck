@@ -69,6 +69,7 @@ class HealthController extends Controller
 		} catch (\Throwable $e) {
 			// Do not expose exception message to unauthenticated users (PublicPage).
 			// Log internally; return generic message for health checks (load balancers, monitoring).
+			\OCP\Log\logger('arbeitszeitcheck')->error('HealthController::check failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'status' => 'unhealthy',
 				'timestamp' => time(),

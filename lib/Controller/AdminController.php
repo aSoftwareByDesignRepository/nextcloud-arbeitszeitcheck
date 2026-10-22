@@ -783,6 +783,7 @@ class AdminController extends Controller
 			]);
 			return $this->configureCSP($response, 'admin');
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::dashboard failed: ' . $e->getMessage(), ['exception' => $e]);
 			$response = new TemplateResponse('arbeitszeitcheck', 'admin-dashboard', $this->buildAdminShellParams(
 				'admin-dashboard',
 				$this->l10n->t('Administration - Status'),
@@ -1495,6 +1496,7 @@ class AdminController extends Controller
 				'holidays' => $holidays,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getCompanyHolidays failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -1571,6 +1573,7 @@ class AdminController extends Controller
 				'success' => true,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::saveCompanyHoliday failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -1614,6 +1617,7 @@ class AdminController extends Controller
 				'success' => true,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteCompanyHoliday failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -1672,6 +1676,7 @@ class AdminController extends Controller
 				],
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getStateHolidays failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -1743,6 +1748,7 @@ class AdminController extends Controller
 				'suggestions' => $suggestions,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getHolidaySuggestions failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -1915,6 +1921,7 @@ class AdminController extends Controller
 				],
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::saveStateHoliday failed: ' . $e->getMessage(), ['exception' => $e]);
 			if ($this->isUniqueConstraintViolation($e)) {
 				return new JSONResponse([
 					'success' => false,
@@ -1985,6 +1992,7 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('Holiday not found'),
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteStateHoliday failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -2491,6 +2499,7 @@ class AdminController extends Controller
 				'availableAccessUsers' => $this->getAvailableAccessUsersForAccessControl(),
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getAdminSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -2510,6 +2519,7 @@ class AdminController extends Controller
 				'eventTypes' => $this->getNotificationEventTypes(),
 			]);
 		} catch (\Throwable) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getNotificationSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -2937,6 +2947,7 @@ class AdminController extends Controller
 				'settings' => $updatedSettings
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateAdminSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -3554,6 +3565,7 @@ class AdminController extends Controller
 				}
 			}
 		} catch (\Throwable) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateNotificationSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -4425,6 +4437,7 @@ class AdminController extends Controller
 				]
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getStatistics failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -4854,9 +4867,33 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 			$policy = $this->findVacationPolicyForAdminEdit($userId, $startDate);
-			$entitlementPreview = $this->vacationEntitlementEngine->computeForDate($userId, new \DateTimeImmutable('today'));
-			$entitlementFullDays = round((float)$entitlementPreview['days'], 2);
-			$entitlementProration = $this->vacationProrationService->prorateForYear($userId, $currentYear, $entitlementFullDays);
+			// Entitlement preview is optional enrichment for the edit dialog:
+			// a broken policy reference (e.g. a deleted tariff rule set — the
+			// table carries no FK) must degrade to an explicit `unavailable`
+			// payload instead of taking down the whole employee editor.
+			try {
+				$entitlementPreview = $this->vacationEntitlementEngine->computeForDate($userId, new \DateTimeImmutable('today'));
+				$entitlementFullDays = round((float)$entitlementPreview['days'], 2);
+				$entitlementProration = $this->vacationProrationService->prorateForYear($userId, $currentYear, $entitlementFullDays);
+				$entitlementPreviewPayload = [
+					'days' => (float)$entitlementProration['days'],
+					'fullYearDays' => $entitlementFullDays,
+					'prorated' => (bool)$entitlementProration['prorated'],
+					'prorationMethod' => $entitlementProration['method'],
+					'monthsCovered' => $entitlementProration['months_covered'],
+					'employedInYear' => (bool)($entitlementProration['employed_in_year'] ?? true),
+					'source' => $entitlementPreview['source'],
+					'ruleSetId' => $entitlementPreview['ruleSetId'],
+					'calculationTrace' => $entitlementPreview['trace'],
+					'prorationTrace' => $entitlementProration,
+				];
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->error(
+					'AdminController::getUser entitlement preview failed for user ' . $userId . ': ' . $e->getMessage(),
+					['exception' => $e]
+				);
+				$entitlementPreviewPayload = ['unavailable' => true];
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -4918,18 +4955,7 @@ class AdminController extends Controller
 						'effectiveTo' => $policy->getEffectiveTo()?->format('Y-m-d'),
 						'inheritLowerLayers' => $policy->isInherit(),
 					] : null,
-					'entitlementPreview' => [
-						'days' => (float)$entitlementProration['days'],
-						'fullYearDays' => $entitlementFullDays,
-						'prorated' => (bool)$entitlementProration['prorated'],
-						'prorationMethod' => $entitlementProration['method'],
-						'monthsCovered' => $entitlementProration['months_covered'],
-						'employedInYear' => (bool)($entitlementProration['employed_in_year'] ?? true),
-						'source' => $entitlementPreview['source'],
-						'ruleSetId' => $entitlementPreview['ruleSetId'],
-						'calculationTrace' => $entitlementPreview['trace'],
-						'prorationTrace' => $entitlementProration,
-					],
+					'entitlementPreview' => $entitlementPreviewPayload,
 					'timeCapture' => array_merge(
 						$this->timeCaptureMethodService->getSettings($userId),
 						['preferences' => $this->timeCaptureMethodService->getUserPreferences($userId)],
@@ -4948,6 +4974,10 @@ class AdminController extends Controller
 				]
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'AdminController::getUser failed for user ' . $userId . ': ' . $e->getMessage(),
+				['exception' => $e]
+			);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5029,6 +5059,7 @@ class AdminController extends Controller
 				'history' => $history
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getUserAssignmentHistory failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5064,6 +5095,7 @@ class AdminController extends Controller
 				}, $models)
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getWorkingTimeModels failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5115,6 +5147,7 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('Working time model not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getWorkingTimeModel failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5205,6 +5238,7 @@ class AdminController extends Controller
 				]
 			], Http::STATUS_CREATED);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::createWorkingTimeModel failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5319,6 +5353,7 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('Working time model not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateWorkingTimeModel failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5424,6 +5459,7 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('Working time model not found')
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteWorkingTimeModel failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
@@ -5473,6 +5509,7 @@ class AdminController extends Controller
 			}
 			return new JSONResponse(['success' => true, 'ruleSets' => $all]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getTariffRuleSets failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to load tariff rule sets')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -5489,6 +5526,7 @@ class AdminController extends Controller
 		} catch (DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Tariff rule set not found')], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getTariffRuleSet failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to load tariff rule set')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
@@ -5551,6 +5589,7 @@ class AdminController extends Controller
 		} catch (DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Tariff rule set not found')], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteTariffRuleSet failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to delete tariff rule set')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
@@ -5936,6 +5975,7 @@ class AdminController extends Controller
 		} catch (AdminUserProfileUpdateException $e) {
 			return $this->profileUpdateExceptionResponse($e);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::assignVacationPolicy failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to assign vacation policy')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -6915,6 +6955,7 @@ class AdminController extends Controller
 				'offset' => $offset,
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getAuditLogs failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
@@ -6955,6 +6996,7 @@ class AdminController extends Controller
 				'statistics' => $stats
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getAuditLogStats failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')

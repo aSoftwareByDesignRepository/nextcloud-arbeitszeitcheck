@@ -269,7 +269,9 @@ class TimeEntryController extends Controller
 		if ($entry->getStatus() !== TimeEntry::STATUS_COMPLETED || $entry->getEndTime() === null) {
 			return;
 		}
-		$this->projectCheckLaborSync->syncFromTimeEntry($entry, $actorUserId);
+		$entry->setBillingSyncWarning(
+			$this->correctionService->syncProjectCheckBilling($entry, $actorUserId)
+		);
 	}
 
 	/**
@@ -287,6 +289,7 @@ class TimeEntryController extends Controller
 				'projects' => $linkingEnabled ? $this->projectCheckIntegration->getAvailableProjects($userId) : [],
 			]);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('TimeEntryController::apiAssignableProjectcheckProjects failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('Could not load projects.'),
@@ -1411,6 +1414,7 @@ class TimeEntryController extends Controller
 							'success' => true,
 							'entry' => $savedEntry->getSummary(),
 							'break_warning' => $this->breakWarningPayload($savedEntry),
+							'billing_warning' => $savedEntry->getBillingSyncWarning(),
 							'message' => $this->l10n->t('Manual time entry submitted for manager approval.')
 						], Http::STATUS_CREATED);
 					}
@@ -1438,7 +1442,8 @@ class TimeEntryController extends Controller
 					return new JSONResponse([
 						'success' => true,
 						'entry' => $savedEntry->getSummary(),
-						'break_warning' => $this->breakWarningPayload($savedEntry)
+						'break_warning' => $this->breakWarningPayload($savedEntry),
+						'billing_warning' => $savedEntry->getBillingSyncWarning(),
 					], Http::STATUS_CREATED);
 				});
 			} catch (LockedException $e) {
@@ -1933,7 +1938,8 @@ class TimeEntryController extends Controller
 							return new JSONResponse([
 								'success' => true,
 								'entry' => $updatedEntry->getSummary(),
-								'break_warning' => $this->breakWarningPayload($updatedEntry)
+								'break_warning' => $this->breakWarningPayload($updatedEntry),
+								'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 							]);
 						}, $this->db);
 					});
@@ -2312,6 +2318,7 @@ class TimeEntryController extends Controller
 					'success' => true,
 					'entry' => $updatedEntry->getSummary(),
 					'break_warning' => $this->breakWarningPayload($updatedEntry),
+					'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 					'message' => $this->l10n->t('Correction request submitted and auto-approved (no approver assigned in the app).')
 				]);
 			}
@@ -2320,6 +2327,7 @@ class TimeEntryController extends Controller
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
 				'break_warning' => $this->breakWarningPayload($updatedEntry),
+				'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 				'message' => $this->l10n->t('Correction request submitted successfully')
 			]);
 		} catch (DoesNotExistException $e) {
@@ -2544,6 +2552,7 @@ class TimeEntryController extends Controller
 				'success' => true,
 				'entry' => $updatedEntry->getSummary(),
 				'break_warning' => $this->breakWarningPayload($updatedEntry),
+				'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 				'message' => $this->l10n->t('Paused session was completed and recorded successfully.'),
 			]);
 		} catch (DoesNotExistException $e) {
@@ -3123,6 +3132,7 @@ class TimeEntryController extends Controller
 								'success' => true,
 								'entry' => $savedEntry->getSummary(),
 								'break_warning' => $this->breakWarningPayload($savedEntry),
+								'billing_warning' => $savedEntry->getBillingSyncWarning(),
 								'message' => $this->l10n->t('Manual time entry submitted for manager approval.'),
 							], Http::STATUS_CREATED);
 						}
@@ -3146,7 +3156,8 @@ class TimeEntryController extends Controller
 						return new JSONResponse([
 							'success' => true,
 							'entry' => $savedEntry->getSummary(),
-							'break_warning' => $this->breakWarningPayload($savedEntry)
+							'break_warning' => $this->breakWarningPayload($savedEntry),
+							'billing_warning' => $savedEntry->getBillingSyncWarning(),
 						], Http::STATUS_CREATED);
 					}, $this->db);
 				});

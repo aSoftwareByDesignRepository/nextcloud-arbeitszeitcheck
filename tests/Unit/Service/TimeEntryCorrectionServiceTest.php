@@ -940,4 +940,71 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$json = json_decode($entry->getJustification(), true);
 		$this->assertSame('external', $json['proposed']['workLocation']);
 	}
+
+	private function failingBillingSyncService(): TimeEntryCorrectionService
+	{
+		$integration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$integration->method('isProjectCheckAvailable')->willReturn(true);
+		$sync = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class);
+		$sync->method('syncFromTimeEntry')->willReturn(['success' => false]);
+		return $this->serviceWithProjectCheck($integration, $sync);
+	}
+
+	public function testApproveAttachesBillingWarningToReturnedEntry(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode(['justification' => 'forgot to clock out']));
+
+		$result = $this->failingBillingSyncService()->approve($entry, 'manager1');
+
+		$this->assertNotNull(
+			$result->getBillingSyncWarning(),
+			'a failed billing sync must reach the caller — it must never be silently dropped'
+		);
+	}
+
+	public function testApproveLeavesWarningNullWhenSyncSucceeds(): void
+	{
+		$integration = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
+		$integration->method('isProjectCheckAvailable')->willReturn(true);
+		$sync = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class);
+		$sync->method('syncFromTimeEntry')->willReturn(['success' => true]);
+
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode(['justification' => 'forgot to clock out']));
+
+		$result = $this->serviceWithProjectCheck($integration, $sync)->approve($entry, 'manager1');
+
+		$this->assertNull($result->getBillingSyncWarning());
+	}
+
+	public function testApplyManagerCorrectionAttachesBillingWarning(): void
+	{
+		$entry = $this->buildEntry();
+		$proposal = ['startTime' => '2026-01-15T10:00:00+00:00', 'endTime' => '2026-01-15T16:00:00+00:00'];
+
+		$result = $this->failingBillingSyncService()
+			->applyManagerCorrection($entry, $proposal, 'manager1', 'Adjusted retroactively per HR.');
+
+		$this->assertNotNull($result->getBillingSyncWarning());
+	}
+
+	public function testCreateManagerRecordedEntryAttachesBillingWarning(): void
+	{
+		$this->timeEntryMapper->method('insert')->willReturnCallback(
+			static fn (TimeEntry $e): TimeEntry => $e
+		);
+		$entry = $this->buildEntry();
+		$proposal = [
+			'startTime' => '2026-01-15T10:00:00+00:00',
+			'endTime' => '2026-01-15T16:00:00+00:00',
+		];
+
+		$result = $this->failingBillingSyncService()
+			->createManagerRecordedEntry($entry, $proposal, 'manager1', 'Employee forgot to track.');
+
+		$this->assertNotNull($result->getBillingSyncWarning());
+	}
 }

@@ -46,6 +46,7 @@ final class ManagerBulkDecisionService
 		private readonly PermissionService $permissionService,
 		private readonly WorkforceSuiteConfig $config,
 		private readonly IL10N $l10n,
+		private ?PostCommitEffectQueue $postCommitEffectQueue = null,
 	) {
 	}
 
@@ -87,11 +88,22 @@ final class ManagerBulkDecisionService
 			);
 			$this->db->commit();
 		} catch (\Throwable $e) {
+			// Deferred external effects (mail) must never fire for rolled-back data.
+			$this->effectQueue()->discard();
 			$this->db->rollBack();
 			throw $e;
 		}
 
+		// Only now are per-item decisions durable — release deferred external
+		// effects (approval/rejection mail) collected by per-item services.
+		$this->effectQueue()->flush();
+
 		return $results;
+	}
+
+	private function effectQueue(): PostCommitEffectQueue
+	{
+		return $this->postCommitEffectQueue ??= \OCP\Server::get(PostCommitEffectQueue::class);
 	}
 
 	/**
@@ -192,10 +204,11 @@ final class ManagerBulkDecisionService
 	private function applyDecision(array $item, string $action, string $managerId, ?string $comment): array
 	{
 		$entity = $item['entity'];
+		$billingWarning = null;
 		try {
 			if ($item['type'] === 'time_entry') {
 				if ($action === self::ACTION_APPROVE) {
-					$this->correctionService->approve($entity, $managerId, $comment);
+					$billingWarning = $this->correctionService->approve($entity, $managerId, $comment)->getBillingSyncWarning();
 				} else {
 					$this->correctionService->reject($entity, $managerId, $comment);
 				}
@@ -224,11 +237,15 @@ final class ManagerBulkDecisionService
 			);
 		}
 
-		return [
+		$result = [
 			'type' => $item['type'],
 			'id' => $item['id'],
 			'status' => $action === self::ACTION_APPROVE ? 'approved' : 'rejected',
 		];
+		if ($billingWarning !== null) {
+			$result['billing_warning'] = $billingWarning;
+		}
+		return $result;
 	}
 
 	/** Uniform not-found for missing, disabled or out-of-scope items. */

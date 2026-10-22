@@ -237,6 +237,10 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			// 'overtid'/'indgang' unbounded stems catch every compound
 			// ('overtidsregistrering', 'indgangsinformation').
 			'\bvalfrit\b|\w*(prioritetsvar|exportsplitt|indgang|overtid)\w*',
+			// r8 sibling-mangle sweep: 'administrator' is the da/de spelling;
+			// Swedish only has 'administratör'. Caught 2 live residuals
+			// ('Lägg till administrator' for 'Add manager').
+			'\badministrator\w*',
 			// sentence-initial/implicit-subject calques: Danish/MT drops the
 			// required Swedish subject pronoun ('Om var sjuk', 'slutade
 			// arbeta', 'får hantera'). Catches the verb-second violation a
@@ -287,6 +291,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// below; a new identical requires a human to verify it is genuinely
 		// shared before allowlisting (fail-closed).
 		$this->assertNoUnregisteredDanishIdenticals($sv, $this->translations('da'), $this->translations('en'), 'sv');
+		// Layer 7 — English-run lint: ≥3 consecutive English tokens is
+		// residual untranslated text, not a loanword.
+		self::assertNoEnglishRuns($sv, self::LEGIT_EN_RUNS, 'sv', $this->appRoot);
 	}
 
 	/**
@@ -445,6 +452,12 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// would false-positive on legit nb 'der borte' adverbials.
 		self::assertNoForbiddenPatterns($nb, [
 			'\bder (ble|var|vil|matcher|ligger|kommer|finnes|skal|kan|er)\b',
+			// r8 sibling-mangle sweep: 'Bloker månedsavlutning' — 'bloker'
+			// is neither nb 'blokker' nor da 'bloker' (da 'blokere'); and
+			// 'avlutning' is a dropped-s mangle of nb 'avslutning' that no
+			// Scandinavian vocabulary contains. Unbounded stems catch the
+			// compound variants.
+			'\w*(bloker|avlutning)\w*',
 			'\bat (vise|gjøre|få|være|kunne|bruke|velge|se|slette|sende|ta|sette|aktivere|deaktivere|fortsætte|benytte|tildele|bruge|åbne|lukke|tilføje|fjerne|bekræfte|downloade|udfylde|gemme|registrere)\b',
 			// da '-kæde' compounds (prioritetskæde/forrangskæde; nb '-kjede')
 			// and da 'feriedage' (nb 'feriedager') — boundary-guarded so legit
@@ -472,6 +485,24 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// 'trykke' is a legit Norwegian verb; only the capitalized 'Print'
 		// mistranslation is a bleed.
 		self::assertNoForbiddenExactCase($nb, ['Trykke'], 'nb');
+		// Layer 4 — donor-vocabulary token lint nb←da (same shape as
+		// sv←da). Earlier rounds claimed nb↔da was ungateable because ~945
+		// identical *values* are legitimate — but token-level lint still
+		// discriminates: a da token with no valid Bokmål reading inside an
+		// nb value is a bleed suspect. The legit shared token mass lives
+		// in tests/Fixtures/l10n/legit-tokens-nb-da.txt (1,514 reviewed
+		// shared Scandinavian tokens — every current nb-catalog token
+		// spelled verbatim in the da vocabulary; adding a new token
+		// requires human verification).
+		self::assertNoDonorVocabTokens(
+			$nb,
+			['da'],
+			self::fixtureTokens('legit-tokens-nb-da'),
+			'nb',
+			$this->appRoot,
+		);
+		// English-run lint (same shape as sv/pl).
+		self::assertNoEnglishRuns($nb, self::LEGIT_EN_RUNS, 'nb', $this->appRoot);
 	}
 
 	public function testPolishHasNoDutchOrGermanBleed(): void
@@ -719,6 +750,10 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'\b(?!kontynuu\w*)\w*uu\w*',
 			'\b(?!weekend\w*|employee\w*|feedback\w*|cookie\w*|screen\w*|career\w*)\w*ee\w*',
 		], 'pl');
+		// English-run lint: caught 'Pracownik work schedule assigned',
+		// 'Zapisz ProjectCheck connection setting', 'Tariff rule set nie
+		// znaleziono', 'User ustawienia'.
+		self::assertNoEnglishRuns($pl, self::LEGIT_EN_RUNS, 'pl', $this->appRoot);
 	}
 
 	public function testNoCatalogContainsZeroWidthCharacters(): void
@@ -845,6 +880,15 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'totalt', 'tredje', 'typen', 'typer', 'tyskland', 'undertid', 'validering', 'versionen',
 		'versioner', 'versionsnummer', 'visning', 'yngre', 'zürich', 'årlig', 'årligt', 'årsdag',
 		'årsdagsår',
+		// 2026-11-05 family-union expansion (r8 residue fix): legit sv
+		// tokens surfaced only when the donor vocabulary was widened to
+		// all sibling da catalogs — all reviewed, genuine Swedish.
+		'ansvarsområde', 'arkiv', 'beslut', 'bland', 'cirka', 'dialogen', 'effekten',
+		'effektivt', 'etiketter', 'givet', 'grupp', 'gången', 'importfilen', 'inget',
+		'installation', 'integritet', 'internt', 'introduktion', 'jurisdiktion',
+		'kredit', 'laddas', 'licenssignaturen', 'nextclouds', 'objektet', 'perioden',
+		'postdetaljer', 'procenten', 'rensning', 'signaturen', 'standardstatus',
+		'testning',
 	];
 
 	/**
@@ -853,6 +897,10 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	 */
 	private const LEGIT_PL_NL_TOKENS = [
 		'centrum', 'firma', 'kanton', 'legenda', 'marketing', 'netto', 'premie', 'tekst',
+		// family-union expansion (r8 residue fix): legit Polish, shared
+		// with Dutch — all reviewed.
+		'adres', 'klient', 'kwestie', 'linie', 'procent', 'proces', 'element',
+		'projekt',
 	];
 
 	/**
@@ -862,6 +910,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	private const LEGIT_PL_DE_TOKENS = [
 		'alarm', 'element', 'firma', 'jeden', 'kanton', 'katalog', 'kategorie', 'konflikt', 'konto',
 		'marketing', 'netto', 'profil', 'projekt', 'punkt', 'telefon', 'termin',
+		// family-union expansion (r8 residue fix): legit Polish, shared
+		// with German — all reviewed.
+		'klient', 'linie', 'selektor',
 	];
 
 	/**
@@ -977,6 +1028,17 @@ final class L10nScandinavianQualityContractTest extends TestCase
 				JSON_THROW_ON_ERROR,
 			);
 			$donorVocab += self::catalogVocab($data['translations'] ?? [], 4);
+			// Family-union expansion (r8 residue fix): a leaked donor word
+			// this app never uses ('verzenden', 'fundet') is invisible to
+			// the own-catalog vocabulary. The fixture unions every sibling
+			// app's donor catalog — regenerate via
+			// scripts/generate-l10n-donor-vocab.php.
+			$fixture = $appRoot . '/tests/Fixtures/l10n/donor-vocab-' . $donor . '.txt';
+			if (is_file($fixture)) {
+				foreach (file($fixture, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $w) {
+					$donorVocab[$w] = true;
+				}
+			}
 		}
 		$enData = json_decode(
 			(string)file_get_contents($appRoot . '/l10n/en.json'),
@@ -1318,6 +1380,134 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			);
 		}
 	}
+
+	/**
+	 * English-run lint (r8 residue fix): a run of ≥3 consecutive letter
+	 * tokens where every token is in the English vocabulary is residual
+	 * untranslated text — 'Pracownik work schedule assigned',
+	 * 'Zapisz ProjectCheck connection setting', 'global admin switch'.
+	 * Single/duplicate English loanwords are normal; three in a row is a
+	 * fragment, not a loan. Registered legit runs live in
+	 * LEGIT_EN_RUNS (product names, domain terms, commands).
+	 *
+	 * Only meaningful for sv/pl/nb: en msgids embed German product
+	 * strings ('Arbeitszeitmodell', 'Tarifvertrag'), so de-family
+	 * catalogs trivially form runs of 4+.
+	 *
+	 * @param array<string, string|list<string>> $target
+	 * @param list<string> $legitRuns lowercased legit run phrases
+	 */
+	private static function assertNoEnglishRuns(
+		array $target,
+		array $legitRuns,
+		string $lang,
+		string $appRoot,
+	): void {
+		static $enVocab = null;
+		if ($enVocab === null) {
+			$enVocab = self::englishVocab($appRoot);
+		}
+		$legit = array_fill_keys($legitRuns, true);
+		foreach ($target as $msgid => $text) {
+			foreach (is_array($text) ? $text : [$text] as $t) {
+				if (!is_string($t) || $t === $msgid) {
+					continue;
+				}
+				if (preg_match_all(
+					'/[\p{L}\p{M}]+|[^\p{L}\p{M}\s]+/u', $t, $m
+				) === false) {
+					continue;
+				}
+				$run = [];
+				$flush = static function () use (&$run, $legit, $lang, $msgid, $t): void {
+					if (count($run) >= 3) {
+						$phrase = mb_strtolower(implode(' ', $run));
+						self::assertTrue(
+							isset($legit[$phrase]),
+							"{$lang} English run '" . implode(' ', $run) . "' — residual "
+							. "untranslated text in msgid '{$msgid}' => '{$t}'",
+						);
+					}
+					$run = [];
+				};
+				foreach ($m[0] as $piece) {
+					if (preg_match('/[\p{L}\p{M}]/u', $piece)
+						&& isset($enVocab[mb_strtolower($piece)])
+					) {
+						$run[] = $piece;
+					} else {
+						$flush();
+					}
+				}
+				$flush();
+			}
+		}
+	}
+
+	/**
+	 * English passthrough vocabulary: every word in en values AND en
+	 * msgids (msgids carry technical terms like 'Mandantennummer' that
+	 * legitimately appear untranslated in other catalogs).
+	 *
+	 * @return array<string, true>
+	 */
+	private static function englishVocab(string $appRoot): array
+	{
+		$enCat = json_decode(
+			(string)file_get_contents($appRoot . '/l10n/en.json'),
+			true,
+			512,
+			JSON_THROW_ON_ERROR,
+		)['translations'] ?? [];
+		$vocab = self::catalogVocab($enCat, 3);
+		foreach (array_keys($enCat) as $msgid) {
+			if (preg_match_all('/[\p{L}]+/u', mb_strtolower((string)$msgid), $m) !== false) {
+				foreach ($m[0] as $w) {
+					if (mb_strlen($w) >= 3) {
+						$vocab[$w] = true;
+					}
+				}
+			}
+		}
+		return $vocab;
+	}
+
+	/**
+	 * Load a committed token fixture (one token per line).
+	 *
+	 * @return list<string>
+	 */
+	private static function fixtureTokens(string $name): array
+	{
+		$file = dirname(__DIR__, 2) . '/Fixtures/l10n/' . $name . '.txt';
+		if (!is_file($file)) {
+			self::fail("l10n fixture missing: {$file} — regenerate via scripts/generate-l10n-donor-vocab.php");
+		}
+		return array_values(array_filter(
+			file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [],
+			static fn(string $w): bool => $w !== '',
+		));
+	}
+
+	/**
+	 * Legit English runs in Scandinavian/Polish values (lowercased):
+	 * product names, DATEV domain terms, shell commands, borrowed
+	 * idioms. A new entry requires human verification that the run is
+	 * genuinely language-agnostic.
+	 *
+	 * @var list<string>
+	 */
+	private const LEGIT_EN_RUNS = [
+		'php occ upgrade',
+		'nextcloud login flow',
+		'mandantennummer under administration',
+		'mandantennummer under admin',
+		'datev personalnummer under',
+		'datev lohnart for',
+		'per person under',
+		'send ical via',
+		'pro rata for',
+	];
 
 	// The one-off formalizer script (l10n/build_quality_fixes.py) no longer ships
 	// in the app repo — dev tooling lives in the workspace artifacts tree, which

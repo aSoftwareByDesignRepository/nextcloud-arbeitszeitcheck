@@ -629,10 +629,43 @@ class ComplianceControllerTest extends TestCase
 
 		$response = $this->controller->resolveViolation($violationId);
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_CONFLICT, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 		$this->assertStringContainsString('already resolved', $data['error']);
+		$this->assertSame('ALREADY_RESOLVED', $data['error_code']);
+	}
+
+	/**
+	 * Resolve race: the mapper CAS reports the row was resolved concurrently —
+	 * the loser must get a 409, not a 500/"unexpected error".
+	 */
+	public function testResolveViolationReturnsConflictWhenResolveRaceLost(): void
+	{
+		$userId = 'testuser';
+		$ownerUserId = 'otheruser';
+		$violationId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canResolveViolation')->willReturn(true);
+
+		$violation = new ComplianceViolation();
+		$violation->setId($violationId);
+		$violation->setUserId($ownerUserId);
+		$violation->setResolved(false);
+
+		$this->violationMapper->method('find')->willReturn($violation);
+		$this->violationMapper->method('resolveViolation')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException('Violation is already resolved'));
+
+		$response = $this->controller->resolveViolation($violationId);
+
+		$this->assertEquals(Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('ALREADY_RESOLVED', $data['error_code']);
 	}
 
 	/**
@@ -748,7 +781,7 @@ class ComplianceControllerTest extends TestCase
 
 		$response = $this->controller->getViolations();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 		$this->assertEquals('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.', $data['error']);
@@ -856,7 +889,7 @@ class ComplianceControllerTest extends TestCase
 
 		$response = $this->controller->getStatus();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 	}
@@ -878,7 +911,7 @@ class ComplianceControllerTest extends TestCase
 
 		$response = $this->controller->getReport();
 
-		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertEquals(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
 	}

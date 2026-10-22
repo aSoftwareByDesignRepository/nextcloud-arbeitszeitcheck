@@ -227,8 +227,6 @@ achterstanden
 achteruit
 achtervoegsel
 achterwaarts
-achtste
-achttiende
 acked
 acquisitie
 across
@@ -949,6 +947,7 @@ begindatum
 beginkilometerstand
 beginminuut
 beginnen
+beginsaldo
 beginstand
 begint
 begintijd
@@ -2139,7 +2138,6 @@ contacteer
 contacten
 contactfoto
 contactgegevens
-contactgroep
 contactgroepen
 contactgroepnaam
 contactinformatie
@@ -2378,7 +2376,6 @@ debit
 debiteurenrekening
 debug
 december
-deciljoenste
 decimaal
 decimaalteken
 decimale
@@ -2458,8 +2455,6 @@ depubliceren
 derde
 derden
 dergelijke
-dertiende
-dertigste
 description
 deselecteer
 deselecteren
@@ -2709,13 +2704,9 @@ duidelijkheid
 duits
 duitse
 duitsland
-duizendste
 duizendtalteken
 dummybedrijf
 dunning
-duodeciljoenste
-duotrigintiljoenste
-duovigintiljoenste
 duplex
 duplicaat
 duplicaten
@@ -2813,7 +2804,6 @@ elektronisch
 elektronische
 element
 elementen
-elfde
 elftal
 elimineren
 elkaar
@@ -4144,7 +4134,6 @@ hogere
 homebord
 homecheck
 honden
-honderdste
 honduras
 hongarije
 hoofd
@@ -5746,8 +5735,6 @@ migratiegereedheid
 migratieregistraties
 migraties
 migreren
-miljardste
-miljoenste
 milli
 mimetype
 minder
@@ -5894,6 +5881,7 @@ naast
 nacht
 nachtdienst
 nachtdiensten
+nachtdienstregistraties
 nachtelijke
 nachtpercentage
 nachtrust
@@ -5964,9 +5952,6 @@ negatief
 negatieve
 negeer
 negeert
-negende
-negentiende
-negentigste
 negeren
 nemen
 nepal
@@ -6019,7 +6004,6 @@ noemt
 nogmaals
 nominatieve
 nominatim
-noniljoenste
 noodactie
 noodgeval
 noodtoegang
@@ -6053,9 +6037,6 @@ notitie
 notities
 notulen
 november
-novemdeciljoenste
-novemtrigintiljoenste
-novemvigintiljoenste
 nthserver
 nulstelling
 number
@@ -6080,10 +6061,6 @@ obwalden
 oceaanterritorium
 ochtend
 ochtends
-octiljoenste
-octodeciljoenste
-octotrigintiljoenste
-octovigintiljoenste
 oefening
 oefenronde
 oeganda
@@ -7433,17 +7410,8 @@ pushmeldingen
 pushmeldingsgateway
 pushmeldingsservice
 pushnotificatie
-quadragintiljoenste
-quadriljoenste
-quattuordeciljoenste
-quattuortrigintiljoenste
-quattuorvigintiljoenste
 query
 queue
-quindeciljoenste
-quinquatrigintiljoenste
-quinquavigintiljoenste
-quintiljoenste
 quota
 quoteregel
 quotum
@@ -8073,10 +8041,6 @@ sendgrid
 sendmail
 senegal
 september
-septendeciljoenste
-septentrigintiljoenste
-septenvigintiljoenste
-septiljoenste
 sequentie
 serie
 serieel
@@ -8130,12 +8094,9 @@ sessie
 sessiecontext
 sessies
 sessietimer
-sestrigintiljoenste
-sesvigintiljoenste
 setup
-sexdeciljoenste
-sextiljoenste
 seychellen
+sfeestdagen
 sgebruiksvoorwaarden
 sgeregistreerde
 sgestuurd
@@ -8238,6 +8199,7 @@ small
 smalle
 smart
 smedewerkerinstellingen
+smedewerkers
 smedewerkersinstellingen
 smith
 smoke
@@ -8565,6 +8527,7 @@ straat
 strakke
 strategie
 stream
+streefuren
 streep
 streng
 strengere
@@ -8633,6 +8596,7 @@ swaptotalbytes
 swapusagebytes
 swapverzoek
 swaziland
+swerktijdmodellen
 swift
 swijzigde
 switch
@@ -8704,7 +8668,6 @@ tabletnaam
 tabletplaatsen
 tablets
 tablettoetsenbord
-tachtigste
 tadzjikistan
 tafel
 tagactiviteit
@@ -9030,7 +8993,6 @@ tickettoken
 tickettype
 ticketvelden
 ticketweergave
-tiende
 tijdbeheer
 tijdboeking
 tijdboekingen
@@ -9308,7 +9270,6 @@ transmissie
 transparant
 transport
 transportversleuteling
-tredeciljoenste
 treedt
 treffen
 treffer
@@ -9320,13 +9281,9 @@ trekken
 trekt
 trendfilters
 trends
-trestrigintiljoenste
-tresvigintiljoenste
 triage
 triageren
 trigger
-trigintiljoenste
-triljoenste
 trinidad
 tristan
 troef
@@ -9342,7 +9299,6 @@ tussentijd
 tussentijds
 tuvalu
 tvoed
-twaalfde
 tweede
 tweefactor
 tweefactorauthenticatie
@@ -9356,7 +9312,6 @@ tweet
 tweetrapsauthenticatie
 tweets
 twijfel
-twintigste
 twitter
 typefout
 typen
@@ -9494,7 +9449,6 @@ uitzonderingsfilters
 uitzonderingsmodus
 uitzonderlijk
 uitzoomen
-undeciljoenste
 underscore
 underscores
 undertijd
@@ -9512,8 +9466,6 @@ unread
 unternehmen
 until
 untildate
-untrigintiljoenste
-unvigintiljoenste
 upcode
 upcodes
 update
@@ -9696,8 +9648,6 @@ veelgebruikte
 veelgestelde
 veelhoek
 veelvoorkomend
-veertiende
-veertigste
 veganistisch
 vegetarisch
 veilig
@@ -10258,11 +10208,8 @@ vierogen
 vietnam
 viewer
 viewname
-vigintiljoenste
 vijfde
 vijftien
-vijftiende
-vijftigste
 vincent
 vinden
 vindt
@@ -10957,15 +10904,9 @@ zelfondertekende
 zelfs
 zelfservice
 zentrale
-zesde
-zestiende
-zestigste
 zetel
 zetels
 zetten
-zevende
-zeventiende
-zeventigste
 zichtbaar
 zichtbaarheid
 zichtbaarheidsscope
@@ -10973,6 +10914,7 @@ zichtbaarheidsvoorwaarde
 zichtbaarheidsvoorwaarden
 zichtbare
 zichzelf
+ziekmelden
 ziekte
 ziektedag
 ziektedagen

@@ -165,6 +165,7 @@ adresse
 adressebog
 adressebogen
 adressebogslinket
+adressebogsnavn
 adressebogssynkronisering
 adressebøger
 adressefelterne
@@ -300,6 +301,7 @@ afrunding
 afrundingsmodus
 afrundingsregel
 afsendelse
+afsendelsen
 afsendelser
 afsendelsesbevis
 afsendelsesdatoen
@@ -726,7 +728,6 @@ arbejdende
 arbejder
 arbejdernes
 arbejdes
-arbejdespager
 arbejdet
 arbejdets
 arbejds
@@ -805,6 +806,7 @@ arbejdspolitikker
 arbejdsregler
 arbejdsret
 arbejdsretlige
+arbejdsretsregler
 arbejdsrum
 arbejdsrums
 arbejdsrækkefølge
@@ -917,7 +919,6 @@ assistentfunktioner
 assisterende
 associeret
 atomisk
-attende
 attendee
 attendeename
 attestationer
@@ -973,6 +974,8 @@ available
 avancerede
 avanceret
 avatar
+avatarbillede
+avataren
 avatarer
 avatars
 azure
@@ -1838,6 +1841,7 @@ changes
 chapter
 charlie
 charset
+chatapp
 chatbeskeder
 chatintegration
 chatkommunikation
@@ -2109,8 +2113,6 @@ debitering
 debitorkonto
 debug
 december
-decillionte
-decilliontedel
 decimal
 decimaler
 decimalgrader
@@ -2394,9 +2396,6 @@ dublettrækker
 dukke
 dukker
 dummy
-duodecilionte
-duotrigintillionte
-duovigintillionte
 duplikat
 dupliker
 duplikere
@@ -2545,7 +2544,6 @@ elementer
 elementet
 eller
 ellers
-ellevte
 ellipse
 elsker
 elster
@@ -2873,7 +2871,6 @@ favoritter
 favorittilstand
 feature
 februar
-federated
 fediverse
 feedback
 feedet
@@ -2914,7 +2911,6 @@ feltregisteret
 feltændringer
 femte
 femten
-femtende
 ferie
 ferieanmodninger
 feriebeløb
@@ -2960,6 +2956,7 @@ ferieåret
 ferieårsmodus
 fetch
 field
+fields
 figur
 filbaseret
 filcachen
@@ -3106,7 +3103,6 @@ firmasiden
 firmastøtte
 firmature
 firmware
-firsindstyvende
 first
 firstdayofweek
 fjerde
@@ -3132,8 +3128,8 @@ fjernserver
 fjernsletning
 fjernslette
 fjernstyret
+fjernudbyderen
 fjernundermappe
-fjortende
 flade
 fladt
 flagene
@@ -3150,6 +3146,8 @@ fleste
 fletning
 fletningsmålet
 flette
+flettede
+flettes
 flettet
 flightnr
 fliser
@@ -3518,6 +3516,7 @@ forsøger
 forsøget
 forsøgsstadium
 forsøgt
+forsøgte
 forsømte
 fortalt
 fortalte
@@ -3784,7 +3783,6 @@ fylde
 fylder
 fyldes
 fyldt
-fyrretyvende
 fysisk
 fysiske
 fælles
@@ -3811,6 +3809,7 @@ færøerne
 føder
 føderal
 føderale
+føderation
 fødererede
 fødereret
 fødested
@@ -4199,7 +4198,6 @@ gruppemedlemsskaber
 gruppen
 gruppenavn
 gruppenavne
-gruppenavnet
 gruppens
 gruppenøgle
 grupper
@@ -4298,11 +4296,8 @@ halvdagshelligdag
 halvdel
 halvdelen
 halve
-halvfemsindstyvende
-halvfjerdsende
 halvimporteret
 halvtimes
-halvtredsindstyvende
 halvvejs
 handel
 handelsområder
@@ -4543,7 +4538,6 @@ hukommelsesgrænsen
 hukommelsesgræsen
 huller
 hunde
-hundrededel
 hundredevis
 hurtig
 hurtigadgang
@@ -5066,7 +5060,12 @@ invitation
 invitationen
 invitationens
 invitationer
+invitationerne
 invitations
+invitationskode
+invitationskoden
+invitationslink
+invitationslinket
 inviter
 invitere
 inviterede
@@ -5430,6 +5429,7 @@ koblingen
 kodeblok
 kodeblokkens
 kodebloksprog
+kodede
 kodeformatet
 kodeintegritet
 kodekommentarer
@@ -5439,6 +5439,7 @@ kodeordet
 kodeordspolitik
 koder
 koderne
+kodet
 kohort
 kohortepolitik
 kohortepolitikker
@@ -5569,6 +5570,7 @@ kontakte
 kontakten
 kontaktens
 kontakter
+kontakterne
 kontaktet
 kontaktfil
 kontaktforslag
@@ -5576,6 +5578,8 @@ kontaktgruppe
 kontaktgrupper
 kontaktindstillinger
 kontaktlabel
+kontaktliste
+kontaktlister
 kontaktmail
 kontaktmuligheder
 kontaktmulighederne
@@ -5586,7 +5590,6 @@ kontaktperson
 kontaktpersonens
 kontaktpersoner
 kontakttelefon
-kontaktvisningen
 kontaktværdi
 kontanter
 kontekst
@@ -5870,9 +5873,7 @@ kursus
 kursusserie
 kurve
 kuwait
-kvadragintilliontedel
 kvadratisk
-kvadrilliontedel
 kvalificere
 kvalificerede
 kvalificeret
@@ -5888,10 +5889,7 @@ kvartalsslut
 kvartalsvis
 kvartalsvist
 kvarter
-kvattuorvigintillionte
 kvinde
-kvindecilliontedel
-kvintilliontedel
 kvitter
 kvitteret
 kvittering
@@ -5946,7 +5944,6 @@ køleskabet
 køleskabsniveau
 køleskabsniveauer
 køleskabstabletten
-kønsdecillionte
 kørbar
 kørebog
 kørebogspost
@@ -6866,6 +6863,7 @@ medlemsisolation
 medlemskab
 medlemskaber
 medlemskabsisolering
+medlemsliste
 medlemslisten
 medlemsniveauet
 medlemsnummer
@@ -6950,11 +6948,8 @@ miljø
 miljøer
 miljøvariabler
 miljøvariablerne
-milliardtedel
 millienhed
 millienheder
-millionte
-milliontedel
 mimetype
 mimetyper
 mimetyperne
@@ -7067,7 +7062,6 @@ modererer
 moderering
 moderne
 moderér
-modifikationer
 modkonto
 modpart
 modparter
@@ -7300,6 +7294,7 @@ natten
 nattens
 nattero
 nattevagter
+nattevagtsposter
 nattevindue
 nattillæg
 natvindue
@@ -7384,10 +7379,8 @@ nginx
 nicaragua
 nidwalden
 niederösterreich
-niende
 niger
 nigeria
-nittende
 niveau
 niveauer
 niveauet
@@ -7433,8 +7426,6 @@ notifikationstjeneste
 notits
 notér
 november
-novemtrigintillionte
-novemvigintillionte
 nthserver
 nuance
 nulstil
@@ -7568,11 +7559,7 @@ officiel
 officielle
 officielt
 offline
-oktilliontedel
 oktober
-oktodecillion
-oktotrigintilliontedel
-oktovigintilliontedel
 oldfile
 oldname
 oldsystemtag
@@ -7814,7 +7801,6 @@ ophold
 ophør
 ophører
 ophørt
-opieret
 opkald
 opkaldskontrollen
 opkaldt
@@ -7874,7 +7860,6 @@ opsiges
 opslag
 opslaget
 opslagsindstillinger
-opslagskort
 opslagsserver
 opslagsserveren
 opslagsserverforbindelse
@@ -8016,7 +8001,6 @@ originaltekst
 orlov
 orlovsrettigheder
 other
-ottende
 outbound
 outdated
 outliing
@@ -9014,11 +8998,7 @@ påvirkes
 påvirket
 påvirkningsanalyse
 qatar
-quattuordecilionte
-quattuortrigintillionte
 query
-quinquatrigintillionte
-quinquavigintillionte
 quota
 rabat
 rabatkoder
@@ -9069,6 +9049,7 @@ receptions
 receptionstablets
 rechnung
 rechnungswesen
+recipient
 recipients
 recommendation
 record
@@ -9296,7 +9277,9 @@ reserveringsloft
 reserveringstimer
 reservér
 reset
+resourcename
 resourcer
+resourcetype
 respekterer
 respekteres
 respektive
@@ -9306,6 +9289,7 @@ ressourceallokering
 ressourcekrævende
 ressourcepulje
 ressourcer
+ressourcetype
 restbeløb
 restbudget
 resten
@@ -9463,6 +9447,7 @@ rules
 rulle
 rullende
 ruller
+rulles
 rullevindue
 rumdeling
 rumdisplay
@@ -9671,6 +9656,7 @@ sandsynligt
 sandsynligvis
 sandwichøer
 sange
+sarbejdstidsmodeller
 satsbånd
 satser
 satsgrænse
@@ -9740,8 +9726,6 @@ seglet
 segment
 segmenterne
 segmentet
-sekstende
-sekstilliontedel
 sektion
 sektionen
 sektioner
@@ -9789,10 +9773,6 @@ sensitive
 separat
 separate
 september
-septendecillionte
-septentrigintillionte
-septenvigintillionte
-septillionte
 serbien
 serie
 seriekrav
@@ -9868,8 +9848,6 @@ sessionen
 sessioner
 sessionskontekst
 sessionstimeren
-sestrigintillionte
-sesvigintillionte
 setting
 setup
 seychellerne
@@ -9877,6 +9855,7 @@ share
 sharee
 shares
 sharewith
+shelligdage
 shift
 shortcut
 shown
@@ -9988,7 +9967,6 @@ sitenavn
 sites
 sitet
 situationer
-sjette
 skabe
 skabelon
 skabelonen
@@ -10209,6 +10187,7 @@ small
 smart
 smarte
 smartere
+smedarbejdere
 smedarbejderindstillinger
 smelter
 smith
@@ -10790,6 +10769,7 @@ synligt
 synsfeltet
 syntaks
 syntaksen
+syntaksfejl
 syntaksspørgsmål
 syrien
 system
@@ -10797,6 +10777,7 @@ systemadgang
 systemadministration
 systemadministrator
 systemadministratorer
+systemadressebogen
 systemadressebogsadgang
 systemantal
 systematisk
@@ -10824,8 +10805,6 @@ systemstandard
 systemtag
 systemtags
 systemydeevne
-syttende
-syvende
 sådan
 således
 såsom
@@ -10893,7 +10872,6 @@ søgepunkter
 søger
 søgeresultater
 søgeresultaterne
-søges
 søgesagter
 søgetype
 søgeudstyr
@@ -11221,7 +11199,6 @@ tidszoner
 tidszoneregistrering
 tidszonevalg
 tidsændringen
-tiende
 tilbage
 tilbagebetalinger
 tilbagedatering
@@ -11537,7 +11514,6 @@ tokenscanninger
 tolerance
 tolerancer
 tolkes
-tolvte
 tomgang
 tomgangsdage
 tomgangstimer
@@ -11587,20 +11563,12 @@ transportkryptering
 transportmetode
 transportselskabet
 transskriberet
-tredecillionte
-tredivte
 tredje
 tredjeland
 tredjepartsapplikationer
 tredjepartsapps
-tresindstyvende
-trestrigintillionte
-tresvigintillionte
-trettende
 triage
 triagering
-trigintilliontedel
-trilliontedel
 trinene
 trinidad
 trinnene
@@ -11646,7 +11614,6 @@ turlog
 turskabelon
 turskabeloner
 turskabelontabel
-tusindedel
 tusindtalsseparator
 tusindvis
 tuvalu
@@ -11672,7 +11639,6 @@ tyrkiet
 tyrol
 tyske
 tyskland
-tyvende
 tätigkeitsstätte
 tåget
 tælle
@@ -12059,7 +12025,6 @@ umærket
 unanvngiven
 unavngiven
 unavngivet
-undecilionth
 under
 underadministrator
 underadministratorer
@@ -12160,7 +12125,6 @@ unread
 unternehmen
 until
 untildate
-untrigintillionte
 untute
 unødvendige
 unøjagtigheder
@@ -12237,7 +12201,6 @@ utilstrækkelig
 utilstrækkelige
 uudnyttet
 uventet
-uvigintillionth
 uændrede
 uændret
 uønskede
@@ -12471,7 +12434,6 @@ viderestilling
 vietnam
 viewer
 viewname
-vigintilliontedel
 vigtig
 vigtige
 vigtighed
@@ -12731,6 +12693,7 @@ zürich
 åbningstider
 ålandsøerne
 årene
+årets
 årgang
 årlig
 årlige

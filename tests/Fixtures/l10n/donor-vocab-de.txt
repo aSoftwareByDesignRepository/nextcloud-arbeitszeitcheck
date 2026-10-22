@@ -279,10 +279,7 @@ accessibility
 account
 accountmanager
 accounttimezone
-achte
 achtung
-achtzehnte
-achtzigste
 acked
 acmes
 action
@@ -327,6 +324,7 @@ adress
 adressaten
 adressbuch
 adressbuches
+adressbuchs
 adressbücher
 adressbüchern
 adresse
@@ -2040,9 +2038,7 @@ bildupload
 bildvorschau
 bildvorschauen
 bildänderungen
-billiardste
 billing
-billionste
 binden
 bindestrich
 bindestriche
@@ -2685,8 +2681,6 @@ deutsches
 deutschland
 deutschlands
 dezember
-dezilliardste
-dezillionste
 dezimal
 dezimalgrade
 dezimalschritte
@@ -2828,8 +2822,6 @@ draußen
 drehen
 drehung
 dreistelliger
-dreizehnte
-dreißigste
 dringend
 dringende
 dringenden
@@ -2862,8 +2854,6 @@ dunkelmodus
 dunklem
 dunklen
 dunkles
-duodezilliardste
-duodezillionste
 duplex
 duplikat
 duplikate
@@ -3265,7 +3255,6 @@ elementen
 elements
 elementverweise
 elfenbeinküste
-elfte
 ellipse
 elster
 eltern
@@ -4321,12 +4310,9 @@ führungskräfte
 füllen
 füllt
 füllung
-fünfte
 fünften
 fünftletztes
 fünfzehn
-fünfzehnte
-fünfzigste
 gabun
 galerie
 gallen
@@ -5214,7 +5200,6 @@ httpd
 https
 hunde
 hunderten
-hundertste
 hybrid
 hygiene
 hypothetische
@@ -6069,6 +6054,7 @@ krankheitstag
 krankheitstage
 krankheitsurlaub
 krankheitszeiten
+krankmelden
 krankmeldung
 krankschreibung
 kratzer
@@ -6795,8 +6781,6 @@ migrierter
 mikronesien
 milch
 milli
-milliardste
-millionste
 minderstunden
 minderstundenerlass
 mindest
@@ -7234,9 +7218,6 @@ neuigkeiten
 neujahr
 neukaledonien
 neuladen
-neunte
-neunzehnte
-neunzigste
 neuordnen
 neuseeland
 neustart
@@ -7285,8 +7266,6 @@ niveau
 nkonfigurierten
 nochmal
 nominatim
-nonilliardste
-nonillionste
 noopener
 nordkorea
 noreferrer
@@ -7309,8 +7288,6 @@ notiz
 notizen
 notwendig
 november
-novemdezilliardste
-novemdezillionste
 nthserver
 nullung
 number
@@ -7413,11 +7390,7 @@ offizieller
 offline
 offsets
 ohnehin
-oktilliardste
-oktillionste
 oktober
-oktodezilliardste
-oktodezillionste
 oldfile
 oldname
 oldsystemtag
@@ -8238,8 +8211,6 @@ pünktlichkeit
 pünktlichkeits
 quadrat
 quadratische
-quadrilliardste
-quadrillionste
 qualifikation
 qualifikationen
 qualifikationscode
@@ -8251,8 +8222,6 @@ qualitätseinbußen
 quartal
 quartalsende
 quartalsweise
-quatttuordezilliardste
-quatttuordezillionste
 quellcode
 quelle
 quellen
@@ -8267,10 +8236,6 @@ quellzeitraum
 query
 queue
 queues
-quindezilliardste
-quindezillionste
-quintilliardste
-quintillionste
 quittieren
 quittiert
 quittierte
@@ -8694,6 +8659,7 @@ samstagsprozentsatz
 samstagszuschlag
 sandbox
 sandwichinseln
+sarbeitszeitmodelle
 satzkatalog
 satzstaffel
 sauber
@@ -8925,9 +8891,6 @@ scrumpy
 seatingcapacity
 seats
 sechseläuten
-sechste
-sechzehnte
-sechzigste
 second
 seconds
 secret
@@ -9004,10 +8967,6 @@ separate
 separaten
 separates
 september
-septendezilliardste
-septendezillionste
-septilliardste
-septillionste
 sequenz
 sequenzen
 serbien
@@ -9065,11 +9024,8 @@ setup
 setze
 setzen
 setzt
-sexdezilliardste
-sexdezillionste
-sextilliardste
-sextillionste
 seychellen
+sfeiertage
 share
 shared
 sharee
@@ -9127,9 +9083,6 @@ sichtbaren
 sichtbarkeit
 sichtbarkeitsbedingung
 sichtbarkeitsbedingungen
-siebte
-siebzehnte
-siebzigste
 siegel
 siehe
 siehst
@@ -9204,6 +9157,7 @@ slowenien
 small
 smart
 smartphone
+smitarbeitende
 smitarbeiter
 smoke
 snack
@@ -9453,6 +9407,7 @@ standardmäßig
 standardname
 standardordner
 standardpriorität
+standardregion
 standardrichtlinie
 standardrichtlinien
 standards
@@ -9884,6 +9839,7 @@ tagesordnungspunkte
 tagespläne
 tagesstunden
 tagestouren
+tageswechsel
 tageszahlen
 tageszeit
 tagesziel
@@ -9937,7 +9893,6 @@ tauschregeln
 tauschs
 tausende
 tausendertrenner
-tausendste
 teambericht
 teamberichte
 teambezogene
@@ -10190,8 +10145,6 @@ transport
 transporter
 transportiert
 transportverschlüsselung
-tredezilliardste
-tredezillionste
 treffen
 treffenden
 treffens
@@ -10208,8 +10161,6 @@ trennzeichen
 treten
 triage
 triagiere
-trilliardste
-trillionste
 trimmen
 trinidad
 tristan
@@ -10336,8 +10287,6 @@ unbezahlter
 unbezahltes
 unchecked
 undatierte
-undezilliardste
-undezillionste
 uneingeschränkt
 uneingeschränkten
 unerwartet
@@ -10845,6 +10794,7 @@ verlängerungserinnerungen
 verlängerungsfeed
 verlängerungsmodus
 verlängerungstitel
+verlässlich
 verlässliche
 verlässt
 vermeiden
@@ -11114,13 +11064,9 @@ vierteljährlichen
 viertelstunde
 vierten
 viertletztes
-vierzehnte
-vierzigste
 vietnam
 viewer
 viewname
-vigintilliardste
-vigintillionste
 vincent
 viren
 virtuellen
@@ -11690,7 +11636,6 @@ zahlungsmittel
 zahlungsreferenz
 zahlungsstatus
 zahlungsziel
-zehnte
 zeichen
 zeichenkette
 zeichnen
@@ -12065,7 +12010,6 @@ zuzuweisen
 zuzüglich
 zwangsschließen
 zwangsweise
-zwanzigste
 zweck
 zwecke
 zweckvermerk
@@ -12088,7 +12032,6 @@ zwischenliegende
 zwischenspeichern
 zwischenspeichert
 zwischenzeitlich
-zwölfte
 zwölftelung
 zyklen
 zyklische

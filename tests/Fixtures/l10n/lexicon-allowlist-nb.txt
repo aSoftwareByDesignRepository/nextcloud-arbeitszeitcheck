@@ -18,8 +18,6 @@ formiddags # shared — formiddag genitive
 identifikatoren # shared — legit Bokmål coverage gap
 josefs # proper — saint's day
 kalenderårs # shared — kalenderår genitive
-kvadrilliontedel # shared — ordinal fraction form
-kvintilliontedel # shared
 leopolds # proper
 lørdags # shared — lørdag genitive
 marias # proper
@@ -30,8 +28,6 @@ ons # abbrev — Wednesday
 persons # shared — person genitive
 ruperts # proper
 saldoår # shared — saldo+år compound
-sekstilliontedel # shared
-septillionte # shared
 sexdeciljonte # shared
 snapshot # loanword
 søn # abbrev — Sunday

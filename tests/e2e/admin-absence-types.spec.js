@@ -295,6 +295,9 @@ test.describe('Custom absence types (admin-defined)', () => {
 		page.on('request', (req) => {
 			if (req.method() === 'DELETE' && req.url().includes(deleteUrl)) deleteSeen = true
 		})
+		// Row actions reveal on tr:hover at >=769px (pointer-events:none panel);
+		// Playwright hit-tests without moving the cursor, so hover the row first.
+		await row.hover()
 		await deleteBtn.click()
 		const confirmDialog = page.locator('.confirm-dialog[role="alertdialog"], .confirm-dialog[role="dialog"]')
 		await expect(confirmDialog).toBeVisible({ timeout: 10000 })
@@ -311,6 +314,7 @@ test.describe('Custom absence types (admin-defined)', () => {
 			(res) => res.request().method() === 'DELETE' && res.url().includes(deleteUrl),
 			{ timeout: 15000 },
 		)
+		await row.hover()
 		await deleteBtn.click()
 		await expect(confirmDialog).toBeVisible({ timeout: 10000 })
 		await confirmDialog.locator('.confirm-dialog__confirm').click()

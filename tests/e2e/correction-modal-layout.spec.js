@@ -63,6 +63,9 @@ test.describe('time entry correction modal layout', () => {
 		}
 
 		await expect(requestBtn).toBeVisible({ timeout: 15000 })
+		// Row actions reveal on tr:hover at >=769px (pointer-events:none panel);
+		// Playwright hit-tests without moving the cursor, so hover the row first.
+		await requestBtn.locator('xpath=ancestor::tr[1]').hover()
 		await requestBtn.click()
 
 		const modal = page.locator('#time-entry-correction-modal')

@@ -30,11 +30,84 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		return $tr;
 	}
 
+	/**
+	 * Case-insensitive containment check: a forbidden lexeme is a cross-language
+	 * bleed in ANY casing (residual 2026-10-21: 'Tildelt'/'Korrektion' evaded the
+	 * exact-case needles). Needles are lowercased once and compared against the
+	 * lowercased value.
+	 *
+	 * @param array<string, string> $catalog
+	 * @param list<string> $forbidden
+	 */
+	private static function assertNoForbiddenLexemes(array $catalog, array $forbidden, string $lang): void
+	{
+		foreach ($catalog as $msgid => $text) {
+			if (!is_string($text)) {
+				continue;
+			}
+			$haystack = mb_strtolower($text);
+			foreach ($forbidden as $needle) {
+				self::assertStringNotContainsString(
+					mb_strtolower($needle),
+					$haystack,
+					"{$lang} must not contain foreign-language bleed '{$needle}' in msgid {$msgid}",
+				);
+			}
+		}
+	}
+
+	/**
+	 * Case-insensitive regex check for bleed shapes a plain substring cannot
+	 * express (e.g. sv 'periode' is only Danish when NOT extended to legit
+	 * 'perioden/perioder/periods').
+	 *
+	 * @param array<string, string> $catalog
+	 * @param list<string> $patterns PCRE patterns (no delimiters)
+	 */
+	private static function assertNoForbiddenPatterns(array $catalog, array $patterns, string $lang): void
+	{
+		foreach ($catalog as $msgid => $text) {
+			if (!is_string($text)) {
+				continue;
+			}
+			foreach ($patterns as $pattern) {
+				self::assertSame(
+					0,
+					preg_match('/' . $pattern . '/iu', $text),
+					"{$lang} must not match foreign-language bleed /{$pattern}/ in msgid {$msgid}",
+				);
+			}
+		}
+	}
+
+	/**
+	 * Exact-case containment for needles whose lowercase form collides with
+	 * legit target-language words ('Trykke'/'trykke', formal 'Państwa').
+	 *
+	 * @param array<string, string> $catalog
+	 * @param list<string> $forbidden
+	 */
+	private static function assertNoForbiddenExactCase(array $catalog, array $forbidden, string $lang): void
+	{
+		foreach ($catalog as $msgid => $text) {
+			if (!is_string($text)) {
+				continue;
+			}
+			foreach ($forbidden as $needle) {
+				self::assertStringNotContainsString(
+					$needle,
+					$text,
+					"{$lang} must not contain foreign-language bleed '{$needle}' in msgid {$msgid}",
+				);
+			}
+		}
+	}
+
 	public function testSwedishHasNoDanishBleedOrFormalizerDamage(): void
 	{
 		$sv = $this->translations('sv');
 		// Danish-only lexemes: none of these are valid Swedish words, so a hit is
-		// always cross-language bleed (2026-10-20 r6 residual sweep).
+		// always cross-language bleed (2026-10-20 r6 + 2026-10-21 residual sweeps).
 		$forbidden = [
 			'aktuella administratör',
 			'Kontakta aktuella',
@@ -61,7 +134,6 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'genereret',
 			'Genereret',
 			'nytår',
-			'Trykke',
 			'sidste',
 			'Sidste',
 			'gendan',
@@ -79,19 +151,17 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'korrektion',
 			'teamoversigt',
 			'holdoversigt',
+			// 2026-10-21 residuals: da 'oversigt' (sv 'översikt'), untranslated
+			// 'download'/'Generer och' truncation; 'trykke' is da/nb (sv 'trycka').
+			'oversigt',
+			'download',
+			'generer och',
+			'trykke',
 		];
-		foreach ($sv as $msgid => $text) {
-			if (!is_string($text)) {
-				continue;
-			}
-			foreach ($forbidden as $needle) {
-				self::assertStringNotContainsString(
-					$needle,
-					$text,
-					"sv must not contain Danish/formalizer bleed '{$needle}' in msgid {$msgid}",
-				);
-			}
-		}
+		self::assertNoForbiddenLexemes($sv, $forbidden, 'sv');
+		// Danish 'periode' is only a bleed when not extended into the legit
+		// Swedish 'perioden/perioder/periods' declensions.
+		self::assertNoForbiddenPatterns($sv, ['periode(?![nrs])'], 'sv');
 	}
 
 	public function testNorwegianHasNoDanishContamination(): void
@@ -118,7 +188,6 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'genereret',
 			'Genereret',
 			'nytår',
-			'Trykke',
 			'sidste',
 			'Sidste',
 			'gendan',
@@ -144,19 +213,24 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'løbet',
 			'anlæg',
 			'misligholdelse',
+			// 2026-10-21 residuals: 'indeholde'/'overskuelig' (da; nb
+			// 'inneholde'/'oversiktlig'), 'nedn' MT-truncation, 'kun at'
+			// Danish infinitive shape (nb 'å').
+			'indeholde',
+			'overskuelig',
+			'nedn',
 		];
-		foreach ($nb as $msgid => $text) {
-			if (!is_string($text)) {
-				continue;
-			}
-			foreach ($forbidden as $needle) {
-				self::assertStringNotContainsString(
-					$needle,
-					$text,
-					"nb must not contain Danish '{$needle}' in msgid {$msgid}",
-				);
-			}
-		}
+		self::assertNoForbiddenLexemes($nb, $forbidden, 'nb');
+		// Danish 'der' as existential/relative pronoun (nb 'det'/'som') and
+		// Danish 'at'-infinitive (nb 'å') need regex shapes — plain substring
+		// would false-positive on legit nb 'der borte' adverbials.
+		self::assertNoForbiddenPatterns($nb, [
+			'\bder (ble|var|vil|matcher|ligger|kommer|finnes|skal|kan|er)\b',
+			'\bat (vise|gjøre|få|være|kunne|bruke|velge|se|slette|sende|ta|sette|aktivere|deaktivere|fortsætte|benytte|tildele|bruge|åbne|lukke|tilføje|fjerne|bekræfte|downloade|udfylde|gemme|registrere)\b',
+		], 'nb');
+		// 'trykke' is a legit Norwegian verb; only the capitalized 'Print'
+		// mistranslation is a bleed.
+		self::assertNoForbiddenExactCase($nb, ['Trykke'], 'nb');
 	}
 
 	public function testPolishHasNoDutchOrGermanBleed(): void
@@ -164,6 +238,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		$pl = $this->translations('pl');
 		// Dutch/German bleed found in the same 2026-10 contamination cluster
 		// ('Zespółs en afdelingen', 'Werktijdrapporten', 'Technische … (auwtt)').
+		// 2026-10-21 second residual pass added the capitalized/inflected
+		// variants that evaded the exact-case needles plus the mangled MT
+		// tokens (Reponining, Vollewtg, czwwnload, pongazijn, ptij…).
 		$forbidden = [
 			' en ',
 			'vakantie',
@@ -206,18 +283,60 @@ final class L10nScandinavianQualityContractTest extends TestCase
 			'itbetaling',
 			'aanvra',
 			'aanp',
-			' requests',
-			' found',
+			'found',
+			// 2026-10-21 residuals
+			'requests',
+			'uitklokken',
+			'tijdregistratie',
+			'toewijzingshistoria',
+			'bijwerken',
+			'zespółlijst',
+			'bewerken',
+			'vorige',
+			'volgende',
+			'periode',
+			'bijv',
+			'urlop days',
+			'ptij',
+			'pongazijn',
+			'reponining',
+			'vollewt',
+			'czwwnload',
+			'resolutiespoor',
+			'nadgodzinyrekening',
+			'nadgodzinybetaling',
+			'klantbendek',
+			'handpontig',
+			'rokdni',
+			'vergadervoorbereiwtng',
+			'projectnaam',
+			'projectwerk',
+			'succesvol',
+			'sobrejestrowano',
+			'plaatsen',
+			'einde ',
+			' tonen',
+			'lijst',
+			'cios',
 		];
+		self::assertNoForbiddenLexemes($pl, $forbidden, 'pl');
+		// Formal-register 'Państwa/Państwo/Państwu/Państwem/Państwom' is MT
+		// register damage (app uses informal 'Twój'); lowercase 'państwow-'
+		// (state, e.g. 'święta państwowe') stays legit.
+		self::assertNoForbiddenPatterns($pl, ['[\p{L}\s"„]Państw[auom]\b'], 'pl');
+		// 'your' must never be rendered by the 'assigned' calque
+		// 'przypisan*' (66-string MT formalizer damage fixed 2026-10-21).
 		foreach ($pl as $msgid => $text) {
 			if (!is_string($text)) {
 				continue;
 			}
-			foreach ($forbidden as $needle) {
-				self::assertStringNotContainsString(
-					$needle,
-					$text,
-					"pl must not contain Dutch/German bleed '{$needle}' in msgid {$msgid}",
+			if (preg_match('/\byour\b/i', $msgid) === 1
+				&& preg_match('/assign/i', $msgid) !== 1
+			) {
+				self::assertSame(
+					0,
+					preg_match('/przypisan/iu', $text),
+					"pl must not render 'your' as 'przypisan*' calque in msgid {$msgid}",
 				);
 			}
 		}

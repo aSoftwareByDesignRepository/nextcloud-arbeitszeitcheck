@@ -846,7 +846,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'konsekvent', 'konsultationstider', 'konto', 'kontor', 'kontoret', 'kontos', 'kontrakt',
 		'kontraktsmål', 'kontroller', 'konvertering', 'korrekt', 'kortet', 'kraft', 'kreditering',
 		'krediteringen', 'kristi', 'kronologisk', 'kryptografisk', 'kunde', 'kunder', 'kvoter', 'kärntens',
-		'lager', 'lagring', 'landet', 'landsprofil', 'ledig', 'lektioner', 'leopolds', 'licens',
+		'lager', 'lagring', 'lagringen', 'landet', 'landsprofil', 'ledig', 'lektioner', 'leopolds', 'licens',
 		'licensadministration', 'licensdata', 'licensen', 'licenser', 'licensformat', 'licenssignatur',
 		'ligger', 'lokalt', 'luzern', 'låser', 'mandantnummer', 'markering', 'medlem', 'metoder',
 		'migrering', 'migreringen', 'mindre', 'minut', 'mobil', 'mobilappen', 'modellen', 'modellens',

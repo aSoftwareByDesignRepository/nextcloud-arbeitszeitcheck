@@ -1313,6 +1313,7 @@ bestuurdersrecords
 bestuurdersregister
 bestuurderstaken
 bestuursgebeurtenissen
+betaal
 betaalaanbieder
 betaald
 betaalde
@@ -2990,6 +2991,7 @@ facturatiestatusfilter
 facturatoren
 factureerbaar
 factureerbare
+factureerder
 factureert
 facturen
 factureren
@@ -4544,7 +4546,6 @@ invoeren
 invoert
 invoicecheck
 invoiced
-invoiceur
 invullen
 inwisselen
 inzage

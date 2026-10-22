@@ -2189,6 +2189,7 @@ delingstype
 dellinje
 delmængde
 delstat
+delstaten
 delstaters
 delta
 deltag
@@ -3258,8 +3259,6 @@ forbudt
 forbundet
 forbundne
 forbundsministerium
-forbundsstat
-forbundsstaten
 forbyd
 force
 fordamper
@@ -10340,6 +10339,7 @@ standardbeløbet
 standardbudgetter
 standarddage
 standarddelstat
+standarddelstaten
 standarden
 standarder
 standarderne
@@ -10398,7 +10398,6 @@ standardsvartid
 standardteksten
 standardtidszone
 standardtilstand
-standardtilstanden
 standardtimer
 standardudgifts
 standardudgiftskategori

@@ -196,6 +196,7 @@ delen
 deler
 deling
 delstat
+delstaten
 delstaters
 delte
 deltid
@@ -1199,6 +1200,8 @@ sporing
 spring
 springe
 stabil
+standarddelstat
+standarddelstaten
 standarden
 standarder
 standardhelligdagsregionen

@@ -185,7 +185,10 @@ function* matrixCells(theme, role) {
 const ROLES = [...new Set(MANIFEST.surfaces.map((s) => s.role || 'EMPLOYEE'))];
 
 test.describe('SCREENSHOT_MATRIX capture', () => {
-	test.setTimeout(600_000);
+	// One role sweep = up to ~33 cells × full goto+settle+shot. On the shared
+	// farm instance under parallel load a cell costs ~30-50s, so EMPLOYEE
+	// needs ~20-30 min; 600s repeatedly timed out mid-sweep (2026-10-22).
+	test.setTimeout(1_800_000);
 	test.skip(!process.env.AZC_MATRIX, 'Opt-in capture — run with AZC_MATRIX=1 --project=screenshot-matrix');
 
 	for (const role of ROLES) {

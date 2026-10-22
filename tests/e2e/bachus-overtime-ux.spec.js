@@ -18,7 +18,7 @@ test.describe('Bachus: overtime discoverability (employee)', () => {
 		await login(page, credsFromEnv('EMPLOYEE'));
 	});
 
-	test('J-E1/J-E2: overtime balance card always visible with formula', async ({ page }) => {
+	test('J-E1/J-E2: overtime balance card always visible with balance label', async ({ page }) => {
 		await page.goto('/apps/arbeitszeitcheck/dashboard');
 		await page.waitForSelector('#azc-main-content', { timeout: 30000 });
 
@@ -26,9 +26,12 @@ test.describe('Bachus: overtime discoverability (employee)', () => {
 		await expect(heading).toBeVisible();
 		await expect(heading).toHaveText(/overtime balance|Überstundensaldo|Ihre Überstunden/i);
 
-		const formula = page.locator('#dashboard-overtime-formula');
-		await expect(formula).toBeVisible();
-		await expect(formula).not.toBeEmpty();
+		// The explicit formula line was removed in the J-S2 simplify pass —
+		// the balance label now carries the explanation ("Balance (year to
+		// date)" / "Balance (after payouts and adjustments)").
+		const label = page.locator('.dashboard-overtime-card__balance-label');
+		await expect(label).toBeVisible();
+		await expect(label).not.toBeEmpty();
 
 		const balance = page.locator('#dashboard-overtime-balance-value');
 		await expect(balance).toBeVisible();

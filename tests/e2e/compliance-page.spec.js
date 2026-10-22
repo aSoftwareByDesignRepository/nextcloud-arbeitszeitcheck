@@ -28,8 +28,9 @@ test.describe('Compliance page is one screen', () => {
 
 	test('old subpage addresses land on this page', async ({ page }) => {
 		await loginAs(page, 'EMPLOYEE')
+		// Merged contract: /compliance/violations stays a real page
+		// (whole-scope discovery for managers; own list for employees).
 		await page.goto('/apps/arbeitszeitcheck/compliance/violations')
-		await expect(page).toHaveURL(/\/apps\/arbeitszeitcheck\/compliance#compliance-violations$/)
 		await expect(page.locator('#violations-table')).toBeVisible()
 
 		await page.goto('/apps/arbeitszeitcheck/compliance/reports')

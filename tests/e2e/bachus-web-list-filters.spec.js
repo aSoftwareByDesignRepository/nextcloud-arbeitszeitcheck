@@ -67,7 +67,11 @@ test.describe('Bachus: employee time-entries + absences filters', () => {
 		const empty = page.locator('.azc-empty-state__title, .empty-state__title, table tbody tr');
 		await expect(empty.first()).toBeVisible();
 
-		await page.locator('#btn-filter').click();
+		// The panel renders open while a filter is active — only toggle it
+		// when it is collapsed, otherwise the click would hide the controls.
+		if (!(await panel.isVisible())) {
+			await page.locator('#btn-filter').click();
+		}
 		await Promise.all([
 			page.waitForURL((url) => !url.searchParams.has('status'), { timeout: 45000 }),
 			page.locator('#btn-clear-filter').click(),
@@ -90,7 +94,11 @@ test.describe('Bachus: employee time-entries + absences filters', () => {
 		const emptyOrRows = page.locator('.empty-state__title, .azc-empty-state__title, table tbody tr');
 		await expect(emptyOrRows.first()).toBeVisible();
 
-		await page.locator('#btn-filter').click();
+		// The panel renders open while a filter is active — only toggle it
+		// when it is collapsed, otherwise the click would hide the controls.
+		if (!(await panel.isVisible())) {
+			await page.locator('#btn-filter').click();
+		}
 		await Promise.all([
 			page.waitForURL((url) => !url.searchParams.has('status'), { timeout: 45000 }),
 			page.locator('#btn-clear-filter').click(),

@@ -56,7 +56,7 @@ test.describe('Desktop table width (#12)', () => {
 		}
 	})
 
-	test('Time entries: horizontal scroll exposes actions on laptop width', async ({ page }) => {
+	test('Time entries: row actions reachable on laptop width', async ({ page }) => {
 		test.skip(!process.env.NC_EMPLOYEE_USER, 'Requires NC_EMPLOYEE_USER / NC_EMPLOYEE_PASS')
 
 		await page.setViewportSize(LAPTOP)
@@ -64,9 +64,11 @@ test.describe('Desktop table width (#12)', () => {
 		await page.goto('/apps/arbeitszeitcheck/time-entries')
 		await page.waitForSelector('#time-entries-table', { timeout: 30000 })
 
+		// Issue #12 contract: actions reachable at laptop width — either fully
+		// visible or via overflow-x scroll. The shared-footer layout now fits
+		// the columns at 1440, so scroll is optional, not required.
 		const metrics = await collectDesktopTableMetrics(page, '#time-entries-table')
 		assertDesktopTableMetrics(expect, metrics, { requireFullyVisibleActions: false })
-		expect(metrics.needsHorizontalScroll, 'overflow-x scroll region when columns exceed width').toBe(true)
 	})
 
 	/**

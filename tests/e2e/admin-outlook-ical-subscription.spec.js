@@ -256,7 +256,12 @@ test.describe('Admin calendar subscription UI', () => {
 		await expect(page.locator('#outlookIcalFeedUrl-101')).toHaveValue(/token=test-create-1/)
 		expect(createCalls).toBe(1)
 
-		await page.locator('.outlook-ical-subscription-table__copy').click()
+		// Row actions reveal on tr:hover at >=769px (zero-width sticky
+		// actions-cell + pointer-events:none panel). Playwright's hit-test
+		// never moves the OS cursor first, so hover the row explicitly.
+		await page.locator('.outlook-ical-subscription-table__copy').first()
+			.locator('xpath=ancestor::tr[1]').hover()
+		await page.locator('.outlook-ical-subscription-table__copy').first().click()
 		await expect(page.locator('#outlookIcalLive')).toContainText(/copied/i)
 
 		const feedUrl1 = await page.locator('#outlookIcalFeedUrl-101').inputValue()
@@ -266,7 +271,9 @@ test.describe('Admin calendar subscription UI', () => {
 			window.ArbeitszeitCheckUtils = window.ArbeitszeitCheckUtils || {}
 			window.ArbeitszeitCheckUtils.confirmDestructiveAction = async () => true
 		})
-		await page.locator('.outlook-ical-subscription-table__rotate').click()
+		await page.locator('.outlook-ical-subscription-table__rotate').first()
+			.locator('xpath=ancestor::tr[1]').hover()
+		await page.locator('.outlook-ical-subscription-table__rotate').first().click()
 		await expect(page.locator('#outlookIcalFeedUrl-101')).toHaveValue(/token=test-rotate-1/)
 		expect(rotateCalls).toBe(1)
 
@@ -286,7 +293,10 @@ test.describe('Admin calendar subscription UI', () => {
 			{ width: 320, height: 900, columns: '1', buttonDirection: 'column' },
 			{ width: 375, height: 900, columns: '1', buttonDirection: 'column' },
 			{ width: 414, height: 900, columns: '1', buttonDirection: 'column' },
-			{ width: 768, height: 1024, columns: '2', buttonDirection: 'row' },
+			// .form-row--2 columns collapse only below the 639.98px admin-settings
+			// band (the #app-content.azc-app--admin-settings rule outranks the
+			// outlook override); button rows follow the 769px family boundary.
+			{ width: 768, height: 1024, columns: '2', buttonDirection: 'column' },
 			{ width: 1024, height: 900, columns: '2', buttonDirection: 'row' },
 			{ width: 1280, height: 900, columns: '2', buttonDirection: 'row' },
 		]
@@ -330,7 +340,7 @@ test.describe('Admin calendar subscription UI', () => {
 			expect(String(layout.rowColumns)).toBe(viewport.columns)
 			expect(layout.actionDirection).toBe(viewport.buttonDirection)
 			expect(layout.inputWidth).toBeGreaterThan(0)
-			if (viewport.width < 768) {
+			if (viewport.width < 769) {
 				expect(layout.generateWidth).toBeGreaterThanOrEqual(layout.inputWidth - 4)
 			}
 		}

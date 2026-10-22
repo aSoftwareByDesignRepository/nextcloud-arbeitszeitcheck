@@ -57,11 +57,12 @@ const LIST_ALLOW = [
 ].join(', ');
 
 /**
- * Intentionally centered controls: the hour/minute selects of the time picker
- * (.time-input-group) are deliberately text-align:center with tabular-nums —
- * a clock-face digit pattern, not an inherited shell leak.
+ * Intentionally centered controls: the hour/minute segments of the time
+ * picker (.time-input-group selects, .azc-timepicker__section inputs) are
+ * deliberately text-align:center with tabular-nums — a clock-face digit
+ * pattern, not an inherited shell leak.
  */
-const CENTER_ALLOW = 'select.time-hour, select.time-minute';
+const CENTER_ALLOW = 'select.time-hour, select.time-minute, input.azc-timepicker__section';
 
 test.describe('Rendered-surface contract', () => {
 	for (const [path, name, role] of SURFACES) {

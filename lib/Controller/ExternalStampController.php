@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Service\ExternalStampService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -81,6 +82,8 @@ class ExternalStampController extends Controller
 			return new JSONResponse(['success' => true, 'timeEntryId' => $result['timeEntryId']]);
 		} catch (BusinessRuleException $e) {
 			return $this->mapError($e);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (\Throwable $e) {
 			return $this->unexpected($e);
 		}
@@ -95,6 +98,8 @@ class ExternalStampController extends Controller
 			return new JSONResponse(['success' => true]);
 		} catch (BusinessRuleException $e) {
 			return $this->mapError($e);
+		} catch (StampReplayException $e) {
+			return $this->stampReplayErrorResponse($e);
 		} catch (\Throwable $e) {
 			return $this->unexpected($e);
 		}
@@ -121,6 +126,26 @@ class ExternalStampController extends Controller
 				'error_code' => $e->getReasonCode() ?? 'rejected',
 			], Http::STATUS_BAD_REQUEST),
 		};
+	}
+
+	private function stampReplayErrorResponse(StampReplayException $e): JSONResponse
+	{
+		$code = $e->getErrorCode();
+		$message = match ($code) {
+			'STAMP_OCCURRED_AT_OUT_OF_BOUNDS' => $this->l10n->t('This suggestion is too old to confirm. Dismiss it or ask your administrator.'),
+			'STAMP_OCCURRED_AT_INVALID' => $this->l10n->t('The suggested time is invalid.'),
+			'STAMP_CLIENT_REQUEST_IN_FLIGHT' => $this->l10n->t('That suggestion is still being processed. Please wait a moment.'),
+			default => $this->l10n->t('Could not apply the suggested time.'),
+		};
+		$status = $code === 'STAMP_CLIENT_REQUEST_IN_FLIGHT'
+			? Http::STATUS_CONFLICT
+			: Http::STATUS_UNPROCESSABLE_ENTITY;
+		return new JSONResponse([
+			'success' => false,
+			'error' => $message,
+			'message' => $message,
+			'error_code' => $code,
+		], $status);
 	}
 
 	private function unexpected(\Throwable $e): JSONResponse

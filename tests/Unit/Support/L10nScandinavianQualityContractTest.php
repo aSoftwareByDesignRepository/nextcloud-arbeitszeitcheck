@@ -878,7 +878,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'tidsregistreringsdata', 'tidsregistreringsmetoder', 'tidsregistreringsrapporter',
 		'tidsregistreringssystemet', 'tidssegment', 'tidszonen', 'tidszoner', 'titel', 'toppen', 'torsdag',
 		'totalt', 'tredje', 'typen', 'typer', 'tyskland', 'undertid', 'validering', 'versionen',
-		'versioner', 'versionsnummer', 'visning', 'yngre', 'zürich', 'årlig', 'årligt', 'årsdag',
+		'versioner', 'versionsnummer', 'visning', 'yngre', 'zürich', 'årets', 'årlig', 'årligt', 'årsdag',
 		'årsdagsår',
 		// 2026-11-05 family-union expansion (r8 residue fix): legit sv
 		// tokens surfaced only when the donor vocabulary was widened to

@@ -280,11 +280,10 @@ class ComplianceControllerTest extends TestCase
 		$this->violationMapper->method('findByUser')->willReturn([$violation]);
 
 		$params = $this->controller->dashboard()->getParams();
-		$this->assertCount(1, $params['recentViolations']);
-		$row = $params['recentViolations'][0];
-		$this->assertNull($row['id']);
+		$this->assertCount(1, $params['violations']);
+		$row = $params['violations'][0];
+		$this->assertSame(0, $row['id']);
 		$this->assertSame('15.03.2026', $row['date']);
-		$this->assertSame('2026-03-15', $row['dateIso']);
 	}
 
 	public function testDashboardFallsBackToErrorPayloadOnFailure(): void
@@ -296,7 +295,7 @@ class ComplianceControllerTest extends TestCase
 		$params = $this->controller->dashboard()->getParams();
 		$this->assertFalse($params['complianceStatus']['compliant']);
 		$this->assertTrue($params['complianceStatus']['load_error']);
-		$this->assertSame([], $params['recentViolations']);
+		$this->assertSame([], $params['violations']);
 		$this->assertArrayHasKey('error', $params);
 	}
 
@@ -320,11 +319,12 @@ class ComplianceControllerTest extends TestCase
 	public function testReportsReturnsTemplate(): void
 	{
 		$this->mockAuthenticatedUser();
-		$this->violationMapper->method('findByUser')->willReturn([]);
 
 		$response = $this->controller->reports();
 
-		$this->assertInstanceOf(TemplateResponse::class, $response);
+		// The report summary moved into the unified compliance page — the
+		// old URL redirects to its status-card anchor (lara/dashboard merge).
+		$this->assertInstanceOf(\OCP\AppFramework\Http\RedirectResponse::class, $response);
 	}
 
 	/**

@@ -37,6 +37,7 @@ use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\IL10N;
+use OCP\Util;
 
 /**
  * ComplianceController

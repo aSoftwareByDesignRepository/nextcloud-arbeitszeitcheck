@@ -681,6 +681,7 @@ kontos
 kontrakt
 kontrakten
 kontrakttimer
+kontraktsmål
 kontroller
 kontrollere
 kontrollerer
@@ -1512,3 +1513,4 @@ zürich
 ønsker
 øverst
 øverste
+årets

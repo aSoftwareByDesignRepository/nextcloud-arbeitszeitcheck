@@ -291,13 +291,19 @@ final class ComplianceControllerDashboardTest extends TestCase {
 	}
 
 	public function testOldViolationsAddressKeepsAPermittedUserAndTheListAnchor(): void {
+		// The merged implementation keeps the violations list as a real page
+		// (whole-scope discovery lives here) — a permitted userId opens the
+		// list filtered to that person instead of bouncing to the dashboard.
+		$this->uid = 'manager';
 		$this->requestedUserId = '  employee1  ';
+		$this->allowedTargets = ['employee1'];
+
 		$response = $this->controller->violations();
-		self::assertInstanceOf(RedirectResponse::class, $response);
-		self::assertSame(
-			'/apps/arbeitszeitcheck/compliance?userId=employee1#compliance-violations',
-			$response->getRedirectURL()
-		);
+
+		self::assertInstanceOf(TemplateResponse::class, $response);
+		$params = $response->getParams();
+		self::assertSame('employee1', $params['filterUserId']);
+		self::assertSame('Ada', $params['filterDisplayName']);
 	}
 
 	public function testOldReportsAddressDropsANonStringUserAndOpensTheStatus(): void {

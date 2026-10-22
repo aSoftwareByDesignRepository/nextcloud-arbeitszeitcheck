@@ -305,7 +305,8 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	 * @var list<string>
 	 */
 	private const SHARED_DA_SV_IDENTICALS = [
-		'%1$s t', '%1$s → %2$s', '%n teammedlem', '(ingen)', '0 poster',
+		'%1$s t', '%1$s → %2$s', '%n teammedlem', '(ingen)', '0 poster', '1 post',
+		'%n poster',
 		'1 hel dag', '1 medlem', 'Administration', 'Administration (panel)',
 		'Aktiv', 'Aktiv i dag', 'Aldrig', 'ArbeitszeitCheck Mobile på Google Play',
 		'ArbeitszeitCheck-version:', 'Automatisk', 'Beta', 'Cykel',

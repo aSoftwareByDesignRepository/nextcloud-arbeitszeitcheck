@@ -155,7 +155,7 @@ $currentYear = (int)(new \DateTime())->format('Y');
 								<th scope="col"><?php p($l->t('Overtime')); ?></th>
 								<th scope="col"><?php p($l->t('Open issues')); ?></th>
 								<th scope="col"><?php p($l->t('Pending requests')); ?></th>
-								<th scope="col" class="actions-cell"><?php p($l->t('Details')); ?></th>
+								<th scope="col" class="azc-table-actions-col"><?php p($l->t('Details')); ?></th>
 							</tr>
 						</thead>
 						<tbody id="manager-people-body"></tbody>

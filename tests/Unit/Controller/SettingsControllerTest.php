@@ -562,10 +562,14 @@ class SettingsControllerTest extends TestCase
 			->method('getUser')
 			->willReturn($user);
 
-		$this->request->expects($this->once())
-			->method('getParam')
-			->with('completed', true)
-			->willReturn(true);
+		$this->request->method('getParam')
+			->willReturnCallback(static function (string $key, $default = null) {
+				return match ($key) {
+					'completed' => true,
+					'scope' => $default,
+					default => $default,
+				};
+			});
 
 		$this->userSettingsMapper->expects($this->once())
 			->method('setSetting')

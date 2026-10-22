@@ -198,7 +198,7 @@
   margin: 0 0 var(--azc-space-3, 0.75rem);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 599.98px) {
   .compliance-status__figures {
     grid-template-columns: 1fr;
   }

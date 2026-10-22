@@ -232,7 +232,6 @@ $adminDashboardL10n = [
 	'No employees found.' => $l->t('No employees found.'),
 	'Yes' => $l->t('Yes'),
 	'No' => $l->t('No'),
-	'drilldownCount' => $l->t('{count} employees'),
 	'drilldownLoadError' => $l->t('Could not load employee list.'),
 	'drilldownTruncatedNotice' => $l->t('Showing the first results. Use search to narrow down the list.'),
 	'statisticsRefreshError' => $l->t('Could not refresh statistics.'),

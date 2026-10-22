@@ -44,6 +44,7 @@ describe('Time entry form justification (four-eyes create)', () => {
 	it('l10n bundle includes justification feedback strings', () => {
 		expect(formL10n).toContain("'justificationRequired'")
 		expect(formL10n).toContain("'justificationReady'")
-		expect(formL10n).toContain("'justificationRemaining'")
+		expect(formJs).toContain("'1 more character needed ({count} of {min})'")
+		expect(formJs).toContain("'%n more characters needed ({count} of {min})'")
 	})
 })

@@ -31,6 +31,15 @@
 		return msgid;
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function n(singular, plural, count) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c);
+		}
+		return String(c === 1 ? singular : plural).replace('%n', String(c));
+	}
+
 	function el(id) {
 		return document.getElementById(id);
 	}
@@ -143,7 +152,7 @@
 			return;
 		}
 		if (state.total > 0) {
-			badge.textContent = t('{count} employees', '{count} employees', { count: state.total });
+			badge.textContent = n('1 employee', '%n employees', state.total);
 			badge.classList.remove('visually-hidden');
 		} else {
 			badge.textContent = '';

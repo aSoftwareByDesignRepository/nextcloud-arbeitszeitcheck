@@ -23,7 +23,6 @@ $messageIds = [
 	'No employees in your scope.',
 	'There is nobody in your scope to show yet.',
 	'No matching employees found.',
-	'{count} employees',
 	'Page {page} of {pages}',
 	'Employee',
 	'Vacation remaining',

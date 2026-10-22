@@ -4975,13 +4975,8 @@
         "yard": "pátio",
         "yearFourDigitsHelp": "Introduza um ano de quatro dígitos (p. ex. 2026).",
         "zone": "zona",
-        "{count} Nextcloud accounts without app access are hidden.": "{count} contas Nextcloud sem acesso à aplicação estão escondidas.",
-        "{count} employees": "{count} colaboradores",
-        "{count} employees match your search": "{count} colaboradores correspondem à sua pesquisa",
-        "{count} entries": "{count} entradas",
         "{count} of 10+ characters — you can submit": "{count} de 10+ caracteres — pode submeter",
         "{field} is required. Please fill in this field.": "{field} é obrigatório. Preencha este campo.",
-        "{remaining} more characters needed ({count} of {min})": "Faltam {remaining} caracteres ({count} de {min})",
         "“All employees” for the whole company, or one team (child teams included automatically).": "“Todos os colaboradores” para a empresa inteira, ou uma equipa (as subequipas são incluídas automaticamente).",
         "“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "“Gerar URL de feed” cria a primeira ligação para um âmbito. “Revogar e rodar” substitui uma ligação existente — o URL antigo deixa de funcionar imediatamente.",
         "%1$s of %2$s hours": "%1$s de %2$s horas",
@@ -5947,7 +5942,37 @@
         "Name or user ID": "Nome ou ID de utilizador",
         "Needs attention": "Precisa de atenção",
         "Open issues first": "Problemas em aberto primeiro",
-        "Sort by": "Ordenar por"
+        "Sort by": "Ordenar por",
+        "1 employee": "1 colaborador",
+        "%n employees": "%n colaboradores",
+        "_1 employee_:: _%n employees_": [
+            "1 colaborador",
+            "%n colaboradores"
+        ],
+        "1 entry": "1 entrada",
+        "%n entries": "%n entradas",
+        "_1 entry_:: _%n entries_": [
+            "1 entrada",
+            "%n entradas"
+        ],
+        "1 employee matches your search": "1 colaborador corresponde à sua pesquisa",
+        "%n employees match your search": "%n colaboradores correspondem à sua pesquisa",
+        "_1 employee matches your search_:: _%n employees match your search_": [
+            "1 colaborador corresponde à sua pesquisa",
+            "%n colaboradores correspondem à sua pesquisa"
+        ],
+        "1 Nextcloud account without app access is hidden.": "1 conta Nextcloud sem acesso à aplicação está escondida.",
+        "%n Nextcloud accounts without app access are hidden.": "%n contas Nextcloud sem acesso à aplicação estão escondidas.",
+        "_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+            "1 conta Nextcloud sem acesso à aplicação está escondida.",
+            "%n contas Nextcloud sem acesso à aplicação estão escondidas."
+        ],
+        "1 more character needed ({count} of {min})": "Falta 1 caráter ({count} de {min})",
+        "%n more characters needed ({count} of {min})": "Faltam %n caracteres ({count} de {min})",
+        "_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+            "Falta 1 caráter ({count} de {min})",
+            "Faltam %n caracteres ({count} de {min})"
+        ]
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

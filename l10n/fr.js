@@ -4990,13 +4990,8 @@
 		"yard" : "cour",
 		"yearFourDigitsHelp" : "Saisissez une année à quatre chiffres (p. ex. 2026).",
 		"zone" : "Zone",
-		"{count} Nextcloud accounts without app access are hidden." : "{count} comptes Nextcloud sans accès à l’app sont masqués.",
-		"{count} employees" : "{count} employés",
-		"{count} employees match your search" : "{count} employés correspondent à votre recherche",
-		"{count} entries" : "{count} entrées",
 		"{count} of 10+ characters — you can submit" : "{count} sur 10+ caractères — vous pouvez envoyer",
 		"{field} is required. Please fill in this field." : "{field} est obligatoire. Veuillez remplir ce champ.",
-		"{remaining} more characters needed ({count} of {min})" : "Encore {remaining} caractères requis ({count} sur {min})",
 		"“All employees” for the whole company, or one team (child teams included automatically)." : "« Tous les employés » pour toute l’entreprise, ou une équipe (équipes enfants incluses automatiquement).",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "« Générer l’URL du flux » crée le premier lien pour un périmètre. « Révoquer et renouveler » remplace un lien existant — l’ancienne URL cesse immédiatement de fonctionner.",
 		"%1$s of %2$s hours" : "%1$s sur %2$s heures",
@@ -5962,8 +5957,24 @@
 		"Name or user ID" : "Nom ou ID utilisateur",
 		"Needs attention" : "Nécessite une attention",
 		"Open issues first" : "Problèmes ouverts d’abord",
-		"Sort by" : "Trier par"
-		}
+		"Sort by" : "Trier par",
+		"1 employee" : "1 employé",
+		"%n employees" : "%n employés",
+		"_1 employee_:: _%n employees_" : ["1 employé","%n employés"],
+		"1 entry" : "1 entrée",
+		"%n entries" : "%n entrées",
+		"_1 entry_:: _%n entries_" : ["1 entrée","%n entrées"],
+		"1 employee matches your search" : "1 employé correspond à votre recherche",
+		"%n employees match your search" : "%n employés correspondent à votre recherche",
+		"_1 employee matches your search_:: _%n employees match your search_" : ["1 employé correspond à votre recherche","%n employés correspondent à votre recherche"],
+		"1 Nextcloud account without app access is hidden." : "1 compte Nextcloud sans accès à l’app est masqué.",
+		"%n Nextcloud accounts without app access are hidden." : "%n comptes Nextcloud sans accès à l’app sont masqués.",
+		"_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._" : ["1 compte Nextcloud sans accès à l’app est masqué.","%n comptes Nextcloud sans accès à l’app sont masqués."],
+		"1 more character needed ({count} of {min})" : "Encore 1 caractère requis ({count} sur {min})",
+		"%n more characters needed ({count} of {min})" : "Encore %n caractères requis ({count} sur {min})",
+		"_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_" : ["Encore 1 caractère requis ({count} sur {min})","Encore %n caractères requis ({count} sur {min})"]
+		},
+		"nplurals=2; plural=(n > 1);"
 	);
 	});
 })();

@@ -97,7 +97,6 @@ $timeEntryFormMessageIds = [
 	'initFailed' => 'Form initialization failed. Please refresh the page.',
 	'justificationRequired' => 'A justification of at least 10 characters is required for manual time entries.',
 	'justificationReady' => '{count} of 10+ characters — you can submit',
-	'justificationRemaining' => '{remaining} more characters needed ({count} of {min})',
 ];
 
 $timeEntryFormL10n = [];

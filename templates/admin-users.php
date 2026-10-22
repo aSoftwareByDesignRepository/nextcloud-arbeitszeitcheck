@@ -101,7 +101,7 @@ $filterIntro = $isAccessRestricted
             	p('hidden');
             } ?>>
             <p class="admin-users-hidden-banner__text">
-                <span class="admin-users-hidden-banner__prefix"><?php p(str_replace('{count}', (string)$hiddenCount, $l->t('{count} Nextcloud accounts without app access are hidden.'))); ?></span>
+                <span class="admin-users-hidden-banner__prefix"><?php p($l->n('1 Nextcloud account without app access is hidden.', '%n Nextcloud accounts without app access are hidden.', $hiddenCount)); ?></span>
                 <button type="button" id="employee-list-show-all" class="azc-btn azc-btn--primary azc-btn--sm">
                     <?php p($l->t('Show all accounts')); ?>
                 </button>

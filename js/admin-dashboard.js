@@ -21,6 +21,15 @@
 		return value !== undefined && value !== '' ? value : (fallback || key);
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function n(singular, plural, count) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c);
+		}
+		return String(c === 1 ? singular : plural).replace('%n', String(c));
+	}
+
 	function buildApiUrl(path) {
 		if (Utils && typeof Utils.buildAppUrl === 'function') {
 			return Utils.buildAppUrl(path);
@@ -238,7 +247,7 @@
 				}).join('');
 			}
 			if (statusEl) {
-				const countLabel = t('drilldownCount', '{count} employees').replace('{count}', String(filtered.length));
+				const countLabel = n('1 employee', '%n employees', filtered.length);
 				const truncatedNotice = state.truncated
 					? ' · ' + t('drilldownTruncatedNotice', 'Showing the first results. Use search to narrow down the list.')
 					: '';

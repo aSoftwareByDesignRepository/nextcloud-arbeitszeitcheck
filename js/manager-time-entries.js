@@ -36,6 +36,15 @@
 		return msgid;
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function n(singular, plural, count) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c);
+		}
+		return String(c === 1 ? singular : plural).replace('%n', String(c));
+	}
+
 	function formatHours(value) {
 		if (value === null || value === undefined || value === '') {
 			return '-';
@@ -436,7 +445,7 @@
 			state.countBeforeLoad = '';
 			return;
 		}
-		const text = t('{count} entries', '{count} entries', { count: state.total });
+		const text = n('1 entry', '%n entries', state.total);
 		countEl.textContent = text;
 		state.countBeforeLoad = text;
 	}

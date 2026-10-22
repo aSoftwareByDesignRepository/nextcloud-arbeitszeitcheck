@@ -25,6 +25,15 @@
         return englishFallback || '';
     }
 
+    /** Plural-aware translate (Nextcloud window.n replaces %n). */
+    function aun(singular, plural, count) {
+        const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+        if (typeof window.n === 'function') {
+            return window.n('arbeitszeitcheck', singular, plural, c);
+        }
+        return String(c === 1 ? singular : plural).replace('%n', String(c));
+    }
+
     let searchTimeout = null;
     const USERS_TABLE_COLS = 9;
     const FILTER_APP_ACCESS = 'app_access';
@@ -218,17 +227,18 @@
             const showHidden = hiddenCount > 0 && listAccessFilter === FILTER_APP_ACCESS;
             hiddenBanner.hidden = !showHidden;
             if (showHidden && hiddenText) {
-                const template = auMsg(
-                    'hiddenAccountsBanner',
-                    '{count} Nextcloud accounts without app access are hidden.'
+                const template = aun(
+                    '1 Nextcloud account without app access is hidden.',
+                    '%n Nextcloud accounts without app access are hidden.',
+                    hiddenCount
                 );
                 const countNode = hiddenText.querySelector('.admin-users-hidden-banner__count');
                 if (countNode) {
-                    countNode.textContent = String(hiddenCount);
+                    countNode.textContent = template;
                 } else {
                     const prefix = hiddenText.querySelector('.admin-users-hidden-banner__prefix');
                     if (prefix) {
-                        prefix.textContent = template.replace('{count}', String(hiddenCount));
+                        prefix.textContent = template;
                     }
                 }
             }
@@ -359,8 +369,11 @@
         const count = Number.isFinite(shown) ? shown : 0;
         const totalCount = Number.isFinite(total) ? total : count;
         if (listSearch.trim() !== '') {
-            let text = auMsg('searchMatches', '{count} employees match your search')
-                .replace('{count}', String(count));
+            let text = aun(
+                '1 employee matches your search',
+                '%n employees match your search',
+                count
+            );
             if (listTruncated || count >= USERS_PAGE_SIZE) {
                 text += ' ' + auMsg('searchRefineHint', 'More than {count} matches — refine your search to find a specific person.')
                     .replace('{count}', String(count));

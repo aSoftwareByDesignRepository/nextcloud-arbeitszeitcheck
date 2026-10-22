@@ -17,6 +17,21 @@
 		return value !== undefined && value !== '' ? value : (fallback || key);
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function n(singular, plural, count, vars) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c, vars);
+		}
+		let out = String(c === 1 ? singular : plural).replace('%n', String(c));
+		if (vars && typeof vars === 'object') {
+			out = out.replace(/\{(\w+)\}/g, (_, name) => (
+				Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : '{' + name + '}'
+			));
+		}
+		return out;
+	}
+
 	function escapeHtml(value) {
 		if (Utils.escapeHtml) {
 			return Utils.escapeHtml(value);
@@ -167,10 +182,12 @@ class TimeEntryFormManager {
 				this.justificationCount.classList.remove('time-entry-form__char-count--warn');
 				this.justificationCount.classList.add('time-entry-form__char-count--ok');
 			} else {
-				this.justificationCount.textContent = t('justificationRemaining')
-					.replace('{remaining}', String(remaining))
-					.replace('{count}', String(len))
-					.replace('{min}', String(min));
+				this.justificationCount.textContent = n(
+					'1 more character needed ({count} of {min})',
+					'%n more characters needed ({count} of {min})',
+					remaining,
+					{ count: len, min: min }
+				);
 				this.justificationCount.classList.add('time-entry-form__char-count--warn');
 				this.justificationCount.classList.remove('time-entry-form__char-count--ok');
 			}

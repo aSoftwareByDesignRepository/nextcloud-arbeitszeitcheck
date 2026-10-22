@@ -25,7 +25,6 @@ $sharedMessageIds = [
 	'No entries found for the selected filters.',
 	'Please select start and end date.',
 	'Page {page} of {pages}',
-	'{count} entries',
 	'All in my scope',
 	'Type at least 2 characters to search.',
 	'Employee search failed.',

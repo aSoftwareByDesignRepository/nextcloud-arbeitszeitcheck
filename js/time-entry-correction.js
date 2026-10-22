@@ -36,6 +36,21 @@
 		return value !== undefined && value !== '' ? value : (fallback || key);
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function n(singular, plural, count, vars) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c, vars);
+		}
+		let out = String(c === 1 ? singular : plural).replace('%n', String(c));
+		if (vars && typeof vars === 'object') {
+			out = out.replace(/\{(\w+)\}/g, (_, name) => (
+				Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : '{' + name + '}'
+			));
+		}
+		return out;
+	}
+
 	function escapeHtml(value) {
 		if (value === null || value === undefined) {
 			return '';
@@ -420,10 +435,12 @@
 				justificationCount.classList.remove('correction-dialog__char-count--warn');
 				justificationCount.classList.add('correction-dialog__char-count--ok');
 			} else {
-				justificationCount.textContent = t('correctionJustificationRemaining')
-					.replace('{remaining}', String(remaining))
-					.replace('{count}', String(len))
-					.replace('{min}', String(MIN_JUSTIFICATION_LENGTH));
+				justificationCount.textContent = n(
+					'1 more character needed ({count} of {min})',
+					'%n more characters needed ({count} of {min})',
+					remaining,
+					{ count: len, min: MIN_JUSTIFICATION_LENGTH }
+				);
 				justificationCount.classList.add('correction-dialog__char-count--warn');
 				justificationCount.classList.remove('correction-dialog__char-count--ok');
 			}

@@ -4975,13 +4975,8 @@
         "yard": "gård",
         "yearFourDigitsHelp": "Ange ett fyrsiffrigt år (t.ex. 2026).",
         "zone": "Zon",
-        "{count} Nextcloud accounts without app access are hidden.": "{count} Nextcloud-konton utan appåtkomst är dolda.",
-        "{count} employees": "{count} medarbetare",
-        "{count} employees match your search": "{count} medarbetare matchar din sökning",
-        "{count} entries": "{count} poster",
         "{count} of 10+ characters — you can submit": "{count} av 10+ tecken — du kan skicka",
         "{field} is required. Please fill in this field.": "{field} krävs. Fyll i detta fält.",
-        "{remaining} more characters needed ({count} of {min})": "{remaining} tecken saknas ännu ({count} av {min})",
         "“All employees” for the whole company, or one team (child teams included automatically).": "« Alla medarbetare » för hela företaget, eller ett team (underteam inkluderas automatiskt).",
         "“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "«Generera flödes-URL» skapar den första länken för ett omfattning. «Återkalla och rotera» ersätter en befintlig länk — den gamla URL:en slutar fungera direkt.",
         "%1$s of %2$s hours": "%1$s av %2$s timmar",
@@ -5947,7 +5942,37 @@
         "Name or user ID": "Namn eller användar-ID",
         "Needs attention": "Kräver uppmärksamhet",
         "Open issues first": "Öppna problem först",
-        "Sort by": "Sortera efter"
+        "Sort by": "Sortera efter",
+        "1 employee": "1 medarbetare",
+        "%n employees": "%n medarbetare",
+        "_1 employee_:: _%n employees_": [
+            "1 medarbetare",
+            "%n medarbetare"
+        ],
+        "1 entry": "1 post",
+        "%n entries": "%n poster",
+        "_1 entry_:: _%n entries_": [
+            "1 post",
+            "%n poster"
+        ],
+        "1 employee matches your search": "1 medarbetare matchar din sökning",
+        "%n employees match your search": "%n medarbetare matchar din sökning",
+        "_1 employee matches your search_:: _%n employees match your search_": [
+            "1 medarbetare matchar din sökning",
+            "%n medarbetare matchar din sökning"
+        ],
+        "1 Nextcloud account without app access is hidden.": "1 Nextcloud-konto utan appåtkomst är dolt.",
+        "%n Nextcloud accounts without app access are hidden.": "%n Nextcloud-konton utan appåtkomst är dolda.",
+        "_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+            "1 Nextcloud-konto utan appåtkomst är dolt.",
+            "%n Nextcloud-konton utan appåtkomst är dolda."
+        ],
+        "1 more character needed ({count} of {min})": "1 tecken saknas ännu ({count} av {min})",
+        "%n more characters needed ({count} of {min})": "%n tecken saknas ännu ({count} av {min})",
+        "_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+            "1 tecken saknas ännu ({count} av {min})",
+            "%n tecken saknas ännu ({count} av {min})"
+        ]
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

@@ -283,6 +283,11 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			requestBtn = page.locator('.btn-request-correction').first();
 		}
 		if (await requestBtn.count()) {
+			// Row actions reveal on tr:hover at >=769px (zero-width sticky
+			// actions-cell + pointer-events:none panel). Playwright's hit-test
+			// never moves the OS cursor first, so hover the row explicitly —
+			// same thing a real pointer user does.
+			await requestBtn.locator('xpath=ancestor::tr[1]').hover();
 			await requestBtn.click();
 			const corrDlg = page.locator(
 				'.correction-dialog[role="dialog"], #time-entry-correction-form',

@@ -184,20 +184,12 @@ window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
         TemplateL10n::translate($l, 'Showing employees {from}–{to} of {total}'),
         TemplateL10n::JSON_ENCODE_FLAGS
     ); ?>;
-    window.ArbeitszeitCheck.l10n.searchMatches = <?php echo json_encode(
-        TemplateL10n::translate($l, '{count} employees match your search'),
-        TemplateL10n::JSON_ENCODE_FLAGS
-    ); ?>;
     window.ArbeitszeitCheck.l10n.searchRefineHint = <?php echo json_encode(
         TemplateL10n::translate($l, 'More than {count} matches — refine your search to find a specific person.'),
         TemplateL10n::JSON_ENCODE_FLAGS
     ); ?>;
     window.ArbeitszeitCheck.l10n.searchMinLength = <?php echo json_encode(
         TemplateL10n::translate($l, 'Type at least 2 characters to search.'),
-        TemplateL10n::JSON_ENCODE_FLAGS
-    ); ?>;
-    window.ArbeitszeitCheck.l10n.hiddenAccountsBanner = <?php echo json_encode(
-        TemplateL10n::translate($l, '{count} Nextcloud accounts without app access are hidden.'),
         TemplateL10n::JSON_ENCODE_FLAGS
     ); ?>;
     window.ArbeitszeitCheck.l10n.noAppAccessEmployees = <?php echo json_encode(

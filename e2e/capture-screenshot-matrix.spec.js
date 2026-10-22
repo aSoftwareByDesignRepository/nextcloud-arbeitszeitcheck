@@ -79,12 +79,26 @@ const SEED_EMP = () => process.env.NC_EMPLOYEE_USER || 'e2e_employee';
 const fmtDE = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 const fmtISO = (d) => d.toISOString().slice(0, 10);
 
-async function fillRangeAndShow(page, days) {
+/**
+ * Range pickers are readonly inputs driven by the calendar widget — fill()
+ * rejects them. Set the value via the DOM and dispatch input/change so the
+ * page's own listeners pick it up (same pattern as bachus-web-list-filters).
+ */
+async function setDateValue(page, selector, value) {
+	await page.locator(selector).evaluate((el, v) => {
+		el.removeAttribute('readonly');
+		el.value = v;
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		el.dispatchEvent(new Event('change', { bubbles: true }));
+	}, value);
+}
+
+async function fillRangeAndShow(page, startSel, endSel, submitSel, days) {
 	const start = new Date(Date.now() - days * 86400000);
 	const end = new Date(Date.now() + days * 86400000);
-	await page.locator('#start-date-filter').fill(fmtDE(start));
-	await page.locator('#end-date-filter').fill(fmtDE(end));
-	await page.locator('[id$="-submit"].azc-btn--primary').first().click();
+	await setDateValue(page, startSel, fmtDE(start));
+	await setDateValue(page, endSel, fmtDE(end));
+	await page.locator(submitSel).click();
 }
 
 const STATE_PRODUCERS = {
@@ -108,7 +122,7 @@ const STATE_PRODUCERS = {
 					reason: 'matrix-populated seed',
 				},
 			});
-			await fillRangeAndShow(page, 30);
+			await fillRangeAndShow(page, '#start-date-filter', '#end-date-filter', '#employee-time-entries-submit', 60);
 			await expect(page.locator('.manager-scope-page__results-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
 		},
 		'manager-absences': async (page) => {
@@ -134,9 +148,9 @@ const STATE_PRODUCERS = {
 			// may still exist inside it.
 			const start = seededSd ? new Date(seededSd.getTime() - 30 * 86400000) : new Date(Date.now() - 180 * 86400000);
 			const end = new Date(start.getTime() + 360 * 86400000);
-			await page.locator('#start-date-filter').fill(fmtDE(start));
-			await page.locator('#end-date-filter').fill(fmtDE(end));
-			await page.locator('[id$="-submit"].azc-btn--primary').first().click();
+			await setDateValue(page, '#employee-absences-start-date-filter', fmtDE(start));
+			await setDateValue(page, '#employee-absences-end-date-filter', fmtDE(end));
+			await page.locator('#employee-absences-submit').click();
 			await expect(page.locator('.manager-scope-page__results-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
 		},
 		'admin-users': async (page) => {

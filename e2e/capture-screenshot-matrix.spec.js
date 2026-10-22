@@ -60,13 +60,28 @@ async function applyTheme(page, theme) {
 	}, theme);
 }
 
+/**
+ * Two painted frames — the real "rendered" signal — but bounded: in old
+ * headless the compositor only produces frames on demand, so an unbounded
+ * requestAnimationFrame evaluate can starve forever on an otherwise static
+ * page (observed: EMPLOYEE sweep hung >10min on /timeline with an idle
+ * renderer, 2026-10-22). 10s cap keeps the painted-frame guarantee while
+ * never stalling a cell.
+ */
+async function paintedFrames(page) {
+	await page.evaluate(() => new Promise((res) => {
+		const t = setTimeout(res, 10_000);
+		requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); res(); }));
+	})).catch(() => {});
+}
+
 /** Wait for a painted frame — the real "rendered" signal, not a blind settle. */
 async function settle(page, path) {
 	await page.goto(`${APP}${path}`, { waitUntil: 'domcontentloaded' });
-	await page.waitForLoadState('networkidle').catch(() => {});
+	await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 	await page.waitForSelector('#app-content', { timeout: 30_000 });
 	// two painted frames before the shutter
-	await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+	await paintedFrames(page);
 }
 
 /**
@@ -217,9 +232,10 @@ test.describe('SCREENSHOT_MATRIX capture', () => {
 					const shotH = Math.min(Math.max(contentH + 60, vp.height), 8192);
 					if (shotH !== vp.height) {
 						await page.setViewportSize({ width: vp.width, height: shotH });
-						await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+						await paintedFrames(page);
 					}
-					await page.screenshot({ path: file });
+					console.log(`[matrix] ${shotName(surface, state, vp, theme)}`);
+					await page.screenshot({ path: file, timeout: 60_000 });
 					if (!existsSync(file)) { missing.push(file); }
 				}
 			}

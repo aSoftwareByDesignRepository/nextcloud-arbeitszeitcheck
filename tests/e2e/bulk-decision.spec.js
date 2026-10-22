@@ -110,6 +110,12 @@ test.describe('Manager bulk decision (suite appendix)', () => {
 			})
 			expect(badType.status).toBe(400)
 		} finally {
+			// Approved seeds occupy overlap windows on the shared employee
+			// (decided rows persist by design) — cancel flips them to
+			// non-blocking 'cancelled'; see concurrent-absence-decision teardown.
+			for (const id of ids) {
+				await apiAllowFailure(employeePage, 'POST', `/apps/arbeitszeitcheck/api/absences/${id}/cancel`).catch(() => {})
+			}
 			await employeeContext.close().catch(() => {})
 			await managerContext.close().catch(() => {})
 		}

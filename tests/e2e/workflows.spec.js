@@ -170,21 +170,28 @@ test('Absence substitute approval -> manager approval', async ({ page, browser }
   const absenceId = absence.absence?.id
   expect(absenceId).toBeTruthy()
 
-  // Substitute approves
-  const pageSub = await browser.newPage()
-  await login(pageSub, substitute)
-  await pageSub.goto('/apps/arbeitszeitcheck/substitution-requests')
-  const subApprove = await api(pageSub, 'POST', `/apps/arbeitszeitcheck/api/substitution-requests/${absenceId}/approve`)
-  expect(subApprove.success).toBe(true)
+  try {
+    // Substitute approves
+    const pageSub = await browser.newPage()
+    await login(pageSub, substitute)
+    await pageSub.goto('/apps/arbeitszeitcheck/substitution-requests')
+    const subApprove = await api(pageSub, 'POST', `/apps/arbeitszeitcheck/api/substitution-requests/${absenceId}/approve`)
+    expect(subApprove.success).toBe(true)
 
-  // Manager approves
-  const pageMgr = await browser.newPage()
-  await login(pageMgr, manager)
-  await pageMgr.goto('/apps/arbeitszeitcheck/manager')
-  const mgrApprove = await api(pageMgr, 'POST', `/apps/arbeitszeitcheck/api/manager/absences/${absenceId}/approve`, {
-    data: { comment: 'Approved by manager' },
-  })
-  expect(mgrApprove.success).toBe(true)
+    // Manager approves
+    const pageMgr = await browser.newPage()
+    await login(pageMgr, manager)
+    await pageMgr.goto('/apps/arbeitszeitcheck/manager')
+    const mgrApprove = await api(pageMgr, 'POST', `/apps/arbeitszeitcheck/api/manager/absences/${absenceId}/approve`, {
+      data: { comment: 'Approved by manager' },
+    })
+    expect(mgrApprove.success).toBe(true)
+  } finally {
+    // The approved seed occupies an overlap window on the shared employee
+    // forever (decided rows persist by design) — cancel flips it to
+    // non-blocking 'cancelled'; see concurrent-absence-decision teardown.
+    await apiAllowFailure(page, 'POST', `/apps/arbeitszeitcheck/api/absences/${absenceId}/cancel`).catch(() => {})
+  }
 })
 
 test('Manager reports API supports preview and CSV download', async ({ page }) => {

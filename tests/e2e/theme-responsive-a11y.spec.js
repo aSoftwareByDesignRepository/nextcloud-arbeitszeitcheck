@@ -208,6 +208,18 @@ async function assertPolicyChromeTouchTargets(page) {
  * @param {string} label
  */
 async function runAxe(page, label) {
+	// Hover-reveal row actions (.azc-table-actions) animate opacity when a row
+	// gains :hover — including pointer-residue hover after setViewportSize —
+	// and when the 769px media boundary flips them in/out of reveal mode.
+	// Sampling mid-fade flattens button colors through partial opacity and
+	// produces phantom color-contrast violations; let transitions finish first.
+	await page.waitForFunction(
+		() => document.getAnimations({ subtree: true }).every((a) => {
+			const d = a.effect?.getTiming().duration
+			return a.playState !== 'running' || typeof d !== 'number' || d >= 10_000
+		}),
+		null, { timeout: 1_000 },
+	).catch(() => {})
 	const results = await new AxeBuilder({ page })
 		.include('#content')
 		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

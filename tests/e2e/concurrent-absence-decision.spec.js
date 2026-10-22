@@ -113,6 +113,13 @@ test.describe('Concurrent pending absence decision (live)', () => {
 			expect(['approved', 'rejected']).toContain(finalStatus)
 			expect(finalStatus).not.toBe('pending')
 		} finally {
+			// The race leaves the seed decided (approved|rejected). Cancelling an
+			// approved row flips it to non-blocking 'cancelled' so the shared
+			// employee's overlap windows stay usable (decided rows persist by
+			// design; rejected is already non-blocking — cancel errors harmlessly).
+			if (absenceId) {
+				await apiAllowFailure(employeePage, 'POST', `/apps/arbeitszeitcheck/api/absences/${absenceId}/cancel`).catch(() => {})
+			}
 			await employeeContext.close()
 			await managerContext.close()
 		}

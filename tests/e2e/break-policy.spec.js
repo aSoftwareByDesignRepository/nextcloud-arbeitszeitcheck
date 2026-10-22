@@ -262,7 +262,10 @@ test.describe('Organisational break policy', () => {
 			// Edit view re-renders the saved row.
 			await page.goto('/apps/arbeitszeitcheck/admin/working-time-models')
 			await assertArbeitszeitcheckLoaded(page)
-			await page.locator(`[data-action="edit-model"][data-model-id="${modelId}"]`).first().click()
+			// Row actions sit in a hover-reveal panel (pointer-events:none until tr:hover).
+			const editBtn = page.locator(`[data-action="edit-model"][data-model-id="${modelId}"]`).first()
+			await editBtn.locator('xpath=ancestor::tr[1]').hover()
+			await editBtn.click()
 			const editRow = page.locator('.wtm-presence-windows [data-presence-row]').first()
 			await expect(editRow).toBeVisible()
 			await expect(editRow.locator('.wtm-presence-start')).toHaveValue('08:00')

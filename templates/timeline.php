@@ -14,16 +14,20 @@ declare(strict_types=1);
 // Assets registered by PageController::registerFrontEndAssets
 
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
+ob_start();
+?>
+            <button id="btn-refresh-timeline" class="btn btn--secondary" type="button" aria-label="<?php p($l->t('Refresh timeline data')); ?>">
+                <?php p($l->t('Refresh')); ?>
+            </button>
+<?php
+$captured = ob_get_clean();
+$compact = preg_replace('/>\s+</', '><', $captured);
+$pageHeaderActions = is_string($compact) ? $compact : $captured;
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
 
         <div class="azc-page-stack">
-        <div class="header-actions">
-            <button id="btn-refresh-timeline" class="btn btn--secondary" type="button" aria-label="<?php p($l->t('Refresh timeline data')); ?>">
-                <?php p($l->t('Refresh')); ?>
-            </button>
-        </div>
 
         <!-- Timeline Content -->
         <section class="section" aria-label="<?php p($l->t('Timeline of working time')); ?>">

@@ -3,24 +3,33 @@
  * WCAG 2.1 AA: 44px action targets, visible focus, theme-safe contrast.
  */
 
-/* Legacy flat markup (no __body): stack instead of scattered flex items */
-#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)),
-.modal-backdrop .azc-callout:not(:has(.azc-callout__body)) {
-	flex-direction: column;
-	align-items: stretch;
-	flex-wrap: nowrap;
-	gap: var(--azc-space-2, 0.5rem);
+/*
+ * No __body wrapper: icon and the first text share one row.
+ * A column stack put the headline on the next line and wasted a row.
+ * Collapsed callouts and dismissible hints keep their own header row.
+ */
+#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body),
+.modal-backdrop .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body) {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	column-gap: var(--azc-space-3, 0.75rem);
+	row-gap: var(--azc-space-2, 0.5rem);
 }
 
-/* Prevent flex:1 on __text from stretching the first line in stacked flat callouts */
-#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)) > .azc-callout__text,
-#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)) > .azc-callout__hint,
-.modal-backdrop .azc-callout:not(:has(.azc-callout__body)) > .azc-callout__text,
-.modal-backdrop .azc-callout:not(:has(.azc-callout__body)) > .azc-callout__hint {
-	flex: 0 0 auto;
-	align-self: stretch;
+#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body) > .azc-callout__icon,
+.modal-backdrop .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body) > .azc-callout__icon {
+	grid-column: 1;
+	grid-row: 1;
+}
+
+#app-content.azc-app .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body) > :not(.azc-callout__icon),
+.modal-backdrop .azc-callout:not(:has(.azc-callout__body)):not(details):not(.azc-hint__body) > :not(.azc-callout__icon) {
+	grid-column: 2;
+	min-width: 0;
+	width: auto;
 	max-width: none;
-	width: 100%;
+	flex: none;
 }
 
 #app-content.azc-app .azc-callout:not(:has(.azc-callout__body)) > .azc-callout__actions,

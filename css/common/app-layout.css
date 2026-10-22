@@ -215,11 +215,6 @@
   /* Generous spacing: easy to scan, even for users with low vision */
 }
 
-#app-content-wrapper>.section:focus-within {
-  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
-  outline-offset: 2px;
-}
-
 /* Section left accent: quick visual scanning (border + bar, not only color — WCAG 1.4.11) */
 #app-content-wrapper>.section:not(.page-header-section)::before {
   content: '';

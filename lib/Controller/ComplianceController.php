@@ -16,6 +16,9 @@ use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
+use OCA\ArbeitszeitCheck\Support\CompliancePageScope;
+use OCA\ArbeitszeitCheck\Support\TablePager;
+use OCA\ArbeitszeitCheck\Support\ComplianceReportSummary;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
@@ -27,13 +30,13 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\IL10N;
-use OCP\Util;
 
 /**
  * ComplianceController
@@ -43,6 +46,9 @@ class ComplianceController extends Controller
 	use CSPTrait;
 	use NavigationFlagsTrait;
 	use PageShellTrait;
+
+	/** Latest rows painted on the page. Filters load the rest through the API. */
+	private const COMPLIANCE_PAGE_VIOLATION_LIMIT = 50;
 
 	private ComplianceService $complianceService;
 	private ComplianceViolationMapper $violationMapper;
@@ -229,49 +235,61 @@ class ComplianceController extends Controller
 	}
 
 	/**
-	 * Compliance dashboard page
-	 *
+	 * Compliance page: status, personal report, and the violations table.
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('compliance-dashboard', 'compliance-violations', ['compliance-violations']);
+		$this->registerFrontEndAssets(
+			'compliance-dashboard',
+			'compliance-violations',
+			[],
+			['common/datepicker', 'common/table-pager', 'compliance-violations'],
+		);
 
 		try {
 			$userId = $this->getUserId();
+			$scope = $this->complianceScope($userId);
+			$targetUserId = $scope['targetUserId'];
 
-			// Get compliance status
-			$complianceStatus = $this->complianceService->getComplianceStatus($userId);
-
-			// Get recent violations
-			$recentViolations = $this->violationMapper->findByUser($userId, null, 10, 0);
-			$violationsData = [];
-			foreach ($recentViolations as $violation) {
-				$date = $violation->getDate();
-				$violationsData[] = [
-					'id' => $violation->getId(),
-					'type' => $violation->getViolationType(),
-					'severity' => $violation->getSeverity(),
-					// Human-readable, localized date for dashboard display (DD.MM.YYYY)
-					'date' => $date ? $date->format('d.m.Y') : null,
-					// Machine-friendly ISO date for charts / sorting
-					'dateIso' => $date ? $date->format('Y-m-d') : null,
-					'resolved' => $violation->getResolved(),
-					'description' => $violation->getDescription()
-				];
-			}
+			$complianceStatus = $this->complianceService->getComplianceStatus($targetUserId);
+			$rows = $this->mapViolationRows($userId, $this->violationMapper->findByUser($targetUserId, null));
+			$reportData = ComplianceReportSummary::fromRows($rows);
+			$shownViolations = array_slice($rows, 0, self::COMPLIANCE_PAGE_VIOLATION_LIMIT);
+			$violationPager = TablePager::state(
+				count($shownViolations),
+				$this->request->getParam('v_page'),
+				$this->request->getParam('v_per_page'),
+			);
+			$typePager = TablePager::state(
+				count(is_array($reportData['by_type'] ?? null) ? $reportData['by_type'] : []),
+				$this->request->getParam('t_page'),
+				$this->request->getParam('t_per_page'),
+			);
+			$severityPager = TablePager::state(
+				count(is_array($reportData['by_severity'] ?? null) ? $reportData['by_severity'] : []),
+				$this->request->getParam('s_page'),
+				$this->request->getParam('s_per_page'),
+			);
 
 			$navFlags = $this->getNavigationFlags($userId);
-
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-dashboard', $this->buildShellParams(
 				'compliance',
 				$this->l10n->t('Compliance Dashboard'),
 				$this->complianceDashboardLead($userId),
 				$navFlags,
 			) + [
+				'collapsePageHelp' => false,
 				'complianceStatus' => $complianceStatus,
-				'recentViolations' => $violationsData,
+				'violations' => $shownViolations,
+				'violationTotal' => count($rows),
+				'violationPager' => $violationPager,
+				'typePager' => $typePager,
+				'severityPager' => $severityPager,
+				'reportData' => $reportData,
+				'filterUserId' => $scope['filterUserId'],
+				'filterDisplayName' => $scope['filterDisplayName'],
 				'showComplianceRunCheck' => $this->permissionService->isAdmin($userId),
 				'complianceRunCheckUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.compliance.runCheck'),
 				'complianceViolationsUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.compliance.violations'),
@@ -292,13 +310,19 @@ class ComplianceController extends Controller
 				$this->complianceDashboardLead($leadUserId),
 				$navFlags,
 			) + [
+				'collapsePageHelp' => false,
 				'complianceStatus' => [
 					'compliant' => false,
 					'score' => 0,
 					'has_data' => false,
 					'load_error' => true,
 				],
-				'recentViolations' => [],
+				'violations' => [],
+				'violationTotal' => 0,
+				'reportData' => ComplianceReportSummary::fromRows([]),
+				'filterUserId' => null,
+				'filterDisplayName' => null,
+				'showComplianceRunCheck' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			]);
 			return $this->configureCSP($response);
@@ -405,77 +429,87 @@ class ComplianceController extends Controller
 	}
 
 	/**
-	 * Compliance reports page
-	 *
+	 * Old reports URL. The summary now lives in the status card.
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function reports(): TemplateResponse
+	public function reports(): RedirectResponse
 	{
-		$this->registerFrontEndAssets('compliance-reports');
+		return $this->redirectToCompliancePage('#compliance-status');
+	}
 
-		try {
-			$userId = $this->getUserId();
-
-			// Get compliance summary for all recorded violations
-			$violations = $this->violationMapper->findByUser($userId, null);
-
-			$reportData = [
-				'total_violations' => count($violations),
-				'unresolved' => 0,
-				'by_type' => [],
-				'by_severity' => []
-			];
-
-			foreach ($violations as $violation) {
-				if (!$violation->getResolved()) {
-					$reportData['unresolved']++;
-				}
-
-				$type = $violation->getViolationType();
-				$reportData['by_type'][$type] = ($reportData['by_type'][$type] ?? 0) + 1;
-
-				$severity = $violation->getSeverity();
-				$reportData['by_severity'][$severity] = ($reportData['by_severity'][$severity] ?? 0) + 1;
-			}
-
-			$navFlags = $this->getNavigationFlags($userId);
-
-			$response = new TemplateResponse(
-				'arbeitszeitcheck',
-				'compliance-reports',
-				$this->buildShellParams(
-					'compliance-reports',
-					$this->l10n->t('Compliance Reports'),
-					$this->l10n->t('Summary of compliance violations and trends'),
-					$navFlags,
-				) + [
-					'reportData' => $reportData,
-					'startDate' => null,
-					'endDate' => null,
-				]
-			);
-			return $this->configureCSP($response);
-		} catch (\Throwable $e) {
-			$navFlags = $this->getNavigationFlagsForSession();
-			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-reports', $this->buildShellParams(
-				'compliance-reports',
-				$this->l10n->t('Compliance Reports'),
-				$this->l10n->t('Summary of compliance violations and trends'),
-				$navFlags,
-			) + [
-				'reportData' => [
-					'total_violations' => 0,
-					'unresolved' => 0,
-					'by_type' => [],
-					'by_severity' => []
-				],
-				'startDate' => date('Y-m-d', strtotime('-30 days')),
-				'endDate' => date('Y-m-d'),
-				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
-			]);
-			return $this->configureCSP($response);
+	private function redirectToCompliancePage(string $fragment): RedirectResponse
+	{
+		$raw = $this->request->getParam('userId');
+		$params = [];
+		if (is_string($raw) && trim($raw) !== '') {
+			$params['userId'] = trim($raw);
 		}
+		$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard', $params);
+
+		return new RedirectResponse($url . $fragment);
+	}
+
+	/**
+	 * @return array{targetUserId: string, filterUserId: ?string, filterDisplayName: ?string}
+	 */
+	private function complianceScope(string $currentUserId): array
+	{
+		$raw = $this->request->getParam('userId');
+		try {
+			$scope = CompliancePageScope::resolve(
+				$currentUserId,
+				$raw,
+				fn (string $actor, string $target): bool => $this->permissionService->canViewUserCompliance($actor, $target),
+			);
+		} catch (\InvalidArgumentException $e) {
+			if ($e->getMessage() !== CompliancePageScope::DENIED) {
+				throw $e;
+			}
+			$requested = is_string($raw) ? trim($raw) : '';
+			$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $requested);
+			throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+		}
+
+		$filterDisplayName = null;
+		if ($scope['filterUserId'] !== null) {
+			$user = $this->userManager->get($scope['filterUserId']);
+			$filterDisplayName = $user ? $user->getDisplayName() : $scope['filterUserId'];
+		}
+
+		return [
+			'targetUserId' => $scope['targetUserId'],
+			'filterUserId' => $scope['filterUserId'],
+			'filterDisplayName' => $filterDisplayName,
+		];
+	}
+
+	/**
+	 * @param list<ComplianceViolation> $violations
+	 * @return list<array{id: int, type: string, severity: string, date: string, resolved: bool, description: string, can_resolve: bool}>
+	 */
+	private function mapViolationRows(string $actorId, array $violations): array
+	{
+		$rows = [];
+		foreach ($violations as $violation) {
+			if (!$violation instanceof ComplianceViolation) {
+				continue;
+			}
+			$date = $violation->getDate();
+			$resolved = (bool)$violation->getResolved();
+			$rows[] = [
+				'id' => (int)$violation->getId(),
+				'type' => (string)$violation->getViolationType(),
+				'severity' => (string)$violation->getSeverity(),
+				'date' => $date instanceof \DateTimeInterface ? $date->format('d.m.Y') : '-',
+				'resolved' => $resolved,
+				'description' => (string)$violation->getDescription(),
+				'can_resolve' => !$resolved
+					&& $this->permissionService->canResolveViolation($actorId, (string)$violation->getUserId()),
+			];
+		}
+
+		return $rows;
 	}
 
 	/**

@@ -44,8 +44,7 @@
 #app-content.azc-app .azc-semantic-panel .azc-callout__text,
 #app-content.azc-app .azc-semantic-panel .auto-break-panel__title,
 #app-content.azc-app .azc-semantic-panel .auto-break-panel__help,
-#app-content.azc-app .azc-semantic-panel .toggle-label,
-#app-content.azc-app .azc-semantic-panel .break-requirement-indicator__text {
+#app-content.azc-app .azc-semantic-panel .toggle-label {
 	color: var(--color-main-text);
 }
 

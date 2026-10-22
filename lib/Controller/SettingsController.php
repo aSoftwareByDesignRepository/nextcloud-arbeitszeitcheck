@@ -519,6 +519,9 @@ class SettingsController extends Controller
 
 			$userId = $user->getUID();
 			$completed = $this->request->getParam('completed', true);
+			$settingKey = $this->request->getParam('scope') === 'admin'
+				? 'admin_setup_onboarding_completed'
+				: 'onboarding_completed';
 
 			if (!$this->isDatabaseSchemaReady()) {
 				return new JSONResponse([
@@ -529,7 +532,7 @@ class SettingsController extends Controller
 			}
 
 			try {
-				$this->userSettingsMapper->setSetting($userId, 'onboarding_completed', $completed ? '1' : '0');
+				$this->userSettingsMapper->setSetting($userId, $settingKey, $completed ? '1' : '0');
 			} catch (DBException $e) {
 				\OCP\Log\logger('arbeitszeitcheck')->error('Settings table not found while schema was reported ready', ['exception' => $e]);
 				return new JSONResponse([
@@ -543,11 +546,11 @@ class SettingsController extends Controller
 			try {
 				$this->auditLogMapper->logAction(
 					$userId,
-					'onboarding_completed',
+					$settingKey,
 					'user_settings',
 					null,
 					null,
-					['onboarding_completed' => $completed ? '1' : '0']
+					[$settingKey => $completed ? '1' : '0']
 				);
 			} catch (\Throwable $e) {
 				// Log audit error but don't fail the request

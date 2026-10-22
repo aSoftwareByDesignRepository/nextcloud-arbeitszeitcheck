@@ -28,6 +28,7 @@ import path from 'node:path'
 import { login, credsFromEnv } from './helpers/auth.js'
 import { gotoApp } from './helpers/auth-guard.js'
 import { api, apiAllowFailure } from './helpers/api.js'
+import { setAzcTime } from './helpers/timepicker.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(path.join(__dirname, 'package.json'))
@@ -245,10 +246,8 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 			el.dispatchEvent(new Event('input', { bubbles: true }))
 			el.dispatchEvent(new Event('change', { bubbles: true }))
 		}, `${dd}.${mm}.${yyyy}`)
-		await page.locator('#entry-start-time-hour').selectOption('22')
-		await page.locator('#entry-start-time-minute').selectOption('30')
-		await page.locator('#entry-end-time-hour').selectOption('23')
-		await page.locator('#entry-end-time-minute').selectOption('10')
+		await setAzcTime(page, 'entry-start-time', '22:30')
+		await setAzcTime(page, 'entry-end-time', '23:10')
 		await page.locator('#entry-description').fill(`${STAMP}-dbl`)
 		const submit = form.locator('button[type="submit"]').first()
 		try {
@@ -268,10 +267,8 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 		await gotoApp(page, `${APP}/time-entries/create`)
 		const form = page.locator('#time-entry-form')
 		await form.waitFor({ state: 'visible', timeout: 30_000 })
-		await page.locator('#entry-start-time-hour').selectOption('22')
-		await page.locator('#entry-start-time-minute').selectOption('30')
-		await page.locator('#entry-end-time-hour').selectOption('23')
-		await page.locator('#entry-end-time-minute').selectOption('10')
+		await setAzcTime(page, 'entry-start-time', '22:30')
+		await setAzcTime(page, 'entry-end-time', '23:10')
 		const submit = form.locator('button[type="submit"]').first()
 		await assertFormSurvivesFailure(page, {
 			failUrl: '/apps/arbeitszeitcheck/api/time-entries',

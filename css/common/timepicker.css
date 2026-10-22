@@ -1,0 +1,258 @@
+/**
+ * 24-hour time picker. Field chrome matches form inputs; the popover is a
+ * portaled dialog so card overflow cannot clip it.
+ *
+ * @copyright Copyright (c) 2026
+ * @license AGPL-3.0-or-later
+ */
+
+.azc-timepicker {
+	width: 100%;
+	min-width: 0;
+}
+
+.azc-timepicker:not([data-azc-timepicker-ready]) {
+	min-height: var(--azc-touch, 44px);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--color-main-background);
+}
+
+#app-content.azc-app .azc-timepicker__control,
+.azc-timepicker__control {
+	display: flex;
+	align-items: center;
+	gap: var(--azc-space-1, 4px);
+	width: 100%;
+	min-height: var(--azc-touch, 44px);
+	padding: 0 0 0 var(--azc-space-2, 8px);
+	box-sizing: border-box;
+	background: var(--color-main-background);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast));
+	border-radius: var(--azc-radius-md, 12px);
+}
+
+#app-content.azc-app .azc-timepicker--error .azc-timepicker__control,
+.azc-timepicker--error .azc-timepicker__control,
+#app-content.azc-app .azc-timepicker[aria-invalid="true"] .azc-timepicker__control,
+.azc-timepicker[aria-invalid="true"] .azc-timepicker__control {
+	border: 2px solid var(--color-error, var(--color-element-error));
+	box-shadow: none;
+}
+
+#app-content.azc-app .azc-timepicker__section,
+.azc-timepicker__section {
+	display: inline-block;
+	width: 3.25rem;
+	flex: 0 0 3.25rem;
+	min-height: 2.25rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: var(--azc-radius-sm, 6px);
+	background: transparent;
+	box-shadow: none;
+	color: var(--color-main-text);
+	font-family: inherit;
+	font-size: 1.125rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	line-height: 2.25rem;
+	text-align: center;
+	caret-color: transparent;
+}
+
+#app-content.azc-app .azc-timepicker__section:focus,
+.azc-timepicker__section:focus {
+	background: var(--azc-tint-info, var(--color-primary-element-light));
+	border: 0;
+	box-shadow: none;
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
+.azc-timepicker__colon {
+	color: var(--color-text-maxcontrast);
+	font-size: 1.125rem;
+	font-weight: 600;
+	line-height: 1;
+}
+
+#app-content.azc-app .azc-timepicker__open,
+.azc-timepicker__open {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 var(--azc-touch, 44px);
+	width: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	min-height: var(--azc-touch, 44px);
+	margin: 0 0 0 auto;
+	padding: 0;
+	border: 0;
+	border-radius: var(--azc-radius-sm, 6px);
+	background: transparent;
+	color: var(--color-main-text);
+	cursor: pointer;
+}
+
+#app-content.azc-app .azc-timepicker__open:hover,
+.azc-timepicker__open:hover {
+	background: var(--color-background-hover);
+}
+
+#app-content.azc-app .azc-timepicker__open:focus-visible,
+.azc-timepicker__open:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+.azc-timepicker__icon {
+	width: 1.25rem;
+	height: 1.25rem;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.azc-timepicker__backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10040;
+	background: var(--azc-scrim, color-mix(in srgb, var(--color-main-text) 45%, transparent));
+}
+
+.azc-timepicker__popover {
+	position: fixed;
+	z-index: 10050;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-2, 8px);
+	box-sizing: border-box;
+	min-width: 12rem;
+	padding: var(--azc-space-3, 12px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast));
+	border-radius: var(--azc-radius-md, 12px);
+	box-shadow: var(--azc-shadow-md, 0 8px 24px color-mix(in srgb, var(--color-main-text) 12%, transparent));
+}
+
+.azc-timepicker__column {
+	display: flex;
+	flex-direction: column;
+	min-width: 4.5rem;
+	flex: 1 1 4.5rem;
+}
+
+.azc-timepicker__heading {
+	margin: 0 0 var(--azc-space-1, 4px);
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-align: center;
+	color: var(--color-text-maxcontrast);
+}
+
+.azc-timepicker__list {
+	max-height: 16rem;
+	overflow: auto;
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-sm, 6px);
+	background: var(--color-main-background);
+}
+
+.azc-timepicker__option {
+	display: block;
+	width: 100%;
+	min-height: var(--azc-touch, 44px);
+	margin: 0;
+	padding: 0 var(--azc-space-2, 8px);
+	border: 2px solid transparent;
+	background: transparent;
+	color: var(--color-main-text);
+	font: inherit;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	line-height: 1;
+	text-align: center;
+	cursor: pointer;
+}
+
+/*
+ * Core paints every button:hover and button:focus with the pale
+ * --color-primary-element-light-hover (specificity 0,2,1). White or
+ * primary ink on that wash fails AA. The popover prefix beats that rule.
+ * --color-primary-element-hover is the darker blue; its paired text token
+ * stays at least 4.5:1 on light and dark themes.
+ */
+.azc-timepicker__popover button.azc-timepicker__option:hover,
+.azc-timepicker__popover button.azc-timepicker__option:focus,
+.azc-timepicker__popover button.azc-timepicker__option:active,
+.azc-timepicker__popover button.azc-timepicker__option[aria-selected="true"] {
+	background-color: var(--color-primary-element-hover);
+	color: var(--color-primary-element-text);
+	border-color: var(--color-primary-element-hover);
+}
+
+.azc-timepicker__popover button.azc-timepicker__option:focus-visible {
+	outline: 2px solid var(--color-primary-element-text);
+	outline-offset: -4px;
+}
+
+.azc-timepicker__actions {
+	display: flex;
+	flex: 1 1 100%;
+	gap: var(--azc-space-2, 8px);
+	justify-content: flex-end;
+}
+
+.azc-timepicker__clear,
+.azc-timepicker__done {
+	min-height: var(--azc-touch, 44px);
+	padding: 0 var(--azc-space-4, 16px);
+	border-radius: var(--azc-radius-sm, 6px);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.azc-timepicker__clear {
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast));
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+.azc-timepicker__done {
+	border: 1px solid var(--color-primary-element);
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+}
+
+.azc-timepicker__clear:focus-visible,
+.azc-timepicker__done:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+.azc-timepicker__popover--sheet {
+	left: 50%;
+	top: auto;
+	bottom: max(16px, env(safe-area-inset-bottom));
+	width: min(22rem, calc(100vw - 24px));
+	transform: translateX(-50%);
+}
+
+.azc-timepicker__popover--sheet .azc-timepicker__list {
+	max-height: 40vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.azc-timepicker__popover,
+	.azc-timepicker__option {
+		scroll-behavior: auto;
+	}
+}

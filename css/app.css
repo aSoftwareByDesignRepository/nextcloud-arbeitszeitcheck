@@ -2,7 +2,7 @@
  * ArbeitszeitCheck design system + page shell.
  * Feature CSS remains in page-specific files during transition.
  */
-@import url('common/tokens.css');
+@import url('common/tokens.css?v=20261019-tint');
 @import url('common/icons.css');
 @import url('common/colors.css');
 @import url('common/typography.css');
@@ -12,6 +12,7 @@
 @import url('common/layout.css');
 @import url('common/app-layout.css');
 @import url('common/page-patterns.css');
+@import url('common/table-pager.css');
 @import url('common/stat-tiles.css');
 @import url('common/manager-scope-filter.css');
 @import url('common/utilities.css');
@@ -137,8 +138,22 @@
 	width: 100%;
 	max-width: none;
 	margin: 0;
-	padding: var(--azc-space-5) var(--azc-space-5) var(--azc-space-7);
+	padding: var(--azc-space-5) var(--azc-space-5) 0;
 	box-sizing: border-box;
+}
+/*
+ * End inset is a flex item, not padding-bottom.
+ * Core sets #app-content-wrapper { min-height: 100% } inside the scrolling
+ * #app-content. Bottom padding is swallowed by that minimum and never
+ * becomes scrollable space, so the last block sits on the viewport edge.
+ */
+#app-content.azc-app #app-content-wrapper.azc-shell::after {
+	content: "";
+	display: block;
+	flex: 0 0 auto;
+	width: 100%;
+	height: calc(var(--azc-page-end) + env(safe-area-inset-bottom, 0px));
+	pointer-events: none;
 }
 #app-content.azc-app--dashboard .azc-dashboard-alerts .azc-callout {
 	margin: 0;
@@ -241,7 +256,8 @@
 }
 .azc-page-header__main {
 	display: grid;
-	grid-template-columns: 56px 1fr auto;
+	/* The title yields (minmax 0) so the action column keeps the buttons' own width. */
+	grid-template-columns: 56px minmax(0, 1fr) auto;
 	gap: var(--azc-space-4);
 	align-items: start;
 }
@@ -360,17 +376,198 @@
 .azc-collapsed-callout {
 	margin-bottom: var(--azc-space-3);
 }
+#app-content.azc-app details.azc-callout.azc-collapsed-callout,
+.modal-backdrop details.azc-callout.azc-collapsed-callout,
+.azc-nc-admin-settings details.azc-callout.azc-collapsed-callout {
+	flex-direction: column;
+	align-items: stretch;
+	padding: 0 var(--azc-space-5);
+	gap: 0;
+}
+#app-content.azc-app details.azc-callout.azc-collapsed-callout[open],
+.modal-backdrop details.azc-callout.azc-collapsed-callout[open],
+.azc-nc-admin-settings details.azc-callout.azc-collapsed-callout[open] {
+	padding-bottom: var(--azc-space-4);
+	gap: var(--azc-space-2);
+}
+#app-content.azc-app details.azc-collapsed-callout:not([open]) > :not(summary),
+.modal-backdrop details.azc-collapsed-callout:not([open]) > :not(summary),
+.azc-nc-admin-settings details.azc-collapsed-callout:not([open]) > :not(summary) {
+	display: none;
+}
+#app-content.azc-app details.azc-collapsed-callout > summary,
+#app-content.azc-app details.azc-collapsed-callout > summary:hover,
+#app-content.azc-app details.azc-collapsed-callout > summary:focus,
+#app-content.azc-app details.azc-collapsed-callout > summary:active,
+.modal-backdrop details.azc-collapsed-callout > summary,
+.modal-backdrop details.azc-collapsed-callout > summary:hover,
+.modal-backdrop details.azc-collapsed-callout > summary:focus,
+.azc-nc-admin-settings details.azc-collapsed-callout > summary,
+#app-content.azc-app details.azc-collapsed-callout::details-content,
+.modal-backdrop details.azc-collapsed-callout::details-content,
+#app-content.azc-app details.azc-collapsed-callout > .azc-callout__text,
+#app-content.azc-app details.azc-collapsed-callout > .azc-callout__body,
+#app-content.azc-app details.azc-collapsed-callout .azc-callout__text,
+.modal-backdrop details.azc-collapsed-callout .azc-callout__text {
+	background: transparent;
+	background-color: transparent;
+	box-shadow: none;
+}
+#app-content.azc-app details.azc-collapsed-callout > .azc-callout__text,
+#app-content.azc-app details.azc-collapsed-callout > .azc-callout__body,
+.modal-backdrop details.azc-collapsed-callout > .azc-callout__text,
+.modal-backdrop details.azc-collapsed-callout > .azc-callout__body {
+	flex: 1 1 auto;
+	align-self: stretch;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+}
+#app-content.azc-app details.azc-collapsed-callout::details-content,
+.modal-backdrop details.azc-collapsed-callout::details-content,
+.azc-nc-admin-settings details.azc-collapsed-callout::details-content {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+#app-content.azc-app details.azc-collapsed-callout .azc-callout__text,
+.modal-backdrop details.azc-collapsed-callout .azc-callout__text,
+.azc-nc-admin-settings details.azc-collapsed-callout .azc-callout__text {
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+	overflow-wrap: break-word;
+}
+#app-content.azc-app details.azc-callout.azc-collapsed-callout > summary,
+.modal-backdrop details.azc-callout.azc-collapsed-callout > summary,
+.azc-nc-admin-settings details.azc-callout.azc-collapsed-callout > summary,
 .azc-collapsed-callout > summary {
 	cursor: pointer;
 	font-weight: 600;
+	width: 100%;
 	min-height: var(--azc-touch, 44px);
+	margin: 0;
+	padding: var(--azc-space-3) 0;
+	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	gap: var(--azc-space-2);
 	list-style: none;
 }
-.azc-collapsed-callout > summary::-webkit-details-marker {
+.azc-collapsed-callout > summary::-webkit-details-marker,
+.azc-collapsed-callout > summary::marker {
 	display: none;
+	content: "";
+}
+.azc-collapsed-callout > summary:focus-visible {
+	outline: 3px solid var(--color-primary-element);
+	outline-offset: 3px;
+	border-radius: var(--azc-radius-sm, 6px);
+}
+.azc-collapsed-callout__bulb,
+.azc-collapsed-callout__chevron,
+.azc-hint__icon {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: inherit;
+}
+.azc-collapsed-callout__label {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.azc-collapsed-callout__chevron,
+.azc-hint .azc-hint__dismiss {
+	position: relative;
+	flex: 0 0 var(--azc-icon-md, 1.125rem);
+	width: var(--azc-icon-md, 1.125rem);
+	height: var(--azc-icon-md, 1.125rem);
+	min-width: var(--azc-icon-md, 1.125rem);
+	min-height: var(--azc-icon-md, 1.125rem);
+	margin: 0;
+	margin-inline-start: auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.azc-hint .azc-hint__dismiss::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: 0;
+	width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	transform: translateY(-50%);
+}
+.azc-collapsed-callout__chevron .azc-icon,
+.azc-hint .azc-hint__dismiss .azc-icon {
+	transition: transform 0.15s ease;
+}
+.azc-collapsed-callout[open] > summary .azc-collapsed-callout__chevron .azc-icon {
+	transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+	.azc-collapsed-callout__chevron .azc-icon,
+	.azc-hint .azc-hint__dismiss .azc-icon {
+		transition: none;
+	}
+}
+#app-content.azc-app .azc-hint > .azc-callout.azc-hint__body,
+.modal-backdrop .azc-hint > .azc-callout.azc-hint__body,
+.azc-nc-admin-settings .azc-hint > .azc-callout.azc-hint__body {
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	padding: 0 0 var(--azc-space-4);
+	gap: var(--azc-space-2);
+}
+.azc-hint__header {
+	display: flex;
+	align-items: center;
+	gap: var(--azc-space-2);
+	width: 100%;
+	min-height: var(--azc-touch, 44px);
+	margin: 0;
+	padding: var(--azc-space-3) var(--azc-space-5);
+	box-sizing: border-box;
+}
+.azc-hint__title {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+}
+#app-content.azc-app .azc-hint > .azc-hint__body > .azc-callout__text,
+.modal-backdrop .azc-hint > .azc-hint__body > .azc-callout__text,
+.azc-nc-admin-settings .azc-hint > .azc-hint__body > .azc-callout__text {
+	box-sizing: border-box;
+	flex: 1 1 auto;
+	align-self: stretch;
+	width: 100%;
+	min-width: 0;
+	max-width: none;
+	padding: 0 var(--azc-space-5);
+	overflow-wrap: break-word;
+}
+.azc-hint .azc-hint__dismiss {
+	padding: 0;
+	border: none;
+	border-radius: var(--azc-radius-sm, 6px);
+	background: transparent;
+	color: var(--color-text-maxcontrast);
+	cursor: pointer;
+	text-decoration: none;
+}
+.azc-hint .azc-hint__dismiss:hover,
+.azc-hint .azc-hint__dismiss:focus-visible {
+	color: var(--color-main-text);
+	background: color-mix(in srgb, var(--color-main-text) 8%, transparent);
+}
+.azc-hint .azc-hint__dismiss:focus-visible {
+	outline: 3px solid var(--color-primary-element);
+	outline-offset: 2px;
 }
 /* WCAG 2.5.8 floor for plain <summary> disclosures (absence detail,
  * vacation stats, admin partials) that carry no dedicated touch style. */
@@ -382,7 +579,18 @@
 	flex-wrap: wrap;
 	gap: var(--azc-space-2);
 	align-items: center;
+	align-content: flex-start;
 	justify-content: flex-end;
+}
+.azc-page-header__actions:empty {
+	display: none;
+}
+.azc-page-header__actions .azc-btn,
+.azc-page-header__actions .btn,
+.azc-page-header__actions > a,
+.azc-page-header__actions > .view-toggle {
+	flex: 0 0 auto;
+	white-space: nowrap;
 }
 
 /* ── Scope strip ───────────────────────────────────────────── */
@@ -488,13 +696,25 @@
 	color: var(--color-primary-element-text) !important;
 }
 
+/* Light primary tint. Label stays main text, never --color-primary-element-light-text.
+   Dialogs are appended to document.body, so they need their own scope. */
 #app-content.azc-app .azc-btn--secondary,
 #app-content-wrapper .azc-btn--secondary,
 .azc-nc-admin-settings .azc-btn--secondary,
 .azc-nc-settings-panel .azc-btn--secondary,
-.azc-app .btn--secondary {
-	background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;
-	border-color: var(--color-border-dark, var(--azc-border-strong, var(--color-border))) !important;
+.azc-app .btn--secondary,
+.azc-app .btn-secondary,
+.azc-app .button.secondary,
+.azc-modal-backdrop .azc-btn--secondary,
+.azc-modal-backdrop .btn--secondary,
+.azc-modal-backdrop .btn-secondary,
+.azc-modal-backdrop .button.secondary,
+.azc-dialog .azc-btn--secondary,
+.azc-dialog .btn--secondary,
+.azc-dialog .btn-secondary,
+.azc-dialog .button.secondary {
+	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
+	border-color: var(--color-primary-element) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
 }
 
@@ -502,9 +722,39 @@
 #app-content-wrapper .azc-btn--secondary:hover,
 .azc-nc-admin-settings .azc-btn--secondary:hover,
 .azc-nc-settings-panel .azc-btn--secondary:hover,
-.azc-app .btn--secondary:hover {
-	background-color: color-mix(in srgb, var(--color-main-background) 70%, var(--color-main-text) 30%) !important;
-	border-color: var(--color-primary-element, var(--azc-border-strong)) !important;
+.azc-app .btn--secondary:hover,
+.azc-app .btn-secondary:hover,
+.azc-app .button.secondary:hover,
+.azc-modal-backdrop .azc-btn--secondary:hover,
+.azc-modal-backdrop .btn--secondary:hover,
+.azc-modal-backdrop .btn-secondary:hover,
+.azc-modal-backdrop .button.secondary:hover,
+.azc-dialog .azc-btn--secondary:hover,
+.azc-dialog .btn--secondary:hover,
+.azc-dialog .btn-secondary:hover,
+.azc-dialog .button.secondary:hover {
+	background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover)) !important;
+	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
+	color: var(--azc-text, var(--color-main-text)) !important;
+}
+
+#app-content.azc-app .azc-btn--secondary:active,
+#app-content-wrapper .azc-btn--secondary:active,
+.azc-nc-admin-settings .azc-btn--secondary:active,
+.azc-nc-settings-panel .azc-btn--secondary:active,
+.azc-app .btn--secondary:active,
+.azc-app .btn-secondary:active,
+.azc-app .button.secondary:active,
+.azc-modal-backdrop .azc-btn--secondary:active,
+.azc-modal-backdrop .btn--secondary:active,
+.azc-modal-backdrop .btn-secondary:active,
+.azc-modal-backdrop .button.secondary:active,
+.azc-dialog .azc-btn--secondary:active,
+.azc-dialog .btn--secondary:active,
+.azc-dialog .btn-secondary:active,
+.azc-dialog .button.secondary:active {
+	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
+	border-color: var(--color-primary-element) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
 }
 
@@ -834,16 +1084,16 @@
 }
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary,
 .modal-backdrop .azc-callout__actions .azc-btn--secondary {
-	background: var(--color-main-background);
-	border-color: var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+	background: var(--color-primary-element-light, var(--color-primary-light));
+	border-color: var(--color-primary-element);
 	color: var(--color-main-text);
 }
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary:hover,
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary:focus-visible,
 .modal-backdrop .azc-callout__actions .azc-btn--secondary:hover,
 .modal-backdrop .azc-callout__actions .azc-btn--secondary:focus-visible {
-	background: var(--color-background-hover, var(--color-main-background));
-	border-color: var(--color-primary-element);
+	background: var(--color-primary-element-light-hover, var(--color-primary-light-hover));
+	border-color: var(--color-primary-element-hover, var(--color-primary-element));
 	color: var(--color-main-text);
 }
 #app-content.azc-app .azc-callout__hint,
@@ -1214,7 +1464,7 @@
 /* ── Responsive page header (table card reflow: page-patterns.css) ── */
 @media (max-width: 767.98px) {
 	.azc-page-header__main {
-		grid-template-columns: 48px 1fr;
+		grid-template-columns: 48px minmax(0, 1fr);
 	}
 	.azc-page-header__actions {
 		grid-column: 1 / -1;
@@ -1623,9 +1873,10 @@ dialog.entitlement-explain-dialog::backdrop {
 	max-inline-size: 100%;
 	overflow-x: auto;
 	-webkit-overflow-scrolling: touch;
-	border: 1px solid var(--azc-border, var(--color-border));
-	border-radius: var(--azc-radius-sm, 0.375rem);
-	background: var(--azc-surface, var(--color-main-background));
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
 }
 
 .wtm-weekday-table {

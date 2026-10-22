@@ -284,8 +284,9 @@
 				'<td data-label="' + colUserId + '"><code class="azc-license-user-id">' + escapeHtml(seat.userId) + '</code></td>' +
 				'<td data-label="' + colAssigned + '">' + escapeHtml(formatAssignedAt(seat.assignedAt)) + '</td>' +
 				'<td data-label="' + colActions + '" class="actions-cell">' +
+				'<div class="azc-table-actions" role="group" aria-label="' + colActions + '">' +
 				'<button type="button" class="azc-btn azc-btn--secondary azc-btn--small azc-seat-remove" data-user-id="' + escapeAttr(seat.userId) + '">' +
-				escapeHtml(removeLabel) + '</button></td>';
+				escapeHtml(removeLabel) + '</button></div></td>';
 			seatListBody.appendChild(tr);
 		});
 	}

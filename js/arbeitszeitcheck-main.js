@@ -870,6 +870,7 @@
                 filterBtn.setAttribute('aria-controls', 'filter-section');
                 const applyFilterVisibility = (visible) => {
                     filterSection.style.display = visible ? 'block' : 'none';
+                    filterSection.classList.toggle('is-open', visible);
                     filterSection.setAttribute('aria-hidden', visible ? 'false' : 'true');
                     filterBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
                 };
@@ -888,13 +889,19 @@
                     const startDate = toISO(document.getElementById('filter-start-date')?.value || '');
                     const endDate = toISO(document.getElementById('filter-end-date')?.value || '');
                     const status = document.getElementById('filter-status')?.value;
+                    const workLocation = document.getElementById('filter-work-location')?.value;
                     
                     // Build query string (API expects yyyy-mm-dd)
                     const params = new URLSearchParams();
                     if (startDate) params.append('start_date', startDate);
                     if (endDate) params.append('end_date', endDate);
+                    if (workLocation) params.append('work_location', workLocation);
                     if (status) params.append('status', status);
-                    
+                    const pageSize = document.querySelector('#time-entries-table-pager select');
+                    if (pageSize && /^(10|50|100)$/.test(pageSize.value)) {
+                        params.append('per_page', pageSize.value);
+                    }
+
                     // Reload page with filters
                     const currentUrl = window.location.pathname;
                     const queryString = params.toString();
@@ -908,6 +915,10 @@
                 clearFilterBtn.addEventListener('click', () => {
                     document.getElementById('filter-start-date').value = '';
                     document.getElementById('filter-end-date').value = '';
+                    const workLocationEl = document.getElementById('filter-work-location');
+                    if (workLocationEl) {
+                        workLocationEl.value = '';
+                    }
                     document.getElementById('filter-status').value = '';
                     // Reload without filters
                     window.location.href = window.location.pathname;
@@ -1143,6 +1154,15 @@
                                     if (row) {
                                         row.remove();
                                     }
+                                    const remainingRows = document.querySelectorAll('#time-entries-table tbody tr[data-azc-row]').length;
+                                    if (remainingRows === 0) {
+                                        window.location.reload();
+                                        return;
+                                    }
+                                    const pager = document.getElementById('time-entries-table-pager');
+                                    if (pager && window.AzcTablePager && typeof window.AzcTablePager.resync === 'function') {
+                                        window.AzcTablePager.resync(pager);
+                                    }
                                     const successMsg = this.config.l10n?.deleted ||
                                         mainT('Time entry deleted successfully');
                                     this.showSuccess(successMsg);
@@ -1169,32 +1189,6 @@
                 });
             });
 
-            // Pagination buttons (if implemented)
-            const prevPageBtn = document.getElementById('btn-prev-page');
-            const nextPageBtn = document.getElementById('btn-next-page');
-            
-            if (prevPageBtn) {
-                prevPageBtn.addEventListener('click', () => {
-                    const currentPage = parseInt(document.getElementById('current-page')?.textContent || '1');
-                    if (currentPage > 1) {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('page', (currentPage - 1).toString());
-                        window.location.href = window.location.pathname + '?' + params.toString();
-                    }
-                });
-            }
-            
-            if (nextPageBtn) {
-                nextPageBtn.addEventListener('click', () => {
-                    const currentPage = parseInt(document.getElementById('current-page')?.textContent || '1');
-                    const totalPages = parseInt(document.getElementById('total-pages')?.textContent || '1');
-                    if (currentPage < totalPages) {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('page', (currentPage + 1).toString());
-                        window.location.href = window.location.pathname + '?' + params.toString();
-                    }
-                });
-            }
         },
 
         /**
@@ -1284,6 +1278,7 @@
                 filterBtn.setAttribute('aria-controls', 'filter-section');
                 const applyFilterVisibility = (visible) => {
                     filterSection.style.display = visible ? 'block' : 'none';
+                    filterSection.classList.toggle('is-open', visible);
                     filterSection.setAttribute('aria-hidden', visible ? 'false' : 'true');
                     filterBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
                 };
@@ -1296,7 +1291,7 @@
                 });
             }
 
-            // Apply / clear absences list filters (query: start_date, end_date, status)
+            // Apply / clear absences list filters (query: start_date, end_date, type, status)
             const applyAbsenceFilterBtn = document.getElementById('btn-apply-filter');
             if (applyAbsenceFilterBtn && filterSection) {
                 applyAbsenceFilterBtn.addEventListener('click', () => {
@@ -1305,10 +1300,16 @@
                     const startDate = toISO(document.getElementById('filter-start-date')?.value || '');
                     const endDate = toISO(document.getElementById('filter-end-date')?.value || '');
                     const status = document.getElementById('filter-status')?.value;
+                    const type = document.getElementById('filter-type')?.value;
                     const params = new URLSearchParams();
                     if (startDate) params.append('start_date', startDate);
                     if (endDate) params.append('end_date', endDate);
+                    if (type) params.append('type', type);
                     if (status) params.append('status', status);
+                    const pageSize = document.querySelector('#absences-table-pager select[name="per_page"]');
+                    if (pageSize && /^(10|50|100)$/.test(pageSize.value)) {
+                        params.append('per_page', pageSize.value);
+                    }
                     const queryString = params.toString();
                     window.location.href = window.location.pathname + (queryString ? '?' + queryString : '');
                 });
@@ -1319,11 +1320,18 @@
                     const startEl = document.getElementById('filter-start-date');
                     const endEl = document.getElementById('filter-end-date');
                     const statusEl = document.getElementById('filter-status');
+                    const typeEl = document.getElementById('filter-type');
                     if (startEl) startEl.value = '';
                     if (endEl) endEl.value = '';
                     if (statusEl) statusEl.value = '';
+                    if (typeEl) typeEl.value = '';
                     window.location.href = window.location.pathname;
                 });
+            }
+
+            const absencePager = document.getElementById('absences-table-pager');
+            if (absencePager && window.AzcTablePager && typeof window.AzcTablePager.attach === 'function') {
+                window.AzcTablePager.attach(absencePager);
             }
 
             // Edit buttons in table rows (for pending absences)
@@ -1378,6 +1386,15 @@
                                 const row = button.closest('tr');
                                 if (row) {
                                     row.remove();
+                                }
+                                const remainingRows = document.querySelectorAll('#absences-table tbody tr[data-absence-id]').length;
+                                if (remainingRows === 0) {
+                                    window.location.reload();
+                                    return;
+                                }
+                                const pager = document.getElementById('absences-table-pager');
+                                if (pager && window.AzcTablePager && typeof window.AzcTablePager.resync === 'function') {
+                                    window.AzcTablePager.resync(pager);
                                 }
                                 const successMsg = this.config.l10n?.canceled ||
                                     mainT('Absence request cancelled successfully');
@@ -1793,6 +1810,7 @@
          * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
          * @param {object|null} data - Data to send (null for GET/DELETE)
          * @param {boolean} reloadOnSuccess - Whether to reload page on success (default: true)
+         * GET/HEAD never toggle the punch-button busy state; their labels stay put.
          */
 		callApi: function(endpoint, method = 'POST', data = null, reloadOnSuccess = true) {
             const url = this.resolveRequestUrl(endpoint);
@@ -1822,8 +1840,14 @@
                 options.body = JSON.stringify(payload);
             }
 
-            // Show loading state
-            this.setLoadingState(true);
+            // Background reads (the session timer polls status every few seconds)
+            // must not disable or relabel the punch buttons. A slow poll otherwise
+            // flashes "Loading" on Start break / Clock out, and an overlapping
+            // poll can store that word as the button's original label.
+            const showBusyUi = upper !== 'GET' && upper !== 'HEAD';
+            if (showBusyUi) {
+                this.setLoadingState(true);
+            }
 
             const resolveTransportError = (status, rawText) => {
                 if (window.AzcApi && typeof window.AzcApi.mapApiError === 'function') {
@@ -1904,7 +1928,9 @@
                     return result;
                 })
                 .then(result => {
-                    this.setLoadingState(false);
+                    if (showBusyUi) {
+                        this.setLoadingState(false);
+                    }
 
                     const res = result._response;
                     const okHttp = res && res.ok;
@@ -1939,7 +1965,9 @@
                     }
                 })
                 .catch(error => {
-                    this.setLoadingState(false);
+                    if (showBusyUi) {
+                        this.setLoadingState(false);
+                    }
                     
                     // If error already has response data, keep it
                     if (!error.response) {
@@ -1964,25 +1992,19 @@
         },
 
         /**
-         * Set loading state on buttons and forms (includes clock-in/out/break for double-submit guard)
+         * Disable punch controls while a mutation is in flight (double-submit guard).
+         * Labels stay as rendered — never swap them for a loading string.
          */
         setLoadingState: function(loading) {
             const buttons = document.querySelectorAll(
                 'button[data-api-action], #btn-clock-in, #btn-start-break, #btn-end-break, .btn-clock-out'
             );
             buttons.forEach(button => {
+                button.disabled = !!loading;
                 if (loading) {
-                    button.disabled = true;
                     button.setAttribute('aria-busy', 'true');
-                    button.dataset.originalText = button.textContent;
-                    button.textContent = this.config.l10n?.loading || 'Loading...';
                 } else {
-                    button.disabled = false;
                     button.removeAttribute('aria-busy');
-                    if (button.dataset.originalText) {
-                        button.textContent = button.dataset.originalText;
-                        delete button.dataset.originalText;
-                    }
                 }
             });
         },

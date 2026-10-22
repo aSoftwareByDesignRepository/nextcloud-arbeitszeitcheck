@@ -2334,6 +2334,57 @@ class TimeEntryControllerTest extends TestCase
 		// PDF string escaping: parens and backslash must be backslash-escaped
 		// or they break the Tj operator syntax.
 		$this->assertStringContainsString('\\(parens\\)', $pdf);
+		$this->assertStringContainsString('Work location: Not specified', $pdf);
+	}
+
+	/**
+	 * Each exported row names the work location with the same labels as the list.
+	 */
+	public function testExportPdfListsWorkLocation(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$home = new TimeEntry();
+		$home->setId(1);
+		$home->setUserId('testuser');
+		$home->setStartTime(new \DateTime('2024-01-15T09:00:00'));
+		$home->setEndTime(new \DateTime('2024-01-15T17:00:00'));
+		$home->setStatus(TimeEntry::STATUS_COMPLETED);
+		$home->setWorkLocation('home');
+		$home->setDescription('marker-home');
+
+		$office = new TimeEntry();
+		$office->setId(2);
+		$office->setUserId('testuser');
+		$office->setStartTime(new \DateTime('2024-01-16T09:00:00'));
+		$office->setEndTime(new \DateTime('2024-01-16T17:00:00'));
+		$office->setStatus(TimeEntry::STATUS_COMPLETED);
+		$office->setWorkLocation('office');
+		$office->setDescription('marker-office');
+
+		$external = new TimeEntry();
+		$external->setId(3);
+		$external->setUserId('testuser');
+		$external->setStartTime(new \DateTime('2024-01-17T09:00:00'));
+		$external->setEndTime(new \DateTime('2024-01-17T17:00:00'));
+		$external->setStatus(TimeEntry::STATUS_COMPLETED);
+		$external->setWorkLocation('external');
+		$external->setDescription('marker-external');
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([$home, $office, $external]);
+
+		$response = $this->controller->exportPdf('2024-01-01', '2024-01-31');
+		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
+		$pdf = $response->render();
+
+		$this->assertStringContainsString('Work location: Home office', $pdf);
+		$this->assertStringContainsString('Work location: Office', $pdf);
+		$this->assertStringContainsString('Work location: External appointment', $pdf);
+		$this->assertStringContainsString('marker-home', $pdf);
+		$this->assertStringContainsString('marker-office', $pdf);
+		$this->assertStringContainsString('marker-external', $pdf);
 	}
 
 	/**

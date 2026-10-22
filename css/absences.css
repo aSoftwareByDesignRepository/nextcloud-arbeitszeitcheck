@@ -10,9 +10,60 @@
 	padding-bottom: 20px;
 }
 
-/* Page layout: clear spacing between sections */
-#app-content-wrapper .section--stats + .section--list {
-	margin-top: var(--space-8, 2rem);
+/* Same header-to-page gap as Zeiteinträge. The shared header keeps 24px
+   under it; Zeiteinträge uses 12px. Without this the table sits that much lower. */
+#app-content.azc-app--absences .azc-page-header {
+	gap: var(--azc-space-2, 0.5rem);
+	margin-bottom: var(--azc-space-3, 0.75rem);
+}
+
+/* Page layout: 4em above and below the table, same as Zeiteinträge.
+   The page stack already inserts a gap. #azc-main-content .section { margin: 0 }
+   beats a one-id rule, so this selector has to include both ids or the gap
+   stays and the space above the table is 4em plus that gap. */
+#app-content.azc-app.azc-app--absences #azc-main-content .azc-page-stack > .section--list {
+	margin-top: calc(-1 * var(--azc-space-5, 1.5rem));
+	margin-bottom: calc(-1 * var(--azc-space-5, 1.5rem));
+}
+
+/* Absences list uses the Zeiteinträge table: grey header, frame around the table.
+   The shared section rule strips that frame; this puts it back. */
+#app-content.azc-app.azc-app--absences .section--list .table-container {
+	display: flex;
+	flex-direction: column;
+	margin: 4em 0;
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--azc-bg-card, var(--color-main-background));
+	overflow: hidden;
+}
+
+#app-content.azc-app.azc-app--absences .section--list .absences-table-scroll {
+	overflow-x: auto;
+	min-width: 0;
+}
+
+#app-content.azc-app.azc-app--absences .section--list .table thead,
+#app-content.azc-app.azc-app--absences .section--list .table thead th {
+	background-color: var(--azc-bg-soft);
+	color: var(--azc-text, var(--color-main-text));
+}
+
+/* Type was absorbing the spare width. Cap it at the badges; the other
+   columns share what's left. 24rem fits a type label plus "Past record". */
+@media (min-width: 768px) {
+	#app-content.azc-app.azc-app--absences .section--list .absences-table {
+		table-layout: fixed;
+		min-width: 0;
+	}
+
+	#app-content.azc-app.azc-app--absences .section--list .absences-table th:nth-child(1) {
+		width: 24rem;
+	}
+
+	#app-content.azc-app.azc-app--absences .section--list .absences-table .absence-type-badges {
+		max-width: 100%;
+	}
 }
 
 /* Section Styling */
@@ -58,21 +109,68 @@
 	margin-bottom: var(--space-6, 1.5rem);
 }
 
-#app-content.azc-app--absences .absences-page__filter {
-	margin-bottom: var(--space-6, 1.5rem);
+/* Same row as Zeiteinträge: wrap only when a field would be narrower than its text.
+   Apply and the reset icon stay side by side. */
+#app-content.azc-app.azc-app--absences .absences-page__filter-grid {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	column-gap: var(--azc-space-5, 1.25rem);
+	row-gap: var(--azc-space-3, 0.75rem);
 }
 
-#app-content.azc-app--absences .absences-page__filter-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: var(--space-4, 1rem) var(--space-6, 1.5rem);
-	align-items: end;
+#app-content.azc-app.azc-app--absences .absences-page__filter-grid > .azc-filter-field {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 12.5rem;
+	min-width: min(100%, 12.5rem);
+	max-width: 100%;
+	grid-row: auto;
+	grid-template-rows: none;
+	gap: var(--azc-space-2, 0.5rem);
 }
 
-@media (max-width: 639.98px) {
-	#app-content.azc-app--absences .absences-page__filter-grid {
-		grid-template-columns: 1fr;
-	}
+#app-content.azc-app.azc-app--absences .absences-page__filter-grid > .azc-filter-field--actions {
+	flex: 0 0 auto;
+	min-width: max-content;
+	max-width: none;
+}
+
+#app-content.azc-app.azc-app--absences .absences-page__filter-grid .form-input,
+#app-content.azc-app.azc-app--absences .absences-page__filter-grid .form-select {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+}
+
+#app-content.azc-app.azc-app--absences .absences-page__filter-actions {
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--azc-space-2, 0.5rem);
+	min-height: var(--azc-touch, 44px);
+}
+
+#app-content.azc-app.azc-app--absences .absences-page__filter-reset {
+	width: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	padding: 0;
+}
+
+#app-content.azc-app.azc-app--absences .absences-page__filter .azc-filter-panel__head {
+	padding-block: var(--azc-space-3, 12px);
+	padding-inline: var(--azc-space-5, 24px);
+}
+
+#app-content.azc-app.azc-app--absences .absences-page__filter .azc-filter-panel__head h2 {
+	margin: 0;
+}
+
+/* Closed filters keep the 4em above the table. Open filters use half of that. */
+#app-content.azc-app--absences .absences-page__filter.is-open + .section--list .table-container {
+	margin-top: 2em;
 }
 
 #app-content.azc-app--absences .absence-request-card .azc-card__body {
@@ -105,15 +203,6 @@
 	margin: 0 0 var(--space-2, 0.5rem);
 	line-height: 1.35;
 	width: 100%;
-	border-bottom: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
-	padding-bottom: var(--space-2, 0.5rem);
-}
-
-#app-content.azc-app--absences .absence-form-fieldset--substitute {
-	padding: var(--space-5, 1.25rem);
-	border-radius: var(--radius-base, 8px);
-	border: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
-	background: color-mix(in srgb, var(--color-primary-element, var(--color-primary)) 6%, var(--color-main-background, var(--arbeitszeitcheck-color-background-elevated)));
 }
 
 #app-content.azc-app--absences .absence-past-entry-hint {
@@ -353,6 +442,126 @@
 }
 
 /* Stats Section: clear hierarchy, WCAG 2.1 AA */
+#app-content.azc-app .stats-section-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0 0 var(--space-4, 1rem);
+	overflow: visible;
+}
+
+#app-content.azc-app .stats-section-heading .stats-section-title {
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+	margin: 0;
+	width: auto;
+	max-width: 100%;
+}
+
+/* The mark is a text "?" inside the heading so it inherits the heading
+   color. button-vue opts out of NC's pale primary button fill, and
+   !important keeps that fill from painting over the glyph. */
+#app-content.azc-app .stats-balance-help,
+#app-content.azc-app .stats-balance-help.tooltip {
+	flex: 0 0 auto;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem !important;
+	height: 1.75rem !important;
+	min-width: 1.75rem !important;
+	min-height: 1.75rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	box-sizing: border-box;
+	border-radius: 999px;
+	border: 2px solid currentColor !important;
+	background-color: transparent !important;
+	color: inherit !important;
+	-webkit-text-fill-color: currentColor;
+	box-shadow: none !important;
+	opacity: 1 !important;
+	visibility: visible !important;
+	font-size: 1.05rem !important;
+	font-weight: 700 !important;
+	line-height: 1 !important;
+	cursor: pointer !important;
+	vertical-align: middle;
+	position: relative;
+	z-index: 1;
+}
+
+#app-content.azc-app .stats-balance-help__mark {
+	display: block;
+	color: inherit;
+	font-size: 1.05rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+#app-content.azc-app .stats-balance-help:hover,
+#app-content.azc-app .stats-balance-help:focus {
+	background-color: transparent !important;
+	color: inherit !important;
+	border-color: currentColor !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+
+#app-content.azc-app .stats-balance-help:focus-visible {
+	outline: 3px solid currentColor;
+	outline-offset: 2px;
+}
+
+#app-content.azc-app .stats-balance-help.tooltip--below::after {
+	bottom: auto;
+	top: 100%;
+	margin-bottom: 0;
+	margin-top: var(--space-2, 0.5rem);
+	white-space: normal;
+	width: max-content;
+	max-width: 16rem;
+	text-align: center;
+	background-color: var(--color-main-text);
+	color: var(--color-main-background);
+}
+
+#app-content.azc-app .stats-balance-help.tooltip--below::before {
+	bottom: auto;
+	top: 100%;
+	margin-bottom: 0;
+	margin-top: 2px;
+	border-top-color: transparent;
+	border-bottom-color: var(--color-main-text);
+}
+
+@media (forced-colors: active) {
+	#app-content.azc-app .stats-balance-help {
+		border: 2px solid ButtonText;
+		background-color: ButtonFace;
+		color: ButtonText;
+		forced-color-adjust: none;
+	}
+
+	#app-content.azc-app .stats-balance-help .stats-balance-help__mark {
+		color: ButtonText;
+	}
+}
+
+.stat-card__facts {
+	list-style: none;
+	margin: 0.15rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	font-size: 0.75rem;
+	line-height: 1.35;
+	color: var(--arbeitszeitcheck-color-text-maxcontrast);
+}
+
 .stats-section-title {
 	font-size: 1.125rem;
 	font-weight: 600;
@@ -561,7 +770,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	padding: 0.85rem 1rem;
 	border-radius: var(--border-radius, 6px);
 	border: 1px solid color-mix(in srgb, var(--color-error) 40%, var(--color-border));
-	background: color-mix(in srgb, var(--color-error-text) 10%, var(--color-background-hover));
+	background: color-mix(in srgb, var(--color-element-error, var(--color-error)) 10%, var(--color-background-hover));
 	color: var(--color-main-text);
 	line-height: 1.45;
 }
@@ -698,6 +907,9 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	border-color: color-mix(in srgb, var(--color-primary-element) 30%, var(--color-border));
 	background: color-mix(in srgb, var(--color-primary-element) 10%, var(--color-background-hover));
 }
+.entitlement-explain-dialog__actions:not(:has(button:not([hidden]))) {
+	display: none;
+}
 .entitlement-explain-dialog__actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -707,9 +919,6 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	border-top: 1px solid var(--color-border);
 	padding-top: 0.85rem;
 	margin-top: 0.25rem;
-}
-.entitlement-explain-dialog__close-form {
-	margin: 0;
 }
 @media (prefers-reduced-motion: reduce) {
 	.entitlement-explain-dialog__spinner {
@@ -726,8 +935,8 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 
 .section--stats .stats-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-	gap: var(--space-6, 1.5rem);
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: var(--space-4, 1rem);
 	visibility: visible;
 	opacity: 1;
 	width: 100%;
@@ -810,8 +1019,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 
 .stat-card--remaining.stat-card--hero {
-	grid-column: 1 / -1;
-	padding: var(--space-5, 1.25rem) var(--space-4, 1rem);
+	padding: var(--space-6, 1.5rem);
 	background: var(--arbeitszeitcheck-color-background-elevated);
 }
 
@@ -821,10 +1029,10 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 
 .stat-card--remaining .stat-value--hero {
-	font-size: clamp(2rem, 5vw, 2.75rem);
-	line-height: 1.1;
+	font-size: 2.25rem;
+	line-height: 1.2;
 	font-weight: 700;
-	min-height: 2.75rem;
+	min-height: 1.2em;
 }
 
 .absence-hours-presets {
@@ -925,7 +1133,45 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	gap: 0.75rem;
 	justify-content: center;
 	align-items: center;
-	margin-top: 1rem;
+	margin-top: 0.25rem;
+}
+
+/* Empty table: keep the message in the middle of the row, including the
+   narrow card layout that otherwise pins cell text to the right. */
+#app-content.azc-app--absences #absences-table td.azc-table-empty {
+	text-align: center;
+	vertical-align: middle;
+}
+
+#app-content.azc-app--absences #absences-table td.azc-table-empty > .azc-empty-state {
+	width: 100%;
+	max-width: 36rem;
+	margin-inline: auto;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+}
+
+#app-content.azc-app--absences #absences-table .azc-empty-state__title,
+#app-content.azc-app--absences #absences-table .azc-empty-state__text {
+	width: 100%;
+	margin-inline: auto;
+	text-align: center;
+}
+
+@media (max-width: 767.98px) {
+	#app-content.azc-app--absences #absences-table.azc-table--responsive tbody td.azc-table-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		text-align: center;
+	}
+
+	#app-content.azc-app--absences #absences-table.azc-table--responsive tbody td.azc-table-empty::before {
+		content: none;
+	}
 }
 
 .absence-empty-actions .azc-btn,
@@ -1063,11 +1309,16 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	vertical-align: baseline;
 }
 
-/* Required fields note */
+/* Required fields note — sentence stays muted, asterisk uses NC error ink */
 .form-required-note {
 	font-size: var(--arbeitszeitcheck-font-size-sm);
 	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 	margin-bottom: var(--space-4);
+}
+
+.form-required-note .form-required {
+	color: var(--color-error-text);
+	font-weight: 700;
 }
 
 /* Absence detail view */

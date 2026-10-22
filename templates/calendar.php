@@ -22,12 +22,8 @@ $timeCapture = is_array($_['timeCapture'] ?? null) ? $_['timeCapture'] : [
 	'manualTimeEntryEnabled' => true,
 ];
 $timeEntryCreateUrl = (string)($_['timeEntryCreateUrl'] ?? $urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.create'));
+ob_start();
 ?>
-
-<?php include __DIR__ . '/common/page-start.php'; ?>
-
-        <div class="azc-page-stack">
-        <div class="header-actions">
             <div class="view-toggle" role="group" aria-label="<?php p($l->t('View')); ?>">
                 <button id="btn-month-view" class="btn btn--secondary active" type="button" data-view="month" aria-pressed="true">
                     <?php p($l->t('Month')); ?>
@@ -39,7 +35,15 @@ $timeEntryCreateUrl = (string)($_['timeEntryCreateUrl'] ?? $urlGenerator->linkTo
             <button id="btn-today" class="btn btn--secondary" type="button" aria-label="<?php p($l->t('Go to today')); ?>">
                 <?php p($l->t('Today')); ?>
             </button>
-        </div>
+<?php
+$captured = ob_get_clean();
+$compact = preg_replace('/>\s+</', '><', $captured);
+$pageHeaderActions = is_string($compact) ? $compact : $captured;
+?>
+
+<?php include __DIR__ . '/common/page-start.php'; ?>
+
+        <div class="azc-page-stack">
 
         <!-- Calendar Navigation -->
         <section class="section calendar-section" aria-labelledby="current-period-label" aria-label="<?php p($l->t('Calendar view')); ?>">

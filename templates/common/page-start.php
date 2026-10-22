@@ -130,8 +130,9 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 						$helpTrim = trim($pageHelp);
 						$helpLead = $helpTrim;
 						$helpMore = '';
-						// Collapse long leads so primary actions stay above the fold.
-						if (mb_strlen($helpTrim) > 90) {
+						// Long leads collapse into "More help" unless this page opts out.
+						$collapsePageHelp = ($_['collapsePageHelp'] ?? true) !== false;
+						if ($collapsePageHelp && mb_strlen($helpTrim) > 90) {
 							if (preg_match('/^(.+?[.!?])(\s|$)/u', $helpTrim, $helpMatch) === 1) {
 								$helpLead = $helpMatch[1];
 								$helpMore = trim(mb_substr($helpTrim, mb_strlen($helpMatch[1])));
@@ -154,7 +155,13 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 						<?php endif; ?>
 					<?php endif; ?>
 				</div>
-				<div id="azc-page-actions" class="azc-page-header__actions" aria-live="polite"></div>
+				<div id="azc-page-actions" class="azc-page-header__actions"><?php
+					// Pre-escaped template HTML captured before this include.
+					// Printing it here keeps the controls in the header on first paint.
+					if (isset($pageHeaderActions) && is_string($pageHeaderActions) && $pageHeaderActions !== '') {
+						print_unescaped($pageHeaderActions);
+					}
+				?></div>
 			</div>
 			<?php if ($pendingCorrectionCount > 0): ?>
 			<div class="azc-scope-strip" aria-label="<?php p($l->t('Pending corrections')); ?>">

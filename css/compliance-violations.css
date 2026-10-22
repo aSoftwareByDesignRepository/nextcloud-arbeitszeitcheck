@@ -83,3 +83,123 @@
     width: 100%;
   }
 }
+
+/* Report totals sit in the status card. No second frame. */
+.compliance-status__reports {
+  display: flex;
+  flex-direction: column;
+  gap: var(--azc-space-4, 1rem);
+  margin-top: var(--azc-space-5, 1.25rem);
+}
+
+.compliance-status__reports h3,
+.compliance-status__reports h4 {
+  margin: 0;
+  color: var(--color-main-text);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.compliance-status__reports h3 {
+  font-size: 1.125rem;
+}
+
+.compliance-status__reports h4 {
+  font-size: 1rem;
+}
+
+.compliance-status__figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--azc-space-4, 1rem);
+  margin: 0;
+}
+
+/* Core server.css draws dt/dd inline (130px, end-aligned). That collides
+   the longer label with the number. Stack the number, then the label. */
+#app-content.azc-app .compliance-status__figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin: 0;
+  min-width: 0;
+}
+
+#app-content.azc-app .compliance-status__figure dt,
+#app-content.azc-app .compliance-status__figure dd {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  float: none;
+  text-align: start;
+  white-space: normal;
+}
+
+#app-content.azc-app .compliance-status__figure dd {
+  order: -1;
+  color: var(--color-main-text);
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+#app-content.azc-app .compliance-status__figure dt {
+  order: 0;
+  color: var(--color-text-maxcontrast);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Core sets table { white-space: nowrap }. The empty sentence is longer than
+   the 32rem description cap, so it starts at the left of that box and spills
+   right. Let it wrap across the full cell and center each line. */
+#app-content.azc-app #violations-table td.empty-state,
+#app-content.azc-app #violations-table td.text-center {
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+}
+
+#app-content.azc-app #violations-table td.empty-state .empty-state__title,
+#app-content.azc-app #violations-table td.empty-state .empty-state__description {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  text-align: center;
+  white-space: normal;
+}
+
+#app-content.azc-app #violations-table td.empty-state .empty-state__title {
+  margin-bottom: 0.25rem;
+}
+
+.compliance-status__breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--azc-space-2, 0.5rem);
+  min-width: 0;
+}
+
+.compliance-dashboard__violations .compliance-violations__filters {
+  margin-bottom: var(--azc-space-4, 1rem);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.compliance-dashboard__truncation {
+  margin: 0 0 var(--azc-space-3, 0.75rem);
+}
+
+@media (max-width: 600px) {
+  .compliance-status__figures {
+    grid-template-columns: 1fr;
+  }
+}

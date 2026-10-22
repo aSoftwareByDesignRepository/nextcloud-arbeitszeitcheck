@@ -126,7 +126,7 @@ body {
   --arbeitszeitcheck-color-form-border-success: var(--color-success);
   --arbeitszeitcheck-color-form-label: var(--color-main-text);
   --arbeitszeitcheck-color-form-help: var(--color-text-maxcontrast);
-  --arbeitszeitcheck-color-form-required: var(--color-error);
+  --arbeitszeitcheck-color-form-required: var(--color-error-text);
 
   /* Table */
   --arbeitszeitcheck-color-table-background: var(--color-main-background);

@@ -6,7 +6,7 @@ use OCA\ArbeitszeitCheck\Service\IconCatalog;
 use OCA\ArbeitszeitCheck\Support\BadgeVariant;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
-use OCA\ArbeitszeitCheck\Support\TimePickerMinutes;
+use OCA\ArbeitszeitCheck\Support\TimePickerField;
 /**
  * Time Entries template for arbeitszeitcheck app
  *
@@ -40,19 +40,10 @@ $timeCapture = is_array($_['timeCapture'] ?? null) ? $_['timeCapture'] : [];
 $manualTimeEntryEnabled = (bool)($timeCapture['manualTimeEntryEnabled'] ?? true);
 require __DIR__ . '/common/user-display-timezone.php';
 /** @var \DateTimeZone $arbeitszeitCheckUserDisplayTz */
-?>
-
-<?php include __DIR__ . '/common/page-start.php'; ?>
-
-        <div class="azc-page-stack time-entries-page">
-        <?php if ($mode === 'list' && $error): ?>
-            <div class="azc-callout azc-callout--danger time-entries-page__list-error" role="alert">
-                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('alert-triangle', 'azc-callout__icon-svg')); ?></span>
-                <p class="azc-callout__text"><?php p($error); ?></p>
-            </div>
-        <?php endif; ?>
-        <?php if ($mode === 'list'): ?>
-            <div class="header-actions azc-page-actions-source">
+$pageHeaderActions = '';
+if ($mode === 'list') {
+	ob_start();
+	?>
                 <?php if ($manualTimeEntryEnabled): ?>
                 <button id="btn-add-entry"
                     class="azc-btn azc-btn--primary"
@@ -66,7 +57,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                     class="azc-btn azc-btn--secondary"
                     type="button"
                     aria-label="<?php p($l->t('Filter time entries by date or status')); ?>"
-                    title="<?php p($l->t('Click to show options for filtering your time entries. You can filter by date range or status.')); ?>">
+                    title="<?php p($l->t('Click to show options for filtering your time entries. You can filter by date range, work location, or status.')); ?>">
                     <?php p($l->t('Filter')); ?>
                 </button>
                 <button id="btn-export"
@@ -83,8 +74,23 @@ require __DIR__ . '/common/user-display-timezone.php';
                     title="<?php p($l->t('Downloads the currently filtered list as a PDF. Without a filter, the last 30 days are exported.')); ?>">
                     <?php p($l->t('Download PDF')); ?>
                 </button>
+	<?php
+	$captured = ob_get_clean();
+	$compact = preg_replace('/>\s+</', '><', $captured);
+	$pageHeaderActions = is_string($compact) ? $compact : $captured;
+}
+?>
+
+<?php include __DIR__ . '/common/page-start.php'; ?>
+
+        <div class="azc-page-stack time-entries-page">
+        <?php if ($mode === 'list' && $error): ?>
+            <div class="azc-callout azc-callout--danger time-entries-page__list-error" role="alert">
+                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('alert-triangle', 'azc-callout__icon-svg')); ?></span>
+                <p class="azc-callout__text"><?php p($error); ?></p>
             </div>
-            <?php if ($mode === 'list' && !$manualTimeEntryEnabled): ?>
+        <?php endif; ?>
+        <?php if ($mode === 'list' && !$manualTimeEntryEnabled): ?>
             <div class="azc-callout azc-callout--info time-entries-page__capture-disabled" role="status">
                 <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('info', 'azc-callout__icon-svg')); ?></span>
                 <div class="azc-callout__body">
@@ -92,7 +98,6 @@ require __DIR__ . '/common/user-display-timezone.php';
                     <p class="azc-callout__text"><?php p($l->t('Your administrator disabled adding hours by hand. You can still view entries and request corrections if something is wrong.')); ?></p>
                 </div>
             </div>
-            <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($mode === 'create' || $mode === 'edit'): ?>
@@ -103,7 +108,11 @@ require __DIR__ . '/common/user-display-timezone.php';
             ?>
             <?php if ($tzMismatchForm): ?>
             <details class="azc-callout azc-callout--info time-entries-page__tz-callout azc-collapsed-callout">
-                <summary class="azc-callout__title"><?php p($l->t('How times are stored')); ?></summary>
+                <summary class="azc-callout__title">
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('How times are stored')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
+                </summary>
                 <div class="azc-callout__body">
                     <p class="azc-callout__text"><?php p($l->t('You enter start and end in your personal timezone (%2$s). The app stores them in the organization timezone (%1$s).', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?></p>
                     <div class="time-entries-page__tz-badges" role="list" aria-label="<?php p($l->t('Time zone summary')); ?>">
@@ -159,8 +168,8 @@ require __DIR__ . '/common/user-display-timezone.php';
 
                         <div class="time-entry-form__primary">
                         <fieldset class="time-entry-form-fieldset">
-                            <legend class="time-entry-form-fieldset__legend"><?php p($l->t('Date and time')); ?></legend>
-                            <div class="time-entry-form__date">
+                            <legend class="time-entry-form-fieldset__legend" id="entry-date-time-legend"><?php p($l->t('Date and time')); ?></legend>
+                            <div class="form-grid form-grid--3 time-entry-form__when" role="group" aria-labelledby="entry-date-time-legend">
                                 <div class="form-group">
                                     <label for="entry-date" id="entry-date-label" class="form-label">
                                         <span class="form-label-icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('calendar', 'form-label-icon__svg')); ?></span>
@@ -200,18 +209,8 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     <p id="entry-date-help" class="form-help"><?php p($l->t('Day you worked (dd.mm.yyyy). Use “Today” for the current day.')); ?></p>
                                     <div id="entry-date-error" role="alert" class="form-error-container" style="display: none;"></div>
                                 </div>
-                            </div>
-
-                            <p class="time-pair-matrix__intro" id="work-time-intro"><?php p($l->t('Working hours (24-hour clock)')); ?></p>
-                            <div class="time-pair-matrix" role="group" aria-labelledby="work-time-intro entry-date-label">
-                                <div class="time-pair-matrix__grid time-pair-matrix__grid--header">
-                                    <span class="time-pair-matrix__colhead"><?php p($l->t('Start Time')); ?></span>
-                                    <span class="time-pair-matrix__colhead"><?php p($l->t('End Time')); ?></span>
-                                    <span class="time-pair-matrix__colhead time-pair-matrix__colhead--action" aria-hidden="true"></span>
-                                </div>
-                                <div class="time-pair-matrix__grid time-pair-matrix__grid--row">
                                 <div class="form-group">
-                                    <label for="entry-start-time" id="entry-start-time-label" class="form-label">
+                                    <label for="entry-start-time-hour" id="entry-start-time-label" class="form-label">
                                         <span class="form-label-icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('clock', 'form-label-icon__svg')); ?></span>
                                         <?php p($l->t('Start Time')); ?>
                                         <span class="form-required" aria-hidden="true">*</span>
@@ -227,62 +226,29 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     } else {
                                         $startTimeValue = '09:00';
                                     }
-                                    $startTimeParts = explode(':', $startTimeValue);
-                                    $startHour = $startTimeParts[0] ?? '09';
-                                    $startMinute = $startTimeParts[1] ?? '00';
                                     ?>
-                                    <div class="time-input-group time-input-group--with-type" 
-                                         data-time-input="entry-start-time"
-                                         role="group"
-                                         aria-labelledby="entry-start-time-label"
-                                         aria-describedby="entry-start-time-help entry-start-time-error">
-                                        <select id="entry-start-time-hour" 
-                                                name="startTimeHour" 
-                                                class="form-input time-hour" 
-                                                required 
-                                                aria-label="<?php p($l->t('Start hour')); ?>"
-                                                aria-required="true">
-                                            <?php for ($h = 0; $h < 24; $h++): ?>
-                                                <option value="<?php p(sprintf('%02d', $h)); ?>" <?php p(sprintf('%02d', $h) === $startHour ? 'selected' : ''); ?>>
-                                                    <?php p(sprintf('%02d', $h)); ?>
-                                                </option>
-                                            <?php endfor; ?>
-                                        </select>
-                                        <span class="time-separator" aria-hidden="true">:</span>
-                                        <select id="entry-start-time-minute" 
-                                                name="startTimeMinute" 
-                                                class="form-input time-minute" 
-                                                required 
-                                                aria-label="<?php p($l->t('Start minute')); ?>"
-                                                aria-required="true">
-                                            <?php foreach (TimePickerMinutes::options($startMinute) as $minuteOpt): ?>
-                                                <option value="<?php p($minuteOpt); ?>" <?php p($minuteOpt === $startMinute ? 'selected' : ''); ?>>
-                                                    <?php p($minuteOpt); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                        <input type="text"
-                                               id="entry-start-time-type"
-                                               class="form-input time-input-group__type"
-                                               inputmode="numeric"
-                                               autocomplete="off"
-                                               maxlength="5"
-                                               placeholder="<?php p($l->t('HH:MM')); ?>"
-                                               value="<?php p($startTimeValue); ?>"
-                                               aria-label="<?php p($l->t('Or type start time as HH:MM')); ?>">
-                                        <input type="hidden" 
-                                               id="entry-start-time" 
-                                               name="startTime" 
-                                               value="<?php p($startTimeValue); ?>" 
-                                               required
-                                               aria-invalid="false">
-                                    </div>
-                                    <p id="entry-start-time-help" class="form-help"><?php p($l->t('When you started (e.g. 09:00). Minutes use 5-minute steps — or type any time as HH:MM.')); ?></p>
+                                    <?php print_unescaped(TimePickerField::render([
+                                    	'id' => 'entry-start-time',
+                                    	'name' => 'startTime',
+                                    	'value' => $startTimeValue,
+                                    	'labelId' => 'entry-start-time-label',
+                                    	'describedBy' => 'entry-start-time-help entry-start-time-error',
+                                    	'hourLabel' => $l->t('Start hour'),
+                                    	'minuteLabel' => $l->t('Start minute'),
+                                    	'openLabel' => $l->t('Choose start time'),
+                                    	'hoursLabel' => $l->t('Hours'),
+                                    	'minutesLabel' => $l->t('Minutes'),
+                                    	'doneLabel' => $l->t('Done'),
+                                    	'notSetLabel' => $l->t('Not set'),
+                                    	'required' => true,
+                                    	'allowEmpty' => false,
+                                    ])); ?>
+                                    <p id="entry-start-time-help" class="form-help"><?php p($l->t('Type the hour and minute, or open the clock to pick a time. Example: 09:00.')); ?></p>
                                     <div id="entry-start-time-error" role="alert" class="form-error-container" style="display: none;"></div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="entry-end-time" id="entry-end-time-label" class="form-label">
+                                    <label for="entry-end-time-hour" id="entry-end-time-label" class="form-label">
                                         <span class="form-label-icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('clock', 'form-label-icon__svg')); ?></span>
                                         <?php p($l->t('End Time')); ?>
                                         <span class="form-required" aria-hidden="true">*</span>
@@ -300,89 +266,32 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     } else {
                                         $endTimeValue = '17:00';
                                     }
-                                    $endTimeParts = explode(':', $endTimeValue);
-                                    $endHour = $endTimeParts[0] ?? '17';
-                                    $endMinute = $endTimeParts[1] ?? '00';
                                     ?>
-                                    <div class="time-input-group time-input-group--with-type" 
-                                         data-time-input="entry-end-time"
-                                         role="group"
-                                         aria-labelledby="entry-end-time-label"
-                                         aria-describedby="entry-end-time-help entry-end-time-error">
-                                        <select id="entry-end-time-hour" 
-                                                name="endTimeHour" 
-                                                class="form-input time-hour" 
-                                                required 
-                                                aria-label="<?php p($l->t('End hour')); ?>"
-                                                aria-required="true">
-                                            <?php for ($h = 0; $h < 24; $h++): ?>
-                                                <option value="<?php p(sprintf('%02d', $h)); ?>" <?php p(sprintf('%02d', $h) === $endHour ? 'selected' : ''); ?>>
-                                                    <?php p(sprintf('%02d', $h)); ?>
-                                                </option>
-                                            <?php endfor; ?>
-                                        </select>
-                                        <span class="time-separator" aria-hidden="true">:</span>
-                                        <select id="entry-end-time-minute" 
-                                                name="endTimeMinute" 
-                                                class="form-input time-minute" 
-                                                required 
-                                                aria-label="<?php p($l->t('End minute')); ?>"
-                                                aria-required="true">
-                                            <?php foreach (TimePickerMinutes::options($endMinute) as $minuteOpt): ?>
-                                                <option value="<?php p($minuteOpt); ?>" <?php p($minuteOpt === $endMinute ? 'selected' : ''); ?>>
-                                                    <?php p($minuteOpt); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                        <input type="text"
-                                               id="entry-end-time-type"
-                                               class="form-input time-input-group__type"
-                                               inputmode="numeric"
-                                               autocomplete="off"
-                                               maxlength="5"
-                                               placeholder="<?php p($l->t('HH:MM')); ?>"
-                                               value="<?php p($endTimeValue); ?>"
-                                               aria-label="<?php p($l->t('Or type end time as HH:MM')); ?>">
-                                        <input type="hidden" 
-                                               id="entry-end-time" 
-                                               name="endTime" 
-                                               value="<?php p($endTimeValue); ?>" 
-                                               required
-                                               aria-invalid="false">
-                                    </div>
+                                    <?php print_unescaped(TimePickerField::render([
+                                    	'id' => 'entry-end-time',
+                                    	'name' => 'endTime',
+                                    	'value' => $endTimeValue,
+                                    	'labelId' => 'entry-end-time-label',
+                                    	'describedBy' => 'entry-end-time-help entry-end-time-error',
+                                    	'hourLabel' => $l->t('End hour'),
+                                    	'minuteLabel' => $l->t('End minute'),
+                                    	'openLabel' => $l->t('Choose end time'),
+                                    	'hoursLabel' => $l->t('Hours'),
+                                    	'minutesLabel' => $l->t('Minutes'),
+                                    	'doneLabel' => $l->t('Done'),
+                                    	'notSetLabel' => $l->t('Not set'),
+                                    	'required' => true,
+                                    	'allowEmpty' => false,
+                                    ])); ?>
                                     <p id="entry-end-time-help" class="form-help"><?php p($l->t('When you finished. Night shifts: use the next calendar day if end is after midnight.')); ?></p>
                                     <div id="entry-end-time-error" role="alert" class="form-error-container" style="display: none;"></div>
-                                </div>
-                                <div class="time-pair-matrix__action time-pair-matrix__action--spacer" aria-hidden="true"></div>
                                 </div>
                             </div>
                         </fieldset>
                         </div><!-- /.time-entry-form__primary -->
 
-                        <!-- Real-time Summary — after primary fields so entry starts above the fold -->
-                        <div id="time-summary" 
-                             role="status" 
-                             aria-live="polite" 
-                             aria-atomic="true"
-                             class="time-summary-card time-summary-card--secondary">
-                            <h4 class="time-summary-title"><?php p($l->t('Day Summary')); ?></h4>
-                            <div class="summary-row">
-                                <span class="summary-label"><?php p($l->t('Working Hours')); ?>:</span>
-                                <span class="summary-amount">
-                                    <span id="summary-working-hours" class="summary-value">0.0</span><span class="summary-unit"> h</span>
-                                </span>
-                            </div>
-                            <div class="summary-row">
-                                <span class="summary-label"><?php p($l->t('Break Time')); ?>:</span>
-                                <span class="summary-amount">
-                                    <span id="summary-break-time" class="summary-value">0.0</span><span class="summary-unit"> h</span>
-                                </span>
-                            </div>
-                            <div id="compliance-status" class="compliance-status" role="status" aria-live="polite"></div>
-                        </div>
-
                         <fieldset class="time-entry-form-fieldset time-entry-form-fieldset--breaks">
-                            <legend class="time-entry-form-fieldset__legend"><?php p($l->t('Breaks')); ?> <span class="form-optional"><?php p($l->t('(optional)')); ?></span></legend>
+                            <legend class="time-entry-form-fieldset__legend" id="breaks-legend"><?php p($l->t('Breaks')); ?></legend>
                             <?php
                             $existingBreaks = [];
                             $autoBreakFormEnabled = false;
@@ -459,48 +368,26 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 ? implode(' ', $azcBreakIntroLines) . ' ' . $l->t('Enable automatic breaks or add times yourself.')
                                 : $l->t('Enable automatic breaks or add times yourself.');
                             ?>
-                            <div class="azc-callout azc-semantic-panel azc-semantic-panel--info time-entry-form__break-intro" role="note">
-                                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('coffee', 'azc-callout__icon-svg')); ?></span>
-                                <p class="azc-callout__text"><?php p($azcBreakIntroText); ?></p>
-                            </div>
 
-                            <div class="auto-break-panel <?php p($autoBreakFormEnabled ? 'auto-break-panel--enabled' : 'auto-break-panel--disabled'); ?> azc-callout azc-semantic-panel azc-semantic-panel--success"
-                                 role="group"
-                                 aria-labelledby="auto-break-panel-title">
-                                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('check', 'azc-callout__icon-svg')); ?></span>
-                                <div class="auto-break-panel__body">
-                                    <p id="auto-break-panel-title" class="auto-break-panel__title"><?php p($l->t('Automatic breaks')); ?></p>
-                                    <div class="auto-break-panel__control">
-                                        <label class="form-toggle">
-                                            <input type="checkbox"
-                                                   id="auto-break-enabled"
-                                                   <?php if ($autoBreakFormEnabled): ?>checked<?php endif; ?>
-                                                   aria-labelledby="auto-break-panel-title auto-break-toggle-label"
-                                                   aria-describedby="auto-break-toggle-help auto-break-toggle-state">
-                                            <span class="toggle-slider" aria-hidden="true"></span>
-                                            <span id="auto-break-toggle-label" class="toggle-label"><?php p($l->t('Automatically add required breaks')); ?></span>
-                                        </label>
-                                        <span id="auto-break-toggle-state"
-                                              class="azc-status-pill auto-break-toggle__status <?php p($autoBreakFormEnabled ? 'azc-status-pill--on auto-break-toggle__status--on' : 'azc-status-pill--off auto-break-toggle__status--off'); ?>"
-                                              role="status"
-                                              aria-live="polite"><?php p($autoBreakFormEnabled ? $l->t('Enabled') : $l->t('Disabled')); ?></span>
-                                    </div>
-                                    <p id="auto-break-toggle-help" class="auto-break-panel__help"><?php p($l->t('Turn off only if you want to enter every break manually.')); ?></p>
+                            <div class="auto-break-panel <?php p($autoBreakFormEnabled ? 'auto-break-panel--enabled' : 'auto-break-panel--disabled'); ?>">
+                                <div class="auto-break-panel__control">
+                                    <label class="form-toggle">
+                                        <input type="checkbox"
+                                               id="auto-break-enabled"
+                                               <?php if ($autoBreakFormEnabled): ?>checked<?php endif; ?>
+                                               aria-describedby="auto-break-toggle-help auto-break-toggle-state">
+                                        <span class="toggle-slider" aria-hidden="true"></span>
+                                        <span id="auto-break-toggle-label" class="toggle-label"><?php p($l->t('Automatically add required breaks')); ?></span>
+                                    </label>
+                                    <span id="auto-break-toggle-state"
+                                          class="azc-status-pill auto-break-toggle__status <?php p($autoBreakFormEnabled ? 'azc-status-pill--on auto-break-toggle__status--on' : 'azc-status-pill--off auto-break-toggle__status--off'); ?>"
+                                          role="status"
+                                          aria-live="polite"><?php p($autoBreakFormEnabled ? $l->t('Enabled') : $l->t('Disabled')); ?></span>
                                 </div>
-                            </div>
-                            <div id="break-requirement-indicator"
-                                 class="break-requirement-indicator azc-callout azc-semantic-panel azc-semantic-panel--warning"
-                                 role="status"
-                                 aria-live="polite"
-                                 hidden>
-                                <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('alert-triangle', 'azc-callout__icon-svg')); ?></span>
-                                <p class="azc-callout__text break-requirement-indicator__text">
-                                    <span id="break-requirement-text"></span>
-                                </p>
+                                <p id="auto-break-toggle-help" class="form-help auto-break-panel__help"><?php p($l->t('Turn off only if you want to enter every break manually.')); ?></p>
                             </div>
 
-                            <p class="time-pair-matrix__intro time-pair-matrix__intro--breaks" id="break-times-intro"><?php p($l->t('Break times')); ?></p>
-                            <div class="time-pair-matrix time-pair-matrix--breaks" role="group" aria-labelledby="break-times-intro">
+                            <div class="time-pair-matrix time-pair-matrix--breaks" role="group" aria-labelledby="breaks-legend">
                                 <div class="time-pair-matrix__grid time-pair-matrix__grid--header">
                                     <span class="time-pair-matrix__colhead"><?php p($l->t('Start Time')); ?></span>
                                     <span class="time-pair-matrix__colhead"><?php p($l->t('End Time')); ?></span>
@@ -513,74 +400,56 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     <div class="break-entry" data-break-index="<?php p((string)$index); ?>"<?php if ($breakIsAutomatic): ?> data-auto-break="true"<?php endif; ?>>
                                         <div class="time-pair-matrix__grid time-pair-matrix__grid--row<?php if ($breakIsAutomatic): ?> time-pair-matrix__grid--row--with-note<?php endif; ?>">
                                             <div class="form-group">
-                                                <label class="form-label time-pair-matrix__row-label" id="break-<?php p((string)$index); ?>-start-label">
-                                                    <span class="form-label-icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('coffee', 'form-label-icon__svg')); ?></span>
+                                                <label class="form-label time-pair-matrix__row-label" id="break-<?php p((string)$index); ?>-start-label" for="break-<?php p((string)$index); ?>-start-hour">
                                                     <span class="sr-only"><?php p($l->t('Break %1$s start', [(string)($index + 1)])); ?></span>
                                                 </label>
-                                                <?php 
-                                                // Custom 24-hour time input - always shows 24h format
-                                                $breakStartValue = $break['start'] ?? '';
-                                                $breakStartParts = $breakStartValue ? explode(':', $breakStartValue) : ['', ''];
-                                                $breakStartHour = $breakStartParts[0] ?? '';
-                                                $breakStartMinute = $breakStartParts[1] ?? '';
-                                                ?>
-                                                <div class="time-input-group" data-time-input="break-start-<?php p((string)$index); ?>" role="group" aria-labelledby="break-<?php p((string)$index); ?>-start-label">
-                                                    <select class="form-input time-hour break-start-time-hour" data-break-index="<?php p((string)$index); ?>" aria-label="<?php p($l->t('Break start hour')); ?>">
-                                                        <option value="">--</option>
-                                                        <?php for ($h = 0; $h < 24; $h++): ?>
-                                                            <option value="<?php p(sprintf('%02d', $h)); ?>" <?php p(sprintf('%02d', $h) === $breakStartHour ? 'selected' : ''); ?>>
-                                                                <?php p(sprintf('%02d', $h)); ?>
-                                                            </option>
-                                                        <?php endfor; ?>
-                                                    </select>
-                                                    <span class="time-separator" aria-hidden="true">:</span>
-                                                    <select class="form-input time-minute break-start-time-minute" data-break-index="<?php p((string)$index); ?>" aria-label="<?php p($l->t('Break start minute')); ?>">
-                                                        <option value="">--</option>
-                                                        <?php foreach (TimePickerMinutes::options($breakStartMinute !== '' ? $breakStartMinute : null) as $minuteOpt): ?>
-                                                            <option value="<?php p($minuteOpt); ?>" <?php p($minuteOpt === $breakStartMinute ? 'selected' : ''); ?>>
-                                                                <?php p($minuteOpt); ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                    <input type="hidden" class="break-start-time" data-break-index="<?php p((string)$index); ?>" name="breaks[<?php p((string)$index); ?>][start]" value="<?php p($breakStartValue); ?>">
-                                                </div>
+                                                <?php print_unescaped(TimePickerField::render([
+                                                	'id' => 'break-' . (string)$index . '-start',
+                                                	'name' => 'breaks[' . (string)$index . '][start]',
+                                                	'value' => (string)($break['start'] ?? ''),
+                                                	'labelId' => 'break-' . (string)$index . '-start-label',
+                                                	'hourLabel' => $l->t('Break start hour'),
+                                                	'minuteLabel' => $l->t('Break start minute'),
+                                                	'openLabel' => $l->t('Choose break start time'),
+                                                	'hoursLabel' => $l->t('Hours'),
+                                                	'minutesLabel' => $l->t('Minutes'),
+                                                	'doneLabel' => $l->t('Done'),
+                                                	'notSetLabel' => $l->t('Not set'),
+                                                	'clearLabel' => $l->t('Clear time'),
+                                                	'hiddenClass' => 'break-start-time',
+                                                	'breakIndex' => (string)$index,
+                                                	'allowEmpty' => true,
+                                                ])); ?>
                                             </div>
 
                                             <div class="form-group">
-                                                <label class="form-label time-pair-matrix__row-label" id="break-<?php p((string)$index); ?>-end-label">
-                                                    <span class="form-label-icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('coffee', 'form-label-icon__svg')); ?></span>
+                                                <label class="form-label time-pair-matrix__row-label" id="break-<?php p((string)$index); ?>-end-label" for="break-<?php p((string)$index); ?>-end-hour">
                                                     <span class="sr-only"><?php p($l->t('Break %1$s end', [(string)($index + 1)])); ?></span>
                                                 </label>
-                                                    <?php 
-                                                    // Custom 24-hour time input - always shows 24h format
-                                                    $breakEndValue = $break['end'] ?? '';
-                                                    $breakEndParts = $breakEndValue ? explode(':', $breakEndValue) : ['', ''];
-                                                    $breakEndHour = $breakEndParts[0] ?? '';
-                                                    $breakEndMinute = $breakEndParts[1] ?? '';
-                                                    ?>
-                                                    <div class="time-input-group" data-time-input="break-end-<?php p((string)$index); ?>" role="group" aria-labelledby="break-<?php p((string)$index); ?>-end-label">
-                                                        <select class="form-input time-hour break-end-time-hour" data-break-index="<?php p((string)$index); ?>" aria-label="<?php p($l->t('Break end hour')); ?>">
-                                                            <option value="">--</option>
-                                                            <?php for ($h = 0; $h < 24; $h++): ?>
-                                                                <option value="<?php p(sprintf('%02d', $h)); ?>" <?php p(sprintf('%02d', $h) === $breakEndHour ? 'selected' : ''); ?>>
-                                                                    <?php p(sprintf('%02d', $h)); ?>
-                                                                </option>
-                                                            <?php endfor; ?>
-                                                        </select>
-                                                        <span class="time-separator" aria-hidden="true">:</span>
-                                                        <select class="form-input time-minute break-end-time-minute" data-break-index="<?php p((string)$index); ?>" aria-label="<?php p($l->t('Break end minute')); ?>">
-                                                            <option value="">--</option>
-                                                            <?php foreach (TimePickerMinutes::options($breakEndMinute !== '' ? $breakEndMinute : null) as $minuteOpt): ?>
-                                                                <option value="<?php p($minuteOpt); ?>" <?php p($minuteOpt === $breakEndMinute ? 'selected' : ''); ?>>
-                                                                    <?php p($minuteOpt); ?>
-                                                                </option>
-                                                            <?php endforeach; ?>
-                                                        </select>
-                                                        <input type="hidden" class="break-end-time" data-break-index="<?php p((string)$index); ?>" name="breaks[<?php p((string)$index); ?>][end]" value="<?php p($breakEndValue); ?>">
-                                                    </div>
+                                                <?php print_unescaped(TimePickerField::render([
+                                                	'id' => 'break-' . (string)$index . '-end',
+                                                	'name' => 'breaks[' . (string)$index . '][end]',
+                                                	'value' => (string)($break['end'] ?? ''),
+                                                	'labelId' => 'break-' . (string)$index . '-end-label',
+                                                	'hourLabel' => $l->t('Break end hour'),
+                                                	'minuteLabel' => $l->t('Break end minute'),
+                                                	'openLabel' => $l->t('Choose break end time'),
+                                                	'hoursLabel' => $l->t('Hours'),
+                                                	'minutesLabel' => $l->t('Minutes'),
+                                                	'doneLabel' => $l->t('Done'),
+                                                	'notSetLabel' => $l->t('Not set'),
+                                                	'clearLabel' => $l->t('Clear time'),
+                                                	'hiddenClass' => 'break-end-time',
+                                                	'breakIndex' => (string)$index,
+                                                	'allowEmpty' => true,
+                                                ])); ?>
                                             </div>
                                             <div class="time-pair-matrix__action">
-                                                    <button type="button" class="azc-btn azc-btn--sm azc-btn--danger btn-remove-break" data-break-index="<?php p((string)$index); ?>" title="<?php p($l->t('Remove break')); ?>" aria-label="<?php p($l->t('Remove this break')); ?>">
+                                                    <?php
+                                                    $breakHasTimes = trim((string)($break['start'] ?? '')) !== '' || trim((string)($break['end'] ?? '')) !== '';
+                                                    $breakCanRemove = $breakHasTimes || count($existingBreaks) > 1;
+                                                    ?>
+                                                    <button type="button" class="azc-btn azc-btn--sm azc-btn--danger btn-remove-break" data-break-index="<?php p((string)$index); ?>" title="<?php p($l->t('Remove break')); ?>" aria-label="<?php p($l->t('Remove this break')); ?>"<?php if (!$breakCanRemove): ?> disabled<?php endif; ?>>
                                                         <?php p($l->t('Remove')); ?>
                                                     </button>
                                             </div>
@@ -600,6 +469,9 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                             </div>
 
+                            <p class="form-help time-entry-form__break-hint" id="break-rules-hint"><?php p($azcBreakIntroText); ?></p>
+                            <div id="break-submit-error" role="alert" class="form-error" hidden></div>
+
                             <div class="time-entry-form__add-break">
                                 <button type="button" id="btn-add-break" class="azc-btn azc-btn--secondary azc-btn--sm">
                                     <?php p($l->t('Add another break')); ?>
@@ -610,7 +482,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                         <fieldset class="time-entry-form-fieldset time-entry-form-fieldset--location" aria-describedby="entry-work-location-help">
                             <legend class="time-entry-form-fieldset__legend">
                                 <span class="time-entry-form-fieldset__legend-icon" aria-hidden="true"><?php print_unescaped(\OCA\ArbeitszeitCheck\Service\IconCatalog::render('briefcase', 'time-entry-form-fieldset__legend-icon-svg')); ?></span>
-                                <?php p($l->t('Work location')); ?> <span class="form-optional"><?php p($l->t('(optional)')); ?></span>
+                                <?php p($l->t('Work location')); ?>
                             </legend>
                             <div class="form-group">
                                 <label for="entry-work-location" class="form-label" id="entry-work-location-label">
@@ -693,7 +565,7 @@ require __DIR__ . '/common/user-display-timezone.php';
                         <?php endif; ?>
 
                         <fieldset class="time-entry-form-fieldset">
-                            <legend class="time-entry-form-fieldset__legend"><?php p($l->t('Note')); ?> <span class="form-optional"><?php p($l->t('(optional)')); ?></span></legend>
+                            <legend class="time-entry-form-fieldset__legend"><?php p($l->t('Note')); ?></legend>
                             <div class="form-group">
                                 <label for="entry-description" id="entry-description-label" class="form-label">
                                     <?php p($l->t('What did you work on?')); ?>
@@ -767,6 +639,27 @@ require __DIR__ . '/common/user-display-timezone.php';
                         </div>
                         <?php endif; ?>
 
+                        <div id="time-summary"
+                             role="status"
+                             aria-live="polite"
+                             aria-atomic="true"
+                             class="time-summary-card time-summary-card--secondary">
+                            <h4 class="time-summary-title"><?php p($l->t('Day Summary')); ?></h4>
+                            <div class="summary-row">
+                                <span class="summary-label"><?php p($l->t('Working Hours')); ?>:</span>
+                                <span class="summary-amount">
+                                    <span id="summary-working-hours" class="summary-value">0.0</span><span class="summary-unit"> h</span>
+                                </span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label"><?php p($l->t('Break Time')); ?>:</span>
+                                <span class="summary-amount">
+                                    <span id="summary-break-time" class="summary-value">0.0</span><span class="summary-unit"> h</span>
+                                </span>
+                            </div>
+                            <div id="compliance-status" class="compliance-status" role="status" aria-live="polite"></div>
+                        </div>
+
                         <div class="form-actions time-entry-form__actions" role="group" aria-label="<?php p($l->t('Form actions')); ?>">
                             <button type="submit"
                                     id="submit-button"
@@ -788,11 +681,26 @@ require __DIR__ . '/common/user-display-timezone.php';
             $filterStartDate = $_['filterStartDate'] ?? '';
             $filterEndDate = $_['filterEndDate'] ?? '';
             $filterStatus = $_['filterStatus'] ?? '';
+            $filterWorkLocation = $_['filterWorkLocation'] ?? '';
+            $azcListFiltered = $filterStartDate !== '' || $filterEndDate !== '' || $filterStatus !== '' || $filterWorkLocation !== '';
+            $azcFilterLocations = is_array($workLocationOptions ?? null) ? $workLocationOptions : [
+                ['code' => 'office', 'label' => $l->t('Office')],
+                ['code' => 'home', 'label' => $l->t('Home office')],
+                ['code' => 'external', 'label' => $l->t('External appointment')],
+            ];
+            $azcFilterLocationCodes = [];
+            foreach ($azcFilterLocations as $azcFilterLocation) {
+                if (is_array($azcFilterLocation) && isset($azcFilterLocation['code'])) {
+                    $azcFilterLocationCodes[] = (string)$azcFilterLocation['code'];
+                }
+            }
+            if ($filterWorkLocation !== '' && !in_array($filterWorkLocation, $azcFilterLocationCodes, true)) {
+                $azcFilterLocations[] = ['code' => $filterWorkLocation, 'label' => $filterWorkLocation];
+            }
             ?>
-            <section id="filter-section" class="azc-card azc-filter-panel time-entries-page__filter" style="display: none;" aria-labelledby="time-entries-filter-title">
+            <section id="filter-section" class="azc-card azc-filter-panel time-entries-page__filter<?php if ($azcListFiltered): ?> is-open<?php endif; ?>"<?php if (!$azcListFiltered): ?> style="display: none;"<?php endif; ?> aria-labelledby="time-entries-filter-title">
                 <header class="azc-filter-panel__head">
                     <h2 id="time-entries-filter-title"><?php p($l->t('Filter')); ?></h2>
-                    <p class="azc-filter-panel__intro"><?php p($l->t('Narrow the list by date range or status, then click Apply.')); ?></p>
                 </header>
                 <div class="azc-filter-panel__body">
                     <form class="azc-filter-panel__form" novalidate>
@@ -810,6 +718,18 @@ require __DIR__ . '/common/user-display-timezone.php';
                                 </div>
                             </div>
                             <div class="azc-filter-field">
+                                <label for="filter-work-location" class="azc-filter-field__label"><?php p($l->t('Work location')); ?></label>
+                                <div class="azc-filter-field__control">
+                                    <select id="filter-work-location" name="work_location" class="form-select">
+                                        <option value="" <?php echo $filterWorkLocation === '' ? 'selected' : ''; ?>><?php p($l->t('All')); ?></option>
+                                        <?php foreach ($azcFilterLocations as $azcFilterLocation): ?>
+                                            <?php if (!is_array($azcFilterLocation) || !isset($azcFilterLocation['code'], $azcFilterLocation['label'])) { continue; } ?>
+                                            <option value="<?php p((string)$azcFilterLocation['code']); ?>" <?php echo $filterWorkLocation === (string)$azcFilterLocation['code'] ? 'selected' : ''; ?>><?php p((string)$azcFilterLocation['label']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="azc-filter-field">
                                 <label for="filter-status" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
                                 <div class="azc-filter-field__control">
                                     <select id="filter-status" name="status" class="form-select">
@@ -823,9 +743,15 @@ require __DIR__ . '/common/user-display-timezone.php';
                             </div>
                             <div class="azc-filter-field azc-filter-field--actions">
                                 <span class="azc-filter-field__label" aria-hidden="true">&nbsp;</span>
-                                <div class="azc-filter-field__control azc-filter-field__control--actions">
+                                <div class="azc-filter-field__control azc-filter-field__control--actions time-entries-page__filter-actions">
                                     <button id="btn-apply-filter" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Apply')); ?></button>
-                                    <button id="btn-clear-filter" class="azc-btn azc-btn--secondary" type="button"><?php p($l->t('Clear')); ?></button>
+                                    <button id="btn-clear-filter"
+                                        class="azc-btn azc-btn--secondary time-entries-page__filter-reset"
+                                        type="button"
+                                        title="<?php p($l->t('Clear')); ?>"
+                                        aria-label="<?php p($l->t('Clear')); ?>">
+                                        <?php print_unescaped(IconCatalog::render('rotate', 'azc-btn__icon')); ?>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -833,8 +759,8 @@ require __DIR__ . '/common/user-display-timezone.php';
                 </div>
             </section>
 
-            <section class="azc-card time-entries-page__list" aria-label="<?php p($l->t('Time entries list')); ?>" role="region">
-                <div class="azc-card__body time-entries-page__list-body">
+            <section class="time-entries-page__list" aria-label="<?php p($l->t('Time entries list')); ?>" role="region">
+                <div class="time-entries-page__list-body">
                 <?php
                 $pausedEntriesCount = 0;
                 foreach (($entries ?? []) as $pausedCheckEntry) {
@@ -881,7 +807,25 @@ require __DIR__ . '/common/user-display-timezone.php';
                     include __DIR__ . '/common/alert-callout.php';
                 endif;
                 ?>
+                <?php
+                $entryPager = is_array($_['entryPager'] ?? null) ? $_['entryPager'] : \OCA\ArbeitszeitCheck\Support\TablePager::state(is_array($entries ?? null) ? count($entries) : 0, null, null);
+                $entryPagerTotal = (int)($entryPager['total'] ?? 0);
+                $entryPagerPage = (int)($entryPager['page'] ?? 1);
+                $entryPagerPages = (int)($entryPager['pages'] ?? 1);
+                $entryPagerPerPage = (int)($entryPager['perPage'] ?? \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE);
+                $entryPagerOffset = (int)($entryPager['offset'] ?? 0);
+                $entryPagerItems = is_array($entryPager['items'] ?? null) ? $entryPager['items'] : [1];
+                $entryPagerFilters = is_array($entryPager['filters'] ?? null) ? $entryPager['filters'] : [];
+                $entryListLoaded = (int)($_['entryListLoaded'] ?? $entryPagerTotal);
+                $entryListTotal = (int)($_['entryListTotal'] ?? $entryListLoaded);
+                $entryListUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries');
+                $entryRowIndex = 0;
+                ?>
+                <?php if ($entryListTotal > $entryListLoaded): ?>
+                    <p class="form-help"><?php p($l->t('Showing the latest %1$s of %2$s entries.', [(string)$entryListLoaded, (string)$entryListTotal])); ?></p>
+                <?php endif; ?>
                 <div class="table-container">
+                    <div class="azc-table-scroll">
                     <table class="table table--hover azc-table--responsive" id="time-entries-table" role="table" aria-label="<?php p($l->t('Time entries list')); ?>">
                         <thead>
                             <tr>
@@ -909,13 +853,16 @@ require __DIR__ . '/common/user-display-timezone.php';
                                     // through the request dialog and the manager approval UI.
                                     $rowDisplayStart = $entry->getStartTime() ? (clone $entry->getStartTime())->setTimezone($arbeitszeitCheckUserDisplayTz) : null;
                                     $rowDisplayEnd = $entry->getEndTime() ? (clone $entry->getEndTime())->setTimezone($arbeitszeitCheckUserDisplayTz) : null;
+                                    $hideEntryRow = $entryPagerTotal > $entryPagerPerPage
+                                    	&& ($entryRowIndex < $entryPagerOffset || $entryRowIndex >= $entryPagerOffset + $entryPagerPerPage);
+                                    $entryRowIndex++;
                                     $entrySummaryJson = htmlspecialchars(
                                         (string)json_encode($entrySummary, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE),
                                         ENT_QUOTES,
                                         'UTF-8'
                                     );
                                     ?>
-                                    <tr data-entry-id="<?php p($entry->getId()); ?>" class="<?php echo $isPendingRow ? 'time-entry-row--pending' : ''; ?>">
+                                    <tr data-azc-row data-entry-id="<?php p($entry->getId()); ?>" class="<?php echo $isPendingRow ? 'time-entry-row--pending' : ''; ?>"<?php echo $hideEntryRow ? ' hidden' : ''; ?>>
                                         <td data-label="<?php p($l->t('Date')); ?>"><?php if ($rowDisplayStart) { p($rowDisplayStart->format('d.m.Y')); } else { p('-'); } ?></td>
                                         <td data-label="<?php p($l->t('Start Time')); ?>"><?php if ($rowDisplayStart) { p($rowDisplayStart->format('H:i')); } else { p('-'); } ?></td>
                                         <td data-label="<?php p($l->t('End Time')); ?>"><?php
@@ -1194,12 +1141,11 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <?php else: ?>
                                 <tr>
                                     <td colspan="10">
-                                        <?php $azcListFiltered = ($filterStartDate ?? '') !== '' || ($filterEndDate ?? '') !== '' || ($filterStatus ?? '') !== ''; ?>
                                         <div class="azc-empty-state">
                                             <?php if ($azcListFiltered): ?>
                                                 <h3 class="azc-empty-state__title"><?php p($l->t('No entries match this filter')); ?></h3>
                                                 <p class="azc-empty-state__text">
-                                                    <?php p($l->t('Try a wider date range or a different status, or clear the filter to see all entries again.')); ?>
+                                                    <?php p($l->t('Try a wider date range, another work location, or a different status, or clear the filter to see all entries again.')); ?>
                                                 </p>
                                                 <a id="btn-clear-filter-empty"
                                                     class="azc-btn azc-btn--secondary"
@@ -1230,41 +1176,47 @@ require __DIR__ . '/common/user-display-timezone.php';
                             <?php endif; ?>
                         </tbody>
                     </table>
+                    </div>
+                    <?php
+                    $azcTablePager = [
+                    	'id' => 'time-entries-table-pager',
+                    	'tableId' => 'time-entries-table',
+                    	'label' => $l->t('Time entries pagination'),
+                    	'base' => $entryListUrl,
+                    	'filters' => $entryPagerFilters,
+                    	'allow' => ['start_date', 'end_date', 'status', 'work_location'],
+                    	'state' => [
+                    		'total' => $entryPagerTotal,
+                    		'page' => $entryPagerPage,
+                    		'pages' => $entryPagerPages,
+                    		'perPage' => $entryPagerPerPage,
+                    		'items' => $entryPagerItems,
+                    	],
+                    	'pageParam' => 'page',
+                    	'sizeParam' => 'per_page',
+                    	'mode' => 'navigate',
+                    ];
+                    include __DIR__ . '/partials/table-pager.php';
+                    ?>
                 </div>
-
-                <?php if (!empty($entries) && count($entries) > 0): ?>
-                    <nav class="time-entries-page__pagination" aria-label="<?php p($l->t('Time entries pagination')); ?>">
-                        <button id="btn-prev-page" class="azc-btn azc-btn--secondary" type="button" disabled>
-                            <?php p($l->t('Previous')); ?>
-                        </button>
-                        <span class="time-entries-page__pagination-info">
-                            <span id="current-page">1</span> / <span id="total-pages">1</span>
-                        </span>
-                        <button id="btn-next-page" class="azc-btn azc-btn--secondary" type="button" disabled>
-                            <?php p($l->t('Next')); ?>
-                        </button>
-                    </nav>
-                <?php endif; ?>
                 </div>
             </section>
 
             <?php /* Overview + help material below the list (LWS request: primary content first). */ ?>
             <?php if (!empty($stats)): ?>
-                <section class="azc-card time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
-                    <div class="azc-card__body">
-                        <div class="stats-grid time-entries-page__stats-grid">
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
-                                <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('This Month')); ?></span>
-                                <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
-                                <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
-                            </div>
+                <section class="time-entries-page__stats" aria-label="<?php p($l->t('Time entry statistics')); ?>">
+                    <div class="stats-grid time-entries-page__stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('Total Entries')); ?></span>
+                            <span class="stat-value"><?php p($stats['total_time_entries'] ?? 0); ?></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('This Month')); ?></span>
+                            <span class="stat-value"><?php p($stats['entries_this_month'] ?? 0); ?></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label"><?php p($l->t('Total Hours')); ?></span>
+                            <span class="stat-value"><?php p(round($stats['total_hours'] ?? 0, 2)); ?> h</span>
                         </div>
                     </div>
                 </section>
@@ -1326,7 +1278,11 @@ require __DIR__ . '/common/user-display-timezone.php';
             ?>
             <?php if ($tzMismatchList): ?>
             <details class="azc-callout azc-callout--info arbeitszeit-check-tz-context azc-collapsed-callout">
-                <summary class="azc-callout__title"><?php p($l->t('Time zones')); ?></summary>
+                <summary class="azc-callout__title">
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('Time zones')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
+                </summary>
                 <div class="arbeitszeit-check-tz-context__body">
                     <p class="azc-callout__text arbeitszeit-check-tz-context__text" id="arbeitszeit-tz-context-desc">
                         <?php p($l->t('Start and end times are shown in your personal timezone (%2$s). Values are stored using the organization timezone (%1$s) so daylight saving time is handled consistently.', [$appTimezone, $arbeitszeitCheckUserDisplayTz->getName()])); ?>
@@ -1345,7 +1301,9 @@ require __DIR__ . '/common/user-display-timezone.php';
 
             <details class="azc-callout azc-callout--info time-entries-page__deletion-guide azc-collapsed-callout">
                 <summary id="time-entries-deletion-guide-title" class="azc-callout__title time-entries-page__deletion-guide-title">
-                    <?php p($l->t('Changing or removing time entries')); ?>
+                    <span class="azc-collapsed-callout__bulb" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                    <span class="azc-collapsed-callout__label"><?php p($l->t('Changing or removing time entries')); ?></span>
+                    <span class="azc-collapsed-callout__chevron" aria-hidden="true"><?php print_unescaped(IconCatalog::render('chevron-down')); ?></span>
                 </summary>
                 <p class="azc-callout__text">
                     <?php p($l->t('For clocked entries less than %d days old: use Edit to change times, or Delete to remove the entry entirely. Older clocked entries: use Request correction. Entries in a finalized month or approved by your manager cannot be deleted here.', [$editWindowDays])); ?>
@@ -1360,20 +1318,24 @@ require __DIR__ . '/common/user-display-timezone.php';
             <?php /* Full dismissed set for the JS merge — hints not rendered on this page must survive a save. */ ?>
             <script type="application/json" id="azc-dismissed-hints-data"><?php print_unescaped(json_encode(array_values($azcDismissedHints))); ?></script>
             <div class="azc-hint" data-hint="time-entries-export-hint">
-                <p class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
-                    <span class="azc-callout__text">
+                <div class="azc-callout azc-callout--neutral time-entries-page__export-hint azc-hint__body" id="time-entries-export-hint" role="note" aria-labelledby="time-entries-export-hint-title"<?php echo $azcExportHintDismissed ? ' hidden' : ''; ?>>
+                    <div class="azc-hint__header">
+                        <span class="azc-hint__icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('lightbulb')); ?></span>
+                        <p class="azc-callout__title azc-hint__title" id="time-entries-export-hint-title"><?php p($l->t('Export of night-shift entries that cross midnight')); ?></p>
+                        <button type="button"
+                            class="azc-hint__dismiss"
+                            data-hint-dismiss="time-entries-export-hint"
+                            aria-expanded="true"
+                            aria-controls="time-entries-export-hint"
+                            aria-label="<?php p($l->t('Hide this help text permanently')); ?>">
+                            <?php print_unescaped(IconCatalog::render('x', 'azc-hint__dismiss-icon')); ?>
+                        </button>
+                    </div>
+                    <p class="azc-callout__text">
                         <?php p($l->t('Quick CSV uses the long layout (columns include start and end times). Overnight entries can appear as two rows after midnight if the administrator enabled split in export settings.')); ?>
                         <?php p($l->t('All exported timestamps use timezone: %s (MEZ/MESZ).', [$appTimezone])); ?>
-                    </span>
-                    <button type="button"
-                        class="azc-hint__dismiss"
-                        data-hint-dismiss="time-entries-export-hint"
-                        aria-expanded="true"
-                        aria-controls="time-entries-export-hint"
-                        title="<?php p($l->t('Hide this help text permanently')); ?>">
-                        <?php p($l->t('Hide')); ?>
-                    </button>
-                </p>
+                    </p>
+                </div>
                 <button type="button"
                     class="azc-hint__show azc-btn azc-btn--tertiary azc-btn--small"
                     data-hint-show="time-entries-export-hint"

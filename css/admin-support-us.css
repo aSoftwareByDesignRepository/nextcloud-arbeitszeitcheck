@@ -474,15 +474,13 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.azc-support-us__option:hover,
-.azc-support-us__option:focus-within {
+.azc-support-us__option:hover {
 	border-color: color-mix(in srgb, var(--color-primary-element) 45%, var(--azc-border, var(--color-border)));
 	box-shadow: var(--azc-shadow-md);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.azc-support-us__option:hover,
-	.azc-support-us__option:focus-within {
+	.azc-support-us__option:hover {
 		transform: translateY(-2px);
 	}
 }
@@ -538,16 +536,16 @@
 }
 
 #app-content.azc-app--admin-support-us a.azc-support-us__cta.azc-btn--secondary {
-	background-color: color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%) !important;
-	border-color: var(--color-border-dark, var(--azc-border-strong, var(--color-border))) !important;
+	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
+	border-color: var(--color-primary-element) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
 	min-height: 44px !important;
 	min-width: 44px !important;
 }
 
 #app-content.azc-app--admin-support-us a.azc-support-us__cta.azc-btn--secondary:hover {
-	background-color: color-mix(in srgb, var(--color-main-background) 70%, var(--color-main-text) 30%) !important;
-	border-color: var(--color-primary-element, var(--azc-border-strong)) !important;
+	background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover)) !important;
+	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
 }
 

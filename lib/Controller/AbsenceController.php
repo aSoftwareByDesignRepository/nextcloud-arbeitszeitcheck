@@ -26,6 +26,7 @@ use OCA\ArbeitszeitCheck\Service\VacationHoursDebitService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Util\AbsenceCreateQueryPrefill;
 use OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
@@ -105,6 +106,29 @@ class AbsenceController extends Controller
 		$this->localeFormat = $localeFormat;
 		$this->navigationFlags = $navigationFlags;
 		$this->setCspService($cspService);
+	}
+
+	/**
+	 * Dismissed hint ids for this user, so a hidden note stays hidden on reload.
+	 *
+	 * @return list<string>
+	 */
+	private function dismissedHintIds(string $userId): array
+	{
+		if ($userId === '') {
+			return [];
+		}
+		try {
+			$setting = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class)
+				->getSetting($userId, 'dismissed_hints');
+			$raw = $setting !== null ? json_decode((string)$setting->getSettingValue(), true) : null;
+			if (!is_array($raw)) {
+				return [];
+			}
+			return array_values(array_filter($raw, static fn ($v): bool => is_string($v) && $v !== ''));
+		} catch (\Throwable) {
+			return [];
+		}
 	}
 
 	private function vacationUnitService(): VacationUnitService
@@ -231,6 +255,9 @@ class AbsenceController extends Controller
 			}
 		}
 		$pageData['stats'] = $stats;
+		if (\in_array($mode, ['create', 'edit'], true)) {
+			$pageData['dismissedHints'] = $this->dismissedHintIds($userId);
+		}
 
 		return \array_merge($this->buildAbsencesShellParams($mode, $navFlags), $pageData);
 	}
@@ -809,6 +836,7 @@ class AbsenceController extends Controller
 		$prefillStart = null;
 		$prefillEnd = null;
 		$prefillHalf = false;
+		$prefillType = AbsenceCreateQueryPrefill::type($this->request->getParam('type', ''));
 		$qStart = trim((string)$this->request->getParam('start', ''));
 		$qEnd = trim((string)$this->request->getParam('end', ''));
 		$qHalf = strtolower(trim((string)$this->request->getParam('half', '')));
@@ -861,6 +889,7 @@ class AbsenceController extends Controller
 				'prefillStart' => $prefillStart,
 				'prefillEnd' => $prefillEnd,
 				'prefillHalf' => $prefillHalf,
+				'prefillType' => $prefillType,
 				'error' => $displayError,
 			])
 		);

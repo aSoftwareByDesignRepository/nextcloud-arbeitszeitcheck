@@ -39,10 +39,15 @@ final class FilterPanelLayoutContractTest extends TestCase
 			$this->assertStringContainsString('azc-card azc-filter-panel', $html, $rel);
 			preg_match_all('/<section[^>]*\bazc-filter-panel\b[^>]*>[\s\S]*?<\/section>/', $html, $blocks);
 			$this->assertNotEmpty($blocks[0], $rel . ' missing filter panel section');
+			$titleOnly = $rel !== 'templates/admin-users.php';
 			foreach ($blocks[0] as $i => $block) {
 				$label = $rel . ' panel#' . $i;
 				$this->assertStringContainsString('azc-filter-panel__head', $block, $label);
-				$this->assertStringContainsString('azc-filter-panel__intro', $block, $label);
+				if ($titleOnly) {
+					$this->assertStringNotContainsString('azc-filter-panel__intro', $block, $label);
+				} else {
+					$this->assertStringContainsString('azc-filter-panel__intro', $block, $label);
+				}
 				$this->assertStringContainsString('azc-filter-panel__body', $block, $label);
 				$this->assertStringContainsString('azc-filter-panel__form', $block, $label);
 				$this->assertStringNotContainsString('azc-card__header', $block, $label . ' must not use azc-card__header');

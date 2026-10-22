@@ -197,3 +197,179 @@ describe('ArbeitszeitCheckComponents confirmDialog', () => {
     expect(Components._modalLockDepth).toBe(0)
   })
 })
+
+describe('row action reveal', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = `
+      <div id="app-content">
+        <table class="table">
+          <tbody>
+            <tr id="entry-row">
+              <td>09:00</td>
+              <td class="actions-cell">
+                <div class="azc-table-actions">
+                  <button type="button" id="edit-entry">Edit</button>
+                </div>
+              </td>
+            </tr>
+            <tr id="plain-row">
+              <td><button type="button" id="plain-button">Open</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`
+    vi.resetModules()
+    await import('./components.js')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  function escapeOn(target) {
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  }
+
+  it('Escape hides that row until the pointer or an action is focused again', () => {
+    const row = document.getElementById('entry-row')
+    const edit = document.getElementById('edit-entry')
+
+    const first = escapeOn(edit)
+    expect(first.defaultPrevented).toBe(true)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(true)
+    expect(row.getAttribute('tabindex')).toBe('-1')
+    expect(row.dataset.azcRowTabindexAdded).toBe('true')
+    expect(document.activeElement).toBe(row)
+
+    const second = escapeOn(edit)
+    expect(second.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(true)
+
+    edit.focus()
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+
+    row.classList.add('azc-row-actions-dismissed')
+    row.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+  })
+
+  it('leaves rows without actions, existing tabindex, modals, and dialogs alone', () => {
+    const plain = document.getElementById('plain-row')
+    plain.setAttribute('tabindex', '0')
+    const plainEvent = escapeOn(document.getElementById('plain-button'))
+    expect(plainEvent.defaultPrevented).toBe(false)
+    expect(plain.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    expect(plain.getAttribute('tabindex')).toBe('0')
+
+    const row = document.getElementById('entry-row')
+    row.setAttribute('tabindex', '0')
+    escapeOn(document.getElementById('edit-entry'))
+    expect(row.getAttribute('tabindex')).toBe('0')
+    expect(row.dataset.azcRowTabindexAdded).toBeUndefined()
+    row.classList.remove('azc-row-actions-dismissed')
+
+    const backdrop = document.createElement('div')
+    backdrop.className = 'modal-backdrop'
+    backdrop.style.display = 'flex'
+    document.body.appendChild(backdrop)
+    const modalEvent = escapeOn(document.getElementById('edit-entry'))
+    expect(modalEvent.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    backdrop.remove()
+
+    const dialog = document.createElement('dialog')
+    dialog.open = true
+    document.body.appendChild(dialog)
+    const dialogEvent = escapeOn(document.getElementById('edit-entry'))
+    expect(dialogEvent.defaultPrevented).toBe(false)
+    expect(row.classList.contains('azc-row-actions-dismissed')).toBe(false)
+    dialog.remove()
+
+    const onDocument = escapeOn(document)
+    expect(onDocument.defaultPrevented).toBe(false)
+  })
+})
+
+describe('relocatePageActions', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = `
+      <div id="azc-page-actions" class="azc-page-header__actions"></div>
+      <main>
+        <div class="header-actions azc-page-actions-source">
+          <button id="act-a" type="button">Request</button>
+          <button id="act-b" type="button">Filter</button>
+          <button id="act-c" type="button">Download</button>
+        </div>
+        <div class="azc-card__header-actions">
+          <button id="act-card" type="button">Refresh</button>
+        </div>
+      </main>`
+    vi.resetModules()
+    await import('./components.js')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('moves a leftover group into the header in order and leaves card actions alone', () => {
+    const target = document.getElementById('azc-page-actions')
+    expect([...target.querySelectorAll('button')].map((button) => button.id)).toEqual(['act-a', 'act-b', 'act-c'])
+    expect(document.querySelector('main .header-actions')).toBeNull()
+    const card = document.getElementById('act-card')
+    expect(card.parentElement.className).toBe('azc-card__header-actions')
+    expect(target.contains(card)).toBe(false)
+  })
+
+  it('appends one document fragment, not one node per button', () => {
+    const target = document.getElementById('azc-page-actions')
+    target.replaceChildren()
+    const source = document.createElement('div')
+    source.className = 'azc-page-actions-source'
+    source.innerHTML = '<button id="n1" type="button">One</button><button id="n2" type="button">Two</button>'
+    document.body.appendChild(source)
+    const appended = []
+    const original = target.appendChild.bind(target)
+    target.appendChild = (node) => {
+      appended.push(node)
+      return original(node)
+    }
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(appended).toHaveLength(1)
+    expect(appended[0].nodeType).toBe(Node.DOCUMENT_FRAGMENT_NODE)
+    expect([...target.children].map((el) => el.id)).toEqual(['n1', 'n2'])
+    expect(source.isConnected).toBe(false)
+  })
+
+  it('does not unwrap controls that already sit in the header slot', () => {
+    const target = document.getElementById('azc-page-actions')
+    target.innerHTML = '<div class="header-actions"><button id="keep" type="button">Keep</button></div>'
+    const wrap = target.querySelector('.header-actions')
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(document.getElementById('keep').parentElement).toBe(wrap)
+    expect(wrap.isConnected).toBe(true)
+  })
+
+  it('does nothing when the header slot is missing', () => {
+    document.getElementById('azc-page-actions').remove()
+    const source = document.createElement('div')
+    source.className = 'header-actions'
+    source.innerHTML = '<button id="stay" type="button">Stay</button>'
+    document.body.appendChild(source)
+    expect(() => window.ArbeitszeitCheckComponents.relocatePageActions()).not.toThrow()
+    expect(document.getElementById('stay').parentElement).toBe(source)
+  })
+
+  it('removes an empty leftover source without adding a node', () => {
+    const target = document.getElementById('azc-page-actions')
+    const before = target.childNodes.length
+    const source = document.createElement('div')
+    source.className = 'header-actions'
+    document.body.appendChild(source)
+    window.ArbeitszeitCheckComponents.relocatePageActions()
+    expect(source.isConnected).toBe(false)
+    expect(target.childNodes.length).toBe(before)
+  })
+})

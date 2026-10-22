@@ -30,13 +30,13 @@ test.describe('GitHub #34–#36 time UX (legacy-safe)', () => {
 		const minuteStep = await page.evaluate(() => window.ArbeitszeitCheck.timeEntryForm.minuteStep)
 		expect(minuteStep).toBe(1)
 
-		const minuteSelect = page.locator('#entry-start-time-minute')
-		await expect(minuteSelect).toBeVisible()
-		const values = await minuteSelect.locator('option').evaluateAll((opts) =>
-			opts.map((o) => o.value).filter((v) => v !== ''),
+		await page.locator('#entry-start-time-open').click()
+		const values = await page.locator('[data-column="minute"] .azc-timepicker__option').evaluateAll((opts) =>
+			opts.map((o) => o.textContent || ''),
 		)
 		expect(values).toContain('51')
 		expect(values.length).toBeGreaterThanOrEqual(60)
+		await page.keyboard.press('Escape')
 		await page.screenshot({ path: 'test-results/azc-gh34-minute-step.png', fullPage: false })
 	})
 

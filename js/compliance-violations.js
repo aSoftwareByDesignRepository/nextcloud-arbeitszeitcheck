@@ -35,7 +35,23 @@
     /**
      * Initialize violations page
      */
+    function formatViolationDate(value) {
+        if (value === null || value === undefined || value === '') {
+            return '-';
+        }
+        const text = String(value);
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+        if (!match) {
+            return text;
+        }
+        return match[3] + '.' + match[2] + '.' + match[1];
+    }
+
     function getFilterUserId() {
+        const fromDom = document.getElementById('violations-table')?.getAttribute('data-filter-user-id') || '';
+        if (String(fromDom).trim() !== '') {
+            return String(fromDom).trim();
+        }
         const cfg = window.ArbeitszeitCheck || {};
         const id = cfg.complianceFilterUserId;
         return id && String(id).trim() !== '' ? String(id).trim() : '';
@@ -77,6 +93,9 @@
      * Bind event listeners
      */
     function bindEvents() {
+        if (typeof Utils.$ !== 'function' || typeof Utils.on !== 'function') {
+            return;
+        }
         const applyBtn = Utils.$('#apply-filters');
         if (applyBtn) {
             Utils.on(applyBtn, 'click', loadViolations);
@@ -131,6 +150,7 @@
         if (tbody) {
             const loadingMsg = cvT('Loading...');
             tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(loadingMsg) + '</td></tr>';
+            syncViolationPager(true);
         }
 
         Utils.ajax('/apps/arbeitszeitcheck/api/compliance/violations?' + params.toString(), {
@@ -140,7 +160,8 @@
                     renderViolations(data.violations);
                 } else {
                     const errorMsg = (data && data.error) ? data.error : cvT('Error loading violations');
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                    syncViolationPager(true);
                 }
             },
             onError: function (error) {
@@ -150,7 +171,8 @@
                     clearButtonSelector: '#violations-employee-filter-clear',
                 });
                 const errorMsg = (error && error.error) ? error.error : cvT('Error loading violations');
-                if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                syncViolationPager(true);
                 if (Messaging && Messaging.showError) {
                     const failMsg = (error && error.error) ? error.error : cvT('Failed to load violations. Please try again.');
                     Messaging.showError(failMsg);
@@ -167,7 +189,8 @@
         if (!tbody) return;
 
         if (violations.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + cvT('No violations found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + cvT('No violations found') + '</td></tr>';
+            syncViolationPager(true);
             return;
         }
 
@@ -205,13 +228,13 @@
                 ? td(cvT('Employee'), Utils.escapeHtml(v.displayName || v.userId || '-'))
                 : '';
             return `
-            <tr>
+            <tr data-azc-row>
                 ${employeeCell}
                 ${td(cvT('Problem Type'), Utils.escapeHtml(typeLabels[v.type] || v.type))}
                 ${td(cvT('How Serious'), `<span class="badge badge--${Utils.badgeVariantForComplianceSeverity ? Utils.badgeVariantForComplianceSeverity(v.severity) : (v.severity === 'error' ? 'error' : (v.severity === 'warning' ? 'warning' : 'primary'))}">
                         ${Utils.escapeHtml(severityLabels[v.severity] || v.severity)}
                     </span>`)}
-                ${td(cvT('Date'), Utils.escapeHtml(v.date || '-'))}
+                ${td(cvT('Date'), Utils.escapeHtml(formatViolationDate(v.date)))}
                 ${td(cvT('What Happened'), Utils.escapeHtml(v.description || '-'))}
                 ${td(cvT('Fixed?'), `<span class="badge badge--${v.resolved ? 'success' : 'error'}">
                         ${Utils.escapeHtml(v.resolved ? resolvedLabel : unresolvedLabel)}
@@ -223,6 +246,23 @@
         tbody.querySelectorAll('[id^="btn-resolve-violation-"]').forEach((btn) => {
             btn.addEventListener('click', () => resolveViolation(btn.getAttribute('data-violation-id')));
         });
+        syncViolationPager(true);
+    }
+
+    function syncViolationPager(resetPage) {
+        const nav = document.getElementById('violations-table-pager');
+        const pager = window.AzcTablePager;
+        if (!nav || !pager) {
+            return;
+        }
+        if (resetPage && typeof pager.showPage === 'function') {
+            nav.dataset.page = '1';
+            pager.showPage(nav, 1, false);
+            return;
+        }
+        if (typeof pager.resync === 'function') {
+            pager.resync(nav);
+        }
     }
 
     async function resolveViolation(id) {
@@ -258,6 +298,8 @@
     if (typeof window !== 'undefined') {
         window.__ArbeitszeitCheckComplianceViolationsTestables = {
             resolveViolation: resolveViolation,
+            formatViolationDate: formatViolationDate,
+            getFilterUserId: getFilterUserId,
         };
     }
 

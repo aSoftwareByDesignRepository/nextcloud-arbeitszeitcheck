@@ -71,10 +71,10 @@ class AbsenceHalfDayParamsForwardingContractTest extends TestCase
 		$this->assertStringContainsString("body.set('day_fraction'", $src);
 		$this->assertStringContainsString('absence-day-fraction-group', $src);
 		$this->assertStringContainsString('role="radiogroup"', $src);
-		$this->assertStringContainsString('btn-half-day-today', $src);
+		$this->assertStringContainsString('btn-report-sick-today', $src);
 		$this->assertStringContainsString('absence-multi-day-half-tip', $src);
 		$this->assertStringContainsString('prefillHalf', $src);
-		$this->assertStringContainsString('HalfDayVacationShortcut', $src);
+		$this->assertStringNotContainsString('HalfDayVacationShortcut', $src);
 		$this->assertStringContainsString('absence-days-cell--half', $src);
 	}
 

@@ -301,9 +301,10 @@
 	overflow-x: auto;
 	-webkit-overflow-scrolling: touch;
 	margin-top: var(--azc-space-3);
-	border: 1px solid var(--azc-border);
-	border-radius: var(--azc-radius-md);
-	background: var(--azc-bg-card);
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
 }
 
 #app-content.azc-app--admin-notifications .admin-notifications-form .admin-notifications-matrix,
@@ -744,14 +745,6 @@
 #app-content.azc-app--admin-vacation-rules .azc-choice-card:has(> input[type='radio']:checked) .azc-choice-card__hint,
 #app-content.azc-app--admin-vacation-layers .azc-choice-card:has(> input[type='radio']:checked) .azc-choice-card__hint {
 	color: var(--azc-text, var(--color-main-text));
-}
-
-#app-content.azc-app--admin-notifications .azc-choice-card:focus-within,
-#app-content.azc-app--admin-overtime-settings .azc-choice-card:focus-within,
-#app-content.azc-app--admin-vacation-rules .azc-choice-card:focus-within,
-#app-content.azc-app--admin-vacation-layers .azc-choice-card:focus-within {
-	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
-	outline-offset: 2px;
 }
 
 #app-content.azc-app--admin-notifications .azc-choice-card > input[type='radio'],

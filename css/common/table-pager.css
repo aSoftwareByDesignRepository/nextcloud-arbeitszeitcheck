@@ -1,0 +1,134 @@
+/* Table footer: total, page size, and a short page list.
+   Inside a bordered table it is the last row. Page spacing stays outside. */
+
+#app-content.azc-app .azc-table-pager {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem 1.5rem;
+	margin: 0;
+	color: var(--color-main-text);
+	font-size: 0.875rem;
+	line-height: 1.4;
+}
+
+#app-content.azc-app .azc-table-pager__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem 1rem;
+	margin: 0;
+}
+
+#app-content.azc-app .azc-table-pager__total {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+#app-content.azc-app .azc-table-pager__size {
+	margin: 0;
+}
+
+#app-content.azc-app .azc-table-pager__size select {
+	min-height: 2rem;
+	padding: 0.15rem 1.75rem 0.15rem 0.65rem;
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-sm, 6px);
+	background-color: var(--azc-bg-card, var(--color-main-background));
+	color: var(--color-main-text);
+	font: inherit;
+	font-variant-numeric: tabular-nums;
+}
+
+#app-content.azc-app .azc-table-pager__pages {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.15rem;
+	margin: 0;
+}
+
+#app-content.azc-app .azc-table-pager__page,
+#app-content.azc-app .azc-table-pager__step {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 2rem;
+	min-height: 2rem;
+	padding: 0 0.25rem;
+	border: 0;
+	background: transparent;
+	color: var(--color-text-maxcontrast);
+	font: inherit;
+	font-variant-numeric: tabular-nums;
+	text-decoration: none;
+}
+
+#app-content.azc-app .azc-table-pager__page.is-current {
+	color: var(--color-main-text);
+	font-weight: 700;
+}
+
+#app-content.azc-app a.azc-table-pager__page:hover,
+#app-content.azc-app a.azc-table-pager__step:hover {
+	color: var(--color-main-text);
+}
+
+#app-content.azc-app .azc-table-pager__step[aria-disabled="true"] {
+	opacity: 0.35;
+}
+
+#app-content.azc-app .azc-table-pager__ellipsis {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.5rem;
+	color: var(--color-text-maxcontrast);
+}
+
+#app-content.azc-app .azc-table-pager__page:focus-visible,
+#app-content.azc-app .azc-table-pager__step:focus-visible,
+#app-content.azc-app .azc-table-pager__size select:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+/* The footer is the last row of the frame. The scroll lives on the rows,
+   so a wide table does not drag the footer sideways. */
+#app-content.azc-app .table-container:has(> .azc-table-pager),
+#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+#app-content.azc-app .azc-table-scroll {
+	overflow-x: auto;
+	min-width: 0;
+}
+
+#app-content.azc-app .table-container > .azc-table-pager,
+#app-content.azc-app .azc-table-wrap > .azc-table-pager {
+	margin: 0;
+	padding: 0.25rem 1rem;
+	border-top: 1px solid var(--azc-border, var(--color-border));
+	background: var(--azc-bg-card, var(--color-main-background));
+}
+
+#app-content.azc-app .table-container:has(> .azc-table-pager) tbody tr:last-child > td,
+#app-content.azc-app .table-container:has(> .azc-table-pager) tbody tr:not([hidden]):has(+ tr[hidden]) > td,
+#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) tbody tr:last-child > td,
+#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) tbody tr:not([hidden]):has(+ tr[hidden]) > td {
+	border-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+	#app-content.azc-app .table-container:has(> .azc-table-pager) .azc-table--responsive tbody tr:last-child,
+	#app-content.azc-app .table-container:has(> .azc-table-pager) .azc-table--responsive tbody tr:not([hidden]):has(+ tr[hidden]),
+	#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) .azc-table--responsive tbody tr:last-child,
+	#app-content.azc-app .azc-table-wrap:has(> .azc-table-pager) .azc-table--responsive tbody tr:not([hidden]):has(+ tr[hidden]) {
+		border-bottom: 0;
+	}
+}

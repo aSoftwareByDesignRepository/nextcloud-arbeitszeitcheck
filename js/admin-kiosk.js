@@ -519,7 +519,7 @@
 				+ ' data-user-id="' + escapeHtml(g.userId) + '"' + (g.kioskAllowed ? ' checked' : '') + '>'
 				+ '<span class="azc-sr-only">' + escapeHtml(allowedLabel) + ' — ' + escapeHtml(g.displayName) + '</span>'
 				+ '</label></td>'
-				+ '<td data-label="' + escapeHtml(labels.actions) + '"><div class="azc-kiosk-cred-actions">' + actions + '</div></td>'
+				+ '<td class="actions-cell" data-label="' + escapeHtml(labels.actions) + '"><div class="azc-kiosk-cred-actions azc-table-actions" role="group" aria-label="' + escapeHtml(labels.actions) + '">' + actions + '</div></td>'
 				+ '</tr>';
 		}).join('');
 

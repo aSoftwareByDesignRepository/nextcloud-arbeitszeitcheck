@@ -17,7 +17,7 @@
 #app-content.azc-app #app-content-wrapper.azc-shell--minimal {
 	max-width: 39.99875rem;
 	margin-inline: auto;
-	padding: var(--azc-space-6) var(--azc-space-5);
+	padding: var(--azc-space-6) var(--azc-space-5) 0;
 }
 
 /* ── Page stack (vertical rhythm inside main) ───────────────── */
@@ -339,6 +339,9 @@
    Actions column: .azc-table-actions-col + .azc-table-actions
    Matrix tables: .azc-table--matrix (admin notification grids)
    Card layout on narrow screens: .azc-table--responsive + data-label on td
+   A table inside a card, a bordered section, or a dialog is not a second box.
+   The outer frame stays; the wrap drops its border, radius, and fill.
+   Narrow screens stack rows with a divider, not a card per row.
    ───────────────────────────────────────────────────────────── */
 #app-content.azc-app .table-container,
 #app-content.azc-app .table-responsive,
@@ -354,10 +357,31 @@
 	scroll-padding-inline-end: var(--azc-space-4, 1rem);
 }
 
+#app-content.azc-app .azc-card .table-container,
+#app-content.azc-app .azc-card .table-responsive,
+#app-content.azc-app .azc-card .azc-table-wrap,
+#app-content.azc-app .section .table-container,
+#app-content.azc-app .section .table-responsive,
+#app-content.azc-app .section .azc-table-wrap,
+.azc-dialog .table-container,
+.azc-dialog .table-responsive,
+.azc-dialog .azc-table-wrap,
 #app-content.azc-app .azc-card__body > .table-container,
 #app-content.azc-app .azc-card__body > .table-responsive,
 #app-content.azc-app .azc-card__body > .azc-table-wrap {
 	margin-block: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+/* Sole content of the card: sit flush under the header, no inner inset. */
+#app-content.azc-app .azc-card__body:has(> .table-container:only-child),
+#app-content.azc-app .azc-card__body:has(> .table-responsive:only-child),
+#app-content.azc-app .azc-card__body:has(> .azc-table-wrap:only-child) {
+	padding: 0;
+	gap: 0;
 }
 
 #app-content.azc-app .table-container .table,
@@ -387,13 +411,24 @@
 	}
 }
 
-#app-content.azc-app .table thead th,
-#app-content.azc-app .grid-table thead th {
+#app-content.azc-app .table:not(.azc-table--matrix) thead,
+#app-content.azc-app .grid-table:not(.azc-table--matrix) thead,
+.azc-dialog .table thead {
+	background: transparent;
+}
+
+#app-content.azc-app .table:not(.azc-table--matrix) thead th,
+#app-content.azc-app .grid-table:not(.azc-table--matrix) thead th,
+.azc-dialog .table thead th {
 	position: sticky;
 	top: 0;
-	z-index: 1;
-	background-color: var(--arbeitszeitcheck-color-table-header-background, var(--color-background-dark));
-	box-shadow: 0 1px 0 var(--arbeitszeitcheck-color-table-border, var(--color-border));
+	z-index: 3;
+	background-color: var(--azc-bg-card, var(--color-main-background));
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+	font-weight: 600;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	box-shadow: none;
+	border-bottom: 1px solid var(--azc-border, var(--color-border));
 }
 
 #app-content.azc-app .table tbody tr:focus-within,
@@ -441,7 +476,9 @@
 	white-space: normal;
 }
 
-/* Actions column: never shrink below button labels (avoid width:1% clipping) */
+/* Actions column: size to the buttons below 768px. From 768px the column
+   collapses and the buttons float on the hovered or focused row — see below.
+   Never shrink below button labels (avoid width:1% clipping). */
 #app-content.azc-app .table th.azc-table-actions-col,
 #app-content.azc-app .table th.actions-col,
 #app-content.azc-app .table td.actions-cell,
@@ -478,6 +515,146 @@
 #app-content.azc-app .grid-table .azc-table-actions .btn {
 	flex-shrink: 0;
 	white-space: nowrap;
+}
+
+/*
+ * Wide tables: the actions column must not widen the table or sit on top of
+ * the data while you scroll. The header text stays in the accessibility tree
+ * and is clipped by the zero-width cell. Buttons stay in the tab order
+ * (never display:none). A pointer reveals them on the row; keyboard focus
+ * does too. Escape adds .azc-row-actions-dismissed until the pointer
+ * re-enters or focus returns to an action. Touch (hover: none) keeps the
+ * cluster visible, pinned to the inline end, so it is tappable without a
+ * sideways scroll. Dialogs live on document.body, so .azc-dialog is included.
+ */
+@media (min-width: 768px) {
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) th.azc-table-actions-col,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) th.actions-col,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table th.azc-table-actions-col {
+		width: 0;
+		min-width: 0;
+		max-width: 0;
+		padding: 0;
+		border: 0;
+		overflow: hidden;
+		position: static;
+		box-shadow: none;
+		background: transparent;
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.azc-table-actions-col,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-ot-audit__actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-tariff-rules__row-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.layer-card__history-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.azc-table-actions-col {
+		position: sticky;
+		inset-inline-end: 0;
+		width: 0;
+		min-width: 0;
+		max-width: none;
+		padding: 0;
+		overflow: visible;
+		background: transparent;
+		box-shadow: none;
+		z-index: 2;
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell > .azc-row-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell > .azc-row-actions {
+		width: 0;
+		min-width: 0;
+		overflow: visible;
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.azc-table-actions-col .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-ot-audit__actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-tariff-rules__row-actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.layer-card__history-actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.azc-table-actions-col .azc-table-actions {
+		position: absolute;
+		inset-inline-end: 0;
+		top: 0;
+		bottom: 0;
+		transform: none;
+		z-index: 2;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: var(--azc-space-2, 0.5rem);
+		margin: 0;
+		max-width: none;
+		padding-block: 0;
+		padding-inline: 1.25rem var(--azc-space-3, 0.75rem);
+		overflow: hidden;
+		border: 0;
+		border-radius: 0;
+		box-shadow: none;
+		background-color: var(--azc-bg-card, var(--color-main-background));
+		background-image: linear-gradient(
+			to inline-end,
+			transparent,
+			var(--azc-bg-card, var(--color-main-background)) 1rem
+		);
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions > .btn,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions > .azc-btn,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions > a,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions > .btn,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions > .azc-btn,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions > a {
+		flex: 0 0 auto;
+		width: auto;
+		max-width: none;
+		white-space: nowrap;
+	}
+}
+
+@media (min-width: 768px) and (hover: hover) {
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.azc-table-actions-col .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-ot-audit__actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.admin-tariff-rules__row-actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.layer-card__history-actions .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.azc-table-actions-col .azc-table-actions {
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.12s linear;
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) tbody tr:hover td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) tbody tr:focus-within td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table tbody tr:hover td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table tbody tr:focus-within td.actions-cell .azc-table-actions {
+		opacity: 1;
+		pointer-events: auto;
+		background-color: var(--color-background-hover, var(--azc-bg-card, var(--color-main-background)));
+		background-image: linear-gradient(
+			to inline-end,
+			transparent,
+			var(--color-background-hover, var(--azc-bg-card, var(--color-main-background))) 1rem
+		);
+	}
+
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) tbody tr.azc-row-actions-dismissed td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table tbody tr.azc-row-actions-dismissed td.actions-cell .azc-table-actions {
+		opacity: 0;
+		pointer-events: none;
+	}
+}
+
+@media (min-width: 768px) and (hover: hover) and (prefers-reduced-motion: reduce) {
+	:is(#app-content.azc-app, .azc-dialog) :is(.table, .azc-table) td.actions-cell .azc-table-actions,
+	:is(#app-content.azc-app, .azc-dialog) .grid-table td.actions-cell .azc-table-actions {
+		transition: none;
+	}
 }
 
 /* Truncated text columns — do not steal space from actions */
@@ -568,16 +745,21 @@
 		border: 0;
 	}
 
-	#app-content.azc-app .table.azc-table--responsive tbody tr {
-		margin-bottom: var(--azc-space-4, 1rem);
+	#app-content.azc-app .table.azc-table--responsive tbody tr,
+	.azc-dialog .table.azc-table--responsive tbody tr {
+		margin: 0;
 		padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
-		border: 1px solid var(--azc-border, var(--color-border));
-		border-radius: var(--azc-radius-sm, 8px);
-		background: var(--azc-bg-card, var(--color-main-background));
+		border: 0;
+		border-bottom: 1px solid var(--azc-border, var(--color-border));
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
 	}
 
-	#app-content.azc-app .table.azc-table--responsive tbody tr:last-child {
+	#app-content.azc-app .table.azc-table--responsive tbody tr:last-child,
+	.azc-dialog .table.azc-table--responsive tbody tr:last-child {
 		margin-bottom: 0;
+		border-bottom: 0;
 	}
 
 	#app-content.azc-app .table.azc-table--responsive tbody td {

@@ -63,6 +63,10 @@ final class L10nCatalogGauntletContractTest extends TestCase
 			'Could not load subscription links. Please try again.',
 			'Your subscription links',
 			'Create subscription link',
+			'Compliant - automatic %d min break',
+			'Compliant - %d min break provided',
+			'%1$d minutes break required (%2$s)',
+			'%d minutes',
 		];
 		foreach ($critical as $msgid) {
 			self::assertArrayHasKey($msgid, $enT, "en missing {$msgid}");

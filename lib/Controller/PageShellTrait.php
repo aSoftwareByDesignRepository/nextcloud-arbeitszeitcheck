@@ -40,6 +40,7 @@ trait PageShellTrait
 		'timeline',
 		'reports',
 		'substitution-requests',
+		'compliance',
 		'compliance-dashboard',
 		'compliance-violations',
 		'compliance-reports',
@@ -229,10 +230,17 @@ trait PageShellTrait
 	 */
 	protected function buildTimeEntriesShellParams(string $mode, array $navFlags = []): array
 	{
+		// One sentence stays under the 90-character page-start split, so create
+		// does not grow a "More help" disclosure under the title.
+		$createHelp = $this->l10n->t('Date, working hours, optional breaks, and a short note. Compliance is checked while you type.');
+		$createHelpParts = preg_split('/(?<=[.!?])\s+/u', $createHelp, 2);
+		if (is_array($createHelpParts) && ($createHelpParts[0] ?? '') !== '') {
+			$createHelp = $createHelpParts[0];
+		}
 		$titles = [
 			'create' => [
 				$this->l10n->t('Record working time'),
-				$this->l10n->t('Date, working hours, optional breaks, and a short note. Compliance is checked while you type.'),
+				$createHelp,
 			],
 			'edit' => [
 				$this->l10n->t('Edit time entry'),

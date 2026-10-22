@@ -228,20 +228,9 @@ input[type="reset"] {
   margin-top: var(--space-1); /* Small gap between touch targets */
 }
 
-/* ===== FOCUS-WITHIN FOR CONTAINERS ===== */
-
-/* Form groups with focus */
-.form-group:focus-within {
-  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-base);
-}
-
-/* Card focus */
-.card:focus-within {
-  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
-  outline-offset: 2px;
-}
+/* Focus stays on the control (WCAG 2.4.7). Do not outline .form-group,
+   .card, or a fieldset because a child input is focused — that second
+   ring sits around the label and the help text. */
 
 /* ===== ARIA LIVE REGIONS ===== */
 
@@ -315,7 +304,7 @@ header {
 /* Required field indicators */
 .form-label .required,
 .form-required {
-  color: var(--arbeitszeitcheck-color-error);
+  color: var(--color-error-text);
   font-weight: var(--arbeitszeitcheck-font-weight-bold);
 }
 
@@ -328,9 +317,9 @@ header {
   border-width: 2px;
 }
 
-/* Error messages should be associated; body text uses main-text for contrast (accent is border + icon) */
+/* Error messages use the same ink as required asterisks. */
 .form-error[role="alert"] {
-  color: var(--arbeitszeitcheck-color-main-text);
+  color: var(--color-error-text);
   font-weight: var(--arbeitszeitcheck-font-weight-medium);
 }
 

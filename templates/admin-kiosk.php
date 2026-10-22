@@ -45,6 +45,16 @@ $statusBadgeClass = static function (string $status): string {
 };
 
 $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalLimit) * 100)) : 0;
+$terminalPager = \OCA\ArbeitszeitCheck\Support\TablePager::state(
+	count($terminals),
+	filter_input(INPUT_GET, 'kt_page'),
+	filter_input(INPUT_GET, 'kt_per_page'),
+);
+$terminalPagerTotal = (int)$terminalPager['total'];
+$terminalPagerPerPage = (int)$terminalPager['perPage'];
+$terminalPagerOffset = (int)$terminalPager['offset'];
+$terminalRowIndex = 0;
+\OCP\Util::addScript('arbeitszeitcheck', 'common/table-pager');
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -208,6 +218,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 			</div>
 
 			<div class="azc-table-wrap">
+				<div class="azc-table-scroll">
 				<table class="azc-table azc-kiosk-table" id="azc-kiosk-terminals-table">
 					<caption class="azc-sr-only"><?php p($l->t('Registered kiosk terminals')); ?></caption>
 					<thead>
@@ -215,7 +226,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<th scope="col"><?php p($l->t('Label')); ?></th>
 							<th scope="col"><?php p($l->t('Status')); ?></th>
 							<th scope="col"><?php p($l->t('Last seen')); ?></th>
-							<th scope="col"><?php p($l->t('Actions')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
 						</tr>
 					</thead>
 					<tbody id="azc-kiosk-terminals-body">
@@ -231,7 +242,12 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 						$canRevoke = $status === 'active' || $status === 'pending';
 						$lastSeen = (string)($t['lastSeenAt'] ?? '');
 						?>
-						<tr data-terminal-id="<?php p($tid); ?>">
+						<?php
+						$hideTerminalRow = $terminalPagerTotal > $terminalPagerPerPage
+							&& ($terminalRowIndex < $terminalPagerOffset || $terminalRowIndex >= $terminalPagerOffset + $terminalPagerPerPage);
+						$terminalRowIndex++;
+						?>
+						<tr data-azc-row data-terminal-id="<?php p($tid); ?>"<?php echo $hideTerminalRow ? ' hidden' : ''; ?>>
 							<td data-label="<?php p($l->t('Label')); ?>"><?php p((string)($t['label'] ?? '')); ?></td>
 							<td data-label="<?php p($l->t('Status')); ?>">
 								<span class="<?php p($statusBadgeClass($status)); ?>"><?php p($statusLabel($status)); ?></span>
@@ -239,12 +255,14 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<td data-label="<?php p($l->t('Last seen')); ?>" class="azc-kiosk-last-seen" data-iso="<?php p($lastSeen); ?>">
 								<?php p($lastSeen !== '' ? $lastSeen : (string)($i18n['neverSeen'] ?? $l->t('Never'))); ?>
 							</td>
-							<td data-label="<?php p($l->t('Actions')); ?>">
+							<td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
 								<?php if ($canRevoke): ?>
-								<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-revoke-terminal"
-									data-terminal-id="<?php p($tid); ?>">
-									<?php p($l->t('Revoke')); ?>
-								</button>
+								<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
+									<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-revoke-terminal"
+										data-terminal-id="<?php p($tid); ?>">
+										<?php p($l->t('Revoke')); ?>
+									</button>
+								</div>
 								<?php else: ?>
 								<span class="azc-kiosk-no-action" aria-hidden="true">—</span>
 								<?php endif; ?>
@@ -253,6 +271,22 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 						<?php endforeach; ?>
 					</tbody>
 				</table>
+				</div>
+				<?php
+				$azcTablePager = [
+					'id' => 'azc-kiosk-terminals-pager',
+					'tableId' => 'azc-kiosk-terminals-table',
+					'label' => $l->t('Terminals pagination'),
+					'base' => '',
+					'filters' => [],
+					'allow' => [],
+					'state' => $terminalPager,
+					'pageParam' => 'kt_page',
+					'sizeParam' => 'kt_per_page',
+					'mode' => 'client',
+				];
+				include __DIR__ . '/partials/table-pager.php';
+				?>
 			</div>
 		</div>
 	</section>
@@ -438,6 +472,7 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 			<h3 class="azc-kiosk-creds-list__title" id="azc-kiosk-creds-list-heading"><?php p($l->t('Already assigned')); ?></h3>
 			<p class="azc-kiosk-creds-list__lead"><?php p($l->t('Everyone who already has a badge or PIN. Use the row buttons to create a new PIN or remove credentials.')); ?></p>
 			<div class="azc-table-wrap">
+				<div class="azc-table-scroll">
 				<table class="azc-table azc-kiosk-table" id="azc-kiosk-creds-table" aria-labelledby="azc-kiosk-creds-list-heading">
 					<caption class="azc-sr-only"><?php p($l->t('Kiosk credentials')); ?></caption>
 					<thead>
@@ -445,11 +480,28 @@ $meterPct = $terminalLimit > 0 ? min(100, (int)round(($terminalUsed / $terminalL
 							<th scope="col"><?php p($l->t('Employee')); ?></th>
 							<th scope="col"><?php p($l->t('Credentials')); ?></th>
 							<th scope="col"><?php p($l->t('Kiosk allowed')); ?></th>
-							<th scope="col"><?php p($l->t('Actions')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
 						</tr>
 					</thead>
 					<tbody id="azc-kiosk-creds-body"></tbody>
 				</table>
+				</div>
+				<?php
+				$azcTablePager = [
+					'id' => 'azc-kiosk-creds-pager',
+					'tableId' => 'azc-kiosk-creds-table',
+					'label' => $l->t('Credentials pagination'),
+					'base' => '',
+					'filters' => [],
+					'allow' => [],
+					'state' => \OCA\ArbeitszeitCheck\Support\TablePager::state(0, null, null),
+					'pageParam' => 'kc_page',
+					'sizeParam' => 'kc_per_page',
+					'mode' => 'client',
+					'rows' => 'tbody tr',
+				];
+				include __DIR__ . '/partials/table-pager.php';
+				?>
 			</div>
 		</div>
 		</div>

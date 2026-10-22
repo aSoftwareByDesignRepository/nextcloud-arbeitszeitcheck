@@ -163,4 +163,137 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		self::assertStringContainsString('id="azc-kiosk-pin-share" class="azc-btn azc-btn--secondary"', $kiosk);
 		self::assertStringContainsString('id="azc-kiosk-pin-close" class="azc-btn azc-btn--secondary"', $kiosk);
 	}
+
+	public function testSecondaryFillIsPrimaryLightOnEverySurface(): void {
+		$root = dirname(__DIR__, 2);
+		$app = (string)file_get_contents($root . '/css/app.css');
+		$block = self::ruleBody($app, '#app-content.azc-app .azc-btn--secondary,');
+		self::assertSame(
+			"background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;\n"
+			. "\tborder-color: var(--color-primary-element) !important;\n"
+			. "\tcolor: var(--azc-text, var(--color-main-text)) !important;",
+			trim($block)
+		);
+		self::assertStringNotContainsString('primary-element-light-text', $block);
+		self::assertStringContainsString('.azc-modal-backdrop .btn--secondary,', $app);
+		self::assertStringContainsString('.azc-dialog .btn--secondary,', $app);
+
+		$secondaryAt = strpos($app, ".azc-app .btn--secondary,");
+		$dangerAt = strpos($app, ".azc-app .btn--danger {");
+		self::assertNotFalse($secondaryAt);
+		self::assertNotFalse($dangerAt);
+		self::assertLessThan($dangerAt, $secondaryAt, 'Danger must follow secondary so a dual-class button stays danger');
+		self::assertStringContainsString('background-color: var(--azc-danger-fill) !important;', $app);
+
+		$hover = self::ruleBody($app, '#app-content.azc-app .azc-btn--secondary:hover,');
+		self::assertStringContainsString(
+			'background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover)) !important;',
+			$hover
+		);
+		self::assertStringContainsString('color: var(--azc-text, var(--color-main-text)) !important;', $hover);
+
+		$grey = 'color-mix(in srgb, var(--color-main-background) 82%, var(--color-main-text) 18%)';
+		$greyHover = 'color-mix(in srgb, var(--color-main-background) 70%, var(--color-main-text) 30%)';
+		foreach ([
+			'css/app.css',
+			'css/dashboard-widgets.css',
+			'css/admin-support-us.css',
+			'css/common/components.css',
+			'css/time-entries.css',
+		] as $rel) {
+			$css = (string)file_get_contents($root . '/' . $rel);
+			self::assertStringNotContainsString($grey, $css, $rel);
+			self::assertStringNotContainsString($greyHover, $css, $rel);
+		}
+
+		$components = (string)file_get_contents($root . '/css/common/components.css');
+		$librarySecondary = self::ruleBody($components, ".btn--secondary {");
+		self::assertStringContainsString(
+			'background-color: var(--color-primary-element-light, var(--color-primary-light));',
+			$librarySecondary
+		);
+		self::assertStringNotContainsString('background-dark', $librarySecondary);
+		self::assertStringContainsString(
+			".button.secondary,\n.btn-secondary {\n  background-color: var(--color-primary-element-light, var(--color-primary-light));",
+			$components
+		);
+
+		$desk = (string)file_get_contents($root . '/css/dashboard-widgets.css');
+		self::assertStringContainsString(
+			"background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;",
+			$desk
+		);
+		self::assertStringContainsString('border-color: var(--color-primary-element) !important;', self::ruleBody(
+			$desk,
+			'.dz-workspace .azc-btn--secondary,'
+		));
+
+		$support = (string)file_get_contents($root . '/css/admin-support-us.css');
+		self::assertStringContainsString(
+			"a.azc-support-us__cta.azc-btn--secondary {\n\tbackground-color: var(--color-primary-element-light, var(--color-primary-light)) !important;",
+			$support
+		);
+
+		$timeEntries = (string)file_get_contents($root . '/css/time-entries.css');
+		self::assertStringNotContainsString('azc-app--time-entries .azc-btn--secondary', $timeEntries);
+
+		// Nextcloud default theme values for the tokens above. White on the tint fails AA,
+		// so a test that always returns a passing ratio cannot hide a broken formula.
+		$themes = [
+			'light' => ['text' => '#222222', 'fill' => '#e5eff5', 'hover' => '#d9e3e8', 'border' => '#00679e', 'page' => '#ffffff'],
+			'light-default-css' => ['text' => '#222222', 'fill' => '#e5eff5', 'hover' => '#dbe4ea', 'border' => '#00679e', 'page' => '#ffffff'],
+			'dark' => ['text' => '#EBEBEB', 'fill' => '#14232c', 'hover' => '#1f2e36', 'border' => '#0091f2', 'page' => '#171717'],
+			'light-hc' => ['text' => '#000000', 'fill' => '#e5eef3', 'hover' => '#d9e2e6', 'border' => '#005c88', 'page' => '#ffffff'],
+			'dark-hc' => ['text' => '#ffffff', 'fill' => '#031119', 'hover' => '#0f1c24', 'border' => '#27abff', 'page' => '#000000'],
+		];
+		foreach ($themes as $name => $theme) {
+			self::assertGreaterThanOrEqual(4.5, self::contrastRatio($theme['text'], $theme['fill']), $name . ' text on fill');
+			self::assertGreaterThanOrEqual(4.5, self::contrastRatio($theme['text'], $theme['hover']), $name . ' text on hover');
+			self::assertGreaterThanOrEqual(3.0, self::contrastRatio($theme['border'], $theme['page']), $name . ' border on page');
+			self::assertGreaterThanOrEqual(3.0, self::contrastRatio($theme['border'], $theme['fill']), $name . ' border on fill');
+		}
+		self::assertEqualsWithDelta(21.0, self::contrastRatio('#000', '#fff'), 0.01);
+		self::assertEqualsWithDelta(13.63, self::contrastRatio('#222222', '#e5eff5'), 0.05);
+		self::assertLessThan(4.5, self::contrastRatio('#ffffff', '#e5eff5'));
+		try {
+			self::relativeLuminance('#gggggg');
+			self::fail('A non-hex colour must not produce a contrast ratio');
+		} catch (\InvalidArgumentException $e) {
+			self::assertStringContainsString('hex', $e->getMessage());
+		}
+	}
+
+	private static function ruleBody(string $css, string $selectorStart): string {
+		$at = strpos($css, $selectorStart);
+		self::assertNotFalse($at, 'Missing rule ' . $selectorStart);
+		$open = strpos($css, '{', $at);
+		self::assertNotFalse($open);
+		$close = strpos($css, '}', $open);
+		self::assertNotFalse($close);
+		return substr($css, $open + 1, $close - $open - 1);
+	}
+
+	private static function contrastRatio(string $foreground, string $background): float {
+		$lighter = max(self::relativeLuminance($foreground), self::relativeLuminance($background));
+		$darker = min(self::relativeLuminance($foreground), self::relativeLuminance($background));
+		return ($lighter + 0.05) / ($darker + 0.05);
+	}
+
+	private static function relativeLuminance(string $hex): float {
+		$hex = ltrim($hex, '#');
+		if (strlen($hex) === 3) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) {
+			throw new \InvalidArgumentException('Expected a hex colour, got ' . $hex);
+		}
+		$channels = [];
+		foreach ([0, 2, 4] as $offset) {
+			$channel = hexdec(substr($hex, $offset, 2)) / 255;
+			$channels[] = $channel <= 0.04045
+				? $channel / 12.92
+				: (($channel + 0.055) / 1.055) ** 2.4;
+		}
+		return (0.2126 * $channels[0]) + (0.7152 * $channels[1]) + (0.0722 * $channels[2]);
+	}
 }

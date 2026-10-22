@@ -392,3 +392,74 @@ describe('main confirm call-sites open→cancel→confirm', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('dashboard punch button labels', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    document.body.innerHTML = ''
+    globalThis.window.ArbeitszeitCheck = {
+      page: 'none',
+      l10n: { loading: 'Loading' },
+    }
+    await import('./arbeitszeitcheck-main.js')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps Start break and Clock out labels while a status refresh is in flight', async () => {
+    const app = globalThis.window.ArbeitszeitCheckApp
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<button type="button" id="btn-start-break">Start break</button><button type="button" class="btn-clock-out">Clock out</button>',
+    )
+    let release
+    const pending = new Promise((resolve) => {
+      release = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn(() => pending.then(() => new Response(
+      JSON.stringify({ success: true, status: { status: 'active' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))))
+
+    const started = app.getStatus()
+    await Promise.resolve()
+
+    const startBreak = document.getElementById('btn-start-break')
+    const clockOut = document.querySelector('.btn-clock-out')
+    expect(startBreak.textContent).toBe('Start break')
+    expect(clockOut.textContent).toBe('Clock out')
+    expect(startBreak.disabled).toBe(false)
+    expect(clockOut.disabled).toBe(false)
+    expect(startBreak.getAttribute('aria-busy')).toBeNull()
+
+    release()
+    await started
+    expect(startBreak.textContent).toBe('Start break')
+    expect(clockOut.textContent).toBe('Clock out')
+  })
+
+  it('disables punch buttons during a mutation without changing their labels', () => {
+    const app = globalThis.window.ArbeitszeitCheckApp
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<button type="button" id="btn-start-break">Start break</button><button type="button" class="btn-clock-out">Clock out</button>',
+    )
+
+    app.setLoadingState(true)
+
+    const startBreak = document.getElementById('btn-start-break')
+    const clockOut = document.querySelector('.btn-clock-out')
+    expect(startBreak.textContent).toBe('Start break')
+    expect(clockOut.textContent).toBe('Clock out')
+    expect(startBreak.disabled).toBe(true)
+    expect(startBreak.getAttribute('aria-busy')).toBe('true')
+
+    app.setLoadingState(false)
+    expect(startBreak.textContent).toBe('Start break')
+    expect(startBreak.disabled).toBe(false)
+    expect(startBreak.hasAttribute('aria-busy')).toBe(false)
+  })
+})

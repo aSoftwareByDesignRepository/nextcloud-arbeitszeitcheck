@@ -80,7 +80,8 @@ $isBusinessTrips = $pageId === 'business-trips'
 	|| ($pageId === '' && strpos($currentPage, '/business-trips') !== false);
 $isSubstitutionRequests = $pageId === 'substitution-requests'
 	|| ($pageId === '' && strpos($currentPage, '/substitution-requests') !== false);
-$isCompliance = str_starts_with($pageId, 'compliance-')
+$isCompliance = $pageId === 'compliance'
+	|| str_starts_with($pageId, 'compliance-')
 	|| ($pageId === '' && strpos($currentPage, '/compliance') !== false);
 $isAdmin = str_starts_with($pageId, 'admin-')
 	|| ($pageId === '' && strpos($currentPage, '/admin') !== false);

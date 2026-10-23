@@ -151,7 +151,8 @@ final class CleanDanglingTariffRuleSetRefsTest extends TestCase
 
 		$output = $this->createMock(IOutput::class);
 		$output->expects($this->once())->method('info');
-		$output->expects($this->never())->method('warning');
+		$output->expects($this->once())->method('warning')
+			->with($this->stringContains('at_model_vacation_defaults'));
 
 		(new CleanDanglingTariffRuleSetRefs($db, $audit))->run($output);
 	}

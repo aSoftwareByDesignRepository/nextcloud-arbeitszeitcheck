@@ -78,6 +78,7 @@ class CleanDanglingTariffRuleSetRefs implements IRepairStep
 
 			$counts = [];
 			$total = 0;
+			$failed = [];
 			foreach (self::TABLES as $table) {
 				try {
 					if (!$this->db->tableExists($table)) {
@@ -93,12 +94,21 @@ class CleanDanglingTariffRuleSetRefs implements IRepairStep
 						$total += $affected;
 					}
 				} catch (\Throwable $e) {
-					// One broken layer table must not block cleanup of the rest.
+					// Best-effort cleanup only: one broken layer table must not
+					// block the rest; the failure is reported in the output below.
+					$failed[] = $table;
 					\OCP\Log\logger('arbeitszeitcheck')->warning(
 						'CleanDanglingTariffRuleSetRefs: failed for table ' . $table,
 						['app' => 'arbeitszeitcheck', 'exception' => $e]
 					);
 				}
+			}
+
+			if ($failed !== []) {
+				$output->warning(
+					'Skipped ' . count($failed) . ' vacation policy table(s) after errors: '
+					. implode(', ', $failed) . '.'
+				);
 			}
 
 			if ($total === 0) {

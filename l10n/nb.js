@@ -6030,7 +6030,9 @@
 		"Working time model assignment updated" : "Arbeidstidsmodelltildeling oppdatert",
 		"Working time model created" : "Arbeidstidsmodell opprettet",
 		"Working time model deleted" : "Arbeidstidsmodell slettet",
-		"Working time model updated" : "Arbeidstidsmodell oppdatert"
+		"Working time model updated" : "Arbeidstidsmodell oppdatert",
+		"%n critical violation" : "%n kritisk overtredelse",
+		"%n critical violations" : "%n kritiske overtredelser"
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

@@ -6030,7 +6030,9 @@
 		"Working time model assignment updated" : "Atribuição de modelo de tempo de trabalho atualizada",
 		"Working time model created" : "Modelo de tempo de trabalho criado",
 		"Working time model deleted" : "Modelo de tempo de trabalho excluído",
-		"Working time model updated" : "Modelo de tempo de trabalho atualizado"
+		"Working time model updated" : "Modelo de tempo de trabalho atualizado",
+		"%n critical violation" : "%n violação crítica",
+		"%n critical violations" : "%n violações críticas"
 		},
 		"nplurals=2; plural=(n > 1);"
 	);

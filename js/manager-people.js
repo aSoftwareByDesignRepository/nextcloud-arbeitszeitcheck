@@ -279,7 +279,7 @@
 		// Severity-colored: red when any unresolved violation is critical.
 		const cls = critical > 0 ? 'azc-badge azc-badge--danger' : 'azc-badge azc-badge--warning';
 		const text = critical > 0
-			? num + ' · ' + critical + ' ' + t('critical', 'critical')
+			? num + ' · ' + n('%n critical violation', '%n critical violations', critical)
 			: String(num);
 		const badge = '<span class="' + cls + '">' + escapeHtml(text) + '</span>';
 		return url

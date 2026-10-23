@@ -6030,7 +6030,9 @@
 		"Working time model assignment updated": "Working time model assignment updated",
 		"Working time model created": "Working time model created",
 		"Working time model deleted": "Working time model deleted",
-		"Working time model updated": "Working time model updated"
+		"Working time model updated": "Working time model updated",
+		"%n critical violation": "%n critical violation",
+		"%n critical violations": "%n critical violations"
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

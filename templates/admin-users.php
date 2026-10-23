@@ -25,7 +25,7 @@ $hiddenCount = (int)($_['hiddenCount'] ?? 0);
 $isAccessRestricted = (bool)($_['isAccessRestricted'] ?? false);
 $listTruncated = (bool)($_['truncated'] ?? false);
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
-$accessSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.settingsAccess');
+$accessSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.settingsSection', ['section' => \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ACCESS]);
 $exportBaseUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.exportUsers', ['format' => 'csv']);
 $exportHref = $exportBaseUrl . (str_contains($exportBaseUrl, '?') ? '&' : '?') . 'filter=' . rawurlencode($accessFilter);
 $filterIntro = $isAccessRestricted

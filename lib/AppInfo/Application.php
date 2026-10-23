@@ -23,6 +23,7 @@ use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
+use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
 use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
@@ -686,6 +687,13 @@ class Application extends App implements IBootstrap {
 		$context->registerService(ClearStuckKioskEnrollmentLocks::class, function ($c): ClearStuckKioskEnrollmentLocks {
 			return new ClearStuckKioskEnrollmentLocks(
 				$c->query(IDBConnection::class),
+			);
+		});
+
+		$context->registerService(CleanDanglingTariffRuleSetRefs::class, function ($c): CleanDanglingTariffRuleSetRefs {
+			return new CleanDanglingTariffRuleSetRefs(
+				$c->query(IDBConnection::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 			);
 		});
 

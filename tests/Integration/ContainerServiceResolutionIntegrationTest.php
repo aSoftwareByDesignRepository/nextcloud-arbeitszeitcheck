@@ -66,7 +66,7 @@ class ContainerServiceResolutionIntegrationTest extends TestCase
 	/** @dataProvider registeredServices */
 	public function testServiceResolvesFromContainer(string $fqcn): void
 	{
-		$service = \OCP\Server::get($fqcn);
+		$service = \OC::$server->get($fqcn);
 		$this->assertInstanceOf($fqcn, $service, $fqcn . ' could not be resolved from the container');
 	}
 

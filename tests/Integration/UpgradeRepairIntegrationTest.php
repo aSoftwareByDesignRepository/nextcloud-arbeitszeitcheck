@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
+use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
@@ -34,6 +35,7 @@ class UpgradeRepairIntegrationTest extends TestCase
 			BackfillAbsenceDays::class,
 			ReleaseStuckPendingAbsences::class,
 			RepairOrphanedPausedEntries::class,
+			CleanDanglingTariffRuleSetRefs::class,
 			UninstallDropTables::class,
 			BackupBeforeUpdate::class,
 		] as $class) {
@@ -152,6 +154,17 @@ class UpgradeRepairIntegrationTest extends TestCase
 		$output->method('startProgress');
 		$output->method('advance');
 		$output->method('finishProgress');
+
+		$step->run($output);
+		$this->addToAssertionCount(1);
+	}
+
+	public function testCleanDanglingTariffRuleSetRefsRunsWithoutFatal(): void
+	{
+		/** @var CleanDanglingTariffRuleSetRefs $step */
+		$step = \OCP\Server::get(CleanDanglingTariffRuleSetRefs::class);
+		$output = $this->createMock(IOutput::class);
+		$output->method('info');
 
 		$step->run($output);
 		$this->addToAssertionCount(1);

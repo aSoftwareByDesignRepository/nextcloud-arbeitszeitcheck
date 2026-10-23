@@ -65,6 +65,7 @@ class AuditLogPresenter
 		'tariff_rule_set_activated' => 'Tariff rule set activated',
 		'tariff_rule_set_created' => 'Tariff rule set created',
 		'tariff_rule_set_deleted' => 'Tariff rule set deleted',
+		'tariff_rule_set_refs_cleaned' => 'Dangling tariff rule set references cleaned',
 		'tariff_rule_set_retired' => 'Tariff rule set retired',
 		'tariff_rule_set_updated' => 'Tariff rule set updated',
 		'team_created' => 'Team created',

@@ -428,6 +428,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 			<step>OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences</step>
 			<step>OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries</step>
 			<step>OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks</step>
+			<step>OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs</step>
 		</post-migration>
 		<uninstall>
 			<step>OCA\ArbeitszeitCheck\Repair\UninstallDropTables</step>

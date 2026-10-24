@@ -577,6 +577,18 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			await shot(page, `azc-admin-settings-${section}.png`, { settleMs: 500 });
 		}
 
+		/* --- compliance section detail: the org-level paid-break cap field
+		   sits below the fold — scroll it into frame for an honest capture. */
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/settings/compliance');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await dismissToasts(page);
+		if (await page.locator('#breakPolicyPaidCapMinutes').count()) {
+			await shot(page, 'azc-admin-settings-compliance-paid-break.png', {
+				scroll: '#breakPolicyPaidCapMinutes',
+				settleMs: 300,
+			});
+		}
+
 		/* --- user detail (first linked employee row) --- */
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
@@ -656,9 +668,9 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await resetUserTheme(page).catch(() => {});
 	});
 
-	test('craft admin dialogs + filter toolbars (3.5.15 inventory)', async ({ page }) => {
+	test('craft admin dialogs + filter toolbars (3.5.15 inventory)', async ({ page, browser }) => {
 		test.skip(!hasCreds('ADMIN'), 'Requires NC_ADMIN_* creds');
-		test.setTimeout(420_000);
+		test.setTimeout(480_000);
 
 		await login(page, credsFromEnv('ADMIN'));
 		await resetUserTheme(page).catch(() => {});
@@ -673,6 +685,151 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await shot(page, 'azc-admin-tariff-rules-modal.png', { settleMs: 300 });
 		await tariffModal.locator('[data-dismiss="modal"]').first().click();
 		await expect(tariffModal).toBeHidden({ timeout: 10_000 });
+
+		/* --- working-time-model editor: paid-break controls + live impact
+		   preview (TVöD §6), and the employee time-entries paid line.
+		   Seed a dedicated model via API, assign the shared employee to it
+		   (assignment restored in finally), let the employee record one
+		   9h+1h-break day in 1993 so the allocator snapshots a paid portion,
+		   then: (a) open the model editor, change the cap → the debounced
+		   preview GET fires with REAL affected counts (the callout only
+		   renders in edit mode when flag/cap differ from persisted state);
+		   (b) capture the employee list cell's "Net: … · paid break: …" line. */
+		let pbModelId = null;
+		let pbEntryId = null;
+		let pbOrigAssignment = null;
+		const pbEmployeeUid = hasCreds('EMPLOYEE') ? credsFromEnv('EMPLOYEE').username : null;
+		let empCtx = null;
+		let empPage = null;
+		try {
+			const pbModel = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/admin/working-time-models', {
+				data: {
+					name: `AZC craft paid-break ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+					description: 'craft capture fixture — deleted after shot',
+					type: 'full_time',
+					weeklyHours: 40,
+					dailyHours: 8,
+					workDaysPerWeek: 5,
+					breakRules: { breaks_count_as_work: true, paid_break_cap_minutes: 45 },
+				},
+			});
+			pbModelId = pbModel.json?.model?.id ?? null;
+			expect(pbModelId, `paid-break model seed failed: ${JSON.stringify(pbModel.json)}`).toBeTruthy();
+
+			if (pbEmployeeUid) {
+				const userBefore = await apiAllowFailure(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${pbEmployeeUid}`);
+				const origModel = userBefore.json?.user?.userWorkingTimeModel ?? null;
+				if (origModel?.workingTimeModelId) {
+					pbOrigAssignment = {
+						workingTimeModelId: origModel.workingTimeModelId,
+						startDate: userBefore.json?.user?.workingTimeModelStartDate ?? null,
+						endDate: userBefore.json?.user?.workingTimeModelEndDate ?? null,
+						vacationDaysPerYear: userBefore.json?.user?.vacationDaysPerYear ?? null,
+						germanState: userBefore.json?.user?.germanState ?? null,
+					};
+				}
+				await apiAllowFailure(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${pbEmployeeUid}/working-time-model`, {
+					data: { workingTimeModelId: pbModelId, startDate: '1993-01-01' },
+				});
+
+				empCtx = await browser.newContext();
+				empPage = await empCtx.newPage();
+				await login(empPage, credsFromEnv('EMPLOYEE'));
+				// Scan 1993 for a free day (same convention as paid-breaks.spec).
+				const pbBase = new Date('1993-03-01T00:00:00Z');
+				let pbWorkDate = null;
+				for (let i = 0; i < 40 && !pbWorkDate; i++) {
+					const d = new Date(pbBase);
+					d.setUTCDate(d.getUTCDate() + i + Math.floor(Math.random() * 200));
+					const date = d.toISOString().slice(0, 10);
+					const res = await apiAllowFailure(empPage, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
+						data: {
+							date,
+							startTime: '08:00',
+							endTime: '17:00',
+							breaks: [{ start: '12:00', end: '13:00' }],
+							justification: 'craft paid-break capture entry.',
+						},
+					});
+					if (res.ok && res.json?.success) {
+						pbWorkDate = date;
+						pbEntryId = res.json.entry?.id ?? null;
+					}
+				}
+				expect(pbWorkDate, 'employee could not create the paid-break craft entry').toBeTruthy();
+
+				// (a) Admin editor with the impact preview mid-fire.
+				await gotoApp(page, '/apps/arbeitszeitcheck/admin/working-time-models');
+				await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+				const pbRow = page.locator(`tr[data-model-id="${pbModelId}"]`);
+				await pbRow.scrollIntoViewIfNeeded();
+				// dispatchEvent: the actions-cell overlay reveals on row hover;
+				// firing the handler directly avoids a pointer hit-test stall.
+				await pbRow.locator('[data-action="edit-model"]').dispatchEvent('click');
+				const pbPanel = page.locator('#wtm-editor-panel');
+				await expect(pbPanel).toBeVisible({ timeout: 15_000 });
+				await expect(pbPanel.locator('#wtm-model-breaks-count-as-work')).toBeChecked();
+				const pbCap = pbPanel.locator('#wtm-model-paid-break-cap');
+				await expect(pbCap).toHaveValue('45');
+				const impactResp = page.waitForResponse(
+					(r) => r.url().includes('/paid-break-impact') && r.status() === 200,
+					{ timeout: 15_000 });
+				await pbCap.fill('30');
+				await impactResp;
+				await expect(pbPanel.locator('#wtm-model-paid-break-impact'))
+					.toBeVisible({ timeout: 10_000 });
+				// Scroll the callout itself into frame — the editor is taller
+				// than the viewport; a panel-top scroll strands the preview
+				// (and the flag/cap block sits just above it).
+				await shot(page, 'azc-admin-working-time-models-editor-paid-break.png', {
+					scroll: '#wtm-model-paid-break-impact',
+					settleMs: 300,
+				});
+				await pbPanel.locator('[data-action="close-editor"]').first().click();
+				await expect(pbPanel.locator('#wtm-model-form')).toHaveCount(0, { timeout: 10_000 });
+
+				// (b) Employee list cell: "Net: 8.00 h · paid break: 45 min".
+				// Durable postcondition first — never capture a surface whose
+				// paid snapshot silently failed (e.g. pending-approval path).
+				const pbList = await apiAllowFailure(empPage, 'GET', `/apps/arbeitszeitcheck/api/time-entries?start_date=${pbWorkDate}&end_date=${pbWorkDate}`);
+				const pbRowJson = (pbList.json?.entries || pbList.json?.data?.entries || [])
+					.find((e) => Number(e.id) === Number(pbEntryId));
+				expect(
+					Number(pbRowJson?.paidBreakSeconds ?? 0),
+					`paid snapshot missing on entry ${pbEntryId}: ${JSON.stringify(pbRowJson)}`,
+				).toBeGreaterThan(0);
+
+				await empPage.goto(`/apps/arbeitszeitcheck/time-entries?start_date=${pbWorkDate}&end_date=${pbWorkDate}`);
+				await empPage.waitForSelector('#azc-main-content', { timeout: 30_000 });
+				// Numeric needle, locale-safe: 8.00 net + 0.75h paid = "8.75".
+				await expect(
+					empPage.locator('#time-entries-table td[data-label]', { hasText: '8.75' }).first(),
+				).toBeVisible({ timeout: 15_000 });
+				await shot(empPage, 'azc-time-entries-paid-break.png', {
+					waitFor: '#time-entries-table, .azc-empty-state',
+					scroll: '#time-entries-table',
+					settleMs: 300,
+				});
+			}
+		} finally {
+			if (empCtx) {
+				if (pbEntryId && empPage) {
+					// Reuse the logged-in page — a fresh blank page has no
+					// OC.requestToken for the API helper.
+					await apiAllowFailure(empPage, 'DELETE', `/apps/arbeitszeitcheck/api/time-entries/${pbEntryId}`).catch(() => {});
+				}
+				await empCtx.close().catch(() => {});
+			}
+			if (pbEmployeeUid) {
+				const restore = pbOrigAssignment
+					? { ...pbOrigAssignment }
+					: { workingTimeModelId: '' };
+				await apiAllowFailure(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${pbEmployeeUid}/working-time-model`, { data: restore });
+			}
+			if (pbModelId) {
+				await apiAllowFailure(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/working-time-models/${pbModelId}`);
+			}
+		}
 
 		/* --- holiday calendar filters: year select re-queries the list --- */
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/holidays');

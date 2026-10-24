@@ -75,6 +75,18 @@ $mutants = [
 		'replacement' => '',
 		'runs' => 'tests/Unit/BackgroundJob/PaidBreakRecomputeJobTest.php',
 	],
+	[
+		'name' => 'dedupe marker never cleared: post-completion enqueues swallowed (dedupe_marker_lost_enqueue)',
+		'needle' => '$this->clearEnqueueMarker($modelId, is_string($userId) ? $userId : null);',
+		'replacement' => '',
+		'runs' => 'tests/Unit/BackgroundJob/PaidBreakRecomputeJobTest.php',
+	],
+	[
+		'name' => 'marker add unguarded: dedupe block removed entirely',
+		'needle' => 'if ($markerCache !== null && !$markerCache->add($markerKey, 1, self::ENQUEUE_MARKER_TTL)) {',
+		'replacement' => 'if (false) {',
+		'runs' => 'tests/Unit/BackgroundJob/PaidBreakRecomputeJobTest.php',
+	],
 ];
 
 function runSuite(string $phpunit, string $testFile, string $root): int

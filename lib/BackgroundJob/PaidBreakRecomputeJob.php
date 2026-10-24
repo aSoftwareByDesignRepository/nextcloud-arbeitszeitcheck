@@ -37,6 +37,8 @@ use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
 use OCP\BackgroundJob\QueuedJob;
+use OCP\ICacheFactory;
+use OCP\IMemcache;
 use Psr\Log\LoggerInterface;
 
 class PaidBreakRecomputeJob extends QueuedJob
@@ -58,6 +60,7 @@ class PaidBreakRecomputeJob extends QueuedJob
 		private AuditLogMapper $auditLogMapper,
 		private IJobList $jobList,
 		private LoggerInterface $logger,
+		private ?ICacheFactory $cacheFactory = null,
 	) {
 		parent::__construct($timeFactory);
 	}
@@ -66,54 +69,104 @@ class PaidBreakRecomputeJob extends QueuedJob
 	 * Queue a model-wide recompute, deduplicated on the logical target.
 	 * Returns true when a job was actually enqueued.
 	 */
-	public static function enqueueForModel(IJobList $jobList, int $workingTimeModelId): bool
+	public static function enqueueForModel(IJobList $jobList, int $workingTimeModelId, ?ICacheFactory $cacheFactory = null): bool
 	{
 		if ($workingTimeModelId <= 0) {
 			return false;
 		}
-		return self::enqueue($jobList, [self::ARG_MODEL_ID => $workingTimeModelId]);
+		return self::enqueue($jobList, [self::ARG_MODEL_ID => $workingTimeModelId], $cacheFactory);
 	}
 
 	/**
 	 * Queue a full-history recompute for one user, deduplicated on the user.
 	 */
-	public static function enqueueForUser(IJobList $jobList, string $userId): bool
+	public static function enqueueForUser(IJobList $jobList, string $userId, ?ICacheFactory $cacheFactory = null): bool
 	{
 		if ($userId === '') {
 			return false;
 		}
-		return self::enqueue($jobList, [self::ARG_USER_ID => $userId]);
+		return self::enqueue($jobList, [self::ARG_USER_ID => $userId], $cacheFactory);
 	}
 
 	/**
 	 * Dedupe window for the enqueue marker — long enough to cover the
 	 * check→add race; the isQueued() scan still dedupes jobs that sit in the
-	 * queue longer than the marker lives.
+	 * queue longer than the marker lives. The marker is released inside
+	 * run() at job start — it must never outlive the job it guards, or a
+	 * post-completion enqueue is silently dropped while callers report
+	 * success.
 	 */
 	private const ENQUEUE_MARKER_TTL = 600;
+
+	private const ENQUEUE_CACHE_PREFIX = 'azc_pbr_enqueue';
 
 	/**
 	 * @param array<string, mixed> $target logical target keys only
 	 */
-	private static function enqueue(IJobList $jobList, array $target): bool
+	private static function enqueue(IJobList $jobList, array $target, ?ICacheFactory $cacheFactory = null): bool
 	{
 		if (self::isQueued($jobList, $target)) {
 			return false;
 		}
-		// Atomic marker closes the check→add TOCTOU: ILockingCache::add only
+		// Atomic marker closes the check→add TOCTOU: IMemcache::add() only
 		// succeeds for the first writer across processes. The job effect is
 		// idempotent regardless — this just avoids a duplicate queue row.
+		$markerCache = self::enqueueMarkerCache($cacheFactory);
+		$markerKey = self::enqueueMarkerKey($target);
+		$markerSet = false;
 		try {
-			$cache = \OCP\Server::get(\OCP\ICacheFactory::class)->createLockingCache('azc_pbr_enqueue');
-			if (!$cache->add('m_' . md5(json_encode($target) ?: ''), 1, self::ENQUEUE_MARKER_TTL)) {
+			if ($markerCache !== null && !$markerCache->add($markerKey, 1, self::ENQUEUE_MARKER_TTL)) {
 				return false;
 			}
+			$markerSet = $markerCache !== null;
 		} catch (\Throwable) {
-			// No locking cache backend — isQueued scan above remains; the job
-			// is idempotent so a duplicate enqueue is benign.
+			// Backend hiccup mid-add → degrade to the isQueued scan; the
+			// job is idempotent so a duplicate enqueue is benign.
 		}
-		$jobList->add(self::class, $target);
+		try {
+			$jobList->add(self::class, $target);
+		} catch (\Throwable $e) {
+			// The marker we just set must not outlive a failed queue write —
+			// an orphan would swallow the next enqueue for the TTL remainder
+			// with no job existing. (Only our own marker is removed: add()
+			// returned true, so no other process holds this key.)
+			if ($markerSet && $markerCache !== null) {
+				try {
+					$markerCache->remove($markerKey);
+				} catch (\Throwable) {
+					// best-effort cleanup
+				}
+			}
+			throw $e;
+		}
 		return true;
+	}
+
+	/**
+	 * Locking-cache backend for the enqueue marker; null when unavailable
+	 * (unit context, no locking backend configured → createLocking() yields
+	 * a NullCache whose add() always succeeds, and the isQueued() scan
+	 * remains as the dedupe — a duplicate run stays idempotent-benign).
+	 */
+	private static function enqueueMarkerCache(?ICacheFactory $cacheFactory): ?IMemcache
+	{
+		try {
+			$cacheFactory ??= \OCP\Server::get(ICacheFactory::class);
+			return $cacheFactory->createLocking(self::ENQUEUE_CACHE_PREFIX);
+		} catch (\Throwable) {
+			return null;
+		}
+	}
+
+	/**
+	 * Marker key derived from the logical target only — cursor/continuation
+	 * arguments never change which marker guards the target.
+	 *
+	 * @param array<string, mixed> $target
+	 */
+	private static function enqueueMarkerKey(array $target): string
+	{
+		return 'm_' . md5(json_encode($target) ?: '');
 	}
 
 	/**
@@ -127,8 +180,15 @@ class PaidBreakRecomputeJob extends QueuedJob
 	{
 		$offset = 0;
 		do {
-			$jobs = $jobList->getJobs(self::class, 50, $offset);
-			foreach ($jobs as $job) {
+			$count = 0;
+			// Iterate lazily: buildJob() resolves job classes through the DI
+			// container, which returns a shared instance mutated per row —
+			// getJobs() materializes the whole page first, so every element
+			// would expose only the LAST row's argument. Reading the argument
+			// inside the foreach sees each row's state before the next
+			// hydration overwrites it.
+			foreach ($jobList->getJobsIterator(self::class, 50, $offset) as $job) {
+				$count++;
 				$arg = $job->getArgument();
 				if (!is_array($arg)) {
 					continue;
@@ -144,8 +204,8 @@ class PaidBreakRecomputeJob extends QueuedJob
 					return true;
 				}
 			}
-			$offset += count($jobs);
-		} while (count($jobs) === 50);
+			$offset += $count;
+		} while ($count === 50);
 		return false;
 	}
 
@@ -156,6 +216,15 @@ class PaidBreakRecomputeJob extends QueuedJob
 		}
 		$modelId = (int)($argument[self::ARG_MODEL_ID] ?? 0);
 		$userId = $argument[self::ARG_USER_ID] ?? null;
+
+		// The oc_jobs row is already gone (QueuedJob::start() removes it
+		// before run()), so the enqueue marker must be released now —
+		// otherwise every legitimate re-enqueue for this target is
+		// silently swallowed for the marker TTL remainder while callers
+		// still report success (dedupe_marker_lost_enqueue). Worklist and
+		// policy are re-read at execution, so a post-start edit covered by
+		// a fresh enqueue converges correctly.
+		$this->clearEnqueueMarker($modelId, is_string($userId) ? $userId : null);
 
 		// Worklist: (user, windowStart, windowEnd) triples. Model mode scans
 		// every assignment row ever written for the model — including
@@ -263,6 +332,36 @@ class PaidBreakRecomputeJob extends QueuedJob
 		}
 
 		$this->writeAudit($argument, $stats);
+	}
+
+	/**
+	 * Release the dedupe marker for this job's logical target so an edit
+	 * landing after job start can queue a fresh recompute. The recompute
+	 * is idempotent, so overlapping queued runs converge. Best-effort:
+	 * without a locking backend there is no marker to clear.
+	 */
+	private function clearEnqueueMarker(int $modelId, ?string $userId): void
+	{
+		$target = [];
+		if (is_string($userId) && $userId !== '') {
+			$target[self::ARG_USER_ID] = $userId;
+		} elseif ($modelId > 0) {
+			$target[self::ARG_MODEL_ID] = $modelId;
+		} else {
+			return;
+		}
+		$cache = self::enqueueMarkerCache($this->cacheFactory);
+		if ($cache === null) {
+			return;
+		}
+		try {
+			$cache->remove(self::enqueueMarkerKey($target));
+		} catch (\Throwable $e) {
+			$this->logger->warning('PaidBreakRecomputeJob: could not clear enqueue marker: ' . $e->getMessage(), [
+				'app' => 'arbeitszeitcheck',
+				'exception' => $e,
+			]);
+		}
 	}
 
 	/**

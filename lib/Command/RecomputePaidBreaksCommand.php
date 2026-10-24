@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Command;
 
-use OCA\Arbeitszeitcheck\BackgroundJob\PaidBreakRecomputeJob;
-use OCA\Arbeitszeitcheck\Db\AuditLogMapper;
-use OCA\Arbeitszeitcheck\Db\TimeEntryMapper;
-use OCA\Arbeitszeitcheck\Db\UserWorkingTimeModelMapper;
-use OCA\Arbeitszeitcheck\Service\TimeTrackingService;
+use OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
+use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\BackgroundJob\IJobList;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;

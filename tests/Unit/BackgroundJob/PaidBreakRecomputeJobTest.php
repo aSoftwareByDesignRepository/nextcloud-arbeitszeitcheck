@@ -106,7 +106,7 @@ class PaidBreakRecomputeJobTest extends TestCase
 		);
 	}
 
-	private function job(): PaidBreakRecomputeJob
+	private function job(?\OCP\ICacheFactory $cacheFactory = null): PaidBreakRecomputeJob
 	{
 		return new PaidBreakRecomputeJob(
 			$this->createMock(ITimeFactory::class),
@@ -116,6 +116,7 @@ class PaidBreakRecomputeJobTest extends TestCase
 			$this->auditLog,
 			$this->jobList,
 			new NullLogger(),
+			$cacheFactory,
 		);
 	}
 
@@ -316,7 +317,7 @@ class PaidBreakRecomputeJobTest extends TestCase
 	public function testEnqueueForUserDedupesExistingJob(): void
 	{
 		$this->jobList = $this->createMock(IJobList::class);
-		$this->jobList->method('getJobs')->willReturnCallback(
+		$this->jobList->method('getJobsIterator')->willReturnCallback(
 			function (string $class, int $limit, int $offset): array {
 				if ($offset !== 0) {
 					return [];
@@ -334,11 +335,11 @@ class PaidBreakRecomputeJobTest extends TestCase
 
 	public function testEnqueueIgnoresJobQueuedForDifferentTarget(): void
 	{
-		// Regression: getJobs() returns IJob objects, not row arrays — the
+		// Regression: the job list yields IJob objects, not row arrays — the
 		// dedupe scan must read getArgument(), and a queued job for another
 		// target must not block (or crash) a new enqueue.
 		$this->jobList = $this->createMock(IJobList::class);
-		$this->jobList->method('getJobs')->willReturnCallback(
+		$this->jobList->method('getJobsIterator')->willReturnCallback(
 			function (string $class, int $limit, int $offset): array {
 				if ($offset !== 0) {
 					return [];
@@ -360,12 +361,123 @@ class PaidBreakRecomputeJobTest extends TestCase
 	public function testEnqueueForModelAddsWhenNotQueued(): void
 	{
 		$this->jobList = $this->createMock(IJobList::class);
-		$this->jobList->method('getJobs')->willReturn([]);
+		$this->jobList->method('getJobsIterator')->willReturn([]);
 		$this->jobList->expects($this->once())->method('add')->with(
 			PaidBreakRecomputeJob::class,
 			[PaidBreakRecomputeJob::ARG_MODEL_ID => 7]
 		);
 		$this->assertTrue(PaidBreakRecomputeJob::enqueueForModel($this->jobList, 7));
 		$this->assertFalse(PaidBreakRecomputeJob::enqueueForModel($this->jobList, 0));
+	}
+
+	/**
+	 * In-memory locking cache with real add/remove semantics — models a
+	 * deployed memcache.locking backend so the marker path is testable.
+	 *
+	 * @param array<string,bool> &$markers shared marker state
+	 * @return array{0: \OCP\ICacheFactory, 1: \OCP\IMemcache}
+	 */
+	private function fakeMarkerBackend(array &$markers): array
+	{
+		$memcache = $this->createMock(\OCP\IMemcache::class);
+		$memcache->method('add')->willReturnCallback(
+			function ($key, $value, $ttl = 0) use (&$markers): bool {
+				if (isset($markers[$key])) {
+					return false;
+				}
+				$markers[$key] = true;
+				return true;
+			}
+		);
+		$memcache->method('remove')->willReturnCallback(
+			function ($key) use (&$markers): bool {
+				unset($markers[$key]);
+				return true;
+			}
+		);
+		$memcache->method('hasKey')->willReturnCallback(
+			function ($key) use (&$markers): bool {
+				return isset($markers[$key]);
+			}
+		);
+		$factory = $this->createMock(\OCP\ICacheFactory::class);
+		$factory->method('createLocking')->willReturn($memcache);
+		return [$factory, $memcache];
+	}
+
+	public function testEnqueueMarkerBlocksPostDrainUntilRunClearsIt(): void
+	{
+		// dedupe_marker_lost_enqueue: once the job drains oc_jobs the
+		// isQueued() scan no longer sees it, so a marker that outlives the
+		// job silently drops the next legitimate enqueue. run() must clear
+		// the marker at job start so the post-completion enqueue lands.
+		$markers = [];
+		[$factory] = $this->fakeMarkerBackend($markers);
+
+		$this->jobList = $this->createMock(IJobList::class);
+		$this->jobList->method('getJobsIterator')->willReturn([]); // drained queue
+		$this->jobList->method('add')->willReturnCallback(
+			function ($class, $argument): void {
+				$this->addedJobs[] = [$class, $argument];
+			}
+		);
+
+		// First enqueue lands and sets the marker.
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1', $factory));
+		$this->assertCount(1, $this->addedJobs);
+
+		// Marker still set, job row gone → the marker alone blocks the
+		// enqueue. This pinpoints the marker's role in the swallow window.
+		$this->assertFalse(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1', $factory));
+		$this->assertCount(1, $this->addedJobs);
+
+		// run() clears the marker at job start → post-completion enqueue lands.
+		$this->runJob($this->job($factory), [PaidBreakRecomputeJob::ARG_USER_ID => 'u1']);
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1', $factory));
+		$this->assertCount(2, $this->addedJobs);
+	}
+
+	public function testMarkerClearUsesLogicalTargetFromContinuationArgs(): void
+	{
+		$markers = [];
+		[$factory, $memcache] = $this->fakeMarkerBackend($markers);
+
+		$this->jobList = $this->createMock(IJobList::class);
+		$this->jobList->method('getJobsIterator')->willReturn([]);
+		$this->jobList->method('add')->willReturnCallback(
+			function ($class, $argument): void {
+				$this->addedJobs[] = [$class, $argument];
+			}
+		);
+
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForModel($this->jobList, 7, $factory));
+		$this->assertFalse(PaidBreakRecomputeJob::enqueueForModel($this->jobList, 7, $factory));
+
+		// A continuation argument (cursor + stats attached) targets the same
+		// logical marker — the model key must be reconstructed exactly.
+		$this->uwtmMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->runJob($this->job($factory), [
+			PaidBreakRecomputeJob::ARG_MODEL_ID => 7,
+			PaidBreakRecomputeJob::ARG_ASSIGNMENT_IDX => 3,
+			PaidBreakRecomputeJob::ARG_AFTER_ENTRY_ID => 55,
+			PaidBreakRecomputeJob::ARG_STATS => ['entries' => 12, 'users' => ['u9']],
+		]);
+
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForModel($this->jobList, 7, $factory));
+		$this->assertCount(2, $this->addedJobs);
+	}
+
+	public function testEnqueueStillAddsWhenMarkerBackendUnavailable(): void
+	{
+		// No locking backend / factory failure → degrade to the isQueued
+		// scan; a duplicate run is idempotent-benign but a lost enqueue is not.
+		$factory = $this->createMock(\OCP\ICacheFactory::class);
+		$factory->method('createLocking')->willThrowException(new \RuntimeException('no backend'));
+
+		$this->jobList = $this->createMock(IJobList::class);
+		$this->jobList->method('getJobsIterator')->willReturn([]);
+		$this->jobList->expects($this->once())->method('add');
+
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1', $factory));
 	}
 }

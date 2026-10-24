@@ -3887,6 +3887,23 @@ class AdminController extends Controller
 		if ($outcome['written']) {
 			$resolver->clearCache();
 			$this->clearLaborLawProfileCache();
+			// Post-commit enqueue: the policy write is durable, so the
+			// recompute jobs and their dedupe markers now correspond to
+			// committed state (dedupe collapses repeats; the job re-reads
+			// the policy at execution).
+			foreach ((array)($outcome['recompute_model_ids'] ?? []) as $wtmId) {
+				try {
+					\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForModel(
+						\OCP\Server::get(\OCP\BackgroundJob\IJobList::class),
+						(int)$wtmId
+					);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'Org paid-break-cap recompute enqueue failed: ' . $e->getMessage(),
+						['exception' => $e, 'working_time_model_id' => (int)$wtmId]
+					);
+				}
+			}
 		}
 		return $outcome['doc'];
 	}
@@ -4004,30 +4021,24 @@ class AdminController extends Controller
 		);
 
 		$paidCapChanged = ($current['paid_break_cap_minutes'] ?? null) !== ($normalized['paid_break_cap_minutes'] ?? null);
+		$recomputeModelIds = [];
 		if ($paidCapChanged) {
 			// NH-04: the org-cap delta changes the effective cap of every model
 			// that inherits it (flag on, no own cap — explicit caps incl. 0 win).
-			// Enqueued inside the same transaction so a rolled-back policy write
-			// cannot leave a phantom recompute queued; dedupe collapses repeats.
-			try {
-				$jobList = \OCP\Server::get(\OCP\BackgroundJob\IJobList::class);
-				foreach ($this->workingTimeModelMapper->findAll() as $wtm) {
-					$rules = $resolver->normalizeModelRules($wtm->getBreakRulesArray() ?? []);
-					if ($rules['breaks_count_as_work'] === true && $rules['paid_break_cap_minutes'] === null) {
-						\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForModel(
-							$jobList, (int)$wtm->getId()
-						);
-					}
+			// Only the target scan runs under the lock; the enqueue itself is
+			// deferred to post-commit in persistBreakPolicyFromParams() — a
+			// rolled-back policy write must not leave a phantom oc_jobs row
+			// OR an orphaned non-transactional enqueue marker that would
+			// swallow the next save's recompute.
+			foreach ($this->workingTimeModelMapper->findAll() as $wtm) {
+				$rules = $resolver->normalizeModelRules($wtm->getBreakRulesArray() ?? []);
+				if ($rules['breaks_count_as_work'] === true && $rules['paid_break_cap_minutes'] === null) {
+					$recomputeModelIds[] = (int)$wtm->getId();
 				}
-			} catch (\Throwable $e) {
-				\OCP\Log\logger('arbeitszeitcheck')->warning(
-					'Org paid-break-cap recompute enqueue failed: ' . $e->getMessage(),
-					['exception' => $e]
-				);
 			}
 		}
 
-		return ['doc' => $normalized, 'written' => true];
+		return ['doc' => $normalized, 'written' => true, 'recompute_model_ids' => $recomputeModelIds];
 	}
 
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null;

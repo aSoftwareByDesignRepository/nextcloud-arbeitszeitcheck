@@ -163,7 +163,7 @@ class ComplianceService
      * break minutes (and AZG split patterns, when configured) are not met —
      * or null when the entry is compliant.
      *
-     * @return array{afterHours: float, breakMinutes: int}|null
+     * @return array{afterHours: float, breakMinutes: int, counted_minutes: int, missing_minutes: int, min_break_minutes: int}|null
      */
     private function findViolatedBreakTier(TimeEntry $timeEntry): ?array
     {
@@ -194,8 +194,41 @@ class ComplianceService
             (int)$tier['breakMinutes'],
             $profile->allowedBreakSplitPatterns,
         );
+        if ($ok) {
+            return null;
+        }
 
-        return $ok ? null : $tier;
+        // B2: make the block explainable — how much counted and how much is
+        // still missing under the countable-break floor.
+        $counted = array_sum($portions);
+        return $tier + [
+            'counted_minutes' => $counted,
+            'missing_minutes' => max(0, (int)$tier['breakMinutes'] - $counted),
+            'min_break_minutes' => (int)$profile->minBreakMinutes,
+        ];
+    }
+
+    /**
+     * Structured detail map for the §4 save-block response (B2-MH-02) —
+     * additive to the human message so clients can render field-level errors.
+     *
+     * @return array{required_break_minutes: int, counted_break_minutes: int, missing_break_minutes: int, min_break_minutes: int}|null
+     */
+    public function breakBlockDetailsForCompletedEntry(TimeEntry $timeEntry): ?array
+    {
+        if ($timeEntry->getStatus() !== TimeEntry::STATUS_COMPLETED || $timeEntry->getEndTime() === null) {
+            return null;
+        }
+        $tier = $this->findViolatedBreakTier($timeEntry);
+        if ($tier === null) {
+            return null;
+        }
+        return [
+            'required_break_minutes' => (int)$tier['breakMinutes'],
+            'counted_break_minutes' => (int)$tier['counted_minutes'],
+            'missing_break_minutes' => (int)$tier['missing_minutes'],
+            'min_break_minutes' => (int)$tier['min_break_minutes'],
+        ];
     }
 
     private function missingBreakMessage(array $tier, ?string $userId = null): string
@@ -203,7 +236,7 @@ class ComplianceService
         // %2$s (not %2$d): CH ArG Art. 15 uses a 5.5 h threshold — (int)5.5 === 5
         // would lie to employees and auditors. Keep the legacy %2$d msgid unused
         // but present in l10n for one release (parallel keys).
-        return $this->l10n->t(
+        $base = $this->l10n->t(
             'Mandatory %1$d-minute break missing after %2$s hours of work (%3$s)',
             [
                 (int)$tier['breakMinutes'],
@@ -211,6 +244,18 @@ class ComplianceService
                 $this->profile($userId)->lawLabel('breaks'),
             ]
         );
+        // B2-MH-01: explain *why* a recorded break did not count.
+        if (isset($tier['counted_minutes'], $tier['missing_minutes'], $tier['min_break_minutes'])) {
+            $base .= ' ' . $this->l10n->t(
+                'Recorded break: %1$d minutes — %2$d minutes still missing (only breaks of at least %3$d minutes count; the break remains legally required — pay crediting only changes remuneration).',
+                [
+                    (int)$tier['counted_minutes'],
+                    (int)$tier['missing_minutes'],
+                    (int)$tier['min_break_minutes'],
+                ]
+            );
+        }
+        return $base;
     }
 
     /**

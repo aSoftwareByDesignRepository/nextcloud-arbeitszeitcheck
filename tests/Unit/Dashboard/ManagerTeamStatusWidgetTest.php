@@ -26,6 +26,9 @@ class ManagerTeamStatusWidgetTest extends TestCase {
 		$this->l10n->method('t')->willReturnCallback(
 			static fn (string $s, array $p = []): string => $p === [] ? $s : (string)vsprintf($s, $p)
 		);
+		$this->l10n->method('n')->willReturnCallback(
+			static fn (string $singular, string $plural, int $count): string => $count === 1 ? $singular : str_replace('%n', (string)$count, $plural)
+		);
 
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->urlGenerator->method('imagePath')->willReturn('/apps/arbeitszeitcheck/img/app-dark.svg');

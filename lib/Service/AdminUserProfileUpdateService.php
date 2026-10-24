@@ -337,6 +337,7 @@ class AdminUserProfileUpdateService
 		// transaction: a failure anywhere must never leave a half-written
 		// model or an assignment pointing at a row that was rolled back.
 		// Nested inside updateProfile's atomic this degrades to a savepoint.
+		$assignmentChanged = false;
 		$updated = $this->atomic(function () use (
 			$userId,
 			$params,
@@ -346,7 +347,8 @@ class AdminUserProfileUpdateService
 			$vacationDaysPerYear,
 			$startDate,
 			$endDate,
-			$performedBy
+			$performedBy,
+			&$assignmentChanged
 		): ?UserWorkingTimeModel {
 			// Resolve the row this dialog edits *in place*. Using the editable
 			// resolution (active-today, else the latest assignment) instead of
@@ -387,6 +389,7 @@ class AdminUserProfileUpdateService
 					$currentModel->setUpdatedAt(new \DateTime());
 					$this->assertEntityValid($currentModel->validate());
 					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+					$assignmentChanged = true;
 					$this->auditLogMapper->logAction(
 						$userId,
 						'user_working_time_model_updated',
@@ -410,6 +413,7 @@ class AdminUserProfileUpdateService
 				$newModel->setUpdatedAt(new \DateTime());
 				$this->assertEntityValid($newModel->validate());
 				$updated = $this->userWorkingTimeModelMapper->insert($newModel);
+				$assignmentChanged = true;
 				$this->auditLogMapper->logAction(
 					$userId,
 					'user_working_time_model_created',
@@ -432,6 +436,7 @@ class AdminUserProfileUpdateService
 				$startsInFuture = $currentModel->getStartDate() !== null && $currentModel->getStartDate() > $today;
 				if ($startsInFuture) {
 					$this->userWorkingTimeModelMapper->delete($currentModel);
+					$assignmentChanged = true;
 					$this->auditLogMapper->logAction(
 						$userId,
 						'user_working_time_model_ended',
@@ -447,6 +452,7 @@ class AdminUserProfileUpdateService
 					$currentModel->setUpdatedAt(new \DateTime());
 					$this->assertEntityValid($currentModel->validate());
 					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
+					$assignmentChanged = true;
 					$this->auditLogMapper->logAction(
 						$userId,
 						'user_working_time_model_ended',
@@ -463,6 +469,23 @@ class AdminUserProfileUpdateService
 
 			return $updated;
 		}, $this->db);
+
+		// Assignment window changed → per-day as-of resolution may now point
+		// at a different (paid-break flagged or unflagged) model. The queued
+		// full-history recompute converges the snapshots (MH-07 / EC-08).
+		if ($assignmentChanged) {
+			try {
+				\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForUser(
+					\OCP\Server::get(\OCP\BackgroundJob\IJobList::class),
+					$userId
+				);
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'Paid-break recompute enqueue for user failed: ' . $e->getMessage(),
+					['exception' => $e, 'user_id' => $userId]
+				);
+			}
+		}
 
 		if ($germanState !== null) {
 			if ($germanState === '') {
@@ -961,9 +984,16 @@ class AdminUserProfileUpdateService
 		$effectiveFrom = $this->parseStrictYmd((string)($params['effectiveFrom'] ?? date('Y-m-d')));
 		$this->parseOptionalEffectiveTo($params['effectiveTo'] ?? null);
 
-		if ($vacationMode === Constants::VACATION_MODE_TARIFF_RULE_BASED && $tariffRuleSetId !== null) {
+		// B3 write-side guard: a non-null reference must always exist —
+		// otherwise a dangling id lands in `at_user_vacation_policies` even on
+		// non-tariff modes. Status/validity windows only bind tariff mode.
+		if ($tariffRuleSetId !== null) {
 			try {
 				$ruleSet = $this->tariffRuleSetMapper->find($tariffRuleSetId);
+			} catch (DoesNotExistException) {
+				throw new AdminUserProfileUpdateException($this->l10n->t('Tariff rule set not found'), 404);
+			}
+			if ($vacationMode === Constants::VACATION_MODE_TARIFF_RULE_BASED) {
 				if ($ruleSet->getStatus() !== Constants::TARIFF_RULE_SET_STATUS_ACTIVE) {
 					throw new AdminUserProfileUpdateException($this->l10n->t('Only active tariff rule sets can be assigned'));
 				}
@@ -974,8 +1004,6 @@ class AdminUserProfileUpdateService
 				if ($ruleValidTo !== null && $ruleValidTo < $effectiveFrom) {
 					throw new AdminUserProfileUpdateException($this->l10n->t('Tariff rule set is no longer valid for the selected policy date'));
 				}
-			} catch (DoesNotExistException) {
-				throw new AdminUserProfileUpdateException($this->l10n->t('Tariff rule set not found'), 404);
 			}
 		}
 

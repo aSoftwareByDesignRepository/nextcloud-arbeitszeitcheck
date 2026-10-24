@@ -349,6 +349,23 @@ class ManagerController extends Controller
 		return $this->permissionService->canManageEmployee($actor, $targetUserId);
 	}
 
+	/**
+	 * B1-MH-04: self-targeting through manager write paths gets its own 403 so
+	 * the UI can route the actor into the self-service flow (BX-02) instead of
+	 * a dead-end error toast. Existence is not leaked — the actor always knows
+	 * their own id.
+	 */
+	private function selfTargetForbiddenResponse(string $area, string $action, string $targetUserId): JSONResponse
+	{
+		$this->permissionService->logPermissionDenied($this->getUserId(), $action, 'user', $targetUserId);
+		return new JSONResponse([
+			'success' => false,
+			'selfTarget' => true,
+			'selfServiceArea' => $area,
+			'error' => $this->l10n->t('Please record your own entries via Time Entries / Absences.'),
+		], Http::STATUS_FORBIDDEN);
+	}
+
 	private function normalizeLimit(?int $limit): int
 	{
 		$normalized = $limit ?? Constants::DEFAULT_LIST_LIMIT;
@@ -485,7 +502,8 @@ class ManagerController extends Controller
 				$user = $this->userManager->get($userId);
 				if (!$user) continue;
 
-				$todayHours = $this->timeTrackingService->getTodayHours($userId);
+				// Manager day total is tariff-facing — paid basis.
+				$todayHours = $this->timeTrackingService->getTodayPaidHours($userId);
 				$status = $this->timeTrackingService->getStatus($userId);
 				$pendingAbsences = $this->absenceService->getAbsencesByUser($userId, ['status' => 'pending']);
 
@@ -2183,6 +2201,9 @@ class ManagerController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			if ($targetUserId === $actorUserId) {
+				return $this->selfTargetForbiddenResponse('absences', 'create_employee_absence', $targetUserId);
+			}
 			if (!$this->permissionService->canManageEmployee($actorUserId, $targetUserId)) {
 				$this->permissionService->logPermissionDenied($actorUserId, 'create_employee_absence', 'user', $targetUserId);
 				return new JSONResponse([
@@ -2402,6 +2423,9 @@ class ManagerController extends Controller
 				$reason = mb_substr($reason, 0, 2000);
 			}
 
+			if ($targetUserId === $managerId) {
+				return $this->selfTargetForbiddenResponse('time-entries', 'create_employee_time_entry', $targetUserId);
+			}
 			if (!$this->permissionService->canManageEmployee($managerId, $targetUserId)) {
 				$this->permissionService->logPermissionDenied($managerId, 'create_employee_time_entry', 'user', $targetUserId);
 				return new JSONResponse([
@@ -2600,6 +2624,8 @@ class ManagerController extends Controller
 								'startTime' => $this->displayClock($startTime, $entry->getUserId()),
 								'endTime' => $this->displayClock($endTime, $entry->getUserId()),
 								'durationHours' => $entry->getDurationHours(),
+								'paidDurationHours' => $entry->getPaidDurationHours(),
+								'paidBreakSeconds' => $entry->getPaidBreakSeconds(),
 								'description' => $entry->getDescription(),
 								'justification' => $justificationData['justification'] ?? '',
 								'requestType' => $requestType,
@@ -3457,6 +3483,9 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$entry = $this->timeEntryMapper->find($timeEntryId);
 
+			if ($entry->getUserId() === $managerId) {
+				return $this->selfTargetForbiddenResponse('time-entries', 'correct_time_entry', (string)$timeEntryId);
+			}
 			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'correct_time_entry', 'time_entry', (string)$timeEntryId);
 				return new JSONResponse([
@@ -3624,6 +3653,8 @@ class ManagerController extends Controller
 						'startTime' => ($startTime = $entry->getStartTime()) ? $startTime->format('c') : null,
 						'endTime' => $entry->getEndTime() ? $entry->getEndTime()->format('c') : null,
 						'durationHours' => $entry->getDurationHours(),
+						'paidDurationHours' => $entry->getPaidDurationHours(),
+						'paidBreakSeconds' => $entry->getPaidBreakSeconds(),
 						'description' => $entry->getDescription(),
 						'status' => $entry->getStatus(),
 						'justification' => $justificationData['justification'] ?? '',

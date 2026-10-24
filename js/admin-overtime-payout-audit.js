@@ -34,6 +34,15 @@
 		return n.toFixed(2);
 	}
 
+	/** Plural-aware translate (Nextcloud window.n replaces %n). */
+	function plural(singular, pluralText, count) {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, pluralText, c);
+		}
+		return String(c === 1 ? singular : pluralText).replace('%n', String(c));
+	}
+
 	function formatProcessedAt(value) {
 		if (value == null || value === '' || value === '—') {
 			return { display: '—', datetime: '' };
@@ -115,9 +124,11 @@
 
 		gapsSection.hidden = false;
 		if (gapsCount) {
-			const countMsg = (i18n.gapsCount || '%1$s compliance gap(s) found')
-				.replace('%1$s', String(gaps.length));
-			gapsCount.textContent = countMsg;
+			gapsCount.textContent = plural(
+				'%n compliance gap found',
+				'%n compliance gaps found',
+				gaps.length
+			);
 		}
 
 		gapsList.innerHTML = gaps.map(function (g) {
@@ -146,9 +157,11 @@
 			return;
 		}
 
-		let text = (i18n.summary || '%1$s payout(s), %2$s hours total')
-			.replace('%1$s', String(total))
-			.replace('%2$s', formatHours(totalHours));
+		let text = plural(
+			'%n payout, %s hours total',
+			'%n payouts, %s hours total',
+			total
+		).replace('%s', formatHours(totalHours));
 
 		if (meta && meta.truncated) {
 			summaryEl.classList.add('azc-callout--warning');

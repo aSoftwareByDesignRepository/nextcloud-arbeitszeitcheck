@@ -69,7 +69,7 @@ final class WidgetStatusCopy {
 			$bits[] = $this->l10n->t('%1$d paused', [$paused]);
 		}
 		if ($out > 0) {
-			$bits[] = $this->l10n->t('%1$d out', [$out]);
+			$bits[] = $this->l10n->n('1 out', '%n out', $out);
 		}
 		if ($away > 0) {
 			$bits[] = $this->absenceBit($absence);
@@ -144,19 +144,22 @@ final class WidgetStatusCopy {
 
 		$detail = [];
 		if ($vacation > 0) {
-			$detail[] = $this->l10n->t('%1$d vacation', [$vacation]);
+			$detail[] = $this->l10n->n('1 vacation', '%n vacation', $vacation);
 		}
 		if ($sick > 0) {
-			$detail[] = $this->l10n->t('%1$d sick', [$sick]);
+			$detail[] = $this->l10n->n('1 sick', '%n sick', $sick);
 		}
 		if ($other > 0) {
-			$detail[] = $this->l10n->t('%1$d other', [$other]);
+			$detail[] = $this->l10n->n('1 other', '%n other', $other);
 		}
 
 		if ($detail === []) {
-			return $this->l10n->t('%1$d away', [$away]);
+			return $this->l10n->n('1 away', '%n away', $away);
 		}
 
-		return $this->l10n->t('%1$d away (%2$s)', [$away, implode(', ', $detail)]);
+		return sprintf(
+			$this->l10n->n('1 away (%1$s)', '%n away (%1$s)', $away),
+			implode(', ', $detail)
+		);
 	}
 }

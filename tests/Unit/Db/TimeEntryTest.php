@@ -169,4 +169,57 @@ class TimeEntryTest extends TestCase
 		$end = $entry->occupancyEnd($now);
 		$this->assertSame('2026-08-30T12:00:00+00:00', $end->format('c'));
 	}
+
+	public function testPaidBreakSnapshotDefaultsToZero(): void
+	{
+		$entry = new TimeEntry();
+		$this->assertSame(0, $entry->getPaidBreakSeconds());
+		$this->assertEqualsWithDelta(0.0, $entry->getPaidBreakHours(), 0.0001);
+	}
+
+	public function testPaidDurationIsNetPlusSnapshot(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 17:00:00'));
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T12:00:00+00:00', 'end' => '2024-01-01T12:30:00+00:00'],
+		]));
+
+		// Net = 8h span − 30min break = 7.5h; snapshot adds 30min back ⇒ 8h paid.
+		$this->assertEqualsWithDelta(7.5, $entry->getDurationHours(), 0.0001);
+		$entry->setPaidBreakSeconds(1800);
+		$this->assertEqualsWithDelta(0.5, $entry->getPaidBreakHours(), 0.0001);
+		$this->assertEqualsWithDelta(8.0, $entry->getPaidDurationHours(), 0.0001);
+	}
+
+	public function testPaidDurationEqualsNetWithoutSnapshot(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 17:00:00'));
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T12:00:00+00:00', 'end' => '2024-01-01T12:30:00+00:00'],
+		]));
+
+		$this->assertSame($entry->getDurationHours(), $entry->getPaidDurationHours());
+	}
+
+	public function testSummaryExposesPaidFieldsAdditively(): void
+	{
+		$entry = new TimeEntry();
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 17:00:00'));
+		$entry->setPaidBreakSeconds(900);
+
+		$summary = $entry->getSummary();
+		$this->assertSame(900, $summary['paidBreakSeconds']);
+		$this->assertSame(15, $summary['paidBreakMinutes']);
+		$this->assertEqualsWithDelta(0.25, $summary['paidBreakHours'], 0.0001);
+		$this->assertArrayHasKey('paidDurationHours', $summary);
+		$this->assertArrayHasKey('durationHours', $summary);
+	}
 }

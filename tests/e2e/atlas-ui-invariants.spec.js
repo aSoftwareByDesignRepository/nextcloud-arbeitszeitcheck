@@ -1,5 +1,4 @@
 // @ts-check
-/* global process */
 /**
  * Atlas UI invariants — shared-contract coverage for ArbeitszeitCheck web.
  *

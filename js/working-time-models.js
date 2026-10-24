@@ -30,6 +30,15 @@
         return englishFallback || '';
     }
 
+    /** Plural-aware translate (Nextcloud window.n replaces %n). */
+    function wtmPlural(singular, plural, count) {
+        const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+        if (typeof window.n === 'function') {
+            return window.n('arbeitszeitcheck', singular, plural, c);
+        }
+        return String(c === 1 ? singular : plural).replace('%n', String(c));
+    }
+
     /** Option tags for working-time model type; labels from working-time-models.php l10n. */
     function modelTypeSelectOptions(selectedType) {
         // Bachus: Type defaults to Full-time when creating (granny never picks from jargon first).
@@ -465,7 +474,165 @@
         } else {
             delete base.allow_sunday_work;
         }
+        const breaksPaid = !!form.querySelector('#wtm-model-breaks-count-as-work')?.checked;
+        if (breaksPaid) {
+            base.breaks_count_as_work = true;
+            const capRaw = String(form.querySelector('#wtm-model-paid-break-cap')?.value || '').trim();
+            if (capRaw === '') {
+                // Empty = all eligible break time is paid.
+                delete base.paid_break_cap_minutes;
+            } else if (!/^\d+$/.test(capRaw) || parseInt(capRaw, 10) > 480) {
+                return {
+                    error: wtmMsg('paidBreakCapInvalid', 'Paid break limit must be a whole number of minutes between 0 and 480.'),
+                    field: 'paidBreakCap'
+                };
+            } else {
+                base.paid_break_cap_minutes = parseInt(capRaw, 10);
+            }
+        } else {
+            delete base.breaks_count_as_work;
+            delete base.paid_break_cap_minutes;
+        }
         return Object.keys(base).length ? base : null;
+    }
+
+    /** Inline, announced error on the paid-break cap field (aria-live, no toast). */
+    function showPaidBreakError(form, message) {
+        const err = form && form.querySelector('#wtm-model-paid-break-cap-error');
+        const capInput = form && form.querySelector('#wtm-model-paid-break-cap');
+        if (err && capInput) {
+            err.textContent = message;
+            err.hidden = false;
+            capInput.setAttribute('aria-invalid', 'true');
+            capInput.focus();
+        } else {
+            Messaging.showError(message);
+        }
+    }
+
+    function clearPaidBreakError(form) {
+        const err = form && form.querySelector('#wtm-model-paid-break-cap-error');
+        const capInput = form && form.querySelector('#wtm-model-paid-break-cap');
+        if (err) {
+            err.textContent = '';
+            err.hidden = true;
+        }
+        if (capInput) {
+            capInput.removeAttribute('aria-invalid');
+        }
+    }
+
+    /** Paid-break controls: cap field only matters while the flag is on. */
+    function bindPaidBreakControls(form) {
+        const checkbox = form && form.querySelector('#wtm-model-breaks-count-as-work');
+        const capGroup = form && form.querySelector('#wtm-model-paid-break-cap-group');
+        const capInput = form && form.querySelector('#wtm-model-paid-break-cap');
+        if (!checkbox || !capGroup || !capInput) {
+            return;
+        }
+        const sync = function() {
+            capGroup.hidden = !checkbox.checked;
+            capInput.disabled = !checkbox.checked;
+        };
+        checkbox.addEventListener('change', sync);
+        capInput.addEventListener('input', function() {
+            clearPaidBreakError(form);
+        });
+        sync();
+    }
+
+    /**
+     * NH-03: live impact preview — when flag/cap differ from the saved model,
+     * show how many users/entries the background recompute will touch.
+     * Debounced, read-only GET, stale-safe. Hidden for create (no
+     * assignments can reference an unsaved model) and while the editor
+     * matches the persisted state.
+     */
+    function bindPaidBreakImpact(form, modelId, savedFlag, savedCap) {
+        const box = form && form.querySelector('#wtm-model-paid-break-impact');
+        const text = form && form.querySelector('#wtm-model-paid-break-impact-text');
+        const checkbox = form && form.querySelector('#wtm-model-breaks-count-as-work');
+        const capInput = form && form.querySelector('#wtm-model-paid-break-cap');
+        if (!box || !text || !checkbox || !capInput) {
+            return;
+        }
+        if (modelId === null || modelId === undefined || modelId === '') {
+            return;
+        }
+
+        let timer = null;
+        let reqId = 0;
+        const hide = function() {
+            box.hidden = true;
+            text.textContent = '';
+        };
+        const normalizeCap = function(raw) {
+            const v = String(raw || '').trim();
+            return v === '' ? null : v;
+        };
+        const changed = function() {
+            return checkbox.checked !== savedFlag
+                || normalizeCap(capInput.value) !== normalizeCap(savedCap);
+        };
+        const run = function() {
+            if (!changed()) {
+                hide();
+                return;
+            }
+            const id = ++reqId;
+            text.textContent = wtmMsg('paidBreakImpactEstimating', 'Estimating impact…');
+            box.hidden = false;
+            Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models/'
+                + encodeURIComponent(String(modelId)) + '/paid-break-impact', {
+                method: 'GET',
+                onSuccess: function(data) {
+                    if (id !== reqId) {
+                        return;
+                    }
+                    const payload = (data && data.data) || {};
+                    const users = Number(payload.affected_user_count || 0);
+                    const entries = Number(payload.affected_entry_count || 0);
+                    if (users === 0 || entries === 0) {
+                        text.textContent = wtmMsg(
+                            'paidBreakImpactNone',
+                            'No existing entries are affected — the setting applies to new records only.'
+                        );
+                    } else {
+                        text.textContent = wtmPlural(
+                            'Saving recalculates %n existing entry in the background.',
+                            'Saving recalculates %n existing entries in the background.',
+                            entries
+                        ) + ' ' + wtmPlural(
+                            'This affects %n user.',
+                            'This affects %n users.',
+                            users
+                        );
+                    }
+                    box.hidden = false;
+                },
+                onError: function() {
+                    if (id !== reqId) {
+                        return;
+                    }
+                    text.textContent = wtmMsg('paidBreakImpactError', 'Impact preview unavailable.');
+                    box.hidden = false;
+                }
+            });
+        };
+        const schedule = function() {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(run, 250);
+        };
+        checkbox.addEventListener('change', schedule);
+        capInput.addEventListener('input', schedule);
+    }
+
+    function routeBreakRulesError(form, breakRules) {
+        if (breakRules && breakRules.field === 'paidBreakCap') {
+            showPaidBreakError(form, breakRules.error);
+        } else {
+            showPresenceError(form, breakRules.error);
+        }
     }
 
     /**
@@ -567,6 +734,21 @@
             : null;
         const existingBreakRules = isEdit ? (model.breakRules || null) : null;
         const modelId = isEdit ? String(model.id) : '';
+        const breaksPaidChecked = (isEdit && model.breakRules && model.breakRules.breaks_count_as_work === true) ? ' checked' : '';
+        const paidBreakCapRaw = (isEdit && model.breakRules
+            && model.breakRules.paid_break_cap_minutes !== undefined
+            && model.breakRules.paid_break_cap_minutes !== null)
+            ? String(model.breakRules.paid_break_cap_minutes) : '';
+        const breaksPaidLabel = wtmMsg('breaksCountAsWork', 'Breaks count as paid working time');
+        const breaksPaidHelp = wtmMsg(
+            'breaksCountAsWorkHelp',
+            'When enabled, recorded breaks are paid as working time (e.g. TVöD §6). Statutory break rules and compliance checks are unchanged.'
+        );
+        const paidCapLabel = wtmMsg('paidBreakCap', 'Paid break limit per day (minutes)');
+        const paidCapHelp = wtmMsg(
+            'paidBreakCapHelp',
+            'Leave empty to pay all recorded break time. 0 pays none. Maximum 480.'
+        );
 
         host.hidden = false;
         host.setAttribute('data-mode', isEdit ? 'edit' : 'create');
@@ -634,6 +816,27 @@
                     </div>
                     <p id="wtm-model-allow-sunday-work-help" class="form-help">${Utils.escapeHtml(allowSundayHelp)}</p>
                 </div>
+                <div class="form-group">
+                    <div class="form-checkbox">
+                        <input type="checkbox" id="wtm-model-breaks-count-as-work" name="breaksCountAsWork" value="1"${breaksPaidChecked}
+                               aria-describedby="wtm-model-breaks-count-as-work-help">
+                        <label for="wtm-model-breaks-count-as-work">${Utils.escapeHtml(breaksPaidLabel)}</label>
+                    </div>
+                    <p id="wtm-model-breaks-count-as-work-help" class="form-help">${Utils.escapeHtml(breaksPaidHelp)}</p>
+                </div>
+                <div class="form-group" id="wtm-model-paid-break-cap-group">
+                    <label for="wtm-model-paid-break-cap" class="form-label">${Utils.escapeHtml(paidCapLabel)}</label>
+                    <input type="text" id="wtm-model-paid-break-cap" name="paidBreakCapMinutes" class="form-input"
+                           inputmode="numeric" pattern="^[0-9]{1,3}$" value="${Utils.escapeHtml(paidBreakCapRaw)}"
+                           placeholder="30" aria-describedby="wtm-model-paid-break-cap-help wtm-model-paid-break-cap-error">
+                    <p id="wtm-model-paid-break-cap-help" class="form-help">${Utils.escapeHtml(paidCapHelp)}</p>
+                    <p id="wtm-model-paid-break-cap-error" class="field-error" role="alert" hidden></p>
+                </div>
+                <div class="azc-callout azc-callout--info" id="wtm-model-paid-break-impact" role="status" hidden>
+                    <div class="azc-callout__body">
+                        <p class="azc-callout__text" id="wtm-model-paid-break-impact-text"></p>
+                    </div>
+                </div>
                 <details class="wtm-editor-desc"${descOpen}>
                     <summary class="wtm-editor-desc__summary">${Utils.escapeHtml(descriptionMore)}</summary>
                     <div class="form-group">
@@ -662,6 +865,13 @@
             bindWeekdayScheduleFieldset(form.querySelector('.wtm-weekday-schedule'));
             bindPresenceWindowsFieldset(form.querySelector('.wtm-presence-windows'));
             bindUeHelper(form.querySelector('.wtm-ue-helper'), form);
+            bindPaidBreakControls(form);
+            bindPaidBreakImpact(
+                form,
+                isEdit ? model.id : null,
+                isEdit && model.breakRules && model.breakRules.breaks_count_as_work === true,
+                isEdit && model.breakRules ? model.breakRules.paid_break_cap_minutes : null
+            );
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 if (editorSaveInflight || host.getAttribute('aria-busy') === 'true') {
@@ -904,7 +1114,7 @@
         const formData = new FormData(form);
         const breakRules = buildBreakRulesPayload(form, null);
         if (breakRules && breakRules.error) {
-            showPresenceError(form, breakRules.error);
+            routeBreakRulesError(form, breakRules);
             return;
         }
         const data = {
@@ -982,7 +1192,7 @@
         const formData = new FormData(form);
         const breakRules = buildBreakRulesPayload(form, existingBreakRules);
         if (breakRules && breakRules.error) {
-            showPresenceError(form, breakRules.error);
+            routeBreakRulesError(form, breakRules);
             return;
         }
         const data = {
@@ -1137,6 +1347,7 @@
             computeUeConversion: computeUeConversion,
             ueHelperSectionHtml: ueHelperSectionHtml,
             bindUeHelper: bindUeHelper,
+            bindPaidBreakImpact: bindPaidBreakImpact,
         };
     }
 

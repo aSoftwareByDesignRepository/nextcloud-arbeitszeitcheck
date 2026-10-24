@@ -68,7 +68,12 @@ final class SurfaceCoverageTest extends TestCase
 		$output->expects($this->once())->method('info')
 			->with(self::stringContains('Auto-approved 1'));
 
-		$step = new \OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences($mapper, $service);
+		$timeEntryMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$timeEntryMapper->method('findPendingApproval')->willReturn([]);
+		$correctionService = $this->createMock(\OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService::class);
+		$teamResolver = $this->createMock(\OCA\ArbeitszeitCheck\Service\TeamResolverService::class);
+
+		$step = new \OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences($mapper, $service, $timeEntryMapper, $correctionService, $teamResolver);
 		$this->assertSame('Release pending absences with no assignable approver', $step->getName());
 		$step->run($output);
 	}
@@ -84,7 +89,12 @@ final class SurfaceCoverageTest extends TestCase
 		$service->method('autoApprovePendingIfNoAssignableManager')
 			->willThrowException(new \RuntimeException('db gone'));
 
-		$step = new \OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences($mapper, $service);
+		$timeEntryMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$timeEntryMapper->method('findPendingApproval')->willReturn([]);
+		$correctionService = $this->createMock(\OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService::class);
+		$teamResolver = $this->createMock(\OCA\ArbeitszeitCheck\Service\TeamResolverService::class);
+
+		$step = new \OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences($mapper, $service, $timeEntryMapper, $correctionService, $teamResolver);
 		$step->run($this->createMock(IOutput::class));
 		$this->addToAssertionCount(1);
 	}

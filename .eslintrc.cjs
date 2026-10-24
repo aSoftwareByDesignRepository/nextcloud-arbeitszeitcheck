@@ -28,6 +28,11 @@ module.exports = {
     },
     {
       files: ['js/**/*.test.js', 'tests/e2e/**/*.js'],
+      // Specs and unit tests execute in Node (Playwright / Vitest), so
+      // process.env and friends are legitimately defined there.
+      env: {
+        node: true,
+      },
       rules: {
         'no-restricted-syntax': 'off',
         'arbeitszeitcheck/no-raw-app-url': 'off',

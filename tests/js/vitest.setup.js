@@ -7,5 +7,6 @@ globalThis.OC = {
 }
 
 globalThis.t = (_app, s) => s
-globalThis.n = (_app, singular, plural, count) => (count === 1 ? singular : plural)
+globalThis.n = (_app, singular, plural, count) =>
+  (count === 1 ? singular : plural).replace('%n', String(count))
 

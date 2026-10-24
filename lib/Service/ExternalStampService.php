@@ -260,6 +260,13 @@ class ExternalStampService
 			$this->timeTrackingService->calculateAndSetAutomaticBreak($entry);
 			$this->timeTrackingService->adjustEndTimeForDailyMaximum($entry);
 			$entry = $this->timeEntryMapper->insert($entry);
+			// Same user lock as the insert: converge the paid-break snapshot
+			// (an auto-break may already have been recorded above).
+			$this->timeTrackingService->recomputePaidBreaksForUserSpan(
+				$uid,
+				\DateTime::createFromImmutable($start),
+				$entry->getEndTime() ?? \DateTime::createFromImmutable($end)
+			);
 			$entryId = (int)$entry->getId();
 		});
 		return $entryId;

@@ -132,6 +132,78 @@ class TimeEntryExportTransformerTest extends TestCase
 		$this->assertSame('12:45:00', $rows[0]['break_end']);
 	}
 
+	public function testPaidBreakColumnsAreExportedOnSingleRow(): void
+	{
+		$entry = $this->makeEntry(
+			11,
+			new \DateTime('2024-06-10 08:00:00', new \DateTimeZone('Europe/Berlin')),
+			new \DateTime('2024-06-10 17:00:00', new \DateTimeZone('Europe/Berlin'))
+		);
+		$entry->setBreaks(json_encode([
+			['start' => '2024-06-10 12:00:00', 'end' => '2024-06-10 13:00:00'],
+		]));
+		$entry->setPaidBreakSeconds(1800); // 0.5h paid break snapshot
+
+		$rows = $this->transformer->entryToExportRows($entry, false);
+		$this->assertCount(1, $rows);
+		$row = $rows[0];
+		// net = 9h wall - 1h break = 8h; paid = 8 + 0.5 = 8.5h
+		$this->assertEqualsWithDelta(8.5, (float)$row['working_hours'], 1e-4);
+		$this->assertEqualsWithDelta(8.0, (float)$row['net_working_hours'], 1e-4);
+		$this->assertEqualsWithDelta(0.5, (float)$row['paid_break_hours'], 1e-4);
+		// working_hours is the paid basis: net + paid break component.
+		$this->assertEqualsWithDelta(
+			(float)$row['net_working_hours'] + (float)$row['paid_break_hours'],
+			(float)$row['working_hours'],
+			1e-4
+		);
+	}
+
+	public function testPaidBreakColumnsAreProratedOnMidnightSplit(): void
+	{
+		$entry = $this->makeEntry(
+			12,
+			new \DateTime('2024-06-10 22:00:00', new \DateTimeZone('Europe/Berlin')),
+			new \DateTime('2024-06-11 06:00:00', new \DateTimeZone('Europe/Berlin'))
+		);
+		$entry->setBreaks(json_encode([
+			['start' => '2024-06-10 23:00:00', 'end' => '2024-06-11 00:00:00'],
+		]));
+		$entry->setPaidBreakSeconds(1800);
+
+		$rows = $this->transformer->entryToExportRows($entry, true);
+		$this->assertCount(2, $rows);
+
+		foreach ($rows as $row) {
+			$this->assertArrayHasKey('net_working_hours', $row);
+			$this->assertArrayHasKey('paid_break_hours', $row);
+			// Per-segment consistency: paid basis = net part + paid-break part.
+			$this->assertEqualsWithDelta(
+				(float)$row['net_working_hours'] + (float)$row['paid_break_hours'],
+				(float)$row['working_hours'],
+				1e-4
+			);
+		}
+		// Segments re-assemble the entry totals (one boundary second is lost
+		// by design in the split, hence the 0.01 tolerance).
+		$this->assertEqualsWithDelta(7.5, array_sum(array_column($rows, 'working_hours')), 0.01);
+		$this->assertEqualsWithDelta(7.0, array_sum(array_column($rows, 'net_working_hours')), 0.01);
+		$this->assertEqualsWithDelta(0.5, array_sum(array_column($rows, 'paid_break_hours')), 0.01);
+	}
+
+	public function testDefaultPaidBreakIsZeroNotNull(): void
+	{
+		$entry = $this->makeEntry(
+			13,
+			new \DateTime('2024-06-10 08:00:00', new \DateTimeZone('Europe/Berlin')),
+			new \DateTime('2024-06-10 12:00:00', new \DateTimeZone('Europe/Berlin'))
+		);
+		$rows = $this->transformer->entryToExportRows($entry, false);
+		$this->assertSame(0.0, $rows[0]['paid_break_hours']);
+		$this->assertEqualsWithDelta(4.0, (float)$rows[0]['working_hours'], 1e-4);
+		$this->assertEqualsWithDelta(4.0, (float)$rows[0]['net_working_hours'], 1e-4);
+	}
+
 	private function makeEntry(int $id, \DateTime $start, \DateTime $end): TimeEntry
 	{
 		$e = new TimeEntry();

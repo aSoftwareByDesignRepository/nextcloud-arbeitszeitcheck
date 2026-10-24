@@ -1,4 +1,3 @@
-/* global process */
 // @ts-check
 /**
  * Theme × viewport × WCAG 2.1 AA gauntlet for ArbeitszeitCheck policy pages.

@@ -58,6 +58,8 @@ class DashboardWidgetDataService {
 			'userId'                 => $userId,
 			'status'                 => (string)($status['status'] ?? 'clocked_out'),
 			'workingTodayHours'      => (float)($status['working_today_hours'] ?? 0.0),
+			// Additive: tariff basis for clients that display billable hours.
+			'workingTodayPaidHours'  => (float)($status['working_today_paid_hours'] ?? 0.0),
 			'atDailyMaximum'         => (bool)($status['at_daily_maximum'] ?? false),
 			'currentSessionDuration' => (int)($status['current_session_duration'] ?? 0),
 			// Drift-safe timer anchor (same fields as GET /api/clock/status).
@@ -133,6 +135,8 @@ class DashboardWidgetDataService {
 			'status'                 => (string)($status['status'] ?? 'clocked_out'),
 			'currentEntryId'         => $currentEntryId,
 			'workingTodayHours'      => (float)($status['working_today_hours'] ?? 0.0),
+			// Additive: tariff basis for clients that display billable hours.
+			'workingTodayPaidHours'  => (float)($status['working_today_paid_hours'] ?? 0.0),
 			'atDailyMaximum'         => (bool)($status['at_daily_maximum'] ?? false),
 			'currentSessionDuration' => (int)($status['current_session_duration'] ?? 0),
 			// Drift-safe timer anchor (same fields as GET /api/clock/status).
@@ -335,11 +339,13 @@ class DashboardWidgetDataService {
 			}
 			$statusKey = $live[$memberId] ?? 'clocked_out';
 			$hours = 0.0;
+			$paidHours = 0.0;
 			if ($statusKey !== 'clocked_out') {
 				try {
 					$status = $this->timeTrackingService->getStatus($memberId);
 					$statusKey = (string)($status['status'] ?? $statusKey);
 					$hours = (float)($status['working_today_hours'] ?? 0.0);
+					$paidHours = (float)($status['working_today_paid_hours'] ?? 0.0);
 				} catch (\Throwable) {
 					// Keep batch status; hours stay 0.
 				}
@@ -349,6 +355,7 @@ class DashboardWidgetDataService {
 				'displayName' => $member->getDisplayName(),
 				'status' => $statusKey,
 				'workingTodayHours' => $hours,
+				'workingTodayPaidHours' => $paidHours,
 			];
 		}
 
@@ -412,11 +419,13 @@ class DashboardWidgetDataService {
 			$uid = $user->getUID();
 			$statusKey = $live[$uid] ?? 'clocked_out';
 			$hours = 0.0;
+			$paidHours = 0.0;
 			if ($statusKey !== 'clocked_out') {
 				try {
 					$status = $this->timeTrackingService->getStatus($uid);
 					$statusKey = (string)($status['status'] ?? $statusKey);
 					$hours = (float)($status['working_today_hours'] ?? 0.0);
+					$paidHours = (float)($status['working_today_paid_hours'] ?? 0.0);
 				} catch (\Throwable) {
 					// Keep batch status; hours stay 0.
 				}
@@ -426,6 +435,7 @@ class DashboardWidgetDataService {
 				'displayName' => $user->getDisplayName(),
 				'status' => $statusKey,
 				'workingTodayHours' => $hours,
+				'workingTodayPaidHours' => $paidHours,
 			];
 		}
 

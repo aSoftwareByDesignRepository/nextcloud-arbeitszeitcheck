@@ -66,7 +66,7 @@ function removeLeaseIf(lease) {
 	if (current && current.token === lease.token) {
 		try {
 			fs.unlinkSync(LOCK_PATH)
-		} catch {}
+		} catch { /* best-effort — stale/torn lease artifacts must never abort */ }
 		return true
 	}
 	return false
@@ -135,16 +135,16 @@ export function acquireInstanceLock() {
 				let ino = null
 				try {
 					ino = fs.statSync(LOCK_PATH).ino
-				} catch {}
+				} catch { /* best-effort — stale/torn lease artifacts must never abort */ }
 				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500)
 				let sameIno = false
 				try {
 					sameIno = fs.statSync(LOCK_PATH).ino === ino
-				} catch {}
+				} catch { /* best-effort — stale/torn lease artifacts must never abort */ }
 				if (!readLease() && sameIno) {
 					try {
 						fs.unlinkSync(LOCK_PATH)
-					} catch {}
+					} catch { /* best-effort — stale/torn lease artifacts must never abort */ }
 				}
 			}
 			continue

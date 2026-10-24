@@ -36,6 +36,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private WorkingTimeModelMapper $workingTimeModelMapper;
 	private UserVacationPolicyAssignmentMapper $vacationPolicyMapper;
+	private TariffRuleSetMapper $tariffRuleSetMapper;
 
 	protected function setUp(): void
 	{
@@ -48,7 +49,8 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
 		$vacationYearBalanceMapper = $this->createMock(VacationYearBalanceMapper::class);
 		$vacationAllocationService = $this->createMock(VacationAllocationService::class);
-		$tariffRuleSetMapper = $this->createMock(TariffRuleSetMapper::class);
+		$this->tariffRuleSetMapper = $this->createMock(TariffRuleSetMapper::class);
+		$tariffRuleSetMapper = $this->tariffRuleSetMapper;
 		$this->vacationPolicyMapper = $this->createMock(UserVacationPolicyAssignmentMapper::class);
 		$userOvertimeSettingsService = $this->createMock(UserOvertimeSettingsService::class);
 		$userEmploymentSettingsService = $this->createMock(UserEmploymentSettingsService::class);
@@ -706,6 +708,52 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 
 		$this->assertSame(5, $result['policyId']);
 		$this->assertTrue($result['unchanged']);
+	}
+
+	public function testApplyVacationPolicyRejectsDanglingTariffRuleSetOnManualMode(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$this->userManager->method('get')->with('alice')->willReturn($user);
+		$this->tariffRuleSetMapper->method('find')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
+
+		$this->vacationPolicyMapper->expects($this->never())->method('insert');
+		$this->vacationPolicyMapper->expects($this->never())->method('update');
+
+		// Non-tariff mode must still reject a nonexistent rule-set id —
+		// that is exactly how the dangling reference rows were produced (B3).
+		try {
+			$this->service->applyVacationPolicy('alice', [
+				'vacationMode' => Constants::VACATION_MODE_MANUAL_FIXED,
+				'manualDays' => 30,
+				'tariffRuleSetId' => 999,
+				'effectiveFrom' => '2025-03-27',
+			], 'admin');
+			$this->fail('dangling tariff rule set reference must be rejected');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(404, $e->httpStatus);
+		}
+	}
+
+	public function testApplyVacationPolicyRejectsDanglingTariffRuleSetOnTariffMode(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$this->userManager->method('get')->with('alice')->willReturn($user);
+		$this->tariffRuleSetMapper->method('find')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
+
+		$this->vacationPolicyMapper->expects($this->never())->method('insert');
+
+		try {
+			$this->service->applyVacationPolicy('alice', [
+				'vacationMode' => Constants::VACATION_MODE_TARIFF_RULE_BASED,
+				'tariffRuleSetId' => 999,
+				'effectiveFrom' => '2025-03-27',
+			], 'admin');
+			$this->fail('dangling tariff rule set reference must be rejected');
+		} catch (AdminUserProfileUpdateException $e) {
+			$this->assertSame(404, $e->httpStatus);
+		}
 	}
 
 	public function testApplyDatevSettingsPersistsPersonalnummer(): void

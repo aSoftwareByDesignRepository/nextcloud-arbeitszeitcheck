@@ -365,6 +365,7 @@ return [
 		['name' => 'admin#getWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'admin#createWorkingTimeModel', 'url' => '/api/admin/working-time-models', 'verb' => 'POST'],
 		['name' => 'admin#updateWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+		['name' => 'admin#getPaidBreakImpact', 'url' => '/api/admin/working-time-models/{id}/paid-break-impact', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'admin#deleteWorkingTimeModel', 'url' => '/api/admin/working-time-models/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
 		['name' => 'admin#tariffRuleSets', 'url' => '/admin/tariff-rules', 'verb' => 'GET'],
 		['name' => 'admin#getTariffRuleSets', 'url' => '/api/admin/tariff-rule-sets', 'verb' => 'GET'],

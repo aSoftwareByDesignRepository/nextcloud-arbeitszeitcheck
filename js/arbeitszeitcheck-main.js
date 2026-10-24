@@ -2589,17 +2589,34 @@
                 // Subtract break time if available
                 workingDurationHours = durationHours - breakDurationHours;
             }
-            
+
+            // Tariff display: paid basis (net + paid-break snapshot) is primary;
+            // net/statutory duration stays visible as detail when they differ.
+            const paidBreakMin = entry.paidBreakMinutes != null
+                ? Number(entry.paidBreakMinutes)
+                : (entry.paidBreakSeconds != null ? Number(entry.paidBreakSeconds) / 60 : 0);
+            const paidDurationHours = (entry.paidDurationHours != null && !isNaN(entry.paidDurationHours))
+                ? Number(entry.paidDurationHours)
+                : workingDurationHours;
+
             const status = entry.status || 'completed';
-            
+
             const startTimeStr = startTime ? formatDisplayTime(startTime) : '-';
             const endTimeStr = endTime ? formatDisplayTime(endTime) : '-';
-            
+
             // Format duration: show working hours and break time
-            const workingHours = Math.floor(workingDurationHours);
-            const workingMinutes = Math.floor((workingDurationHours - workingHours) * 60);
+            const workingHours = Math.floor(paidDurationHours);
+            const workingMinutes = Math.floor((paidDurationHours - workingHours) * 60);
             let durationStr = `${workingHours}h ${workingMinutes}m`;
-            
+
+            if (paidBreakMin > 0.5 && paidDurationHours > workingDurationHours) {
+                const netH = Math.floor(workingDurationHours);
+                const netM = Math.floor((workingDurationHours - netH) * 60);
+                const netLabel = this.config.l10n?.netTime || mainT('Net') || 'Net';
+                const paidBreakLabel = this.config.l10n?.paidBreak || mainT('paid break') || 'paid break';
+                durationStr += ` (${netLabel}: ${netH}h ${netM}m · ${paidBreakLabel}: ${Math.round(paidBreakMin)}m)`;
+            }
+
             // Add break time if available
             if (breakDurationHours > 0) {
                 const breakHours = Math.floor(breakDurationHours);
@@ -3580,10 +3597,13 @@
                 return dateKey >= start && dateKey <= end;
             });
 
-            // Calculate total hours (API returns workingDurationHours/durationHours in hours; legacy duration/working_duration in seconds)
+            // Calculate total hours — tariff basis (paid snapshot) preferred,
+            // net fallback for old payloads.
             let totalHours = 0;
             dayEntries.forEach(entry => {
-                if (entry.workingDurationHours != null && !isNaN(entry.workingDurationHours)) {
+                if (entry.paidDurationHours != null && !isNaN(entry.paidDurationHours)) {
+                    totalHours += Number(entry.paidDurationHours);
+                } else if (entry.workingDurationHours != null && !isNaN(entry.workingDurationHours)) {
                     totalHours += Number(entry.workingDurationHours);
                 } else if (entry.durationHours != null && !isNaN(entry.durationHours)) {
                     totalHours += Number(entry.durationHours);
@@ -3846,21 +3866,29 @@
                     dayData.entries.forEach(entry => {
                         const startTime = entry.start_time || entry.startTime;
                         const endTime = entry.end_time || entry.endTime;
-                        const durationSec = (entry.workingDurationHours != null ? Number(entry.workingDurationHours) * 3600 : null)
+                        const durationSec = (entry.paidDurationHours != null ? Number(entry.paidDurationHours) * 3600 : null)
+                            || (entry.workingDurationHours != null ? Number(entry.workingDurationHours) * 3600 : null)
                             || (entry.durationHours != null ? Number(entry.durationHours) * 3600 : null)
                             || entry.duration || entry.working_duration || 0;
                         const breakDuration = entry.breakDurationHours != null ? Number(entry.breakDurationHours) * 3600 : (entry.break_duration || 0);
+                        const paidBreakSec = entry.paidBreakSeconds != null
+                            ? Number(entry.paidBreakSeconds)
+                            : (entry.paidBreakMinutes != null ? Number(entry.paidBreakMinutes) * 60 : 0);
                         const hours = Math.floor(durationSec / 3600);
                         const minutes = Math.floor((durationSec % 3600) / 60);
                         const breakHours = Math.floor(breakDuration / 3600);
                         const breakMinutes = Math.floor((breakDuration % 3600) / 60);
-                        
+
                         const start = startTime ? formatDisplayTime(startTime) : '-';
                         const end = endTime ? formatDisplayTime(endTime) : '-';
-                        
+
                         let entryHtml = `<li><strong>${start} - ${end}</strong> (${hours}h ${minutes}m`;
                         if (breakDuration > 0) {
                             entryHtml += `, ${this.config.l10n?.breakTime || 'Break'}: ${breakHours}h ${breakMinutes}m`;
+                        }
+                        if (paidBreakSec >= 30) {
+                            const paidBreakLabel = this.config.l10n?.paidBreak || 'paid break';
+                            entryHtml += `, ${paidBreakLabel}: ${Math.round(paidBreakSec / 60)}m`;
                         }
                         entryHtml += `)</li>`;
                         html += entryHtml;

@@ -32,7 +32,36 @@ test.describe('time entry correction modal layout', () => {
 		await page.goto('/apps/arbeitszeitcheck/time-entries')
 		await page.waitForSelector('#azc-main-content', { timeout: 30000 })
 
-		let requestBtn = page.locator('.btn-request-correction').first()
+		// The entries table paginates server-side (newest first): rows outside the
+		// current page render with `hidden`, so only query *visible* buttons.
+		// Correction-eligible entries (> edit window) sit on the oldest pages —
+		// jump to the last page before concluding none exists.
+		const visibleRequestBtn = () => page.locator('.btn-request-correction:visible').first()
+		// Walk the pager oldest→newest until a visible button appears.
+		const findAcrossPages = async () => {
+			const visited = new Set()
+			for (let hops = 0; hops < 15; hops += 1) {
+				const btn = visibleRequestBtn()
+				if ((await btn.count()) > 0) {
+					return btn
+				}
+				const current = await page.locator('#time-entries-table-pager .azc-table-pager__page.is-current').textContent().catch(() => '1')
+				visited.add(Number(String(current).trim()))
+				const nums = await page.locator('#time-entries-table-pager .azc-table-pager__pages a[data-page]').evaluateAll(
+					(links) => links.map((a) => Number(a.getAttribute('data-page'))),
+				)
+				// Highest page number first (oldest entries); skip visited pages.
+				const nextPage = nums.filter((p) => !visited.has(p)).sort((a, b) => b - a)[0]
+				if (nextPage == null) {
+					return btn
+				}
+				await page.locator(`#time-entries-table-pager a[data-page="${nextPage}"]`).click()
+				await page.waitForSelector('#azc-main-content', { timeout: 30000 })
+			}
+			return visibleRequestBtn()
+		}
+
+		let requestBtn = await findAcrossPages()
 		if ((await requestBtn.count()) === 0) {
 			let seeded = false
 			let lastErr = ''
@@ -57,9 +86,10 @@ test.describe('time entry correction modal layout', () => {
 				}
 			}
 			expect(seeded, lastErr || 'could not seed old entry for correction button').toBe(true)
+			// Seeded entry is old → sits past page 1 after reload; scan the pager.
 			await page.reload()
 			await page.waitForSelector('#azc-main-content', { timeout: 30000 })
-			requestBtn = page.locator('.btn-request-correction').first()
+			requestBtn = await findAcrossPages()
 		}
 
 		await expect(requestBtn).toBeVisible({ timeout: 15000 })

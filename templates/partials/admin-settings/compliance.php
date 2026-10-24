@@ -140,6 +140,23 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                         </p>
                     </div>
 
+                    <div class="form-group">
+                        <label for="breakPolicyPaidCapMinutes" class="form-label"><?php p($l->t('Default paid break time per day (minutes)')); ?></label>
+                        <input type="number"
+                            class="form-input"
+                            id="breakPolicyPaidCapMinutes"
+                            data-bp-field="paid_break_cap_minutes"
+                            min="0"
+                            max="480"
+                            step="1"
+                            value="<?php p(isset($bpPolicy['paid_break_cap_minutes']) && $bpPolicy['paid_break_cap_minutes'] !== null ? (string)$bpPolicy['paid_break_cap_minutes'] : ''); ?>"
+                            placeholder="<?php p($l->t('No organisation default')); ?>"
+                            aria-describedby="breakPolicyPaidCapMinutes-help">
+                        <p id="breakPolicyPaidCapMinutes-help" class="form-help">
+                            <?php p($l->t('Only applies to working time models that count breaks as working time (e.g. TVöD §6 (1) Wechselschicht) and do not set their own cap. Leave empty to credit all recorded breaks; a number caps the paid amount per day. Changing it recalculates existing entries in the background.')); ?>
+                        </p>
+                    </div>
+
                     <fieldset class="form-fieldset azc-policy-rows" data-bp-rows="tiers" data-bp-max="8">
                         <legend class="form-legend"><?php p($l->t('Required break by daily working time')); ?></legend>
                         <p class="form-help form-help--block">

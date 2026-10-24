@@ -364,6 +364,61 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Vacation/entitlement layer tables carrying a nullable
+	 * `tariff_rule_set_id` (no FK by design). Mirror of
+	 * CleanDanglingTariffRuleSetRefs::TABLES — keep in sync.
+	 */
+	/**
+	 * Known top-level `break_rules` keys on WorkingTimeModel. Case/separator
+	 * variants of these are rejected at the write boundary (near-miss keys
+	 * silently bypass validation and never apply).
+	 */
+	private const BREAK_RULE_KEYS = [
+		'weekday_schedule',
+		'presence_windows',
+		'breaks_count_as_work',
+		'paid_break_cap_minutes',
+		'ue_label',
+		'allow_sunday_work',
+	];
+
+	private const TARIFF_RULE_SET_REFERENCE_TABLES = [
+		'org_vacation_defaults' => 'at_org_vacation_defaults',
+		'model_vacation_defaults' => 'at_model_vacation_defaults',
+		'team_vacation_policies' => 'at_team_vacation_policies',
+		'user_vacation_policies' => 'at_user_vacation_policies',
+		'special_entitlement_policies' => 'at_se_policy',
+	];
+
+	/**
+	 * Count live `tariff_rule_set_id` references per layer. Literal table
+	 * names match the repair step so both views agree on what "referenced"
+	 * means.
+	 *
+	 * @return array<string,int>
+	 */
+	private function tariffRuleSetReferenceCounts(int $ruleSetId): array
+	{
+		$counts = [];
+		foreach (self::TARIFF_RULE_SET_REFERENCE_TABLES as $layer => $table) {
+			if (!$this->db->tableExists($table)) {
+				$counts[$layer] = 0;
+				continue;
+			}
+			$result = $this->db->executeQuery(
+				'SELECT COUNT(*) FROM `*PREFIX*' . $table . '` WHERE `tariff_rule_set_id` = ?',
+				[$ruleSetId]
+			);
+			try {
+				$counts[$layer] = (int)$result->fetchOne();
+			} finally {
+				$result->closeCursor();
+			}
+		}
+		return $counts;
+	}
+
+	/**
 	 * Convert UserWorkingTimeModel to JSON-serializable array for audit log.
 	 */
 	/**
@@ -457,6 +512,29 @@ class AdminController extends Controller
 			], Http::STATUS_BAD_REQUEST);
 		}
 
+		// Near-miss key guard: a case/separator variant of a known key
+		// (`breaksCountAsWork`, `paidBreakCapMinutes`, …) silently bypasses the
+		// typed validation below and persists verbatim — the flag then never
+		// applies. Reject with a field-level error naming the correct key;
+		// genuinely unknown keys stay passthrough-by-design ({...existing}).
+		foreach (array_keys($breakRules) as $key) {
+			if (!is_string($key) || in_array($key, self::BREAK_RULE_KEYS, true)) {
+				continue;
+			}
+			$normalized = strtolower(str_replace(['-', '_'], '', $key));
+			foreach (self::BREAK_RULE_KEYS as $known) {
+				if ($normalized === strtolower(str_replace('_', '', $known))) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Validation failed'),
+						'errors' => ['breakRules' => 'BREAK_RULE_KEY_UNKNOWN'],
+						'fields' => [$key => 'BREAK_RULE_KEY_UNKNOWN'],
+						'code' => 'BREAK_RULE_KEY_UNKNOWN',
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+		}
+
 		// presence_windows (Feature A-2): strict shape validation at the write
 		// boundary — weekday∈1..7, HH:MM, ≤8, no same-weekday overlap.
 		if (array_key_exists('presence_windows', $breakRules)) {
@@ -474,6 +552,47 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 			$breakRules['presence_windows'] = $checked['normalized'];
+		}
+
+		// Paid-break flag (TVöD §6 Abs. 1 S. 2): explicit parse — a form-encoded
+		// "false"/"0" string must never become truthy. Anything not clearly
+		// truthy falls back to false (fail closed = unpaid).
+		if (array_key_exists('breaks_count_as_work', $breakRules)) {
+			$flagRaw = $breakRules['breaks_count_as_work'];
+			$breakRules['breaks_count_as_work'] = $flagRaw === true
+				|| $flagRaw === 1
+				|| $flagRaw === '1'
+				|| (is_string($flagRaw) && strtolower(trim($flagRaw)) === 'true');
+		}
+
+		// Paid-break daily cap: strict write-boundary validation (US-PB-01
+		// AC-3). Absent/empty = volle Einberechnung (no cap, MF-01); integers
+		// 0..480 only — "abc", "-5", "999" and float smuggling are rejected
+		// with a field-level error instead of being silently clamped.
+		if (array_key_exists('paid_break_cap_minutes', $breakRules)) {
+			$capRaw = $breakRules['paid_break_cap_minutes'];
+			if ($capRaw === null || $capRaw === '') {
+				unset($breakRules['paid_break_cap_minutes']);
+			} else {
+				$capInt = null;
+				if (is_int($capRaw)) {
+					$capInt = $capRaw;
+				} elseif (is_string($capRaw) && preg_match('/^\d+$/', trim($capRaw))) {
+					$capInt = (int)trim($capRaw);
+				} elseif (is_float($capRaw) && floor($capRaw) === $capRaw) {
+					$capInt = (int)$capRaw;
+				}
+				if ($capInt === null || $capInt < 0 || $capInt > 480) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Validation failed'),
+						'errors' => ['breakRules' => 'PAID_BREAK_CAP_INVALID'],
+						'fields' => ['paid_break_cap_minutes' => 'PAID_BREAK_CAP_INVALID'],
+						'code' => 'PAID_BREAK_CAP_INVALID',
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$breakRules['paid_break_cap_minutes'] = $capInt;
+			}
 		}
 
 		// B-6 ue_label: display-only metadata from the teaching-unit helper.
@@ -3818,6 +3937,12 @@ class AdminController extends Controller
 			'tiers' => $tiers ?? [],
 			'windows' => $windows ?? [],
 			'presence_exemptions' => $exemptions ?? [],
+			// NH-04: org-level default paid-break cap. Absent param ⇒ keep
+			// current; '' ⇒ clear; value ⇒ validated by validatePolicy.
+			'paid_break_cap_minutes' => array_key_exists(
+				\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_PAID_CAP, $params)
+				? $params[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_PAID_CAP]
+				: $current['paid_break_cap_minutes'],
 		];
 
 		$errors = [];
@@ -3877,6 +4002,30 @@ class AdminController extends Controller
 			['policy' => $normalized, 'version' => $oldVersion + 1],
 			$performedBy
 		);
+
+		$paidCapChanged = ($current['paid_break_cap_minutes'] ?? null) !== ($normalized['paid_break_cap_minutes'] ?? null);
+		if ($paidCapChanged) {
+			// NH-04: the org-cap delta changes the effective cap of every model
+			// that inherits it (flag on, no own cap — explicit caps incl. 0 win).
+			// Enqueued inside the same transaction so a rolled-back policy write
+			// cannot leave a phantom recompute queued; dedupe collapses repeats.
+			try {
+				$jobList = \OCP\Server::get(\OCP\BackgroundJob\IJobList::class);
+				foreach ($this->workingTimeModelMapper->findAll() as $wtm) {
+					$rules = $resolver->normalizeModelRules($wtm->getBreakRulesArray() ?? []);
+					if ($rules['breaks_count_as_work'] === true && $rules['paid_break_cap_minutes'] === null) {
+						\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForModel(
+							$jobList, (int)$wtm->getId()
+						);
+					}
+				}
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'Org paid-break-cap recompute enqueue failed: ' . $e->getMessage(),
+					['exception' => $e]
+				);
+			}
+		}
 
 		return ['doc' => $normalized, 'written' => true];
 	}
@@ -5287,7 +5436,18 @@ class AdminController extends Controller
 			if (isset($params['isDefault'])) {
 				$model->setIsDefault(filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN));
 			}
+			// Paid-break recompute trigger (US-PB-06): only flag/cap deltas
+			// change the snapshot — other break_rules keys are irrelevant here.
+			$paidPolicyBefore = null;
+			$paidPolicyAfter = null;
 			if (isset($params['breakRules']) && is_array($params['breakRules'])) {
+				$resolverForPaid = $this->breakPolicyResolver();
+				if ($resolverForPaid !== null) {
+					$normBefore = $resolverForPaid->normalizeModelRules($model->getBreakRulesArray() ?? []);
+					$paidPolicyBefore = [$normBefore['breaks_count_as_work'], $normBefore['paid_break_cap_minutes']];
+					$normAfter = $resolverForPaid->normalizeModelRules($params['breakRules']);
+					$paidPolicyAfter = [$normAfter['breaks_count_as_work'], $normAfter['paid_break_cap_minutes']];
+				}
 				$scheduleError = $this->applyBreakRulesToWorkingTimeModel($model, $params['breakRules']);
 				if ($scheduleError !== null) {
 					return $scheduleError;
@@ -5333,6 +5493,22 @@ class AdminController extends Controller
 				);
 				return $updated;
 			}, $this->db);
+
+			// Flag/cap changed → queue the chunked snapshot recompute for all
+			// assignment windows of this model (deduplicated inside the job).
+			if ($paidPolicyBefore !== null && $paidPolicyBefore !== $paidPolicyAfter) {
+				try {
+					\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForModel(
+						\OCP\Server::get(\OCP\BackgroundJob\IJobList::class),
+						$updatedModel->getId()
+					);
+				} catch (\Throwable $e) {
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						'Paid-break recompute enqueue failed: ' . $e->getMessage(),
+						['exception' => $e]
+					);
+				}
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -5419,9 +5595,10 @@ class AdminController extends Controller
 				$userAssignments = $this->userWorkingTimeModelMapper->findByWorkingTimeModel($id, false);
 				if (!empty($userAssignments)) {
 					throw new BusinessRuleException(
-						$this->l10n->t(
-							'Cannot delete working time model: %d user(s) are assigned to this model. Please reassign users first.',
-							[count($userAssignments)]
+						$this->l10n->n(
+							'Cannot delete working time model: %n user is assigned to this model. Reassign them first.',
+							'Cannot delete working time model: %n users are assigned to this model. Reassign them first.',
+							count($userAssignments)
 						),
 						'MODEL_IN_USE'
 					);
@@ -5597,6 +5774,28 @@ class AdminController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('Only draft tariff rule sets can be deleted. Active or retired sets must remain for audit purposes.'),
+			], Http::STATUS_CONFLICT);
+		}
+
+		// B3 delete guard: a draft set must not be removed while vacation /
+		// entitlement layers still reference it — that is exactly how the
+		// dangling `tariff_rule_set_id` rows the CleanDanglingTariffRuleSetRefs
+		// repair step exists for were produced.
+		try {
+			$references = $this->tariffRuleSetReferenceCounts($id);
+		} catch (\Throwable $e) {
+			// Fail closed: if the reference inventory cannot be established,
+			// deleting would risk producing dangling rows.
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteTariffRuleSet reference check failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Failed to delete tariff rule set')], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+		$totalRefs = array_sum($references);
+		if ($totalRefs > 0) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->n('This tariff rule set is still referenced by %n vacation or entitlement policy row and cannot be deleted.', 'This tariff rule set is still referenced by %n vacation or entitlement policy rows and cannot be deleted.', $totalRefs),
+				'error_code' => 'tariff_rule_set_in_use',
+				'references' => $references,
 			], Http::STATUS_CONFLICT);
 		}
 
@@ -6439,6 +6638,101 @@ class AdminController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('previewVacationLayerImpact failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Impact preview failed')], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Impact preview for the paid-break controls on the working-time-model
+	 * editor (NH-03): how many users/entries a flag-or-cap save would touch.
+	 *
+	 * Counts the exact scope the recompute job scans — every assignment row
+	 * of the model (current and historical) and the entries inside each
+	 * window. Read-only; safe to call while editing, before any write.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function getPaidBreakImpact(int $id): JSONResponse
+	{
+		try {
+			$model = $this->workingTimeModelMapper->find($id);
+
+			// Personal models are managed through the employee profile, not
+			// through global model CRUD — same 404 as a missing row so the id
+			// cannot be used as an existence oracle.
+			if ($model->isPersonal()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Working time model not found')
+				], Http::STATUS_NOT_FOUND);
+			}
+
+			// Collect half-open [start, end+1d) windows per user, then merge
+			// overlaps: the recompute job scans each user's entries once, so
+			// overlapping assignment rows must not double-count entries.
+			$windowsByUser = [];
+			foreach ($this->userWorkingTimeModelMapper->findByWorkingTimeModel($model->getId(), false) as $assignment) {
+				$end = $assignment->getEndDate();
+				$windowsByUser[$assignment->getUserId()][] = [
+					$assignment->getStartDate(),
+					$end !== null ? (clone $end)->modify('+1 day') : null,
+				];
+			}
+
+			$entries = 0;
+			foreach ($windowsByUser as $userId => $windows) {
+				usort($windows, static function (array $a, array $b): int {
+					if ($a[0] === null) {
+						return $b[0] === null ? 0 : -1;
+					}
+					return $b[0] === null ? 1 : ($a[0] <=> $b[0]);
+				});
+				$merged = [];
+				foreach ($windows as [$ws, $we]) {
+					$last = count($merged) - 1;
+					if ($last < 0) {
+						$merged[] = [$ws, $we];
+						continue;
+					}
+					[$ms, $me] = $merged[$last];
+					if ($me === null) {
+						continue; // open-ended window swallows the rest
+					}
+					if ($ws === null || $ws <= $me) {
+						// Overlapping or adjacent — extend (null end = open).
+						if ($we === null || $we > $me) {
+							$merged[$last][1] = $we;
+						}
+						if ($ws === null) {
+							$merged[$last][0] = null;
+						}
+						continue;
+					}
+					$merged[] = [$ws, $we];
+				}
+				foreach ($merged as [$ms, $me]) {
+					$entries += $this->timeEntryMapper->countByUserStartBetween($userId, $ms, $me);
+				}
+			}
+
+			return new JSONResponse([
+				'success' => true,
+				'data' => [
+					'modelId' => $model->getId(),
+					'affected_user_count' => count($windowsByUser),
+					'affected_entry_count' => $entries,
+				],
+			]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Working time model not found'),
+			], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getPaidBreakImpact failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Impact preview failed'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
 

@@ -405,6 +405,8 @@ class TimeTrackingServiceTest extends TestCase {
 			->willReturn($pausedEntry);
 
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		// Post-recompute snapshot refresh re-reads the row by id.
+		$this->timeEntryMapper->method('find')->willReturn($pausedEntry);
 
 		$this->timeEntryMapper->expects($this->once())
 			->method('update')
@@ -782,7 +784,9 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setCreatedAt(clone $start);
 		$entry->setUpdatedAt($pausedAt);
 
-		$this->timeEntryMapper->expects($this->once())
+		// find() runs once to load the paused entry and once more to refresh
+		// the persisted paid-break snapshot after recompute.
+		$this->timeEntryMapper->expects($this->exactly(2))
 			->method('find')
 			->with(77)
 			->willReturn($entry);
@@ -996,6 +1000,7 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setStartTime(new \DateTime('-2 hours'));
 
 		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
 		$this->timeEntryMapper->expects($this->once())->method('update')
 			->willReturnArgument(0);
 		$this->db->expects($this->once())->method('beginTransaction');
@@ -1052,6 +1057,7 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setBreakEndTime(new \DateTime('-90 minutes'));
 
 		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
 		$this->timeEntryMapper->method('update')->willReturnArgument(0);
 
 		$result = $this->service->startBreak('alice');
@@ -1070,6 +1076,7 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setBreakStartTime(new \DateTime('-30 minutes'));
 
 		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
 		$this->timeEntryMapper->expects($this->once())->method('update')
 			->willReturnArgument(0);
 		$this->db->expects($this->once())->method('commit');

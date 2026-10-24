@@ -250,8 +250,13 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 				|| str_contains($msg, 'uberschneid')
 				|| str_contains($msg, 'nakłada')
 				|| str_contains($msg, 'naklada')
+				|| str_contains($msg, 'nachodzi')
 				|| str_contains($msg, 'chevauche')
 				|| str_contains($msg, 'solapa')
+				|| str_contains($msg, 'sobrep')
+				|| str_contains($msg, 'sovrapp')
+				|| str_contains($msg, 'overlapt')
+				|| str_contains($msg, 'överlapp')
 				|| str_contains($msg, 'overlapp');
 			$this->assertTrue(
 				$looksLikeOverlap,
@@ -259,15 +264,22 @@ final class HalfDayVacationDaysModeIntegrationTest extends TestCase
 			);
 		} catch (\Throwable $e) {
 			$overlapThrown = true;
-			// Locale-safe: EN "overlap", DE "überschneid", PL "nakłada", FR "chevauche", …
+			// Locale-safe: EN "overlap", DE "überschneid", PL "nakłada"/"nachodzi",
+			// FR "chevauche", ES "solapa", PT "sobrepõe", IT "sovrappone",
+			// NL "overlapt", SV "överlappar", …
 			$msg = mb_strtolower($e->getMessage());
 			$looksLikeOverlap = str_contains($msg, 'overlap')
 				|| str_contains($msg, 'überschneid')
 				|| str_contains($msg, 'uberschneid')
 				|| str_contains($msg, 'nakłada')
 				|| str_contains($msg, 'naklada')
+				|| str_contains($msg, 'nachodzi')
 				|| str_contains($msg, 'chevauche')
 				|| str_contains($msg, 'solapa')
+				|| str_contains($msg, 'sobrep')
+				|| str_contains($msg, 'sovrapp')
+				|| str_contains($msg, 'overlapt')
+				|| str_contains($msg, 'överlapp')
 				|| str_contains($msg, 'overlapp');
 			$this->assertTrue(
 				$looksLikeOverlap,

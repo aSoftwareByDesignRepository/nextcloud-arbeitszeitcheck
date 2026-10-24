@@ -64,6 +64,7 @@ final class BreakPolicyResolver
 	public const FIELD_TIERS = 'breakPolicyTiers';
 	public const FIELD_WINDOWS = 'breakPolicyWindows';
 	public const FIELD_EXEMPTIONS = 'presenceExemptions';
+	public const FIELD_PAID_CAP = 'breakPolicyPaidCapMinutes';
 
 	private const TIME_PATTERN = '/^([01]\d|2[0-3]):[0-5]\d$/';
 	private const DATE_PATTERN = '/^\d{4}-\d{2}-\d{2}$/';
@@ -151,6 +152,10 @@ final class BreakPolicyResolver
 			'tiers' => [],
 			'windows' => [],
 			'presence_exemptions' => [],
+			// NH-04: org-level default paid-break cap — models whose flag is on
+			// but whose own cap is unset inherit this; null = no org default
+			// (model-unset then means full inclusion, MF-01).
+			'paid_break_cap_minutes' => null,
 		];
 	}
 
@@ -259,7 +264,9 @@ final class BreakPolicyResolver
 	 * @return array{
 	 *   tiers: list<array{afterHours: float, breakMinutes: int}>,
 	 *   min_break_minutes: int|null,
-	 *   presence_windows: list<array{weekday: int, start: string, end: string}>
+	 *   presence_windows: list<array{weekday: int, start: string, end: string}>,
+	 *   breaks_count_as_work: bool,
+	 *   paid_break_cap_minutes: int|null,
 	 * }
 	 */
 	public function modelRulesForUser(?string $userId): array
@@ -282,6 +289,8 @@ final class BreakPolicyResolver
 			'tiers' => [],
 			'min_break_minutes' => null,
 			'presence_windows' => [],
+			'breaks_count_as_work' => false,
+			'paid_break_cap_minutes' => null,
 		];
 	}
 
@@ -322,7 +331,86 @@ final class BreakPolicyResolver
 			}
 		}
 
+		// Paid-break flag (TVöD §6 Abs. 1 S. 2): tolerant bool — anything that
+		// is not clearly truthy falls back to false so a corrupt fragment
+		// degrades to net semantics (fail closed = unpaid).
+		if (array_key_exists('breaks_count_as_work', $raw)) {
+			$flag = $raw['breaks_count_as_work'];
+			$rules['breaks_count_as_work'] = $flag === true
+				|| $flag === 1
+				|| $flag === '1'
+				|| (is_string($flag) && strtolower(trim($flag)) === 'true');
+		}
+
+		// Optional paid-break cap in minutes (0..480). null/absent = full
+		// inclusion of all deductible breaks; 0 = explicit "pay nothing".
+		if (array_key_exists('paid_break_cap_minutes', $raw)) {
+			$capRaw = $raw['paid_break_cap_minutes'];
+			if ($capRaw === null) {
+				$rules['paid_break_cap_minutes'] = null;
+			} else {
+				$cap = $this->strictInt($capRaw);
+				if ($cap !== null && $cap >= 0 && $cap <= self::MAX_WINDOW_MINUTES) {
+					$rules['paid_break_cap_minutes'] = $cap;
+				}
+			}
+		}
+
 		return $rules;
+	}
+
+	/**
+	 * Effective paid-break policy for a user on a calendar day.
+	 *
+	 * Resolves the working-time model assigned as-of $asOf (storage TZ date —
+	 * the same resolution {@see UserWorkingTimeModelMapper::findByUserAndDate}
+	 * provides) so a snapshot recompute evaluates the model that governed the
+	 * day, not whatever is current at run time. When $asOf is omitted the
+	 * current assignment is used.
+	 *
+	 * @return array{count_as_work: bool, cap_minutes: int|null}
+	 */
+	public function paidBreakPolicyForUser(?string $userId, ?\DateTimeInterface $asOf = null): array
+	{
+		$off = ['count_as_work' => false, 'cap_minutes' => null];
+		if ($userId === null || $userId === '') {
+			return $off;
+		}
+
+		try {
+			if ($asOf !== null) {
+				$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate(
+					$userId,
+					\DateTime::createFromInterface($asOf)
+				);
+				if ($assignment === null) {
+					return $off;
+				}
+				$model = $this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
+			} else {
+				$model = $this->modelForUser($userId);
+			}
+		} catch (\Throwable $e) {
+			$this->logWarning('paidBreakPolicyForUser model resolution failed', $e);
+			return $off;
+		}
+
+		if ($model === null) {
+			return $off;
+		}
+
+		$raw = $model->getBreakRulesArray() ?? [];
+		$rules = $this->normalizeModelRules(is_array($raw) ? $raw : []);
+		$cap = $rules['paid_break_cap_minutes'];
+		if ($cap === null) {
+			// NH-04: org-level default cap — only inherits when the model has
+			// no explicit cap (incl. explicit 0, which always wins).
+			$cap = $this->orgConfig()['paid_break_cap_minutes'] ?? null;
+		}
+		return [
+			'count_as_work' => $rules['breaks_count_as_work'] === true,
+			'cap_minutes' => $cap,
+		];
 	}
 
 	// ------------------------------------------------------------------ //
@@ -651,9 +739,15 @@ final class BreakPolicyResolver
 	/**
 	 * Break portions of one entry clipped to [clipStart, clipEnd).
 	 *
+	 * JSON portions contribute when they carry start+end; the legacy
+	 * breakStartTime/breakEndTime pair contributes when both are set. When
+	 * $openBreakEndTs is given, an open legacy break (start set, end null) is
+	 * treated as ending at that timestamp — matching the live deduction in
+	 * {@see TimeEntry::getBreakDurationHours()}.
+	 *
 	 * @return list<array{start: int, end: int, automatic: bool}>
 	 */
-	private function entryBreakIntervals(TimeEntry $entry, int $clipStart, int $clipEnd): array
+	public function entryBreakIntervals(TimeEntry $entry, int $clipStart, int $clipEnd, ?int $openBreakEndTs = null): array
 	{
 		$out = [];
 
@@ -685,12 +779,14 @@ final class BreakPolicyResolver
 		}
 
 		$legacyStart = $entry->getBreakStartTime();
-		$legacyEnd = $entry->getBreakEndTime();
-		if ($legacyStart !== null && $legacyEnd !== null) {
-			$s = max($legacyStart->getTimestamp(), $clipStart);
-			$e = min($legacyEnd->getTimestamp(), $clipEnd);
-			if ($e > $s) {
-				$out[] = ['start' => $s, 'end' => $e, 'automatic' => false];
+		if ($legacyStart !== null) {
+			$legacyEndTs = $entry->getBreakEndTime()?->getTimestamp() ?? $openBreakEndTs;
+			if ($legacyEndTs !== null) {
+				$s = max($legacyStart->getTimestamp(), $clipStart);
+				$e = min($legacyEndTs, $clipEnd);
+				if ($e > $s) {
+					$out[] = ['start' => $s, 'end' => $e, 'automatic' => false];
+				}
 			}
 		}
 
@@ -1006,6 +1102,18 @@ final class BreakPolicyResolver
 			}
 		}
 
+		// paid_break_cap_minutes — null or int 0..480 (org default for models
+		// with the paid-break flag but no explicit cap).
+		$paidCapRaw = $input['paid_break_cap_minutes'] ?? null;
+		if ($paidCapRaw !== null && $paidCapRaw !== '') {
+			$paidCap = $this->strictInt($paidCapRaw);
+			if ($paidCap === null || $paidCap < 0 || $paidCap > self::MAX_WINDOW_MINUTES) {
+				$errors[self::FIELD_PAID_CAP] = 'VALIDATION_RANGE';
+			} else {
+				$normalized['paid_break_cap_minutes'] = $paidCap;
+			}
+		}
+
 		// presence_exemptions — ≤8 ISO ranges, start ≤ end (overlaps allowed).
 		$exemptRaw = $input['presence_exemptions'] ?? [];
 		if (!is_array($exemptRaw)) {
@@ -1091,6 +1199,14 @@ final class BreakPolicyResolver
 			}
 		} elseif ($exemptions !== [] && $exemptions !== null) {
 			$drop('presence_exemptions');
+		}
+
+		$paidCap = $decoded['paid_break_cap_minutes'] ?? null;
+		$paidCapInt = $this->strictInt($paidCap);
+		if ($paidCapInt !== null && $paidCapInt >= 0 && $paidCapInt <= self::MAX_WINDOW_MINUTES) {
+			$policy['paid_break_cap_minutes'] = $paidCapInt;
+		} elseif ($paidCap !== null) {
+			$drop('paid_break_cap_minutes');
 		}
 
 		return $policy;
@@ -1474,10 +1590,13 @@ final class BreakPolicyResolver
 	// ------------------------------------------------------------------ //
 
 	/**
+	 * Merge overlapping/adjacent [start, end) intervals. Public so the paid-break
+	 * allocator reuses the exact day-pool merge semantics instead of drifting.
+	 *
 	 * @param list<array{0:int,1:int}> $intervals
 	 * @return list<array{0:int,1:int}>
 	 */
-	private function mergeIntervals(array $intervals): array
+	public function mergeIntervals(array $intervals): array
 	{
 		if ($intervals === []) {
 			return [];
@@ -1496,7 +1615,7 @@ final class BreakPolicyResolver
 	}
 
 	/** @param list<array{0:int,1:int}> $intervals */
-	private function intervalSeconds(array $intervals): int
+	public function intervalSeconds(array $intervals): int
 	{
 		$sum = 0;
 		foreach ($intervals as $iv) {

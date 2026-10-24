@@ -116,6 +116,8 @@ class KioskAuthService
 		$kioskStatus = $this->mapKioskStatus((string)($statusData['status'] ?? 'clocked_out'));
 		$allowedActions = $this->mapAllowedActions($kioskStatus);
 		$workedSeconds = (int)round(((float)($statusData['working_today_hours'] ?? 0)) * 3600);
+		// Additive: tariff-basis day total (net + paid-break snapshot).
+		$paidWorkedSeconds = (int)round(((float)($statusData['working_today_paid_hours'] ?? 0)) * 3600);
 
 		$this->auditLogMapper->logAction($userIdResolved, 'kiosk_identify_ok', 'kiosk_session', $session->getId(), null, [
 			'method' => $method,
@@ -128,6 +130,7 @@ class KioskAuthService
 			'displayName' => $user !== null ? $user->getDisplayName() : $userIdResolved,
 			'status' => $kioskStatus,
 			'workedSecondsToday' => $workedSeconds,
+			'paidWorkedSecondsToday' => $paidWorkedSeconds,
 			'allowedActions' => $allowedActions,
 			// Absolute wall expiry (ATOM) — tablet countdown must never invent past this.
 			'sessionExpiresAt' => $expires->format(\DateTimeInterface::ATOM),

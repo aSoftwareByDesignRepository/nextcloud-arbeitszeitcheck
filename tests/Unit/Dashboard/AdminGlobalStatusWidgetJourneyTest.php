@@ -22,6 +22,9 @@ class AdminGlobalStatusWidgetJourneyTest extends TestCase {
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $s, array $p = []): string => $p === [] ? $s : (string)vsprintf($s, $p)
 		);
+		$l10n->method('n')->willReturnCallback(
+			static fn (string $singular, string $plural, int $count): string => $count === 1 ? $singular : str_replace('%n', (string)$count, $plural)
+		);
 
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('imagePath')->willReturn('/apps/arbeitszeitcheck/img/app-dark.svg');

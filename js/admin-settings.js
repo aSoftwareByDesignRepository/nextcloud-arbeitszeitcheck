@@ -25,6 +25,15 @@
     /** @type {{ clear: function(): void, getUserId: function(): string } | null} */
     let monthReopenPicker = null;
 
+    /** Plural-aware translate (Nextcloud window.n replaces %n). */
+    function n(singular, plural, count) {
+        const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+        if (typeof window.n === 'function') {
+            return window.n('arbeitszeitcheck', singular, plural, c);
+        }
+        return String(c === 1 ? singular : plural).replace('%n', String(c));
+    }
+
     function setLiveMessage(liveRegion, message, type) {
         if (!liveRegion) {
             return;
@@ -212,7 +221,11 @@
                 }
             });
             if (exemptions.length > 0) {
-                parts.push(t('{n} presence exception period(s) configured.', '{n} presence exception period(s) configured.').replace('{n}', String(exemptions.length)));
+                parts.push(n(
+                    '%n presence exception period configured.',
+                    '%n presence exception periods configured.',
+                    exemptions.length
+                ));
             }
             preview.textContent = parts.join(' ');
             preview.hidden = parts.length === 0;
@@ -258,7 +271,7 @@
     function collectBreakPolicyFormData(form, formData) {
         const editor = form.querySelector('#azc-break-policy-editor');
         if (!editor) {
-            ['breakPolicyEnforced', 'breakPolicyMinBreakMinutes', 'breakPolicyTiers',
+            ['breakPolicyEnforced', 'breakPolicyMinBreakMinutes', 'breakPolicyPaidCapMinutes', 'breakPolicyTiers',
                 'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm'].forEach(function(k) {
                 delete formData[k];
             });
@@ -285,6 +298,8 @@
         formData.breakPolicyEnforced = !!document.getElementById('breakPolicyEnforced')?.checked;
         const minBreak = String((document.getElementById('breakPolicyMinBreakMinutes') || {}).value || '').trim();
         formData.breakPolicyMinBreakMinutes = minBreak === '' ? null : minBreak;
+        const paidCap = String((document.getElementById('breakPolicyPaidCapMinutes') || {}).value || '').trim();
+        formData.breakPolicyPaidCapMinutes = paidCap === '' ? null : paidCap;
         formData.breakPolicyTiers = JSON.stringify(collect('tiers'));
         formData.breakPolicyWindows = JSON.stringify(collect('windows'));
         formData.presenceExemptions = JSON.stringify(collect('exemptions'));
@@ -355,6 +370,7 @@
         const fieldLabels = {
             breakPolicyEnforced: t('Enforce central break rules', 'Enforce central break rules'),
             breakPolicyMinBreakMinutes: t('Minimum countable break', 'Minimum countable break'),
+            breakPolicyPaidCapMinutes: t('Default paid break time', 'Default paid break time'),
             breakPolicyTiers: t('Break rules', 'Break rules'),
             breakPolicyWindows: t('Break windows', 'Break windows'),
             presenceExemptions: t('Presence exceptions', 'Presence exceptions'),
@@ -386,7 +402,8 @@
                         }, { once: true });
                     });
                 }
-            } else if (base === 'breakPolicyMinBreakMinutes' || base === 'breakPolicyEnforced') {
+            } else if (base === 'breakPolicyMinBreakMinutes' || base === 'breakPolicyEnforced'
+                || base === 'breakPolicyPaidCapMinutes') {
                 const input = document.getElementById(base);
                 if (input) {
                     input.setAttribute('aria-invalid', 'true');
@@ -600,10 +617,7 @@
                 }
                 return;
             }
-            const template = l10n.appAdminsSelected || '%s app admin(s) selected';
-            countEl.textContent = template.indexOf('%s') !== -1
-                ? template.replace('%s', String(selectedCount))
-                : String(selectedCount) + ' ' + template;
+            countEl.textContent = n('%n app admin selected', '%n app admins selected', selectedCount);
             const summary = Utils.$('#azcAccessAdminsSummary');
             if (summary) {
                 summary.textContent = countEl.textContent;
@@ -767,10 +781,7 @@
                 }
                 return;
             }
-            const template = l10n.accessUsersSelected || '%s user(s) selected';
-            countEl.textContent = template.indexOf('%s') !== -1
-                ? template.replace('%s', String(selectedCount))
-                : String(selectedCount) + ' ' + template;
+            countEl.textContent = n('%n user selected', '%n users selected', selectedCount);
             const summary = Utils.$('#azcAccessUsersSummary');
             if (summary) {
                 summary.textContent = countEl.textContent;
@@ -888,10 +899,7 @@
                 }
                 return;
             }
-            const template = l10n.accessGroupsSelected || '%s group(s) selected';
-            countEl.textContent = template.indexOf('%s') !== -1
-                ? template.replace('%s', String(selectedCount))
-                : String(selectedCount) + ' ' + template;
+            countEl.textContent = n('%n group selected', '%n groups selected', selectedCount);
             const summary = Utils.$('#azcAccessGroupsSummary');
             if (summary) {
                 summary.textContent = countEl.textContent;

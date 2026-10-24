@@ -2298,4 +2298,63 @@ class ComplianceServiceTest extends TestCase
 		$statuses = $this->service->getComplianceStatusForUsers(['u1', 'u1']);
 		$this->assertSame(['u1'], array_keys($statuses));
 	}
+
+	public function testBreakBlockDetailsExposesCountedAndMissingMinutes(): void
+	{
+		// 8h net (>6h → 30min required, DE). A 10-minute break is below the
+		// 15-minute countable floor → counted 0, missing the full 30.
+		$entry = new TimeEntry();
+		$entry->setUserId('de-user');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2026-03-10 08:00:00'));
+		$entry->setEndTime(new \DateTime('2026-03-10 16:00:00'));
+		$entry->setBreaks(json_encode([
+			['start' => '2026-03-10T12:00:00+00:00', 'end' => '2026-03-10T12:10:00+00:00'],
+		]));
+
+		$details = $this->service->breakBlockDetailsForCompletedEntry($entry);
+		$this->assertNotNull($details);
+		$this->assertSame(30, $details['required_break_minutes']);
+		$this->assertSame(0, $details['counted_break_minutes']);
+		$this->assertSame(30, $details['missing_break_minutes']);
+		$this->assertSame(15, $details['min_break_minutes']);
+	}
+
+	public function testBreakBlockDetailsPartiallyCountedBreak(): void
+	{
+		// 8h net → 30min required; one countable 20min break → missing 10.
+		$entry = new TimeEntry();
+		$entry->setUserId('de-user');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2026-03-10 08:00:00'));
+		$entry->setEndTime(new \DateTime('2026-03-10 16:00:00'));
+		$entry->setBreaks(json_encode([
+			['start' => '2026-03-10T12:00:00+00:00', 'end' => '2026-03-10T12:20:00+00:00'],
+		]));
+
+		$details = $this->service->breakBlockDetailsForCompletedEntry($entry);
+		$this->assertNotNull($details);
+		$this->assertSame(30, $details['required_break_minutes']);
+		$this->assertSame(20, $details['counted_break_minutes']);
+		$this->assertSame(10, $details['missing_break_minutes']);
+	}
+
+	public function testBreakBlockDetailsNullForCompliantOrIncompleteEntry(): void
+	{
+		$compliant = new TimeEntry();
+		$compliant->setUserId('de-user');
+		$compliant->setStatus(TimeEntry::STATUS_COMPLETED);
+		$compliant->setStartTime(new \DateTime('2026-03-10 08:00:00'));
+		$compliant->setEndTime(new \DateTime('2026-03-10 16:00:00'));
+		$compliant->setBreaks(json_encode([
+			['start' => '2026-03-10T12:00:00+00:00', 'end' => '2026-03-10T12:30:00+00:00'],
+		]));
+		$this->assertNull($this->service->breakBlockDetailsForCompletedEntry($compliant));
+
+		$open = new TimeEntry();
+		$open->setUserId('de-user');
+		$open->setStatus(TimeEntry::STATUS_ACTIVE);
+		$open->setStartTime(new \DateTime('2026-03-10 08:00:00'));
+		$this->assertNull($this->service->breakBlockDetailsForCompletedEntry($open));
+	}
 }

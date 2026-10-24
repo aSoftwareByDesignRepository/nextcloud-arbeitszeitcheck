@@ -151,8 +151,9 @@ export default async function globalSetup() {
 		// eslint-disable-next-line no-console
 		console.log('[e2e globalSetup] Nextcloud container not reachable — skipping env normalization (non-Docker target)')
 		return
-	resetE2eUserState()
 	}
+
+	resetE2eUserState()
 
 	preconditionBruteForce()
 
@@ -171,7 +172,11 @@ export default async function globalSetup() {
 		if (!user || !pass) {
 			continue
 		}
-		;(syncPassword(user, pass) ? synced : failed).push(user)
+		if (syncPassword(user, pass)) {
+			synced.push(user)
+		} else {
+			failed.push(user)
+		}
 	}
 	if (failed.length > 0) {
 		// eslint-disable-next-line no-console

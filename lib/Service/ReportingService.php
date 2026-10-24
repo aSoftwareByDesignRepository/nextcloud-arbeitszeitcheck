@@ -763,7 +763,8 @@ class ReportingService
 		$breakHours = 0.0;
 		foreach ($entries as $entry) {
 			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED) {
-				$totalHours += $entry->getWorkingDurationHours();
+				// Reports are payroll-facing: paid basis (net + paid-break snapshot).
+				$totalHours += $entry->getPaidDurationHours() ?? 0.0;
 				$breakHours += $entry->getBreakDurationHours();
 			}
 		}
@@ -838,7 +839,8 @@ class ReportingService
 			}
 			$entryDate = (clone $startTime)->setTime(0, 0, 0);
 			if ($this->holidayCalendarService->isHolidayForUser($userId, $entryDate)) {
-				$hours = $entry->getWorkingDurationHours();
+				// Payroll report — paid basis (net + paid-break snapshot).
+				$hours = $entry->getPaidDurationHours();
 				if ($hours !== null) {
 					$holidayWorkHours += $hours;
 				}

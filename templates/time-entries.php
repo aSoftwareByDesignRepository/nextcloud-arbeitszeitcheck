@@ -977,10 +977,16 @@ if ($mode === 'list') {
                                                 p(round($workingHours, 2)); ?> h
                                             <?php } else {
                                                 $workingHours = $entry->getWorkingDurationHours() ?? 0;
+                                                // Paid (tariff) basis is the payroll figure: net + paid break.
+                                                $paidHours = $entry->getPaidDurationHours() ?? $workingHours;
                                                 // Also limit completed entries to max for display (should already be enforced)
                                                 $maxWorkingHours = 10.0;
-                                                $workingHours = min($workingHours, $maxWorkingHours);
-                                                p(round($workingHours, 2)); ?> h
+                                                $paidHours = min($paidHours, $maxWorkingHours);
+                                                p(round($paidHours, 2)); ?> h
+                                                <?php $paidBreakMin = (int)round($entry->getPaidBreakSeconds() / 60); ?>
+                                                <?php if ($paidBreakMin > 0): ?>
+                                                    <div class="text-muted"><?php p($l->t('Net: %1$.2f h · paid break: %2$d min', [round($workingHours, 2), $paidBreakMin])); ?></div>
+                                                <?php endif; ?>
                                             <?php } ?>
                                         </td>
                                         <td class="description-cell" data-label="<?php p($l->t('Description')); ?>">

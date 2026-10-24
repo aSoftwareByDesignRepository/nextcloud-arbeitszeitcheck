@@ -105,6 +105,7 @@ class Application extends App implements IBootstrap {
 			return new ApiExceptionMiddleware(
 				$c->query(\OCP\IRequest::class),
 				$c->query(\Psr\Log\LoggerInterface::class),
+				$c->query(\OCP\L10N\IFactory::class)->get(self::APP_ID),
 			);
 		});
 		$context->registerMiddleware(ApiExceptionMiddleware::class);
@@ -675,6 +676,9 @@ class Application extends App implements IBootstrap {
 			return new ReleaseStuckPendingAbsences(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
 				$c->query(AbsenceService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService::class),
+				$c->query(TeamResolverService::class),
 			);
 		});
 
@@ -1084,6 +1088,17 @@ class Application extends App implements IBootstrap {
 				$c->query(VacationAllocationService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Command\RecomputePaidBreaksCommand::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Command\RecomputePaidBreaksCommand(
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeTrackingService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCP\BackgroundJob\IJobList::class),
 			);
 		});
 

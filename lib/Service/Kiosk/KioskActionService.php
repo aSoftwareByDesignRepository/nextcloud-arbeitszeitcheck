@@ -28,7 +28,7 @@ class KioskActionService
 	}
 
 	/**
-	 * @return array{newStatus: string, message: string}
+	 * @return array{newStatus: string, message: string, paidBreakSeconds?: int, paidBreakMinutes?: int}
 	 */
 	public function performAction(KioskTerminal $terminal, string $sessionToken, string $action): array
 	{
@@ -49,9 +49,10 @@ class KioskActionService
 		}
 
 		try {
+			$completedEntry = null;
 			$newStatus = match ($action) {
 				'clock_in' => $this->doClockIn($userId),
-				'clock_out' => $this->doClockOut($userId),
+				'clock_out' => $this->doClockOut($userId, $completedEntry),
 				'break_start' => $this->doStartBreak($userId),
 				'break_end' => $this->doEndBreak($userId),
 				default => throw new KioskException('KIOSK_ACTION_INVALID'),
@@ -82,10 +83,19 @@ class KioskActionService
 			'newStatus' => $newStatus,
 		], $userId);
 
-		return [
+		$data = [
 			'newStatus' => $newStatus,
 			'message' => $this->actionMessage($action),
 		];
+		if ($completedEntry !== null) {
+			// NH-02 additive transparency: the terminal badge shows how much
+			// recorded break was paid (TVöD §6 models). 0 is meaningful —
+			// older kiosk builds simply ignore the keys.
+			$data['paidBreakSeconds'] = $completedEntry->getPaidBreakSeconds();
+			$data['paidBreakMinutes'] = (int)round($completedEntry->getPaidBreakSeconds() / 60);
+		}
+
+		return $data;
 	}
 
 	private function doClockIn(string $userId): string
@@ -94,9 +104,9 @@ class KioskActionService
 		return 'working';
 	}
 
-	private function doClockOut(string $userId): string
+	private function doClockOut(string $userId, ?\OCA\ArbeitszeitCheck\Db\TimeEntry &$entry = null): string
 	{
-		$this->timeTrackingService->clockOut($userId);
+		$entry = $this->timeTrackingService->clockOut($userId);
 		return 'off';
 	}
 

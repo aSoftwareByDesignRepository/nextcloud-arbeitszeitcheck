@@ -53,7 +53,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                                 <?php
                                 $selectedAdminCount = count($selectedAppAdmins);
                                 p($selectedAdminCount > 0
-                                    ? $l->t('%d app admin(s) selected', [$selectedAdminCount])
+                                    ? $l->n('%n app admin selected', '%n app admins selected', $selectedAdminCount)
                                     : $l->t('No app admins selected (all Nextcloud admins are allowed).'));
                                 ?>
                             </p>
@@ -64,7 +64,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                                 <?php
                                 $selectedUserCount = count($selectedAccessUsers);
                                 p($selectedUserCount > 0
-                                    ? $l->t('%d user(s) selected', [$selectedUserCount])
+                                    ? $l->n('%n user selected', '%n users selected', $selectedUserCount)
                                     : $l->t('No individual users selected.'));
                                 ?>
                             </p>
@@ -75,7 +75,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                                 <?php
                                 $selectedGroupCount = count($selectedAccessGroups);
                                 p($selectedGroupCount > 0
-                                    ? $l->t('%d group(s) selected', [$selectedGroupCount])
+                                    ? $l->n('%n group selected', '%n groups selected', $selectedGroupCount)
                                     : $l->t('No groups selected.'));
                                 ?>
                             </p>
@@ -116,7 +116,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php
                             $selectedAdminCount = count($selectedAppAdmins);
                             p($selectedAdminCount > 0
-                                ? $l->t('%d app admin(s) selected', [$selectedAdminCount])
+                                ? $l->n('%n app admin selected', '%n app admins selected', $selectedAdminCount)
                                 : $l->t('No app admins selected (all Nextcloud admins are allowed).'));
                             ?>
                         </p>
@@ -173,7 +173,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php
                             $selectedUserCount = count($selectedAccessUsers);
                             p($selectedUserCount > 0
-                                ? $l->t('%d user(s) selected', [$selectedUserCount])
+                                ? $l->n('%n user selected', '%n users selected', $selectedUserCount)
                                 : $l->t('No individual users selected.'));
                             ?>
                         </p>
@@ -227,7 +227,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php
                             $selectedCount = count($selectedAccessGroups);
                             p($selectedCount > 0
-                                ? $l->t('%d group(s) selected', [$selectedCount])
+                                ? $l->n('%n group selected', '%n groups selected', $selectedCount)
                                 : $l->t('No groups selected.'));
                             ?>
                         </p>

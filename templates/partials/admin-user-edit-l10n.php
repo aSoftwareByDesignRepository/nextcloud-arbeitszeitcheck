@@ -293,7 +293,6 @@ window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
     window.ArbeitszeitCheck.l10n.useOrgDefault = <?php echo json_encode($l->t('Use organisation default'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.applyToSelected = <?php echo json_encode($l->t('Apply to selected…'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.apply = <?php echo json_encode($l->t('Apply'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    window.ArbeitszeitCheck.l10n.nSelectedApply = <?php echo json_encode(TemplateL10n::translate($l, '%n selected — Apply…'), TemplateL10n::JSON_ENCODE_FLAGS); ?>;
     window.ArbeitszeitCheck.l10n.selectPeopleFirst = <?php echo json_encode($l->t('Select at least one person.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.chooseField = <?php echo json_encode($l->t('Choose a work schedule and/or holiday region.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.previewSummary = <?php echo json_encode(TemplateL10n::translate($l, 'Would update %1$d people (%2$d failed checks).'), TemplateL10n::JSON_ENCODE_FLAGS); ?>;

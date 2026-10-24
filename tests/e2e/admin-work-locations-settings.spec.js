@@ -1,4 +1,3 @@
-/* global process */
 // shared-state-safe: read-only GET page; the only mutation route is
 // page.route-intercepted and fulfilled locally.
 //

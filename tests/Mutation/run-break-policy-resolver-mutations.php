@@ -81,6 +81,36 @@ $mutants = [
 		'replacement' => "\$required = min(\$required, (int)\$tier['breakMinutes']);",
 		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
 	],
+	[
+		'name' => 'NH-04 paid cap: org default never inherited',
+		'needle' => "\$cap = \$this->orgConfig()['paid_break_cap_minutes'] ?? null;",
+		'replacement' => "\$cap = null;",
+		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
+	],
+	[
+		'name' => 'NH-04 paid cap: explicit model 0 loses to org default',
+		'needle' => 'if ($cap === null) {',
+		'replacement' => 'if ($cap === null || $cap === 0) {',
+		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
+	],
+	[
+		'name' => 'paid flag: "1" string no longer accepted',
+		'needle' => "|| \$flag === '1'",
+		'replacement' => "|| \$flag === '9'",
+		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
+	],
+	[
+		'name' => 'paid cap normalization: upper bound dropped',
+		'needle' => 'if ($cap !== null && $cap >= 0 && $cap <= self::MAX_WINDOW_MINUTES) {',
+		'replacement' => 'if ($cap !== null && $cap >= 0) {',
+		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
+	],
+	[
+		'name' => 'org cap validate: negative accepted',
+		'needle' => 'if ($paidCap === null || $paidCap < 0 || $paidCap > self::MAX_WINDOW_MINUTES) {',
+		'replacement' => 'if ($paidCap === null || $paidCap > self::MAX_WINDOW_MINUTES) {',
+		'runs' => 'tests/Unit/Support/BreakPolicyResolverTest.php',
+	],
 ];
 
 function runSuite(string $phpunit, string $testFile, string $root): int

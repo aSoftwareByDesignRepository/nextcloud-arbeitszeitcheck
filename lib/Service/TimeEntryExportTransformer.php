@@ -200,7 +200,8 @@ class TimeEntryExportTransformer
 
 		$totalDurationSeconds = $endTs - $startTs;
 		$totalDurationHours = $entry->getTotalDurationHours();
-		$totalWorkingHours = $entry->getWorkingDurationHours();
+		// Export rows carry tariff/payroll hours (net + paid-break snapshot).
+		$totalWorkingHours = $entry->getPaidDurationHours();
 		$totalBreakHours = $entry->getBreakDurationHours();
 
 		if ($totalDurationHours === null || $totalDurationHours <= 0) {
@@ -229,6 +230,12 @@ class TimeEntryExportTransformer
 				'duration_hours' => round($durationHours, self::HOUR_ROUND_PRECISION),
 				'break_duration_hours' => $breakPart !== null ? round($breakPart, self::HOUR_ROUND_PRECISION) : null,
 				'working_hours' => $workingPart !== null ? round($workingPart, self::HOUR_ROUND_PRECISION) : null,
+				// TH-06: explicit components — working_hours is the PAID basis
+				// (net + paid break); these two make the split unambiguous.
+				'net_working_hours' => $entry->getWorkingDurationHours() !== null
+					? round($entry->getWorkingDurationHours() * $ratio, self::HOUR_ROUND_PRECISION)
+					: null,
+				'paid_break_hours' => round($entry->getPaidBreakHours() * $ratio, self::HOUR_ROUND_PRECISION),
 				'description' => $entry->getDescription() ?? '',
 				'work_location' => $entry->getWorkLocation() ?? '',
 				'work_location_label' => $this->workLocationMeta($entry->getWorkLocation())[0],
@@ -290,7 +297,11 @@ class TimeEntryExportTransformer
 			'break_periods' => $breakPeriods,
 			'duration_hours' => $entry->getTotalDurationHours(),
 			'break_duration_hours' => $entry->getBreakDurationHours(),
-			'working_hours' => $entry->getWorkingDurationHours(),
+			// Paid basis for payroll compatibility (net + paid break) — the
+			// two explicit columns beside it remove the ambiguity (TH-06).
+			'working_hours' => $entry->getPaidDurationHours(),
+			'net_working_hours' => $entry->getWorkingDurationHours(),
+			'paid_break_hours' => $entry->getPaidBreakHours(),
 			'description' => $entry->getDescription() ?? '',
 			'work_location' => $entry->getWorkLocation() ?? '',
 			'work_location_label' => $this->workLocationMeta($entry->getWorkLocation())[0],

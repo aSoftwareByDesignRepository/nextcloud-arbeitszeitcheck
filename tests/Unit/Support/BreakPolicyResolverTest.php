@@ -82,6 +82,9 @@ class BreakPolicyResolverTest extends TestCase
 		$this->userWtmMapper->method('findCurrentByUser')->willReturnCallback(
 			fn (string $uid) => $uid === 'u1' ? $this->assignment : null
 		);
+		$this->userWtmMapper->method('findByUserAndDate')->willReturnCallback(
+			fn (string $uid, \DateTime $date) => $uid === 'u1' ? $this->assignment : null
+		);
 
 		$this->wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$this->wtmMapper->method('find')->willReturnCallback(function (int $id): WorkingTimeModel {
@@ -647,5 +650,180 @@ class BreakPolicyResolverTest extends TestCase
 	{
 		$m = new \ReflectionMethod($this->resolver, 'overlapSeconds');
 		return (int)$m->invoke($this->resolver, $intervals, $start, $end);
+	}
+
+	// ------------------------------------------------------------------
+	// Paid-break keys (TVöD §6 Abs. 1 S. 2)
+	// ------------------------------------------------------------------
+
+	public function testPaidBreakPolicyDefaultsOff(): void
+	{
+		$this->assignModel([]);
+		$p = $this->resolver->paidBreakPolicyForUser('u1');
+		$this->assertSame(['count_as_work' => false, 'cap_minutes' => null], $p);
+	}
+
+	public function testPaidBreakPolicyEnabledWithCap(): void
+	{
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => 30]);
+		$p = $this->resolver->paidBreakPolicyForUser('u1');
+		$this->assertTrue($p['count_as_work']);
+		$this->assertSame(30, $p['cap_minutes']);
+	}
+
+	public function testPaidBreakFlagTolerantParsing(): void
+	{
+		foreach ([true, 1, '1', 'true', ' true '] as $truthy) {
+			$this->assignModel(['breaks_count_as_work' => $truthy]);
+			$this->assertTrue(
+				$this->resolver->paidBreakPolicyForUser('u1')['count_as_work'],
+				'flag ' . var_export($truthy, true) . ' must enable'
+			);
+		}
+		foreach ([false, 0, '0', 'false', 'False', '', 'yes', 2] as $falsy) {
+			$this->assignModel(['breaks_count_as_work' => $falsy]);
+			$this->assertFalse(
+				$this->resolver->paidBreakPolicyForUser('u1')['count_as_work'],
+				'flag ' . var_export($falsy, true) . ' must disable (fail closed = unpaid)'
+			);
+		}
+	}
+
+	public function testPaidBreakCapNormalization(): void
+	{
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => '45']);
+		$this->assertSame(45, $this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => 0]);
+		$this->assertSame(0, $this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => null]);
+		$this->assertNull($this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+
+		foreach ([-1, 481, 'abc', 1.5, [30]] as $bad) {
+			$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => $bad]);
+			$this->assertNull(
+				$this->resolver->paidBreakPolicyForUser('u1')['cap_minutes'],
+				'cap ' . var_export($bad, true) . ' must normalize to null'
+			);
+		}
+	}
+
+	public function testPaidBreakPolicyNoUserOrAssignmentIsOff(): void
+	{
+		$this->assertSame(['count_as_work' => false, 'cap_minutes' => null], $this->resolver->paidBreakPolicyForUser(null));
+		$this->assertSame(['count_as_work' => false, 'cap_minutes' => null], $this->resolver->paidBreakPolicyForUser(''));
+		$this->assertSame(['count_as_work' => false, 'cap_minutes' => null], $this->resolver->paidBreakPolicyForUser('nobody'));
+	}
+
+	public function testPaidBreakPolicyAsOfResolvesHistoricalAssignment(): void
+	{
+		$this->assignModel(['breaks_count_as_work' => true]);
+		$p = $this->resolver->paidBreakPolicyForUser('u1', new \DateTime('2020-01-15'));
+		$this->assertTrue($p['count_as_work']);
+		// A user without an as-of assignment resolves to off.
+		$p = $this->resolver->paidBreakPolicyForUser('ghost', new \DateTime('2020-01-15'));
+		$this->assertFalse($p['count_as_work']);
+	}
+
+	public function testNormalizeModelRulesPreservesUnknownKeysUnaffected(): void
+	{
+		// Unknown keys live outside the normalized view — the paid keys must
+		// not clobber sibling structures the editor preserves on save.
+		$normalized = $this->resolver->normalizeModelRules([
+			'weekday_schedule' => ['mon' => '08:00-16:00'],
+			'breaks_count_as_work' => 'true',
+			'paid_break_cap_minutes' => '30',
+		]);
+		$this->assertTrue($normalized['breaks_count_as_work']);
+		$this->assertSame(30, $normalized['paid_break_cap_minutes']);
+	}
+
+	// ------------------------------------------------------------------
+	// NH-04: organisation-level default cap inheritance
+	// ------------------------------------------------------------------
+
+	public function testOrgDefaultCapIsInheritedWhenModelCapUnset(): void
+	{
+		$this->setPolicy(['paid_break_cap_minutes' => 45]);
+		$this->assignModel(['breaks_count_as_work' => true]);
+		$p = $this->resolver->paidBreakPolicyForUser('u1');
+		$this->assertTrue($p['count_as_work']);
+		$this->assertSame(45, $p['cap_minutes']);
+	}
+
+	public function testExplicitModelCapZeroWinsOverOrgDefault(): void
+	{
+		$this->setPolicy(['paid_break_cap_minutes' => 45]);
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => 0]);
+		$this->assertSame(0, $this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+	}
+
+	public function testExplicitModelCapWinsOverOrgDefault(): void
+	{
+		$this->setPolicy(['paid_break_cap_minutes' => 45]);
+		$this->assignModel(['breaks_count_as_work' => true, 'paid_break_cap_minutes' => 20]);
+		$this->assertSame(20, $this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+	}
+
+	public function testNoOrgDefaultMeansFullInclusionForUncappedModel(): void
+	{
+		$this->assignModel(['breaks_count_as_work' => true]);
+		$this->assertNull($this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+	}
+
+	public function testOrgCapIsIrrelevantWhenModelFlagOff(): void
+	{
+		$this->setPolicy(['paid_break_cap_minutes' => 45]);
+		$this->assignModel(['breaks_count_as_work' => false]);
+		$p = $this->resolver->paidBreakPolicyForUser('u1');
+		$this->assertFalse($p['count_as_work']);
+	}
+
+	public function testMalformedOrgCapDropsToNullNotCrash(): void
+	{
+		// Corrupt stored doc must degrade to "no org default" (fail open =
+		// full inclusion), never fatal and never a phantom cap.
+		$this->setPolicy(['paid_break_cap_minutes' => 'totally-bogus']);
+		$this->assignModel(['breaks_count_as_work' => true]);
+		$this->assertNull($this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+
+		$this->setPolicy(['paid_break_cap_minutes' => 481]);
+		$this->assertNull($this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+
+		$this->setPolicy(['paid_break_cap_minutes' => -5]);
+		$this->assertNull($this->resolver->paidBreakPolicyForUser('u1')['cap_minutes']);
+	}
+
+	public function testValidatePolicyAcceptsAndRangesOrgCap(): void
+	{
+		$base = [
+			'enforced' => false,
+			'min_break_minutes' => null,
+			'tiers' => [],
+			'windows' => [],
+			'presence_exemptions' => [],
+		];
+
+		$ok = $this->resolver->validatePolicy($base + ['paid_break_cap_minutes' => '30']);
+		$this->assertSame([], $ok['errors']);
+		$this->assertSame(30, $ok['normalized']['paid_break_cap_minutes']);
+
+		$zero = $this->resolver->validatePolicy($base + ['paid_break_cap_minutes' => 0]);
+		$this->assertSame([], $zero['errors']);
+		$this->assertSame(0, $zero['normalized']['paid_break_cap_minutes']);
+
+		$empty = $this->resolver->validatePolicy($base + ['paid_break_cap_minutes' => '']);
+		$this->assertSame([], $empty['errors']);
+		$this->assertNull($empty['normalized']['paid_break_cap_minutes']);
+
+		foreach (['abc', -1, 481, 12.5] as $bad) {
+			$v = $this->resolver->validatePolicy($base + ['paid_break_cap_minutes' => $bad]);
+			$this->assertArrayHasKey(
+				BreakPolicyResolver::FIELD_PAID_CAP,
+				$v['errors'],
+				'cap ' . var_export($bad, true) . ' must be rejected'
+			);
+		}
 	}
 }

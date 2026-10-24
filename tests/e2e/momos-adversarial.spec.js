@@ -1,4 +1,3 @@
-/* global process */
 // @ts-check
 /**
  * MOMOS adversarial sweep — attack classes the functional suite doesn't cover:

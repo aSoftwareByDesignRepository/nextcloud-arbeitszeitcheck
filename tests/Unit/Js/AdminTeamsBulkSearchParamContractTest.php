@@ -64,9 +64,15 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 			'Add selected (%s)',
 			'%s selected',
 			'Select at least one person.',
-			'Added %1$d, skipped %2$d, failed %3$d.',
 		] as $needle) {
 			$this->assertStringContainsString("'" . $needle . "'", $src, 'Missing teams l10n key: ' . $needle);
+		}
+
+		// Bulk result counts use window.n() plural pairs resolved from the
+		// locale catalogs, not the teamsL10n message map.
+		$js = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
+		foreach (["'1 added'", "'%n added'", "'1 skipped'", "'%n skipped'", "'1 failed'", "'%n failed'"] as $needle) {
+			$this->assertStringContainsString($needle, $js, 'Missing bulk plural pair literal: ' . $needle);
 		}
 	}
 

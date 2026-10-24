@@ -142,7 +142,8 @@ class OvertimeService
 		$workedByDay = [];
 		foreach ($timeEntries as $entry) {
 			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && $entry->getEndTime() !== null) {
-				$hours = (float)$entry->getWorkingDurationHours();
+				// Overtime is tariff-facing: paid basis = net + paid-break snapshot.
+				$hours = (float)($entry->getPaidDurationHours() ?? 0.0);
 				$totalHoursWorked += $hours;
 				$start = $entry->getStartTime();
 				if ($start !== null) {

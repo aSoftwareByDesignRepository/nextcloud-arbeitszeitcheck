@@ -36,13 +36,14 @@ class WorkLocationDefaultPolicyMapper extends QBMapper
 			return [];
 		}
 		$qb = $this->db->getQueryBuilder();
-		$or = $qb->expr()->orX();
+		$scopeExprs = [];
 		foreach ($scopes as [$scopeType, $scopeId]) {
-			$or->add($qb->expr()->andX(
+			$scopeExprs[] = $qb->expr()->andX(
 				$qb->expr()->eq('scope_type', $qb->createNamedParameter($scopeType)),
 				$qb->expr()->eq('scope_id', $qb->createNamedParameter($scopeId)),
-			));
+			);
 		}
+		$or = $qb->expr()->orX(...$scopeExprs);
 		$qb->select('*')->from($this->getTableName())
 			->where($or)
 			->andWhere($qb->expr()->lte('effective_from', $qb->createNamedParameter($date)))

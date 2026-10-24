@@ -275,6 +275,50 @@ class TimeEntryController extends Controller
 	}
 
 	/**
+	 * Converge the paid-break snapshot after a controller-side entry write.
+	 *
+	 * The recompute covers the union of the new span and — when supplied —
+	 * the previous span, because an entry moved off a day also changes that
+	 * day's pool. Lock acquisition is delegated to the canonical
+	 * {@see TimeTrackingService::recomputePaidBreaksForUserSpan()} which is
+	 * reentrant inside an already-held user mutation lock (MF-03/MF-04).
+	 */
+	private function recomputePaidBreaksForEntry(
+		string $userId,
+		TimeEntry $entry,
+		?\DateTime $previousStart = null,
+		?\DateTime $previousEnd = null,
+	): TimeEntry {
+		$now = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
+		$spanStart = $entry->getStartTime();
+		if ($previousStart !== null && ($spanStart === null || $previousStart < $spanStart)) {
+			$spanStart = $previousStart;
+		}
+		if ($spanStart === null) {
+			return $entry;
+		}
+		$spanEnd = $entry->getEndTime() ?? $now;
+		$prevEnd = $previousEnd ?? $now;
+		if ($prevEnd > $spanEnd) {
+			$spanEnd = $prevEnd;
+		}
+		$this->timeTrackingService->recomputePaidBreaksForUserSpan($userId, $spanStart, $spanEnd);
+		// The allocator writes paid_break_seconds through its own entity set —
+		// $entry still carries the pre-recompute value. Refresh so API responses
+		// and audit summaries serialize the persisted snapshot, not a stale 0.
+		$id = $entry->getId();
+		if ($id === null) {
+			return $entry;
+		}
+		try {
+			$fresh = $this->timeEntryMapper->find($id);
+			return $fresh instanceof TimeEntry ? $fresh : $entry;
+		} catch (\Throwable) {
+			return $entry;
+		}
+	}
+
+	/**
 	 * JSON list of ProjectCheck projects the current user may link to their time entries (clock-in / manual).
 	 */
 	#[NoAdminRequired]
@@ -889,7 +933,8 @@ class TimeEntryController extends Controller
 						. ($endLocal !== null ? $endLocal->format('H:i') : $this->l10n->t('open'));
 					$breakMin = (int)round(($entry->getBreakDurationHours() ?? 0.0) * 60);
 					$breakPart = $this->l10n->t('break %d min', [$breakMin]);
-					$workHours = (float)($entry->getWorkingDurationHours() ?? 0.0);
+					// Printable/export line shows tariff hours (paid basis).
+					$workHours = (float)($entry->getPaidDurationHours() ?? 0.0);
 					$hoursPart = number_format($workHours, 2, ',', '') . ' h';
 					$statusPart = $statusLabels[$entry->getStatus()] ?? $entry->getStatus();
 					$desc = trim((string)($entry->getDescription() ?? ''));
@@ -989,7 +1034,7 @@ class TimeEntryController extends Controller
 							return $entry->getStartTime() && $entry->getStartTime()->format('Y-m') === date('Y-m');
 						})),
 						'total_hours' => array_reduce($entries, static function ($sum, $entry) {
-							return $sum + $entry->getWorkingDurationHours();
+							return $sum + ($entry->getPaidDurationHours() ?? 0.0);
 						}, 0.0),
 					],
 					'error' => $this->l10n->t('Manual time entries are not enabled for your account. Please contact your administrator.'),
@@ -1392,6 +1437,7 @@ class TimeEntryController extends Controller
 					}
 
 					$savedEntry = $this->timeEntryMapper->insert($timeEntry);
+					$savedEntry = $this->recomputePaidBreaksForEntry($userId, $savedEntry);
 
 					if ($manualRequiresApproval) {
 						try {
@@ -1509,6 +1555,11 @@ class TimeEntryController extends Controller
 			if ($mc0 !== null) {
 				return $mc0;
 			}
+
+			// Paid-break recompute must cover BOTH the old and the new span —
+			// an entry moved off a day also changes that day's pool.
+			$previousEntryStart = $entry->getStartTime() !== null ? clone $entry->getStartTime() : null;
+			$previousEntryEnd = $entry->getEndTime() !== null ? clone $entry->getEndTime() : null;
 
 			// Check if entry can be edited (logic lives in TimeEntry::canEdit to stay DRY)
 			$canEdit = $entry->canEdit(Constants::EDIT_WINDOW_DAYS);
@@ -1909,8 +1960,9 @@ class TimeEntryController extends Controller
 
 					// Persist + post-persist checks atomically: a strict-mode
 					// compliance throw must roll back the update (see apiStore).
-					return $this->atomic(function () use ($entry, $userId, $id, $oldSummary) {
+					return $this->atomic(function () use ($entry, $userId, $id, $oldSummary, $previousEntryStart, $previousEntryEnd) {
 						$updatedEntry = $this->timeEntryMapper->update($entry);
+						$updatedEntry = $this->recomputePaidBreaksForEntry($userId, $updatedEntry, $previousEntryStart, $previousEntryEnd);
 						$this->syncProjectCheckBillingAfterSave($updatedEntry, $userId);
 
 						// Real-time compliance check if entry is now completed
@@ -2167,6 +2219,8 @@ class TimeEntryController extends Controller
 				'breakEndTime' => $entry->getBreakEndTime() ? $entry->getBreakEndTime()->format('c') : null,
 				'breaks' => $originalBreaks,
 				'durationHours' => $entry->getDurationHours(),
+				'paidDurationHours' => $entry->getPaidDurationHours(),
+				'paidBreakSeconds' => $entry->getPaidBreakSeconds(),
 				'description' => $entry->getDescription(),
 				'workLocation' => $entry->getWorkLocation(),
 			];
@@ -2381,7 +2435,12 @@ class TimeEntryController extends Controller
 			$result = $this->correctionService->cancelByEmployee($entry);
 			if ($result === null) {
 				$this->projectCheckLaborSync->onTimeEntryDeleted($oldSummary, $userId);
-				$this->timeEntryMapper->delete($entry);
+				// Delete + pool recompute under the user mutation lock so the
+				// vanished breaks cannot race a concurrent mutation (MF-03).
+				$this->timeTrackingService->withUserMutationLock($userId, function () use ($userId, $entry): void {
+					$this->timeEntryMapper->delete($entry);
+					$this->recomputePaidBreaksForEntry($userId, $entry);
+				});
 				$this->auditLogMapper->logAction($userId, 'time_entry_correction_cancelled', 'time_entry', $id, $oldSummary, ['cascade_delete' => true]);
 				return new JSONResponse(['success' => true, 'deleted' => true]);
 			}
@@ -2447,10 +2506,15 @@ class TimeEntryController extends Controller
 				];
 			}
 
-			// Delete the entry itself
+			// Delete the entry itself. Delete + pool recompute under the user
+			// mutation lock: the removed breaks must not race a concurrent
+			// mutation of the same day's pool (MF-03).
 			$entryId = $entry->getId();
 			$this->projectCheckLaborSync->onTimeEntryDeleted($deletedSummary ?? [], $userId);
-			$this->timeEntryMapper->delete($entry);
+			$this->timeTrackingService->withUserMutationLock($userId, function () use ($userId, $entry): void {
+				$this->timeEntryMapper->delete($entry);
+				$this->recomputePaidBreaksForEntry($userId, $entry);
+			});
 
 			// Log the action
 			try {
@@ -2627,7 +2691,8 @@ class TimeEntryController extends Controller
 			// Exclusive upper bound for DB queries (strict < comparison in findByUserAndDateRange).
 			$endExclusive = (clone $end)->modify('+1 day');
 
-			$totalHours = $this->timeTrackingService->getWorkingHoursForPeriod($userId, $start, $endExclusive);
+			// KPI/statistics surface — tariff basis (net + paid-break snapshot).
+			$totalHours = $this->timeTrackingService->getPaidHoursForPeriod($userId, $start, $endExclusive);
 			$totalBreakHours = $this->timeEntryMapper->getTotalBreakHoursByUserAndDateRange($userId, $start, $endExclusive);
 			$totalEntries = $this->timeEntryMapper->countByUser($userId);
 
@@ -3111,6 +3176,7 @@ class TimeEntryController extends Controller
 					// committed entry behind a 500 response.
 					return $this->atomic(function () use ($timeEntry, $manualRequiresApproval, $userId, $justificationText) {
 						$savedEntry = $this->timeEntryMapper->insert($timeEntry);
+						$savedEntry = $this->recomputePaidBreaksForEntry($userId, $savedEntry);
 						if ($manualRequiresApproval) {
 							try {
 								$this->notificationService->notifyTimeEntryCorrectionRequested(
@@ -3161,6 +3227,12 @@ class TimeEntryController extends Controller
 						], Http::STATUS_CREATED);
 					}, $this->db);
 				});
+			} catch (LockedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Another time-tracking change is in progress. Please try again in a moment.'),
+					'error_code' => 'locked',
+				], Http::STATUS_LOCKED);
 			} catch (\Throwable $e) {
 				\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeEntryController::apiStore: ' . $e->getMessage(), ['exception' => $e]);
 				return new JSONResponse([
@@ -3516,11 +3588,24 @@ class TimeEntryController extends Controller
 			return null;
 		}
 
-		return new JSONResponse([
+		$payload = [
 			'success' => false,
 			'error' => $issues[0],
 			'error_code' => 'compliance_blocked',
-		], Http::STATUS_BAD_REQUEST);
+		];
+		// B2-MH-02: additive machine-readable detail so clients can render a
+		// field-level error on the break control instead of a bare banner.
+		try {
+			$breakDetails = $this->complianceService->breakBlockDetailsForCompletedEntry($timeEntry);
+		} catch (\Throwable) {
+			$breakDetails = null;
+		}
+		if ($breakDetails !== null) {
+			$payload['details'] = $breakDetails;
+			$payload['field'] = 'breaks';
+		}
+
+		return new JSONResponse($payload, Http::STATUS_BAD_REQUEST);
 	}
 
 	private function performRealTimeComplianceCheck(TimeEntry $timeEntry): void

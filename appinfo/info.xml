@@ -368,6 +368,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<command>OCA\ArbeitszeitCheck\Command\EnsureE2eVacationEntitlementCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\EnsureE2eClockReadyCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\VerifyHolidaysCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\RecomputePaidBreaksCommand</command>
 	</commands>
 
 	<!-- No <navigation> here: the menu entry is registered conditionally via

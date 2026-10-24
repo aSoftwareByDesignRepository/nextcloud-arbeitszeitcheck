@@ -1,4 +1,3 @@
-/* global process */
 /**
  * ATLAS durable-mutation sweep — covers mutating endpoints that previously had
  * only happy-path/authz proof. Every assertion re-reads persisted state through

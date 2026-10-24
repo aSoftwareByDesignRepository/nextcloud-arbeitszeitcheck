@@ -1,5 +1,4 @@
 // @ts-check
-/* global process */
 /**
  * Permanent probe — azc-extstamps-dashboard-grid-squeeze.
  *

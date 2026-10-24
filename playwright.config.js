@@ -61,6 +61,11 @@ const STATEFUL_SPECS = [
   // Mutates the shared employee's working-time assignment (personal model
   // create/assign/prune) — same shared-state class as admin-users-profile.
   /concurrent-personal-model\.spec\.js/,
+  // Paid breaks: creates a model, reassigns the shared employee, writes an
+  // entry and toggles org manual-entry settings — serialized + restored.
+  /paid-breaks\.spec\.js/,
+  // Flips shared admin theme via OCS — same race class as theme-responsive.
+  /paid-breaks-theme-matrix\.spec\.js/,
   // Live-clock mutators share the e2e_employee stamp session — running them in
   // the parallel pool lets one spec's clock-out / clock-in race another's
   // (observed: timezone-smoke "not currently clocked in", slice-c rest check

@@ -1,4 +1,3 @@
-/* global process */
 // @ts-check
 /**
  * Locale rendering + overflow + raw-key proof for ArbeitszeitCheck web.

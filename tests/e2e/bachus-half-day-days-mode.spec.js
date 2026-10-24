@@ -1,4 +1,3 @@
-/* global process */
 // @ts-check
 /**
  * Bachus: days-mode half-day vacation UX (fixture + live create when credentials present).

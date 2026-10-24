@@ -49,6 +49,15 @@
         return fallback || key;
     }
 
+    /** Plural-aware translate (Nextcloud window.n replaces %n). */
+    function atn(singular, plural, count) {
+        const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+        if (typeof window.n === 'function') {
+            return window.n('arbeitszeitcheck', singular, plural, c);
+        }
+        return String(c === 1 ? singular : plural).replace('%n', String(c));
+    }
+
     let selectedTeamId = null;
     let teamsTreeData = [];
 
@@ -1125,10 +1134,11 @@
                             onSuccess: function(res) {
                                 if (res.success) {
                                     const s = res.summary || {};
-                                    const msg = t('Added %1$d, skipped %2$d, failed %3$d.', 'Added %1$d, skipped %2$d, failed %3$d.')
-                                        .replace('%1$d', String(s.added ?? 0))
-                                        .replace('%2$d', String(s.skipped ?? 0))
-                                        .replace('%3$d', String(s.failed ?? 0));
+                                    const msg = [
+                                        atn('1 added', '%n added', s.added ?? 0),
+                                        atn('1 skipped', '%n skipped', s.skipped ?? 0),
+                                        atn('1 failed', '%n failed', s.failed ?? 0),
+                                    ].join(', ') + '.';
                                     if (calloutEl) {
                                         calloutEl.hidden = false;
                                         calloutEl.textContent = msg;

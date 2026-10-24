@@ -54,6 +54,18 @@ class TimeEntryCorrectionService
 
 	public function applyProposal(TimeEntry $entry, array $proposal): void
 	{
+		// MH-11: client payloads must never write the allocator-owned paid-break
+		// snapshot. applyProposal() already uses an explicit key allow-list, so
+		// this is defense-in-depth for every future field that might loop keys.
+		unset(
+			$proposal['paid_break_seconds'],
+			$proposal['paidBreakSeconds'],
+			$proposal['paid_break_minutes'],
+			$proposal['paidBreakMinutes'],
+			$proposal['paid_duration_hours'],
+			$proposal['paidDurationHours'],
+		);
+
 		if (isset($proposal['breaks']) && is_array($proposal['breaks'])) {
 			$this->applyBreaksJson($entry, $proposal['breaks']);
 		}
@@ -312,6 +324,7 @@ class TimeEntryCorrectionService
 		$entry->setJustification($encoded);
 
 		$updated = $this->persistPendingDecision($entry);
+		$updated = $this->recomputePaidBreaks($updated);
 		$this->runComplianceIfEnabled($updated);
 		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
@@ -350,10 +363,55 @@ class TimeEntryCorrectionService
 		}
 
 		$updated = $this->persistPendingDecision($entry);
+		$updated = $this->recomputePaidBreaks($updated);
 		$this->runComplianceIfEnabled($updated);
+
+		// B1-MH-05: audit row mirrors absence auto-approval — reason + which
+		// approvers the predicate counted (method_exists: upgrade repair paths
+		// may hold a stale TeamResolverService).
+		try {
+			$this->auditLogMapper->logAction(
+				$updated->getUserId(),
+				'time_entry_auto_approved',
+				'time_entry',
+				$updated->getId(),
+				null,
+				array_merge($updated->getSummary(), [
+					'auto_approve' => [
+						'reason' => 'no_assignable_approver',
+						'predicate' => $this->approverPredicateSnapshotSafe($updated->getUserId()),
+					],
+				]),
+				'system'
+			);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Auto-approve audit row failed for entry ' . $updated->getId() . ': ' . $e->getMessage(),
+				['app' => 'arbeitszeitcheck', 'exception' => $e]
+			);
+		}
+
 		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, 'system'));
 
 		return $updated;
+	}
+
+	/**
+	 * Approver-predicate snapshot for the auto-approve audit row; null when the
+	 * resolver predates the method (upgrade path with stale classes).
+	 *
+	 * @return array{mode: string, approvers: list<string>}|null
+	 */
+	private function approverPredicateSnapshotSafe(string $employeeUserId): ?array
+	{
+		try {
+			$resolver = \OCP\Server::get(TeamResolverService::class);
+			return method_exists($resolver, 'approverPredicateSnapshot')
+				? $resolver->approverPredicateSnapshot($employeeUserId)
+				: null;
+		} catch (\Throwable) {
+			return null;
+		}
 	}
 
 	public function reject(TimeEntry $entry, string $managerId, ?string $reason = null): TimeEntry
@@ -378,7 +436,10 @@ class TimeEntryCorrectionService
 			}
 			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 
-			return $this->persistPendingDecision($entry);
+			$rejected = $this->persistPendingDecision($entry);
+			// Status flipped to REJECTED — its breaks leave the day pool.
+			$rejected = $this->recomputePaidBreaks($rejected);
+			return $rejected;
 		}
 
 		$originalData = is_array($justificationData['original'] ?? null) ? $justificationData['original'] : [];
@@ -394,7 +455,10 @@ class TimeEntryCorrectionService
 			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 		}
 
-		return $this->persistPendingDecision($entry);
+		$rejected = $this->persistPendingDecision($entry);
+		// Restored snapshot changed the recorded breaks — rebalance the pool.
+		$rejected = $this->recomputePaidBreaks($rejected);
+		return $rejected;
 	}
 
 	/**
@@ -418,7 +482,41 @@ class TimeEntryCorrectionService
 		$entry->setJustification(null);
 		$entry->setUpdatedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
 
-		return $this->persistPendingDecision($entry);
+		$restored = $this->persistPendingDecision($entry);
+		// Restored snapshot changed the recorded breaks — rebalance the pool.
+		$restored = $this->recomputePaidBreaks($restored);
+		return $restored;
+	}
+
+	/**
+	 * Snapshot recompute for the day pool covering this entry's span.
+	 * Delegates to the canonical lock-aware writer path (EC-05/MF-03).
+	 */
+	private function recomputePaidBreaks(TimeEntry $entry): TimeEntry
+	{
+		$start = $entry->getStartTime();
+		if ($start === null) {
+			return $entry;
+		}
+		$end = $entry->getEndTime()
+			?? AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
+		$this->timeTrackingService->recomputePaidBreaksForUserSpan(
+			$entry->getUserId(),
+			$start,
+			$end
+		);
+		// Re-read so callers serialize the persisted paid_break_seconds
+		// snapshot — the allocator wrote through its own entity set.
+		$id = $entry->getId();
+		if ($id === null) {
+			return $entry;
+		}
+		try {
+			$fresh = $this->timeEntryMapper->find($id);
+			return $fresh instanceof TimeEntry ? $fresh : $entry;
+		} catch (\Throwable) {
+			return $entry;
+		}
 	}
 
 	/**
@@ -473,6 +571,7 @@ class TimeEntryCorrectionService
 		$entry->setJustification(json_encode($justification, JSON_THROW_ON_ERROR));
 
 		$updated = $this->timeEntryMapper->update($entry);
+		$updated = $this->recomputePaidBreaks($updated);
 		$this->runComplianceIfEnabled($updated);
 		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
@@ -514,6 +613,7 @@ class TimeEntryCorrectionService
 		$entry->setUpdatedAt(clone $nowAt);
 
 		$inserted = $this->timeEntryMapper->insert($entry);
+		$inserted = $this->recomputePaidBreaks($inserted);
 		$this->runComplianceIfEnabled($inserted);
 		$inserted->setBillingSyncWarning($this->syncProjectCheckBilling($inserted, $managerId));
 

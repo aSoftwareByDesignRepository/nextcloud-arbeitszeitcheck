@@ -204,7 +204,18 @@ class TeamResolverServiceTest extends TestCase
 		$this->assertTrue($this->service->hasAssignableManagerForEmployee($userId));
 	}
 
-	public function testHasAssignableManagerForEmployeeLegacyUsesColleagues(): void
+	/**
+	 * Inject a mocked PermissionService into the lazy-resolution seam
+	 * (constructor injection would be circular — see permissionService()).
+	 */
+	private function injectPermissionService($permissionService): void
+	{
+		$ref = new \ReflectionProperty($this->service, 'permissionServiceInstance');
+		$ref->setAccessible(true);
+		$ref->setValue($this->service, $permissionService);
+	}
+
+	public function testHasAssignableManagerForEmployeeLegacyIgnoresColleagues(): void
 	{
 		$this->config->method('getAppValue')->willReturn('0');
 
@@ -218,8 +229,112 @@ class TeamResolverServiceTest extends TestCase
 		$colleague = $this->createMock(IUser::class);
 		$colleague->method('getUID')->willReturn('other');
 		$group->method('getUsers')->willReturn([$user, $colleague]);
+		// No 'admin' group exists at all.
+		$this->groupManager->method('get')->with('admin')->willReturn(null);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn([]);
+		$this->injectPermissionService($permission);
+
+		// Group-mode colleagues can never approve — canManageEmployee() denies
+		// them; counting them was the pending-item deadlock (B1-MH-02).
+		$this->assertFalse($this->service->hasAssignableManagerForEmployee('employee1'));
+	}
+
+	public function testHasAssignableManagerForEmployeeLegacyTrueWhenAdminExists(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+
+		$admin = $this->createMock(IUser::class);
+		$admin->method('getUID')->willReturn('boss');
+		$adminGroup = $this->createMock(IGroup::class);
+		$adminGroup->method('getUsers')->willReturn([$admin]);
+		$this->groupManager->method('get')->with('admin')->willReturn($adminGroup);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn([]);
+		$permission->method('isAdmin')->willReturnCallback(static fn (string $uid): bool => $uid === 'boss');
+		$this->injectPermissionService($permission);
 
 		$this->assertTrue($this->service->hasAssignableManagerForEmployee('employee1'));
+	}
+
+	public function testHasAssignableManagerForEmployeeLegacyFalseWhenOnlyGhostAdmin(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+
+		// Stale 'admin' group row / configured app-admin uid — isAdmin() must
+		// reject ghosts (existence + enabled leg), not just membership.
+		$ghost = $this->createMock(IUser::class);
+		$ghost->method('getUID')->willReturn('deleted-admin');
+		$adminGroup = $this->createMock(IGroup::class);
+		$adminGroup->method('getUsers')->willReturn([$ghost]);
+		$this->groupManager->method('get')->with('admin')->willReturn($adminGroup);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn(['also-gone']);
+		$permission->method('isAdmin')->willReturn(false);
+		$this->injectPermissionService($permission);
+
+		$this->assertFalse($this->service->hasAssignableManagerForEmployee('employee1'));
+	}
+
+	public function testHasAssignableManagerForEmployeeLegacyExcludesSelfAsApprover(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+
+		$self = $this->createMock(IUser::class);
+		$self->method('getUID')->willReturn('lone-admin');
+		$adminGroup = $this->createMock(IGroup::class);
+		$adminGroup->method('getUsers')->willReturn([$self]);
+		$this->groupManager->method('get')->with('admin')->willReturn($adminGroup);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn([]);
+		$permission->method('isAdmin')->willReturn(true);
+		$this->injectPermissionService($permission);
+
+		// The only admin IS the employee — nobody else can approve.
+		$this->assertFalse($this->service->hasAssignableManagerForEmployee('lone-admin'));
+	}
+
+	public function testListGroupModeAdminApproversUnionsAndSorts(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+
+		$groupAdmin = $this->createMock(IUser::class);
+		$groupAdmin->method('getUID')->willReturn('z-admin');
+		$employee = $this->createMock(IUser::class);
+		$employee->method('getUID')->willReturn('employee1');
+		$adminGroup = $this->createMock(IGroup::class);
+		$adminGroup->method('getUsers')->willReturn([$groupAdmin, $employee]);
+		$this->groupManager->method('get')->with('admin')->willReturn($adminGroup);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn(['a-admin', 'z-admin']);
+		$permission->method('isAdmin')->willReturnCallback(
+			static fn (string $uid): bool => in_array($uid, ['a-admin', 'z-admin', 'employee1'], true)
+		);
+		$this->injectPermissionService($permission);
+
+		$this->assertSame(
+			['a-admin', 'z-admin'],
+			$this->service->listGroupModeAdminApprovers('employee1')
+		);
+	}
+
+	public function testApproverPredicateSnapshotLabelsModes(): void
+	{
+		$this->config->method('getAppValue')->willReturn('0');
+		$this->groupManager->method('get')->with('admin')->willReturn(null);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn([]);
+		$this->injectPermissionService($permission);
+
+		$snap = $this->service->approverPredicateSnapshot('employee1');
+		$this->assertSame('groups', $snap['mode']);
+		$this->assertSame([], $snap['approvers']);
 	}
 
 	public function testHasAssignableManagerForEmployeeLegacyFalseWhenSoloInGroups(): void
@@ -233,6 +348,11 @@ class TeamResolverServiceTest extends TestCase
 		$group = $this->createMock(IGroup::class);
 		$this->groupManager->method('getUserGroups')->with($user)->willReturn([$group]);
 		$group->method('getUsers')->willReturn([$user]);
+		$this->groupManager->method('get')->with('admin')->willReturn(null);
+
+		$permission = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permission->method('getConfiguredAppAdminUserIds')->willReturn([]);
+		$this->injectPermissionService($permission);
 
 		$this->assertFalse($this->service->hasAssignableManagerForEmployee('solo'));
 	}

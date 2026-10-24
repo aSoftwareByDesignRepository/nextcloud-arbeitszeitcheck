@@ -148,6 +148,65 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Cursor-based chunk scan for background recomputation: entries of a user
+	 * ordered by primary key, optionally limited to a start_time window
+	 * (e.g. a working-time-model assignment window). Stable pagination is via
+	 * `id > $afterId` — OFFSET paging would skip or repeat rows when entries
+	 * are inserted/deleted mid-scan.
+	 *
+	 * @return TimeEntry[]
+	 */
+	public function findChunkByUserAfterId(
+		string $userId,
+		?\DateTime $startFrom = null,
+		?\DateTime $startBefore = null,
+		int $afterId = 0,
+		int $limit = 200,
+	): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->gt('id', $qb->createNamedParameter($afterId, IQueryBuilder::PARAM_INT)))
+			->orderBy('id', 'ASC')
+			->setMaxResults(max(1, $limit));
+
+		if ($startFrom !== null) {
+			$qb->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startFrom->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($startBefore !== null) {
+			$qb->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($startBefore->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Count of a user's entries whose start_time falls inside [$from, $to)
+	 * — the same window semantics {@see findChunkByUserAfterId()} scans.
+	 * Used by the paid-break impact preview (NH-03); read-only.
+	 */
+	public function countByUserStartBetween(
+		string $userId,
+		?\DateTime $startFrom = null,
+		?\DateTime $startBefore = null,
+	): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->func()->count('id'))
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+
+		if ($startFrom !== null) {
+			$qb->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startFrom->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($startBefore !== null) {
+			$qb->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($startBefore->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Whether the user has at least one time entry whose start_time falls in the given calendar month.
 	 */
 	public function userHasTimeEntryInCalendarMonth(string $userId, int $year, int $month): bool

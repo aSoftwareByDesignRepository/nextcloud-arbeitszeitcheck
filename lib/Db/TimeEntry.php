@@ -154,6 +154,18 @@ class TimeEntry extends Entity
 	protected $workLocation;
 
 	/**
+	 * Paid-break snapshot in seconds (TVöD §6 Abs. 1 shift-work feature).
+	 *
+	 * Written exclusively by {@see \OCA\ArbeitszeitCheck\Service\PaidBreakAllocator}
+	 * inside the per-user mutation lock — never accepted from request payloads.
+	 * When the working-time model does not flag breaks as paid, this stays 0
+	 * and {@see getPaidDurationHours()} equals {@see getDurationHours()}.
+	 *
+	 * @var int
+	 */
+	protected $paidBreakSeconds = 0;
+
+	/**
 	 * Not persisted. Profile floor for countable breaks (DE/CH 15, AT 10).
 	 * When null, {@see resolveCountableMinBreakMinutes()} uses the profile
 	 * for this entry's user when the container is available, else 15.
@@ -203,6 +215,7 @@ class TimeEntry extends Entity
 		$this->addType('approvedAt', 'datetime');
 		$this->addType('liveUserId', 'string');
 		$this->addType('workLocation', 'string');
+		$this->addType('paidBreakSeconds', 'integer');
 	}
 
 	/**
@@ -397,6 +410,57 @@ class TimeEntry extends Entity
 	public function getWorkingDurationHours(): ?float
 	{
 		return $this->getDurationHours();
+	}
+
+	/**
+	 * Paid-break portion snapshotted on this entry, in seconds.
+	 *
+	 * Stored by the paid-break allocator; never writable through client
+	 * payloads. 0 when the model does not pay breaks (default) — in that case
+	 * {@see getPaidDurationHours()} is identical to {@see getDurationHours()}.
+	 */
+	public function getPaidBreakSeconds(): int
+	{
+		return (int)($this->paidBreakSeconds ?? 0);
+	}
+
+	/**
+	 * Allocator-only writer. Values are clamped to >= 0; a negative stored or
+	 * computed amount can never represent payable break time.
+	 */
+	public function setPaidBreakSeconds(int $seconds): void
+	{
+		$seconds = max(0, $seconds);
+		if ($this->paidBreakSeconds !== $seconds) {
+			$this->paidBreakSeconds = $seconds;
+			$this->markFieldUpdated('paidBreakSeconds');
+		}
+	}
+
+	/**
+	 * Paid-break portion snapshotted on this entry, in hours.
+	 */
+	public function getPaidBreakHours(): float
+	{
+		return $this->getPaidBreakSeconds() / 3600;
+	}
+
+	/**
+	 * Paid (tariff) working duration in hours: net working duration plus the
+	 * snapshotted paid-break portion. Statutory checks must keep using
+	 * {@see getDurationHours()} / {@see getWorkingDurationHours()} — this
+	 * getter is only for payroll-facing consumers (overtime, soll comparison,
+	 * reports, exports, display).
+	 *
+	 * @return float|null null while the entry has no end time
+	 */
+	public function getPaidDurationHours(): ?float
+	{
+		$net = $this->getDurationHours();
+		if ($net === null) {
+			return null;
+		}
+		return $net + $this->getPaidBreakHours();
 	}
 
 	/**
@@ -729,6 +793,10 @@ class TimeEntry extends Entity
 			'durationHours' => $this->getDurationHours(),
 			'breakDurationHours' => $this->getBreakDurationHours(),
 			'workingDurationHours' => $this->getWorkingDurationHours(),
+			'paidBreakSeconds' => $this->getPaidBreakSeconds(),
+			'paidBreakMinutes' => (int)round($this->getPaidBreakSeconds() / 60),
+			'paidBreakHours' => $this->getPaidBreakHours(),
+			'paidDurationHours' => $this->getPaidDurationHours(),
 			/** Effective countable break floor for this entry's user (DE/CH: 15, AT: 10). */
 			'minBreakMinutes' => $this->resolveCountableMinBreakMinutes(),
 			'description' => $this->getDescription(),

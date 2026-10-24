@@ -1730,6 +1730,13 @@ class TimeEntryFormManager {
 			}
 
 			if (!response.ok) {
+				// B2: break shortfall blocks render as a field-level error on the
+				// break control (aria-invalid + inline error), not a bare banner.
+				if (result && result.error_code === 'compliance_blocked' && result.field === 'breaks') {
+					this.showBreakSubmitError(result.error || result.message || t('saveError'));
+					this.resetSubmitButton(submitBtn, originalText);
+					return;
+				}
 				const apiErrorMessage = (result && (result.error || result.message)) || '';
 				if (apiErrorMessage) {
 					throw new Error(`API_ERROR:${apiErrorMessage}`);

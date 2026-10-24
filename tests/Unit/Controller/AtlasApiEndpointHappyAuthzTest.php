@@ -340,6 +340,11 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'AdminController::createTariffRuleSet' => [
 				'OCA\ArbeitszeitCheck\Db\TariffRuleSetMapper::findByCodeAndVersion' => null,
 			],
+			// B3 delete guard: zero live references in every layer table so the
+			// draft delete proceeds (generic mixed-return would cast to 1).
+			'AdminController::deleteTariffRuleSet' => [
+				'OCP\DB\IResult::fetchOne' => 0,
+			],
 			'AdminController::activateTariffRuleSet' => [
 				'OCA\ArbeitszeitCheck\Db\TariffRuleModuleMapper::findByRuleSetId' => fn () => [
 					$this->entityMock(\OCA\ArbeitszeitCheck\Db\TariffRuleModule::class),
@@ -368,6 +373,8 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'ManagerController::rejectTimeEntryCorrection' => ['status' => 'pending_approval'],
 		'AdminController::deleteWorkingTimeModel' => ['isdefault' => false, 'default' => false],
 		'AdminController::deleteTariffRuleSet' => ['status' => 'draft'],
+		// Manager correcting a subordinate's entry — self-targets legitimately 403.
+		'ManagerController::correctTimeEntry' => ['userid' => 'bob'],
 		'AdminController::updateTariffRuleSet' => ['status' => 'draft'],
 		'AdminController::activateTariffRuleSet' => [
 			'status' => 'draft',
@@ -390,6 +397,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::setTeamsUseAppTeams' => ['useAppTeams' => true],
 		'KioskAdminController::setUserAllowed' => ['kioskAllowed' => true],
 		'KioskAdminController::importCredentials' => ['csv' => "uid,type\nbob,pin"],
+		'ManagerController::correctTimeEntry' => [
+			'reason' => 'Corrected by manager (documented).',
+			'description' => 'corrected description',
+		],
 		'OutlookIcalSubscriptionController::adminCreateToken' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminCreateSubscriptionLink' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminRotateToken' => ['teamId' => 1, 'languageCode' => 'en'],

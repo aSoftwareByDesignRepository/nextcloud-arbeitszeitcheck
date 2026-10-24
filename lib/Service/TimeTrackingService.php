@@ -312,6 +312,8 @@ class TimeTrackingService
 				}
 
 				$updated = $this->timeEntryMapper->update($entry);
+				$this->refreshPaidBreaksAlreadyLocked($userId, $start, $endCandidate);
+				$updated = $this->refreshEntrySnapshot($updated);
 				$repaired++;
 
 				try {
@@ -590,6 +592,13 @@ class TimeTrackingService
 				}
 
 				$updatedEntry = $this->timeEntryMapper->update($currentEntry);
+				// EC-05: paid-break snapshot converges inside the clock-out TX.
+				$this->refreshPaidBreaksAlreadyLocked(
+					$userId,
+					$updatedEntry->getStartTime() ?? $now,
+					$now
+				);
+				$updatedEntry = $this->refreshEntrySnapshot($updatedEntry);
 				$this->auditLogMapper->logAction(
 					$userId,
 					'clock_out',
@@ -673,6 +682,12 @@ class TimeTrackingService
 		}
 
 		$updated = $this->timeEntryMapper->update($pausedEntry);
+		$this->refreshPaidBreaksAlreadyLocked(
+			$userId,
+			$updated->getStartTime() ?? $pausedAt,
+			$pausedAt
+		);
+		$updated = $this->refreshEntrySnapshot($updated);
 		$this->auditLogMapper->logAction(
 			$userId,
 			'clock_out',
@@ -752,6 +767,13 @@ class TimeTrackingService
 		$pausedEntry->setUpdatedAt($now);
 
 		$resumed = $this->timeEntryMapper->update($pausedEntry);
+		// The archived pause-gap is a new deductible break — recompute shares.
+		$this->refreshPaidBreaksAlreadyLocked(
+			$userId,
+			$resumed->getStartTime() ?? $now,
+			$now
+		);
+		$resumed = $this->refreshEntrySnapshot($resumed);
 
 		$this->auditLogMapper->logAction(
 			$userId,
@@ -807,6 +829,12 @@ class TimeTrackingService
 				$activeEntry->setStatus(TimeEntry::STATUS_BREAK);
 				$activeEntry->setUpdatedAt($now);
 				$updatedEntry = $this->timeEntryMapper->update($activeEntry);
+				$this->refreshPaidBreaksAlreadyLocked(
+					$userId,
+					$updatedEntry->getStartTime() ?? $now,
+					$now
+				);
+				$updatedEntry = $this->refreshEntrySnapshot($updatedEntry);
 				$this->auditLogMapper->logAction(
 					$userId,
 					'start_break',
@@ -854,6 +882,12 @@ class TimeTrackingService
 				$breakEntry->setStatus(TimeEntry::STATUS_ACTIVE);
 				$breakEntry->setUpdatedAt($now);
 				$updatedEntry = $this->timeEntryMapper->update($breakEntry);
+				$this->refreshPaidBreaksAlreadyLocked(
+					$userId,
+					$updatedEntry->getStartTime() ?? $now,
+					$now
+				);
+				$updatedEntry = $this->refreshEntrySnapshot($updatedEntry);
 				$this->auditLogMapper->logAction(
 					$userId,
 					'end_break',
@@ -1033,6 +1067,9 @@ class TimeTrackingService
 		if (!array_key_exists('working_today_hours', $status)) {
 			$status['working_today_hours'] = $this->getTodayHours($userId);
 		}
+		// Additive: tariff-facing day total (net + paid-break snapshot). Old
+		// clients keep reading working_today_hours unchanged.
+		$status['working_today_paid_hours'] = round($this->getTodayPaidHours($userId), 4);
 		$status['at_daily_maximum'] = $this->isAtOrAboveDailyMaximum($userId);
 		if ($liveEntry !== null) {
 			[$todayStart, $todayEnd] = $this->getAppLocalTodayWindow();
@@ -1112,6 +1149,36 @@ class TimeTrackingService
 			$rangeStart,
 			$rangeEndExclusive,
 		);
+	}
+
+	/**
+	 * Paid (tariff) hours for a half-open period: net working hours (including a
+	 * live session) plus the stored paid-break snapshot of every entry that
+	 * overlaps the period. Entry-level paid-break seconds attribute to the day
+	 * the entry is counted on — EC-10 snapshot basis.
+	 *
+	 * Paid basis only: statutory surfaces must keep {@see getWorkingHoursForPeriod()}.
+	 */
+	public function getPaidHoursForPeriod(
+		string $userId,
+		\DateTime $rangeStart,
+		\DateTime $rangeEndExclusive,
+	): float {
+		$net = $this->getWorkingHoursForPeriod($userId, $rangeStart, $rangeEndExclusive);
+		$paidBreak = 0.0;
+		foreach ($this->timeEntryMapper->findOverlapping($userId, $rangeStart, $rangeEndExclusive) as $entry) {
+			$paidBreak += $entry->getPaidBreakHours();
+		}
+		return $net + $paidBreak;
+	}
+
+	/**
+	 * Paid (tariff) hours worked today — {@see getTodayHours()} analogue.
+	 */
+	public function getTodayPaidHours(string $userId): float
+	{
+		[$todayStart, $todayEnd] = $this->getAppLocalTodayWindow();
+		return $this->getPaidHoursForPeriod($userId, $todayStart, $todayEnd);
 	}
 
 	/**
@@ -1402,6 +1469,16 @@ class TimeTrackingService
 			
 			// Save the entry (with endTime, breaks, and status all set)
 			$this->timeEntryMapper->update($timeEntry);
+
+			// EC-07: snapshot is computed AFTER the end-time extension — the
+			// extension compensates the §3 net ceiling, paid breaks settle on
+			// the final recorded state. Public API so direct callers without
+			// the user lock still serialise the day-pool recompute.
+			$this->recomputePaidBreaksForUserSpan(
+				$userId,
+				$timeEntry->getStartTime() ?? $now,
+				$timeEntry->getEndTime() ?? $now
+			);
 			
 			// Get final break hours after automatic break calculation
 			$finalBreakHoursAfterCalculation = $breakHoursAfterAuto;
@@ -1902,20 +1979,120 @@ class TimeTrackingService
 		return $status;
 	}
 
+	/**
+	 * Reentrancy depth for {@see acquireUserMutationLock()} per lock key.
+	 * The paid-break snapshot recompute runs inside the same user mutation
+	 * lock the mutating workflow already holds; without depth tracking the
+	 * nested acquire would deadlock on the exclusive lock. Static on purpose:
+	 * DI may resolve distinct service instances within one request while the
+	 * underlying lock resource is process-global, so the bookkeeping must be
+	 * process-global as well.
+	 *
+	 * @var array<string, int>
+	 */
+	private static array $userMutationLockDepth = [];
+
 	private function acquireUserMutationLock(string $userId): string
 	{
 		$key = DbLockKeys::timeTrackingUser($userId);
+		if ((self::$userMutationLockDepth[$key] ?? 0) > 0) {
+			self::$userMutationLockDepth[$key]++;
+			return $key;
+		}
 		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Time tracking workflow lock for user ' . $userId);
+		self::$userMutationLockDepth[$key] = 1;
 		return $key;
 	}
 
 	private function releaseUserMutationLock(string $key): void
 	{
+		$depth = self::$userMutationLockDepth[$key] ?? 0;
+		if ($depth > 1) {
+			self::$userMutationLockDepth[$key] = $depth - 1;
+			return;
+		}
+		unset(self::$userMutationLockDepth[$key]);
 		try {
 			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->warning('Failed to release time tracking workflow lock: ' . $e->getMessage(), ['exception' => $e]);
 		}
+	}
+
+	private ?PaidBreakAllocator $paidBreakAllocator = null;
+
+	/**
+	 * Lazily resolved so existing constructor call sites and unit-test
+	 * harnesses keep working, same convention as {@see breakPolicyResolver()}.
+	 */
+	private function paidBreakAllocator(): PaidBreakAllocator
+	{
+		if ($this->paidBreakAllocator === null) {
+			$this->paidBreakAllocator = \OCP\Server::get(PaidBreakAllocator::class);
+		}
+		return $this->paidBreakAllocator;
+	}
+
+	/**
+	 * Recompute the paid-break snapshot for every entry of $userId overlapping
+	 * [$from, $to]. CALLER MUST ALREADY HOLD the user mutation lock — every
+	 * call site lives inside an {@see acquireUserMutationLock()} span, which
+	 * is what makes the day-pool distribution race-free (MF-03/NN-09).
+	 *
+	 * Failures are logged and swallowed: the snapshot converges on the next
+	 * mutation or recompute run, and a payroll auxiliary value must never
+	 * roll back a clock-out the user is legally entitled to.
+	 *
+	 * @return array{changed: int, days_recomputed: int, skipped_finalized: list<string>}
+	 */
+	/**
+	 * Re-read a persisted entry after {@see refreshPaidBreaksAlreadyLocked()}:
+	 * the allocator writes paid_break_seconds through its own entity set, so a
+	 * caller-held instance still carries the pre-recompute value. Responses and
+	 * audit summaries must serialize the persisted snapshot.
+	 */
+	private function refreshEntrySnapshot(TimeEntry $entry): TimeEntry
+	{
+		$id = $entry->getId();
+		if ($id === null) {
+			return $entry;
+		}
+		try {
+			$fresh = $this->timeEntryMapper->find($id);
+			return $fresh instanceof TimeEntry ? $fresh : $entry;
+		} catch (\Throwable) {
+			return $entry;
+		}
+	}
+
+	private function refreshPaidBreaksAlreadyLocked(string $userId, \DateTimeInterface $from, \DateTimeInterface $to): array
+	{
+		try {
+			return $this->paidBreakAllocator()->recomputeSpan($userId, $from, $to);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Paid-break snapshot recompute failed: ' . $e->getMessage(),
+				['exception' => $e, 'user_id' => $userId]
+			);
+			return ['changed' => 0, 'days_recomputed' => 0, 'skipped_finalized' => []];
+		}
+	}
+
+	/**
+	 * Recompute paid-break snapshots for entries overlapping [$from, $to],
+	 * acquiring the user mutation lock when the caller does not hold it.
+	 *
+	 * Canonical entry point for writers outside {@see TimeTrackingService}
+	 * (manual create/update in the controller, corrections, external stamps):
+	 * {@see PaidBreakAllocator} must never be invoked without this lock.
+	 *
+	 * @return array{changed: int, days_recomputed: int, skipped_finalized: list<string>}
+	 */
+	public function recomputePaidBreaksForUserSpan(string $userId, \DateTimeInterface $from, \DateTimeInterface $to): array
+	{
+		return $this->withUserMutationLock($userId, function () use ($userId, $from, $to): array {
+			return $this->refreshPaidBreaksAlreadyLocked($userId, $from, $to);
+		});
 	}
 
 	/**
@@ -2065,6 +2242,8 @@ class TimeTrackingService
 				}
 
 				$updatedEntry = $this->timeEntryMapper->update($entry);
+				$this->refreshPaidBreaksAlreadyLocked($userId, $startTime, $endTime);
+				$updatedEntry = $this->refreshEntrySnapshot($updatedEntry);
 
 				try {
 					$this->auditLogMapper->logAction(

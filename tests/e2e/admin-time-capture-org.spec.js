@@ -1,4 +1,3 @@
-/* global process */
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'

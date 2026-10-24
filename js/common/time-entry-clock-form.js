@@ -199,7 +199,7 @@
 				const minutes = resolveMinBreakMinutes(minBreakMinutes);
 				return {
 					ok: false,
-					error: t('breakTooShort', 'Each break must be at least ' + minutes + ' minutes.'),
+					error: t('breakTooShort', 'Each break must be at least {minutes} minutes.').replace('{minutes}', String(minutes)),
 				};
 			}
 			if (bStart < startMs || bEnd > endMs) {

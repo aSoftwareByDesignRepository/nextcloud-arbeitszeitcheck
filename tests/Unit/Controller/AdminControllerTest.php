@@ -132,6 +132,9 @@ class AdminControllerTest extends TestCase
 	/** @var \OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $vacationYearBalanceMapper;
 
+	/** @var IDBConnection|\PHPUnit\Framework\MockObject\MockObject */
+	private $db;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -160,6 +163,7 @@ class AdminControllerTest extends TestCase
 		$cspService->method('applyPolicyWithNonce')->willReturnArgument(0);
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
+		$l10n->method('n')->willReturnCallback(fn ($sing, $plur, $count) => str_replace('%n', (string)$count, $count === 1 ? $sing : $plur));
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator = $this->urlGenerator;
 		$holidayMapper = $this->createMock(HolidayMapper::class);
@@ -225,7 +229,9 @@ class AdminControllerTest extends TestCase
 		$dateTimeFormatter->method('formatDateTime')->willReturn('2026-06-03 19:04');
 		$auditLogPresenter = new \OCA\ArbeitszeitCheck\Service\AuditLogPresenter($l10n, $dateTimeFormatter);
 
-		$db = $this->createMock(IDBConnection::class);
+		$this->db = $this->createMock(IDBConnection::class);
+		$this->db->method('tableExists')->willReturn(true);
+		$db = $this->db;
 		$config = $this->createMock(\OCP\IConfig::class);
 		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, $default = '') {
 			return $default;
@@ -2275,6 +2281,29 @@ class AdminControllerTest extends TestCase
 		$this->assertSame('SCHEDULE_INVALID_BREAK', $data['code']);
 	}
 
+	public function testCreateWorkingTimeModelRejectsNearMissBreakRuleKey(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'CamelCase flag',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				// Near-miss of 'breaks_count_as_work' — must not silently
+				// persist and never apply.
+				'breakRules' => ['breaksCountAsWork' => true],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('BREAK_RULE_KEY_UNKNOWN', $data['code']);
+		$this->assertSame('BREAK_RULE_KEY_UNKNOWN', $data['fields']['breaksCountAsWork']);
+	}
+
 	public function testCreateWorkingTimeModelRejectsListEncodedBreakRules(): void
 	{
 		$this->request->method('getParams')
@@ -4260,6 +4289,7 @@ class AdminControllerTest extends TestCase
 		// stale copy for the rest of B's request lifecycle.
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s, $p = []) => empty($p) ? $s : vsprintf($s, $p));
+		$l10n->method('n')->willReturnCallback(fn ($sing, $plur, $count) => str_replace('%n', (string)$count, $count === 1 ? $sing : $plur));
 		$resolverB = $this->buildTestBreakPolicyResolver($l10n);
 		$resolverB->orgConfig();
 
@@ -4335,5 +4365,151 @@ class AdminControllerTest extends TestCase
 		$this->assertFalse($m->invoke($this->controller, new \Exception('unique constraint violation')));
 		$this->assertFalse($m->invoke($this->controller,
 			new \Exception('outer', 0, new \Exception('no such table: at_teams'))));
+	}
+
+	private function draftRuleSet(int $id): TariffRuleSet
+	{
+		$ruleSet = new TariffRuleSet();
+		$ruleSet->setId($id);
+		$ruleSet->setStatus(Constants::TARIFF_RULE_SET_STATUS_DRAFT);
+		$ruleSet->setTariffCode('TVOED');
+		$ruleSet->setVersion('2026');
+		$ruleSet->setJurisdiction('DE');
+		return $ruleSet;
+	}
+
+	private function stubReferenceCounts(array $counts): void
+	{
+		// executeQuery is called once per reference table, in
+		// TARIFF_RULE_SET_REFERENCE_TABLES order.
+		$results = [];
+		foreach ($counts as $count) {
+			$result = $this->createMock(\OCP\DB\IResult::class);
+			$result->method('fetchOne')->willReturn($count);
+			$results[] = $result;
+		}
+		$this->db->method('executeQuery')->willReturnOnConsecutiveCalls(...$results);
+	}
+
+	public function testDeleteTariffRuleSetBlocksWhenReferenced(): void
+	{
+		$ruleSet = $this->draftRuleSet(7);
+		$this->tariffRuleSetMapper->method('find')->willReturn($ruleSet);
+		$this->stubReferenceCounts([0, 0, 0, 3, 0]); // user_vacation_policies: 3 rows
+
+		$this->tariffRuleSetMapper->expects($this->never())->method('delete');
+		$this->tariffRuleModuleMapper->expects($this->never())->method('deleteByRuleSetId');
+
+		$response = $this->controller->deleteTariffRuleSet(7);
+		$data = $response->getData();
+
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertSame('tariff_rule_set_in_use', $data['error_code']);
+		$this->assertSame(3, $data['references']['user_vacation_policies']);
+		$this->assertArrayHasKey('special_entitlement_policies', $data['references']);
+	}
+
+	public function testDeleteTariffRuleSetProceedsWhenUnreferenced(): void
+	{
+		$ruleSet = $this->draftRuleSet(8);
+		$this->tariffRuleSetMapper->method('find')->willReturn($ruleSet);
+		$this->stubReferenceCounts([0, 0, 0, 0, 0]);
+
+		$this->tariffRuleModuleMapper->expects($this->once())->method('deleteByRuleSetId')->with(8);
+		$this->tariffRuleSetMapper->expects($this->once())->method('delete')->with($ruleSet);
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+
+		$response = $this->controller->deleteTariffRuleSet(8);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	/**
+	 * NH-03: the paid-break impact preview counts every assignment row of
+	 * the model (current and historical) — and each user's entries once,
+	 * even when assignment windows overlap.
+	 */
+	public function testGetPaidBreakImpactCountsUsersAndEntriesInAssignmentWindows(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setId(7);
+		$this->workingTimeModelMapper->method('find')->with(7)->willReturn($model);
+
+		$a1 = new UserWorkingTimeModel();
+		$a1->setUserId('alice');
+		$a1->setWorkingTimeModelId(7);
+		$a1->setStartDate(new \DateTime('2026-01-01'));
+		$a1->setEndDate(new \DateTime('2026-03-31'));
+
+		// Overlapping second window for alice — entries must not double-count.
+		$a2 = new UserWorkingTimeModel();
+		$a2->setUserId('alice');
+		$a2->setWorkingTimeModelId(7);
+		$a2->setStartDate(new \DateTime('2026-03-01'));
+		// open-ended
+
+		$b1 = new UserWorkingTimeModel();
+		$b1->setUserId('bob');
+		$b1->setWorkingTimeModelId(7);
+		$b1->setStartDate(new \DateTime('2026-02-15'));
+		$b1->setEndDate(new \DateTime('2026-02-28'));
+
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')
+			->with(7, false)
+			->willReturn([$a1, $a2, $b1]);
+
+		$calls = [];
+		$this->timeEntryMapper->method('countByUserStartBetween')
+			->willReturnCallback(function (string $uid, ?\DateTime $from, ?\DateTime $before) use (&$calls): int {
+				$calls[] = [$uid, $from?->format('Y-m-d'), $before?->format('Y-m-d')];
+				return $uid === 'alice' ? 5 : 3;
+			});
+
+		$response = $this->controller->getPaidBreakImpact(7);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame(7, $data['data']['modelId']);
+		$this->assertSame(2, $data['data']['affected_user_count']);
+		$this->assertSame(8, $data['data']['affected_entry_count']);
+
+		// alice's overlapping windows merge into one [2026-01-01, ∞) scan;
+		// bob's inclusive end date becomes the half-open bound +1 day.
+		$this->assertSame(
+			[
+				['alice', '2026-01-01', null],
+				['bob', '2026-02-15', '2026-03-01'],
+			],
+			$calls
+		);
+	}
+
+	public function testGetPaidBreakImpactReturns404ForUnknownModel(): void
+	{
+		$this->workingTimeModelMapper->method('find')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('nope'));
+
+		$response = $this->controller->getPaidBreakImpact(999);
+
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testGetPaidBreakImpactZeroWhenModelUnassigned(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setId(9);
+		$this->workingTimeModelMapper->method('find')->with(9)->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')
+			->with(9, false)
+			->willReturn([]);
+		$this->timeEntryMapper->expects($this->never())->method('countByUserStartBetween');
+
+		$response = $this->controller->getPaidBreakImpact(9);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertSame(0, $data['data']['affected_user_count']);
+		$this->assertSame(0, $data['data']['affected_entry_count']);
 	}
 }

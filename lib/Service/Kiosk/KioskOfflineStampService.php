@@ -85,13 +85,19 @@ class KioskOfflineStampService
 				default => throw new KioskException('KIOSK_ACTION_INVALID'),
 			};
 
+			$data = [
+				'newStatus' => $newStatus,
+				'message' => $this->actionService->actionMessageFor($action),
+				'break_warning' => $completedEntry !== null ? $this->breakWarning($completedEntry) : null,
+			];
+			if ($completedEntry !== null) {
+				// NH-02 additive transparency, same contract as performAction.
+				$data['paidBreakSeconds'] = $completedEntry->getPaidBreakSeconds();
+				$data['paidBreakMinutes'] = (int)round($completedEntry->getPaidBreakSeconds() / 60);
+			}
 			$payload = [
 				'success' => true,
-				'data' => [
-					'newStatus' => $newStatus,
-					'message' => $this->actionService->actionMessageFor($action),
-					'break_warning' => $completedEntry !== null ? $this->breakWarning($completedEntry) : null,
-				],
+				'data' => $data,
 			];
 			$json = json_encode($payload, JSON_THROW_ON_ERROR);
 			$this->idempotencyMapper->updateResponseJsonForId($claimId, $json);

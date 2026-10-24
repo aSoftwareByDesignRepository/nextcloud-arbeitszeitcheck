@@ -1596,6 +1596,8 @@ class TimeEntryControllerTest extends TestCase
 		$savedEntry->setStartTime(new \DateTime('2024-01-15T09:00:00'));
 		$savedEntry->setEndTime(new \DateTime('2024-01-15T17:00:00'));
 		$this->timeEntryMapper->method('insert')->willReturn($savedEntry);
+		// Post-recompute snapshot refresh re-reads the row by id.
+		$this->timeEntryMapper->method('find')->willReturn($savedEntry);
 
 		// pre-save gate (persist=false) passes; the post-persist check (persist=true)
 		// throws -> strict rethrow inside the atomic block -> rollBack, not commit.

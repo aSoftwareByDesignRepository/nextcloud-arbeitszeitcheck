@@ -374,7 +374,16 @@
 						announce(l10n('deleted'));
 						loadRuleSets();
 					} else {
-						Messaging.showError && Messaging.showError((r.payload && r.payload.error) || l10n('deleteError'));
+						// B3: reference conflicts carry per-layer counts — surface them.
+						let msg = (r.payload && r.payload.error) || l10n('deleteError');
+						const refs = r.payload && r.payload.references;
+						if (refs && typeof refs === 'object') {
+							const parts = Object.keys(refs).filter((k) => refs[k] > 0).map((k) => `${k}: ${refs[k]}`);
+							if (parts.length) {
+								msg += ' (' + parts.join(', ') + ')';
+							}
+						}
+						Messaging.showError && Messaging.showError(msg);
 					}
 				},
 			);

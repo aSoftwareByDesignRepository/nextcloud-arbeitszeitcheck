@@ -402,7 +402,12 @@
 				td(t('Date', 'Date'), escapeHtml(formatDateTime(entry.startTime, 'date'))),
 				td(t('Start', 'Start'), escapeHtml(formatDateTime(entry.startTime, 'time'))),
 				td(t('End', 'End'), escapeHtml(formatDateTime(entry.endTime, 'time'))),
-				td(t('Working Hours', 'Working Hours'), escapeHtml(formatHours(entry.workingDurationHours))),
+				td(t('Working Hours', 'Working Hours'), escapeHtml(
+					formatHours(entry.paidDurationHours != null ? entry.paidDurationHours : entry.workingDurationHours)
+					+ (Number(entry.paidBreakSeconds || 0) >= 30
+						? ` (${t('net', 'net')} ${formatHours(entry.workingDurationHours)} · ${t('paid break', 'paid break')} ${Math.round(Number(entry.paidBreakSeconds) / 60)}m)`
+						: '')
+				)),
 				td(t('Break', 'Break'), escapeHtml(formatBreaks(entry))),
 				td(t('Status', 'Status'), statusBadgeHtml(entry.status)),
 				td(t('Location', 'Location'), workLocationCellHtml(entry.workLocation)),

@@ -8,6 +8,7 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Middleware;
+use OCP\IL10N;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
 
@@ -29,6 +30,7 @@ final class ApiExceptionMiddleware extends Middleware
 	public function __construct(
 		private readonly IRequest $request,
 		private readonly LoggerInterface $logger,
+		private readonly IL10N $l10n,
 	) {
 	}
 
@@ -49,7 +51,7 @@ final class ApiExceptionMiddleware extends Middleware
 		]);
 		return new JSONResponse([
 			'success' => false,
-			'error' => 'Internal error.',
+			'error' => $this->l10n->t('Internal error.'),
 			'error_code' => 'internal_error',
 			'fields' => [],
 		], Http::STATUS_INTERNAL_SERVER_ERROR);

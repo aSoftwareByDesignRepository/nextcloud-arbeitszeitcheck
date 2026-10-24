@@ -1,4 +1,3 @@
-/* global process */
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'child_process'
 import { dirname, resolve } from 'path'

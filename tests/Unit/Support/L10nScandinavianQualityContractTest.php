@@ -356,6 +356,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'prioritet', 'produktion', 'projekt', 'punkt', 'september', 'stabil', 'standard',
 		'status', 'tag', 'territorium', 'tom', 'torsdag', 'tredje',
 		'{count} poster', 'År', 'år',
+		// 2026-11-24: 'netto' — column header, legit shared da/sv spelling
+		// (same word both languages).
+		'netto',
 	];
 
 	/**
@@ -846,7 +849,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'komma', 'kommer', 'kommunikation', 'kompakt', 'kompatibel', 'konfiguration', 'konflikt',
 		'konsekvent', 'konsultationstider', 'konto', 'kontor', 'kontoret', 'kontos', 'kontrakt',
 		'kontraktsmål', 'kontroller', 'konvertering', 'korrekt', 'kortet', 'kraft', 'kreditering',
-		'krediteringen', 'kristi', 'kronologisk', 'kryptografisk', 'kunde', 'kunder', 'kvoter', 'kärntens',
+		'krediteringen', 'kristi', 'kritisk', 'kronologisk', 'kryptografisk', 'kunde', 'kunder', 'kvoter', 'kärntens',
 		'lager', 'lagring', 'lagringen', 'landet', 'landsprofil', 'ledig', 'lektioner', 'leopolds', 'licens',
 		'licensadministration', 'licensdata', 'licensen', 'licenser', 'licensformat', 'licenssignatur',
 		'ligger', 'lokalt', 'luzern', 'låser', 'mandantnummer', 'markering', 'medlem', 'metoder',
@@ -892,6 +895,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'kredit', 'laddas', 'licenssignaturen', 'nextclouds', 'objektet', 'perioden',
 		'postdetaljer', 'procenten', 'rensning', 'signaturen', 'standardstatus',
 		'testning',
+		// 2026-11-24: 'semantik' — genuine Swedish noun (cf. 'grammatik');
+		// identical spelling in da is shared vocabulary, not bleed.
+		'semantik',
 	];
 
 	/**
@@ -951,6 +957,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'Marketing', 'Netto', 'Neuchâtel (kanton)', 'Nextcloud', 'Nidwalden (kanton)', 'Obwalden (kanton)',
 		'ProjectCheck', 'Salzburg (AT)', 'Schwyz (kanton)', 'Ticino (kanton)', 'Vaud (kanton)',
 		'Vorarlberg (AT)', 'alfa', 'centrum', 'firma', 'HR', 'IT',
+		// 2026-11-24: lowercase 'netto' — same legit shared form as 'Netto'
+		// (column-header casing variant); reviewed identical to nl.
+		'netto',
 	];
 
 	/**

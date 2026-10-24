@@ -25,6 +25,9 @@ class TeamResolverService
 {
 	private const APP_ID = 'arbeitszeitcheck';
 	private const USE_APP_TEAMS_KEY = 'use_app_teams';
+	private const ADMIN_GROUP_ID = 'admin';
+
+	private ?PermissionService $permissionServiceInstance = null;
 
 	public function __construct(
 		private readonly IGroupManager $groupManager,
@@ -34,6 +37,15 @@ class TeamResolverService
 		private readonly TeamMemberMapper $teamMemberMapper,
 		private readonly TeamManagerMapper $teamManagerMapper,
 	) {
+	}
+
+	/**
+	 * Lazy resolve — PermissionService depends on this service, so constructor
+	 * injection would create a circular dependency.
+	 */
+	private function permissionService(): PermissionService
+	{
+		return $this->permissionServiceInstance ??= \OCP\Server::get(PermissionService::class);
 	}
 
 	/**
@@ -271,18 +283,73 @@ class TeamResolverService
 	}
 
 	/**
-	 * Whether the employee has at least one user who can approve absences / time corrections
-	 * under current team configuration (used for auto-approval when nobody can act as manager).
+	 * Whether the employee has at least one user who can *actually* approve absences /
+	 * time corrections under current team configuration (auto-approval valve).
 	 *
 	 * - App-teams mode: true iff {@see getManagerIdsForEmployee} is non-empty (colleagues alone do not count).
-	 * - Legacy (group) mode: true iff {@see getColleagueIds} is non-empty (no explicit managers in DB).
+	 * - Legacy (group) mode: true iff an **enabled** admin (NC admin group ∪
+	 *   app_admin_user_ids) other than the employee exists. Colleagues in the same
+	 *   group are counted by getColleagueIds() but {@see PermissionService::canManageEmployee()}
+	 *   denies them manager powers in group mode — counting them left pending items
+	 *   permanently stuck (approval deadlock).
 	 */
 	public function hasAssignableManagerForEmployee(string $employeeUserId): bool
 	{
 		if ($this->useAppTeams()) {
 			return $this->getManagerIdsForEmployee($employeeUserId) !== [];
 		}
-		return $this->getColleagueIds($employeeUserId) !== [];
+		return $this->listGroupModeAdminApprovers($employeeUserId) !== [];
+	}
+
+	/**
+	 * Enabled admins (NC admin group ∪ app_admin_user_ids) other than the employee —
+	 * the only factual approvers in legacy group mode. Bounded enumeration:
+	 * admin group members + configured app-admin list, no directory-wide scan.
+	 * Membership is validated through {@see PermissionService::isAdmin()} so this
+	 * predicate shares one definition of "admin" with the authorization check.
+	 *
+	 * @return list<string>
+	 */
+	public function listGroupModeAdminApprovers(string $employeeUserId): array
+	{
+		$permissionService = $this->permissionService();
+		$candidates = [];
+
+		$adminGroup = $this->groupManager->get(self::ADMIN_GROUP_ID);
+		if ($adminGroup !== null) {
+			foreach ($adminGroup->getUsers() as $user) {
+				$candidates[$user->getUID()] = true;
+			}
+		}
+		foreach ($permissionService->getConfiguredAppAdminUserIds() as $uid) {
+			$candidates[$uid] = true;
+		}
+		unset($candidates[$employeeUserId]);
+
+		$approvers = [];
+		foreach (array_keys($candidates) as $uid) {
+			// isAdmin() already enforces the enabled filter (user exists + enabled).
+			if ($permissionService->isAdmin($uid)) {
+				$approvers[] = $uid;
+			}
+		}
+		sort($approvers);
+		return $approvers;
+	}
+
+	/**
+	 * Audit snapshot of the approver predicate: which mode evaluated and which
+	 * approvers were counted. Written into auto-approve audit rows so a delegated
+	 * admin removing peer admins (→ own items auto-approve) stays traceable.
+	 *
+	 * @return array{mode: string, approvers: list<string>}
+	 */
+	public function approverPredicateSnapshot(string $employeeUserId): array
+	{
+		if ($this->useAppTeams()) {
+			return ['mode' => 'app_teams', 'approvers' => $this->getManagerIdsForEmployee($employeeUserId)];
+		}
+		return ['mode' => 'groups', 'approvers' => $this->listGroupModeAdminApprovers($employeeUserId)];
 	}
 
 	/**

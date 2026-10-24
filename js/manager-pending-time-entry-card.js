@@ -179,6 +179,21 @@
 					+ escapeHtml(duration) + ' ' + escapeHtml(t('hours', 'hours')) + '</dd></div>'
 				);
 			}
+			if (summary.paidDurationHours != null && summary.paidDurationHours !== summary.durationHours) {
+				const paidDuration = formatDurationHours(summary.paidDurationHours);
+				if (paidDuration !== '') {
+					facts.push(
+						'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('Paid duration', 'Paid duration')) + '</dt><dd>'
+						+ escapeHtml(paidDuration) + ' ' + escapeHtml(t('hours', 'hours')) + '</dd></div>'
+					);
+				}
+			}
+			if (Number(summary.paidBreakSeconds || 0) >= 30) {
+				facts.push(
+					'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('Paid break', 'Paid break')) + '</dt><dd>'
+					+ escapeHtml(String(Math.round(Number(summary.paidBreakSeconds) / 60))) + ' ' + escapeHtml(t('min', 'min')) + '</dd></div>'
+				);
+			}
 			facts.push(
 				'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('workLocationLabel', 'Work location')) + '</dt><dd>'
 				+ escapeHtml(formatWorkLocation(summary.workLocation, t)) + '</dd></div>'

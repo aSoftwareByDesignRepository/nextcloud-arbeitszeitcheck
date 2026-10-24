@@ -244,6 +244,130 @@ class ExportControllerTest extends TestCase
 	}
 
 	/**
+	 * TH-06: working_hours rows must carry the paid-basis semantics annotation
+	 * so payroll consumers cannot misread the column as statutory net time.
+	 */
+	public function testTimeEntriesExportAsCsvAnnotatesPaidBasisSemantics(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreakStartTime(null);
+		$entry->setBreakEndTime(null);
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setProjectCheckProjectId(null);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		$response = $this->controller->timeEntries('csv', '2024-01-01', '2024-01-31');
+		$content = (string)$response->render();
+
+		$this->assertStringContainsString(
+			'Semantics: working_hours is paid basis (net working time + paid break)',
+			$content
+		);
+		// The explicit column trio must ship in the header row.
+		$header = null;
+		foreach (explode("\n", $content) as $line) {
+			if ($line === '') {
+				continue;
+			}
+			$cells = str_getcsv($line);
+			if (in_array('working_hours', $cells, true)) {
+				$header = $cells;
+				break;
+			}
+		}
+		$this->assertNotNull($header, 'CSV must contain a header row with working_hours');
+		foreach (['working_hours', 'net_working_hours', 'paid_break_hours'] as $col) {
+			$this->assertContains($col, $header);
+		}
+	}
+
+	/**
+	 * TH-06: JSON envelope mirrors the CSV annotation for machine consumers.
+	 */
+	public function testTimeEntriesExportAsJsonIncludesSemanticsEnvelope(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$entry = new TimeEntry();
+		$entry->setId(1);
+		$entry->setUserId($userId);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setBreaks(null);
+		$entry->setDescription('Work');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setUpdatedAt(new \DateTime('2024-01-15 17:00:00'));
+
+		$this->timeEntryMapper->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		$response = $this->controller->timeEntries('json', '2024-01-01', '2024-01-31');
+		$envelope = json_decode((string)$response->render(), true);
+
+		$this->assertIsArray($envelope);
+		$this->assertSame(
+			'paid basis (net working time + paid break)',
+			$envelope['semantics']['working_hours'] ?? null
+		);
+		$this->assertSame(
+			'statutory net working time',
+			$envelope['semantics']['net_working_hours'] ?? null
+		);
+	}
+
+	/**
+	 * TH-06 negative: exports without a working_hours column must NOT get the
+	 * paid-basis annotation (absences rows are not payroll working time).
+	 */
+	public function testAbsencesExportAsCsvOmitsPaidBasisSemantics(): void
+	{
+		$userId = 'testuser';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId(1);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-06-01'));
+		$absence->setEndDate(new \DateTime('2024-06-01'));
+		$absence->setDays(1);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setCreatedAt(new \DateTime('2024-05-01'));
+		$absence->setUpdatedAt(new \DateTime('2024-05-01'));
+
+		$this->absenceMapper->method('findByUserAndDateRange')
+			->willReturn([$absence]);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30');
+		$content = (string)$response->render();
+
+		$this->assertStringNotContainsString('paid basis', $content);
+	}
+
+	/**
 	 * Test timeEntries export as DATEV
 	 */
 	public function testTimeEntriesExportAsDatev(): void

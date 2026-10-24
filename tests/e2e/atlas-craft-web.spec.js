@@ -261,7 +261,32 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		   window; seed via the session API then click Request correction --- */
 		await gotoApp(page, '/apps/arbeitszeitcheck/time-entries');
 		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
-		let requestBtn = page.locator('.btn-request-correction').first();
+		// The entries table paginates server-side (newest first): rows outside
+		// the current page render with `hidden`. Correction-eligible entries
+		// (> edit window) sit on the oldest pages — walk the pager backwards.
+		const visibleRequestBtn = () => page.locator('.btn-request-correction:visible').first();
+		const findAcrossPages = async () => {
+			const visited = new Set();
+			for (let hops = 0; hops < 15; hops += 1) {
+				const btn = visibleRequestBtn();
+				if ((await btn.count()) > 0) {
+					return btn;
+				}
+				const current = await page.locator('#time-entries-table-pager .azc-table-pager__page.is-current').textContent().catch(() => '1');
+				visited.add(Number(String(current).trim()));
+				const nums = await page.locator('#time-entries-table-pager .azc-table-pager__pages a[data-page]').evaluateAll(
+					(links) => links.map((a) => Number(a.getAttribute('data-page'))),
+				);
+				const nextPage = nums.filter((p) => !visited.has(p)).sort((a, b) => b - a)[0];
+				if (nextPage == null) {
+					return btn;
+				}
+				await page.locator(`#time-entries-table-pager a[data-page="${nextPage}"]`).click();
+				await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+			}
+			return visibleRequestBtn();
+		};
+		let requestBtn = await findAcrossPages();
 		if ((await requestBtn.count()) === 0) {
 			for (let age = 20; age <= 70; age += 1) {
 				const d = new Date();
@@ -280,7 +305,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			}
 			await page.reload({ waitUntil: 'domcontentloaded' });
 			await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
-			requestBtn = page.locator('.btn-request-correction').first();
+			requestBtn = await findAcrossPages();
 		}
 		if (await requestBtn.count()) {
 			// Row actions reveal on tr:hover at >=769px (zero-width sticky

@@ -713,7 +713,8 @@ class PageController extends Controller
 						return $entry->getStartTime() && $entry->getStartTime()->format('Y-m') === date('Y-m');
 					})),
 					'total_hours' => array_reduce($allEntries, function($sum, $entry) {
-						return $sum + $entry->getWorkingDurationHours();
+						// KPI card — tariff basis (net + paid-break snapshot).
+						return $sum + ($entry->getPaidDurationHours() ?? 0.0);
 					}, 0)
 				],
 				'maxDailyHours' => $maxDailyHours,

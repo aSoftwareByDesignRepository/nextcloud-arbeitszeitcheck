@@ -2413,13 +2413,25 @@ class AbsenceService
 
 		$updatedAbsence = $this->absenceMapper->update($absence);
 
+		// B1-MH-05: record why the item auto-approved and which approvers the
+		// predicate counted — keeps the "delegated admin removes peers" path
+		// auditable. method_exists guard: this code runs in upgrade repair paths
+		// where a stale TeamResolverService may already be loaded.
+		$newValues = $updatedAbsence->getSummary();
+		$newValues['auto_approve'] = [
+			'reason' => 'no_assignable_approver',
+			'predicate' => method_exists($this->teamResolver, 'approverPredicateSnapshot')
+				? $this->teamResolver->approverPredicateSnapshot($absence->getUserId())
+				: null,
+		];
+
 		$this->auditLogMapper->logAction(
 			$absence->getUserId(),
 			'absence_auto_approved',
 			'absence',
 			$updatedAbsence->getId(),
 			$oldData,
-			$updatedAbsence->getSummary(),
+			$newValues,
 			'system'
 		);
 

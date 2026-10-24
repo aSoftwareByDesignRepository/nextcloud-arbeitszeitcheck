@@ -92,7 +92,6 @@ $teamsMessageIds = [
 	'Add %1$d people to team “%2$s”?',
 	'Add people to team',
 	'Add to team',
-	'Added %1$d, skipped %2$d, failed %3$d.',
 ];
 
 $teamsL10n = TemplateL10n::mapFromMessageIds($l, $teamsMessageIds);

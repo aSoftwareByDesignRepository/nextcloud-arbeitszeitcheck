@@ -1050,6 +1050,7 @@
 			if (daysMode && type === 'vacation' && dayFractionField && !dayFractionField.hidden) {
 				payload.dayFraction = (dayFractionHalf && dayFractionHalf.checked) ? '0.5' : '1';
 			}
+			form.querySelector('.azc-self-target-notice')?.remove();
 			Utils.ajax('/apps/arbeitszeitcheck/api/manager/employee-absences', {
 				method: 'POST',
 				data: payload,
@@ -1074,6 +1075,12 @@
 				onError: (err) => {
 					submitBtn.disabled = false;
 					submitBtn.textContent = original;
+					// B1-MH-04 / BX-02: self-target renders a hint with a link into
+					// the self-service flow instead of a dead-end toast.
+					if (err?.data?.selfTarget === true) {
+						renderSelfTargetNotice(form, err.data);
+						return;
+					}
 					const code = err?.error_code || err?.code || err?.data?.error_code || err?.data?.code || '';
 					let message = err?.error || t('Could not save absence.', 'Could not save absence.');
 					if (code === 'ABSENCE_HOURS_CLIENT_REQUIRED') {
@@ -1083,6 +1090,39 @@
 				},
 			});
 		});
+	}
+
+	/**
+	 * B1-MH-04 / BX-02: self-target 403 renders an inline hint with a link into
+	 * the self-service flow — not a dead-end toast.
+	 */
+	function renderSelfTargetNotice(host, err) {
+		if (!host) {
+			Messaging?.showError?.(err?.error || t('Could not save absence.', 'Could not save absence.'));
+			return;
+		}
+		let notice = host.querySelector('.azc-self-target-notice');
+		if (!notice) {
+			notice = document.createElement('p');
+			notice.className = 'field-error azc-self-target-notice';
+			notice.setAttribute('role', 'alert');
+			host.prepend(notice);
+		}
+		const area = err.selfServiceArea === 'absences' ? 'absences' : 'time-entries';
+		const href = Utils.buildAppUrl('/apps/arbeitszeitcheck/' + area);
+		const linkLabel = area === 'absences'
+			? t('Open Absences', 'Open Absences')
+			: t('Open Time Entries', 'Open Time Entries');
+		notice.textContent = (err.error
+			|| t('Please record your own entries via Time Entries / Absences.', 'Please record your own entries via Time Entries / Absences.')) + ' ';
+		const link = document.createElement('a');
+		link.href = href;
+		link.textContent = linkLabel;
+		notice.appendChild(link);
+		notice.hidden = false;
+		if (typeof notice.scrollIntoView === 'function') {
+			notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
 	}
 
 	function toEuropeanDateString(date) {

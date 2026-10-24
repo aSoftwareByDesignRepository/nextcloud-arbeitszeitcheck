@@ -543,7 +543,7 @@
             return;
         }
         bar.hidden = false;
-        countEl.textContent = auMsg('nSelectedApply', '%n selected — Apply…').replace('%s', String(n));
+        countEl.textContent = aun('1 selected — Apply…', '%n selected — Apply…', n);
     }
 
     function bindBulkSelection() {

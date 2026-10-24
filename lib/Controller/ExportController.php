@@ -751,6 +751,11 @@ class ExportController extends Controller
 		$fp = fopen('php://temp', 'r+');
 		fputcsv($fp, ['# ' . $this->l10n->t('Timezone'), $timezone]);
 		fputcsv($fp, ['# ' . $this->l10n->t('Exported at'), (new \DateTime('now', new \DateTimeZone($timezone)))->format('Y-m-d H:i:s T')]);
+		// TH-06: announce the paid-basis semantics inside the file so payroll
+		// consumers cannot misread working_hours as statutory net time.
+		if (!empty($data) && array_key_exists('working_hours', $data[0])) {
+			fputcsv($fp, ['# ' . $this->l10n->t('Semantics: working_hours is paid basis (net working time + paid break); net_working_hours is statutory working time.')]);
+		}
 
 		if (!empty($data)) {
 			fputcsv($fp, array_keys($data[0]));
@@ -780,12 +785,21 @@ class ExportController extends Controller
 	 */
 	private function exportAsJson(array $data, string $filename, string $timezone): DataDownloadResponse
 	{
-		$json = json_encode([
+		$envelope = [
 			'timezone' => $timezone,
 			'exported_at' => (new \DateTime('now', new \DateTimeZone($timezone)))->format('c'),
 			'record_count' => count($data),
-			'entries' => $data,
-		], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+		];
+		// TH-06: paid-basis semantics annotation for rows carrying working_hours.
+		if (!empty($data) && array_key_exists('working_hours', $data[0])) {
+			$envelope['semantics'] = [
+				'working_hours' => 'paid basis (net working time + paid break)',
+				'net_working_hours' => 'statutory net working time',
+				'paid_break_hours' => 'paid break component per TVöD §6 Abs. 1 S. 2',
+			];
+		}
+		$envelope['entries'] = $data;
+		$json = json_encode($envelope, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 		
 		if ($json === false) {
 			throw new \Exception($this->l10n->t('Failed to encode data as JSON'));

@@ -35,6 +35,8 @@ class TimeEntryCorrectionServiceTest extends TestCase
 {
 	/** @var TimeEntryMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeEntryMapper;
+	/** @var array<int, TimeEntry> */
+	private array $entryStore = [];
 	/** @var MonthClosureGuard|\PHPUnit\Framework\MockObject\MockObject */
 	private $monthClosureGuard;
 	/** @var ComplianceService|\PHPUnit\Framework\MockObject\MockObject */
@@ -79,10 +81,22 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$this->l10n = $this->createMock(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(static fn (string $text) => $text);
 
+		$this->entryStore = [];
 		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
-		$this->timeEntryMapper->method('update')->willReturnCallback(static fn (TimeEntry $e): TimeEntry => $e);
+		$this->timeEntryMapper->method('update')->willReturnCallback(
+			function (TimeEntry $e): TimeEntry {
+				$this->entryStore[$e->getId()] = $e;
+				return $e;
+			}
+		);
+		$this->timeEntryMapper->method('find')->willReturnCallback(
+			function (int $id): ?TimeEntry {
+				return $this->entryStore[$id] ?? null;
+			}
+		);
 		$this->timeEntryMapper->method('updateIfPendingApproval')->willReturnCallback(
-			static function (TimeEntry $e): bool {
+			function (TimeEntry $e): bool {
+				$this->entryStore[$e->getId()] = $e;
 				return true;
 			}
 		);
@@ -550,6 +564,27 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$this->assertNull($entry->getBreaks());
 	}
 
+	public function testApplyProposalStripsAllocatorOwnedPaidBreakFields(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setPaidBreakSeconds(1800);
+
+		$reflection = new \ReflectionMethod($this->service, 'applyProposal');
+		$reflection->setAccessible(true);
+		$reflection->invoke($this->service, $entry, [
+			'description' => 'new desc',
+			'paid_break_seconds' => 99999,
+			'paidBreakSeconds' => 99999,
+			'paid_break_minutes' => 99999,
+			'paidBreakMinutes' => 99999,
+			'paid_duration_hours' => 99.9,
+			'paidDurationHours' => 99.9,
+		]);
+
+		$this->assertSame(1800, $entry->getPaidBreakSeconds(), 'client payload must never write the snapshot');
+		$this->assertSame('new desc', $entry->getDescription());
+	}
+
 	public function testValidateProposalBlocksIllegalAustrianBreakSplit(): void
 	{
 		$entry = $this->buildEntry();
@@ -618,8 +653,9 @@ class TimeEntryCorrectionServiceTest extends TestCase
 					&& $saved->getStartTime()->format('Y-m-d H:i') === '2026-06-15 08:00'
 					&& $saved->getEndTime()->format('Y-m-d H:i') === '2026-06-15 16:00';
 			}))
-			->willReturnCallback(static function (TimeEntry $saved): TimeEntry {
+			->willReturnCallback(function (TimeEntry $saved): TimeEntry {
 				$saved->setId(101);
+				$this->entryStore[101] = $saved;
 				return $saved;
 			});
 
@@ -994,7 +1030,10 @@ class TimeEntryCorrectionServiceTest extends TestCase
 	public function testCreateManagerRecordedEntryAttachesBillingWarning(): void
 	{
 		$this->timeEntryMapper->method('insert')->willReturnCallback(
-			static fn (TimeEntry $e): TimeEntry => $e
+			function (TimeEntry $e): TimeEntry {
+				$this->entryStore[$e->getId()] = $e;
+				return $e;
+			}
 		);
 		$entry = $this->buildEntry();
 		$proposal = [

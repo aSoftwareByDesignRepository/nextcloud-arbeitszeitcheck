@@ -132,6 +132,43 @@
 		return { wrap, sel: wrap.querySelector('select') };
 	}
 
+	/**
+	 * B1-MH-04 / BX-02: self-target 403 renders an inline hint with a link into
+	 * the self-service flow — not a dead-end toast.
+	 */
+	function renderSelfTargetNotice(host, err) {
+		if (!host) {
+			Messaging.showError(err?.error || t('Could not save time entry.', 'Could not save time entry.'));
+			return;
+		}
+		let notice = host.querySelector('.azc-self-target-notice');
+		if (!notice) {
+			notice = document.createElement('p');
+			notice.className = 'field-error azc-self-target-notice';
+			notice.setAttribute('role', 'alert');
+			host.prepend(notice);
+		}
+		const area = err.selfServiceArea === 'absences' ? 'absences' : 'time-entries';
+		const href = Utils.buildAppUrl('/apps/arbeitszeitcheck/' + area);
+		const linkLabel = area === 'absences'
+			? t('Open Absences', 'Open Absences')
+			: t('Open Time Entries', 'Open Time Entries');
+		notice.textContent = (err.error
+			|| t('Please record your own entries via Time Entries / Absences.', 'Please record your own entries via Time Entries / Absences.')) + ' ';
+		const link = document.createElement('a');
+		link.href = href;
+		link.textContent = linkLabel;
+		notice.appendChild(link);
+		notice.hidden = false;
+		if (typeof notice.scrollIntoView === 'function') {
+			notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
+	}
+
+	function clearSelfTargetNotice(host) {
+		host?.querySelector('.azc-self-target-notice')?.remove();
+	}
+
 	function open() {
 		if (!ClockForm || !Components.createModal) {
 			Messaging.showError(t('Could not open form.', 'Could not open form.'));
@@ -240,6 +277,7 @@
 
 				saveBtn.disabled = true;
 				saveBtn.setAttribute('aria-busy', 'true');
+				clearSelfTargetNotice(meta);
 
 				Utils.ajax('/apps/arbeitszeitcheck/api/manager/employee-time-entries', {
 					method: 'POST',
@@ -256,7 +294,12 @@
 						document.dispatchEvent(new CustomEvent('arbeitszeitcheck:manager-entry-created'));
 					},
 					onError: (err) => {
-						Messaging.showError(err?.error || t('Could not save time entry.', 'Could not save time entry.'));
+						if (err?.data?.selfTarget === true) {
+							formApi.setStatus(err.data.error || '', true);
+							renderSelfTargetNotice(meta, err.data);
+						} else {
+							Messaging.showError(err?.error || t('Could not save time entry.', 'Could not save time entry.'));
+						}
 					},
 				}).finally(() => {
 					saveBtn.disabled = false;

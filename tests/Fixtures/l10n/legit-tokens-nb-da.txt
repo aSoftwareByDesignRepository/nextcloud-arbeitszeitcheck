@@ -9,6 +9,7 @@ absolutte
 administrationsstatus
 administrationsvisning
 administrativ
+administrator
 administratorer
 administratorgruppen
 administratorredigeringer
@@ -81,6 +82,7 @@ basisformelmodul
 batchbehandling
 beder
 begge
+begrenser
 behandle
 behandles
 behandlet
@@ -104,6 +106,7 @@ beregningsregler
 berettigelse
 berettiget
 berører
+berøres
 berørt
 berørte
 besat
@@ -125,8 +128,11 @@ bestiller
 bestilling
 bestilt
 bestilte
+betale
+betaler
 betales
 betalt
+betalte
 bindende
 blandede
 bloker
@@ -153,6 +159,7 @@ celler
 centrum
 chipnumre
 chipsene
+count
 dagen
 dagene
 dagens
@@ -468,6 +475,8 @@ glemt
 glemte
 globale
 globalt
+godskrive
+godskriver
 gratis
 gruppe
 gruppeledere
@@ -527,6 +536,7 @@ holdt
 holdvarsler
 hoppe
 hopper
+hours
 hovedindhold
 hovednavigation
 hundrededel
@@ -738,6 +748,7 @@ lederomfang
 lederroller
 leders
 ledig
+ledige
 leopolds
 levende
 leverandøren
@@ -817,6 +828,7 @@ minimal
 minimale
 minimumspauser
 minut
+minutes
 minutter
 minutters
 mislykkede
@@ -826,6 +838,7 @@ mister
 mistet
 mobil
 mobilappen
+mobile
 modellen
 modellens
 modeller
@@ -833,6 +846,7 @@ modelleres
 modul
 moduler
 modultype
+morgen
 morgenen
 mulig
 muligvis
@@ -892,6 +906,7 @@ obligatoriske
 offentlig
 offentlige
 oktober
+omberegnes
 omfang
 omfanget
 omfatte
@@ -959,6 +974,7 @@ papiret
 pares
 parkering
 partnertilbud
+pause
 pauseberegning
 pausede
 pausegenerering
@@ -1200,6 +1216,7 @@ sporing
 spring
 springe
 stabil
+standard
 standarddelstat
 standarddelstaten
 standarden
@@ -1305,6 +1322,7 @@ tekstfil
 telefon
 telefonen
 temaer
+terminal
 terminalbetegnelse
 terminalen
 terminaler
@@ -1373,6 +1391,7 @@ timen
 timeout
 timepakke
 timepakker
+timer
 timers
 timesaldo
 timesaldoen
@@ -1457,6 +1476,8 @@ visning
 visningen
 vurderes
 webappen
+wechselschicht
+working
 yngre
 zürich
 årets

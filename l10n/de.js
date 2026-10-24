@@ -3452,6 +3452,7 @@
 		"Paid break" : "Bezahlte Pause",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "Das Pausenlimit muss eine ganze Zahl von Minuten zwischen 0 und 480 sein.",
 		"Paid break limit per day (minutes)" : "Bezahltes Pausenlimit pro Tag (Minuten)",
+		"Paid breaks recomputed" : "Bezahlte Pausen neu berechnet",
 		"Paid duration" : "Bezahlte Dauer",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Kiosk-Tablets im Kiosk-Admin-Bereich koppeln (Track C). Jedes gekoppelte Gerät belegt einen Lizenz-Slot.",
 		"Pair kiosk tablets from the Kiosk admin area. Each paired device uses one license slot." : "Kiosk-Tablets im Kiosk-Adminbereich koppeln. Jedes gekoppelte Gerät belegt einen Lizenzplatz.",

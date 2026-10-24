@@ -3452,6 +3452,7 @@
 		"Paid break" : "Pausa remunerada",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "O limite de pausa remunerada deve ser um número inteiro de minutos entre 0 e 480.",
 		"Paid break limit per day (minutes)" : "Limite de pausa remunerada por dia (minutos)",
+		"Paid breaks recomputed" : "Pausas remuneradas recalculadas",
 		"Paid duration" : "Duração remunerada",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Emparelhe tablets do quiosque na área de administração do quiosque (faixa C). Cada dispositivo emparelhado utiliza um slot de licença.",
 		"Pair kiosk tablets from the Kiosk admin area. Each paired device uses one license slot." : "Emparelhe tablets de quiosque na área de administração do quiosque. Cada dispositivo emparelhado utiliza um slot de licença.",

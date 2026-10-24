@@ -3452,6 +3452,7 @@
 		"Paid break" : "Betaalde pauze",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "De pauzelimiet moet een geheel aantal minuten tussen 0 en 480 zijn.",
 		"Paid break limit per day (minutes)" : "Betaalde pauzelimiet per dag (minuten)",
+		"Paid breaks recomputed" : "Betaalde pauzes herberekend",
 		"Paid duration" : "Betaalde duur",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Koppel kiosk-tablets vanuit het Kiosk-beheergebied (Track C). Elk gekoppeld apparaat gebruikt één licentieplaats.",
 		"Pair kiosk tablets from the Kiosk admin area. Each paired device uses one license slot." : "Koppel kiosktablets vanuit Kioskbeheer. Elk gekoppeld apparaat gebruikt één licentieplaats.",

@@ -218,7 +218,7 @@ $terminalRowIndex = 0;
 			</div>
 
 			<div class="azc-table-wrap">
-				<div class="azc-table-scroll">
+				<div class="azc-table-scroll" tabindex="0">
 				<table class="azc-table azc-kiosk-table" id="azc-kiosk-terminals-table">
 					<caption class="azc-sr-only"><?php p($l->t('Registered kiosk terminals')); ?></caption>
 					<thead>
@@ -472,7 +472,7 @@ $terminalRowIndex = 0;
 			<h3 class="azc-kiosk-creds-list__title" id="azc-kiosk-creds-list-heading"><?php p($l->t('Already assigned')); ?></h3>
 			<p class="azc-kiosk-creds-list__lead"><?php p($l->t('Everyone who already has a badge or PIN. Use the row buttons to create a new PIN or remove credentials.')); ?></p>
 			<div class="azc-table-wrap">
-				<div class="azc-table-scroll">
+				<div class="azc-table-scroll" tabindex="0">
 				<table class="azc-table azc-kiosk-table" id="azc-kiosk-creds-table" aria-labelledby="azc-kiosk-creds-list-heading">
 					<caption class="azc-sr-only"><?php p($l->t('Kiosk credentials')); ?></caption>
 					<thead>

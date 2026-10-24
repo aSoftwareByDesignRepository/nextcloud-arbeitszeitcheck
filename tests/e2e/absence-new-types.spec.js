@@ -69,6 +69,31 @@ async function freeFutureWeekday(page, startOffset) {
 	return null
 }
 
+/**
+ * Same fragility guard for the no-planned-hours probe: pick a Sunday far out
+ * that no existing absence covers — an overlap rejection would mask the
+ * OVERTIME_COMP_NO_PLANNED_HOURS guard under test.
+ */
+async function freeFutureSunday(page, startOffset) {
+	const existing = await api(page, 'GET', `${APP}/api/absences?limit=500`)
+	const rows = existing.absences ?? existing.items ?? []
+	const occupied = rows
+		.map((a) => [a.start_date ?? a.startDate, a.end_date ?? a.endDate])
+		.filter(([s, e]) => typeof s === 'string' && typeof e === 'string')
+	for (let off = startOffset; off <= 180; off++) {
+		const d = new Date()
+		d.setUTCDate(d.getUTCDate() + off)
+		if (d.getUTCDay() !== 0) {
+			continue
+		}
+		const candidate = d.toISOString().slice(0, 10)
+		if (!occupied.some(([s, e]) => candidate >= s && candidate <= e)) {
+			return candidate
+		}
+	}
+	return null
+}
+
 test.describe('New absence types: child_sick + overtime_comp', () => {
 	test.skip(!process.env.NC_EMPLOYEE_PASS, 'e2e creds required')
 
@@ -130,13 +155,10 @@ test.describe('New absence types: child_sick + overtime_comp', () => {
 	test('overtime_comp rejects a free weekend day (no planned hours)', async ({ page }) => {
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await gotoApp(page, `${APP}/absences`)
-		// Find a Sunday far enough out that no entries can exist.
-		const d = new Date()
-		d.setUTCDate(d.getUTCDate() + 21)
-		while (d.getUTCDay() !== 0) {
-			d.setUTCDate(d.getUTCDate() + 1)
-		}
-		const sunday = d.toISOString().slice(0, 10)
+		// Find a Sunday far enough out that no entries can exist — and outside
+		// every existing absence range (overlap would mask the guard under test).
+		const sunday = await freeFutureSunday(page, 21)
+		expect(sunday, 'no free future Sunday found').toBeTruthy()
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/absences`, {
 			data: { type: 'overtime_comp', start_date: sunday, end_date: sunday, reason: `atlas-nt ${UNIQ}` },
 		})

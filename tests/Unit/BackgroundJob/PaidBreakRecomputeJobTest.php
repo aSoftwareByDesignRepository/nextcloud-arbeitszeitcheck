@@ -318,13 +318,43 @@ class PaidBreakRecomputeJobTest extends TestCase
 		$this->jobList = $this->createMock(IJobList::class);
 		$this->jobList->method('getJobs')->willReturnCallback(
 			function (string $class, int $limit, int $offset): array {
-				return $offset === 0
-					? [['id' => 9, 'argument' => [PaidBreakRecomputeJob::ARG_USER_ID => 'u1', 'after_entry_id' => 55]]]
-					: [];
+				if ($offset !== 0) {
+					return [];
+				}
+				$job = $this->createMock(\OCP\BackgroundJob\IJob::class);
+				$job->method('getArgument')->willReturn(
+					[PaidBreakRecomputeJob::ARG_USER_ID => 'u1', 'after_entry_id' => 55]
+				);
+				return [$job];
 			}
 		);
 		$this->jobList->expects($this->never())->method('add');
 		$this->assertFalse(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1'));
+	}
+
+	public function testEnqueueIgnoresJobQueuedForDifferentTarget(): void
+	{
+		// Regression: getJobs() returns IJob objects, not row arrays — the
+		// dedupe scan must read getArgument(), and a queued job for another
+		// target must not block (or crash) a new enqueue.
+		$this->jobList = $this->createMock(IJobList::class);
+		$this->jobList->method('getJobs')->willReturnCallback(
+			function (string $class, int $limit, int $offset): array {
+				if ($offset !== 0) {
+					return [];
+				}
+				$job = $this->createMock(\OCP\BackgroundJob\IJob::class);
+				$job->method('getArgument')->willReturn(
+					[PaidBreakRecomputeJob::ARG_USER_ID => 'u2']
+				);
+				return [$job];
+			}
+		);
+		$this->jobList->expects($this->once())->method('add')->with(
+			PaidBreakRecomputeJob::class,
+			[PaidBreakRecomputeJob::ARG_USER_ID => 'u1']
+		);
+		$this->assertTrue(PaidBreakRecomputeJob::enqueueForUser($this->jobList, 'u1'));
 	}
 
 	public function testEnqueueForModelAddsWhenNotQueued(): void

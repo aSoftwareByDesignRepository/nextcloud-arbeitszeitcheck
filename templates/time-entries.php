@@ -825,7 +825,7 @@ if ($mode === 'list') {
                     <p class="form-help"><?php p($l->t('Showing the latest %1$s of %2$s entries.', [(string)$entryListLoaded, (string)$entryListTotal])); ?></p>
                 <?php endif; ?>
                 <div class="table-container">
-                    <div class="azc-table-scroll">
+                    <div class="azc-table-scroll" tabindex="0">
                     <table class="table table--hover azc-table--responsive" id="time-entries-table" role="table" aria-label="<?php p($l->t('Time entries list')); ?>">
                         <thead>
                             <tr>

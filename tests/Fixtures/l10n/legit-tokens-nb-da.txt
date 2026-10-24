@@ -906,7 +906,9 @@ obligatoriske
 offentlig
 offentlige
 oktober
-omberegnes
+omregner
+omregnes
+omregnet
 omfang
 omfanget
 omfatte

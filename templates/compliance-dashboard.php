@@ -202,8 +202,8 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                                 $typePagerOffset = (int)($typePager['offset'] ?? 0);
                                 $typeRowIndex = 0;
                                 ?>
-                                <div class="table-container" tabindex="0" role="region" aria-labelledby="compliance-by-type">
-                                    <div class="azc-table-scroll">
+                                <div class="table-container" role="region" aria-labelledby="compliance-by-type">
+                                    <div class="azc-table-scroll" tabindex="0">
                                     <table class="table table--hover azc-table--responsive" id="compliance-by-type-table">
                                         <thead>
                                             <tr>
@@ -256,8 +256,8 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                                 $severityPagerOffset = (int)($severityPager['offset'] ?? 0);
                                 $severityRowIndex = 0;
                                 ?>
-                                <div class="table-container" tabindex="0" role="region" aria-labelledby="compliance-by-severity">
-                                    <div class="azc-table-scroll">
+                                <div class="table-container" role="region" aria-labelledby="compliance-by-severity">
+                                    <div class="azc-table-scroll" tabindex="0">
                                     <table class="table table--hover azc-table--responsive" id="compliance-by-severity-table">
                                         <thead>
                                             <tr>
@@ -351,8 +351,8 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                 $violationPagerOffset = (int)($violationPager['offset'] ?? 0);
                 $violationRowIndex = 0;
                 ?>
-                <div class="table-container" tabindex="0" role="region" aria-labelledby="compliance-violations-heading">
-                    <div class="azc-table-scroll">
+                <div class="table-container" role="region" aria-labelledby="compliance-violations-heading">
+                    <div class="azc-table-scroll" tabindex="0">
                     <table class="table table--hover azc-table--responsive" id="violations-table" data-filter-user-id="<?php p((string)($_['filterUserId'] ?? '')); ?>">
                         <thead>
                             <tr>

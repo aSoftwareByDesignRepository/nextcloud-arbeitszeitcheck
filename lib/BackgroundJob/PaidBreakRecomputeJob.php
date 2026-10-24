@@ -129,7 +129,10 @@ class PaidBreakRecomputeJob extends QueuedJob
 		do {
 			$jobs = $jobList->getJobs(self::class, 50, $offset);
 			foreach ($jobs as $job) {
-				$arg = $job['argument'] ?? [];
+				$arg = $job->getArgument();
+				if (!is_array($arg)) {
+					continue;
+				}
 				$match = true;
 				foreach ($target as $k => $v) {
 					if (($arg[$k] ?? null) !== $v) {

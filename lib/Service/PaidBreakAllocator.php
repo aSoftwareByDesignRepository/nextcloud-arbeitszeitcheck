@@ -75,6 +75,7 @@ class PaidBreakAllocator
 		private TimeZoneService $timeZoneService,
 		private MonthClosureService $monthClosureService,
 		private LoggerInterface $logger,
+		private ?\OCA\ArbeitszeitCheck\Db\AuditLogMapper $auditLogMapper = null,
 	) {
 	}
 
@@ -224,10 +225,15 @@ class PaidBreakAllocator
 				}
 			}
 
+			$previousPaid = $entry->getPaidBreakSeconds();
 			$entry->setPaidBreakSeconds($target);
 			try {
 				$this->timeEntryMapper->update($entry);
 				$result['changed']++;
+				// L1-06: same-day reallocation rewrites a sibling entry's
+				// paid share without any user-visible mutation of that row —
+				// leave a per-entry audit trail for payroll forensics.
+				$this->auditShareChange($userId, $id, $entry, $previousPaid, $target);
 			} catch (DbException $e) {
 				$this->logger->error('PaidBreakAllocator: snapshot write failed', [
 					'app' => 'arbeitszeitcheck',
@@ -243,6 +249,40 @@ class PaidBreakAllocator
 		sort($skipped);
 		$result['skipped_finalized'] = $skipped;
 		return $result;
+	}
+
+	/**
+	 * Per-entry audit row for a reallocation write — the batch-level
+	 * `paid_break_recompute` action only records totals, which cannot show
+	 * which rows moved. Best-effort: audit failure never blocks the write.
+	 */
+	private function auditShareChange(string $userId, int $entryId, TimeEntry $entry, int $previousPaid, int $newPaid): void {
+		if ($this->auditLogMapper === null) {
+			return;
+		}
+		try {
+			$this->auditLogMapper->logAction(
+				'system',
+				'paid_break_share_changed',
+				'time_entry',
+				$entryId,
+				null,
+				[
+					'user_id' => $userId,
+					'entry_id' => $entryId,
+					'date' => $entry->getStartTime()?->format('Y-m-d'),
+					'paid_break_seconds_before' => $previousPaid,
+					'paid_break_seconds_after' => $newPaid,
+				],
+				'paid_break_allocator'
+			);
+		} catch (\Throwable $e) {
+			$this->logger->warning('PaidBreakAllocator: share-change audit write failed', [
+				'app' => 'arbeitszeitcheck',
+				'entryId' => $entryId,
+				'exception' => $e,
+			]);
+		}
 	}
 
 	/**

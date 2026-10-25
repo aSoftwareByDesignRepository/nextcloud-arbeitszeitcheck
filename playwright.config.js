@@ -111,6 +111,9 @@ const STATEFUL_SPECS = [
   // "Suggested stamps" card is visible on that fixture's dashboard for the
   // probe's duration and must not appear mid-run on a parallel spec.
   /atlas-ext-stamps-grid\.spec\.js/,
+  // Mutates the admin fixture's core/lang mid-probe — a parallel spec
+  // reading admin UI text or API error strings could observe German.
+  /api-error-l10n-boundary\.spec\.js/,
 ]
 
 export default defineConfig({

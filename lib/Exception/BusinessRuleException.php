@@ -61,10 +61,11 @@ class BusinessRuleException extends \RuntimeException
 	 */
 	public function toHttpPayload(): array
 	{
+		$message = \OCA\ArbeitszeitCheck\Support\WireText::t($this->getMessage());
 		$payload = [
 			'success' => false,
-			'error' => $this->getMessage(),
-			'message' => $this->getMessage(),
+			'error' => $message,
+			'message' => $message,
 		];
 		if ($this->reasonCode !== null && $this->reasonCode !== '') {
 			$payload['error_code'] = $this->reasonCode;

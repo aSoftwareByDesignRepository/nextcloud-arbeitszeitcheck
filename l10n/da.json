@@ -3428,6 +3428,7 @@
 		"Paid break": "Betalt pause",
 		"Paid break limit must be a whole number of minutes between 0 and 480.": "Pausegrænsen skal være et helt antal minutter mellem 0 og 480.",
 		"Paid break limit per day (minutes)": "Betalt pausegrænse pr. dag (minutter)",
+		"Paid break share adjusted": "Betalt pauseandel justeret",
 		"Paid breaks recomputed": "Betalte pauser genberegnet",
 		"Paid duration": "Betalt varighed",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot.": "Par kiosk-tablets fra Kiosk-adminområdet (Track C). Hver parret enhed bruger én licensplads.",

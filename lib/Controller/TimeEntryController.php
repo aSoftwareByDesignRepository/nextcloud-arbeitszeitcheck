@@ -2642,7 +2642,7 @@ class TimeEntryController extends Controller
 			}
 			return new JSONResponse([
 				'success' => false,
-				'error' => $message,
+				'error' => $this->l10n->t($message),
 			], $status);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeEntryController::complete: ' . $e->getMessage(), ['exception' => $e, 'entry_id' => $id]);
@@ -3590,7 +3590,7 @@ class TimeEntryController extends Controller
 
 		$payload = [
 			'success' => false,
-			'error' => $issues[0],
+			'error' => $this->l10n->t($issues[0]),
 			'error_code' => 'compliance_blocked',
 		];
 		// B2-MH-02: additive machine-readable detail so clients can render a

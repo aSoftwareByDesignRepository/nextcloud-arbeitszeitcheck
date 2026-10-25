@@ -977,6 +977,7 @@ pares
 parkering
 partnertilbud
 pause
+pauseandel
 pauseberegning
 pausede
 pausegenerering

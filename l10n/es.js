@@ -3452,6 +3452,7 @@
 		"Paid break" : "Descanso remunerado",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "El límite de descanso remunerado debe ser un número entero de minutos entre 0 y 480.",
 		"Paid break limit per day (minutes)" : "Límite de descanso remunerado por día (minutos)",
+		"Paid break share adjusted" : "Parte pagada del descanso ajustada",
 		"Paid breaks recomputed" : "Pausas pagadas recalculadas",
 		"Paid duration" : "Duración remunerada",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Empareje tabletas kiosco desde el área de administración Kiosk (Track C). Cada dispositivo emparejado usa una ranura de licencia.",

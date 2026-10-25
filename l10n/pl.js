@@ -3452,6 +3452,7 @@
 		"Paid break" : "Płatna przerwa",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "Limit płatnej przerwy musi być całkowitą liczbą minut od 0 do 480.",
 		"Paid break limit per day (minutes)" : "Limit płatnej przerwy dziennie (minuty)",
+		"Paid break share adjusted" : "Skorygowano płatną część przerwy",
 		"Paid breaks recomputed" : "Płatne przerwy przeliczone",
 		"Paid duration" : "Płatny czas trwania",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Sparuj tablety kioskowe w obszarze administracji Kiosk (ścieżka C). Każde sparowane urządzenie zużywa jedno miejsce licencyjne.",

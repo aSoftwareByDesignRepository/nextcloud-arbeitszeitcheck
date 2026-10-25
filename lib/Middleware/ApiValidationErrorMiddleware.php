@@ -54,11 +54,12 @@ final class ApiValidationErrorMiddleware extends Middleware
 		}
 
 		$param = $exception->getParameterName();
+		$message = \OCA\ArbeitszeitCheck\Support\WireText::t($exception->getMessage());
 		return new JSONResponse([
 			'success' => false,
-			'error' => $exception->getMessage(),
+			'error' => $message,
 			'error_code' => 'invalid_parameter',
-			'fields' => $param !== '' ? [$param => $exception->getMessage()] : [],
+			'fields' => $param !== '' ? [$param => $message] : [],
 		], Http::STATUS_BAD_REQUEST);
 	}
 }

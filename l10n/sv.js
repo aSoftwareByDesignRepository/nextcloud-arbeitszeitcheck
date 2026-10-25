@@ -3452,6 +3452,7 @@
 		"Paid break" : "Betald rast",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "Rastgränsen måste vara ett helt antal minuter mellan 0 och 480.",
 		"Paid break limit per day (minutes)" : "Betald rastgräns per dag (minuter)",
+		"Paid break share adjusted" : "Betald pausandel justerad",
 		"Paid breaks recomputed" : "Betalda raster omräknade",
 		"Paid duration" : "Betald varaktighet",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Parkoppla kiosksurfplattor från kioskens adminområde (Track C). Varje parkopplad enhet använder en licensplats.",

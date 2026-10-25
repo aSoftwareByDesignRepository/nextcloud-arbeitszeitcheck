@@ -3452,6 +3452,7 @@
 		"Paid break" : "Pausa retribuita",
 		"Paid break limit must be a whole number of minutes between 0 and 480." : "Il limite di pausa retribuita deve essere un numero intero di minuti tra 0 e 480.",
 		"Paid break limit per day (minutes)" : "Limite di pausa retribuita al giorno (minuti)",
+		"Paid break share adjusted" : "Quota di pausa retribuita adeguata",
 		"Paid breaks recomputed" : "Pause retribuite ricalcolate",
 		"Paid duration" : "Durata retribuita",
 		"Pair kiosk tablets from the Kiosk admin area (Track C). Each paired device uses one license slot." : "Associate i tablet kiosk dall'area amministrazione Kiosk (Track C). Ogni dispositivo associato usa uno slot di licenza.",

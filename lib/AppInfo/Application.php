@@ -607,6 +607,7 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripCreditLedger::class),
 			$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
 			$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Service\PermissionService::class),
 		));
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor::class, fn ($c): \OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor => new \OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor(
 			$c->query(\OCA\ArbeitszeitCheck\Db\BusinessTripMapper::class),

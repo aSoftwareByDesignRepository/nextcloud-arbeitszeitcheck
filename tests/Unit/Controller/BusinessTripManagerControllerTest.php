@@ -201,7 +201,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 			}
 			throw new DoesNotExistException('x');
 		});
-		$this->permissions->method('canManageEmployee')->willReturn(false);
+		$this->permissions->method('canDecideEntryApproval')->willReturn(false);
 		$this->permissions->expects($this->once())->method('logPermissionDenied')
 			->with('manager', 'view_business_trip', 'business_trip', '7');
 		$missing = $this->controller()->show(99);
@@ -226,7 +226,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 	public function testApproveWithoutValidRevisionIs409(): void
 	{
 		$this->tripMapper->expects($this->never())->method('find');
-		$this->permissions->method('canManageEmployee')->willReturn(true);
+		$this->permissions->method('canDecideEntryApproval')->willReturn(true);
 		$r = $this->controller(['snapshotToken' => 'tok', 'revision' => 'abc'])->approve(7);
 		$this->assertSame(409, $r->getStatus());
 		$this->assertSame('TRIP_REVISION_STALE', $this->payload($r)['error_code']);
@@ -251,7 +251,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 	public function testShowInScopeMergesDetailPayload(): void
 	{
 		$this->tripMapper->method('find')->willReturn($this->submittedTrip());
-		$this->permissions->method('canManageEmployee')->with('manager', 'alice')->willReturn(true);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'alice')->willReturn(true);
 		$r = $this->controller()->show(7);
 		$p = $this->payload($r);
 		$this->assertTrue($p['success']);
@@ -263,5 +263,42 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$this->assertArrayHasKey('days', $p);
 		$this->assertArrayHasKey('linkedTimeEntryIds', $p);
 		$this->assertArrayHasKey('snapshotToken', $p);
+	}
+
+	public function testShowAdminSelfTripMintsSnapshotToken(): void
+	{
+		// The queue lists an app admin's own submitted trip (index gives
+		// admins members===null), so the detail card must open under the
+		// same decision scope — otherwise the snapshotToken that approve()
+		// requires is unobtainable and the row dead-ends.
+		$this->tripMapper->method('find')->willReturn($this->submittedTrip(7, 'manager'));
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'manager')->willReturn(true);
+		$this->permissions->method('canManageEmployee')->willReturn(false);
+		$r = $this->controller()->show(7);
+		$p = $this->payload($r);
+		$this->assertTrue($p['success']);
+		$this->assertSame(7, $p['trip']['id']);
+		$this->assertSame('submitted', $p['trip']['status']);
+		$this->assertArrayHasKey('snapshotToken', $p);
+	}
+
+	public function testShowNonAdminSelfTripIsUniform404(): void
+	{
+		// Four-eyes regression: a non-admin manager must NOT read their own
+		// trip through the decision card — identical payload to a missing id.
+		$this->tripMapper->method('find')->willReturnCallback(static function (int $id) {
+			if ($id === 7) {
+				$t = new BusinessTrip();
+				$t->setId(7);
+				$t->setUserId('manager');
+				return $t;
+			}
+			throw new DoesNotExistException('x');
+		});
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'manager')->willReturn(false);
+		$missing = $this->controller()->show(99);
+		$self = $this->controller()->show(7);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $self->getStatus());
+		$this->assertSame(json_encode($missing->getData()), json_encode($self->getData()));
 	}
 }

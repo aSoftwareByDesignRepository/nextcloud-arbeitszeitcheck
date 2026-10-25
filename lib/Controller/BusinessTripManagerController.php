@@ -6,7 +6,10 @@ declare(strict_types=1);
  * Manager business-trip API (spec §7.5, §9.9).
  *
  * Managers are NOT app admins — these routes live under /api/manager and
- * are scope-checked per trip via PermissionService::canManageEmployee.
+ * are scope-checked per trip via PermissionService::canManageEmployee
+ * (reads that never feed a decision) resp. canDecideEntryApproval
+ * (the decision card + write endpoints — identical for non-self targets,
+ * widened so an app admin may also decide on their own submitted trip).
  * The scope check runs before any state inspection: an out-of-scope
  * caller gets the same uniform 404 as a missing id (AC-GLOBAL-15, no
  * existence oracle). Approval requires both the revision CAS and the
@@ -82,7 +85,7 @@ final class BusinessTripManagerController extends Controller
 			return ApiError::notFound();
 		}
 		try {
-			$trip = $this->scopedTrip($id);
+			$trip = $this->decisionScopedTrip($id, 'view_business_trip');
 			return new JSONResponse(['success' => true, 'trip' => $this->serialize($trip)] + $this->trips->detail($trip));
 		} catch (BusinessTripException $e) {
 			return $this->serviceError($e);
@@ -135,27 +138,15 @@ final class BusinessTripManagerController extends Controller
 
 	// ------------------------------------------------------------------
 
-	/** Scope check before any state inspection — uniform 404 otherwise. */
-	private function scopedTrip(int $id): BusinessTrip
-	{
-		try {
-			$trip = $this->tripMapper->find($id);
-		} catch (DoesNotExistException) {
-			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
-		}
-		if (!$this->permissions->canManageEmployee($this->uid(), (string)$trip->getUserId())) {
-			$this->permissions->logPermissionDenied($this->uid(), 'view_business_trip', 'business_trip', (string)$id);
-			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
-		}
-		return $trip;
-	}
-
 	/**
-	 * Decision scope for approve/reject — same 404 discipline as
-	 * {@see scopedTrip}, but an app admin may decide on their own trip
-	 * (see PermissionService::canDecideEntryApproval).
+	 * Decision scope for the detail card and approve/reject — uniform 404
+	 * before any state inspection, but an app admin may decide on their own
+	 * trip (see PermissionService::canDecideEntryApproval). The detail card
+	 * shares this scope: it mints the snapshot token the approve endpoint
+	 * requires, so the queue row must stay openable by exactly the callers
+	 * who may decide. Identical to canManageEmployee for non-self targets.
 	 */
-	private function decisionScopedTrip(int $id): BusinessTrip
+	private function decisionScopedTrip(int $id, string $action = 'decide_business_trip'): BusinessTrip
 	{
 		try {
 			$trip = $this->tripMapper->find($id);
@@ -163,7 +154,7 @@ final class BusinessTripManagerController extends Controller
 			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
 		}
 		if (!$this->permissions->canDecideEntryApproval($this->uid(), (string)$trip->getUserId())) {
-			$this->permissions->logPermissionDenied($this->uid(), 'decide_business_trip', 'business_trip', (string)$id);
+			$this->permissions->logPermissionDenied($this->uid(), $action, 'business_trip', (string)$id);
 			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
 		}
 		return $trip;

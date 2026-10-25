@@ -16,6 +16,7 @@ use OCA\ArbeitszeitCheck\Db\MonthClosure;
 use OCA\ArbeitszeitCheck\Db\MonthClosureMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Support\DatevPremiumLohnartMap;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -76,11 +77,11 @@ class DatevExportService
 
 		// Validate required configuration
 		if (empty($beraternummer) || empty($mandantennummer)) {
-			throw new \Exception($this->l10n->t('DATEV configuration incomplete. Please configure Beraternummer and Mandantennummer in admin settings.'));
+			throw new BusinessRuleException('DATEV configuration incomplete. Please configure Beraternummer and Mandantennummer in admin settings.');
 		}
 
 		if (empty($personalnummer)) {
-			throw new \Exception($this->l10n->t('Personalnummer not configured for user. Please set DATEV Personalnummer in user settings.'));
+			throw new BusinessRuleException('Personalnummer not configured for user. Please set DATEV Personalnummer in user settings.');
 		}
 
 		// Build DATEV file content
@@ -163,7 +164,7 @@ class DatevExportService
 		$mandantennummer = $this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_DATEV_MANDANTENNUMMER, '');
 
 		if (empty($beraternummer) || empty($mandantennummer)) {
-			throw new \Exception($this->l10n->t('DATEV configuration incomplete. Please configure Beraternummer and Mandantennummer in admin settings.'));
+			throw new BusinessRuleException('DATEV configuration incomplete. Please configure Beraternummer and Mandantennummer in admin settings.');
 		}
 
 		// Add header once

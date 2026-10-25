@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
 
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -274,7 +275,7 @@ class ManagerController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}

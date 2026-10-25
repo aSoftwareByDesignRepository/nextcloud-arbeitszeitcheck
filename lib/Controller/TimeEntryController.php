@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
@@ -215,7 +217,7 @@ class TimeEntryController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -2636,10 +2638,9 @@ class TimeEntryController extends Controller
 			], Http::STATUS_LOCKED);
 		} catch (BusinessRuleException $e) {
 			$message = $e->getMessage();
-			$status = Http::STATUS_BAD_REQUEST;
-			if (stripos($message, 'access denied') !== false) {
-				$status = Http::STATUS_FORBIDDEN;
-			}
+			$status = ExceptionHttpStatus::isAccessDenied($e, $this->l10n)
+				? Http::STATUS_FORBIDDEN
+				: Http::STATUS_BAD_REQUEST;
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t($message),

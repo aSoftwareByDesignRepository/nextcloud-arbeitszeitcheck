@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Exception\StampReplayException;
 use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -64,7 +66,7 @@ class TimeTrackingController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -105,7 +107,7 @@ class TimeTrackingController extends Controller
 			], Http::STATUS_LOCKED);
 		}
 
-		if (strpos($e->getMessage(), 'User not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('User not authenticated'),

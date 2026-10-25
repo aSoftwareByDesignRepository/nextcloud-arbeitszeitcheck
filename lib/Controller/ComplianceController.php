@@ -11,12 +11,16 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
+use OCA\ArbeitszeitCheck\Exception\AccessDeniedException;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Support\CompliancePageScope;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Support\TablePager;
 use OCA\ArbeitszeitCheck\Support\ComplianceReportSummary;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
@@ -164,13 +168,13 @@ class ComplianceController extends Controller
 		// out-of-scope collapse into the same denial (no existence oracle).
 		if ($this->userManager->get($targetUserId) === null) {
 			$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $targetUserId);
-			throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+			throw new AccessDeniedException('Access denied. You can only view compliance data for yourself or your team members.');
 		}
 		if ($this->permissionService->canViewUserCompliance($currentUserId, $targetUserId)) {
 			return;
 		}
 		$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $targetUserId);
-		throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+		throw new AccessDeniedException('Access denied. You can only view compliance data for yourself or your team members.');
 	}
 
 	private function oversightScope(): \OCA\ArbeitszeitCheck\Service\OversightScopeService
@@ -226,11 +230,35 @@ class ComplianceController extends Controller
 	 *
 	 * @return string
 	 */
+	/**
+	 * Locale-stable Throwable → (message, status) mapping. Status keys off
+	 * the exception type via ExceptionHttpStatus; the bilingual residual
+	 * inside it still covers legacy plain-\Exception throws.
+	 *
+	 * @return array{0: string, 1: int} [message, httpStatus]
+	 */
+	private function complianceError(\Throwable $e): array
+	{
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
+			return [$this->l10n->t('User not authenticated'), Http::STATUS_UNAUTHORIZED];
+		}
+		if (ExceptionHttpStatus::isAccessDenied($e, $this->l10n)) {
+			return [$this->l10n->t('Access denied'), Http::STATUS_FORBIDDEN];
+		}
+		if ($e instanceof BusinessRuleException) {
+			return [$this->l10n->t($e->getMessage()), Http::STATUS_BAD_REQUEST];
+		}
+		return [
+			$this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			Http::STATUS_INTERNAL_SERVER_ERROR,
+		];
+	}
+
 	private function getUserId(): string
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -470,7 +498,7 @@ class ComplianceController extends Controller
 			}
 			$requested = is_string($raw) ? trim($raw) : '';
 			$this->permissionService->logPermissionDenied($currentUserId, 'view_compliance', 'compliance', $requested);
-			throw new \Exception($this->l10n->t('Access denied. You can only view compliance data for yourself or your team members.'));
+			throw new AccessDeniedException('Access denied. You can only view compliance data for yourself or your team members.');
 		}
 
 		$filterDisplayName = null;
@@ -529,7 +557,7 @@ class ComplianceController extends Controller
 		}
 		$d = \DateTime::createFromFormat('Y-m-d', $dateStr);
 		if ($d === false || $d->format('Y-m-d') !== $dateStr) {
-			throw new \Exception($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$paramName]));
+			throw new BusinessRuleException($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$paramName]));
 		}
 		return $d;
 	}
@@ -549,7 +577,7 @@ class ComplianceController extends Controller
 			}
 		}
 
-		throw new \InvalidArgumentException($this->l10n->t(
+		throw new BusinessRuleException($this->l10n->t(
 			'Invalid %s format. Use ISO-8601 (e.g. 2024-01-15T09:00:00Z).',
 			[$paramName]
 		));
@@ -708,17 +736,7 @@ class ComplianceController extends Controller
 			]);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
-			$raw = $e->getMessage();
-			if (strpos($raw, 'User not authenticated') !== false) {
-				$errorMessage = $this->l10n->t('User not authenticated');
-				$status = Http::STATUS_UNAUTHORIZED;
-			} elseif (strpos($raw, 'Access denied') !== false) {
-				$errorMessage = $this->l10n->t('Access denied');
-				$status = Http::STATUS_FORBIDDEN;
-			} else {
-				$errorMessage = $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
-				$status = Http::STATUS_INTERNAL_SERVER_ERROR;
-			}
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
@@ -760,15 +778,11 @@ class ComplianceController extends Controller
 			], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
-			$raw = $e->getMessage();
-			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
-			$errorMessage = $isUnauthenticated
-				? $this->l10n->t('User not authenticated')
-				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
+			], $status);
 		}
 	}
 
@@ -838,15 +852,11 @@ class ComplianceController extends Controller
 			], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
-			$raw = $e->getMessage();
-			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
-			$errorMessage = $isUnauthenticated
-				? $this->l10n->t('User not authenticated')
-				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
+			], $status);
 		}
 	}
 
@@ -869,15 +879,11 @@ class ComplianceController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
 			// Check if it's an authentication error
-			$raw = $e->getMessage();
-			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
-			$errorMessage = $isUnauthenticated
-				? $this->l10n->t('User not authenticated')
-				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
+			], $status);
 		}
 	}
 
@@ -953,11 +959,11 @@ class ComplianceController extends Controller
 			}
 			$start->setTime(0, 0, 0);
 			if ($start > $end) {
-				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+				throw new BusinessRuleException('Start date must be before or equal to end date');
 			}
 			$days = (int)$end->diff($start)->format('%a');
 			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-				throw new \Exception($this->l10n->t(
+				throw new BusinessRuleException($this->l10n->t(
 					'Export date range must not exceed %d days. Please narrow the range.',
 					[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 				));
@@ -972,15 +978,11 @@ class ComplianceController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
 			// Check if it's an authentication error
-			$raw = $e->getMessage();
-			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
-			$errorMessage = $isUnauthenticated
-				? $this->l10n->t('User not authenticated')
-				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
+			], $status);
 		}
 	}
 
@@ -1015,7 +1017,7 @@ class ComplianceController extends Controller
 					? $result['earliestStartTime']->format(\DateTime::ATOM)
 					: null,
 			]);
-		} catch (\InvalidArgumentException $e) {
+		} catch (\InvalidArgumentException|BusinessRuleException $e) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t($e->getMessage())
@@ -1058,15 +1060,11 @@ class ComplianceController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ComplianceController: ' . $e->getMessage(), ["exception" => $e]);
 			// Check if it's an authentication error
-			$raw = $e->getMessage();
-			$isUnauthenticated = strpos($raw, 'User not authenticated') !== false;
-			$errorMessage = $isUnauthenticated
-				? $this->l10n->t('User not authenticated')
-				: $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
+			[$errorMessage, $status] = $this->complianceError($e);
 			return new JSONResponse([
 				'success' => false,
 				'error' => $errorMessage
-			], $isUnauthenticated ? Http::STATUS_UNAUTHORIZED : Http::STATUS_INTERNAL_SERVER_ERROR);
+			], $status);
 		}
 	}
 }

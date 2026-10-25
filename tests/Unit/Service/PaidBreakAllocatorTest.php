@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 
+use OCA\ArbeitszeitCheck\Db\AuditLog;
+use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
@@ -38,6 +40,11 @@ class PaidBreakAllocatorTest extends TestCase
 	private TimeEntryMapper $timeEntryMapper;
 	private MonthClosureService $monthClosure;
 	private PaidBreakAllocator $allocator;
+	private BreakPolicyResolver $resolver;
+	private TimeZoneService $timeZoneService;
+
+	/** @var list<array<int, mixed>> logAction() invocations captured by the audit spy */
+	private array $auditCalls = [];
 
 	/** @var array<string,mixed> model break_rules handed to the resolver */
 	private array $modelBreakRules = [];
@@ -62,6 +69,7 @@ class PaidBreakAllocatorTest extends TestCase
 		$this->finalizedMonths = [];
 		$this->writes = [];
 		$this->hasAssignment = true;
+		$this->auditCalls = [];
 
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturnCallback(
@@ -117,21 +125,21 @@ class PaidBreakAllocatorTest extends TestCase
 		$dateTimeZone->method('getTimeZone')->willReturn(new \DateTimeZone('Europe/Berlin'));
 		$userSession = $this->createMock(IUserSession::class);
 		$userSession->method('getUser')->willReturn(null);
-		$timeZoneService = new TimeZoneService($config, $dateTimeZone, $userSession, new NullLogger());
+		$this->timeZoneService = new TimeZoneService($config, $dateTimeZone, $userSession, new NullLogger());
 
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $text, array $params = []): string => $text
 		);
 
-		$resolver = new BreakPolicyResolver(
+		$this->resolver = new BreakPolicyResolver(
 			$config,
 			new LaborLawProfileFactory($config, $userSettingsMapper),
 			$userSettingsMapper,
 			$userWtmMapper,
 			$wtmMapper,
 			$this->timeEntryMapper,
-			$timeZoneService,
+			$this->timeZoneService,
 			$l10n,
 		);
 
@@ -142,10 +150,35 @@ class PaidBreakAllocatorTest extends TestCase
 
 		$this->allocator = new PaidBreakAllocator(
 			$this->timeEntryMapper,
-			$resolver,
-			$timeZoneService,
+			$this->resolver,
+			$this->timeZoneService,
 			$this->monthClosure,
 			new NullLogger(),
+		);
+	}
+
+	/**
+	 * Rebuild the allocator with a spy AuditLogMapper wired as the optional
+	 * 6th ctor arg (same DI path production uses). $auditThrow simulates a
+	 * failing audit sink — the write must survive it.
+	 */
+	private function rebuildAllocatorWithAuditSpy(?\Throwable $auditThrow = null): void
+	{
+		$audit = $this->createMock(AuditLogMapper::class);
+		$audit->method('logAction')->willReturnCallback(function (...$args) use ($auditThrow) {
+			$this->auditCalls[] = $args;
+			if ($auditThrow !== null) {
+				throw $auditThrow;
+			}
+			return new AuditLog();
+		});
+		$this->allocator = new PaidBreakAllocator(
+			$this->timeEntryMapper,
+			$this->resolver,
+			$this->timeZoneService,
+			$this->monthClosure,
+			new NullLogger(),
+			$audit,
 		);
 	}
 
@@ -391,5 +424,83 @@ class PaidBreakAllocatorTest extends TestCase
 		);
 		$this->assertSame(900, $this->writes[1]);
 		$this->assertSame(2, $r['days_recomputed']);
+	}
+
+	/**
+	 * L1-06 regression leg: each changed row must emit exactly one
+	 * `paid_break_share_changed` audit record with the full before/after
+	 * payload — the batch-level `paid_break_recompute` totals alone cannot
+	 * show which rows a same-day reallocation moved.
+	 */
+	public function testShareChangeEmitsAuditRow(): void
+	{
+		$this->rebuildAllocatorWithAuditSpy();
+		$this->modelBreakRules = ['breaks_count_as_work' => true];
+		$this->entries = [$this->entry(1, '2026-03-10 08:00', '2026-03-10 17:00', $this->breaks([['2026-03-10T12:00:00+01:00', '2026-03-10T12:30:00+01:00']]))];
+
+		$r = $this->runSpan();
+
+		$this->assertSame(1, $r['changed']);
+		$this->assertCount(1, $this->auditCalls, 'expected exactly one audit row for the changed entry');
+		[$userId, $action, $entityType, $entityId, $old, $new, $by] = $this->auditCalls[0];
+		$this->assertSame('system', $userId);
+		$this->assertSame('paid_break_share_changed', $action);
+		$this->assertSame('time_entry', $entityType);
+		$this->assertSame(1, $entityId);
+		$this->assertNull($old);
+		$this->assertSame('paid_break_allocator', $by);
+		$this->assertSame('u1', $new['user_id']);
+		$this->assertSame(1, $new['entry_id']);
+		$this->assertSame('2026-03-10', $new['date']);
+		$this->assertSame(0, $new['paid_break_seconds_before']);
+		$this->assertSame(1800, $new['paid_break_seconds_after']);
+	}
+
+	/**
+	 * Two same-day entries share a 30-min cap pool: the earlier entry wins,
+	 * the later entry's stale paid snapshot is rewritten to 0 — the exact
+	 * silent-sibling-rewrite class L1-06 forensics must capture, one row per
+	 * changed entry with correct before/after values.
+	 */
+	public function testSiblingReallocationEmitsPerEntryRows(): void
+	{
+		$this->rebuildAllocatorWithAuditSpy();
+		$this->modelBreakRules = ['breaks_count_as_work' => true, 'paid_break_cap_minutes' => 30];
+		$e1 = $this->entry(1, '2026-03-10 08:00', '2026-03-10 12:30', $this->breaks([['2026-03-10T12:00:00+01:00', '2026-03-10T12:30:00+01:00']]));
+		$e1->setPaidBreakSeconds(0);
+		$e2 = $this->entry(2, '2026-03-10 13:00', '2026-03-10 17:00', $this->breaks([['2026-03-10T14:00:00+01:00', '2026-03-10T14:30:00+01:00']]));
+		$e2->setPaidBreakSeconds(1800);
+		$this->entries = [$e1, $e2];
+
+		$r = $this->runSpan();
+
+		$this->assertSame(2, $r['changed']);
+		$this->assertCount(2, $this->auditCalls, 'each changed row must emit its own audit row');
+		$byEntry = [];
+		foreach ($this->auditCalls as $c) {
+			$byEntry[$c[3]] = $c;
+		}
+		$this->assertSame(1800, $byEntry[1][5]['paid_break_seconds_after']);
+		$this->assertSame(0, $byEntry[1][5]['paid_break_seconds_before']);
+		$this->assertSame(0, $byEntry[2][5]['paid_break_seconds_after']);
+		$this->assertSame(1800, $byEntry[2][5]['paid_break_seconds_before']);
+		$this->assertSame('paid_break_share_changed', $byEntry[2][1]);
+	}
+
+	/**
+	 * Audit is best-effort forensics: a throwing audit sink must warn and
+	 * continue — the snapshot write and the changed counter survive.
+	 */
+	public function testAuditFailureNeverBlocksSnapshotWrite(): void
+	{
+		$this->rebuildAllocatorWithAuditSpy(new \RuntimeException('audit sink down'));
+		$this->modelBreakRules = ['breaks_count_as_work' => true];
+		$this->entries = [$this->entry(1, '2026-03-10 08:00', '2026-03-10 17:00', $this->breaks([['2026-03-10T12:00:00+01:00', '2026-03-10T12:30:00+01:00']]))];
+
+		$r = $this->runSpan();
+
+		$this->assertSame(1, $r['changed'], 'audit failure must not roll back the paid-break write');
+		$this->assertSame(1800, $this->writes[1]);
+		$this->assertCount(1, $this->auditCalls);
 	}
 }

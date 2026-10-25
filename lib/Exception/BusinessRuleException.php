@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 /**
  * Thrown when a service rejects a user request because of a known
- * business rule (e.g. "User is already clocked in"). The message is
- * already translated for the current user, so callers must not run
- * it through IL10N::t() again. HTTP transports map this exception to
- * a 400 Bad Request response.
+ * business rule (e.g. "User is already clocked in"). HTTP transports map
+ * this exception to a 400 Bad Request response.
+ *
+ * Two message conventions are supported — both reach the wire correctly:
+ * throwers may pass a raw catalog msgid (English source string, optionally
+ * with already-substituted parameters) or a message already translated at
+ * throw time. toHttpPayload() applies the catalog-keyed WireText pass at
+ * the boundary, which translates msgids for the current user and returns
+ * anything else verbatim — so neither convention leaks raw English, and
+ * callers must NOT skip the boundary pass "because it is already done".
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later

@@ -26,10 +26,13 @@ use OCA\ArbeitszeitCheck\Service\VacationHoursDebitService;
 use OCA\ArbeitszeitCheck\Service\LocaleFormatService;
 use OCA\ArbeitszeitCheck\Service\NavigationFlagsService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Util\AbsenceCreateQueryPrefill;
 use OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException;
+use OCA\ArbeitszeitCheck\Exception\AccessDeniedException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\CatalogBusyException;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCP\AppFramework\Controller;
@@ -315,17 +318,21 @@ class AbsenceController extends Controller
 	}
 
 	/**
-	 * HTTP status for a sanitised error message: when getSafeErrorMessage()
-	 * collapsed to the generic fallback the throwable was NOT a business
-	 * rule — surfacing it as a client error (400) hides server faults.
+	 * HTTP status for a sanitised error message. Typed throws classify
+	 * first (locale-stable); then, when getSafeErrorMessage() collapsed to
+	 * the generic fallback, the throwable was NOT a business rule —
+	 * surfacing it as a client error (400) hides server faults.
 	 */
-	private function safeErrorStatus(string $safeMessage): int
+	private function safeErrorStatus(\Throwable $e, string $safeMessage): int
 	{
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
+			return Http::STATUS_UNAUTHORIZED;
+		}
+		if (ExceptionHttpStatus::isAccessDenied($e, $this->l10n)) {
+			return Http::STATUS_FORBIDDEN;
+		}
 		if ($safeMessage === $this->genericUnexpectedErrorMessage()) {
 			return Http::STATUS_INTERNAL_SERVER_ERROR;
-		}
-		if (stripos($safeMessage, 'not authenticated') !== false) {
-			return Http::STATUS_UNAUTHORIZED;
 		}
 		return Http::STATUS_BAD_REQUEST;
 	}
@@ -337,7 +344,7 @@ class AbsenceController extends Controller
 	 */
 	private function unexpectedJsonResponse(\Throwable $e): JSONResponse
 	{
-		if (stripos((string)$e->getMessage(), 'not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('User not authenticated')
@@ -352,7 +359,10 @@ class AbsenceController extends Controller
 	private function getSafeErrorMessage(\Throwable $e): string
 	{
 		$generic = $this->genericUnexpectedErrorMessage();
-		$forwardUserMessage = (get_class($e) === \Exception::class) || ($e instanceof BusinessRuleException);
+		$forwardUserMessage = (get_class($e) === \Exception::class)
+			|| ($e instanceof BusinessRuleException)
+			|| ($e instanceof NotAuthenticatedException)
+			|| ($e instanceof AccessDeniedException);
 		if (!$forwardUserMessage) {
 			return $generic;
 		}
@@ -388,7 +398,9 @@ class AbsenceController extends Controller
 				return $generic;
 			}
 		}
-		return $msg;
+		// Catalog-keyed boundary pass: msgid throws translate for the caller,
+		// already-localized throws pass through verbatim (WireText contract).
+		return $this->l10n->t($msg);
 	}
 
 	/**
@@ -449,7 +461,7 @@ class AbsenceController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -607,7 +619,7 @@ class AbsenceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $msg
-			], $this->safeErrorStatus($msg));
+			], $this->safeErrorStatus($e, $msg));
 		}
 	}
 
@@ -657,7 +669,7 @@ class AbsenceController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'error' => $msg
-			], $this->safeErrorStatus($msg));
+			], $this->safeErrorStatus($e, $msg));
 		}
 	}
 
@@ -1241,7 +1253,7 @@ class AbsenceController extends Controller
 				$payload['code'] = $code;
 				$payload['error_code'] = $code;
 			}
-			return new JSONResponse($payload, $this->safeErrorStatus($msg));
+			return new JSONResponse($payload, $this->safeErrorStatus($e, $msg));
 		}
 	}
 
@@ -1406,7 +1418,7 @@ class AbsenceController extends Controller
 				$payload['code'] = $code;
 				$payload['error_code'] = $code;
 			}
-			return new JSONResponse($payload, $this->safeErrorStatus($msg));
+			return new JSONResponse($payload, $this->safeErrorStatus($e, $msg));
 		}
 	}
 

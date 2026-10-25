@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
@@ -147,7 +149,7 @@ class DashboardWidgetController extends Controller {
 				'error_code' => BusinessRuleCode::LOCKED,
 			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
-			if (strpos($e->getMessage(), 'User not authenticated') !== false) {
+			if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 				$message = $this->l10n->t('User not authenticated');
 				return new JSONResponse([
 					'success' => false,
@@ -192,7 +194,7 @@ class DashboardWidgetController extends Controller {
 	private function getUserId(): string {
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			throw new \RuntimeException('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}

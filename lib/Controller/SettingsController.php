@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Service\CSPService;
 use OCA\ArbeitszeitCheck\Service\FrontEndAssetService;
@@ -223,7 +225,7 @@ class SettingsController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception('User not authenticated');
+				throw new NotAuthenticatedException();
 			}
 
 			$userId = $user->getUID();
@@ -330,7 +332,7 @@ class SettingsController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in SettingsController::update: ' . $e->getMessage(), ["exception" => $e]);
 			$rawMessage = $e->getMessage();
-			if (strpos($rawMessage, 'User not authenticated') !== false) {
+			if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('User not authenticated')

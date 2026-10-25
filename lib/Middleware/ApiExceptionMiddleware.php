@@ -45,6 +45,31 @@ final class ApiExceptionMiddleware extends Middleware
 			throw $exception;
 		}
 
+		// Locale-stable typed mapping — status keys off the exception class,
+		// never off message text (a localized "Zugriff verweigert." must not
+		// collapse to a 500 the way an English-substring match would).
+		if ($exception instanceof \OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('User not authenticated'),
+				'error_code' => 'unauthenticated',
+				'fields' => new \stdClass(),
+			], Http::STATUS_UNAUTHORIZED);
+		}
+		if ($exception instanceof \OCA\ArbeitszeitCheck\Exception\AccessDeniedException) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Access denied'),
+				'error_code' => 'access_denied',
+				'fields' => new \stdClass(),
+			], Http::STATUS_FORBIDDEN);
+		}
+		if ($exception instanceof \OCA\ArbeitszeitCheck\Exception\BusinessRuleException) {
+			$payload = $exception->toHttpPayload();
+			$payload['fields'] = new \stdClass();
+			return new JSONResponse($payload, Http::STATUS_BAD_REQUEST);
+		}
+
 		$this->logger->error('ArbeitszeitCheck API request failed: ' . $methodName, [
 			'app' => 'arbeitszeitcheck',
 			'exception' => $exception,
@@ -53,7 +78,7 @@ final class ApiExceptionMiddleware extends Middleware
 			'success' => false,
 			'error' => $this->l10n->t('Internal error.'),
 			'error_code' => 'internal_error',
-			'fields' => [],
+			'fields' => new \stdClass(),
 		], Http::STATUS_INTERNAL_SERVER_ERROR);
 	}
 }

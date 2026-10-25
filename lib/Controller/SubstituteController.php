@@ -13,6 +13,8 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Service\AbsenceService;
@@ -85,7 +87,7 @@ class SubstituteController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception($this->l10n->t('User not authenticated'));
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -273,7 +275,7 @@ class SubstituteController extends Controller
 	{
 		$generic = $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');
 
-		if (strpos($e->getMessage(), 'User not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('User not authenticated'),

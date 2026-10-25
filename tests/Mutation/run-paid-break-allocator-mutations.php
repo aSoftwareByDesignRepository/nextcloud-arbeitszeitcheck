@@ -117,6 +117,18 @@ $mutants = [
 		'replacement' => '$winStart = max($winStart, $start->getTimestamp());',
 		'runs' => 'tests/Unit/Service/PaidBreakAllocatorTest.php',
 	],
+	[
+		'name' => 'L1-06 silent write: per-entry audit emission dropped',
+		'needle' => '$this->auditShareChange($userId, $id, $entry, $previousPaid, $target);',
+		'replacement' => '/* mutant: audit emission removed */',
+		'runs' => 'tests/Unit/Service/PaidBreakAllocatorTest.php',
+	],
+	[
+		'name' => 'L1-06 audit payload: before/after swapped — forensics inverted',
+		'needle' => "'paid_break_seconds_before' => \$previousPaid,",
+		'replacement' => "'paid_break_seconds_before' => \$newPaid,",
+		'runs' => 'tests/Unit/Service/PaidBreakAllocatorTest.php',
+	],
 ];
 
 function runSuite(string $phpunit, string $testFile, string $root): int

@@ -15,6 +15,10 @@ use OCA\ArbeitszeitCheck\Db\TeamManagerMapper;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Exception\AccessDeniedException;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\ReportingService;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
@@ -102,13 +106,13 @@ class ReportController extends Controller
 		// out-of-scope collapse into the same denial (no existence oracle).
 		if ($this->userManager->get($targetUserId) === null) {
 			$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $targetUserId);
-			throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+			throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 		}
 		if ($this->permissionService->canViewUserReport($currentUserId, $targetUserId)) {
 			return;
 		}
 		$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $targetUserId);
-		throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+		throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 	}
 
 	/**
@@ -120,7 +124,7 @@ class ReportController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -136,7 +140,7 @@ class ReportController extends Controller
 			&& ($errors === false || (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0))
 			&& $parsed->format('Y-m-d') === $value;
 		if (!$isValid) {
-			throw new \Exception($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$fieldName]));
+			throw new BusinessRuleException($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$fieldName]));
 		}
 		return new \DateTime($parsed->format('Y-m-d'));
 	}
@@ -152,26 +156,35 @@ class ReportController extends Controller
 			&& ($errors === false || (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0))
 			&& $parsed->format('Y-m') === $value;
 		if (!$isValid) {
-			throw new \Exception($this->l10n->t('Invalid month format. Use Y-m (e.g. 2024-01)'));
+			throw new BusinessRuleException($this->l10n->t('Invalid month format. Use Y-m (e.g. 2024-01)'));
 		}
 		return new \DateTime($parsed->format('Y-m-01'));
 	}
 
+	/**
+	 * Locale-stable error mapping: status comes from the exception TYPE
+	 * (typed throws) — a message-substring match would miss the moment a
+	 * throw is localized ("Zugriff verweigert." ≠ 'Access denied' → 500).
+	 * Legacy plain-\Exception throws still classify via the bilingual
+	 * residual check inside ExceptionHttpStatus.
+	 */
 	private function buildSafeApiError(\Throwable $e): array
 	{
-		$raw = $e->getMessage();
-		if (strpos($raw, 'User not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return ['status' => Http::STATUS_UNAUTHORIZED, 'error' => $this->l10n->t('User not authenticated')];
 		}
-		if (strpos($raw, 'Access denied') !== false) {
-			return ['status' => Http::STATUS_FORBIDDEN, 'error' => $this->l10n->t('Access denied')];
+		if (ExceptionHttpStatus::isAccessDenied($e, $this->l10n)) {
+			// Only the typed carry is ours to forward — a phrase-matched
+			// residual could come from a deep layer (e.g. DB "Access denied
+			// for user") and must not leak to the wire.
+			$denyMessage = $e instanceof AccessDeniedException ? trim($e->getMessage()) : '';
+			return [
+				'status' => Http::STATUS_FORBIDDEN,
+				'error' => $denyMessage !== '' ? $this->l10n->t($denyMessage) : $this->l10n->t('Access denied'),
+			];
 		}
-
-		$knownValidationPrefixes = ['Invalid ', 'Start date', 'Export date range', 'No users', 'Either ', 'Failed to encode report'];
-		foreach ($knownValidationPrefixes as $prefix) {
-			if (strpos($raw, $prefix) === 0) {
-				return ['status' => Http::STATUS_BAD_REQUEST, 'error' => $raw];
-			}
+		if ($e instanceof BusinessRuleException) {
+			return ['status' => Http::STATUS_BAD_REQUEST, 'error' => $this->l10n->t($e->getMessage())];
 		}
 
 		return [
@@ -198,7 +211,7 @@ class ReportController extends Controller
 			$reportUserId = null;
 			if ($userId === '') {
 				if (!$this->permissionService->isAdmin($currentUserId)) {
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 			} else {
 				$reportUserId = $userId ?? $currentUserId;
@@ -248,7 +261,7 @@ class ReportController extends Controller
 			$reportUserId = null;
 			if ($userId === '') {
 				if (!$this->permissionService->isAdmin($currentUserId)) {
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 			} else {
 				$reportUserId = $userId ?? $currentUserId;
@@ -290,7 +303,7 @@ class ReportController extends Controller
 			$reportUserId = null;
 			if ($userId === '') {
 				if (!$this->permissionService->isAdmin($currentUserId)) {
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 			} else {
 				$reportUserId = $userId ?? $currentUserId;
@@ -303,11 +316,11 @@ class ReportController extends Controller
 				$periodStart = $this->parseDateYmd($startDate, 'start_date');
 				$periodEnd = $this->parseDateYmd($endDate, 'end_date');
 				if ($periodStart > $periodEnd) {
-					throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+					throw new BusinessRuleException('Start date must be before or equal to end date');
 				}
 				$days = (int)$periodEnd->diff($periodStart)->format('%a');
 				if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-					throw new \Exception($this->l10n->t(
+					throw new BusinessRuleException($this->l10n->t(
 						'Export date range must not exceed %d days. Please narrow the range.',
 						[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 					));
@@ -360,11 +373,11 @@ class ReportController extends Controller
 			$start->setTime(0, 0, 0);
 			$end->setTime(0, 0, 0);
 			if ($start > $end) {
-				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+				throw new BusinessRuleException('Start date must be before or equal to end date');
 			}
 			$days = (int)$end->diff($start)->format('%a');
 			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+				throw new BusinessRuleException($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
 			}
 			$endExclusive = (clone $end)->modify('+1 day');
 
@@ -373,7 +386,7 @@ class ReportController extends Controller
 			$reportUserId = null;
 			if ($userId === '') {
 				if (!$this->permissionService->isAdmin($currentUserId)) {
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 			} else {
 				$reportUserId = $userId ?? $currentUserId;
@@ -419,11 +432,11 @@ class ReportController extends Controller
 			$start->setTime(0, 0, 0);
 			$end->setTime(0, 0, 0);
 			if ($start > $end) {
-				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+				throw new BusinessRuleException('Start date must be before or equal to end date');
 			}
 			$days = (int)$end->diff($start)->format('%a');
 			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+				throw new BusinessRuleException($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
 			}
 
 			$currentUserId = $this->getUserId();
@@ -443,7 +456,7 @@ class ReportController extends Controller
 				if ($format === 'json') {
 					$json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 					if ($json === false) {
-						throw new \Exception($this->l10n->t('Failed to encode report as JSON'));
+						throw new BusinessRuleException('Failed to encode report as JSON');
 					}
 					return new DataDownloadResponse($json, $filenameBase . '.json', 'application/json');
 				}
@@ -474,7 +487,7 @@ class ReportController extends Controller
 		if ($teamIdRaw !== '') {
 			$tid = (int)$teamIdRaw;
 			if ($tid <= 0) {
-				throw new \Exception($this->l10n->t('Invalid team selected.'));
+				throw new BusinessRuleException('Invalid team selected.');
 			}
 			$memberIds = $this->resolveTeamMemberIdsFromTeamId($currentUserId, $tid);
 			$out = [];
@@ -485,7 +498,7 @@ class ReportController extends Controller
 				}
 				if (!$this->permissionService->canViewUserReport($currentUserId, $uid)) {
 					$this->permissionService->logPermissionDenied($currentUserId, 'view_premium_report', 'report', $uid);
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 				$out[] = $uid;
 			}
@@ -509,7 +522,7 @@ class ReportController extends Controller
 
 		if ($userId === '') {
 			if (!$this->permissionService->isAdmin($currentUserId)) {
-				throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+				throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 			}
 			$userIds = [];
 			$this->userManager->callForAllUsers(function ($user) use (&$userIds) {
@@ -556,7 +569,7 @@ class ReportController extends Controller
 				|| ($scope !== null && trim($scope) !== '');
 			if ($userId === '' || $hasScopeSelector) {
 				if ($userId !== null && trim($userId) !== '' && $hasScopeSelector) {
-					throw new \Exception($this->l10n->t('Invalid scope parameters.'));
+					throw new BusinessRuleException('Invalid scope parameters.');
 				}
 				$effectiveScope = $userId === '' && !$hasScopeSelector
 					? \OCA\ArbeitszeitCheck\Service\OversightScopeService::SCOPE_ORGANIZATION
@@ -566,7 +579,7 @@ class ReportController extends Controller
 				);
 				if (!$resolution['ok']) {
 					$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $resolution['code'] ?? 'scope');
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 				if ($resolution['userIds'] !== null) {
 					$reportUserIds = $resolution['userIds'];
@@ -583,11 +596,11 @@ class ReportController extends Controller
 		$start->setTime(0, 0, 0);
 		$end->setTime(0, 0, 0);
 		if ($start > $end) {
-			throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			throw new BusinessRuleException('Start date must be before or equal to end date');
 		}
 		$days = (int)$end->diff($start)->format('%a');
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-			throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+			throw new BusinessRuleException($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
 		}
 		// Absence date-range mappers use inclusive-end overlap semantics; the
 		// request end date is the last included day (deliberate fix: passing
@@ -638,11 +651,11 @@ class ReportController extends Controller
 			$start->setTime(0, 0, 0);
 			$end->setTime(0, 0, 0);
 			if ($start > $end) {
-				throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+				throw new BusinessRuleException('Start date must be before or equal to end date');
 			}
 			$days = (int)$end->diff($start)->format('%a');
 			if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-				throw new \Exception($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
+				throw new BusinessRuleException($this->l10n->t('Export date range must not exceed %d days. Please narrow the range.', [Constants::MAX_EXPORT_DATE_RANGE_DAYS]));
 			}
 			$endExclusive = (clone $end)->modify('+1 day');
 
@@ -677,7 +690,7 @@ class ReportController extends Controller
 			foreach ($teamUserIds as $uid) {
 				if (!$this->permissionService->canViewUserReport($currentUserId, $uid)) {
 					$this->permissionService->logPermissionDenied($currentUserId, 'view_team_report', 'report', $uid);
-					throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 			}
 
@@ -753,7 +766,7 @@ class ReportController extends Controller
 					if ($format === 'json') {
 						$json = json_encode($exportRows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 						if ($json === false) {
-							throw new \Exception($this->l10n->t('Failed to encode report as JSON'));
+							throw new BusinessRuleException('Failed to encode report as JSON');
 						}
 						return new DataDownloadResponse(
 							$json,
@@ -775,7 +788,7 @@ class ReportController extends Controller
 				if ($format === 'json') {
 					$json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 					if ($json === false) {
-						throw new \Exception($this->l10n->t('Failed to encode report as JSON'));
+						throw new BusinessRuleException('Failed to encode report as JSON');
 					}
 					return new DataDownloadResponse(
 						$json,
@@ -827,7 +840,7 @@ class ReportController extends Controller
 		if ($this->permissionService->canAccessManagerDashboard($currentUserId)) {
 			$managedTeamIds = $this->teamManagerMapper->getTeamIdsForManager($currentUserId);
 			if (!in_array($teamId, $managedTeamIds, true)) {
-				throw new \Exception($this->l10n->t('Access denied. You can only view reports for teams you manage.'));
+				throw new AccessDeniedException('Access denied. You can only view reports for teams you manage.');
 			}
 			$members = $this->teamMemberMapper->findByTeamId($teamId);
 			$ids = [];
@@ -837,7 +850,7 @@ class ReportController extends Controller
 			return $ids;
 		}
 
-		throw new \Exception($this->l10n->t('Access denied. You can only view reports for yourself or your team members.'));
+		throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 	}
 
 	/**

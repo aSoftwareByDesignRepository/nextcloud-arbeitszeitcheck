@@ -17,6 +17,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Db\BusinessTrip;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
 use OCA\ArbeitszeitCheck\Db\BusinessTripMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
 use OCA\ArbeitszeitCheck\Service\BusinessTripService;
@@ -208,7 +209,7 @@ final class BusinessTripManagerController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			throw new \RuntimeException('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}

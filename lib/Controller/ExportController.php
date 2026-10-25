@@ -12,6 +12,10 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Exception\AccessDeniedException;
+use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\ComplianceViolationMapper;
 use OCA\ArbeitszeitCheck\Service\DatevExportService;
@@ -75,29 +79,31 @@ class ExportController extends Controller
 			&& ($errors === false || (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0))
 			&& $parsed->format('Y-m-d') === $value;
 		if (!$isValid) {
-			throw new \Exception($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$fieldName]));
+			throw new BusinessRuleException($this->l10n->t('Invalid %s format. Use Y-m-d (e.g. 2024-01-15)', [$fieldName]));
 		}
 		return new \DateTime($parsed->format('Y-m-d'));
 	}
 
+	/**
+	 * User-facing export error text. Classification is locale-stable —
+	 * typed exceptions decide the branch; message text is only forwarded
+	 * for types the app owns (AccessDenied / BusinessRule carry our own
+	 * strings, passed through the catalog for the caller's language).
+	 */
 	private function safeExportErrorMessage(\Throwable $e): string
 	{
-		$raw = $e->getMessage();
-		if (strpos($raw, 'User not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return $this->l10n->t('User not authenticated');
 		}
-		if (strpos($raw, 'Access denied') !== false) {
+		if ($e instanceof AccessDeniedException) {
+			$msg = trim($e->getMessage());
+			return $msg !== '' ? $this->l10n->t($msg) : $this->l10n->t('Access denied');
+		}
+		if (ExceptionHttpStatus::isAccessDenied($e, $this->l10n)) {
 			return $this->l10n->t('Access denied');
 		}
-		if (strpos($raw, 'User not found') !== false) {
-			return $this->l10n->t('User not found');
-		}
-		if (strpos($raw, 'Start date must be before or equal to end date') !== false
-			|| strpos($raw, 'Export date range must not exceed') !== false
-			|| strpos($raw, 'DATEV configuration incomplete') !== false
-			|| strpos($raw, 'Personalnummer not configured') !== false
-			|| strpos($raw, 'Invalid ') === 0) {
-			return $raw;
+		if ($e instanceof BusinessRuleException) {
+			return $this->l10n->t($e->getMessage());
 		}
 		return $this->l10n->t('Export failed. Please try again. If the problem continues, contact your administrator.');
 	}
@@ -158,7 +164,7 @@ class ExportController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				throw new NotAuthenticatedException();
 			}
 
 			$userId = $user->getUID();
@@ -174,14 +180,14 @@ class ExportController extends Controller
 		$start->setTime(0, 0, 0);
 
 		if ($start > $end) {
-			throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			throw new BusinessRuleException('Start date must be before or equal to end date');
 		}
 
 		// Enforce max date range to prevent heavy queries (midnight-to-midnight is exact).
 		$diff = $end->diff($start);
 		$days = (int) $diff->format('%a');
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-			throw new \Exception($this->l10n->t(
+			throw new BusinessRuleException($this->l10n->t(
 				'Export date range must not exceed %d days. Please narrow the range.',
 				[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 			));
@@ -279,7 +285,7 @@ class ExportController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				throw new NotAuthenticatedException();
 			}
 
 			$actorUid = $user->getUID();
@@ -294,14 +300,14 @@ class ExportController extends Controller
 		$start->setTime(0, 0, 0);
 
 		if ($start > $end) {
-			throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			throw new BusinessRuleException('Start date must be before or equal to end date');
 		}
 
 		// Enforce max date range (midnight-to-midnight gives exact day count).
 		$diff = $end->diff($start);
 		$days = (int) $diff->format('%a');
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-			throw new \Exception($this->l10n->t(
+			throw new BusinessRuleException($this->l10n->t(
 				'Export date range must not exceed %d days. Please narrow the range.',
 				[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 			));
@@ -525,7 +531,7 @@ class ExportController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				throw new NotAuthenticatedException();
 			}
 
 			$actorUid = $user->getUID();
@@ -540,14 +546,14 @@ class ExportController extends Controller
 		$start->setTime(0, 0, 0);
 
 		if ($start > $end) {
-			throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			throw new BusinessRuleException('Start date must be before or equal to end date');
 		}
 
 		// Enforce max date range (midnight-to-midnight gives exact day count).
 		$diff = $end->diff($start);
 		$days = (int) $diff->format('%a');
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-			throw new \Exception($this->l10n->t(
+			throw new BusinessRuleException($this->l10n->t(
 				'Export date range must not exceed %d days. Please narrow the range.',
 				[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 			));
@@ -802,7 +808,7 @@ class ExportController extends Controller
 		$json = json_encode($envelope, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 		
 		if ($json === false) {
-			throw new \Exception($this->l10n->t('Failed to encode data as JSON'));
+			throw new BusinessRuleException('Failed to encode data as JSON');
 		}
 
 		return new DataDownloadResponse($json, $filename, 'application/json; charset=utf-8');
@@ -852,7 +858,7 @@ class ExportController extends Controller
 		try {
 			$user = $this->userSession->getUser();
 			if (!$user) {
-				throw new \Exception($this->l10n->t('User not authenticated'));
+				throw new NotAuthenticatedException();
 			}
 
 			$actorId = $user->getUID();
@@ -864,7 +870,7 @@ class ExportController extends Controller
 			if ($scope === 'organization' || $scope === 'org') {
 				if (!$this->permissionService->isAdmin($actorId)) {
 					$this->permissionService->logPermissionDenied($actorId, 'export_datev_org', 'datev_export');
-					throw new \Exception($this->l10n->t('Access denied'));
+					throw new AccessDeniedException('Access denied');
 				}
 				return $this->exportAsDatevOrganization($start, $endExclusive);
 			}
@@ -873,10 +879,10 @@ class ExportController extends Controller
 			if ($targetParam !== '' && $targetParam !== $actorId) {
 				if (!$this->permissionService->isAdmin($actorId)) {
 					$this->permissionService->logPermissionDenied($actorId, 'export_datev_user', 'datev_export', $targetParam);
-					throw new \Exception($this->l10n->t('Access denied'));
+					throw new AccessDeniedException('Access denied');
 				}
 				if ($this->userManager === null || $this->userManager->get($targetParam) === null) {
-					throw new \Exception($this->l10n->t('User not found'));
+					throw new BusinessRuleException('User not found');
 				}
 				$exportUserId = $targetParam;
 			}
@@ -950,13 +956,13 @@ class ExportController extends Controller
 		$start->setTime(0, 0, 0);
 
 		if ($start > $end) {
-			throw new \Exception($this->l10n->t('Start date must be before or equal to end date'));
+			throw new BusinessRuleException('Start date must be before or equal to end date');
 		}
 
 		$diff = $end->diff($start);
 		$days = (int)$diff->format('%a');
 		if ($days > Constants::MAX_EXPORT_DATE_RANGE_DAYS) {
-			throw new \Exception($this->l10n->t(
+			throw new BusinessRuleException($this->l10n->t(
 				'Export date range must not exceed %d days. Please narrow the range.',
 				[Constants::MAX_EXPORT_DATE_RANGE_DAYS]
 			));

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Exception\BulkDecisionException;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
@@ -151,7 +152,7 @@ final class ManagerBulkDecisionController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			throw new \RuntimeException('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}

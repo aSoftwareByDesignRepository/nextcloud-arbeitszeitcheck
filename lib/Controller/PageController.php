@@ -13,6 +13,8 @@ namespace OCA\ArbeitszeitCheck\Controller;
 
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Exception\NotAuthenticatedException;
+use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
@@ -162,7 +164,7 @@ class PageController extends Controller
 	{
 		$user = $this->userSession->getUser();
 		if (!$user) {
-			throw new \Exception('User not authenticated');
+			throw new NotAuthenticatedException();
 		}
 		return $user->getUID();
 	}
@@ -236,7 +238,7 @@ class PageController extends Controller
 	 */
 	private function buildSafePageErrorMessage(\Throwable $e): string
 	{
-		if (strpos($e->getMessage(), 'User not authenticated') !== false) {
+		if (ExceptionHttpStatus::isUnauthenticated($e, $this->l10n)) {
 			return $this->l10n->t('User not authenticated');
 		}
 		return $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.');

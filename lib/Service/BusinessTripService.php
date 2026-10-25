@@ -72,6 +72,7 @@ final class BusinessTripService
 		private readonly BusinessTripCreditLedger $ledger,
 		private readonly ?MonthClosureService $monthClosures = null,
 		private readonly ?\OCA\ArbeitszeitCheck\Db\AuditLogMapper $audit = null,
+		private readonly ?PermissionService $permissions = null,
 	) {
 	}
 
@@ -555,8 +556,14 @@ final class BusinessTripService
 			throw new BusinessTripException('TRIP_STATE_INVALID', 'This status change is not allowed.', 409, ['status' => 'invalid_transition']);
 		}
 		// Four-eyes: nobody may decide on their own trip. Employee withdrawal
-		// goes through cancel(), never a self-decision.
-		if ($actor === (string)$trip->getUserId() && in_array($target, [BusinessTrip::STATUS_APPROVED, BusinessTrip::STATUS_REJECTED], true)) {
+		// goes through cancel(), never a self-decision. Sole exception: an app
+		// admin may self-decide (single-admin orgs would deadlock otherwise);
+		// the controller gate (canDecideEntryApproval) is the authority, this
+		// is the defense-in-depth mirror.
+		if ($actor === (string)$trip->getUserId()
+			&& in_array($target, [BusinessTrip::STATUS_APPROVED, BusinessTrip::STATUS_REJECTED], true)
+			&& !($this->permissions?->isAdmin($actor) ?? false)
+		) {
 			throw new BusinessTripException('TRIP_SELF_DECISION', 'You cannot decide on your own business trip.', 403, ['actor' => 'self']);
 		}
 

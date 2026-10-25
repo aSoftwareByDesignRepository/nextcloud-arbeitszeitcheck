@@ -170,7 +170,7 @@ final class ManagerBulkDecisionService
 			}
 
 			$userId = (string)$entity->getUserId();
-			if (!$this->permissionService->canManageEmployee($managerId, $userId)) {
+			if (!$this->permissionService->canDecideEntryApproval($managerId, $userId)) {
 				$this->permissionService->logPermissionDenied($managerId, 'bulk_decision', $type, (string)$id);
 				throw $this->notFound($item);
 			}

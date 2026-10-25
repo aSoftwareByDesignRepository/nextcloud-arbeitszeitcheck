@@ -201,7 +201,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	public function testOutOfScopeCollapsesTo404AndLogsDenial(): void
 	{
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(7, 'foreign-user'));
-		$this->permissionService->method('canManageEmployee')->willReturn(false);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(false);
 		$this->permissionService->expects($this->once())->method('logPermissionDenied');
 		try {
 			$this->service()->decide('manager', 'approve', [['type' => 'absence', 'id' => 7]]);
@@ -217,7 +217,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 		$entry = $this->pendingEntry(3);
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$this->timeEntryMapper->method('find')->willReturn($entry);
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 		$this->db->expects($this->never())->method('beginTransaction');
 		try {
 			$this->service()->decide('manager', 'approve', [['type' => 'time_entry', 'id' => 3]]);
@@ -232,7 +232,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 
 		$this->db->expects($this->once())->method('beginTransaction');
 		$this->db->expects($this->once())->method('commit');
@@ -258,7 +258,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 
 		$this->correctionService->method('approve')->willReturnCallback(static function (TimeEntry $e): TimeEntry {
 			return $e;
@@ -287,7 +287,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	public function testApproveTimeEntrySurfacesBillingWarningPerItem(): void
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 		$this->correctionService->method('approve')->willReturnCallback(static function (TimeEntry $e): TimeEntry {
 			$e->setBillingSyncWarning('billing sync failed');
 			return $e;
@@ -302,7 +302,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	public function testRejectRoutesToRejectServices(): void
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(5));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 		$this->correctionService->expects($this->once())->method('reject')->with($this->isInstanceOf(TimeEntry::class), 'manager', 'nope');
 		$this->correctionService->expects($this->never())->method('approve');
 
@@ -314,7 +314,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 		// Once the outer transaction is open, post-commit effects defer.
 		$this->db->method('inTransaction')->willReturn(true);
 
@@ -350,7 +350,7 @@ final class ManagerBulkDecisionServiceTest extends TestCase
 	{
 		$this->timeEntryMapper->method('find')->willReturn($this->pendingEntry(11));
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(22));
-		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
 		$this->db->method('inTransaction')->willReturn(true);
 
 		$effectRan = false;

@@ -280,6 +280,29 @@ class PermissionService
 	}
 
 	/**
+	 * Decision scope for approving/rejecting pending items (time-entry
+	 * corrections, absences, business trips). Equals {@see canManageEmployee}
+	 * plus one deliberate exception: an app admin may decide on their own
+	 * pending entries. Single-admin organisations otherwise deadlock — with
+	 * nobody left to approve, the admin's own vacation or correction could
+	 * never be decided. Regular managers still cannot approve themselves:
+	 * the four-eyes principle stays intact for everyone below admin.
+	 *
+	 * canManageEmployee deliberately keeps returning false for self targets
+	 * so manager write paths (create/correct for others) continue steering
+	 * the actor's own data to the self-service views.
+	 */
+	public function canDecideEntryApproval(string $actorUserId, string $ownerUserId): bool
+	{
+		if ($this->canManageEmployee($actorUserId, $ownerUserId)) {
+			return true;
+		}
+		return $actorUserId !== ''
+			&& $actorUserId === $ownerUserId
+			&& $this->isAdmin($actorUserId);
+	}
+
+	/**
 	 * User ids the actor may manage (direct + delegated team members).
 	 * Empty when app teams are disabled or the actor manages nobody —
 	 * the caller treats an empty list as "no scope", never as "all".

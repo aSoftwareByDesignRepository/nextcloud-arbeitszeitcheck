@@ -128,7 +128,7 @@ final class ManagerBulkDecisionControllerTest extends TestCase
 	public function testOutOfScopeItemCollapsesToUniform404(): void
 	{
 		$this->permissions->method('isAdmin')->willReturn(true);
-		$this->permissions->method('canManageEmployee')->willReturn(false);
+		$this->permissions->method('canDecideEntryApproval')->willReturn(false);
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(5, 'foreign-user'));
 		$res = $this->controller(['action' => 'approve', 'items' => [['type' => 'absence', 'id' => 5]]])->decide();
 		$this->assertSame(Http::STATUS_NOT_FOUND, $res->getStatus());
@@ -138,7 +138,7 @@ final class ManagerBulkDecisionControllerTest extends TestCase
 	public function testAlreadyDecidedMapsTo409(): void
 	{
 		$this->permissions->method('isAdmin')->willReturn(true);
-		$this->permissions->method('canManageEmployee')->willReturn(true);
+		$this->permissions->method('canDecideEntryApproval')->willReturn(true);
 		$absence = $this->pendingAbsence(5);
 		$absence->setStatus(Absence::STATUS_APPROVED);
 		$this->absenceMapper->method('find')->willReturn($absence);
@@ -150,7 +150,7 @@ final class ManagerBulkDecisionControllerTest extends TestCase
 	public function testSuccessReturnsResults(): void
 	{
 		$this->permissions->method('isAdmin')->willReturn(true);
-		$this->permissions->method('canManageEmployee')->willReturn(true);
+		$this->permissions->method('canDecideEntryApproval')->willReturn(true);
 		$this->absenceMapper->method('find')->willReturn($this->pendingAbsence(1));
 		$this->absenceService->method('approveAbsence')->willReturn($this->pendingAbsence(1));
 		$res = $this->controller(['action' => 'approve', 'items' => [['type' => 'absence', 'id' => 1]]])->decide();

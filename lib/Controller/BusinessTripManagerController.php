@@ -103,7 +103,7 @@ final class BusinessTripManagerController extends Controller
 				throw new BusinessTripException('TRIP_SNAPSHOT_REQUIRED', 'A snapshot token is required.', 409, ['snapshot' => 'required']);
 			}
 			$revision = $this->revision($p);
-			$trip = $this->scopedTrip($id);
+			$trip = $this->decisionScopedTrip($id);
 			$saved = $this->trips->approve($trip, $revision, $token, $this->uid());
 			return new JSONResponse(['success' => true, 'trip' => $this->serialize($saved)]);
 		} catch (BusinessTripException $e) {
@@ -125,7 +125,7 @@ final class BusinessTripManagerController extends Controller
 		}
 		try {
 			$revision = $this->revision($p);
-			$trip = $this->scopedTrip($id);
+			$trip = $this->decisionScopedTrip($id);
 			$saved = $this->trips->reject($trip, $revision, $this->uid(), $reason !== '' ? $reason : null);
 			return new JSONResponse(['success' => true, 'trip' => $this->serialize($saved)]);
 		} catch (BusinessTripException $e) {
@@ -145,6 +145,25 @@ final class BusinessTripManagerController extends Controller
 		}
 		if (!$this->permissions->canManageEmployee($this->uid(), (string)$trip->getUserId())) {
 			$this->permissions->logPermissionDenied($this->uid(), 'view_business_trip', 'business_trip', (string)$id);
+			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
+		}
+		return $trip;
+	}
+
+	/**
+	 * Decision scope for approve/reject — same 404 discipline as
+	 * {@see scopedTrip}, but an app admin may decide on their own trip
+	 * (see PermissionService::canDecideEntryApproval).
+	 */
+	private function decisionScopedTrip(int $id): BusinessTrip
+	{
+		try {
+			$trip = $this->tripMapper->find($id);
+		} catch (DoesNotExistException) {
+			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
+		}
+		if (!$this->permissions->canDecideEntryApproval($this->uid(), (string)$trip->getUserId())) {
+			$this->permissions->logPermissionDenied($this->uid(), 'decide_business_trip', 'business_trip', (string)$id);
 			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
 		}
 		return $trip;

@@ -684,7 +684,7 @@ class ManagerControllerTest extends TestCase
 		// Scope check runs BEFORE the status check — the manager is in scope here,
 		// so the already-decided 409 is still reachable (BOLA oracle fix).
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(true);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
@@ -724,7 +724,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(true);
 		$this->absenceService->expects($this->once())
@@ -767,7 +767,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(true);
 		$this->absenceService->expects($this->once())
@@ -810,7 +810,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
@@ -851,7 +851,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('rejectAbsence');
@@ -932,7 +932,7 @@ class ManagerControllerTest extends TestCase
 		$group->method('getUsers')->willReturn([$teamMember]);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $teamMemberId)->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $teamMemberId)->willReturn(true);
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
 
 		$entry = new TimeEntry();
@@ -970,6 +970,53 @@ class ManagerControllerTest extends TestCase
 	}
 
 	/**
+	 * App admin approving their own pending correction — the decision gate
+	 * (canDecideEntryApproval) is the only authorization consulted; the
+	 * management scope check is not part of the decision path.
+	 */
+	public function testApproveTimeEntryCorrectionAdminSelfApproves(): void
+	{
+		$managerId = 'admin1';
+		$entryId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($managerId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $managerId)->willReturn(true);
+		$this->permissionService->expects($this->never())->method('canManageEmployee');
+
+		$entry = new TimeEntry();
+		$entry->setId($entryId);
+		$entry->setUserId($managerId);
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setStartTime(new \DateTime('2024-01-15 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-15 17:00:00'));
+		$entry->setJustification(json_encode(['justification' => 'Correction']));
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+
+		$updatedEntry = new TimeEntry();
+		$updatedEntry->setId($entryId);
+		$updatedEntry->setUserId($managerId);
+		$updatedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$updatedEntry->setCreatedAt(new \DateTime());
+		$updatedEntry->setUpdatedAt(new \DateTime());
+
+		$this->timeEntryMapper->method('find')->with($entryId)->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturn($updatedEntry);
+		$this->config->method('getAppValue')->willReturn('1');
+
+		$this->auditLogMapper->expects($this->once())->method('logAction');
+		$this->notificationService->expects($this->once())->method('notifyTimeEntryCorrectionApproved');
+
+		$response = $this->controller->approveTimeEntryCorrection($entryId, 'Approved');
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('entry', $data);
+	}
+
+	/**
 	 * Test approveTimeEntryCorrection returns 409 when not pending (already decided).
 	 */
 	public function testApproveTimeEntryCorrectionReturnsErrorWhenNotPending(): void
@@ -991,7 +1038,7 @@ class ManagerControllerTest extends TestCase
 
 		$this->timeEntryMapper->method('find')->willReturn($entry);
 		// Scope check runs BEFORE the status check — in scope → 409 still reachable.
-		$this->permissionService->method('canManageEmployee')->with($managerId, $managerId)->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $managerId)->willReturn(true);
 
 		$response = $this->controller->approveTimeEntryCorrection($entryId);
 
@@ -1013,7 +1060,7 @@ class ManagerControllerTest extends TestCase
 		$user->method('getUID')->willReturn($managerId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $otherUserId)->willReturn(false);
 
 		$entry = new TimeEntry();
 		$entry->setId($entryId);
@@ -1051,7 +1098,7 @@ class ManagerControllerTest extends TestCase
 		$group->method('getUsers')->willReturn([$teamMember]);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $teamMemberId)->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $teamMemberId)->willReturn(true);
 		$this->teamResolver->method('getTeamMemberIds')->with($managerId)->willReturn([$teamMemberId]);
 
 		$entry = new TimeEntry();
@@ -1093,7 +1140,7 @@ class ManagerControllerTest extends TestCase
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($managerId);
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $teamMemberId)->willReturn(true);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $teamMemberId)->willReturn(true);
 
 		$entry = new TimeEntry();
 		$entry->setId($entryId);
@@ -2044,7 +2091,7 @@ class ManagerControllerTest extends TestCase
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($managerId);
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $otherUserId)->willReturn(false);
 
 		$entry = new TimeEntry();
 		$entry->setId($entryId);
@@ -2115,7 +2162,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
@@ -2149,7 +2196,7 @@ class ManagerControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($managerId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('rejectAbsence');
@@ -2172,7 +2219,7 @@ class ManagerControllerTest extends TestCase
 		$user->method('getUID')->willReturn($managerId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $otherUserId)->willReturn(false);
 
 		$entry = new TimeEntry();
 		$entry->setId($entryId);
@@ -2202,7 +2249,7 @@ class ManagerControllerTest extends TestCase
 		$user->method('getUID')->willReturn($managerId);
 
 		$this->userSession->method('getUser')->willReturn($user);
-		$this->permissionService->method('canManageEmployee')->with($managerId, $otherUserId)->willReturn(false);
+		$this->permissionService->method('canDecideEntryApproval')->with($managerId, $otherUserId)->willReturn(false);
 
 		$entry = new TimeEntry();
 		$entry->setId($entryId);

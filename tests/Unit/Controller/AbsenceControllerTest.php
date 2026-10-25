@@ -458,7 +458,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(true);
 		$this->absenceService->expects($this->once())
@@ -471,6 +471,87 @@ class AbsenceControllerTest extends TestCase
 
 		$this->assertTrue($data['success']);
 		$this->assertArrayHasKey('absence', $data);
+	}
+
+	/**
+	 * App admin approving their own pending absence — decision gate allows
+	 * self targets for admins (canDecideEntryApproval), the legacy
+	 * management check is not consulted on the decision path.
+	 */
+	public function testApproveOwnAbsenceAsAdmin(): void
+	{
+		$userId = 'admin1';
+		$absenceId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($userId);
+		$absence->setType(Absence::TYPE_VACATION);
+		$absence->setStartDate(new \DateTime('2024-01-01'));
+		$absence->setEndDate(new \DateTime('2024-01-02'));
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setCreatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+		$absence->setUpdatedAt(new \DateTime('2024-01-01T00:00:00Z'));
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canDecideEntryApproval')
+			->with($userId, $userId)
+			->willReturn(true);
+		$this->permissionService->expects($this->never())
+			->method('canManageEmployee');
+		$this->absenceService->expects($this->once())
+			->method('approveAbsence')
+			->with($absenceId, $userId, null)
+			->willReturn($absence);
+
+		$response = $this->controller->approve($absenceId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('absence', $data);
+	}
+
+	/**
+	 * A non-admin cannot approve their own absence — the decision gate
+	 * denies self targets for regular users (four-eyes stays intact).
+	 */
+	public function testApproveOwnAbsenceDeniedForNonAdmin(): void
+	{
+		$userId = 'manager1';
+		$absenceId = 1;
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$absence = new Absence();
+		$absence->setId($absenceId);
+		$absence->setUserId($userId);
+		$absence->setStatus(Absence::STATUS_PENDING);
+
+		$this->absenceMapper->expects($this->once())
+			->method('find')
+			->with($absenceId)
+			->willReturn($absence);
+		$this->permissionService->expects($this->once())
+			->method('canDecideEntryApproval')
+			->with($userId, $userId)
+			->willReturn(false);
+		$this->absenceService->expects($this->never())->method('approveAbsence');
+
+		$response = $this->controller->approve($absenceId);
+		$data = $response->getData();
+
+		$this->assertFalse($data['success']);
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
 	}
 
 	/**
@@ -501,7 +582,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(true);
 		$this->absenceService->expects($this->once())
@@ -539,7 +620,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
@@ -575,7 +656,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('rejectAbsence');
@@ -603,7 +684,7 @@ class AbsenceControllerTest extends TestCase
 			->method('find')
 			->with($absenceId)
 			->willThrowException(new DoesNotExistException('Absence not found'));
-		$this->permissionService->expects($this->never())->method('canManageEmployee');
+		$this->permissionService->expects($this->never())->method('canDecideEntryApproval');
 		$this->absenceService->expects($this->never())->method('approveAbsence');
 
 		$response = $this->controller->approve($absenceId, 'Approved');
@@ -628,7 +709,7 @@ class AbsenceControllerTest extends TestCase
 			->method('find')
 			->with($absenceId)
 			->willThrowException(new DoesNotExistException('Absence not found'));
-		$this->permissionService->expects($this->never())->method('canManageEmployee');
+		$this->permissionService->expects($this->never())->method('canDecideEntryApproval');
 		$this->absenceService->expects($this->never())->method('rejectAbsence');
 
 		$response = $this->controller->reject($absenceId, 'Rejected');
@@ -1056,7 +1137,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('approveAbsence');
@@ -1090,7 +1171,7 @@ class AbsenceControllerTest extends TestCase
 			->with($absenceId)
 			->willReturn($absence);
 		$this->permissionService->expects($this->once())
-			->method('canManageEmployee')
+			->method('canDecideEntryApproval')
 			->with($userId, $employeeId)
 			->willReturn(false);
 		$this->absenceService->expects($this->never())->method('rejectAbsence');

@@ -3139,7 +3139,7 @@ class ManagerController extends Controller
 			$absence = $this->absenceMapper->find($absenceId);
 			// Scope check BEFORE the pending-status check: an out-of-scope caller must
 			// not learn whether the absence exists or was decided (BOLA oracle).
-			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'approve_absence', 'absence', (string) $absenceId);
 				// Collapse out-of-scope to the same 404 as a missing id (existence oracle).
 				return new JSONResponse([
@@ -3204,7 +3204,7 @@ class ManagerController extends Controller
 			$managerId = $this->getUserId();
 			$absence = $this->absenceMapper->find($absenceId);
 			// Scope check BEFORE the pending-status check (BOLA oracle — see approveAbsence()).
-			if (!$this->permissionService->canManageEmployee($managerId, $absence->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($managerId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'reject_absence', 'absence', (string) $absenceId);
 				return new JSONResponse([
 					'success' => false,
@@ -3270,7 +3270,7 @@ class ManagerController extends Controller
 			// Verify manager may manage this employee (admin or team) BEFORE the
 			// pending-status check: an out-of-scope caller must not learn whether
 			// the entry exists or was decided (BOLA oracle).
-			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($managerId, $entry->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'approve_time_entry_correction', 'time_entry', (string) $timeEntryId);
 				return new JSONResponse([
 					'success' => false,
@@ -3384,7 +3384,7 @@ class ManagerController extends Controller
 
 			// Verify manager may manage this employee (admin or team) BEFORE the
 			// pending-status check (BOLA oracle — see approveTimeEntryCorrection()).
-			if (!$this->permissionService->canManageEmployee($managerId, $entry->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($managerId, $entry->getUserId())) {
 				$this->permissionService->logPermissionDenied($managerId, 'reject_time_entry_correction', 'time_entry', (string) $timeEntryId);
 				return new JSONResponse([
 					'success' => false,

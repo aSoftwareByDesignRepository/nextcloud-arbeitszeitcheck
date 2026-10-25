@@ -235,7 +235,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 	public function testApproveOutOfScopeIsUniform404(): void
 	{
 		$this->tripMapper->method('find')->willReturn($this->submittedTrip(7, 'mallory'));
-		$this->permissions->method('canManageEmployee')->with('manager', 'mallory')->willReturn(false);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'mallory')->willReturn(false);
 		$r = $this->controller(['snapshotToken' => 'tok', 'revision' => '4'])->approve(7);
 		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
 		$this->assertSame('NOT_FOUND', $this->payload($r)['error']);

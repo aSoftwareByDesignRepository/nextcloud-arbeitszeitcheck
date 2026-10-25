@@ -476,4 +476,72 @@ class PermissionServiceTest extends TestCase
 		$service = $this->createService($groupManager, $teamResolver, null, null, $userManager);
 		$this->assertSame(['ok_user'], $service->listAppAccessUserIds());
 	}
+
+	public function testCanDecideEntryApprovalAllowsNcAdminSelf(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->with('admin1')->willReturn(true);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->expects($this->never())->method('canUserManageEmployee');
+		$service = $this->createService($groupManager, $teamResolver);
+
+		$this->assertTrue($service->canDecideEntryApproval('admin1', 'admin1'));
+		// Sanity: management scope itself stays self-blocked.
+		$this->assertFalse($service->canManageEmployee('admin1', 'admin1'));
+	}
+
+	public function testCanDecideEntryApprovalAllowsConfiguredAppAdminSelf(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturn('["appadmin1"]');
+
+		$appAdmin = $this->createMock(IUser::class);
+		$appAdmin->method('isEnabled')->willReturn(true);
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->with('appadmin1')->willReturn($appAdmin);
+
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver, null, $config, $userManager);
+
+		$this->assertTrue($service->canDecideEntryApproval('appadmin1', 'appadmin1'));
+	}
+
+	public function testCanDecideEntryApprovalRejectsNonAdminSelf(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
+		$teamResolver->expects($this->never())->method('canUserManageEmployee');
+		$service = $this->createService($groupManager, $teamResolver);
+
+		$this->assertFalse($service->canDecideEntryApproval('manager1', 'manager1'));
+	}
+
+	public function testCanDecideEntryApprovalRejectsEmptyActor(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$service = $this->createService($groupManager, $teamResolver);
+
+		$this->assertFalse($service->canDecideEntryApproval('', ''));
+	}
+
+	public function testCanDecideEntryApprovalDelegatesManagedEmployee(): void
+	{
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn(false);
+		$teamResolver = $this->createMock(TeamResolverService::class);
+		$teamResolver->method('useAppTeams')->willReturn(true);
+		$teamResolver->expects($this->once())
+			->method('canUserManageEmployee')
+			->with('manager1', 'employee1')
+			->willReturn(true);
+		$service = $this->createService($groupManager, $teamResolver);
+
+		$this->assertTrue($service->canDecideEntryApproval('manager1', 'employee1'));
+	}
 }

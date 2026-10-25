@@ -691,6 +691,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			$this->stubMethod($mock, 'isUserAllowedByAccessGroups', $allow);
 			$this->stubMethod($mock, 'isAccessRestrictionEnabled', !$allow);
 			$this->stubMethod($mock, 'canManageEmployee', $allow);
+			$this->stubMethod($mock, 'canDecideEntryApproval', $allow);
 			$this->stubMethod($mock, 'canAccessManagerDashboard', $allow);
 			$this->stubMethod($mock, 'canViewUserReport', $allow);
 			$this->stubMethod($mock, 'canViewUserCompliance', $allow);

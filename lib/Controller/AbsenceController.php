@@ -1508,7 +1508,8 @@ class AbsenceController extends Controller
 
 	/**
 	 * Approve absence endpoint.
-	 * Only users who can manage the absence owner (same-group team) may approve.
+	 * Only users who may decide on the absence owner's entries
+	 * (manager scope; app admins may decide their own) may approve.
 	 *
 	 * @param int $id Absence ID
 	 * @param string|null $comment Approval comment
@@ -1525,7 +1526,7 @@ class AbsenceController extends Controller
 			// not learn whether the absence exists or was decided (BOLA oracle).
 			// Collapse to the same 404 as a missing id — a 403 here would reveal
 			// that the id exists (existence oracle).
-			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'approve_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,
@@ -1568,7 +1569,8 @@ class AbsenceController extends Controller
 
 	/**
 	 * Reject absence endpoint.
-	 * Only users who can manage the absence owner (same-group team) may reject.
+	 * Only users who may decide on the absence owner's entries
+	 * (manager scope; app admins may decide their own) may reject.
 	 *
 	 * @param int $id Absence ID
 	 * @param string|null $comment Rejection comment
@@ -1583,7 +1585,7 @@ class AbsenceController extends Controller
 			$absence = $this->absenceMapper->find($id);
 			// Scope check BEFORE the pending-status check (BOLA oracle — see approve()).
 			// Same 404 collapse as approve(): a 403 would reveal that the id exists.
-			if (!$this->permissionService->canManageEmployee($userId, $absence->getUserId())) {
+			if (!$this->permissionService->canDecideEntryApproval($userId, $absence->getUserId())) {
 				$this->permissionService->logPermissionDenied($userId, 'reject_absence', 'absence', (string) $id);
 				return new JSONResponse([
 					'success' => false,

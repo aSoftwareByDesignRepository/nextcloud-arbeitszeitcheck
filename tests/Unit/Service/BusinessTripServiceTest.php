@@ -171,7 +171,7 @@ final class BusinessTripServiceTest extends TestCase
 		return new WorkforceSuiteConfig($appConfig);
 	}
 
-	private function makeService(WorkforceSuiteConfig $config, ?ILockingProvider $locks = null): BusinessTripService
+	private function makeService(WorkforceSuiteConfig $config, ?ILockingProvider $locks = null, ?\OCA\ArbeitszeitCheck\Service\PermissionService $permissions = null): BusinessTripService
 	{
 		$locking = $locks ?? $this->locks;
 		// Real collaborators over mocked mapper boundaries: the hash chain,
@@ -209,6 +209,7 @@ final class BusinessTripServiceTest extends TestCase
 			$ledger,
 			$this->monthClosures,
 			$this->audit,
+			$permissions,
 		);
 	}
 
@@ -796,6 +797,27 @@ final class BusinessTripServiceTest extends TestCase
 			}
 		}
 		$this->assertCount(0, $this->acquiredKeys); // blocked before locking
+	}
+
+	public function testAppAdminCanDecideOwnTrip(): void
+	{
+		$submitted = $this->draftTrip(7, 'alice', 4);
+		$submitted->setStatus(BusinessTrip::STATUS_SUBMITTED);
+		$this->trips->method('find')->willReturn($submitted);
+		$this->trips->method('findOverlapping')->willReturn([]);
+		$this->stubCasWrite();
+		$this->resolveOrgRule();
+		$this->segments->method('findForTrip')->willReturn([]);
+		$this->links->method('findTimeEntryIdsForTrip')->willReturn([]);
+		$this->profiles->method('findEffectiveForUser')->willReturn(null);
+
+		$permissions = $this->createMock(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		$permissions->method('isAdmin')->with('alice')->willReturn(true);
+		$service = $this->makeService($this->config, null, $permissions);
+		$service->preview($submitted, 'alice');
+		$token = $this->frozenHashes[0];
+		$result = $service->approve($submitted, 4, $token, 'alice');
+		$this->assertSame(BusinessTrip::STATUS_APPROVED, $result->getStatus());
 	}
 
 	public function testCancelApprovedReversesLedgerExactlyOnce(): void

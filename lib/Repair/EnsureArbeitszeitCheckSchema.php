@@ -38,7 +38,7 @@ final class EnsureArbeitszeitCheckSchema implements IRepairStep
 
 		$missingBefore = $this->missingTables();
 		if ($missingBefore === []) {
-			$output->info('ArbeitszeitCheck: all ' . count(ArbeitszeitCheckTableCatalog::TABLES) . ' tables are present.');
+			$output->info('ArbeitszeitCheck: all ' . count(SchemaTableCatalog::EXPECTED_TABLES) . ' tables are present.');
 			return;
 		}
 
@@ -74,7 +74,7 @@ final class EnsureArbeitszeitCheckSchema implements IRepairStep
 	private function missingTables(): array
 	{
 		$missing = [];
-		foreach (ArbeitszeitCheckTableCatalog::TABLES as $table) {
+		foreach (SchemaTableCatalog::EXPECTED_TABLES as $table) {
 			if (!$this->connection->tableExists($table)) {
 				$missing[] = $table;
 			}

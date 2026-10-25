@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Integration;
 
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
+use OCA\ArbeitszeitCheck\Tests\Support\UpgradeBackupStateGuard;
 use OCP\App\IAppManager;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;
@@ -15,9 +16,17 @@ use Test\TestCase;
  */
 final class DisablePreserveDataIntegrationTest extends TestCase
 {
+	private UpgradeBackupStateGuard $backupStateGuard;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
+
+		// Every enableApp below runs the pre-migration BackupBeforeUpdate repair
+		// step, which writes a real snapshot — record the baseline first so the
+		// guard can sweep them in tearDown.
+		$this->backupStateGuard = new UpgradeBackupStateGuard();
+		$this->backupStateGuard->setUp();
 
 		/** @var IAppManager $appManager */
 		$appManager = \OCP\Server::get(IAppManager::class);
@@ -119,6 +128,8 @@ final class DisablePreserveDataIntegrationTest extends TestCase
 			$installer->installApp(UninstallDropTables::APP_ID);
 			$appManager->enableApp(UninstallDropTables::APP_ID);
 		}
+		// After the re-enable above: its pre-migration snapshot is swept too.
+		$this->backupStateGuard->tearDown();
 		parent::tearDown();
 	}
 

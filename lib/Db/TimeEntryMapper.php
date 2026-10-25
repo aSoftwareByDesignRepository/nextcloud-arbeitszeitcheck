@@ -425,7 +425,7 @@ class TimeEntryMapper extends QBMapper
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
 			->andWhere($qb->expr()->eq('status', $qb->createNamedParameter(TimeEntry::STATUS_PAUSED)))
 			->andWhere($qb->expr()->isNull('end_time'))
-			->andWhere($qb->expr()->eq('is_manual_entry', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('is_manual_entry', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
 			->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($localTodayStart->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
 			->orderBy('start_time', 'ASC');
 

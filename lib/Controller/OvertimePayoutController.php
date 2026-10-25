@@ -193,7 +193,7 @@ class OvertimePayoutController extends Controller
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Access denied')], Http::STATUS_FORBIDDEN);
 			}
 
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::listAudit: ' . $e->getMessage(), ['exception' => $e]);
 
@@ -231,7 +231,7 @@ class OvertimePayoutController extends Controller
 				return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Access denied')], Http::STATUS_FORBIDDEN);
 			}
 
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::adminMonthClosurePdf: ' . $e->getMessage(), ['exception' => $e]);
 
@@ -276,7 +276,7 @@ class OvertimePayoutController extends Controller
 
 			return new JSONResponse(['success' => true, 'data' => $data]);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::listMonth: ' . $e->getMessage(), ['exception' => $e]);
 
@@ -306,7 +306,7 @@ class OvertimePayoutController extends Controller
 
 			return new JSONResponse(['success' => true, 'result' => $result]);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\OCP\Lock\LockedException $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -335,7 +335,7 @@ class OvertimePayoutController extends Controller
 
 			return new DataDownloadResponse($csv, $filename, 'text/csv; charset=UTF-8');
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::exportCsv: ' . $e->getMessage(), ['exception' => $e]);
 
@@ -362,7 +362,7 @@ class OvertimePayoutController extends Controller
 
 			return new JSONResponse(['success' => true, 'result' => $result]);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('OvertimePayoutController::processBulk: ' . $e->getMessage(), ['exception' => $e]);
 

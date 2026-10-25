@@ -3038,7 +3038,7 @@ class AdminController extends Controller
 				} catch (BusinessRuleException $e) {
 					return new JSONResponse([
 						'success' => false,
-						'error' => $e->getMessage(),
+						'error' => $this->l10n->t($e->getMessage()),
 					], Http::STATUS_BAD_REQUEST);
 				}
 			}
@@ -4850,7 +4850,7 @@ class AdminController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'code' => InvalidEmployeeListFilterException::CODE,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 			], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in AdminController::getUsers: ' . $e->getMessage(), [
@@ -5638,7 +5638,7 @@ class AdminController extends Controller
 			$status = $e->getReasonCode() === 'DEFAULT_MODEL' ? Http::STATUS_CONFLICT : Http::STATUS_BAD_REQUEST;
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'code' => $e->getReasonCode(),
 			], $status);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
@@ -6270,7 +6270,7 @@ class AdminController extends Controller
 			);
 			return new JSONResponse(array_merge(['success' => true], $result), Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\OCP\Lock\LockedException $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -6305,7 +6305,7 @@ class AdminController extends Controller
 			);
 			return new JSONResponse(array_merge(['success' => true], $result));
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\OCP\Lock\LockedException $e) {
 			return new JSONResponse([
 				'success' => false,
@@ -6337,7 +6337,7 @@ class AdminController extends Controller
 		} catch (AdminUserProfileUpdateException $e) {
 			return $this->profileUpdateExceptionResponse($e);
 		} catch (BusinessRuleException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('updateUserTimeCaptureSettings failed', ['exception' => $e]);
 			return new JSONResponse([
@@ -7132,7 +7132,7 @@ class AdminController extends Controller
 			return new JSONResponse([
 				'success' => false,
 				'code' => InvalidEmployeeListFilterException::CODE,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 			], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			throw new \Exception($this->l10n->t('Failed to export users.'));

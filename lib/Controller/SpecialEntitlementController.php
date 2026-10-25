@@ -112,7 +112,7 @@ final class SpecialEntitlementController extends Controller
 		}
 		return new JSONResponse([
 			'success' => false,
-			'error' => $e->getMessage(),
+			'error' => \OCA\ArbeitszeitCheck\Support\WireText::t($e->getMessage()),
 			'error_code' => $e->getReasonCode(),
 			'fields' => $e->fields(),
 		], $e->httpStatus());

@@ -383,8 +383,8 @@ final class SpecialEntitlementAdminController extends Controller
 		}
 		return new JSONResponse([
 			'success' => false,
-			'error' => $e->getMessage(),
-			'message' => $e->getMessage(),
+			'error' => $this->l10n->t($e->getMessage()),
+			'message' => $this->l10n->t($e->getMessage()),
 			'error_code' => $e->getReasonCode(),
 			'fields' => $e->fields(),
 		], $e->httpStatus());

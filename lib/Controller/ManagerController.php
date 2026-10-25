@@ -2291,7 +2291,7 @@ class ManagerController extends Controller
 				);
 				$payloadOut = [
 					'success' => false,
-					'error' => $e->getMessage(),
+					'error' => $this->l10n->t($e->getMessage()),
 				];
 				$code = $e->getReasonCode();
 				if ($code !== null && $code !== '') {
@@ -2306,7 +2306,7 @@ class ManagerController extends Controller
 				);
 				$payloadOut = [
 					'success' => false,
-					'error' => $e->getMessage(),
+					'error' => $this->l10n->t($e->getMessage()),
 				];
 				if (preg_match('/\[([A-Z0-9_]{3,64})\]\s*$/', $e->getMessage(), $m) === 1) {
 					$payloadOut['code'] = $m[1];
@@ -2484,7 +2484,7 @@ class ManagerController extends Controller
 			try {
 				$saved = $this->correctionService->createManagerRecordedEntry($entry, $proposal, $managerId, $reason);
 			} catch (\InvalidArgumentException $e) {
-				return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+				return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 			}
 
 			$this->auditLogMapper->logAction(
@@ -2510,7 +2510,7 @@ class ManagerController extends Controller
 				'message' => $this->l10n->t('Time entry recorded for the employee.'),
 			], Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
-			return new JSONResponse(['success' => false, 'error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ManagerController::createEmployeeTimeEntry', ['exception' => $e]);
 			return new JSONResponse([
@@ -3315,7 +3315,7 @@ class ManagerController extends Controller
 			} catch (\InvalidArgumentException $e) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $e->getMessage()
+					'error' => $this->l10n->t($e->getMessage())
 				], Http::STATUS_BAD_REQUEST);
 			} catch (ConcurrentDecisionException $e) {
 				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
@@ -3575,7 +3575,7 @@ class ManagerController extends Controller
 			} catch (\InvalidArgumentException $e) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $e->getMessage()
+					'error' => $this->l10n->t($e->getMessage())
 				], Http::STATUS_BAD_REQUEST);
 			}
 

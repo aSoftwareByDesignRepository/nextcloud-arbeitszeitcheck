@@ -2233,7 +2233,7 @@ class TimeEntryController extends Controller
 			} catch (\Exception $e) {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $e->getMessage(),
+					'error' => $this->l10n->t($e->getMessage()),
 				], Http::STATUS_BAD_REQUEST);
 			}
 			if ($clockBased !== null) {
@@ -2258,7 +2258,7 @@ class TimeEntryController extends Controller
 				} catch (\Exception $e) {
 					return new JSONResponse([
 						'success' => false,
-						'error' => $e->getMessage(),
+						'error' => $this->l10n->t($e->getMessage()),
 					], Http::STATUS_BAD_REQUEST);
 				}
 				if ($breaks !== null) {
@@ -2627,7 +2627,7 @@ class TimeEntryController extends Controller
 		} catch (MonthFinalizedException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 			], Http::STATUS_CONFLICT);
 		} catch (LockedException $e) {
 			return new JSONResponse([

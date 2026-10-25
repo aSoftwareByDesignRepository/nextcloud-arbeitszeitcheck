@@ -111,8 +111,8 @@ class ExternalStampController extends Controller
 			'not_found' => $this->notFound(),
 			'already_decided' => new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
-				'message' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
+				'message' => $this->l10n->t($e->getMessage()),
 				'error_code' => 'already_decided',
 			], Http::STATUS_CONFLICT),
 			'unauthenticated' => new JSONResponse([
@@ -121,8 +121,8 @@ class ExternalStampController extends Controller
 			], Http::STATUS_UNAUTHORIZED),
 			default => new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
-				'message' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
+				'message' => $this->l10n->t($e->getMessage()),
 				'error_code' => $e->getReasonCode() ?? 'rejected',
 			], Http::STATUS_BAD_REQUEST),
 		};

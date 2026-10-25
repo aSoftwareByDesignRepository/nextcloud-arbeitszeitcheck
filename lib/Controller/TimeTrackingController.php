@@ -86,7 +86,7 @@ class TimeTrackingController extends Controller
 		if ($e instanceof TimeCaptureForbiddenException) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'error_code' => $e->getErrorCode(),
 			], Http::STATUS_FORBIDDEN);
 		}

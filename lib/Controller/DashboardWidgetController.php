@@ -132,8 +132,8 @@ class DashboardWidgetController extends Controller {
 		} catch (TimeCaptureForbiddenException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
-				'message' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
+				'message' => $this->l10n->t($e->getMessage()),
 				'error_code' => $e->getErrorCode(),
 			], Http::STATUS_FORBIDDEN);
 		} catch (BusinessRuleException $e) {

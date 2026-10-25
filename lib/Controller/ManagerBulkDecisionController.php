@@ -85,13 +85,13 @@ final class ManagerBulkDecisionController extends Controller
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'error_code' => 'VALIDATION_ERROR',
 			], Http::STATUS_BAD_REQUEST);
 		} catch (BulkDecisionException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'error_code' => $e->getReasonCode(),
 				'error_details' => $e->getDetails(),
 				'fields' => $e->fields(),
@@ -101,7 +101,7 @@ final class ManagerBulkDecisionController extends Controller
 		} catch (MonthFinalizedException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'error_code' => 'month_finalized',
 			], Http::STATUS_CONFLICT);
 		} catch (BusinessTripException $e) {
@@ -115,7 +115,7 @@ final class ManagerBulkDecisionController extends Controller
 			}
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage(),
+				'error' => $this->l10n->t($e->getMessage()),
 				'error_code' => $e->getReasonCode(),
 				'fields' => $e->fields(),
 			], $e->httpStatus());

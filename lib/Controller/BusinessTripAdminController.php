@@ -251,7 +251,7 @@ final class BusinessTripAdminController extends Controller
 			if ($e->getReasonCode() === 'TRIP_ROLLOUT_BLOCKED') {
 				return new JSONResponse([
 					'success' => false,
-					'error' => $e->getMessage(),
+					'error' => $this->l10n->t($e->getMessage()),
 					'error_code' => $e->getReasonCode(),
 					'fields' => [],
 					'preflight' => $this->service->rolloutStatus()['preflight'],
@@ -387,7 +387,7 @@ final class BusinessTripAdminController extends Controller
 		}
 		return new JSONResponse([
 			'success' => false,
-			'error' => $e->getMessage(),
+			'error' => $this->l10n->t($e->getMessage()),
 			'error_code' => $e->getReasonCode(),
 			'fields' => $e->fields(),
 		], $e->httpStatus());

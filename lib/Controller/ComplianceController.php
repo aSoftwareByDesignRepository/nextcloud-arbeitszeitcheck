@@ -1018,7 +1018,7 @@ class ComplianceController extends Controller
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse([
 				'success' => false,
-				'error' => $e->getMessage()
+				'error' => $this->l10n->t($e->getMessage())
 			], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('checkRestPeriod error: ' . $e->getMessage(), ['exception' => $e]);

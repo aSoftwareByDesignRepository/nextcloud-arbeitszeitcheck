@@ -542,7 +542,7 @@
 #admin-settings-form .access-groups-item,
 #admin-notifications-form .access-groups-item{
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
     "checkbox label"
     "checkbox meta";

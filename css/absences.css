@@ -844,7 +844,7 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 }
 .entitlement-explain-dialog__step-head {
 	display: grid;
-	grid-template-columns: auto 1fr auto;
+	grid-template-columns: auto minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 0.5rem 0.65rem;
 }

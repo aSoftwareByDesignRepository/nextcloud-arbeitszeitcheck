@@ -254,7 +254,7 @@
   .sm\:items-center { align-items: center; }
   
   .content-layout {
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: var(--space-8);
   }
   
@@ -297,7 +297,7 @@
   .md\:items-center { align-items: center; }
   
   .content-layout {
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: minmax(0, 1fr) 350px;
     gap: var(--space-10);
   }
 }
@@ -332,7 +332,7 @@
   .lg\:items-center { align-items: center; }
   
   .content-layout {
-    grid-template-columns: 1fr 400px;
+    grid-template-columns: minmax(0, 1fr) 400px;
     gap: var(--space-12);
   }
 }
@@ -367,7 +367,7 @@
   .xl\:items-center { align-items: center; }
   
   .content-layout {
-    grid-template-columns: 1fr 450px;
+    grid-template-columns: minmax(0, 1fr) 450px;
     gap: var(--space-16);
   }
 }
@@ -402,7 +402,7 @@
   .2xl\:items-center { align-items: center; }
   
   .content-layout {
-    grid-template-columns: 1fr 500px;
+    grid-template-columns: minmax(0, 1fr) 500px;
     gap: var(--space-20);
   }
 }

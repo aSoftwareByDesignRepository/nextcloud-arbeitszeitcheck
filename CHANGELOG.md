@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.9.8 - 2026-10-25
+
+### Fixed
+
+- locale-stable exception classification + L1-06 audit coverage
+- minmax(0,1fr) on content/grid columns to prevent track blowout
+- dedupe marker no longer swallows post-completion enqueues
+- NC35 IJob-object enqueue dedupe + a11y/l10n hardening
+- localize manager-people violations badge count
+- repair two drifted linkToRoute names
+- surface per-table failures in CleanDanglingTariffRuleSetRefs output
+- catalog 54 AuditLogPresenter labels across all 12 locales
+- CleanDanglingTariffRuleSetRefs post-migration step
+- dismiss hit-target 24px, absence-seed teardown, axe settle, hover-first clicks
+- register ext-stamp suggestion strings + '1 post'/'%n poster' shared da/sv forms
+- map stale-confirm replay errors to 422; e2e specs to merged contracts
+- plural-aware count strings + row-hover reveal in craft spec
+- nb/sv/da residual corrections + reviewed shared-token registry
+- drop dead ordinal-name dataset (66 keys) + sv omprövas + registry purge
+- complete onboarding-key translations (7 catalogs) + strong control border on table pager
+- close crit9 fifth-cluster residuals + real-lexicon gate + 769px boundary family migration
+- post-merge gauntlet — l10n parity across 12 catalogs, nb donor purges, CSS/template contracts
+- purge dashboard-branch residuals — sv/nb/pl l10n bleeds, compliance contract
+- purge r8 sv/pl/nb fourth-cluster residuals + fail-closed systematic gate
+- purge r7 sv/pl third-cluster residuals + systematic gate signatures
+- screenshot-matrix producers — readonly pickers + correct absences field ids
+- purge r6 Danish residuals in nb/sv + harden marker gate
+- align with design-system conventions + fit table at 1280
+- NoCSRFRequired on GET /api/work-locations — raw catalog fetch sent no requesttoken
+- prefer hashchange newURL over racy location.hash
+- purge cross-language contamination residuals (nb/sv/pl/da)
+- BCP-47 normalize dateLocale — pt_BR Intl RangeError emptied manager pages
+- derive controller calendar bounds from storage TZ, not the PHP clock
+- close cross-language contamination residuals — it/nb/sv catalogs
+- cross-language contamination residuals, table wrap path, people-overview deny proof
+- unpin dashboard breakdown dt, self-seed manager width test
+- define --azc-accent-ink token — WCAG AA accent text on dark themes
+- keep punch labels, required marks, and under-Soll red
+
+### Added
+
+- TVöD §6 paid-break snapshots per entry + production-readiness audit fixes
+- share one table footer and settle the employee list screens
+- condense time-entry create and ship the shared time picker
+- search/filter pills/sort + severity badge + spec l10n
+- people overview page + scoped export/report hardening
+
+### Changed
+
+- L10N-08 wire-boundary proof — API error payloads localized per caller language
+- l10n: complete wire-boundary residuals + audit action labeling (L10N-08/L1-06 follow-up)
+- per-entry row for silent paid-break reallocations (L1-06)
+- l10n: translate exception messages at the API wire boundary (L10N-08)
+- paid-breaks craft coverage — wtm editor impact, compliance cap, employee paid line
+- avd_craft r6-android craft recaptures — lane banked output
+- scope work-location badge assert through the server pager
+- bound painted-frame waits + per-cell logging in screenshot matrix
+- raise screenshot-matrix sweep timeout to 30min
+- hover row before row-action clicks (hover-reveal actions-cell)
+- checkpoint multi-lane dirty tree before lara/dashboard merge
+- screenshot-matrix capture contract — closes surface-not-inventoried
+- baseline-green guard for mutation runners
+- assert intro substitutes %s, never literal (shared pack re-sync)
+- l10n: translate people-overview list controls in all 10 locales
+- batch org-scope oversight queries; harden mutation gauntlet
+
 ## 1.9.7 - 2026-10-20
 
 ### Fixed

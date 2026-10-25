@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\DailyComplianceCheckJob;
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -33,6 +34,7 @@ class DailyComplianceCheckJobTest extends TestCase
 			$compliance,
 			$config,
 			$logger,
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$ref = new ReflectionClass($job);
@@ -65,6 +67,7 @@ class DailyComplianceCheckJobTest extends TestCase
 			$compliance,
 			$config,
 			$logger,
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$ref = new ReflectionClass($job);

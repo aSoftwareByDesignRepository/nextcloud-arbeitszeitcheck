@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\KioskMaintenanceJob;
 use OCA\ArbeitszeitCheck\Db\KioskEnrollmentMapper;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskTerminalService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -29,7 +30,7 @@ class KioskMaintenanceJobTest extends TestCase
 		$logger = $this->createMock(LoggerInterface::class);
 		$logger->expects($this->exactly(2))->method('info');
 
-		$job = new KioskMaintenanceJob($time, $terminals, $enrollments, $logger);
+		$job = new KioskMaintenanceJob($time, $terminals, $enrollments, $logger, $this->createMock(ILockingProvider::class));
 		$ref = new ReflectionClass($job);
 		$method = $ref->getMethod('run');
 		$method->setAccessible(true);

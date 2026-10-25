@@ -21,6 +21,7 @@ use OCP\DB\IResult;
 use OCP\DB\QueryBuilder\IExpressionBuilder;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -45,6 +46,7 @@ class JobCoverageTest extends TestCase
 			$this->createMock(ITimeFactory::class),
 			$mail,
 			$logger ?? $this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 	}
 
@@ -99,6 +101,7 @@ class JobCoverageTest extends TestCase
 			$this->createMock(ITimeFactory::class),
 			$db,
 			$logger ?? $this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 	}
 

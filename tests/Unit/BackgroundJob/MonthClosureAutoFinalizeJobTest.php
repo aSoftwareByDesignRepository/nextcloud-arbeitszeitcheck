@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\BackgroundJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\MonthClosureAutoFinalizeJob;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -36,7 +37,7 @@ class MonthClosureAutoFinalizeJobTest extends TestCase
 		$logger->expects($this->once())->method('info')
 			->with('Month closure auto-finalize job finished', $this->arrayHasKey('finalized'));
 
-		$job = new MonthClosureAutoFinalizeJob($time, $monthClosure, $logger);
+		$job = new MonthClosureAutoFinalizeJob($time, $monthClosure, $logger, $this->createMock(ILockingProvider::class));
 
 		$ref = new ReflectionClass($job);
 		$method = $ref->getMethod('run');

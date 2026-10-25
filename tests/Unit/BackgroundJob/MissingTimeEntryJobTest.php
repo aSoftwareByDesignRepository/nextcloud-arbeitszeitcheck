@@ -14,6 +14,7 @@ use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -61,7 +62,8 @@ class MissingTimeEntryJobTest extends TestCase
 			$this->userManager,
 			$this->config,
 			$this->logger,
-			$permissionService
+			$permissionService,
+			$this->createMock(ILockingProvider::class)
 		);
 	}
 

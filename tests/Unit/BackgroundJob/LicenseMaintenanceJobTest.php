@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\LicenseMaintenanceJob;
 use OCA\ArbeitszeitCheck\Service\LicenseEnforcementService;
 use OCA\ArbeitszeitCheck\Service\LicenseService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -28,6 +29,7 @@ class LicenseMaintenanceJobTest extends TestCase
 			$license,
 			$enforcement,
 			$this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$this->invokeRun();
@@ -49,6 +51,7 @@ class LicenseMaintenanceJobTest extends TestCase
 			$license,
 			$enforcement,
 			$this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$this->invokeRun();

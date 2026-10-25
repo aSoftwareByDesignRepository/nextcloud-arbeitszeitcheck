@@ -14,6 +14,7 @@ use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -67,6 +68,7 @@ class BreakReminderJobTest extends TestCase
 				$this->createMock(PermissionService::class),
 				$this->createMock(TimeTrackingService::class),
 				$this->createMock(LaborLawProfileFactory::class),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -102,6 +104,7 @@ class BreakReminderJobTest extends TestCase
 				$this->createMock(PermissionService::class),
 				$this->createMock(TimeTrackingService::class),
 				$this->createMock(LaborLawProfileFactory::class),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -164,6 +167,7 @@ class BreakReminderJobTest extends TestCase
 				$permission,
 				$timeTracking,
 				$this->createMock(LaborLawProfileFactory::class),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -232,6 +236,7 @@ class BreakReminderJobTest extends TestCase
 				$permission,
 				$timeTracking,
 				$this->createMock(LaborLawProfileFactory::class),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -330,6 +335,7 @@ class BreakReminderJobTest extends TestCase
 				$permission,
 				$timeTracking,
 				$law,
+				$this->createMock(ILockingProvider::class),
 				$resolver,
 			);
 
@@ -441,6 +447,7 @@ class BreakReminderJobTest extends TestCase
 				$permission,
 				$timeTracking,
 				$lawProfileFactory,
+				$this->createMock(ILockingProvider::class),
 				$resolver,
 			);
 
@@ -551,6 +558,7 @@ class BreakReminderJobTest extends TestCase
 				$permission,
 				$timeTracking,
 				$law,
+				$this->createMock(ILockingProvider::class),
 				$resolver,
 			);
 

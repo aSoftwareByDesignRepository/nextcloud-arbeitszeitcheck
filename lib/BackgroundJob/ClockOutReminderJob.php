@@ -16,10 +16,13 @@ use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TimeZoneService;
+use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use OCP\IConfig;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -36,6 +39,7 @@ class ClockOutReminderJob extends TimedJob
 	private IUserManager $userManager;
 	private IConfig $config;
 	private LoggerInterface $logger;
+	private ILockingProvider $locking;
 	private PermissionService $permissionService;
 	private TimeZoneService $timeZoneService;
 
@@ -48,7 +52,8 @@ class ClockOutReminderJob extends TimedJob
 		IConfig $config,
 		LoggerInterface $logger,
 		PermissionService $permissionService,
-		TimeZoneService $timeZoneService
+		TimeZoneService $timeZoneService,
+		ILockingProvider $locking
 	) {
 		parent::__construct($timeFactory);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -57,6 +62,7 @@ class ClockOutReminderJob extends TimedJob
 		$this->userManager = $userManager;
 		$this->config = $config;
 		$this->logger = $logger;
+		$this->locking = $locking;
 		$this->permissionService = $permissionService;
 		$this->timeZoneService = $timeZoneService;
 
@@ -68,6 +74,33 @@ class ClockOutReminderJob extends TimedJob
 	 * @inheritDoc
 	 */
 	protected function run($argument): void
+	{
+		// Shared lock on the upgrade-backup key: a restore holds it
+		// exclusively (UpgradeBackupService::runExclusive) — app-table
+		// scans/writes must not interleave with a mid-restore
+		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
+		// on their interval.
+		try {
+			$this->locking->acquireLock(
+				UpgradeBackupService::LOCK_KEY,
+				ILockingProvider::LOCK_SHARED,
+				'clock-out reminder check',
+			);
+		} catch (LockedException) {
+			$this->logger->warning(
+				'ArbeitszeitCheck: skipping clock-out reminder check — upgrade backup/restore in progress.',
+				['app' => 'arbeitszeitcheck'],
+			);
+			return;
+		}
+		try {
+			$this->doRun($argument);
+		} finally {
+			$this->locking->releaseLock(UpgradeBackupService::LOCK_KEY, ILockingProvider::LOCK_SHARED);
+		}
+	}
+
+	private function doRun($argument): void
 	{
 		$currentHour = (int)date('G');
 		

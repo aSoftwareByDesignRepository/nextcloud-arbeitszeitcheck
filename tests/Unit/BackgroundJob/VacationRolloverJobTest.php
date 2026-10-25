@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\BackgroundJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\VacationRolloverJob;
 use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -33,6 +34,7 @@ class VacationRolloverJobTest extends TestCase
 			$this->createMock(ITimeFactory::class),
 			$rollover,
 			$logger,
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$ref = new ReflectionClass($job);

@@ -6,10 +6,13 @@ namespace OCA\ArbeitszeitCheck\BackgroundJob;
 
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Migration\Version1046Date20260921120000;
+use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -23,6 +26,7 @@ class BackfillAuditCaptureSourceJob extends TimedJob
 		ITimeFactory $timeFactory,
 		private IDBConnection $db,
 		private LoggerInterface $logger,
+		private ILockingProvider $locking,
 	) {
 		parent::__construct($timeFactory);
 		// Hourly until idle; cheap no-op when nothing left.
@@ -30,6 +34,33 @@ class BackfillAuditCaptureSourceJob extends TimedJob
 	}
 
 	protected function run($argument): void
+	{
+		// Shared lock on the upgrade-backup key: a restore holds it
+		// exclusively (UpgradeBackupService::runExclusive) — app-table
+		// scans/writes must not interleave with a mid-restore
+		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
+		// on their interval.
+		try {
+			$this->locking->acquireLock(
+				UpgradeBackupService::LOCK_KEY,
+				ILockingProvider::LOCK_SHARED,
+				'audit capture-source backfill',
+			);
+		} catch (LockedException) {
+			$this->logger->warning(
+				'ArbeitszeitCheck: skipping audit capture-source backfill — upgrade backup/restore in progress.',
+				['app' => 'arbeitszeitcheck'],
+			);
+			return;
+		}
+		try {
+			$this->doRun($argument);
+		} finally {
+			$this->locking->releaseLock(UpgradeBackupService::LOCK_KEY, ILockingProvider::LOCK_SHARED);
+		}
+	}
+
+	private function doRun($argument): void
 	{
 		if (!$this->db->tableExists('at_audit')) {
 			return;

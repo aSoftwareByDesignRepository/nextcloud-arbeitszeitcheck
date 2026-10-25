@@ -14,6 +14,7 @@ use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
 use OCP\IUserManager;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -38,6 +39,7 @@ class OvertimeTrafficLightJobTest extends TestCase
 			$this->createMock(IConfig::class),
 			$this->createMock(PermissionService::class),
 			$this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$ref = new ReflectionClass($job);
@@ -71,6 +73,7 @@ class OvertimeTrafficLightJobTest extends TestCase
 			$config,
 			$this->createMock(PermissionService::class),
 			$this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$ref = new ReflectionClass($job);
@@ -136,6 +139,7 @@ class OvertimeTrafficLightJobTest extends TestCase
 			$config,
 			$permission,
 			$this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 
 		$method = (new ReflectionClass($job))->getMethod('run');

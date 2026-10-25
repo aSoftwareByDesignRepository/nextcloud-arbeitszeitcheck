@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\WorkLogPullJob;
 use OCA\ArbeitszeitCheck\Service\ExternalStampService;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -34,6 +35,7 @@ class WorkLogPullJobTest extends TestCase
 			$apps,
 			$svc ?? $this->createMock(ExternalStampService::class),
 			$logger ?? $this->createMock(LoggerInterface::class),
+			$this->createMock(ILockingProvider::class),
 		);
 	}
 

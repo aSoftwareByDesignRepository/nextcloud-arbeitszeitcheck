@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use ReflectionClass;
@@ -116,6 +117,7 @@ class PaidBreakRecomputeJobTest extends TestCase
 			$this->auditLog,
 			$this->jobList,
 			new NullLogger(),
+			$this->createMock(ILockingProvider::class),
 			$cacheFactory,
 		);
 	}

@@ -15,6 +15,7 @@ use OCP\IConfig;
 use OCP\IDateTimeZone;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -82,6 +83,7 @@ class ClockOutReminderJobTest extends TestCase
 				$this->createMock(LoggerInterface::class),
 				$this->createMock(PermissionService::class),
 				$this->timeZoneService(),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -116,6 +118,7 @@ class ClockOutReminderJobTest extends TestCase
 				$logger,
 				$this->createMock(PermissionService::class),
 				$this->timeZoneService(),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$ref = new ReflectionClass($job);
@@ -176,6 +179,7 @@ class ClockOutReminderJobTest extends TestCase
 				new NullLogger(),
 				$permission,
 				$this->timeZoneService(),
+				$this->createMock(ILockingProvider::class),
 			);
 
 			$method = (new ReflectionClass($job))->getMethod('run');

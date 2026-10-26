@@ -164,6 +164,14 @@ svg[class*='__glyph'],
 	color: var(--color-main-text);
 }
 
+/* Month/year jump selects inside the calendar popup (built by
+ * js/common/datepicker.js; geometry lives in the inline styles there). */
+.arbeitszeitcheck-datepicker__month-select:focus-visible,
+.arbeitszeitcheck-datepicker__year-select:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
 /* NC dashboard desklet status glyphs */
 .dashboard-widget-status-icon.azc-icon,
 .dashboard-widget-status-icon {

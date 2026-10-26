@@ -214,13 +214,13 @@ if ($mode === 'list') {
                             <div class="azc-filter-field">
                                 <label for="filter-start-date" class="azc-filter-field__label"><?php p($l->t('Start Date')); ?></label>
                                 <div class="azc-filter-field__control">
-                                    <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterStartDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                                    <input type="text" id="filter-start-date" name="start_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterStartDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10">
                                 </div>
                             </div>
                             <div class="azc-filter-field">
                                 <label for="filter-end-date" class="azc-filter-field__label"><?php p($l->t('End Date')); ?></label>
                                 <div class="azc-filter-field__control">
-                                    <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterEndDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly>
+                                    <input type="text" id="filter-end-date" name="end_date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" value="<?php p($filterEndDate); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10">
                                 </div>
                             </div>
                             <div class="azc-filter-field">

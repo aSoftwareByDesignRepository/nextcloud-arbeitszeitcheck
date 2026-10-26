@@ -238,7 +238,7 @@ test.describe('ArbeitszeitCheck UI invariants (atlas-ui-invariants)', () => {
 		await form.waitFor({ state: 'visible', timeout: 30_000 })
 		const { date } = slotFor(5)
 		const [dd, mm, yyyy] = date.split('-').reverse()
-		// #entry-date is readonly (datepicker-managed) — set programmatically.
+		// #entry-date is datepicker-managed — set programmatically.
 		await page.evaluate((d) => {
 			const el = document.getElementById('entry-date')
 			el.value = d

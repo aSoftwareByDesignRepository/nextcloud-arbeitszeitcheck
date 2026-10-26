@@ -65,11 +65,11 @@ $colCount = $canSeeScope ? 6 : 5;
                     <?php endif; ?>
                     <div class="compliance-violations__filter-field">
                         <label for="start-date" class="compliance-violations__filter-label"><?php p($l->t('Start Date')); ?></label>
-                        <input type="text" id="start-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly aria-label="<?php p($l->t('Start date for filter')); ?>">
+                        <input type="text" id="start-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" aria-label="<?php p($l->t('Start date for filter')); ?>">
                     </div>
                     <div class="compliance-violations__filter-field">
                         <label for="end-date" class="compliance-violations__filter-label"><?php p($l->t('End Date')); ?></label>
-                        <input type="text" id="end-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly aria-label="<?php p($l->t('End date for filter')); ?>">
+                        <input type="text" id="end-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" aria-label="<?php p($l->t('End date for filter')); ?>">
                     </div>
                     <div class="compliance-violations__filter-field">
                         <label for="severity-filter" class="compliance-violations__filter-label"><?php p($l->t('Severity')); ?></label>

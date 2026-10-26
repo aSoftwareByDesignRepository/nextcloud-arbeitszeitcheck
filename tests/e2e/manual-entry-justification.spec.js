@@ -62,7 +62,7 @@ test.describe('Manual time entry justification (four-eyes)', () => {
 			await justification.fill(reason)
 			await expect(employeePage.locator('#entry-justification-count')).toContainText(/10\+|submit/i)
 
-			// Prefer API submit for the persistence proof (datepicker is readonly; form
+			// Prefer API submit for the persistence proof (form
 			// times collide with prior E2E/fixture rows). UI proof above already covers
 			// the missing-field bug; API proves justification is accepted end-to-end.
 			// Scan historical dates to avoid shared-dev overlap with today's clock slots.

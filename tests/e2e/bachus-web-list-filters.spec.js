@@ -158,7 +158,7 @@ test.describe('Bachus: manager reports date-range filters', () => {
 	});
 
 	/**
-	 * Reports datepickers are readonly (calendar widget). Drive values via the DOM
+	 * Reports datepickers are calendar-backed inputs. Drive values via the DOM
 	 * so each range is toggled honestly without depending on the picker UI.
 	 * @param {import('@playwright/test').Locator} locator
 	 * @param {string} value

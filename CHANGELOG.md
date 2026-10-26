@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Datepicker inputs are typeable again (forgiving dd.mm.yyyy parsing incl. short
+  variants) and the calendar header now offers month/year dropdowns — entering a
+  hire date from 2009 no longer means stepping through ~200 months (#48)
+
 ## 1.9.8 - 2026-10-25
 
 ### Fixed

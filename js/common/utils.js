@@ -1237,6 +1237,9 @@ const ArbeitszeitCheckUtils = {
   l10n.openCalendar = l10n.openCalendar || tt('Open calendar');
   l10n.previousMonth = l10n.previousMonth || tt('Previous month');
   l10n.nextMonth = l10n.nextMonth || tt('Next month');
+  l10n.chooseDate = l10n.chooseDate || tt('Choose a date');
+  l10n.chooseMonth = l10n.chooseMonth || tt('Choose month');
+  l10n.chooseYear = l10n.chooseYear || tt('Choose year');
 })();
 
 // Export for use in other modules

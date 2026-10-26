@@ -93,7 +93,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 												placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
 												pattern="\d{2}\.\d{2}\.\d{4}"
 												maxlength="10"
-												readonly
 												required
 												autocomplete="off"
 												aria-required="true"
@@ -111,7 +110,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 												placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
 												pattern="\d{2}\.\d{2}\.\d{4}"
 												maxlength="10"
-												readonly
 												required
 												autocomplete="off"
 												aria-required="true"
@@ -226,13 +224,13 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 						<div class="azc-filter-field">
 							<label for="manager-absence-record-start" class="azc-filter-field__label"><?php p($l->t('From')); ?></label>
 							<div class="azc-filter-field__control">
-								<input id="manager-absence-record-start" name="record_start_date" type="text" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly required autocomplete="off" aria-label="<?php p($l->t('From')); ?>" />
+								<input id="manager-absence-record-start" name="record_start_date" type="text" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" required autocomplete="off" aria-label="<?php p($l->t('From')); ?>" />
 							</div>
 						</div>
 						<div class="azc-filter-field">
 							<label for="manager-absence-record-end" class="azc-filter-field__label"><?php p($l->t('To')); ?></label>
 							<div class="azc-filter-field__control">
-								<input id="manager-absence-record-end" name="record_end_date" type="text" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" readonly required autocomplete="off" aria-label="<?php p($l->t('To')); ?>" />
+								<input id="manager-absence-record-end" name="record_end_date" type="text" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" required autocomplete="off" aria-label="<?php p($l->t('To')); ?>" />
 							</div>
 						</div>
 						<div class="azc-filter-field" id="manager-absence-record-day-fraction-field" hidden>

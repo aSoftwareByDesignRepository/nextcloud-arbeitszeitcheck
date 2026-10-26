@@ -100,7 +100,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 												placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
 												pattern="\d{2}\.\d{2}\.\d{4}"
 												maxlength="10"
-												readonly
 												required
 												autocomplete="off"
 												aria-required="true"
@@ -118,7 +117,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 												placeholder="<?php p($l->t('dd.mm.yyyy')); ?>"
 												pattern="\d{2}\.\d{2}\.\d{4}"
 												maxlength="10"
-												readonly
 												required
 												autocomplete="off"
 												aria-required="true"

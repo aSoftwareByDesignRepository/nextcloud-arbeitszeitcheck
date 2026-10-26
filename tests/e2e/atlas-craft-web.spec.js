@@ -205,7 +205,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await gotoApp(page, '/apps/arbeitszeitcheck/absences/create');
 		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
 		{
-			// Datepicker inputs are readonly — clear via value+events (same
+			// Datepicker inputs — clear via value+events (same
 			// pattern as the filter leg below), never fill().
 			await page.evaluate(() => {
 				for (const id of ['absence-start-date', 'absence-end-date']) {
@@ -324,7 +324,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		}
 
 		/* --- honest empty state: filter time-entries to an empty range ---
-		   The date inputs are readonly datepicker fields — drive them through
+		   The date inputs are datepicker fields — drive them through
 		   the same value+change events the picker sets, then Apply. */
 		const filterToggle = page.locator('#btn-filter').first();
 		if (await filterToggle.count()) {

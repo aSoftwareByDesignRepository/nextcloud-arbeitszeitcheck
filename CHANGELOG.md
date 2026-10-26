@@ -5,13 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 1.9.9 - 2026-10-26
 
 ### Fixed
 
-- Datepicker inputs are typeable again (forgiving dd.mm.yyyy parsing incl. short
-  variants) and the calendar header now offers month/year dropdowns — entering a
-  hire date from 2009 no longer means stepping through ~200 months (#48)
+- datepicker inputs are typeable again (forgiving dd.mm.yyyy parsing incl. short
+  variants like 1.3.09) and the calendar header offers month/year dropdowns —
+  a hire date from 2009 no longer means stepping through ~200 months (#48);
+  applies to every date field in the app
+- trip item sub-label contrast on tinted rows (WCAG 1.4.3)
+- wire all background jobs into the shared-lock contract
+- manager trip detail card follows the decision scope
+
+### Added
+
+- app admins may decide on their own pending entries
+- land family schema-catalog + hardened test-state guard
 
 ## 1.9.8 - 2026-10-25
 

@@ -52,7 +52,9 @@
 
 .bt-trip-item__sub {
 	font-size: 0.85em;
-	color: var(--color-text-maxcontrast, #767676);
+	/* muted-on-tinted-row failed axe 4.5:1 (maxcontrast ≈ 4.08 on the
+	 * primary-light item fill) — size carries the hierarchy instead. */
+	color: var(--color-main-text);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

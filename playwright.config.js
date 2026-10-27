@@ -114,6 +114,9 @@ const STATEFUL_SPECS = [
   // Mutates the admin fixture's core/lang mid-probe — a parallel spec
   // reading admin UI text or API error strings could observe German.
   /api-error-l10n-boundary\.spec\.js/,
+  // Flips the shared employee's theme via OCS (light/dark) mid-probe —
+  // same race class as the theme-responsive specs.
+  /atlas-btn-variant-dialog\.spec\.js/,
 ]
 
 export default defineConfig({

@@ -179,7 +179,7 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		self::assertStringContainsString('.azc-dialog .btn--secondary,', $app);
 
 		$secondaryAt = strpos($app, ".azc-app .btn--secondary,");
-		$dangerAt = strpos($app, ".azc-app .btn--danger {");
+		$dangerAt = strpos($app, ".azc-app .btn--danger,");
 		self::assertNotFalse($secondaryAt);
 		self::assertNotFalse($dangerAt);
 		self::assertLessThan($dangerAt, $secondaryAt, 'Danger must follow secondary so a dual-class button stays danger');
@@ -261,6 +261,70 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		} catch (\InvalidArgumentException $e) {
 			self::assertStringContainsString('hex', $e->getMessage());
 		}
+	}
+
+	/**
+	 * button_variant_specificity_collapse tripwire
+	 * (azc-vis-web-dialog-primary-variant-collapse):
+	 * components.js createModal()/showConfirmDialog() append .azc-dialog /
+	 * .azc-modal-backdrop to document.body — outside #app-content(.azc-app) —
+	 * where NC core button:not(.button-vue) repaints every <button> pale.
+	 * Every variant emitted on <button> inside a dialog must carry
+	 * dialog-scoped !important fill+border armor.
+	 */
+	public function testBodyAppendedDialogsKeepVariantArmor(): void {
+		$css = (string)file_get_contents(dirname(__DIR__, 2) . '/css/app.css');
+
+		foreach (['primary', 'secondary', 'danger'] as $variant) {
+			foreach (['.azc-modal-backdrop', '.azc-dialog'] as $scope) {
+				self::assertMatchesRegularExpression(
+					'/' . preg_quote($scope, '/') . ' \.azc-btn--' . $variant . '[\s,]/',
+					$css,
+					"$scope .azc-btn--$variant selector missing — dialog variant unarmored"
+				);
+				self::assertMatchesRegularExpression(
+					'/' . preg_quote($scope, '/') . ' \.btn--' . $variant . '[\s,]/',
+					$css,
+					"$scope .btn--$variant selector missing — components.js emits plain btn classes"
+				);
+			}
+			// The scoped rule must carry the armored body, not just the selector.
+			self::assertMatchesRegularExpression(
+				'/\.azc-dialog \.btn--' . $variant . '[^{]*\{[^}]*background-color:[^;{}]*!important[^}]*border-color:[^;{}]*!important/s',
+				$css,
+				"Dialog-scoped --$variant rule must pin background + border with !important"
+			);
+		}
+
+		// Core repaints :hover/:active at higher specificity — the armored
+		// states must be restated under the dialog scopes.
+		foreach (['primary', 'secondary', 'danger'] as $variant) {
+			self::assertStringContainsString(".azc-dialog .btn--$variant:hover", $css);
+			self::assertStringContainsString(".azc-modal-backdrop .btn--$variant:hover", $css);
+			self::assertStringContainsString(".azc-dialog .btn--$variant:active", $css);
+			self::assertStringContainsString(".azc-modal-backdrop .btn--$variant:active", $css);
+		}
+
+		// Ghost on <button> exists in dialogs (admin-tariff-rules modal-close);
+		// !important keeps the core hover repaint from giving it a pale fill.
+		foreach (['.azc-modal-backdrop', '.azc-dialog'] as $scope) {
+			self::assertStringContainsString("$scope .azc-btn--ghost", $css);
+		}
+		self::assertMatchesRegularExpression(
+			'/\.azc-dialog \.azc-btn--ghost[^{]*\{[^}]*background-color:\s*transparent\s*!important[^}]*border-color:\s*transparent\s*!important/s',
+			$css,
+			'Dialog-scoped ghost must pin transparent fill + border with !important'
+		);
+
+		// The emitters must keep producing the armored class shapes.
+		$components = (string)file_get_contents(dirname(__DIR__, 2) . '/js/common/components.js');
+		self::assertStringContainsString("document.body.appendChild(backdrop)", $components);
+		self::assertStringContainsString('modal-backdrop azc-modal-backdrop', $components);
+		self::assertMatchesRegularExpression(
+			"/azc-dialog/",
+			$components,
+			'createModal must keep the .azc-dialog class on body-appended modals'
+		);
 	}
 
 	private static function ruleBody(string $css, string $selectorStart): string {

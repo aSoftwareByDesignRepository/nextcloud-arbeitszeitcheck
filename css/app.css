@@ -676,7 +676,17 @@
 #app-content-wrapper .azc-btn--primary,
 .azc-nc-admin-settings .azc-btn--primary,
 .azc-nc-settings-panel .azc-btn--primary,
-.azc-app .btn--primary {
+.azc-app .btn--primary,
+.azc-app .btn-primary,
+.azc-app .button.primary,
+.azc-modal-backdrop .azc-btn--primary,
+.azc-modal-backdrop .btn--primary,
+.azc-modal-backdrop .btn-primary,
+.azc-modal-backdrop .button.primary,
+.azc-dialog .azc-btn--primary,
+.azc-dialog .btn--primary,
+.azc-dialog .btn-primary,
+.azc-dialog .button.primary {
 	/* !important: link + theme cascades must not flatten CTAs to underlined text. */
 	background-color: var(--color-primary-element) !important;
 	border-color: var(--color-primary-element) !important;
@@ -687,7 +697,17 @@
 #app-content-wrapper .azc-btn--primary:hover,
 .azc-nc-admin-settings .azc-btn--primary:hover,
 .azc-nc-settings-panel .azc-btn--primary:hover,
-.azc-app .btn--primary:hover {
+.azc-app .btn--primary:hover,
+.azc-app .btn-primary:hover,
+.azc-app .button.primary:hover,
+.azc-modal-backdrop .azc-btn--primary:hover,
+.azc-modal-backdrop .btn--primary:hover,
+.azc-modal-backdrop .btn-primary:hover,
+.azc-modal-backdrop .button.primary:hover,
+.azc-dialog .azc-btn--primary:hover,
+.azc-dialog .btn--primary:hover,
+.azc-dialog .btn-primary:hover,
+.azc-dialog .button.primary:hover {
 	background-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--color-primary-element-text) !important;
@@ -697,7 +717,17 @@
 #app-content-wrapper .azc-btn--primary:active,
 .azc-nc-admin-settings .azc-btn--primary:active,
 .azc-nc-settings-panel .azc-btn--primary:active,
-.azc-app .btn--primary:active {
+.azc-app .btn--primary:active,
+.azc-app .btn-primary:active,
+.azc-app .button.primary:active,
+.azc-modal-backdrop .azc-btn--primary:active,
+.azc-modal-backdrop .btn--primary:active,
+.azc-modal-backdrop .btn-primary:active,
+.azc-modal-backdrop .button.primary:active,
+.azc-dialog .azc-btn--primary:active,
+.azc-dialog .btn--primary:active,
+.azc-dialog .btn-primary:active,
+.azc-dialog .button.primary:active {
 	background-color: var(--color-primary-element) !important;
 	border-color: var(--color-primary-element) !important;
 	color: var(--color-primary-element-text) !important;
@@ -769,7 +799,17 @@
 #app-content-wrapper .azc-btn--danger,
 .azc-nc-admin-settings .azc-btn--danger,
 .azc-nc-settings-panel .azc-btn--danger,
-.azc-app .btn--danger {
+.azc-app .btn--danger,
+.azc-app .btn-danger,
+.azc-app .button.danger,
+.azc-modal-backdrop .azc-btn--danger,
+.azc-modal-backdrop .btn--danger,
+.azc-modal-backdrop .btn-danger,
+.azc-modal-backdrop .button.danger,
+.azc-dialog .azc-btn--danger,
+.azc-dialog .btn--danger,
+.azc-dialog .btn-danger,
+.azc-dialog .button.danger {
 	background-color: var(--azc-danger-fill) !important;
 	border-color: var(--azc-danger-fill) !important;
 	color: var(--azc-danger-on-fill) !important;
@@ -779,19 +819,59 @@
 #app-content-wrapper .azc-btn--danger:hover,
 .azc-nc-admin-settings .azc-btn--danger:hover,
 .azc-nc-settings-panel .azc-btn--danger:hover,
-.azc-app .btn--danger:hover {
+.azc-app .btn--danger:hover,
+.azc-app .btn-danger:hover,
+.azc-app .button.danger:hover,
+.azc-modal-backdrop .azc-btn--danger:hover,
+.azc-modal-backdrop .btn--danger:hover,
+.azc-modal-backdrop .btn-danger:hover,
+.azc-modal-backdrop .button.danger:hover,
+.azc-dialog .azc-btn--danger:hover,
+.azc-dialog .btn--danger:hover,
+.azc-dialog .btn-danger:hover,
+.azc-dialog .button.danger:hover {
 	background-color: color-mix(in srgb, var(--azc-danger-fill) 85%, var(--color-main-text)) !important;
 	border-color: color-mix(in srgb, var(--azc-danger-fill) 85%, var(--color-main-text)) !important;
 	color: var(--azc-danger-on-fill) !important;
 }
 
+#app-content.azc-app .azc-btn--danger:active,
+#app-content-wrapper .azc-btn--danger:active,
+.azc-nc-admin-settings .azc-btn--danger:active,
+.azc-nc-settings-panel .azc-btn--danger:active,
+.azc-app .btn--danger:active,
+.azc-app .btn-danger:active,
+.azc-app .button.danger:active,
+.azc-modal-backdrop .azc-btn--danger:active,
+.azc-modal-backdrop .btn--danger:active,
+.azc-modal-backdrop .btn-danger:active,
+.azc-modal-backdrop .button.danger:active,
+.azc-dialog .azc-btn--danger:active,
+.azc-dialog .btn--danger:active,
+.azc-dialog .btn-danger:active,
+.azc-dialog .button.danger:active {
+	background-color: var(--azc-danger-fill) !important;
+	border-color: var(--azc-danger-fill) !important;
+	color: var(--azc-danger-on-fill) !important;
+}
+
+/* Dialogs live on document.body — ghost needs !important so the core
+ * button repaint (also on :hover) cannot give it a pale fill. */
 #app-content.azc-app .azc-btn--ghost,
 #app-content-wrapper .azc-btn--ghost,
 .azc-nc-admin-settings .azc-btn--ghost,
-.azc-nc-settings-panel .azc-btn--ghost {
-	background-color: transparent;
+.azc-nc-settings-panel .azc-btn--ghost,
+.azc-modal-backdrop .azc-btn--ghost,
+.azc-modal-backdrop .btn--ghost,
+.azc-modal-backdrop .btn-ghost,
+.azc-modal-backdrop .button.ghost,
+.azc-dialog .azc-btn--ghost,
+.azc-dialog .btn--ghost,
+.azc-dialog .btn-ghost,
+.azc-dialog .button.ghost {
+	background-color: transparent !important;
 	color: var(--azc-text, var(--color-main-text));
-	border-color: transparent;
+	border-color: transparent !important;
 	text-decoration: none !important;
 }
 

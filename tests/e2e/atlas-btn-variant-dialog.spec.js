@@ -152,4 +152,92 @@ test.describe('Dialog button-variant paint (button_variant_specificity_collapse)
 			await resetUserTheme(page).catch(() => {});
 		}
 	});
+
+	test('ATLAS_BTN_VARIANT_DIALOG_NATIVE layer-dialog: native <dialog> primary/secondary <button>s paint like in-page oracles (light + dark)', async ({ page }) => {
+		test.setTimeout(240_000);
+		await loginAs(page, 'ADMIN');
+		await resetUserTheme(page).catch(() => {});
+
+		try {
+			for (const theme of ['light', 'dark']) {
+				await setUserTheme(page, theme);
+				await gotoApp(page, '/apps/arbeitszeitcheck/admin/vacation-layers');
+				await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+				await injectOracles(page);
+				await page.mouse.move(4, 4);
+
+				// admin-vacation-layers.js mounts the native <dialog> on
+				// document.body at init — the exact escape-from-app-scope path
+				// the functional-r19 residual rode on.
+				await page.waitForFunction(
+					() => document.getElementById('layer-dialog')?.parentElement === document.body,
+					null,
+					{ timeout: 15_000 },
+				);
+				await page.locator('[data-action="add-org"]').first().click();
+				await page.waitForSelector('#layer-dialog[open]', { timeout: 10_000 });
+				await page.waitForTimeout(400);
+
+				for (const [btnSel, variant] of [['#layer-dialog-save', 'primary'], ['#layer-dialog-cancel', 'secondary']]) {
+					const btn = await paintOf(page, btnSel);
+					const oracle = await paintOf(page, `a.azc-btn--${variant}.azc-variant-oracle`);
+					expect(btn.tag, `${theme} ${variant}: probe must be a real <button>`).toBe('BUTTON');
+					expect(btn.bg, `${theme} ${variant}: native <dialog> <button> fill must equal the in-page <a> oracle`).toBe(oracle.bg);
+					expect(btn.border, `${theme} ${variant}: native <dialog> <button> border must equal the oracle`).toBe(oracle.border);
+					expect(btn.ink, `${theme} ${variant}: native <dialog> <button> ink must equal the oracle`).toBe(oracle.ink);
+				}
+				await page.locator('#layer-dialog-cancel').click();
+				await page.waitForSelector('#layer-dialog[open]', { state: 'detached', timeout: 10_000 });
+			}
+		} finally {
+			await resetUserTheme(page).catch(() => {});
+		}
+	});
+
+	test('ATLAS_BTN_VARIANT_DIALOG_NATIVE entitlement-explain-dialog: error-path secondary <button> keeps variant paint (light + dark)', async ({ page }) => {
+		test.setTimeout(240_000);
+		await loginAs(page, 'EMPLOYEE');
+		await resetUserTheme(page).catch(() => {});
+
+		try {
+			for (const theme of ['light', 'dark']) {
+				await setUserTheme(page, theme);
+				await gotoApp(page, '/apps/arbeitszeitcheck/absences');
+				await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+				await injectOracles(page);
+				await page.mouse.move(4, 4);
+
+				await page.waitForFunction(
+					() => document.getElementById('entitlement-explain-dialog')?.parentElement === document.body,
+					null,
+					{ timeout: 15_000 },
+				);
+				// The retry button only renders on the trace-load error path —
+				// open the dialog and unhide it for the pure paint probe.
+				await page.evaluate(() => {
+					const dlg = document.getElementById('entitlement-explain-dialog');
+					dlg.showModal();
+					const retry = document.getElementById('entitlement-explain-retry');
+					retry.hidden = false;
+				});
+				await page.waitForSelector('#entitlement-explain-retry', { state: 'visible', timeout: 10_000 });
+				await page.waitForTimeout(400);
+
+				const btn = await paintOf(page, '#entitlement-explain-retry');
+				const oracle = await paintOf(page, 'a.azc-btn--secondary.azc-variant-oracle');
+				expect(btn.tag, `${theme} secondary: probe must be a real <button>`).toBe('BUTTON');
+				// The core repaint pins border:none — a pale fill can coincide
+				// with the secondary oracle, the border cannot.
+				expect(btn.border, `${theme} secondary: entitlement retry border must equal the in-page <a> oracle`).toBe(oracle.border);
+				expect(btn.bg, `${theme} secondary: entitlement retry fill must equal the oracle`).toBe(oracle.bg);
+				expect(btn.ink, `${theme} secondary: entitlement retry ink must equal the oracle`).toBe(oracle.ink);
+				await page.evaluate(() => {
+					const dlg = document.getElementById('entitlement-explain-dialog');
+					if (dlg.open) dlg.close();
+				});
+			}
+		} finally {
+			await resetUserTheme(page).catch(() => {});
+		}
+	});
 });

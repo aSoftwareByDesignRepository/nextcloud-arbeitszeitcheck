@@ -649,6 +649,17 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			await layerTrigger.click();
 			const dlg = page.locator('#layer-dialog');
 			if (await dlg.isVisible({ timeout: 10_000 }).catch(() => false)) {
+				// The dialog scrolls internally (max-height:90dvh) — capture the
+				// footer actions row (Save/Cancel): a top-cropped shot hides
+				// exactly the variant buttons this craft exists to prove.
+				// Wait for the async impact preview to settle first — it grows
+				// the scroll region and would push the actions back below the
+				// fold after an early scroll.
+				await expect(dlg.locator('#layer-dialog-impact')).toHaveAttribute(
+					'data-state', /ok|warn|error/, { timeout: 15_000 },
+				).catch(() => {});
+				await dlg.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+				await expect(dlg.locator('#layer-dialog-save')).toBeInViewport({ timeout: 5_000 });
 				await shot(page, 'azc-admin-vacation-layers-dialog.png', { settleMs: 300 });
 				await page.locator('#layer-dialog-cancel').click()
 					.catch(() => page.keyboard.press('Escape'));

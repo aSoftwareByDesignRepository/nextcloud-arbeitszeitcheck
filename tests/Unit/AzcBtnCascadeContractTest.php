@@ -273,17 +273,35 @@ final class AzcBtnCascadeContractTest extends TestCase {
 	 * dialog-scoped !important fill+border armor.
 	 */
 	public function testBodyAppendedDialogsKeepVariantArmor(): void {
-		$css = (string)file_get_contents(dirname(__DIR__, 2) . '/css/app.css');
+		$root = dirname(__DIR__, 2);
+		$css = (string)file_get_contents($root . '/css/app.css');
 
+		// Canonical body-mounted-overlay scope list — keep in sync with the
+		// comment atop the variant rules in css/app.css. `dialog` armors every
+		// native <dialog> unconditionally; [role="dialog"]/[role="alertdialog"]
+		// armor ARIA overlays; the class scopes cover role-less wrappers and
+		// the named day-details panel.
+		$dialogScopes = [
+			'.azc-modal-backdrop',
+			'.azc-dialog',
+			'dialog',
+			'[role="dialog"]',
+			'[role="alertdialog"]',
+			'.day-details-panel',
+		];
 		foreach (['primary', 'secondary', 'danger'] as $variant) {
-			foreach (['.azc-modal-backdrop', '.azc-dialog'] as $scope) {
+			foreach ($dialogScopes as $scope) {
+				// Selector-boundary anchor: a bare `dialog` scope must not be
+				// satisfied by `.azc-dialog` — require a non-selector char or
+				// start-of-selector before the scope token.
+				$boundary = $scope === 'dialog' ? '(?<=^|[,\\s])' : '';
 				self::assertMatchesRegularExpression(
-					'/' . preg_quote($scope, '/') . ' \.azc-btn--' . $variant . '[\s,]/',
+					'/' . $boundary . preg_quote($scope, '/') . ' \.azc-btn--' . $variant . '[\s,]/m',
 					$css,
-					"$scope .azc-btn--$variant selector missing — dialog variant unarmored"
+					"$scope .azc-btn--$variant selector missing — overlay variant unarmored"
 				);
 				self::assertMatchesRegularExpression(
-					'/' . preg_quote($scope, '/') . ' \.btn--' . $variant . '[\s,]/',
+					'/' . $boundary . preg_quote($scope, '/') . ' \.btn--' . $variant . '[\s,]/m',
 					$css,
 					"$scope .btn--$variant selector missing — components.js emits plain btn classes"
 				);
@@ -297,18 +315,32 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		}
 
 		// Core repaints :hover/:active at higher specificity — the armored
-		// states must be restated under the dialog scopes.
+		// states must be restated under every dialog scope.
 		foreach (['primary', 'secondary', 'danger'] as $variant) {
-			self::assertStringContainsString(".azc-dialog .btn--$variant:hover", $css);
-			self::assertStringContainsString(".azc-modal-backdrop .btn--$variant:hover", $css);
-			self::assertStringContainsString(".azc-dialog .btn--$variant:active", $css);
-			self::assertStringContainsString(".azc-modal-backdrop .btn--$variant:active", $css);
+			foreach ($dialogScopes as $scope) {
+				$boundary = $scope === 'dialog' ? '(?<=^|[,\\s])' : '';
+				self::assertMatchesRegularExpression(
+					'/' . $boundary . preg_quote($scope, '/') . ' \.btn--' . $variant . ':hover[\s,]/m',
+					$css,
+					"$scope .btn--$variant:hover missing — core repaints :hover at 0-2-1"
+				);
+				self::assertMatchesRegularExpression(
+					'/' . $boundary . preg_quote($scope, '/') . ' \.btn--' . $variant . ':active[\s,]/m',
+					$css,
+					"$scope .btn--$variant:active missing — core repaints :active at 0-2-1"
+				);
+			}
 		}
 
 		// Ghost on <button> exists in dialogs (admin-tariff-rules modal-close);
 		// !important keeps the core hover repaint from giving it a pale fill.
-		foreach (['.azc-modal-backdrop', '.azc-dialog'] as $scope) {
-			self::assertStringContainsString("$scope .azc-btn--ghost", $css);
+		foreach ($dialogScopes as $scope) {
+			$boundary = $scope === 'dialog' ? '(?<=^|[,\\s])' : '';
+			self::assertMatchesRegularExpression(
+				'/' . $boundary . preg_quote($scope, '/') . ' \.azc-btn--ghost[\s,]/m',
+				$css,
+				"$scope .azc-btn--ghost missing"
+			);
 		}
 		self::assertMatchesRegularExpression(
 			'/\.azc-dialog \.azc-btn--ghost[^{]*\{[^}]*background-color:\s*transparent\s*!important[^}]*border-color:\s*transparent\s*!important/s',
@@ -317,7 +349,7 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		);
 
 		// The emitters must keep producing the armored class shapes.
-		$components = (string)file_get_contents(dirname(__DIR__, 2) . '/js/common/components.js');
+		$components = (string)file_get_contents($root . '/js/common/components.js');
 		self::assertStringContainsString("document.body.appendChild(backdrop)", $components);
 		self::assertStringContainsString('modal-backdrop azc-modal-backdrop', $components);
 		self::assertMatchesRegularExpression(
@@ -325,6 +357,44 @@ final class AzcBtnCascadeContractTest extends TestCase {
 			$components,
 			'createModal must keep the .azc-dialog class on body-appended modals'
 		);
+
+		// ── Overlay enumeration (functional r19 residual of this class) ──
+		// Every native <dialog> in templates is armored by the bare `dialog`
+		// scope — fail if the inventory goes blind (renamed markup) instead
+		// of silently passing on zero findings.
+		$nativeDialogs = 0;
+		foreach (glob($root . '/templates/*.php') ?: [] as $tpl) {
+			$nativeDialogs += preg_match_all(
+				'/<dialog\b/i',
+				(string)file_get_contents($tpl)
+			);
+		}
+		self::assertGreaterThanOrEqual(
+			2,
+			$nativeDialogs,
+			'Template <dialog> inventory went blind — expected layer-dialog + entitlement-explain-dialog'
+		);
+
+		// Every body-mounted element with a dialog/alertdialog role is covered
+		// by the role scopes — the calendar day panel keeps both its role and
+		// its named class scope so dropping either still leaves it armored.
+		$calendar = (string)file_get_contents($root . '/templates/calendar.php');
+		self::assertMatchesRegularExpression(
+			'/id="day-details-panel"[^>]*role="dialog"/',
+			$calendar,
+			'day-details-panel must keep role="dialog" — it is covered by both the role scope and its named class scope'
+		);
+
+		// The named native dialogs stay mounted on document.body by their js —
+		// an in-template dialog never hits the body-repaint path this armors.
+		foreach ([
+			'js/admin-vacation-layers.js' => 'layer-dialog',
+			'js/entitlement-explainer.js' => 'entitlement-explain-dialog',
+		] as $jsFile => $dialogId) {
+			$js = (string)file_get_contents($root . '/' . $jsFile);
+			self::assertStringContainsString('document.body.appendChild', $js, $jsFile);
+			self::assertStringContainsString($dialogId, $js, $jsFile);
+		}
 	}
 
 	private static function ruleBody(string $css, string $selectorStart): string {

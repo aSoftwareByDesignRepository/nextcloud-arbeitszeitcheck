@@ -672,6 +672,14 @@
 	outline-offset: 2px;
 }
 
+/* Canonical body-mounted-overlay scopes for every variant rule below:
+ * .azc-modal-backdrop + .azc-dialog (components.js JS-built dialogs),
+ * dialog (ANY native <dialog>, current and future — layer-dialog,
+ * entitlement-explain-dialog), [role="dialog"]/[role="alertdialog"] (ARIA
+ * overlays — day-details side panel, timepicker sheet, anything keeping
+ * the dialog-role contract), .day-details-panel (named body-mounted panel).
+ * A new overlay is armored by landing on this list — never by inventing a
+ * per-dialog-class scope. */
 #app-content.azc-app .azc-btn--primary,
 #app-content-wrapper .azc-btn--primary,
 .azc-nc-admin-settings .azc-btn--primary,
@@ -686,7 +694,23 @@
 .azc-dialog .azc-btn--primary,
 .azc-dialog .btn--primary,
 .azc-dialog .btn-primary,
-.azc-dialog .button.primary {
+.azc-dialog .button.primary,
+dialog .azc-btn--primary,
+dialog .btn--primary,
+dialog .btn-primary,
+dialog .button.primary,
+[role="dialog"] .azc-btn--primary,
+[role="dialog"] .btn--primary,
+[role="dialog"] .btn-primary,
+[role="dialog"] .button.primary,
+[role="alertdialog"] .azc-btn--primary,
+[role="alertdialog"] .btn--primary,
+[role="alertdialog"] .btn-primary,
+[role="alertdialog"] .button.primary,
+.day-details-panel .azc-btn--primary,
+.day-details-panel .btn--primary,
+.day-details-panel .btn-primary,
+.day-details-panel .button.primary {
 	/* !important: link + theme cascades must not flatten CTAs to underlined text. */
 	background-color: var(--color-primary-element) !important;
 	border-color: var(--color-primary-element) !important;
@@ -707,7 +731,23 @@
 .azc-dialog .azc-btn--primary:hover,
 .azc-dialog .btn--primary:hover,
 .azc-dialog .btn-primary:hover,
-.azc-dialog .button.primary:hover {
+.azc-dialog .button.primary:hover,
+dialog .azc-btn--primary:hover,
+dialog .btn--primary:hover,
+dialog .btn-primary:hover,
+dialog .button.primary:hover,
+[role="dialog"] .azc-btn--primary:hover,
+[role="dialog"] .btn--primary:hover,
+[role="dialog"] .btn-primary:hover,
+[role="dialog"] .button.primary:hover,
+[role="alertdialog"] .azc-btn--primary:hover,
+[role="alertdialog"] .btn--primary:hover,
+[role="alertdialog"] .btn-primary:hover,
+[role="alertdialog"] .button.primary:hover,
+.day-details-panel .azc-btn--primary:hover,
+.day-details-panel .btn--primary:hover,
+.day-details-panel .btn-primary:hover,
+.day-details-panel .button.primary:hover {
 	background-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--color-primary-element-text) !important;
@@ -727,7 +767,23 @@
 .azc-dialog .azc-btn--primary:active,
 .azc-dialog .btn--primary:active,
 .azc-dialog .btn-primary:active,
-.azc-dialog .button.primary:active {
+.azc-dialog .button.primary:active,
+dialog .azc-btn--primary:active,
+dialog .btn--primary:active,
+dialog .btn-primary:active,
+dialog .button.primary:active,
+[role="dialog"] .azc-btn--primary:active,
+[role="dialog"] .btn--primary:active,
+[role="dialog"] .btn-primary:active,
+[role="dialog"] .button.primary:active,
+[role="alertdialog"] .azc-btn--primary:active,
+[role="alertdialog"] .btn--primary:active,
+[role="alertdialog"] .btn-primary:active,
+[role="alertdialog"] .button.primary:active,
+.day-details-panel .azc-btn--primary:active,
+.day-details-panel .btn--primary:active,
+.day-details-panel .btn-primary:active,
+.day-details-panel .button.primary:active {
 	background-color: var(--color-primary-element) !important;
 	border-color: var(--color-primary-element) !important;
 	color: var(--color-primary-element-text) !important;
@@ -749,7 +805,23 @@
 .azc-dialog .azc-btn--secondary,
 .azc-dialog .btn--secondary,
 .azc-dialog .btn-secondary,
-.azc-dialog .button.secondary {
+.azc-dialog .button.secondary,
+dialog .azc-btn--secondary,
+dialog .btn--secondary,
+dialog .btn-secondary,
+dialog .button.secondary,
+[role="dialog"] .azc-btn--secondary,
+[role="dialog"] .btn--secondary,
+[role="dialog"] .btn-secondary,
+[role="dialog"] .button.secondary,
+[role="alertdialog"] .azc-btn--secondary,
+[role="alertdialog"] .btn--secondary,
+[role="alertdialog"] .btn-secondary,
+[role="alertdialog"] .button.secondary,
+.day-details-panel .azc-btn--secondary,
+.day-details-panel .btn--secondary,
+.day-details-panel .btn-secondary,
+.day-details-panel .button.secondary {
 	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
 	border-color: var(--color-primary-element) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
@@ -769,7 +841,23 @@
 .azc-dialog .azc-btn--secondary:hover,
 .azc-dialog .btn--secondary:hover,
 .azc-dialog .btn-secondary:hover,
-.azc-dialog .button.secondary:hover {
+.azc-dialog .button.secondary:hover,
+dialog .azc-btn--secondary:hover,
+dialog .btn--secondary:hover,
+dialog .btn-secondary:hover,
+dialog .button.secondary:hover,
+[role="dialog"] .azc-btn--secondary:hover,
+[role="dialog"] .btn--secondary:hover,
+[role="dialog"] .btn-secondary:hover,
+[role="dialog"] .button.secondary:hover,
+[role="alertdialog"] .azc-btn--secondary:hover,
+[role="alertdialog"] .btn--secondary:hover,
+[role="alertdialog"] .btn-secondary:hover,
+[role="alertdialog"] .button.secondary:hover,
+.day-details-panel .azc-btn--secondary:hover,
+.day-details-panel .btn--secondary:hover,
+.day-details-panel .btn-secondary:hover,
+.day-details-panel .button.secondary:hover {
 	background-color: var(--color-primary-element-light-hover, var(--color-primary-light-hover)) !important;
 	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
@@ -789,7 +877,23 @@
 .azc-dialog .azc-btn--secondary:active,
 .azc-dialog .btn--secondary:active,
 .azc-dialog .btn-secondary:active,
-.azc-dialog .button.secondary:active {
+.azc-dialog .button.secondary:active,
+dialog .azc-btn--secondary:active,
+dialog .btn--secondary:active,
+dialog .btn-secondary:active,
+dialog .button.secondary:active,
+[role="dialog"] .azc-btn--secondary:active,
+[role="dialog"] .btn--secondary:active,
+[role="dialog"] .btn-secondary:active,
+[role="dialog"] .button.secondary:active,
+[role="alertdialog"] .azc-btn--secondary:active,
+[role="alertdialog"] .btn--secondary:active,
+[role="alertdialog"] .btn-secondary:active,
+[role="alertdialog"] .button.secondary:active,
+.day-details-panel .azc-btn--secondary:active,
+.day-details-panel .btn--secondary:active,
+.day-details-panel .btn-secondary:active,
+.day-details-panel .button.secondary:active {
 	background-color: var(--color-primary-element-light, var(--color-primary-light)) !important;
 	border-color: var(--color-primary-element) !important;
 	color: var(--azc-text, var(--color-main-text)) !important;
@@ -809,7 +913,23 @@
 .azc-dialog .azc-btn--danger,
 .azc-dialog .btn--danger,
 .azc-dialog .btn-danger,
-.azc-dialog .button.danger {
+.azc-dialog .button.danger,
+dialog .azc-btn--danger,
+dialog .btn--danger,
+dialog .btn-danger,
+dialog .button.danger,
+[role="dialog"] .azc-btn--danger,
+[role="dialog"] .btn--danger,
+[role="dialog"] .btn-danger,
+[role="dialog"] .button.danger,
+[role="alertdialog"] .azc-btn--danger,
+[role="alertdialog"] .btn--danger,
+[role="alertdialog"] .btn-danger,
+[role="alertdialog"] .button.danger,
+.day-details-panel .azc-btn--danger,
+.day-details-panel .btn--danger,
+.day-details-panel .btn-danger,
+.day-details-panel .button.danger {
 	background-color: var(--azc-danger-fill) !important;
 	border-color: var(--azc-danger-fill) !important;
 	color: var(--azc-danger-on-fill) !important;
@@ -829,7 +949,23 @@
 .azc-dialog .azc-btn--danger:hover,
 .azc-dialog .btn--danger:hover,
 .azc-dialog .btn-danger:hover,
-.azc-dialog .button.danger:hover {
+.azc-dialog .button.danger:hover,
+dialog .azc-btn--danger:hover,
+dialog .btn--danger:hover,
+dialog .btn-danger:hover,
+dialog .button.danger:hover,
+[role="dialog"] .azc-btn--danger:hover,
+[role="dialog"] .btn--danger:hover,
+[role="dialog"] .btn-danger:hover,
+[role="dialog"] .button.danger:hover,
+[role="alertdialog"] .azc-btn--danger:hover,
+[role="alertdialog"] .btn--danger:hover,
+[role="alertdialog"] .btn-danger:hover,
+[role="alertdialog"] .button.danger:hover,
+.day-details-panel .azc-btn--danger:hover,
+.day-details-panel .btn--danger:hover,
+.day-details-panel .btn-danger:hover,
+.day-details-panel .button.danger:hover {
 	background-color: color-mix(in srgb, var(--azc-danger-fill) 85%, var(--color-main-text)) !important;
 	border-color: color-mix(in srgb, var(--azc-danger-fill) 85%, var(--color-main-text)) !important;
 	color: var(--azc-danger-on-fill) !important;
@@ -849,7 +985,23 @@
 .azc-dialog .azc-btn--danger:active,
 .azc-dialog .btn--danger:active,
 .azc-dialog .btn-danger:active,
-.azc-dialog .button.danger:active {
+.azc-dialog .button.danger:active,
+dialog .azc-btn--danger:active,
+dialog .btn--danger:active,
+dialog .btn-danger:active,
+dialog .button.danger:active,
+[role="dialog"] .azc-btn--danger:active,
+[role="dialog"] .btn--danger:active,
+[role="dialog"] .btn-danger:active,
+[role="dialog"] .button.danger:active,
+[role="alertdialog"] .azc-btn--danger:active,
+[role="alertdialog"] .btn--danger:active,
+[role="alertdialog"] .btn-danger:active,
+[role="alertdialog"] .button.danger:active,
+.day-details-panel .azc-btn--danger:active,
+.day-details-panel .btn--danger:active,
+.day-details-panel .btn-danger:active,
+.day-details-panel .button.danger:active {
 	background-color: var(--azc-danger-fill) !important;
 	border-color: var(--azc-danger-fill) !important;
 	color: var(--azc-danger-on-fill) !important;
@@ -868,7 +1020,23 @@
 .azc-dialog .azc-btn--ghost,
 .azc-dialog .btn--ghost,
 .azc-dialog .btn-ghost,
-.azc-dialog .button.ghost {
+.azc-dialog .button.ghost,
+dialog .azc-btn--ghost,
+dialog .btn--ghost,
+dialog .btn-ghost,
+dialog .button.ghost,
+[role="dialog"] .azc-btn--ghost,
+[role="dialog"] .btn--ghost,
+[role="dialog"] .btn-ghost,
+[role="dialog"] .button.ghost,
+[role="alertdialog"] .azc-btn--ghost,
+[role="alertdialog"] .btn--ghost,
+[role="alertdialog"] .btn-ghost,
+[role="alertdialog"] .button.ghost,
+.day-details-panel .azc-btn--ghost,
+.day-details-panel .btn--ghost,
+.day-details-panel .btn-ghost,
+.day-details-panel .button.ghost {
 	background-color: transparent !important;
 	color: var(--azc-text, var(--color-main-text));
 	border-color: transparent !important;

@@ -53,7 +53,7 @@ class SingleStampCorrectionTest extends TestCase
 		);
 		$this->assertNotNull($result);
 		$this->assertArrayNotHasKey('startTime', $result);
-		$this->assertSame('2026-10-28T17:30:00+00:00', $result['endTime']);
+		$this->assertSame('2026-10-28T17:30:00+01:00', $result['endTime']);
 	}
 
 	public function testEndOnlyProposalOvernightShiftsNextDay(): void
@@ -65,7 +65,7 @@ class SingleStampCorrectionTest extends TestCase
 			new \DateTime('2026-10-28 22:00:00'),
 		);
 		$this->assertNotNull($result);
-		$this->assertSame('2026-10-29T06:15:00+00:00', $result['endTime']);
+		$this->assertSame('2026-10-29T06:15:00+01:00', $result['endTime']);
 	}
 
 	public function testStartAndEndPairKeepsExistingOvernightRule(): void
@@ -74,8 +74,8 @@ class SingleStampCorrectionTest extends TestCase
 			['date' => '2026-10-28', 'startTime' => '22:00', 'endTime' => '06:15'],
 			15,
 		);
-		$this->assertSame('2026-10-28T22:00:00+00:00', $result['startTime']);
-		$this->assertSame('2026-10-29T06:15:00+00:00', $result['endTime']);
+		$this->assertSame('2026-10-28T22:00:00+01:00', $result['startTime']);
+		$this->assertSame('2026-10-29T06:15:00+01:00', $result['endTime']);
 	}
 
 	public function testStartOnlyProposalIsAllowed(): void
@@ -84,7 +84,7 @@ class SingleStampCorrectionTest extends TestCase
 			['date' => '2026-10-28', 'startTime' => '07:45'],
 			15,
 		);
-		$this->assertSame('2026-10-28T07:45:00+00:00', $result['startTime']);
+		$this->assertSame('2026-10-28T07:45:00+01:00', $result['startTime']);
 		$this->assertArrayNotHasKey('endTime', $result);
 	}
 
@@ -109,7 +109,7 @@ class SingleStampCorrectionTest extends TestCase
 			new \DateTime('2026-10-28 08:00:00'),
 		);
 		$this->assertCount(1, $result['breaks']);
-		$this->assertSame('2026-10-28T12:00:00+00:00', $result['breaks'][0]['start']);
+		$this->assertSame('2026-10-28T12:00:00+01:00', $result['breaks'][0]['start']);
 	}
 
 	public function testEndedReasonConstantDistinct(): void

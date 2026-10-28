@@ -62,7 +62,8 @@ class SingleStampCorrectionIntegrationTest extends TestCase
 		$entry = $this->seedOpenSessionCorrectionPending();
 		$id = (int)$entry->getId();
 
-		// Winner: approve — completes at the proposed retro clock-out time.
+		// Winner: approve — completes at the proposed retro clock-out time
+		// (caller contract: supply storage-wall-clock datetimes).
 		$winner = $this->mapper->find($id);
 		$winner->setStatus(TimeEntry::STATUS_COMPLETED);
 		$winner->setEndTime(new \DateTime('2026-01-10 17:00:00'));
@@ -81,6 +82,11 @@ class SingleStampCorrectionIntegrationTest extends TestCase
 		$fresh = $this->mapper->find($id);
 		$this->assertSame(TimeEntry::STATUS_COMPLETED, $fresh->getStatus());
 		$this->assertNotNull($fresh->getEndTime(), 'Approved open-session correction must carry an end time');
+		$this->assertGreaterThan(
+			$fresh->getStartTime()->getTimestamp(),
+			$fresh->getEndTime()->getTimestamp(),
+			'Rehydrated end_time must not land before start_time (wall-clock tz bug)'
+		);
 		$this->assertSame('manager_a', $fresh->getApprovedByUserId());
 	}
 

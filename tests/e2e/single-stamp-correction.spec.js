@@ -176,10 +176,10 @@ test.describe('single-stamp correction — pending open session', () => {
 		const entryData = entry?.entry ?? entry?.data ?? entry
 		expect(entryData.status).toBe('completed')
 		expect(entryData.endTime).toBeTruthy()
-		// endTime is a server-TZ wall-clock string — assert ordering invariants
-		// (completed after start, not in the future) rather than instant equality.
+		// Instant equality: the approved end must equal the proposed instant
+		// regardless of the ISO offset the client sent (Z vs +HH:mm).
+		expect(Math.abs(new Date(entryData.endTime).getTime() - new Date(endIso).getTime())).toBeLessThan(120000)
 		expect(new Date(entryData.endTime).getTime()).toBeGreaterThan(new Date(entryData.startTime).getTime())
-		expect(new Date(entryData.endTime).getTime()).toBeLessThanOrEqual(Date.now() + 60000)
 	})
 
 	test('request-correction rejects a missing end time on an open session (NN-2)', async ({ page }) => {

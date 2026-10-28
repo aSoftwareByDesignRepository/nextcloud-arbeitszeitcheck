@@ -866,6 +866,45 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$this->assertSame('2026-02-10 10:00:00', $entry->getEndTime()->format('Y-m-d H:i:s'));
 	}
 
+	public function testApplyProposalConvertsExplicitOffsetInstantsToStorageWall(): void
+	{
+		// Storage zone Europe/Berlin: a 'Z'-suffixed (or foreign-offset) instant
+		// must keep its instant and persist the Berlin wall clock — persisting
+		// the raw UTC wall would rehydrate one hour early (audit: approved
+		// end_time stored before start_time).
+		$berlinConfig = $this->createMock(IConfig::class);
+		$berlinConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default = '') => $key === 'app_timezone' ? 'Europe/Berlin' : $default
+		);
+		$service = new TimeEntryCorrectionService(
+			$this->timeEntryMapper,
+			$this->monthClosureGuard,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->notificationService,
+			$this->auditLogMapper,
+			$berlinConfig,
+			$this->l10n,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+		);
+
+		$entry = $this->buildEntry();
+		$service->applyProposal($entry, ['endTime' => '2026-01-10T17:00:00+00:00']);
+
+		$stored = $entry->getEndTime();
+		$this->assertNotNull($stored);
+		$this->assertSame('Europe/Berlin', $stored->getTimezone()->getName());
+		// January is CET (+01:00): storage wall must be 18:00, not the raw UTC wall 17:00.
+		$this->assertSame('2026-01-10 18:00:00', $stored->format('Y-m-d H:i:s'));
+		$this->assertSame((new \DateTime('2026-01-10T17:00:00+00:00'))->getTimestamp(), $stored->getTimestamp());
+
+		// A different explicit offset resolves to the same storage wall.
+		$entry2 = $this->buildEntry();
+		$service->applyProposal($entry2, ['endTime' => '2026-01-10T19:00:00+02:00']);
+		$this->assertSame('2026-01-10 18:00:00', $entry2->getEndTime()->format('Y-m-d H:i:s'));
+	}
+
 	public function testApproveRunsRealtimeComplianceWhenEnabled(): void
 	{
 		$config = $this->createMock(IConfig::class);

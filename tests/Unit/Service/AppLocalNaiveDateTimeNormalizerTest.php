@@ -46,9 +46,12 @@ class AppLocalNaiveDateTimeNormalizerTest extends TestCase
 	{
 		$berlin = new \DateTimeZone('Europe/Berlin');
 		$utcNine = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime('2026-05-13T09:00:00Z', $berlin);
-		// PHP may expose UTC as "UTC", "Z", or "+00:00" depending on version; offset is authoritative.
-		$this->assertSame(0, $utcNine->getOffset());
-		$this->assertSame('11:00', $utcNine->setTimezone($berlin)->format('H:i'));
+		// Explicit-offset input: the instant is honoured but the object is
+		// expressed in the storage zone — persisting the raw foreign wall clock
+		// would rehydrate shifted (storage columns are naive storage-wall).
+		$this->assertSame('Europe/Berlin', $utcNine->getTimezone()->getName());
+		$this->assertSame('11:00', $utcNine->format('H:i'));
+		$this->assertSame((new \DateTime('2026-05-13T09:00:00Z'))->getTimestamp(), $utcNine->getTimestamp());
 
 		$naive = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime('2026-05-13T09:00:00', $berlin);
 		$this->assertSame('Europe/Berlin', $naive->getTimezone()->getName());

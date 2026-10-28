@@ -228,12 +228,40 @@ test.describe('Vacation to sick conversion', () => {
 		// Manager flow shows the reason field.
 		await expect(dlg.locator('#sick-convert-reason')).toBeVisible()
 
-		// WCAG scan of the open dialog (aa/21aa rule sets).
-		const axe = await new AxeBuilder({ page: mgr })
+		// WCAG scan of the open dialog (aa/21aa rule sets) — per theme, since
+		// Nextcloud resolves CSS variables from html[data-themes].
+		for (const theme of ['', 'dark', 'dark highcontrast']) {
+			await mgr.evaluate(
+				(t) => document.documentElement.setAttribute('data-themes', t),
+				theme,
+			)
+			const axe = await new AxeBuilder({ page: mgr })
+				.include('dialog.azc-sick-convert')
+				.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+				.analyze()
+			expect(
+				axe.violations,
+				`theme "${theme || 'default'}": ` + JSON.stringify(axe.violations, null, 2),
+			).toEqual([])
+		}
+
+		// <768px: dialog must stay fully usable on a phone viewport — no
+		// horizontal overflow, submit still reachable.
+		await mgr.setViewportSize({ width: 375, height: 700 })
+		const mobileAxe = await new AxeBuilder({ page: mgr })
 			.include('dialog.azc-sick-convert')
 			.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
 			.analyze()
-		expect(axe.violations, JSON.stringify(axe.violations, null, 2)).toEqual([])
+		expect(
+			mobileAxe.violations,
+			'375px viewport: ' + JSON.stringify(mobileAxe.violations, null, 2),
+		).toEqual([])
+		const overflows = await mgr.evaluate(() => {
+			const d = document.querySelector('dialog.azc-sick-convert')
+			return d ? d.scrollWidth > d.clientWidth + 1 : false
+		})
+		expect(overflows, 'dialog must not overflow horizontally at 375px').toBe(false)
+		await mgr.setViewportSize({ width: 1280, height: 800 })
 
 		const vacEnd = await btn.getAttribute('data-vac-end')
 		const sickStart = shiftYmd(vacEnd, -2)

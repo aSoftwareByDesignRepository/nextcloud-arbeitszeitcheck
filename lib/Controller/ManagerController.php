@@ -2561,7 +2561,12 @@ class ManagerController extends Controller
 			} catch (\Throwable) {
 				$minBreakMinutes = null;
 			}
-			$proposal = TimeEntryClockPayloadBuilder::mergeIntoProposal($params, [], $minBreakMinutes);
+			$proposal = TimeEntryClockPayloadBuilder::mergeIntoProposal(
+				$params,
+				[],
+				$minBreakMinutes,
+				AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config)
+			);
 			if (!isset($proposal['startTime'], $proposal['endTime'])) {
 				return new JSONResponse([
 					'success' => false,
@@ -3433,7 +3438,12 @@ class ManagerController extends Controller
 			} catch (\Throwable) {
 				$minBreak = null;
 			}
-			$adjustedProposal = TimeEntryClockPayloadBuilder::mergeIntoProposal($params, [], $minBreak);
+			$adjustedProposal = TimeEntryClockPayloadBuilder::mergeIntoProposal(
+				$params,
+				[],
+				$minBreak,
+				AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config)
+			);
 			if (array_key_exists('description', $params)) {
 				$adjustedProposal['description'] = $params['description'];
 			}
@@ -3677,7 +3687,12 @@ class ManagerController extends Controller
 			} catch (\Throwable) {
 				$minBreakMinutes = null;
 			}
-			$proposal = TimeEntryClockPayloadBuilder::mergeIntoProposal($params, [], $minBreakMinutes);
+			$proposal = TimeEntryClockPayloadBuilder::mergeIntoProposal(
+				$params,
+				[],
+				$minBreakMinutes,
+				AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config)
+			);
 			if (array_key_exists('description', $params)) {
 				$proposal['description'] = $params['description'];
 			}

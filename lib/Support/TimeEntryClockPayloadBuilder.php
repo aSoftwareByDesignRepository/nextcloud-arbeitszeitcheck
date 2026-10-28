@@ -21,8 +21,9 @@ final class TimeEntryClockPayloadBuilder
 	 * @param int|null $minBreakMinutes Profile floor (AT 10 / DE·CH 15). null = historic 15.
 	 * @return array<string, mixed>|null Proposal fragment with ISO instants, or null when clock fields absent
 	 */
-	public static function buildFromParams(array $params, ?int $minBreakMinutes = null): ?array
+	public static function buildFromParams(array $params, ?int $minBreakMinutes = null, ?\DateTimeZone $timeZone = null): ?array
 	{
+		$timeZone = self::resolveZone($timeZone);
 		$dateParam = $params['date'] ?? null;
 		$startTime = $params['startTime'] ?? null;
 		$endTime = $params['endTime'] ?? null;
@@ -35,7 +36,7 @@ final class TimeEntryClockPayloadBuilder
 			return null;
 		}
 
-		$baseDate = self::parseDate($dateParam);
+		$baseDate = self::parseDate($dateParam, $timeZone);
 		if ($baseDate === null) {
 			return null;
 		}
@@ -84,8 +85,9 @@ final class TimeEntryClockPayloadBuilder
 	 * @param \DateTimeInterface|null $endOvernightAfter Reference instant for end-only proposals
 	 * @return array<string, mixed>|null
 	 */
-	public static function buildPartialFromParams(array $params, ?int $minBreakMinutes = null, ?\DateTimeInterface $endOvernightAfter = null): ?array
+	public static function buildPartialFromParams(array $params, ?int $minBreakMinutes = null, ?\DateTimeInterface $endOvernightAfter = null, ?\DateTimeZone $timeZone = null): ?array
 	{
+		$timeZone = self::resolveZone($timeZone);
 		$dateParam = $params['date'] ?? null;
 		$startRaw = $params['startTime'] ?? null;
 		$endRaw = $params['endTime'] ?? null;
@@ -97,7 +99,7 @@ final class TimeEntryClockPayloadBuilder
 		if (!is_string($dateParam)) {
 			return null;
 		}
-		$baseDate = self::parseDate($dateParam);
+		$baseDate = self::parseDate($dateParam, $timeZone);
 		if ($baseDate === null) {
 			return null;
 		}
@@ -147,9 +149,9 @@ final class TimeEntryClockPayloadBuilder
 	 * @param int|null $minBreakMinutes
 	 * @return array<string, mixed>
 	 */
-	public static function mergeIntoProposal(array $params, array $proposal, ?int $minBreakMinutes = null): array
+	public static function mergeIntoProposal(array $params, array $proposal, ?int $minBreakMinutes = null, ?\DateTimeZone $timeZone = null): array
 	{
-		$clock = self::buildFromParams($params, $minBreakMinutes);
+		$clock = self::buildFromParams($params, $minBreakMinutes, $timeZone);
 		if ($clock !== null) {
 			return array_merge($proposal, $clock);
 		}
@@ -172,8 +174,19 @@ final class TimeEntryClockPayloadBuilder
 		return (bool)preg_match(self::PLAIN_TIME_PATTERN, $value);
 	}
 
-	private static function parseDate(string $dateString): ?\DateTime
+	/**
+	 * Storage timezone for date anchoring. Falls back to the app's default —
+	 * callers should pass the configured zone from
+	 * {@see \OCA\ArbeitszeitCheck\Service\TimeZoneService::storageTimeZone()}.
+	 */
+	private static function resolveZone(?\DateTimeZone $timeZone): \DateTimeZone
 	{
+		return $timeZone ?? new \DateTimeZone(\OCA\ArbeitszeitCheck\Service\TimeZoneService::DEFAULT_STORAGE_TZ);
+	}
+
+	private static function parseDate(string $dateString, ?\DateTimeZone $timeZone = null): ?\DateTime
+	{
+		$tz = self::resolveZone($timeZone);
 		$dateString = trim($dateString);
 		if ($dateString === '') {
 			return null;
@@ -186,11 +199,19 @@ final class TimeEntryClockPayloadBuilder
 			if (!checkdate($month, $day, $year)) {
 				return null;
 			}
-			$parsed = \DateTime::createFromFormat('!d.m.Y', $dateString);
+			$parsed = \DateTime::createFromFormat('!d.m.Y', $dateString, $tz);
 			return $parsed === false ? null : $parsed;
 		}
 
-		return StrictYmdDates::parseRequired($dateString);
+		$ymd = StrictYmdDates::parseRequired($dateString);
+		if ($ymd === null) {
+			return null;
+		}
+		// Rebind the validated calendar date to the storage zone — the parsed
+		// object otherwise carries PHP's default zone (UTC under Nextcloud),
+		// and its wall clock would be persisted one offset off.
+		$rebound = \DateTime::createFromFormat('!Y-m-d', $ymd->format('Y-m-d'), $tz);
+		return $rebound === false ? null : $rebound;
 	}
 
 	/**

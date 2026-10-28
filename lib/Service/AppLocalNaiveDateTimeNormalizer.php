@@ -80,7 +80,10 @@ final class AppLocalNaiveDateTimeNormalizer
 	 * Parse a datetime string from HTTP/JSON clients.
 	 *
 	 *  - If PHP detects an explicit zone in the string (e.g. `+02:00`, `Z`,
-	 *    `Europe/Berlin`), that zone is honoured.
+	 *    `Europe/Berlin`), the INSTANT is honoured and the result is expressed
+	 *    in $naiveInThisZoneIfUnset — the storage zone. Returning the raw
+	 *    foreign-offset object instead would make `set*Time()` persist that
+	 *    foreign wall clock into the naive column and rehydrate shifted.
 	 *  - Otherwise the value is treated as a wall clock in
 	 *    $naiveInThisZoneIfUnset.
 	 *
@@ -98,7 +101,7 @@ final class AppLocalNaiveDateTimeNormalizer
 		}
 		$explicit = (($info['is_localtime'] ?? false) === true);
 		if ($explicit) {
-			return new \DateTime($value);
+			return (new \DateTime($value))->setTimezone($naiveInThisZoneIfUnset);
 		}
 		return new \DateTime($value, $naiveInThisZoneIfUnset);
 	}

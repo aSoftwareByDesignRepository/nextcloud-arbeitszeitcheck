@@ -71,19 +71,19 @@ class TimeEntryCorrectionService
 		}
 
 		if (isset($proposal['startTime'])) {
-			$entry->setStartTime(new \DateTime((string)$proposal['startTime']));
+			$entry->setStartTime($this->storageDateTime((string)$proposal['startTime']));
 		}
 		if (isset($proposal['endTime'])) {
-			$entry->setEndTime(new \DateTime((string)$proposal['endTime']));
+			$entry->setEndTime($this->storageDateTime((string)$proposal['endTime']));
 		}
 		if (array_key_exists('breakStartTime', $proposal)) {
-			$entry->setBreakStartTime($proposal['breakStartTime'] ? new \DateTime((string)$proposal['breakStartTime']) : null);
+			$entry->setBreakStartTime($proposal['breakStartTime'] ? $this->storageDateTime((string)$proposal['breakStartTime']) : null);
 			if ($proposal['breakStartTime']) {
 				$entry->setBreaks(null);
 			}
 		}
 		if (array_key_exists('breakEndTime', $proposal)) {
-			$entry->setBreakEndTime($proposal['breakEndTime'] ? new \DateTime((string)$proposal['breakEndTime']) : null);
+			$entry->setBreakEndTime($proposal['breakEndTime'] ? $this->storageDateTime((string)$proposal['breakEndTime']) : null);
 		}
 		if (array_key_exists('description', $proposal)) {
 			$entry->setDescription($proposal['description'] === null ? null : (string)$proposal['description']);
@@ -103,7 +103,7 @@ class TimeEntryCorrectionService
 			}
 		}
 		if (isset($proposal['date'])) {
-			$newStart = new \DateTime((string)$proposal['date']);
+			$newStart = $this->storageDateTime((string)$proposal['date']);
 			$entry->setStartTime($newStart);
 			if (isset($proposal['hours'])) {
 				$endTime = clone $newStart;
@@ -115,6 +115,19 @@ class TimeEntryCorrectionService
 			$endTime->modify('+' . round(((float)$proposal['hours']) * 3600) . ' seconds');
 			$entry->setEndTime($endTime);
 		}
+	}
+
+	/**
+	 * Parse a proposal/original-snapshot datetime into the storage wall clock.
+	 * Explicit-offset inputs ('...Z', '+02:00') keep their instant and shift to
+	 * the configured storage zone — persisting their raw foreign wall clock
+	 * would rehydrate shifted by the offset (audit: approved end_time landed
+	 * one hour early). Naive inputs keep their wall clock in storage TZ.
+	 */
+	private function storageDateTime(string $value): \DateTime
+	{
+		$tz = AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config);
+		return AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($value, $tz);
 	}
 
 	/**
@@ -144,8 +157,8 @@ class TimeEntryCorrectionService
 				continue;
 			}
 			try {
-				$breakStart = new \DateTime((string)$break[$startKey]);
-				$breakEnd = new \DateTime((string)$break[$endKey]);
+				$breakStart = $this->storageDateTime((string)$break[$startKey]);
+				$breakEnd = $this->storageDateTime((string)$break[$endKey]);
 				if ($breakEnd < $breakStart) {
 					$breakEnd->modify('+1 day');
 				}
@@ -754,13 +767,13 @@ class TimeEntryCorrectionService
 	private function restoreOriginalSnapshot(TimeEntry $entry, array $originalData): void
 	{
 		if (isset($originalData['startTime'])) {
-			$entry->setStartTime(new \DateTime((string)$originalData['startTime']));
+			$entry->setStartTime($this->storageDateTime((string)$originalData['startTime']));
 		} elseif (isset($originalData['date'])) {
-			$entry->setStartTime(new \DateTime((string)$originalData['date']));
+			$entry->setStartTime($this->storageDateTime((string)$originalData['date']));
 		}
 		if (array_key_exists('endTime', $originalData)) {
 			$rawEnd = $originalData['endTime'];
-			$entry->setEndTime(is_string($rawEnd) && $rawEnd !== '' ? new \DateTime($rawEnd) : null);
+			$entry->setEndTime(is_string($rawEnd) && $rawEnd !== '' ? $this->storageDateTime($rawEnd) : null);
 		} elseif (isset($originalData['hours']) && $entry->getStartTime()) {
 			$endTime = clone $entry->getStartTime();
 			$endTime->modify('+' . (int)round((float)$originalData['hours'] * 3600) . ' seconds');
@@ -768,13 +781,13 @@ class TimeEntryCorrectionService
 		}
 		if (array_key_exists('breakStartTime', $originalData)) {
 			$raw = $originalData['breakStartTime'];
-			$entry->setBreakStartTime(is_string($raw) && $raw !== '' ? new \DateTime($raw) : null);
+			$entry->setBreakStartTime(is_string($raw) && $raw !== '' ? $this->storageDateTime($raw) : null);
 		} else {
 			$entry->setBreakStartTime(null);
 		}
 		if (array_key_exists('breakEndTime', $originalData)) {
 			$raw = $originalData['breakEndTime'];
-			$entry->setBreakEndTime(is_string($raw) && $raw !== '' ? new \DateTime($raw) : null);
+			$entry->setBreakEndTime(is_string($raw) && $raw !== '' ? $this->storageDateTime($raw) : null);
 		} else {
 			$entry->setBreakEndTime(null);
 		}

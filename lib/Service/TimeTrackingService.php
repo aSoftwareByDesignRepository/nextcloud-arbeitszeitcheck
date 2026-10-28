@@ -896,7 +896,10 @@ class TimeTrackingService
 				);
 			}
 			$start = $entry->getStartTime();
-			$end = \DateTime::createFromInterface($endAt);
+			// Explicit-offset inputs (e.g. '...Z' from API clients) carry the
+			// correct instant but a foreign wall clock — the naive column is
+			// written in storage TZ, so convert before persisting.
+			$end = \DateTime::createFromInterface($endAt)->setTimezone($this->getAppConfiguredTimeZone());
 			$now = $this->nowForAtEntries();
 			if ($end->getTimestamp() > $now->getTimestamp()) {
 				throw new BusinessRuleException(
@@ -1515,6 +1518,7 @@ class TimeTrackingService
 				$newEndTime = (new \DateTime())->setTimestamp($entryStartOnDayTs);
 				$newEndTime->modify('+' . round($maxAllowedWorkingHoursForEntry * 3600) . ' seconds');
 			}
+			$newEndTime->setTimezone($this->getAppConfiguredTimeZone());
 
 			// Archive any open break interval before completing, so working-time math stays correct.
 			if ($timeEntry->getStatus() === TimeEntry::STATUS_BREAK
@@ -1639,6 +1643,7 @@ class TimeTrackingService
 				$entryBreakHours = $timeEntry->getBreakDurationHours();
 				$entryStartOnDayTs = max($startTime->getTimestamp(), $dayStart->getTimestamp());
 				$adjustedEndTime = (new \DateTime())->setTimestamp($entryStartOnDayTs);
+				$adjustedEndTime->setTimezone($this->getAppConfiguredTimeZone());
 				$adjustedEndTime->modify('+' . round(($maxAllowedForEntryOnDay + $entryBreakHours) * 3600) . ' seconds');
 
 				if ($adjustedEndTime > $endTime) {

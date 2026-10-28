@@ -645,7 +645,8 @@ class TimeEntryController extends Controller
 	{
 		return \OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder::buildFromParams(
 			$params,
-			$this->countableMinBreakMinutes($userId)
+			$this->countableMinBreakMinutes($userId),
+			$this->getAppTimeZone()
 		);
 	}
 
@@ -2253,6 +2254,7 @@ class TimeEntryController extends Controller
 					$params,
 					$this->countableMinBreakMinutes($entry->getUserId()),
 					$unfinishedSession ? $entryStartTime : null,
+					$this->getAppTimeZone(),
 				);
 			} catch (\Exception $e) {
 				return new JSONResponse([
@@ -2570,6 +2572,7 @@ class TimeEntryController extends Controller
 				$params,
 				$this->countableMinBreakMinutes($entry->getUserId()),
 				$entry->getStartTime(),
+				$this->getAppTimeZone(),
 			);
 			$endIso = null;
 			if ($clock !== null && isset($clock['endTime'])) {

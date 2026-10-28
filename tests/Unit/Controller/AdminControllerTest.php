@@ -135,6 +135,9 @@ class AdminControllerTest extends TestCase
 	/** @var IDBConnection|\PHPUnit\Framework\MockObject\MockObject */
 	private $db;
 
+	/** @var \OCP\IConfig|\PHPUnit\Framework\MockObject\MockObject */
+	private $iConfig;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -232,8 +235,8 @@ class AdminControllerTest extends TestCase
 		$this->db = $this->createMock(IDBConnection::class);
 		$this->db->method('tableExists')->willReturn(true);
 		$db = $this->db;
-		$config = $this->createMock(\OCP\IConfig::class);
-		$config->method('getAppValue')->willReturnCallback(static function (string $app, string $key, $default = '') {
+		$this->iConfig = $this->createMock(\OCP\IConfig::class);
+		$this->iConfig->method('getAppValue')->willReturnCallback(static function (string $app, string $key, $default = '') {
 			return $default;
 		});
 		$adminUserProfileUpdateService = new AdminUserProfileUpdateService(
@@ -251,6 +254,8 @@ class AdminControllerTest extends TestCase
 			$this->timeCaptureMethodService,
 			$l10n,
 			$db,
+			null,
+			$this->iConfig,
 		);
 
 		$adminEmployeeDirectoryService = new \OCA\ArbeitszeitCheck\Service\AdminEmployeeDirectoryService(
@@ -302,7 +307,7 @@ class AdminControllerTest extends TestCase
 			$localeFormat,
 			$db,
 			null,
-			$config,
+			$this->iConfig,
 			null,
 			null,
 			null,
@@ -4017,6 +4022,47 @@ class AdminControllerTest extends TestCase
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->migrateVacationUnit());
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->getUserAssignmentHistory('bob'));
 		$this->assertInstanceOf(JSONResponse::class, $this->controller->updateUserProfile('bob'));
+	}
+
+	/**
+	 * Regression: the profile PUT must forward the "datev" section — it was
+	 * dropped from the payload, so a saved Personalnummer silently vanished.
+	 */
+	public function testUpdateUserProfilePersistsDatevPersonalnummer(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$this->userManager->method('get')->willReturnMap([['bob', $user]]);
+		$this->request->method('getParams')->willReturn([
+			'datev' => ['personalnummer' => '12345678'],
+		]);
+		$this->iConfig->method('getUserValue')->willReturn('');
+		$this->iConfig->expects($this->once())
+			->method('setUserValue')
+			->with('bob', 'arbeitszeitcheck', Constants::USER_DATEV_PERSONALNUMMER, '12345678');
+
+		$response = $this->controller->updateUserProfile('bob');
+		$data = $response->getData();
+		$this->assertTrue($data['success']);
+		$this->assertSame('12345678', $data['datevPersonalnummer']);
+	}
+
+	/**
+	 * An invalid Personalnummer must still surface a field error and persist nothing.
+	 */
+	public function testUpdateUserProfileRejectsInvalidDatevPersonalnummer(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$this->userManager->method('get')->willReturnMap([['bob', $user]]);
+		$this->request->method('getParams')->willReturn([
+			'datev' => ['personalnummer' => '123456789'],
+		]);
+		$this->iConfig->expects($this->never())->method('setUserValue');
+
+		$response = $this->controller->updateUserProfile('bob');
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertArrayHasKey('datevPersonalnummer', $data['errors']);
 	}
 
 	public function testGetCompanyHolidaysNormalizesItems(): void

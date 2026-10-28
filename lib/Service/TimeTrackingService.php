@@ -558,6 +558,7 @@ class TimeTrackingService
 				$breakEntry = $this->timeEntryMapper->findOnBreakByUser($userId);
 				$currentEntry = $activeEntry ?: $breakEntry;
 				if ($currentEntry === null) {
+					$this->assertNoPendingOpenSession($userId);
 					throw new BusinessRuleException(
 						$this->l10n->t('User is not currently clocked in'),
 						BusinessRuleCode::NOT_CLOCKED_IN,
@@ -804,6 +805,7 @@ class TimeTrackingService
 			try {
 				$activeEntry = $this->timeEntryMapper->findActiveByUser($userId);
 				if ($activeEntry === null) {
+					$this->assertNoPendingOpenSession($userId);
 					throw new BusinessRuleException(
 						$this->l10n->t('User is not currently clocked in'),
 						BusinessRuleCode::NOT_CLOCKED_IN,
@@ -855,6 +857,67 @@ class TimeTrackingService
 	}
 
 	/**
+	 * Pending open session = a retro clock-out request under review. Stamping on
+	 * it would create a second writer for end_time — refuse uniformly so the UI
+	 * can offer withdraw/wait instead of a misleading "not clocked in".
+	 */
+	private function assertNoPendingOpenSession(string $userId): void
+	{
+		if ($this->timeEntryMapper->findPendingOpenSessionByUser($userId) !== null) {
+			throw new BusinessRuleException(
+				$this->l10n->t('A correction request is still pending for an unfinished session. Cancel it or wait for approval before clocking in.'),
+				BusinessRuleCode::OPEN_SESSION_CORRECTION_PENDING,
+			);
+		}
+	}
+
+	/**
+	 * Direct retro clock-out (policy-gated): identical semantics to clockOut()
+	 * but with an explicit past end instant. Entry identity is asserted so a
+	 * client cannot close a different session than intended.
+	 */
+	public function clockOutAt(string $userId, int $entryId, \DateTimeInterface $endAt): TimeEntry
+	{
+		$lockKey = $this->acquireUserMutationLock($userId);
+		try {
+			$entry = $this->timeEntryMapper->findActiveByUser($userId)
+				?? $this->timeEntryMapper->findOnBreakByUser($userId);
+			if ($entry === null) {
+				$this->assertNoPendingOpenSession($userId);
+				throw new BusinessRuleException(
+					$this->l10n->t('User is not currently clocked in'),
+					BusinessRuleCode::NOT_CLOCKED_IN,
+				);
+			}
+			if ($entry->getId() !== $entryId) {
+				throw new BusinessRuleException(
+					$this->l10n->t('Time entry not found'),
+					BusinessRuleCode::NOT_CLOCKED_IN,
+				);
+			}
+			$start = $entry->getStartTime();
+			$end = \DateTime::createFromInterface($endAt);
+			$now = $this->nowForAtEntries();
+			if ($end->getTimestamp() > $now->getTimestamp()) {
+				throw new BusinessRuleException(
+					$this->l10n->t('The clock-out time cannot be in the future.'),
+					BusinessRuleCode::INVALID_INPUT,
+				);
+			}
+			if ($start !== null && $end->getTimestamp() < $start->getTimestamp()) {
+				throw new BusinessRuleException(
+					$this->l10n->t('End time must be after start time'),
+					BusinessRuleCode::INVALID_INPUT,
+				);
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		return $this->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'retro_clock_out', $endAt);
+	}
+
+	/**
 	 * End break for a user
 	 *
 	 * @param string $userId
@@ -869,6 +932,7 @@ class TimeTrackingService
 			try {
 				$breakEntry = $this->timeEntryMapper->findOnBreakByUser($userId);
 				if ($breakEntry === null) {
+					$this->assertNoPendingOpenSession($userId);
 					throw new BusinessRuleException(
 						$this->l10n->t('User is not currently on break'),
 						BusinessRuleCode::NOT_ON_BREAK,
@@ -937,8 +1001,22 @@ class TimeTrackingService
 			$nowImmutable = $this->timeZoneService->nowImmutableInStorage();
 
 			// If no active/break entry, check for a paused entry from today before
-			// declaring the user fully clocked out.
+			// declaring the user fully clocked out. A pending open-session
+			// correction takes precedence: the UI must offer withdraw, not "clock in".
 			if ($currentEntry === null) {
+				$pendingOpenEntry = $this->timeEntryMapper->findPendingOpenSessionByUser($userId);
+				if ($pendingOpenEntry !== null) {
+					$pendingSummary = $this->safeGetSummary($pendingOpenEntry, $userId);
+					return $this->appendAutoClockoutNotice($this->withServerClock(
+						$this->appendArbzgCalendarDayStatusFields([
+							'status' => TimeEntry::STATUS_PENDING_APPROVAL,
+							'current_entry' => $pendingSummary,
+							'working_today_hours' => $this->getTodayHours($userId),
+							'current_session_duration' => null,
+						], $userId, $pendingOpenEntry),
+						$nowImmutable,
+					), $userId);
+				}
 				[$today, $tomorrow] = $this->getAppLocalTodayWindow();
 				$pausedEntry = $this->timeEntryMapper->findPausedOrUnfinishedTodayByUser($userId, $today, $tomorrow);
 				if ($pausedEntry !== null && $pausedEntry->getStatus() === TimeEntry::STATUS_PAUSED) {

@@ -799,6 +799,7 @@ class AdminController extends Controller
 				'timeCapture' => is_array($params['timeCapture'] ?? null) ? $params['timeCapture'] : [],
 				'overtime' => is_array($params['overtime'] ?? null) ? $params['overtime'] : [],
 				'employment' => is_array($params['employment'] ?? null) ? $params['employment'] : [],
+				'datev' => is_array($params['datev'] ?? null) ? $params['datev'] : [],
 			];
 			$result = $this->adminUserProfileUpdateService->updateProfile(
 				$userId,

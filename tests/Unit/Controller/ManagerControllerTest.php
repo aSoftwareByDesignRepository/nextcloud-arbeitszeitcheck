@@ -3170,4 +3170,115 @@ class ManagerControllerTest extends TestCase
 		$this->assertSame(200, strlen($data['search']));
 		$this->assertSame(0, $data['total']);
 	}
+
+	// ---------- convertEmployeeAbsenceToSick (spec: vacation-to-sick-conversion-2026-10) ----------
+
+	private function managedVacation(int $id = 77, string $owner = 'bob'): \OCA\ArbeitszeitCheck\Db\Absence
+	{
+		$a = new \OCA\ArbeitszeitCheck\Db\Absence();
+		$a->setId($id);
+		$a->setUserId($owner);
+		$a->setType(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION);
+		$a->setStatus(\OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED);
+		$a->setStartDate(new \DateTime('-10 days'));
+		$a->setEndDate(new \DateTime('-2 days'));
+		$a->setDays(5.0);
+		$a->setCreatedAt(new \DateTime('-30 days'));
+		$a->setUpdatedAt(new \DateTime('-30 days'));
+		return $a;
+	}
+
+	private function managerConvertParams(): array
+	{
+		return [
+			'sickStart' => (new \DateTime('-8 days'))->format('Y-m-d'),
+			'sickEnd' => (new \DateTime('-5 days'))->format('Y-m-d'),
+			'expectedUpdatedAt' => '2026-10-28T12:00:00+02:00',
+			'reason' => 'AU vorliegend',
+		];
+	}
+
+	private function stubManagerActor(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('manager1');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = true;
+	}
+
+	public function testConvertEmployeeAbsenceToSickSuccess(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canManageEmployee')->with('manager1', 'bob')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerConvertParams());
+		$payload = ['vacation' => ['id' => 77], 'sick' => ['id' => 90, 'status' => 'approved'], 'tail' => null];
+		$this->absenceService->expects($this->once())
+			->method('convertVacationToSick')
+			->with(77, $this->callback(fn ($d) => $d['reason'] === 'AU vorliegend'), 'manager1', true)
+			->willReturn($payload);
+
+		$response = $this->controller->convertEmployeeAbsenceToSick(77);
+		$data = $response->getData();
+		$this->assertTrue($data['success']);
+		$this->assertSame(90, $data['sick']['id']);
+	}
+
+	public function testConvertEmployeeAbsenceToSickScopeDenied(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canManageEmployee')->willReturn(false);
+		$this->absenceService->expects($this->never())->method('convertVacationToSick');
+
+		$response = $this->controller->convertEmployeeAbsenceToSick(77);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testConvertEmployeeAbsenceToSickSelfTargetForbidden(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation(78, 'manager1'));
+		$this->absenceService->expects($this->never())->method('convertVacationToSick');
+
+		$response = $this->controller->convertEmployeeAbsenceToSick(78);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertTrue($data['selfTarget']);
+		$this->assertSame('absences', $data['selfServiceArea']);
+	}
+
+	public function testConvertEmployeeAbsenceToSickNotFound(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willThrowException(new DoesNotExistException('x'));
+		$response = $this->controller->convertEmployeeAbsenceToSick(999);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+	}
+
+	public function testConvertEmployeeAbsenceToSickAccessDenied(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('nobody');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->canAccessManagerDashboard = false;
+		$this->isAdminAccess = false;
+
+		$response = $this->controller->convertEmployeeAbsenceToSick(77);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testConvertEmployeeAbsenceToSickLockContentionReturns423(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canManageEmployee')->with('manager1', 'bob')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerConvertParams());
+		$this->absenceService->method('convertVacationToSick')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException('held'));
+
+		$response = $this->controller->convertEmployeeAbsenceToSick(77);
+		$this->assertSame(Http::STATUS_LOCKED, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
 }

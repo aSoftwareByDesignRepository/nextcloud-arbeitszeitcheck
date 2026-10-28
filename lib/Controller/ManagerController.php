@@ -643,7 +643,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function employeeAbsencesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-absences', 'manager-time-entries', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+		$this->registerFrontEndAssets('manager-absences', 'manager-time-entries', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker', 'common/absence-sick-conversion']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 
 		try {
@@ -2064,6 +2064,7 @@ class ManagerController extends Controller
 					'statusLabel' => $this->getAbsenceStatusLabel($absence->getStatus()),
 					'reason' => $absence->getReason(),
 					'createdAt' => $absence->getCreatedAt()?->format('c'),
+					'updatedAt' => $absence->getUpdatedAt()?->format('c'),
 				];
 			}
 
@@ -2332,6 +2333,116 @@ class ManagerController extends Controller
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
 				'Error in ManagerController::createEmployeeAbsence',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Convert an approved vacation of a managed employee (including already
+	 * ended vacations) into sick leave. Atomic vacation shorten/cancel/split
+	 * plus an approved sick absence. spec: vacation-to-sick-conversion-2026-10
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function convertEmployeeAbsenceToSick(int $absenceId): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'convert_absence_to_sick');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+
+			try {
+				$absence = $this->absenceMapper->find($absenceId);
+			} catch (DoesNotExistException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Absence not found'),
+				], Http::STATUS_NOT_FOUND);
+			}
+
+			$targetUserId = $absence->getUserId();
+			if ($targetUserId === $actorUserId) {
+				return $this->selfTargetForbiddenResponse('absences', 'convert_absence_to_sick', $targetUserId);
+			}
+			if (!$this->permissionService->canManageEmployee($actorUserId, $targetUserId)) {
+				$this->permissionService->logPermissionDenied($actorUserId, 'convert_absence_to_sick', 'absence', (string)$absenceId);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied. You can only record absences for employees you manage.'),
+				], Http::STATUS_FORBIDDEN);
+			}
+
+			$payload = $this->request->getParams();
+			$data = [
+				'sickStart' => $this->requestParamString($payload, 'sickStart'),
+				'sickEnd' => $this->requestParamString($payload, 'sickEnd'),
+				'expectedUpdatedAt' => $this->requestParamString($payload, 'expectedUpdatedAt'),
+				'reason' => $this->requestParamString($payload, 'reason'),
+				'dryRun' => $payload['dryRun'] ?? null,
+			];
+			if ($data['sickStart'] === '' || $data['sickEnd'] === '' || $data['expectedUpdatedAt'] === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Sick start, sick end, and the current absence version are required.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			try {
+				$result = $this->absenceService->convertVacationToSick($absenceId, $data, $actorUserId, true);
+				return new JSONResponse(['success' => true] + $result);
+			} catch (MonthFinalizedException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.'),
+				], Http::STATUS_CONFLICT);
+			} catch (DoesNotExistException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Absence not found'),
+				], Http::STATUS_NOT_FOUND);
+			} catch (AbsenceMutationBusyException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
+			} catch (BusinessRuleException $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t($e->getMessage()),
+					'error_code' => $e->getReasonCode(),
+				], Http::STATUS_BAD_REQUEST);
+			} catch (\Exception $e) {
+				$code = $e->getMessage();
+				$mapped = [
+					'revision_stale' => [Http::STATUS_CONFLICT, 'revision_stale', 'This absence was changed in the meantime. Please reload and try again.'],
+					'overlap' => [Http::STATUS_CONFLICT, 'overlap', 'This period overlaps with an existing absence.'],
+					'range_outside' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'range_outside', 'The sick period must be inside the vacation period.'],
+					'fraction_boundary' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'fraction_boundary', 'This vacation contains half days and cannot be split there.'],
+				];
+				if (isset($mapped[$code])) {
+					[$status, $errCode, $msg] = $mapped[$code];
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t($msg),
+						'error_code' => $errCode,
+					], $status);
+				}
+				\OCP\Log\logger('arbeitszeitcheck')->info(
+					'ManagerController::convertEmployeeAbsenceToSick validation: ' . $e->getMessage(),
+					['exception' => $e]
+				);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t($e->getMessage()),
+				], Http::STATUS_BAD_REQUEST);
+			}
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::convertEmployeeAbsenceToSick',
 				['exception' => $e]
 			);
 			return new JSONResponse([
@@ -3310,9 +3421,41 @@ class ManagerController extends Controller
 				$comment = null;
 			}
 
+			// BQ-3: optional manager-adjusted proposal at approve time. Same field
+			// vocabulary as correctTimeEntry (clock fields, breaks, description,
+			// workLocation). Empty → plain approve of the employee's proposal.
+			$adjustedProposal = [];
+			$params = $this->request->getParams();
+			$minBreak = null;
+			try {
+				$minBreak = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::class)
+					->getProfile($entry->getUserId())->minBreakMinutes;
+			} catch (\Throwable) {
+				$minBreak = null;
+			}
+			$adjustedProposal = TimeEntryClockPayloadBuilder::mergeIntoProposal($params, [], $minBreak);
+			if (array_key_exists('description', $params)) {
+				$adjustedProposal['description'] = $params['description'];
+			}
+			if (array_key_exists('workLocation', $params) || array_key_exists('work_location', $params)) {
+				try {
+					$adjustedProposal['workLocation'] = \OCA\ArbeitszeitCheck\Support\WorkLocation::normalize(
+						$params['workLocation'] ?? $params['work_location']
+					);
+				} catch (\InvalidArgumentException) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid work location.'),
+						'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::INVALID_WORK_LOCATION,
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+
 			$oldValues = $entry->getSummary();
 			try {
-				$updatedEntry = $this->correctionService->approve($entry, $managerId, $comment);
+				$updatedEntry = $adjustedProposal !== []
+					? $this->correctionService->approveWithAdjustment($entry, $managerId, $comment, $adjustedProposal)
+					: $this->correctionService->approve($entry, $managerId, $comment);
 			} catch (\InvalidArgumentException $e) {
 				return new JSONResponse([
 					'success' => false,
@@ -3644,9 +3787,12 @@ class ManagerController extends Controller
 					// Parse justification to get correction details
 					$justificationData = json_decode($entry->getJustification() ?? '{}', true);
 
-					$requestType = (($justificationData['type'] ?? '') === 'manual_create')
-						? 'manual_create'
-						: 'correction';
+					$justType = (string)($justificationData['type'] ?? '');
+					$requestType = match ($justType) {
+						'manual_create' => 'manual_create',
+						'open_session_correction' => 'open_session',
+						default => 'correction',
+					};
 					$corrections[] = [
 						'id' => $entry->getId(),
 						'userId' => $entry->getUserId(),

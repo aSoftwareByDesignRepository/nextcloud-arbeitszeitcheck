@@ -292,6 +292,74 @@ class TimeEntryCorrectionService
 		}
 	}
 
+	/**
+	 * NN-2: a decision must never produce a completed row with end_time NULL.
+	 * When the request closed an open session, mark the end provenance for audit.
+	 *
+	 * @param array<string, mixed> $justificationData
+	 */
+	private function assertCompletableDecision(TimeEntry $entry, array $justificationData): void
+	{
+		if ($entry->getEndTime() === null) {
+			throw new \InvalidArgumentException(
+				$this->l10n->t('A clock-out time is required to complete this session.')
+			);
+		}
+		$original = is_array($justificationData['original'] ?? null) ? $justificationData['original'] : [];
+		if (\array_key_exists('endTime', $original) && $original['endTime'] === null && $entry->getEndedReason() === null) {
+			$entry->setEndedReason(TimeEntry::ENDED_REASON_APPROVED_CLOCK_OUT);
+		}
+	}
+
+	/**
+	 * Approve with a manager-adjusted proposal (BQ-3): the manager's version is
+	 * validated/applied; the employee's requested values stay on the record.
+	 *
+	 * @param array<string, mixed> $adjustedProposal
+	 */
+	public function approveWithAdjustment(TimeEntry $entry, string $managerId, ?string $comment, array $adjustedProposal): TimeEntry
+	{
+		$justificationData = json_decode($entry->getJustification() ?? '{}', true);
+		if (!is_array($justificationData)) {
+			$justificationData = [];
+		}
+
+		$error = $this->validateProposal($entry, $adjustedProposal, $managerId);
+		if ($error !== null) {
+			throw new \InvalidArgumentException($error);
+		}
+		$this->applyProposal($entry, $adjustedProposal);
+		$this->applyComplianceAdjustments($entry);
+		$this->assertCompletableDecision($entry, $justificationData);
+
+		$requestedProposal = is_array($justificationData['proposed'] ?? null) ? $justificationData['proposed'] : null;
+		if ($requestedProposal !== null) {
+			$justificationData['requested_proposal'] = $requestedProposal;
+		}
+		$justificationData['proposed'] = $adjustedProposal;
+		$justificationData['adjusted_by_manager'] = true;
+
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setApprovedByUserId($managerId);
+		$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
+		$entry->setApprovedAt(clone $nowAt);
+		$entry->setUpdatedAt(clone $nowAt);
+
+		$justificationData['approved_at'] = date('c');
+		$justificationData['approved_by'] = $managerId;
+		if ($comment !== null && $comment !== '') {
+			$justificationData['approval_comment'] = $comment;
+		}
+		$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
+
+		$updated = $this->persistPendingDecision($entry);
+		$updated = $this->recomputePaidBreaks($updated);
+		$this->runComplianceIfEnabled($updated);
+		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
+
+		return $updated;
+	}
+
 	public function approve(TimeEntry $entry, string $managerId, ?string $comment = null): TimeEntry
 	{
 		$justificationData = json_decode($entry->getJustification() ?? '{}', true);
@@ -308,6 +376,7 @@ class TimeEntryCorrectionService
 			$this->applyProposal($entry, $proposal);
 			$this->applyComplianceAdjustments($entry);
 		}
+		$this->assertCompletableDecision($entry, $justificationData);
 
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$entry->setApprovedByUserId($managerId);
@@ -346,6 +415,9 @@ class TimeEntryCorrectionService
 				$this->applyProposal($entry, $proposal);
 				$this->applyComplianceAdjustments($entry);
 			}
+		}
+		if (is_array($justificationData)) {
+			$this->assertCompletableDecision($entry, $justificationData);
 		}
 
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
@@ -552,7 +624,32 @@ class TimeEntryCorrectionService
 		}
 
 		$this->applyProposal($entry, $proposal);
+		// A still-open break interval must be archived when the correction
+		// finalises the session — otherwise the row keeps a dangling breakStart.
+		if ($entry->getStatus() === TimeEntry::STATUS_BREAK && $entry->getBreakStartTime() !== null) {
+			$breakStart = $entry->getBreakStartTime();
+			$breakEnd = $entry->getEndTime() !== null && $entry->getEndTime() > $breakStart
+				? clone $entry->getEndTime()
+				: clone $breakStart;
+			$existing = $entry->getBreaks();
+			$breaksList = ($existing !== null && $existing !== '') ? (json_decode($existing, true) ?? []) : [];
+			if (is_array($breaksList)) {
+				$breaksList[] = [
+					'start' => $breakStart->format('c'),
+					'end' => $breakEnd->format('c'),
+					'duration_minutes' => (int)round(($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60),
+				];
+				$entry->setBreaks(json_encode($breaksList));
+			}
+			$entry->setBreakStartTime(null);
+			$entry->setBreakEndTime(null);
+		}
 		$this->applyComplianceAdjustments($entry);
+		if ($entry->getEndTime() === null) {
+			throw new \InvalidArgumentException(
+				$this->l10n->t('A clock-out time is required to complete this session.')
+			);
+		}
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$entry->setApprovedByUserId($managerId);
 		$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
@@ -703,11 +800,18 @@ class TimeEntryCorrectionService
 	private function ensureCandidateStatusForValidation(TimeEntry $candidate): void
 	{
 		$status = $candidate->getStatus();
-		if ($status !== null && $status !== '') {
+		if ($status !== null && $status !== '' && $candidate->getEndTime() === null) {
 			return;
 		}
-		if ($candidate->getEndTime() !== null) {
-			$candidate->setStatus(TimeEntry::STATUS_COMPLETED);
+		// A proposal that supplies an end time finalises the session — validate
+		// the candidate in the completed shape so the labour-law blocking gate
+		// (blockingIssuesForCompletedEntry requires status=completed) fires for
+		// open-session corrections the same as for finished-entry corrections.
+		if ($status === null || $status === ''
+			|| in_array($status, [TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK, TimeEntry::STATUS_PAUSED], true)) {
+			if ($candidate->getEndTime() !== null) {
+				$candidate->setStatus(TimeEntry::STATUS_COMPLETED);
+			}
 		}
 	}
 

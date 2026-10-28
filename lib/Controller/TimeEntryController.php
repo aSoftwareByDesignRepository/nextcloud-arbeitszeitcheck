@@ -2158,6 +2158,16 @@ class TimeEntryController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			// A live break interval must be ended before the session can be
+			// corrected — the proposal merge cannot represent a dangling breakStart.
+			if ($currentStatus === TimeEntry::STATUS_BREAK) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This entry is on break. End the break first, then request the correction.'),
+					'error_code' => 'entry_on_break',
+				], Http::STATUS_BAD_REQUEST);
+			}
+
 			// Get data from request body
 			$params = $this->request->getParams();
 			$justification = $params['justification'] ?? null;
@@ -2228,10 +2238,22 @@ class TimeEntryController extends Controller
 			];
 
 			$proposedData = [];
+			$unfinishedSession = $entry->getEndTime() === null;
+
+			// Open-session requests default `date` to the session's start day so a
+			// bare `endTime` (retro clock-out) resolves on the right calendar day;
+			// the overnight +1d rule inside the builder handles post-midnight ends.
+			if ($unfinishedSession && !isset($params['date']) && $entryStartTime) {
+				$params['date'] = $entryStartTime->format('Y-m-d');
+			}
 
 			$clockBased = null;
 			try {
-				$clockBased = $this->buildProposedWorkTimesFromDateAndClock($params, $entry->getUserId());
+				$clockBased = \OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder::buildPartialFromParams(
+					$params,
+					$this->countableMinBreakMinutes($entry->getUserId()),
+					$unfinishedSession ? $entryStartTime : null,
+				);
 			} catch (\Exception $e) {
 				return new JSONResponse([
 					'success' => false,
@@ -2243,14 +2265,16 @@ class TimeEntryController extends Controller
 				if ($description !== null) {
 					$proposedData['description'] = $description;
 				}
-			} elseif ($startTime && $endTime) {
-				// ISO-8601 instants (legacy clients / API integrations)
+			} elseif ($startTime || $endTime) {
+				// ISO-8601 instants (legacy clients / API integrations). Single-field
+				// proposals are valid: an unfinished session only needs `endTime`.
 				try {
-					$proposedStartTime = $this->parseIsoDateTime($startTime, 'start_time');
-					$proposedEndTime = $this->parseIsoDateTime($endTime, 'end_time');
-					$proposedData['startTime'] = $proposedStartTime->format('c');
-					$proposedData['endTime'] = $proposedEndTime->format('c');
-
+					if ($startTime) {
+						$proposedData['startTime'] = $this->parseIsoDateTime($startTime, 'start_time')->format('c');
+					}
+					if ($endTime) {
+						$proposedData['endTime'] = $this->parseIsoDateTime($endTime, 'end_time')->format('c');
+					}
 					if ($breakStartTime && $breakEndTime) {
 						$proposedBreakStartTime = $this->parseIsoDateTime($breakStartTime, 'break_start_time');
 						$proposedBreakEndTime = $this->parseIsoDateTime($breakEndTime, 'break_end_time');
@@ -2303,6 +2327,9 @@ class TimeEntryController extends Controller
 				'proposed' => $proposedData,
 				'requested_at' => date('c')
 			];
+			if ($unfinishedSession) {
+				$correctionData['type'] = 'open_session_correction';
+			}
 
 			if ($proposedData === []) {
 				return new JSONResponse([
@@ -2310,6 +2337,33 @@ class TimeEntryController extends Controller
 					'error' => $this->l10n->t('At least one proposed change is required.'),
 					'error_code' => 'proposed_change_required',
 				], Http::STATUS_BAD_REQUEST);
+			}
+
+			// Open-session requests must finalise the session: a pending row without
+			// an end would stay an unkillable "completed" ghost on approval (NN-2).
+			if ($unfinishedSession && !isset($proposedData['endTime'])) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('A clock-out time is required to correct an unfinished session.'),
+					'error_code' => 'proposal_requires_end',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if (isset($proposedData['endTime'])) {
+				try {
+					$proposedEnd = new \DateTime((string)$proposedData['endTime']);
+					if ($proposedEnd->getTimestamp() > time()) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('The clock-out time cannot be in the future.'),
+							'error_code' => 'end_in_future',
+						], Http::STATUS_BAD_REQUEST);
+					}
+				} catch (\Throwable $e) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid end_time format. Use ISO-8601 (e.g. 2024-01-15T17:30:00Z).'),
+					], Http::STATUS_BAD_REQUEST);
+				}
 			}
 
 			if (!$entry->canRequestCorrection(Constants::EDIT_WINDOW_DAYS)) {
@@ -2454,6 +2508,136 @@ class TimeEntryController extends Controller
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Time entry not found')], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error cancelling correction: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Direct retro clock-out on an unfinished session (BQ-2): only when the org
+	 * allows direct entry edits — otherwise the request-correction flow applies.
+	 *
+	 * Body: { endTime: "HH:mm"|ISO-8601, date?: "YYYY-MM-DD", justification?: string }
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function retroClockOut(int $id): JSONResponse
+	{
+		try {
+			$userId = $this->getUserId();
+			$entry = $this->timeEntryMapper->find($id);
+
+			if ($entry->getUserId() !== $userId) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Time entry not found')
+				], Http::STATUS_NOT_FOUND);
+			}
+
+			if ($this->requiresChangeApproval()) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Direct edits are disabled. Please request a correction for manager approval.'),
+					'error_code' => 'approval_required',
+				], Http::STATUS_FORBIDDEN);
+			}
+
+			$status = $entry->getStatus();
+			if ($status === TimeEntry::STATUS_PENDING_APPROVAL) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Correction request already pending'),
+					'error_code' => 'correction_pending',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if (!in_array($status, [TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK], true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This time entry cannot be corrected.'),
+					'error_code' => 'correction_not_allowed',
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$mc = $this->assertGuardTimeEntry($entry);
+			if ($mc !== null) {
+				return $mc;
+			}
+
+			$params = $this->request->getParams();
+			if (!isset($params['date']) || !is_string($params['date']) || trim($params['date']) === '') {
+				$params['date'] = $entry->getStartTime() ? $entry->getStartTime()->format('Y-m-d') : null;
+			}
+			$clock = \OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder::buildPartialFromParams(
+				$params,
+				$this->countableMinBreakMinutes($entry->getUserId()),
+				$entry->getStartTime(),
+			);
+			$endIso = null;
+			if ($clock !== null && isset($clock['endTime'])) {
+				$endIso = (string)$clock['endTime'];
+			} else {
+				$rawEnd = $params['endTime'] ?? null;
+				if (is_string($rawEnd) && trim($rawEnd) !== '') {
+					try {
+						$endIso = $this->parseIsoDateTime($rawEnd, 'end_time')->format('c');
+					} catch (\Exception $e) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t($e->getMessage()),
+						], Http::STATUS_BAD_REQUEST);
+					}
+				}
+			}
+			if ($endIso === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('A clock-out time is required to complete this session.'),
+					'error_code' => 'proposal_requires_end',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$endAt = new \DateTime($endIso);
+
+			$justification = null;
+			$rawJust = $params['justification'] ?? null;
+			if (is_string($rawJust) && trim($rawJust) !== '') {
+				$justification = mb_substr(trim($rawJust), 0, 2000);
+			}
+
+			$updatedEntry = $this->timeTrackingService->clockOutAt($userId, $id, $endAt);
+
+			if ($justification !== null) {
+				$updatedEntry->setJustification(json_encode([
+					'type' => 'retro_clock_out',
+					'justification' => $justification,
+					'recorded_by' => $userId,
+					'recorded_at' => date('c'),
+				], JSON_THROW_ON_ERROR));
+				$updatedEntry = $this->timeEntryMapper->update($updatedEntry);
+			}
+			$this->auditLogMapper->logAction(
+				$userId,
+				'time_entry_retro_clock_out',
+				'time_entry',
+				$id,
+				null,
+				array_merge($updatedEntry->getSummary(), ['retro_clock_out_at' => $endAt->format('c')])
+			);
+
+			return new JSONResponse([
+				'success' => true,
+				'entry' => $updatedEntry->getSummary(),
+				'break_warning' => $this->breakWarningPayload($updatedEntry),
+				'message' => $this->l10n->t('Session ended at the recorded time.')
+			]);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Time entry not found')], Http::STATUS_NOT_FOUND);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $e->getMessage(),
+				'error_code' => $e->getReasonCode(),
+			], Http::STATUS_CONFLICT);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Error in retro clock-out: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}

@@ -87,6 +87,26 @@ final class SpecialEntitlementAdminController extends Controller
 		return $this->configureCSP($response, 'admin');
 	}
 
+	/**
+	 * POST /api/admin/special-entitlements/enable — turns the feature on
+	 * (both flags atomically). Explicit ack required, mirroring the
+	 * business-trips rollout enable.
+	 */
+	#[NoAdminRequired]
+	public function enable(): JSONResponse
+	{
+		$ack = $this->request->getParam('acknowledgeRollbackWarning', false);
+		if ($ack !== true && $ack !== '1' && $ack !== 'true') {
+			return $this->serviceError(new SpecialEntitlementException('VALIDATION_ERROR', 'Please confirm the rollback warning.', 400, ['acknowledgeRollbackWarning' => 'required']));
+		}
+		try {
+			$this->service->enableFeature($this->uid());
+			return new JSONResponse(['success' => true, 'special_entitlements_enabled' => true]);
+		} catch (SpecialEntitlementException $e) {
+			return $this->serviceError($e);
+		}
+	}
+
 	#[NoAdminRequired]
 	public function types(): JSONResponse
 	{

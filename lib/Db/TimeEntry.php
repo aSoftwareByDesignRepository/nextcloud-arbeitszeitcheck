@@ -78,6 +78,8 @@ class TimeEntry extends Entity
 	public const ENDED_REASON_AUTO_DAILY_MAX = 'auto_daily_max';
 	/** Automatic completion of legacy/orphan {@see STATUS_PAUSED} rows from a previous calendar day */
 	public const ENDED_REASON_STALE_PAUSED_REPAIR = 'stale_paused_repair';
+	/** Session closed by an approved retro clock-out (open-session correction) */
+	public const ENDED_REASON_APPROVED_CLOCK_OUT = 'approved_clock_out';
 
 	/** @var string */
 	protected $userId;
@@ -687,7 +689,10 @@ class TimeEntry extends Entity
 			return false;
 		}
 
-		if (!in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_PAUSED], true)) {
+		// ACTIVE sessions may file an open-session correction (retro clock-out);
+		// the proposal must then carry an endTime — enforced server-side. BREAK
+		// stays out: the live break interval must be ended first.
+		if (!in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_PAUSED, self::STATUS_ACTIVE], true)) {
 			return false;
 		}
 

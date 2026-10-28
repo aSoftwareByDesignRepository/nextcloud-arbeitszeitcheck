@@ -118,6 +118,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 	 * @var list<string>
 	 */
 	private const HAPPY_PATH_PERMANENT_NA = [
+		// Requires a running (status=active) session owned by the caller; the
+		// generic fixture yields a completed entry, so a designed deny is the
+		// only honest outcome under this sweep.
+		'TimeEntryController::retroClockOut',
 	];
 
 	/**
@@ -277,6 +281,11 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::updateAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::cancelAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::shortenAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
+			'OCA\ArbeitszeitCheck\Service\AbsenceService::convertVacationToSick' => [
+				'vacation' => ['id' => 1, 'status' => 'approved'],
+				'sick' => ['id' => 2, 'status' => 'pending'],
+				'tail' => null,
+			],
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::approveAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::rejectAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::approveBySubstitute' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
@@ -375,6 +384,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::deleteTariffRuleSet' => ['status' => 'draft'],
 		// Manager correcting a subordinate's entry — self-targets legitimately 403.
 		'ManagerController::correctTimeEntry' => ['userid' => 'bob'],
+		'ManagerController::convertEmployeeAbsenceToSick' => ['userid' => 'bob'],
 		'AdminController::updateTariffRuleSet' => ['status' => 'draft'],
 		'AdminController::activateTariffRuleSet' => [
 			'status' => 'draft',
@@ -404,6 +414,16 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'OutlookIcalSubscriptionController::adminCreateToken' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminCreateSubscriptionLink' => ['teamId' => 1, 'languageCode' => 'en'],
 		'OutlookIcalSubscriptionController::adminRotateToken' => ['teamId' => 1, 'languageCode' => 'en'],
+		'AbsenceController::convertToSick' => [
+			'sickStart' => '2026-09-11',
+			'sickEnd' => '2026-09-11',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::convertEmployeeAbsenceToSick' => [
+			'sickStart' => '2026-09-11',
+			'sickEnd' => '2026-09-11',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
 	];
 
 	/**

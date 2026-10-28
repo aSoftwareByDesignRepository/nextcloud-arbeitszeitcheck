@@ -26,4 +26,6 @@ final class BusinessRuleCode
 	public const LOCKED = 'locked';
 	/** Request carried a work_location value outside the canonical allowlist. */
 	public const INVALID_WORK_LOCATION = 'invalid_work_location';
+	/** Generic validation failure for direct write endpoints. */
+	public const INVALID_INPUT = 'invalid_input';
 }

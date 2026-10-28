@@ -674,6 +674,73 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * API: Convert an approved (running) vacation into sick leave — atomic
+	 * shorten/cancel/split of the vacation plus a pending sick request.
+	 * spec: planning/features/arbeitszeitcheck/vacation-to-sick-conversion-2026-10
+	 *
+	 * @param int $id Absence ID
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function convertToSick(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$data = [
+			'sickStart' => isset($params['sickStart']) ? trim((string)$params['sickStart']) : '',
+			'sickEnd' => isset($params['sickEnd']) ? trim((string)$params['sickEnd']) : '',
+			'expectedUpdatedAt' => isset($params['expectedUpdatedAt']) ? trim((string)$params['expectedUpdatedAt']) : '',
+			'reason' => isset($params['reason']) ? trim((string)$params['reason']) : '',
+			'dryRun' => $params['dryRun'] ?? null,
+		];
+		if ($data['sickStart'] === '' || $data['sickEnd'] === '' || $data['expectedUpdatedAt'] === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Sick start, sick end, and the current absence version are required.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			$result = $this->absenceService->convertVacationToSick($id, $data, $this->getUserId(), false);
+			return new JSONResponse(['success' => true] + $result);
+		} catch (MonthFinalizedException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.'),
+			], Http::STATUS_CONFLICT);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Absence not found'),
+			], Http::STATUS_NOT_FOUND);
+		} catch (AbsenceMutationBusyException $e) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
+		} catch (\Throwable $e) {
+			$code = $e->getMessage();
+			$mapped = [
+				'revision_stale' => [Http::STATUS_CONFLICT, 'revision_stale', 'This absence was changed in the meantime. Please reload and try again.'],
+				'overlap' => [Http::STATUS_CONFLICT, 'overlap', 'This period overlaps with an existing absence.'],
+				'range_outside' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'range_outside', 'The sick period must be inside the vacation period.'],
+				'fraction_boundary' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'fraction_boundary', 'This vacation contains half days and cannot be split there.'],
+			];
+			if (isset($mapped[$code])) {
+				[$status, $errCode, $msg] = $mapped[$code];
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t($msg),
+					'error_code' => $errCode,
+				], $status);
+			}
+			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::convertToSick failed: ' . $e->getMessage(), ['exception' => $e]);
+			$msg = $this->getSafeErrorMessage($e);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $msg
+			], $this->safeErrorStatus($e, $msg));
+		}
+	}
+
+	/**
 	 * Form POST: Shorten absence (early return). Redirects back to show page.
 	 *
 	 * @param int $id Absence ID
@@ -1032,7 +1099,11 @@ class AbsenceController extends Controller
 	#[NoCSRFRequired]
 	public function show(int $id): TemplateResponse
 	{
-		\OCA\ArbeitszeitCheck\Service\FrontEndAssetService::registerTranslations();
+		// The detail view renders the same 'absences' template as the form —
+		// it needs the same script bundle (AzcApi for the convert dialog,
+		// datepicker, validation) plus the shared conversion module.
+		$this->registerAbsenceFormAssets();
+		\OCP\Util::addScript('arbeitszeitcheck', 'common/absence-sick-conversion');
 
 		try {
 			$userId = $this->getUserId();

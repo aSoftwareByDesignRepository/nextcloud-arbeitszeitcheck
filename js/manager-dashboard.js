@@ -658,9 +658,25 @@
     function approveTimeEntry(timeEntryId) {
         const card = document.querySelector('.pending-approval-card[data-time-entry-id="' + timeEntryId + '"]');
         const isManualCreate = card && card.getAttribute('data-request-type') === 'manual_create';
+        // BQ-3 approve-with-edit: open-session cards carry an optional adjusted
+        // clock-out time. Only send it when the manager actually changed it —
+        // otherwise the employee's proposal is approved verbatim.
+        const body = {};
+        const adjustInput = card ? card.querySelector('.azc-adjust-end-input') : null;
+        if (adjustInput && adjustInput.value
+            && adjustInput.value !== adjustInput.getAttribute('data-base-hhmm')) {
+            const baseIso = adjustInput.getAttribute('data-base-iso');
+            const base = baseIso ? new Date(baseIso) : null;
+            const hhmm = adjustInput.value.split(':');
+            if (base && !isNaN(base.getTime()) && hhmm.length === 2
+                && hhmm[0] !== '' && hhmm[1] !== '') {
+                base.setHours(parseInt(hhmm[0], 10), parseInt(hhmm[1], 10), 0, 0);
+                body.endTime = base.toISOString();
+            }
+        }
         Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/time-entries/' + timeEntryId + '/approve-correction'), {
             method: 'POST',
-            data: {},
+            data: body,
             onSuccess: function(data) {
                 if (data.success) {
                     Messaging.showSuccess(isManualCreate

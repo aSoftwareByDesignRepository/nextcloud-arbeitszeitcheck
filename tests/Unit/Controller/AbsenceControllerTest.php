@@ -1355,4 +1355,118 @@ class AbsenceControllerTest extends TestCase
 		$this->assertInstanceOf(RedirectResponse::class, $r);
 		$this->assertSame(Http::STATUS_SEE_OTHER, $r->getStatus());
 	}
+
+	// ---------- convertToSick (spec: vacation-to-sick-conversion-2026-10) ----------
+
+	private function convertParams(array $overrides = []): array
+	{
+		return array_merge([
+			'sickStart' => '2026-11-10',
+			'sickEnd' => '2026-11-12',
+			'expectedUpdatedAt' => '2026-10-28T12:00:00+02:00',
+			'reason' => '',
+		], $overrides);
+	}
+
+	private function stubConvertParams(array $params): void
+	{
+		$this->request->method('getParams')->willReturn($params);
+	}
+
+	public function testConvertToSickRequiresParams(): void
+	{
+		$this->stubConvertParams(['sickStart' => '2026-11-10']);
+		$response = $this->controller->convertToSick(7);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testConvertToSickSuccess(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubConvertParams($this->convertParams());
+
+		$payload = ['vacation' => ['id' => 7, 'status' => 'approved'], 'sick' => ['id' => 88, 'status' => 'pending'], 'tail' => null];
+		$this->absenceService->expects($this->once())
+			->method('convertVacationToSick')
+			->with(7, $this->callback(fn ($d) => $d['sickStart'] === '2026-11-10' && $d['sickEnd'] === '2026-11-12'), 'alice', false)
+			->willReturn($payload);
+
+		$response = $this->controller->convertToSick(7);
+		$data = $response->getData();
+		$this->assertTrue($data['success']);
+		$this->assertSame(88, $data['sick']['id']);
+	}
+
+	public function testConvertToSickMapsErrorCodes(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubConvertParams($this->convertParams());
+
+		foreach ([
+			['revision_stale', Http::STATUS_CONFLICT],
+			['overlap', Http::STATUS_CONFLICT],
+			['range_outside', Http::STATUS_UNPROCESSABLE_ENTITY],
+			['fraction_boundary', Http::STATUS_UNPROCESSABLE_ENTITY],
+		] as [$msg, $expected]) {
+			$service = $this->createMock(AbsenceService::class);
+			$service->method('convertVacationToSick')->willThrowException(new \Exception($msg));
+			$ctrl = new AbsenceController(
+				'arbeitszeitcheck', $this->request, $service, $this->absenceMapper,
+				$this->permissionService, $this->teamResolver, $this->userSession,
+				$this->urlGenerator, $this->userManager, $this->cspService, $this->l10n,
+				$this->config, $this->monthClosureService, $this->vacationEntitlementEngine,
+				$this->createMock(\OCA\ArbeitszeitCheck\Service\VacationProrationService::class),
+				$this->createMock(LocaleFormatService::class),
+				new NavigationFlagsService($this->absenceMapper, $this->permissionService, $this->config)
+			);
+			$response = $ctrl->convertToSick(7);
+			$this->assertSame($expected, $response->getStatus(), $msg);
+			$this->assertSame($msg, $response->getData()['error_code']);
+		}
+	}
+
+	public function testConvertToSickNotFound(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubConvertParams($this->convertParams());
+		$this->absenceService->method('convertVacationToSick')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('x'));
+
+		$response = $this->controller->convertToSick(7);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+	}
+
+	public function testConvertToSickMonthFinalized(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubConvertParams($this->convertParams());
+		$this->absenceService->method('convertVacationToSick')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\MonthFinalizedException('finalized'));
+
+		$response = $this->controller->convertToSick(7);
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+	}
+
+	public function testConvertToSickLockContentionReturns423(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->stubConvertParams($this->convertParams());
+		$this->absenceService->method('convertVacationToSick')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException('held'));
+
+		$response = $this->controller->convertToSick(7);
+		$this->assertSame(Http::STATUS_LOCKED, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
 }

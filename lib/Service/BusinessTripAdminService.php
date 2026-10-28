@@ -355,6 +355,25 @@ final class BusinessTripAdminService
 	}
 
 	/**
+	 * Turn `business_trip_credit_enabled` on — the independent gate that lets
+	 * approvals post time-account top-ups. Separated from {@see enableFeature()}
+	 * on purpose: credits are payroll-relevant bookings, so they get their own
+	 * explicit admin opt-in and audit trail. Requires business trips to be
+	 * enabled first (enforced twice: assertEnabled + updateFlags blockers).
+	 */
+	public function enableCreditFeature(string $actor): void
+	{
+		$this->assertEnabled();
+		try {
+			$this->config->updateFlags(['business_trip_credit_enabled' => true]);
+		} catch (\DomainException $e) {
+			throw new BusinessTripException('TRIP_FLAG_BLOCKED', 'The business trips feature must be enabled first.', 400, ['business_trips_enabled' => 'required']);
+		}
+		$this->logger->info('business_trip_credit_enabled set to true', ['actor' => $actor]);
+		$this->audit->logAction($actor, 'business_trip_credit_feature_enabled', 'feature_flag', null, ['business_trip_credit_enabled' => false], ['business_trip_credit_enabled' => true], $actor);
+	}
+
+	/**
 	 * Phase-6 cutover: stop new legacy `business_trip` absence creation.
 	 * Refused while the preflight reports pending legacy requests, undecided
 	 * submitted trips, or no reviewed+active rule set — the cutover is

@@ -136,7 +136,13 @@ class EntityHelpersCoverageTest extends TestCase
 		$active->setUserId('alice');
 		$active->setStatus(TimeEntry::STATUS_ACTIVE);
 		$active->setStartTime(new \DateTime('-1 day'));
-		$this->assertFalse($active->canRequestCorrection(14));
+		$this->assertTrue($active->canRequestCorrection(14));
+
+		$onBreak = new TimeEntry();
+		$onBreak->setUserId('alice');
+		$onBreak->setStatus(TimeEntry::STATUS_BREAK);
+		$onBreak->setStartTime(new \DateTime('-1 day'));
+		$this->assertFalse($onBreak->canRequestCorrection(14));
 
 		$noStart = new TimeEntry();
 		$noStart->setUserId('alice');

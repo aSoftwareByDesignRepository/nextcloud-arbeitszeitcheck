@@ -804,8 +804,9 @@ const ArbeitszeitCheckUtils = {
     const summary = /** @type {Record<string, unknown>} */ (value);
     return typeof summary.startTime === 'string'
       && summary.startTime !== ''
-      && typeof summary.endTime === 'string'
-      && summary.endTime !== '';
+      // endTime may be null on unfinished (still running) sessions — those are
+      // correctable too (retro clock-out request), so accept string|null.
+      && (typeof summary.endTime === 'string' || summary.endTime === null);
   },
 
   /**

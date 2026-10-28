@@ -2706,6 +2706,350 @@ class AbsenceService
 	 * Uses stored days when set; otherwise computes via HolidayService
 	 * for consistency with vacation stats and company/state holidays.
 	 */
+	/**
+	 * Convert an approved vacation absence (partially or fully) into sick leave.
+	 *
+	 * Atomic composition of shorten/split + sick creation so a failed step never
+	 * leaves the employee without coverage or with a lost vacation debit:
+	 * - sick range == vacation range  → vacation cancelled + sick for whole range
+	 * - sick touches the end           → vacation shortened (end = sickStart−1)
+	 * - sick touches the start         → vacation start moved (start = sickEnd+1)
+	 * - sick strictly inside           → mid-split: vacation head kept + tail
+	 *   re-created as a second approved vacation row + sick in the middle
+	 *
+	 * Role matrix (spec vacation-to-sick-conversion-2026-10):
+	 * - owner flow  : caller must own the absence; vacation must be running
+	 *   (start ≤ today); the sick row is created *pending* (normal approval —
+	 *   no self-approval bypass). Not-yet-started vacations keep the existing
+	 *   cancel + new-request path.
+	 * - manager flow: caller's scope was already verified by the controller;
+	 *   retroactive conversions allowed; sick row is created *approved*.
+	 *
+	 * Optimistic locking: `$expectedUpdatedAt` must equal the absence's current
+	 * updatedAt (ISO-8601); a drift answers 409 revision_stale — second submit
+	 * of the same conversion therefore cannot double-post.
+	 *
+	 * @param array<string,mixed> $data sickStart, sickEnd, expectedUpdatedAt,
+	 *        reason?, dryRun?
+	 * @return array{vacation: array<string,mixed>, sick: array<string,mixed>, tail: ?array<string,mixed>}
+	 * @throws \Exception
+	 */
+	public function convertVacationToSick(int $absenceId, array $data, string $actorUserId, bool $managerFlow): array
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		$ownerUserId = $absence->getUserId();
+		if (!$managerFlow && $ownerUserId !== $actorUserId) {
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
+		}
+		if ($absence->getType() !== Absence::TYPE_VACATION) {
+			throw new \Exception($this->l10n->t('Only vacation absences can be converted to sick leave.'));
+		}
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception($this->l10n->t('Only approved vacations can be converted to sick leave.'));
+		}
+
+		$vacStart = $absence->getStartDate();
+		$vacEnd = $absence->getEndDate();
+		if (!$vacStart || !$vacEnd) {
+			throw new \Exception($this->l10n->t('Start date or end date is missing for this absence.'));
+		}
+
+		$today = $this->todayDateInStorage();
+		if (!$managerFlow) {
+			if ($vacStart > $today) {
+				throw new \Exception($this->l10n->t('For a vacation that has not started yet, please cancel it and submit a sick leave request instead.'));
+			}
+			if ($vacEnd < $today) {
+				throw new \Exception($this->l10n->t('This vacation has already ended. Please ask your manager or an administrator to record the sick days.'));
+			}
+		}
+
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+
+		$sickStart = $this->parseDate((string)($data['sickStart'] ?? ''));
+		$sickEnd = $this->parseDate((string)($data['sickEnd'] ?? ''));
+		$sickStart->setTime(0, 0, 0);
+		$sickEnd->setTime(0, 0, 0);
+		if ($sickStart > $sickEnd) {
+			throw new \Exception($this->l10n->t('Start date cannot be after end date'));
+		}
+		// Day-granularity comparison: the stored vacation datetimes carry a
+		// time component, the incoming sick range is date-only (00:00).
+		$vs = $vacStart->format('Y-m-d');
+		$ve = $vacEnd->format('Y-m-d');
+		$ss = $sickStart->format('Y-m-d');
+		$se = $sickEnd->format('Y-m-d');
+		if ($ss < $vs || $se > $ve) {
+			throw new \Exception('range_outside');
+		}
+
+		// Half-day fractions make a clean day boundary impossible to cut —
+		// silently rounding a 0.5 debit up or down would corrupt the quota.
+		$daysStored = $absence->getDays() !== null ? (float)$absence->getDays() : null;
+		$calendarDays = $this->computeWorkingDaysForUser($ownerUserId, $vacStart, $vacEnd);
+		if ($daysStored !== null && abs($daysStored - $calendarDays) > 0.011 && ($sickStart != $vacStart || $sickEnd != $vacEnd)) {
+			throw new \Exception('fraction_boundary');
+		}
+
+		$this->assertVacationUnitMigrationIdle();
+		$this->assertAbsenceMutable($absence);
+		$endOfSick = clone $sickEnd;
+		$endOfSick->setTime(23, 59, 59);
+		if ($this->monthClosureService !== null) {
+			$this->monthClosureService->assertDateRangeMutable($ownerUserId, $sickStart, $endOfSick);
+		}
+
+		$reason = isset($data['reason']) ? trim((string)$data['reason']) : '';
+		if (mb_strlen($reason) > 500) {
+			throw new \Exception($this->l10n->t('Reason is too long.'));
+		}
+
+		$plan = $this->planSickConversion($absence, $sickStart, $sickEnd, $ownerUserId, $managerFlow, $reason);
+		if (!empty($data['dryRun']) && $data['dryRun'] !== '0' && $data['dryRun'] !== 'false') {
+			return $plan['dry'];
+		}
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$result = null;
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $vacStart, $vacEnd);
+				// Re-read under lock — the CAS check above is pre-lock, so a
+				// concurrent shorten/cancel could have landed in between.
+				$absence = $this->absenceMapper->find($absenceId);
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				$overlapping = $this->absenceMapper->findOverlapping($ownerUserId, $sickStart, $sickEnd, $absenceId);
+				if (!empty($overlapping)) {
+					throw new \Exception('overlap');
+				}
+
+				$oldData = $absence->getSummary();
+				$sick = new Absence();
+				$sick->setUserId($ownerUserId);
+				$sick->setType(Absence::TYPE_SICK_LEAVE);
+				$sick->setStartDate($sickStart);
+				$sick->setEndDate($sickEnd);
+				$sick->setReason($reason !== '' ? $reason : null);
+				$sick->setDays($this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd));
+				$now = $this->nowInStorage();
+				if ($managerFlow) {
+					$sick->setStatus(Absence::STATUS_APPROVED);
+					$sick->setApprovedByUserId($actorUserId);
+					$sick->setApprovedAt($now);
+					$sick->setApproverComment($this->l10n->t('Converted from vacation by a manager or administrator.'));
+				} else {
+					$sick->setStatus(Absence::STATUS_PENDING);
+				}
+				$sick->setCreatedAt($now);
+				$sick->setUpdatedAt($now);
+
+				$tail = null;
+				if ($plan['mode'] === 'full') {
+					$absence->setStatus(Absence::STATUS_CANCELLED);
+				} else {
+					if ($plan['mode'] === 'tail' || $plan['mode'] === 'split') {
+						$absence->setEndDate($plan['vacEnd']);
+					}
+					if ($plan['mode'] === 'head') {
+						$absence->setStartDate($plan['vacStart']);
+					}
+					$absence->setDays($this->resolveVacationDaysDebit($ownerUserId, $absence->getStartDate(), $absence->getEndDate(), [
+						'type' => Absence::TYPE_VACATION,
+						'start_date' => $absence->getStartDate()->format('Y-m-d'),
+						'end_date' => $absence->getEndDate()->format('Y-m-d'),
+					]));
+					if ($this->vacationUnitService?->isHoursMode()) {
+						$this->recomputeVacationHoursAfterShorten($absence, $vacEnd, $oldData, (float)$absence->getDays());
+					}
+					if ($plan['mode'] === 'split') {
+						$tail = new Absence();
+						$tail->setUserId($ownerUserId);
+						$tail->setType(Absence::TYPE_VACATION);
+						$tail->setStartDate($plan['tailStart']);
+						$tail->setEndDate($vacEnd);
+						$tail->setReason($absence->getReason());
+						$tail->setSubstituteUserId($absence->getSubstituteUserId());
+						$tail->setStatus(Absence::STATUS_APPROVED);
+						$tail->setApprovedByUserId($absence->getApprovedByUserId());
+						$tail->setApprovedAt($absence->getApprovedAt());
+						$tail->setApproverComment($absence->getApproverComment());
+						$tail->setDays($this->resolveVacationDaysDebit($ownerUserId, $tail->getStartDate(), $tail->getEndDate(), [
+							'type' => Absence::TYPE_VACATION,
+							'start_date' => $tail->getStartDate()->format('Y-m-d'),
+							'end_date' => $tail->getEndDate()->format('Y-m-d'),
+						]));
+						if ($this->vacationUnitService?->isHoursMode()) {
+							$tail->setDurationHours(null);
+							$this->applyVacationDurationHours($tail, [
+								'start_date' => $tail->getStartDate()->format('Y-m-d'),
+								'end_date' => $tail->getEndDate()->format('Y-m-d'),
+							], (float)$tail->getDays());
+						}
+						$tail->setCreatedAt($now);
+						$tail->setUpdatedAt($now);
+					}
+				}
+				$absence->setUpdatedAt($now);
+
+				$updatedVacation = $this->absenceMapper->update($absence);
+				$savedSick = $this->absenceMapper->insert($sick);
+				$savedTail = $tail !== null ? $this->absenceMapper->insert($tail) : null;
+
+				$this->specialEntitlementService?->adjustConsumedAbsence(
+					$updatedVacation,
+					['start_date' => $updatedVacation->getStartDate()->format('Y-m-d'), 'end_date' => $updatedVacation->getEndDate()->format('Y-m-d')],
+					$oldData,
+					$actorUserId
+				);
+
+				$newSummary = $updatedVacation->getSummary();
+				$newSummary['converted_to_sick_absence_id'] = $savedSick->getId();
+				if ($savedTail !== null) {
+					$newSummary['split_tail_absence_id'] = $savedTail->getId();
+				}
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_converted_to_sick',
+					'absence',
+					$updatedVacation->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId
+				);
+				$sickSummary = $savedSick->getSummary();
+				$sickSummary['converted_from_absence_id'] = $updatedVacation->getId();
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					$managerFlow ? 'absence_manager_recorded' : 'absence_created',
+					'absence',
+					$savedSick->getId(),
+					null,
+					$sickSummary,
+					$actorUserId
+				);
+				if ($savedTail !== null) {
+					$this->auditLogMapper->logAction(
+						$ownerUserId,
+						'absence_split_created',
+						'absence',
+						$savedTail->getId(),
+						null,
+						$savedTail->getSummary(),
+						$actorUserId
+					);
+				}
+
+				$this->invalidateVacationStatsAfterCommit($ownerUserId);
+				$this->db->commit();
+
+				$result = [
+					'vacation' => $updatedVacation->getSummary(),
+					'sick' => $savedSick->getSummary(),
+					'tail' => $savedTail !== null ? $savedTail->getSummary() : null,
+				];
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($managerFlow && $this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceApproved(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($savedSick)
+			));
+		}
+		if ($this->absenceNotificationMailService) {
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification(
+				$savedSick,
+				$managerFlow ? 'manager_approved' : 'request_created',
+				$actorUserId
+			));
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Pure plan for {@see convertVacationToSick()} — also used by the dry-run
+	 * preview so the dialog shows exactly what the conversion will write.
+	 *
+	 * @return array{mode: string, vacStart: \DateTime, vacEnd: \DateTime,
+	 *               tailStart: ?\DateTime, dry: array<string,mixed>}
+	 */
+	private function planSickConversion(Absence $absence, \DateTime $sickStart, \DateTime $sickEnd, string $ownerUserId, bool $managerFlow, string $reason): array
+	{
+		$vacStart = $absence->getStartDate();
+		$vacEnd = $absence->getEndDate();
+		$ss = $sickStart->format('Y-m-d');
+		$se = $sickEnd->format('Y-m-d');
+		$mode = 'full';
+		$newVacStart = clone $vacStart;
+		$newVacEnd = clone $vacEnd;
+		$tailStart = null;
+		if ($ss === $vacStart->format('Y-m-d') && $se === $vacEnd->format('Y-m-d')) {
+			$mode = 'full';
+		} elseif ($se === $vacEnd->format('Y-m-d')) {
+			$mode = 'tail';
+			$newVacEnd = (clone $sickStart)->modify('-1 day');
+		} elseif ($ss === $vacStart->format('Y-m-d')) {
+			$mode = 'head';
+			$newVacStart = (clone $sickEnd)->modify('+1 day');
+		} else {
+			$mode = 'split';
+			$newVacEnd = (clone $sickStart)->modify('-1 day');
+			$tailStart = (clone $sickEnd)->modify('+1 day');
+		}
+
+		return [
+			'mode' => $mode,
+			'vacStart' => $newVacStart,
+			'vacEnd' => $newVacEnd,
+			'tailStart' => $tailStart,
+			'dry' => [
+				'vacation' => [
+					'id' => $absence->getId(),
+					'action' => $mode === 'full' ? 'cancel' : ($mode === 'split' ? 'shorten_and_split' : ($mode === 'tail' ? 'shorten' : 'move_start')),
+					'newStart' => $mode === 'full' ? null : $newVacStart->format('Y-m-d'),
+					'newEnd' => $mode === 'full' ? null : $newVacEnd->format('Y-m-d'),
+				],
+				'sick' => [
+					'start' => $sickStart->format('Y-m-d'),
+					'end' => $sickEnd->format('Y-m-d'),
+					'status' => $managerFlow ? 'approved' : 'pending',
+					'days' => $this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd),
+				],
+				'tail' => $tailStart !== null ? [
+					'start' => $tailStart->format('Y-m-d'),
+					'end' => $vacEnd->format('Y-m-d'),
+					'status' => 'approved',
+				] : null,
+				// Read-only probe for the dry-run preview — NOT authoritative
+				// (the in-lock overlap check is the real gate, TOCTOU).
+				'conflicts' => array_map(
+					static fn (Absence $o) => [
+						'id' => $o->getId(),
+						'type' => $o->getType(),
+						'start' => $o->getStartDate()?->format('Y-m-d'),
+						'end' => $o->getEndDate()?->format('Y-m-d'),
+					],
+					$this->absenceMapper->findOverlapping($ownerUserId, $sickStart, $sickEnd, $absence->getId())
+				),
+			],
+		];
+	}
+
 	public function getWorkingDaysForDisplay(Absence $absence): float
 	{
 		if ($absence->getDays() !== null) {

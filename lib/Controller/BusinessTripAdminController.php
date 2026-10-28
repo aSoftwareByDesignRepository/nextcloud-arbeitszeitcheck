@@ -239,6 +239,26 @@ final class BusinessTripAdminController extends Controller
 	}
 
 	/**
+	 * POST /api/admin/business-trips/credit/enable — turns time-account
+	 * top-up postings on. Separate opt-in from the trip workflow itself:
+	 * credits are payroll-relevant bookings. Requires business trips first.
+	 */
+	#[NoAdminRequired]
+	public function enableCredit(): JSONResponse
+	{
+		$ack = $this->request->getParam('acknowledgeRollbackWarning', false);
+		if ($ack !== true && $ack !== '1' && $ack !== 'true') {
+			return $this->serviceError(new BusinessTripException('VALIDATION', 'Please confirm the rollback warning.', 400, ['acknowledgeRollbackWarning' => 'required']));
+		}
+		try {
+			$this->service->enableCreditFeature($this->uid());
+			return new JSONResponse(['success' => true, 'business_trip_credit_enabled' => true]);
+		} catch (BusinessTripException $e) {
+			return $this->serviceError($e);
+		}
+	}
+
+	/**
 	 * POST /api/admin/business-trips/rollout/disable-legacy — Phase-6
 	 * cutover; refused (409 + preflight) while readiness is not green.
 	 */

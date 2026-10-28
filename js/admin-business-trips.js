@@ -93,6 +93,7 @@
 		rolloutStatus: $('bta-rollout-status'),
 		rolloutChecks: $('bta-rollout-checks'),
 		enable: $('bta-enable'),
+		enableCredit: $('bta-enable-credit'),
 		disableLegacy: $('bta-disable-legacy'),
 		presets: $('bta-presets'),
 	};
@@ -782,11 +783,15 @@
 			rolloutCheck(t('A legally reviewed rule set is active'), (p.activeRuleSets || 0) > 0),
 			rolloutCheck(t('At least one rule assignment is in effect'), (p.effectiveAssignments || 0) > 0),
 			rolloutCheck(t('Business trips feature is on'), flags.business_trips_enabled === true),
+			rolloutCheck(t('Time-account credit postings are on'), flags.business_trip_credit_enabled === true),
 			rolloutInfo(t('Submitted trips awaiting a decision: %s').replace('%s', String(p.submittedTripsUndecided || 0))),
 			rolloutInfo(t('Organisation-wide assignment: %s').replace('%s', p.orgScopeCoverage === true ? t('yes') : t('no'))),
 		);
 		if (els.enable) {
 			els.enable.hidden = flags.business_trips_enabled === true;
+		}
+		if (els.enableCredit) {
+			els.enableCredit.hidden = !(flags.business_trips_enabled === true && flags.business_trip_credit_enabled !== true);
 		}
 		const canCut = p.ready === true && flags.business_trips_enabled === true
 			&& flags.legacy_trip_absence_create_enabled === true;
@@ -857,6 +862,31 @@
 				} catch (e) {
 					els.rolloutStatus.textContent = e.message;
 					els.enable.disabled = false;
+				}
+			});
+		}
+		if (els.enableCredit) {
+			els.enableCredit.addEventListener('click', async () => {
+				const creditOk = await confirmStep({
+					title: t('Enable time-account credit postings?'),
+					message: t('Enable credit postings to the time account for approved business trips? Once postings exist, downgrading to a build without this feature cannot write them. You can keep the feature enabled and simply not use it.'),
+					confirmLabel: t('Enable'),
+					cancelLabel: t('Cancel'),
+					variant: 'info',
+				});
+				if (!creditOk) {
+					return;
+				}
+				els.enableCredit.disabled = true;
+				try {
+					await call(root.dataset.creditEnableUrl, {
+						method: 'POST',
+						json: { acknowledgeRollbackWarning: true },
+					});
+					window.location.reload();
+				} catch (e) {
+					els.rolloutStatus.textContent = e.message;
+					els.enableCredit.disabled = false;
 				}
 			});
 		}

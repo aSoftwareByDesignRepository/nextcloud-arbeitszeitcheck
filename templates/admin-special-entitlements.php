@@ -28,13 +28,18 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 	data-cohort-membership-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.special_entitlement_admin.endCohortMember', 'membershipId')); ?>"
 	data-users-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.getUsers')); ?>"
 	data-teams-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.getTeams')); ?>"
-	data-models-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.getWorkingTimeModels')); ?>">
+	data-models-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.getWorkingTimeModels')); ?>"
+	data-enable-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.special_entitlement_admin.enable')); ?>">
 
 	<?php if (!$enabled): ?>
 	<div class="azc-callout azc-callout--info" role="status">
 		<div class="azc-callout__body">
 			<p class="azc-callout__title"><?php p($l->t('Special leave entitlements are not enabled')); ?></p>
-			<p class="azc-callout__text"><?php p($l->t('The feature was added by an upgrade and stays inactive until an administrator enables it. Existing data is unchanged.')); ?></p>
+			<p class="azc-callout__text"><?php p($l->t('The feature was added by an upgrade and stays inactive until you enable it. Existing data is unchanged.')); ?></p>
+			<div class="form-actions">
+				<button id="se-enable" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Enable special leave entitlements')); ?></button>
+				<p id="se-enable-status" class="form-help" role="status" aria-live="polite"></p>
+			</div>
 		</div>
 	</div>
 	<?php endif; ?>

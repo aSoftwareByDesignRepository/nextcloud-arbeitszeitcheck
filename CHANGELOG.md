@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- vacation→sick conversion: approved vacations can be converted (partially or
+  fully) into sick leave in one atomic step — owner self-service for running
+  vacations (pending sick request), manager/admin path incl. retroactive
+  corrections (approved sick record). Optimistic locking via absence revision,
+  day-boundary splits incl. mid-vacation splits, dry-run preview; web + manager
+  UI + mobile companion.
+- app admins can enable special leave entitlements and business-trip credit
+  postings directly from the admin pages (previously occ-only)
+
+### Fixed
+
+- employee edit: the DATEV Personalnummer was sent on save but dropped by the
+  profile endpoint, so the stored number silently vanished after reloading
+
 ## 1.9.9 - 2026-10-26
 
 ### Fixed

@@ -206,6 +206,14 @@
 			const td = (label, html, cls = '') => Utils.responsiveTd
 				? Utils.responsiveTd(label, html, cls)
 				: `<td${cls ? ` class="${cls}"` : ''}>${html}</td>`;
+			const convertBtn = (entry.type === 'vacation' && entry.status === 'approved')
+				? `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}"><button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-sick-convert
+						data-sick-convert-flow="manager"
+						data-sick-convert-url="/apps/arbeitszeitcheck/api/manager/employee-absences/${encodeURIComponent(String(entry.id))}/convert-to-sick"
+						data-vac-start="${escapeHtml(entry.startDate || '')}"
+						data-vac-end="${escapeHtml(entry.endDate || '')}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}">${escapeHtml(t('Convert to sick', 'Convert to sick'))}</button></div>`
+				: '';
 			return [
 			'<tr>',
 			td(t('Name', 'Name'), escapeHtml(entry.displayName || entry.userId || '-')),
@@ -215,6 +223,7 @@
 			td(t('Duration', 'Duration'), escapeHtml(formatDuration(entry))),
 			td(t('Status', 'Status'), statusCell),
 			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')), 'reason-cell'),
+			td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${convertBtn}</div>`, 'actions-cell'),
 			'</tr>',
 			].join('');
 		}).join('');

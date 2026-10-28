@@ -172,7 +172,8 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                 <!-- Status / punch clock -->
                 <?php
 			$statusKey = $status['status'] ?? 'clocked_out';
-			$statusKeySafe = in_array($statusKey, ['active', 'break', 'clocked_out', 'paused'], true) ? $statusKey : 'clocked_out';
+			$statusKeySafe = in_array($statusKey, ['active', 'break', 'clocked_out', 'paused', 'pending_approval'], true) ? $statusKey : 'clocked_out';
+			$pendingEntryId = ($statusKeySafe === 'pending_approval') ? ($status['current_entry']['id'] ?? null) : null;
 			$pausedEntryId = ($statusKeySafe === 'paused') ? ($status['current_entry']['id'] ?? null) : null;
 			$showResumeButton = $clockStampingEnabled && $statusKeySafe === 'paused';
 			$showClockInButton = $clockStampingEnabled && $statusKeySafe === 'clocked_out';
@@ -182,22 +183,25 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
 			// Hide the empty stamp shell when stamping is off and nothing needs action
 			// (still show for active/break/paused so Complete session / clock-out remain reachable).
 			$showPunchCard = $clockStampingEnabled
-				|| in_array($statusKeySafe, ['active', 'break', 'paused'], true);
+				|| in_array($statusKeySafe, ['active', 'break', 'paused', 'pending_approval'], true);
 			$statusLabel = match ($statusKeySafe) {
 				'active' => $l->t('Clocked In'),
 				'break' => $l->t('On Break'),
 				'paused' => $l->t('Paused'),
+				'pending_approval' => $l->t('Correction pending'),
 				default => $l->t('Clocked Out'),
 			};
 			$statusIconName = match ($statusKeySafe) {
 				'active' => 'clock',
 				'break' => 'coffee',
 				'paused' => 'pause',
+				'pending_approval' => 'info',
 				default => 'circle',
 			};
 			$statusSubtitle = match ($statusKeySafe) {
 				'active' => $l->t('Your working time is being recorded.'),
 				'break' => $l->t('You are on a break. End the break or clock out when you are done.'),
+				'pending_approval' => $l->t('Your correction request is waiting for approval. Withdraw it to keep stamping.'),
 				'paused' => $clockStampingEnabled
 					? $l->t('Your session is paused. Resume work or complete the session.')
 					: $l->t('Your session is paused. Use “Complete session” to finish recording this day.'),
@@ -240,7 +244,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             </div>
                         </div>
 
-                        <?php if ($statusKeySafe !== 'clocked_out'): ?>
+                        <?php if (in_array($statusKeySafe, ['active', 'break', 'paused'], true)): ?>
                         <div class="azc-dashboard-punch__timers">
                             <?php if ($statusKeySafe === 'break'): ?>
                                 <div class="break-timer azc-dashboard-punch__timer dashboard-status-card__timer" data-break-start-time="<?php p($status['current_entry']['breakStartTime'] ?? ''); ?>" role="status" aria-live="polite">
@@ -438,6 +442,43 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         </div>
                         <?php endif; ?>
 
+                        <?php if ($statusKeySafe === 'pending_approval' && $pendingEntryId !== null): ?>
+                        <div class="azc-dashboard-punch__actions" role="group" aria-label="<?php p($l->t('Pending correction actions')); ?>">
+                            <button id="dashboard-withdraw-correction"
+                                class="azc-btn azc-btn--secondary"
+                                type="button"
+                                data-entry-id="<?php p((string)$pendingEntryId); ?>"
+                                data-cancel-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.cancelCorrection', ['id' => (int)$pendingEntryId])); ?>"
+                                aria-label="<?php p($l->t('Withdraw the pending correction request')); ?>">
+                                <?php p($l->t('Withdraw request')); ?>
+                            </button>
+                            <a href="<?php p($timeEntriesUrl ?? $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
+                               class="azc-btn azc-btn--secondary">
+                                <?php p($l->t('Review in Time entries')); ?>
+                            </a>
+                        </div>
+                        <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+                        (function () {
+                            var btn = document.getElementById('dashboard-withdraw-correction');
+                            if (!btn) return;
+                            btn.addEventListener('click', function () {
+                                btn.disabled = true;
+                                fetch(btn.getAttribute('data-cancel-url'), {
+                                    method: 'POST',
+                                    headers: { 'requesttoken': (window.OC && OC.requestToken) || '', 'Accept': 'application/json' },
+                                }).then(function (r) { return r.json(); }).then(function (data) {
+                                    if (data && data.success) { window.location.reload(); return; }
+                                    btn.disabled = false;
+                                    window.alert((data && data.error) || <?php echo json_encode($l->t('Could not withdraw correction.')); ?>);
+                                }).catch(function () {
+                                    btn.disabled = false;
+                                    window.alert(<?php echo json_encode($l->t('Could not withdraw correction.')); ?>);
+                                });
+                            });
+                        })();
+                        </script>
+                        <?php endif; ?>
+
                         <?php if ($manualTimeEntryEnabled): ?>
                         <div class="azc-dashboard-punch__secondary">
                             <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.time_entry.create')); ?>"
@@ -445,6 +486,17 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                class="azc-btn azc-btn--secondary"
                                title="<?php p($l->t('Click to add a new time entry. You can record when you started and finished work, and any breaks you took.')); ?>">
                                 <?php p($l->t('Add a time entry')); ?>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($statusKeySafe === 'active'): ?>
+                        <div class="azc-dashboard-punch__secondary">
+                            <a href="<?php p($timeEntriesUrl ?? $urlGenerator->linkToRoute('arbeitszeitcheck.page.timeEntries')); ?>"
+                               id="dashboard-retro-clockout"
+                               class="azc-dashboard-punch__link"
+                               title="<?php p($l->t('Forgot to clock out? Request a retroactive clock-out for manager approval from your time entries list.')); ?>">
+                                <?php p($l->t('Forgot to clock out? Request a correction')); ?>
                             </a>
                         </div>
                         <?php endif; ?>

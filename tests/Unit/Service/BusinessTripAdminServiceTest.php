@@ -250,6 +250,31 @@ final class BusinessTripAdminServiceTest extends TestCase
 		$this->assertSame('admin-1', $this->audited[0]['performedBy']);
 	}
 
+	public function testEnableCreditFeatureFlipsFlagAndLogsActor(): void
+	{
+		$config = $this->suiteConfig(['business_trips_enabled' => true, 'business_trip_credit_enabled' => false]);
+		$service = $this->makeService($config);
+		$service->enableCreditFeature('admin-1');
+		$this->assertTrue($config->isEnabled('business_trip_credit_enabled'));
+		$this->assertSame('business_trip_credit_feature_enabled', $this->audited[0]['action']);
+		$this->assertSame('feature_flag', $this->audited[0]['entityType']);
+		$this->assertSame('admin-1', $this->audited[0]['performedBy']);
+	}
+
+	public function testEnableCreditFeatureRefusedWhileTripsOff(): void
+	{
+		$config = $this->suiteConfig(['business_trips_enabled' => false, 'business_trip_credit_enabled' => false]);
+		$service = $this->makeService($config);
+		try {
+			$service->enableCreditFeature('admin-1');
+			$this->fail();
+		} catch (BusinessTripException $e) {
+			$this->assertSame('FEATURE_DISABLED', $e->getReasonCode());
+		}
+		$this->assertFalse($config->isEnabled('business_trip_credit_enabled'));
+		$this->assertCount(0, $this->audited);
+	}
+
 	public function testCutoverRefusedWhilePreflightRed(): void
 	{
 		$this->counts = [1, 0]; // one pending legacy request

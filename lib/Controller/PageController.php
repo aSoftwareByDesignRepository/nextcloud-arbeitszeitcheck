@@ -759,7 +759,7 @@ class PageController extends Controller
 	#[NoCSRFRequired]
 	public function absences(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker', 'common/table-pager']);
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'absences', ['absences'], ['common/datepicker', 'common/table-pager', 'common/absence-sick-conversion']);
 		Util::addScript('arbeitszeitcheck', 'entitlement-explainer');
 		if ($this->specialEntitlementsEnabled()) {
 			Util::addScript('arbeitszeitcheck', 'absence-entitlements');

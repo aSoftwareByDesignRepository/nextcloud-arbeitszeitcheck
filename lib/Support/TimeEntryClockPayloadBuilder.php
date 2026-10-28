@@ -72,6 +72,74 @@ final class TimeEntryClockPayloadBuilder
 	}
 
 	/**
+	 * Build a proposal fragment when only SOME clock fields are present (single-stamp
+	 * corrections, e.g. a missing clock-out on an unfinished session). `date` plus at
+	 * least one plain HH:mm field are required; otherwise null is returned.
+	 *
+	 * Overnight rule: end ≤ start shifts end +1 day. When only endTime is given,
+	 * `$endOvernightAfter` (the entry's existing start) decides the shift instead.
+	 *
+	 * @param array<string, mixed> $params
+	 * @param int|null $minBreakMinutes
+	 * @param \DateTimeInterface|null $endOvernightAfter Reference instant for end-only proposals
+	 * @return array<string, mixed>|null
+	 */
+	public static function buildPartialFromParams(array $params, ?int $minBreakMinutes = null, ?\DateTimeInterface $endOvernightAfter = null): ?array
+	{
+		$dateParam = $params['date'] ?? null;
+		$startRaw = $params['startTime'] ?? null;
+		$endRaw = $params['endTime'] ?? null;
+		$hasStart = is_string($startRaw) && self::isPlainTime(trim($startRaw));
+		$hasEnd = is_string($endRaw) && self::isPlainTime(trim($endRaw));
+		if (!$hasStart && !$hasEnd) {
+			return null;
+		}
+		if (!is_string($dateParam)) {
+			return null;
+		}
+		$baseDate = self::parseDate($dateParam);
+		if ($baseDate === null) {
+			return null;
+		}
+
+		$result = [];
+		$startDateTime = null;
+		if ($hasStart) {
+			$startDateTime = clone $baseDate;
+			[$sh, $sm] = explode(':', trim($startRaw), 2);
+			$startDateTime->setTime((int)$sh, (int)$sm, 0);
+			$result['startTime'] = $startDateTime->format('c');
+		}
+		if ($hasEnd) {
+			$endDateTime = clone $baseDate;
+			[$eh, $em] = explode(':', trim($endRaw), 2);
+			$endDateTime->setTime((int)$eh, (int)$em, 0);
+			$overnightRef = $startDateTime ?? ($endOvernightAfter !== null ? \DateTime::createFromInterface($endOvernightAfter) : null);
+			if ($overnightRef !== null && $endDateTime <= $overnightRef) {
+				$endDateTime->modify('+1 day');
+			}
+			$result['endTime'] = $endDateTime->format('c');
+		}
+		if ($result === []) {
+			return null;
+		}
+
+		$breaks = isset($params['breaks']) && is_array($params['breaks']) ? $params['breaks'] : null;
+		if ($breaks !== null) {
+			if ($breaks === []) {
+				$result['breaks'] = [];
+			} else {
+				$validBreaks = self::normalizeBreaksOnDate($baseDate, $breaks, $minBreakMinutes);
+				if ($validBreaks !== []) {
+					$result['breaks'] = $validBreaks;
+				}
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Merge clock-based fields into an existing proposal when present; otherwise keep ISO fields.
 	 *
 	 * @param array<string, mixed> $params

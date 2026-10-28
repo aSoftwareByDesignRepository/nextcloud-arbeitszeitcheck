@@ -85,6 +85,7 @@ return [
 		['name' => 'time_entry#apiDelete', 'url' => '/api/time-entries/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#requestCorrection', 'url' => '/api/time-entries/{id}/request-correction', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#cancelCorrection', 'url' => '/api/time-entries/{id}/cancel-correction', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'time_entry#retroClockOut', 'url' => '/api/time-entries/{id}/retro-clock-out', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'time_entry#complete', 'url' => '/api/time-entries/{id}/complete', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
 		// Suite flange F16/F19b — worker-confirmed draft stamps from sibling apps
@@ -118,6 +119,7 @@ return [
 		['name' => 'absence#reject', 'url' => '/api/absences/{id}/reject', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#cancel', 'url' => '/api/absences/{id}/cancel', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#shorten', 'url' => '/api/absences/{id}/shorten', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#convertToSick', 'url' => '/api/absences/{id}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
 		// Manager routes
 		['name' => 'manager#dashboard', 'url' => '/manager', 'verb' => 'GET'],
@@ -137,6 +139,7 @@ return [
 		['name' => 'manager#getEmployeeAbsences', 'url' => '/api/manager/employee-absences', 'verb' => 'GET'],
 		['name' => 'manager#estimateEmployeeVacationHours', 'url' => '/api/manager/employee-absences/estimate-hours', 'verb' => 'GET'],
 		['name' => 'manager#createEmployeeAbsence', 'url' => '/api/manager/employee-absences', 'verb' => 'POST'],
+		['name' => 'manager#convertEmployeeAbsenceToSick', 'url' => '/api/manager/employee-absences/{absenceId}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
 		['name' => 'manager#getTeamCompliance', 'url' => '/api/manager/team-compliance', 'verb' => 'GET'],
 		['name' => 'manager#getTeamOvertimeAlerts', 'url' => '/api/manager/team-overtime-alerts', 'verb' => 'GET'],
@@ -227,6 +230,7 @@ return [
 		['name' => 'special_entitlement#index', 'url' => '/api/special-entitlements', 'verb' => 'GET'],
 		['name' => 'special_entitlement#history', 'url' => '/api/special-entitlements/{typeCode}/history', 'verb' => 'GET', 'requirements' => ['typeCode' => '[a-z0-9_]+']],
 		['name' => 'special_entitlement_admin#page', 'url' => '/admin/special-entitlements', 'verb' => 'GET'],
+		['name' => 'special_entitlement_admin#enable', 'url' => '/api/admin/special-entitlements/enable', 'verb' => 'POST'],
 		['name' => 'special_entitlement_admin#types', 'url' => '/api/admin/special-entitlement-types', 'verb' => 'GET'],
 		['name' => 'special_entitlement_admin#createType', 'url' => '/api/admin/special-entitlement-types', 'verb' => 'POST'],
 		['name' => 'special_entitlement_admin#accounts', 'url' => '/api/admin/special-entitlement-accounts', 'verb' => 'GET'],
@@ -274,6 +278,7 @@ return [
 		['name' => 'business_trip_admin#createPreset', 'url' => '/api/admin/business-trip-rule-presets/{jurisdiction}', 'verb' => 'POST', 'requirements' => ['jurisdiction' => 'DE|AT|CH|custom']],
 		['name' => 'business_trip_admin#rollout', 'url' => '/api/admin/business-trips/rollout', 'verb' => 'GET'],
 		['name' => 'business_trip_admin#enable', 'url' => '/api/admin/business-trips/rollout/enable', 'verb' => 'POST'],
+		['name' => 'business_trip_admin#enableCredit', 'url' => '/api/admin/business-trips/credit/enable', 'verb' => 'POST'],
 		['name' => 'business_trip_admin#disableLegacy', 'url' => '/api/admin/business-trips/rollout/disable-legacy', 'verb' => 'POST'],
 		['name' => 'business_trip_admin#assignments', 'url' => '/api/admin/business-trip-rule-assignments', 'verb' => 'GET'],
 		['name' => 'business_trip_admin#createAssignment', 'url' => '/api/admin/business-trip-rule-assignments', 'verb' => 'POST'],

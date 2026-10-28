@@ -715,6 +715,29 @@ if ($mode === 'list') {
                 </div>
                 <?php endif; ?>
 
+                <?php
+                $canConvertToSick = $absence->getType() === 'vacation'
+                    && $absence->getStatus() === 'approved'
+                    && $start <= $today
+                    && $end >= $today;
+                ?>
+                <?php if ($canConvertToSick): ?>
+                <div class="absence-detail-section absence-detail-sick-convert" role="region" aria-labelledby="sick-convert-heading">
+                    <h3 id="sick-convert-heading" class="absence-detail-section__title"><?php p($l->t('Sick during vacation')); ?></h3>
+                    <p class="absence-detail-sick-convert__desc"><?php p($l->t('Sick days during vacation do not count as vacation days. Select the days you were sick and the vacation is shortened and credited back.')); ?></p>
+                    <button type="button"
+                            class="btn btn--primary"
+                            data-sick-convert
+                            data-sick-convert-flow="owner"
+                            data-sick-convert-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.convertToSick', ['id' => $absence->getId()])); ?>"
+                            data-vac-start="<?php p($start->format('Y-m-d')); ?>"
+                            data-vac-end="<?php p($end->format('Y-m-d')); ?>"
+                            data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
+                        <?php p($l->t('Convert vacation to sick leave')); ?>
+                    </button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Dates & Duration -->
                 <div class="absence-detail-section" role="region" aria-labelledby="absence-detail-dates-heading">
                     <h3 id="absence-detail-dates-heading" class="absence-detail-section__title"><?php p($l->t('Dates and duration')); ?></h3>

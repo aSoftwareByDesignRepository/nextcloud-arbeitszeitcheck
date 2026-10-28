@@ -2463,4 +2463,377 @@ class AbsenceServiceTest extends TestCase
 			$this->assertStringContainsString('Duration cannot exceed 30 days', $e->getMessage());
 		}
 	}
+
+	// ---------- convertVacationToSick (spec: vacation-to-sick-conversion-2026-10) ----------
+
+	private function runningVacation(int $id = 42, string $userId = 'alice'): Absence
+	{
+		return $this->makeAbsenceRow($id, $userId, Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-5 days', '+9 days');
+	}
+
+	private function casToken(Absence $a): string
+	{
+		return $a->getUpdatedAt() ? $a->getUpdatedAt()->format('c') : '';
+	}
+
+	private function convertData(Absence $a, string $sickStart, string $sickEnd, array $extra = []): array
+	{
+		return array_merge([
+			'sickStart' => (new \DateTime($sickStart))->format('Y-m-d'),
+			'sickEnd' => (new \DateTime($sickEnd))->format('Y-m-d'),
+			'expectedUpdatedAt' => $this->casToken($a),
+			'reason' => '',
+		], $extra);
+	}
+
+	private function expectUpdateInsertUpdate(): void
+	{
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willReturnCallback(static function (Absence $a) {
+			if ($a->getId() === null) {
+				$a->setId(999);
+			}
+			return $a;
+		});
+	}
+
+	public function testConvertVacationToSickTailCutShortensVacationAndCreatesPendingSick(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+		$audited = [];
+		$this->auditLogMapper->method('logAction')->willReturnCallback(
+			function ($u, $action, $et, $eid, $old, $new, $pb) use (&$audited) {
+				$audited[] = $action;
+				return $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLog::class);
+			}
+		);
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '+2 days', '+9 days'), 'alice', false);
+
+		$this->assertSame((new \DateTime('+1 days'))->format('Y-m-d'), $result['vacation']['endDate'] ?? $absence->getEndDate()->format('Y-m-d'));
+		$this->assertSame(Absence::STATUS_PENDING, $result['sick']['status']);
+		$this->assertSame(Absence::TYPE_SICK_LEAVE, $result['sick']['type']);
+		$this->assertNull($result['tail']);
+		$this->assertContains('absence_converted_to_sick', $audited);
+		$this->assertContains('absence_created', $audited);
+	}
+
+	public function testConvertVacationToSickFullCancelsVacation(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+		$this->db->expects($this->once())->method('commit');
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '-5 days', '+9 days'), 'alice', false);
+		$this->assertSame(Absence::STATUS_CANCELLED, $absence->getStatus());
+		$this->assertSame(Absence::STATUS_PENDING, $result['sick']['status']);
+	}
+
+	public function testConvertVacationToSickHeadCutMovesVacationStart(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '-5 days', '+2 days'), 'alice', false);
+		$this->assertSame((new \DateTime('+3 days'))->format('Y-m-d'), $absence->getStartDate()->format('Y-m-d'));
+		$this->assertNull($result['tail']);
+	}
+
+	public function testConvertVacationToSickMidSplitCreatesTailVacation(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$inserted = [];
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->expects($this->exactly(2))->method('insert')
+			->willReturnCallback(function (Absence $a) use (&$inserted) {
+				$inserted[] = $a;
+				$a->setId(1000 + count($inserted));
+				return $a;
+			});
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+
+		$this->assertNotNull($result['tail']);
+		$this->assertCount(2, $inserted);
+		$this->assertSame(Absence::TYPE_SICK_LEAVE, $inserted[0]->getType());
+		$this->assertSame(Absence::TYPE_VACATION, $inserted[1]->getType());
+		$this->assertSame((new \DateTime('+4 days'))->format('Y-m-d'), $inserted[1]->getStartDate()->format('Y-m-d'));
+		$this->assertSame(Absence::STATUS_APPROVED, $inserted[1]->getStatus());
+		$this->assertSame('alice', $inserted[1]->getUserId());
+		$this->assertSame((new \DateTime('today'))->format('Y-m-d'), $absence->getEndDate()->format('Y-m-d'));
+	}
+
+	public function testConvertVacationToSickManagerFlowApprovesSickRetroactively(): void
+	{
+		// Vacation already ended — only the manager path may convert it.
+		$absence = $this->makeAbsenceRow(42, 'bob', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-10 days', '-3 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$insertedSick = null;
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willReturnCallback(function (Absence $a) use (&$insertedSick) {
+			if ($a->getType() === Absence::TYPE_SICK_LEAVE) {
+				$insertedSick = $a;
+			}
+			$a->setId(999);
+			return $a;
+		});
+		$audited = [];
+		$this->auditLogMapper->method('logAction')->willReturnCallback(
+			function ($u, $action) use (&$audited) {
+				$audited[] = $action;
+				return $this->createMock(\OCA\ArbeitszeitCheck\Db\AuditLog::class);
+			}
+		);
+
+		$this->service->convertVacationToSick(42, $this->convertData($absence, '-8 days', '-6 days'), 'manager-1', true);
+		$this->assertNotNull($insertedSick);
+		$this->assertSame(Absence::STATUS_APPROVED, $insertedSick->getStatus());
+		$this->assertSame('manager-1', $insertedSick->getApprovedByUserId());
+		$this->assertContains('absence_manager_recorded', $audited);
+	}
+
+	public function testConvertVacationToSickRejectsForeignAbsence(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->expectException(DoesNotExistException::class);
+		$this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'mallory', false);
+	}
+
+	public function testConvertVacationToSickRejectsWrongTypeAndStatus(): void
+	{
+		$sick = $this->makeAbsenceRow(43, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SICK_LEAVE, '-5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($sick);
+		try {
+			$this->service->convertVacationToSick(43, $this->convertData($sick, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('type check must fire');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('vacation', $e->getMessage());
+		}
+
+		$pending = $this->runningVacation(44);
+		$pending->setStatus(Absence::STATUS_PENDING);
+		$mapper = $this->mapperReturning($pending);
+		$service = $this->rebuildService($mapper);
+		try {
+			$service->convertVacationToSick(44, $this->convertData($pending, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('status check must fire');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('approved', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickOwnerFlowRejectsFutureVacation(): void
+	{
+		$absence = $this->makeAbsenceRow(45, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '+5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->convertVacationToSick(45, $this->convertData($absence, '+6 days', '+8 days'), 'alice', false);
+			$this->fail('future vacation must be rejected for owner flow');
+		} catch (\Exception $e) {
+			$this->assertStringContainsString('cancel', $e->getMessage());
+		}
+		// Same absence is convertible in the manager flow (retro/future allowed).
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+		$result = $this->service->convertVacationToSick(45, $this->convertData($absence, '+6 days', '+8 days'), 'manager-1', true);
+		$this->assertSame(Absence::STATUS_APPROVED, $result['sick']['status']);
+	}
+
+	public function testConvertVacationToSickRejectsStaleRevision(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$data = $this->convertData($absence, '+1 days', '+3 days');
+		$data['expectedUpdatedAt'] = '2001-01-01T00:00:00+00:00';
+		try {
+			$this->service->convertVacationToSick(42, $data, 'alice', false);
+			$this->fail('stale revision must be rejected');
+		} catch (\Exception $e) {
+			$this->assertSame('revision_stale', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickRejectsRangeOutsideVacation(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->convertVacationToSick(42, $this->convertData($absence, '+8 days', '+12 days'), 'alice', false);
+			$this->fail('range outside must be rejected');
+		} catch (\Exception $e) {
+			$this->assertSame('range_outside', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickOverlapBlocksAndRollsBack(): void
+	{
+		$absence = $this->runningVacation();
+		$other = $this->makeAbsenceRow(50, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SICK_LEAVE, '+1 days', '+2 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		// TOCTOU: the plan-time probe sees a clean window; a concurrent
+		// insert lands before the in-lock overlap check — that second,
+		// authoritative probe is what must abort the conversion.
+		$this->absenceMapper->method('findOverlapping')
+			->willReturnOnConsecutiveCalls([], [$other]);
+		$this->db->expects($this->once())->method('rollBack');
+		$this->db->expects($this->never())->method('commit');
+		try {
+			$this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('overlap must be rejected');
+		} catch (\Exception $e) {
+			$this->assertSame('overlap', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickDryRunWritesNothing(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->never())->method('update');
+		$this->absenceMapper->expects($this->never())->method('insert');
+		$this->db->expects($this->never())->method('beginTransaction');
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$plan = $this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days', ['dryRun' => '1']), 'alice', false);
+		$this->assertSame('shorten_and_split', $plan['vacation']['action']);
+		$this->assertSame('pending', $plan['sick']['status']);
+		$this->assertNotNull($plan['tail']);
+	}
+
+	public function testConvertVacationToSickRollsBackWhenSickInsertFails(): void
+	{
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willThrowException(new \RuntimeException('db gone'));
+		$this->db->expects($this->once())->method('rollBack');
+		try {
+			$this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('insert failure must propagate');
+		} catch (\RuntimeException $e) {
+			$this->assertSame('db gone', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickRejectsHalfDayBoundary(): void
+	{
+		$absence = $this->runningVacation();
+		// stored 2.4 vs computed 2.0 → diff 0.4 sits above the 0.011 epsilon
+		// but below a widened 0.5 threshold: this kills threshold mutants.
+		$absence->setDays(2.4);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('fraction boundary must be rejected');
+		} catch (\Exception $e) {
+			$this->assertSame('fraction_boundary', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickAllowsVacationEndingToday(): void
+	{
+		// vacEnd == storage-day start instant is still a running vacation —
+		// the owner gate must use strict <. Reading the boundary from the
+		// same clock source the service uses keeps this deterministic in
+		// any storage TZ (TimeZoneService is final, no mock).
+		$prop = new \ReflectionProperty(AbsenceService::class, 'timeZoneService');
+		$prop->setAccessible(true);
+		[$todayStart] = $prop->getValue($this->service)->todayWindowInStorage();
+		$absence = $this->runningVacation();
+		$absence->setStartDate((clone $todayStart)->modify('-5 days'));
+		$absence->setEndDate(clone $todayStart);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+
+		// Full-range conversion skips the fraction check (sick == whole vacation).
+		$data = [
+			'sickStart' => (clone $todayStart)->modify('-5 days')->format('Y-m-d'),
+			'sickEnd' => $todayStart->format('Y-m-d'),
+			'expectedUpdatedAt' => $this->casToken($absence),
+			'reason' => '',
+		];
+		$result = $this->service->convertVacationToSick(42, $data, 'alice', false);
+		$this->assertSame(Absence::STATUS_CANCELLED, $absence->getStatus());
+		$this->assertSame(Absence::STATUS_PENDING, $result['sick']['status']);
+	}
+
+	public function testConvertVacationToSickInLockRecheckRejectsConcurrentDrift(): void
+	{
+		// CAS is re-verified under the user lock: a second find() returning a
+		// newer updatedAt (concurrent shorten/cancel between plan and lock)
+		// must abort with revision_stale and write nothing.
+		$before = $this->runningVacation();
+		$drifted = $this->runningVacation();
+		$drifted->setUpdatedAt(new \DateTime('-1 day'));
+		$this->absenceMapper->method('find')->willReturnOnConsecutiveCalls($before, $drifted);
+		$this->absenceMapper->expects($this->never())->method('insert');
+		$this->db->expects($this->once())->method('rollBack');
+		$this->db->expects($this->never())->method('commit');
+
+		try {
+			$this->service->convertVacationToSick(42, $this->convertData($before, '+2 days', '+9 days'), 'alice', false);
+			$this->fail('in-lock drift must be rejected');
+		} catch (\Exception $e) {
+			$this->assertSame('revision_stale', $e->getMessage());
+		}
+	}
+
+	public function testConvertVacationToSickMonthClosurePropagates(): void
+	{
+		// The VACATION-range closure check (assertAbsenceMutable) must gate
+		// independently of the sick-range check: only calls for the
+		// vacation's own range throw here, so removing that assert lets the
+		// conversion slip through — which this test then catches.
+		$absence = $this->runningVacation();
+		$vacStartDay = $absence->getStartDate()->format('Y-m-d');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->monthClosureService->method('assertDateRangeMutable')
+			->willReturnCallback(static function ($userId, $start, $end) use ($vacStartDay) {
+				if ($start->format('Y-m-d') === $vacStartDay) {
+					throw new \OCA\ArbeitszeitCheck\Exception\MonthFinalizedException('closed');
+				}
+				return null;
+			});
+		$this->absenceMapper->expects($this->never())->method('insert');
+		$this->db->expects($this->never())->method('beginTransaction');
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\MonthFinalizedException::class);
+		$this->service->convertVacationToSick(42, $this->convertData($absence, '+2 days', '+9 days'), 'alice', false);
+	}
+
+	public function testConvertVacationToSickLockContentionBubblesBusy(): void
+	{
+		// A held per-user mutation lock must surface AbsenceMutationBusyException
+		// (→ HTTP 423 upstream) before any transaction work starts.
+		$absence = $this->runningVacation();
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		// Shared pre-locks (unit-migration, year-mode) pass; the exclusive
+		// per-user mutation lock ('azc/ab/<md5>') is the one that is held.
+		$this->lockingProvider->method('acquireLock')
+			->willReturnCallback(static function (string $key) {
+				if (str_starts_with($key, 'azc/ab/')) {
+					throw new \OCP\Lock\LockedException('held');
+				}
+				return null;
+			});
+		$this->db->expects($this->never())->method('beginTransaction');
+		$this->absenceMapper->expects($this->never())->method('insert');
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException::class);
+		$this->service->convertVacationToSick(42, $this->convertData($absence, '+2 days', '+9 days'), 'alice', false);
+	}
 }

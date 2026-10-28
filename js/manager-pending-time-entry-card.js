@@ -157,11 +157,17 @@
 			? escapeHtml(String(justificationText).substring(0, 300))
 			: '';
 		const manualCreate = isManualCreateApproval(summary);
+		const openSession = !manualCreate
+			&& (summary.requestType === 'open_session' || summary.type === 'open_session_correction'
+				|| (asRecord(summary.original) && asRecord(summary.original).endTime === null
+					&& asRecord(summary.proposed) && asRecord(summary.proposed).endTime != null));
 		const id = item.id;
 		const displayName = escapeHtml(item.displayName || item.userId || '');
 		const kindLabel = manualCreate
 			? t('New manual time entry', 'New manual time entry')
-			: t('Time entry correction', 'Time entry correction');
+			: (openSession
+				? t('Retro clock-out (session still running)', 'Retro clock-out (session still running)')
+				: t('Time entry correction', 'Time entry correction'));
 
 		let bodyHtml;
 		if (manualCreate) {
@@ -223,6 +229,33 @@
 			].join('');
 		}
 
+		// BQ-3: open-session retro clock-out may be approved with an adjusted end
+		// time. Optional <input type="time"> prefilled with the employee's proposal;
+		// unchanged value → plain approve (no adjustedProposal sent).
+		let adjustHtml = '';
+		if (openSession) {
+			const propEndIso = (asRecord(summary.proposed) || {}).endTime;
+			let baseHhmm = '';
+			if (propEndIso) {
+				const d = new Date(propEndIso);
+				if (!isNaN(d.getTime())) {
+					baseHhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+				}
+			}
+			if (propEndIso && baseHhmm) {
+				adjustHtml =
+					'<div class="pending-approval-card__adjust">'
+					+ '<label for="azc-adjust-end-' + escapeHtml(String(id)) + '" class="pending-approval-card__adjust-label">'
+					+ escapeHtml(t('Adjust clock-out time (optional)', 'Adjust clock-out time (optional)')) + '</label>'
+					+ '<input type="time" id="azc-adjust-end-' + escapeHtml(String(id)) + '"'
+					+ ' class="azc-adjust-end-input"'
+					+ ' data-base-iso="' + escapeHtml(propEndIso) + '"'
+					+ ' data-base-hhmm="' + escapeHtml(baseHhmm) + '"'
+					+ ' value="' + escapeHtml(baseHhmm) + '">'
+					+ '</div>';
+			}
+		}
+
 		return (
 			'<div class="pending-approval-card pending-approval-card--time-entry'
 			+ (manualCreate ? ' pending-approval-card--manual-create' : ' pending-approval-card--correction')
@@ -240,6 +273,7 @@
 				? '<p class="pending-approval-card__reason"><strong>' + escapeHtml(t('Reason:', 'Reason:')) + '</strong> <em>'
 					+ justification + (String(justificationText).length > 300 ? '…' : '') + '</em></p>'
 				: '')
+			+ adjustHtml
 			+ '    <div class="pending-approval-card__actions">'
 			+ '      <button type="button" class="azc-btn azc-btn--primary btn-approve-time-entry" data-time-entry-id="'
 				+ escapeHtml(String(id)) + '" aria-label="'

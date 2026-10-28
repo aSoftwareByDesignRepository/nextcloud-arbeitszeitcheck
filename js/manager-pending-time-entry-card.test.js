@@ -167,6 +167,80 @@ describe('manager pending time-entry approval card', () => {
 		expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
 	})
 
+	it('renders open-session retro clock-out card with adjustable end time (BQ-3)', () => {
+		const Card = window.ArbeitszeitCheckManagerPendingTimeEntry
+		const html = Card.renderTimeEntryApprovalCardHtml({
+			id: 11,
+			displayName: 'Ada',
+			summary: {
+				date: '2026-09-10',
+				justification: 'Forgot to clock out yesterday',
+				requestType: 'open_session',
+				type: 'open_session_correction',
+				original: {
+					startTime: '2026-09-10T08:00:00+02:00',
+					endTime: null,
+					breaks: [],
+				},
+				proposed: {
+					endTime: '2026-09-10T17:30:00+02:00',
+				},
+			},
+		}, deps)
+
+		expect(html).toContain('Retro clock-out (session still running)')
+		expect(html).not.toContain('Time entry correction')
+		expect(html).toContain('data-request-type="correction"')
+		expect(html).toContain('azc-adjust-end-input')
+		expect(html).toContain('type="time"')
+		expect(html).toContain('data-base-iso="2026-09-10T17:30:00+02:00"')
+		expect(html).toContain('Adjust clock-out time (optional)')
+		// accessible label wiring
+		expect(html).toContain('for="azc-adjust-end-11"')
+		expect(html).toContain('id="azc-adjust-end-11"')
+	})
+
+	it('does not render the adjust input for ordinary corrections', () => {
+		const Card = window.ArbeitszeitCheckManagerPendingTimeEntry
+		const html = Card.renderTimeEntryApprovalCardHtml({
+			id: 4,
+			displayName: 'Ada',
+			summary: {
+				date: '2026-09-10',
+				justification: 'Forgot break',
+				requestType: 'correction',
+				original: {
+					startTime: '2026-09-10T08:00:00+02:00',
+					endTime: '2026-09-10T16:00:00+02:00',
+					breaks: [],
+				},
+				proposed: {
+					endTime: '2026-09-10T17:00:00+02:00',
+				},
+			},
+		}, deps)
+
+		expect(html).toContain('Time entry correction')
+		expect(html).not.toContain('azc-adjust-end-input')
+	})
+
+	it('detects open-session requests via original endTime null fallback', () => {
+		const Card = window.ArbeitszeitCheckManagerPendingTimeEntry
+		const html = Card.renderTimeEntryApprovalCardHtml({
+			id: 12,
+			displayName: 'Ada',
+			summary: {
+				date: '2026-09-10',
+				requestType: 'correction',
+				original: { startTime: '2026-09-10T08:00:00+02:00', endTime: null },
+				proposed: { endTime: '2026-09-10T17:00:00+02:00' },
+			},
+		}, deps)
+
+		expect(html).toContain('Retro clock-out (session still running)')
+		expect(html).toContain('azc-adjust-end-input')
+	})
+
 	it('detects manual_create when original is an empty array (API shape)', () => {
 		const Card = window.ArbeitszeitCheckManagerPendingTimeEntry
 		expect(Card.isManualCreateApproval({

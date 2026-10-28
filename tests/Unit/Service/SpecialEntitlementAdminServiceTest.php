@@ -133,6 +133,41 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		);
 	}
 
+	public function testEnableFeatureFlipsBothFlagsAndLogsActor(): void
+	{
+		$writes = [];
+		$appConfig = $this->createMock(IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, string $default) use (&$writes): string {
+				return $writes[$key] ?? '0';
+			}
+		);
+		$appConfig->method('setAppValue')->willReturnCallback(
+			static function (string $app, string $key, string $value) use (&$writes): void {
+				$writes[$key] = $value;
+			}
+		);
+		$this->cfg = new WorkforceSuiteConfig($appConfig);
+		$service = $this->makeService();
+
+		$this->audit->expects($this->once())
+			->method('logAction')
+			->with(
+				'admin-1',
+				'special_entitlements_feature_enabled',
+				'feature_flag',
+				null,
+				['special_entitlements_enabled' => false, 'policy_cohorts_enabled' => false],
+				['special_entitlements_enabled' => true, 'policy_cohorts_enabled' => true],
+				'admin-1'
+			);
+
+		$service->enableFeature('admin-1');
+
+		$this->assertTrue($this->cfg->isEnabled('special_entitlements_enabled'));
+		$this->assertTrue($this->cfg->isEnabled('policy_cohorts_enabled'));
+	}
+
 	private function type(bool $active = true): SpecialEntitlementType
 	{
 		$type = new SpecialEntitlementType();

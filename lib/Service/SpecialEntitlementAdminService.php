@@ -80,6 +80,29 @@ final class SpecialEntitlementAdminService
 		}
 	}
 
+	/**
+	 * Enable the special-entitlements feature. Both flags are flipped
+	 * atomically: special entitlements cannot resolve scopes without policy
+	 * cohorts, so a half-enabled state would surface as broken pages rather
+	 * than a clean "not enabled". Flag flips are policy mutations — audited.
+	 */
+	public function enableFeature(string $actor): void
+	{
+		$this->suiteConfig->updateFlags([
+			'policy_cohorts_enabled' => true,
+			'special_entitlements_enabled' => true,
+		]);
+		$this->audit->logAction(
+			$actor,
+			'special_entitlements_feature_enabled',
+			'feature_flag',
+			null,
+			['special_entitlements_enabled' => false, 'policy_cohorts_enabled' => false],
+			['special_entitlements_enabled' => true, 'policy_cohorts_enabled' => true],
+			$actor
+		);
+	}
+
 	/** @return list<array<string,mixed>> */
 	public function listTypes(): array
 	{

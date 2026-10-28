@@ -824,6 +824,38 @@
 	searchEl.addEventListener('input', renderTypes);
 	filterEl.addEventListener('change', renderTypes);
 
+	const enableBtn = document.getElementById('se-enable');
+	if (enableBtn && !enabled) {
+		enableBtn.addEventListener('click', async () => {
+			const c = window.AzcComponents || window.ArbeitszeitCheckComponents;
+			const statusEl = document.getElementById('se-enable-status');
+			const ok = c && typeof c.confirmDialog === 'function'
+				? await c.confirmDialog({
+					title: t('Enable special leave entitlements?'),
+					message: t('Enable special leave entitlements and protected groups? Once definitions and bookings exist, downgrading to a build without this feature cannot write them. You can keep the feature enabled and simply not use it.'),
+					confirmLabel: t('Enable'),
+					cancelLabel: t('Cancel'),
+					variant: 'info',
+				})
+				: false;
+			const confirmed = ok === true || (ok && ok.confirmed === true);
+			if (!confirmed) {
+				return;
+			}
+			enableBtn.disabled = true;
+			try {
+				await request(root.dataset.enableUrl, {
+					method: 'POST',
+					body: JSON.stringify({ acknowledgeRollbackWarning: true }),
+				});
+				window.location.reload();
+			} catch (e) {
+				if (statusEl) statusEl.textContent = e.message;
+				enableBtn.disabled = false;
+			}
+		});
+	}
+
 	if (enabled) {
 		Promise.all([loadTypes(), loadCohorts()]).then(loadTargets);
 	}

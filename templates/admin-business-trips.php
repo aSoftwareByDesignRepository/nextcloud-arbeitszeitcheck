@@ -30,6 +30,7 @@ $enabled = !empty($_['businessTripsEnabled']);
 	data-disable-legacy-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.disableLegacy')); ?>"
 	data-presets-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.presets')); ?>"
 	data-preset-create-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.business_trip_admin.createPreset', 'jurisdiction', '__ID__', 'DE')); ?>"
+	data-credit-enable-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.enableCredit')); ?>"
 	data-mark-reviewed-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.business_trip_admin.markReviewed', 'id')); ?>">
 
 	<?php if (!$enabled): ?>
@@ -55,6 +56,9 @@ $enabled = !empty($_['businessTripsEnabled']);
 			<div class="form-actions">
 				<button id="bta-enable" class="azc-btn azc-btn--primary" type="button" hidden>
 					<?php p($l->t('Enable business trips')); ?>
+				</button>
+				<button id="bta-enable-credit" class="azc-btn azc-btn--primary" type="button" hidden>
+					<?php p($l->t('Enable time-account credit postings')); ?>
 				</button>
 				<button id="bta-disable-legacy" class="azc-btn azc-btn--secondary" type="button" disabled>
 					<?php p($l->t('Stop new legacy business-trip requests')); ?>

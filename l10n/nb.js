@@ -6113,6 +6113,7 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "«Minst X timer fravær krediterer minst Y timer.» Rader sjekkes i rekkefølge — den siste matchende raden vinner.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generer feed-URL» oppretter den første lenken for et omfang. «Tilbakekall og roter» erstatter en eksisterende lenke — den gamle URL-en slutter å fungere umiddelbart.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "«Plassering» legger automatiske pauser inne i vinduet. «Påkrevd» betyr at pausen må overlappe vinduet med det angitte antallet minutter.",
+		"Adjust clock-out time (optional)" : "Adjust clock-out time (optional)",
 		"…" : "…"
 		},
 		"nplurals=2; plural=(n != 1);"

@@ -1948,7 +1948,8 @@ dialog.entitlement-explain-dialog::backdrop {
 	font-size: var(--azc-fs-sm, 0.875rem);
 	line-height: var(--azc-line-base, 1.45);
 	white-space: normal;
-	overflow-wrap: anywhere;
+	/* Menu labels keep normal word breaks — anywhere tears mid-word. */
+	overflow-wrap: break-word;
 }
 
 .azc-nav-footer__menu-item:hover {

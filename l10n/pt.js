@@ -6113,6 +6113,7 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "«Pelo menos X horas de ausência creditam pelo menos Y horas.» As linhas são verificadas por ordem — a última linha correspondente vence.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "“Gerar URL de feed” cria a primeira ligação para um âmbito. “Revogar e rodar” substitui uma ligação existente — o URL antigo deixa de funcionar imediatamente.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "“Posicionamento” coloca as pausas automáticas dentro da janela. “Obrigatório” significa que a pausa tem de se sobrepor à janela pelos minutos indicados.",
+		"Adjust clock-out time (optional)" : "Adjust clock-out time (optional)",
 		"…" : "…"
 		},
 		"nplurals=2; plural=(n > 1);"

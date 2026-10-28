@@ -20,7 +20,7 @@ test.describe('admin feature enable workflows', () => {
 			await enable.click()
 			await page
 				.getByRole('alertdialog')
-				.getByRole('button', { name: /enable/i })
+				.locator('.confirm-dialog__confirm')
 				.click()
 			await page.waitForLoadState('load')
 		}
@@ -39,7 +39,7 @@ test.describe('admin feature enable workflows', () => {
 			await enable.click()
 			await page
 				.getByRole('alertdialog')
-				.getByRole('button', { name: /enable/i })
+				.locator('.confirm-dialog__confirm')
 				.click()
 			await page.waitForLoadState('load')
 		}
@@ -52,7 +52,7 @@ test.describe('admin feature enable workflows', () => {
 			await credit.click()
 			await page
 				.getByRole('alertdialog')
-				.getByRole('button', { name: /enable/i })
+				.locator('.confirm-dialog__confirm')
 				.click()
 			await page.waitForLoadState('load')
 		}

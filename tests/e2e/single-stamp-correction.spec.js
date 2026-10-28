@@ -222,4 +222,50 @@ test.describe('single-stamp correction — pending open session', () => {
 		expect(res.status).toBe(400)
 		expect(res.json?.error_code).toBe('end_in_future')
 	})
+
+	test('direct retro-clock-out with a Z-offset endTime persists the instant, not the foreign wall', async ({ page }) => {
+		// naive_datetime_wall_vs_offset_instant regression probe: the direct
+		// retro-clock-out route must persist the instant's STORAGE-zone wall —
+		// a '...Z' input carrying its foreign wall verbatim used to rehydrate
+		// shifted by the offset (end_time BEFORE start_time). Objects are
+		// instants; naive columns hold storage walls.
+		await login(page, credsFromEnv('EMPLOYEE'))
+		await page.goto('/apps/arbeitszeitcheck/')
+		await page.waitForSelector('#azc-main-content', { timeout: 30000 })
+
+		const s = await ensureActiveSession(page)
+		const entryId = s.current_entry?.id
+		expect(entryId).toBeTruthy()
+
+		// Explicit UTC offset — the killer asymmetry from the incident report.
+		// "Now" stays > start of the just-clocked-in session while the server
+		// evaluates it as not-in-the-future by request latency.
+		const endIso = new Date().toISOString()
+		const res = await apiAllowFailure(
+			page,
+			'POST',
+			`/apps/arbeitszeitcheck/api/time-entries/${entryId}/retro-clock-out`,
+			{ data: { endTime: endIso, justification: 'e2e naive-datetime probe — Z offset' } },
+		)
+		expect(
+			res.ok,
+			`retro-clock-out refused (${res.status}): ${JSON.stringify(res.json)}`,
+		).toBe(true)
+
+		const after = await status(page)
+		expect(after.status).toBe('clocked_out')
+
+		const entry = await api(page, 'GET', `/apps/arbeitszeitcheck/api/time-entries/${entryId}`)
+		const entryData = entry?.entry ?? entry?.data ?? entry
+		expect(entryData.status).toBe('completed')
+		expect(entryData.endTime).toBeTruthy()
+		// Instant equality — not non-null, not wall equality: the persisted
+		// instant must equal the instant the client sent regardless of offset.
+		expect(
+			Math.abs(new Date(entryData.endTime).getTime() - new Date(endIso).getTime()),
+		).toBeLessThan(5000)
+		expect(new Date(entryData.endTime).getTime()).toBeGreaterThan(
+			new Date(entryData.startTime).getTime(),
+		)
+	})
 })

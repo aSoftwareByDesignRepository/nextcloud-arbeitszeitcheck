@@ -6166,7 +6166,7 @@
     "revision_stale": "revision_stale",
     "Adjust clock-out time (optional)": "Justera utstämpelningstid (valfritt)",
     "approved": "godkänd",
-    "Warning: this range overlaps an existing absence; saving will be rejected.": "Warning: this range overlaps an existing absence; saving will be rejected."
+    "Warning: this range overlaps an existing absence; saving will be rejected.": "Varning: Detta intervall överlappar en befintlig frånvaro; sparandet kommer att avvisas."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

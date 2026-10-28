@@ -131,7 +131,7 @@
 #app-content.azc-app--manager-dashboard .pending-approval-card__adjust input[type="time"] {
 	min-height: 44px;
 	padding: var(--azc-space-1, 0.35rem) var(--azc-space-2, 0.5rem);
-	border: 1px solid var(--color-border);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast));
 	border-radius: var(--border-radius-element, var(--border-radius-large));
 	background: var(--color-main-background);
 	color: var(--color-main-text);

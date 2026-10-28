@@ -1110,7 +1110,11 @@ class TimeEntryController extends Controller
 			if (!$canEdit) {
 				$isApproved        = $entry->isLockedForEmployeeEdit();
 				$entryDate         = $entry->getStartTime();
-				$editCutoff        = new \DateTime();
+				// Local-midnight semantics: compute the cutoff in the storage zone —
+				// a bare `new \DateTime()` binds UTC walls and shifts the edit
+				// window boundary by the offset (same class as the retro-clock-out
+				// naive_datetime_wall_vs_offset_instant sweep).
+				$editCutoff        = new \DateTime('now', $this->getAppTimeZone());
 				$editCutoff->modify('-' . Constants::EDIT_WINDOW_DAYS . ' days');
 				$editCutoff->setTime(0, 0, 0);
 				$isWithinEditWindow = $entryDate && $entryDate >= $editCutoff;
@@ -1570,7 +1574,11 @@ class TimeEntryController extends Controller
 			if (!$canEdit) {
 				$isApproved        = $entry->isLockedForEmployeeEdit();
 				$entryDate         = $entry->getStartTime();
-				$editCutoff        = new \DateTime();
+				// Local-midnight semantics: compute the cutoff in the storage zone —
+				// a bare `new \DateTime()` binds UTC walls and shifts the edit
+				// window boundary by the offset (same class as the retro-clock-out
+				// naive_datetime_wall_vs_offset_instant sweep).
+				$editCutoff        = new \DateTime('now', $this->getAppTimeZone());
 				$editCutoff->modify('-' . Constants::EDIT_WINDOW_DAYS . ' days');
 				$editCutoff->setTime(0, 0, 0);
 				$isWithinEditWindow = $entryDate && $entryDate >= $editCutoff;
@@ -2787,7 +2795,12 @@ class TimeEntryController extends Controller
 						// `end >= start` and applies break/daily-max logic.
 						$now = new \DateTime('now', $this->getAppTimeZone());
 						[$h, $m] = explode(':', $rawEnd, 2);
-						$explicitEndTime = new \DateTime($now->format('Y-m-d') . ' ' . sprintf('%02d:%02d:00', (int)$h, (int)$m));
+						// Parse the composed wall in the storage zone — without it
+						// PHP binds the string to the UTC default, which shifts the
+						// instant the downstream instant-level checks (rollover,
+						// daily-max) operate on. Never `new \DateTime` a wall string
+						// without the zone beside a set*Time() path.
+						$explicitEndTime = new \DateTime($now->format('Y-m-d') . ' ' . sprintf('%02d:%02d:00', (int)$h, (int)$m), $this->getAppTimeZone());
 					} else {
 						$explicitEndTime = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawEnd, $this->getAppTimeZone());
 					}

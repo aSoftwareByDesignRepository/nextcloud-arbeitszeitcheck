@@ -6174,7 +6174,7 @@
     "revision_stale": "revision_stale",
     "Adjust clock-out time (optional)": "Dostosuj godzinę wyjścia (opcjonalnie)",
     "approved": "zatwierdzone",
-    "Warning: this range overlaps an existing absence; saving will be rejected.": "Warning: this range overlaps an existing absence; saving will be rejected."
+    "Warning: this range overlaps an existing absence; saving will be rejected.": "Ostrzeżenie: ten zakres pokrywa się z istniejącą nieobecnością; zapis zostanie odrzucony."
   },
   "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

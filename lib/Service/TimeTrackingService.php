@@ -199,10 +199,15 @@ class TimeTrackingService
 		if ($effectiveAt === null) {
 			return $this->nowForAtEntries();
 		}
-		if ($effectiveAt instanceof \DateTime) {
-			return clone $effectiveAt;
-		}
-		return \DateTime::createFromInterface($effectiveAt);
+		// Naive SQL columns persist the DateTime's OWN wall clock. Client-supplied
+		// effective-at values arrive as explicit-offset instants (Z/+hh:mm); the
+		// instant is correct but its foreign wall must be rebased to the storage
+		// zone before set*Time() writes — otherwise the persisted clock lands
+		// shifted by the offset (retro clock-out stored an end BEFORE its start;
+		// audit class naive_datetime_wall_vs_offset_instant). Rebasing never
+		// changes the instant, so storage-zone inputs pass through unharmed.
+		return \DateTime::createFromInterface($effectiveAt)
+			->setTimezone($this->getAppConfiguredTimeZone());
 	}
 
 	/**
@@ -917,7 +922,9 @@ class TimeTrackingService
 			$this->releaseUserMutationLock($lockKey);
 		}
 
-		return $this->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'retro_clock_out', $endAt);
+		// Persist the storage-zoned $end (the value just validated), never the
+		// foreign-offset original — the naive column keeps its wall clock.
+		return $this->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'retro_clock_out', $end);
 	}
 
 	/**

@@ -1607,4 +1607,75 @@ class TimeTrackingServiceTest extends TestCase {
 		$saved = $this->service->clockIn('u1');
 		$this->assertSame(5, $saved->getId());
 	}
+
+	/**
+	 * naive_datetime_wall_vs_offset_instant: an explicit-offset effectiveAt
+	 * (UTC 'Z' from API clients) must persist the instant's STORAGE-zone wall,
+	 * never its foreign wall digits. Regression: clockOutAt validated a
+	 * storage-zoned clone but passed the foreign-offset original to clockOut —
+	 * the naive column kept the UTC wall and the end landed one hour early
+	 * (BEFORE the start on the live row).
+	 */
+	public function testClockOutAtPersistsUtcOffsetInstantAsStorageWall(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$tz = new \DateTimeZone('Europe/Berlin'); // storage TZ per setUp config
+		$entry = new TimeEntry();
+		$entry->setId(42);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('2026-10-28 08:00:00', $tz));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		// Instant 16:30 UTC = 17:30 Europe/Berlin (CET, UTC+1).
+		$endAt = new \DateTime('2026-10-28T16:30:00+00:00');
+		$result = $this->service->clockOutAt('alice', 42, $endAt);
+
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		// The persisted wall must read the instant's BERLIN wall (17:30), not
+		// the raw UTC digits (16:30) — naive columns store wall clocks.
+		$end = $result->getEndTime();
+		$this->assertNotNull($end);
+		$this->assertSame(
+			'2026-10-28 17:30:00',
+			$end->format('Y-m-d H:i:s'),
+			'naive column must hold the storage-zone wall of the instant'
+		);
+		// Instant-level sanity: end is strictly after start.
+		$this->assertGreaterThan(
+			$entry->getStartTime()->getTimestamp(),
+			$end->getTimestamp()
+		);
+	}
+
+	/**
+	 * Companion side of the same contract: a storage-zone wall (Berlin) must
+	 * persist verbatim — naive clock payloads are storage walls by convention.
+	 */
+	public function testClockOutAtPersistsStorageZoneWallVerbatim(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setId(43);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime('2026-10-28 08:00:00', $tz));
+
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		$endAt = new \DateTime('2026-10-28 12:15:00', $tz);
+		$result = $this->service->clockOutAt('alice', 43, $endAt);
+
+		$this->assertSame('2026-10-28 12:15:00', $result->getEndTime()?->format('Y-m-d H:i:s'));
+	}
 }

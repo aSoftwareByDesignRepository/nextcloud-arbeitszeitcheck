@@ -113,7 +113,7 @@ declare(strict_types=1);
 								</label>
 							</div>
 							<p id="leaveSollEffectsEnabled-help" class="form-help">
-								<?php p($l->t('On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.')); ?>
+								<?php p($l->t('On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day\'s target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.')); ?>
 							</p>
 						</div>
 						<div class="form-group">

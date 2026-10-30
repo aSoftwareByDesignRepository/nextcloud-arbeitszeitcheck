@@ -3530,6 +3530,12 @@ class AdminController extends Controller
 					$this->toBool($params['paidAbsencePlannedHoursCreditEnabled']) ? '1' : '0'
 				);
 			}
+			if (array_key_exists('leaveSollEffectsEnabled', $params)) {
+				$this->appConfig->setAppValueString(
+					Constants::CONFIG_LEAVE_SOLL_EFFECTS,
+					$this->toBool($params['leaveSollEffectsEnabled']) ? '1' : '0'
+				);
+			}
 
 			$allowedKeys = [
 				'missingClockInRemindersEnabled' => 'missing_clock_in_reminders_enabled',
@@ -4294,6 +4300,10 @@ class AdminController extends Controller
 			'paidAbsencePlannedHoursCreditEnabled' => $this->appConfig->getAppValueString(
 				Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT,
 				Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT_DEFAULT
+			) === '1',
+			'leaveSollEffectsEnabled' => $this->appConfig->getAppValueString(
+				Constants::CONFIG_LEAVE_SOLL_EFFECTS,
+				Constants::CONFIG_LEAVE_SOLL_EFFECTS_DEFAULT
 			) === '1',
 			'premiumSurchargesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '0') === '1',
 			'premiumPolicy' => $this->decodePremiumPolicyForAdmin(),

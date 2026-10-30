@@ -95,11 +95,27 @@ declare(strict_types=1);
 				<section class="azc-card azc-admin-policy-section admin-settings-section" aria-labelledby="paid-absence-credit-heading">
 					<header class="azc-card__header">
 						<div class="azc-card__header-text">
-							<h2 id="paid-absence-credit-heading" class="azc-card__title"><?php p($l->t('Sick leave and planned hours')); ?></h2>
-							<p class="azc-card__lead"><?php p($l->t('Optional Entgeltausfall / Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged.')); ?></p>
+							<h2 id="paid-absence-credit-heading" class="azc-card__title"><?php p($l->t('Absences and planned hours')); ?></h2>
+							<p class="azc-card__lead"><?php p($l->t('How approved absences affect the flextime balance. Leave rules are on by default so vacation never creates minus hours; the sick-leave credit stays opt-in.')); ?></p>
 						</div>
 					</header>
 					<div class="azc-card__body">
+						<div class="form-group">
+							<div class="form-checkbox">
+								<input type="checkbox"
+									id="leaveSollEffectsEnabled"
+									name="leaveSollEffectsEnabled"
+									value="1"
+									<?php echo ($settings['leaveSollEffectsEnabled'] ?? true) ? 'checked' : ''; ?>
+									aria-describedby="leaveSollEffectsEnabled-help">
+								<label for="leaveSollEffectsEnabled" class="form-label">
+									<?php p($l->t('Apply leave rules to the flextime balance (vacation, leave, unpaid leave)')); ?>
+								</label>
+							</div>
+							<p id="leaveSollEffectsEnabled-help" class="form-help">
+								<?php p($l->t('On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.')); ?>
+							</p>
+						</div>
 						<div class="form-group">
 							<div class="form-checkbox">
 								<input type="checkbox"
@@ -113,7 +129,7 @@ declare(strict_types=1);
 								</label>
 							</div>
 							<p id="paidAbsencePlannedHoursCreditEnabled-help" class="form-help">
-								<?php p($l->t('When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are not included yet.')); ?>
+								<?php p($l->t('When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are handled by the leave-rules setting above.')); ?>
 							</p>
 						</div>
 					</div>

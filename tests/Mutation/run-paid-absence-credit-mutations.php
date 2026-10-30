@@ -47,21 +47,50 @@ if ($baseline !== 0) {
 $mutations = [
 	[
 		'label' => 'drop_enabled_gate',
-		'from' => "if (!\$this->isEnabled() || \$userId === '') {\n\t\t\treturn ['hours' => 0.0, 'days_credited' => 0];\n\t\t}",
-		'to' => "if (\$userId === '') {\n\t\t\treturn ['hours' => 0.0, 'days_credited' => 0];\n\t\t}",
+		'from' => "if (\$userId === '' || (!\$this->isEnabled() && !\$this->isLeaveEffectsEnabled())) {",
+		'to' => "if (\$userId === '') {",
 	],
 	[
-		// The creditable-type gate lives in AbsenceTypeCatalog::isSollCreditable
-		// (built-ins + custom soll_credit flag) — mutating the call site proves
-		// the gate is what stops unpaid/pending leave from being credited.
-		'label' => 'drop_soll_creditable_gate',
-		'from' => "if (!AbsenceTypeCatalog::isSollCreditable(\$absence->getType())) {",
-		'to' => "if (false && !AbsenceTypeCatalog::isSollCreditable(\$absence->getType())) {",
+		// The effect gate lives in AbsenceTypeCatalog::sollEffect — mutating the
+		// call site proves the matrix is what stops unpaid/comp types from
+		// being credited into Ist.
+		'label' => 'drop_soll_effect_gate',
+		'from' => "if (AbsenceTypeCatalog::sollEffect(\$type) !== \$effect) {",
+		'to' => "if (false && AbsenceTypeCatalog::sollEffect(\$type) !== \$effect) {",
 	],
 	[
+		// Leave types credit under the leave-effects flag, not the sick opt-in.
+		// Killing this gate must re-open the vacation-Minusstunden bug.
+		'label' => 'drop_leave_credit_gate',
+		'from' => "\t\tif (in_array(\$type, self::LEAVE_CREDIT_TYPES, true)) {\n\t\t\treturn \$this->isLeaveEffectsEnabled();\n\t\t}",
+		'to' => "\t\tif (in_array(\$type, self::LEAVE_CREDIT_TYPES, true)) {\n\t\t\treturn true;\n\t\t}",
+	],
+	[
+		'label' => 'drop_reduction_leave_gate',
+		'from' => "if (!\$this->isLeaveEffectsEnabled() || \$userId === '') {\n\t\t\treturn \$empty;\n\t\t}",
+		'to' => "if (\$userId === '') {\n\t\t\treturn \$empty;\n\t\t}",
+	],
+	[
+		// Suspensions must reduce Soll, not credit — inverting the effect
+		// comparison would pay unpaid leave and strip sick/vacation credit.
+		'label' => 'invert_soll_effect_check',
+		'from' => "if (AbsenceTypeCatalog::sollEffect(\$type) !== \$effect) {",
+		'to' => "if (AbsenceTypeCatalog::sollEffect(\$type) === \$effect) {",
+	],
+	[
+		// Same worked-lookup line exists in expectedSollEffectHours — anchor on
+		// the credit write to keep this mutation unique to creditHoursForRange.
 		'label' => 'ignore_double_count_guard',
-		'from' => "\$worked = max(0.0, (float)(\$workedHoursByDate[\$key] ?? 0.0));\n\t\t\t\t\$credit = max(0.0, \$target - \$worked);",
-		'to' => "\$worked = 0.0;\n\t\t\t\t\$credit = max(0.0, \$target - \$worked);",
+		'from' => "\$worked = max(0.0, (float)(\$workedHoursByDate[\$key] ?? 0.0));\n\t\t\t// Top the day up to its full planned Soll, capped at the absent\n\t\t\t// fraction: a half-day absence + worked other half must net zero,\n\t\t\t// not half a day's Minusstunden. (Was: target - worked, which\n\t\t\t// undercredited every half-day with worked hours.)\n\t\t\t\$credit = max(0.0, min(\$target, \$planned - \$worked));",
+		'to' => "\$worked = 0.0;\n\t\t\t// Top the day up to its full planned Soll, capped at the absent\n\t\t\t// fraction: a half-day absence + worked other half must net zero,\n\t\t\t// not half a day's Minusstunden. (Was: target - worked, which\n\t\t\t// undercredited every half-day with worked hours.)\n\t\t\t\$credit = max(0.0, min(\$target, \$planned - \$worked));",
+	],
+	[
+		// The half-day fix: credit must top up to full planned Soll capped at
+		// the absent fraction — reverting to target - worked undercredits
+		// every half-day with worked hours (the vacation-Minusstunden class).
+		'label' => 'halfday_topup_reverted',
+		'from' => "\$credit = max(0.0, min(\$target, \$planned - \$worked));\n\t\t\tif (\$credit > 0.0001) {\n\t\t\t\t\$bestCreditByDay[\$key] = \$credit;",
+		'to' => "\$credit = max(0.0, \$target - \$worked);\n\t\t\tif (\$credit > 0.0001) {\n\t\t\t\t\$bestCreditByDay[\$key] = \$credit;",
 	],
 ];
 

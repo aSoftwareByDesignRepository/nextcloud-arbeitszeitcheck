@@ -571,7 +571,8 @@ class DashboardWidgetDataService {
 	 * @param array<string, mixed> $weekly Already-fetched weekly overtime row (avoid double work).
 	 * @return array{
 	 *   periods: list<array{key: string, worked: float, target: float, delta: float, period: string}>,
-	 *   absence_credit_hours_ytd: float
+	 *   absence_credit_hours_ytd: float,
+	 *   soll_reduction_hours_ytd: float
 	 * }
 	 */
 	private function buildHoursGlancePeriods(string $userId, array $weekly): array
@@ -619,6 +620,8 @@ class DashboardWidgetDataService {
 			],
 			// GH #40 — companions show note when opt-in credit > 0; old clients ignore key.
 			'absence_credit_hours_ytd' => round(max(0.0, (float)($year['absence_credit_hours'] ?? 0.0)), 2),
+			// Leave-effects matrix: Soll removed by unpaid / parental leave.
+			'soll_reduction_hours_ytd' => round(max(0.0, (float)($year['soll_reduction_hours'] ?? 0.0)), 2),
 		];
 	}
 }

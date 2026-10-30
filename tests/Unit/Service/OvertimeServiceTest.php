@@ -794,4 +794,120 @@ class OvertimeServiceTest extends TestCase
 		$result = $service->calculateOvertime('alice', new \DateTime('2026-06-01'), new \DateTime('2026-06-02'));
 		$this->assertSame(-12.5, $result['overtime_hours']);
 	}
+
+	/**
+	 * Unpaid leave removes the day's Soll — 5 working days à 8 h = 40 h base,
+	 * one suspended day ⇒ 32 h required, and overtime is exactly the gap.
+	 */
+	public function testSuspensionReductionSubtractsFromRequiredHours(): void
+	{
+		$userId = 'testuser';
+
+		$creditService = $this->createMock(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+		$creditService->method('creditHoursForRange')
+			->willReturn(['hours' => 0.0, 'days_credited' => 0]);
+		$creditService->method('sollReductionHoursForRange')
+			->willReturn(['hours' => 8.0, 'days_reduced' => 1]);
+
+		$service = new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$this->holidayCalendarService,
+			$this->overtimeSettingsService,
+			null,
+			$creditService,
+		);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$result = $service->calculateOvertime(
+			$userId,
+			new \DateTime('2024-01-01'),
+			new \DateTime('2024-01-07'),
+		);
+
+		// computeWorkingDaysForUser is mocked to 5 → base 40 h; 8 h suspended ⇒ 32 h.
+		$this->assertSame(32.0, $result['required_hours']);
+		$this->assertSame(8.0, $result['soll_reduction_hours']);
+		$this->assertSame(-32.0, $result['overtime_hours']);
+	}
+
+	/**
+	 * Reduction outage must not inflate the balance — a failing reduction
+	 * lookup falls back to the full (pre-matrix) Soll.
+	 */
+	public function testSuspensionReductionFailureFallsBackToFullSoll(): void
+	{
+		$userId = 'testuser';
+
+		$creditService = $this->createMock(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+		$creditService->method('creditHoursForRange')
+			->willReturn(['hours' => 0.0, 'days_credited' => 0]);
+		$creditService->method('sollReductionHoursForRange')
+			->willThrowException(new \RuntimeException('db gone'));
+
+		$service = new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$this->holidayCalendarService,
+			$this->overtimeSettingsService,
+			null,
+			$creditService,
+		);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$result = $service->calculateOvertime(
+			$userId,
+			new \DateTime('2024-01-01'),
+			new \DateTime('2024-01-07'),
+		);
+
+		$this->assertSame(40.0, $result['required_hours']);
+		$this->assertSame(0.0, $result['soll_reduction_hours']);
+	}
+
+	/**
+	 * Vacation credit lifts Ist: the leave credit lands in overtime_hours
+	 * alongside clocked time (Peter's −60 h case becomes ~0).
+	 */
+	public function testLeaveCreditCountsTowardOvertimeIst(): void
+	{
+		$userId = 'testuser';
+
+		$creditService = $this->createMock(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+		$creditService->method('creditHoursForRange')
+			->willReturn(['hours' => 40.0, 'days_credited' => 5]);
+		$creditService->method('sollReductionHoursForRange')
+			->willReturn(['hours' => 0.0, 'days_reduced' => 0]);
+
+		$service = new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$this->holidayCalendarService,
+			$this->overtimeSettingsService,
+			null,
+			$creditService,
+		);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$result = $service->calculateOvertime(
+			$userId,
+			new \DateTime('2024-01-01'),
+			new \DateTime('2024-01-07'),
+		);
+
+		$this->assertSame(40.0, $result['absence_credit_hours']);
+		$this->assertSame(0.0, $result['overtime_hours']);
+	}
 }

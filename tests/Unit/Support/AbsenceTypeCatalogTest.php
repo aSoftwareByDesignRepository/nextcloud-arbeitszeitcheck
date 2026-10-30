@@ -99,6 +99,100 @@ class AbsenceTypeCatalogTest extends TestCase
 		$this->assertSame(Constants::MAX_ABSENCE_DAYS, AbsenceTypeCatalog::maxCalendarDays('bogus'));
 	}
 
+	public function testSollEffectMatrixCoversEveryBuiltInType(): void
+	{
+		// Paid leave + sick family credit planned hours into Ist.
+		foreach ([
+			Absence::TYPE_VACATION,
+			Absence::TYPE_SICK_LEAVE,
+			Absence::TYPE_CHILD_SICK,
+			Absence::TYPE_PERSONAL_LEAVE,
+			Absence::TYPE_SPECIAL_LEAVE,
+		] as $type) {
+			$this->assertSame(
+				AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST,
+				AbsenceTypeCatalog::sollEffect($type),
+				"$type must credit planned hours",
+			);
+		}
+
+		// Contract suspensions remove the day's Soll — never paid hours.
+		foreach ([
+			Absence::TYPE_UNPAID_LEAVE,
+			Absence::TYPE_PARENTAL_LEAVE,
+		] as $type) {
+			$this->assertSame(
+				AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL,
+				AbsenceTypeCatalog::sollEffect($type),
+				"$type must reduce Soll",
+			);
+		}
+
+		// Freizeitausgleich keeps its Soll gap (that gap IS the debit);
+		// worked-away legacy types are filled by stamping, not credit.
+		foreach ([
+			Absence::TYPE_OVERTIME_COMP,
+			Absence::TYPE_HOME_OFFICE,
+			Absence::TYPE_BUSINESS_TRIP,
+			'not_a_type',
+		] as $type) {
+			$this->assertSame(
+				AbsenceTypeCatalog::SOLL_EFFECT_NONE,
+				AbsenceTypeCatalog::sollEffect($type),
+				"$type must not touch the balance",
+			);
+		}
+	}
+
+	public function testEveryBuiltInTypeHasAnExplicitSollEffect(): void
+	{
+		// The regression guard for the vacation-Minusstunden bug class: any
+		// type added to ORDER without a matrix decision must throw here, not
+		// silently degrade to NONE in production.
+		foreach (AbsenceTypeCatalog::ORDER as $type) {
+			$effect = AbsenceTypeCatalog::sollEffect($type);
+			$this->assertContains(
+				$effect,
+				[
+					AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST,
+					AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL,
+					AbsenceTypeCatalog::SOLL_EFFECT_NONE,
+				],
+				"$type lacks a valid Soll effect",
+			);
+		}
+		$this->assertSame(
+			count(AbsenceTypeCatalog::ORDER),
+			count(array_unique(array_map(
+				static fn (string $t): string => $t,
+				AbsenceTypeCatalog::ORDER,
+			))),
+			'ORDER itself must stay duplicate-free',
+		);
+	}
+
+	public function testIsSollCreditableIncludesPaidLeaveButNeverSuspensions(): void
+	{
+		foreach ([
+			Absence::TYPE_VACATION,
+			Absence::TYPE_SICK_LEAVE,
+			Absence::TYPE_CHILD_SICK,
+			Absence::TYPE_PERSONAL_LEAVE,
+			Absence::TYPE_SPECIAL_LEAVE,
+		] as $type) {
+			$this->assertTrue(AbsenceTypeCatalog::isSollCreditable($type), "$type creditable");
+		}
+		foreach ([
+			Absence::TYPE_UNPAID_LEAVE,
+			Absence::TYPE_PARENTAL_LEAVE,
+			Absence::TYPE_OVERTIME_COMP,
+			Absence::TYPE_HOME_OFFICE,
+			Absence::TYPE_BUSINESS_TRIP,
+		] as $type) {
+			$this->assertFalse(AbsenceTypeCatalog::isSollCreditable($type), "$type not creditable");
+		}
+	}
+
 	public function testStatsOtherTypesExcludeVacationAndSickOnly(): void
 	{
 		$others = AbsenceTypeCatalog::statsOtherTypes();

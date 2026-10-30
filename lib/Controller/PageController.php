@@ -419,6 +419,7 @@ class PageController extends Controller
 			}
 			$hoursGlance = $this->buildHoursGlancePeriods($dayOvertime, $weekOvertime, $monthOvertime, $yearOvertime);
 			$absenceCreditHoursYtd = round((float)($yearOvertime['absence_credit_hours'] ?? 0), 2);
+			$sollReductionHoursYtd = round((float)($yearOvertime['soll_reduction_hours'] ?? 0), 2);
 			$overtimeExtras = $this->loadDashboardOvertimeExtras($userId);
 			try {
 				$overtimeYtdBalance = $this->overtimeDisplayService->getYearToDateBalanceForTrafficLight($userId);
@@ -483,6 +484,7 @@ class PageController extends Controller
 				'hoursGlance' => $hoursGlance,
 				'overtimeYtdBalance' => $overtimeYtdBalance,
 				'absenceCreditHoursYtd' => $absenceCreditHoursYtd,
+				'sollReductionHoursYtd' => $sollReductionHoursYtd,
 				'overtimeBalancePdfUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.overtimeBalancePdf'),
 				'overtimeBank' => $overtimeExtras['overtimeBank'],
 				'overtimeTrafficLight' => $overtimeExtras['overtimeTrafficLight'],
@@ -547,6 +549,7 @@ class PageController extends Controller
 				'hoursGlance' => [],
 				'overtimeYtdBalance' => 0.0,
 				'absenceCreditHoursYtd' => 0.0,
+				'sollReductionHoursYtd' => 0.0,
 				'overtimeBank' => ['enabled' => false, 'bank_max_hours' => 100.0, 'banked_hours' => 0.0, 'bank_fill_percent' => 0.0, 'payout_eligible_hours' => 0.0, 'effective_balance' => 0.0, 'bank_state' => 'disabled'],
 				'overtimeTrafficLight' => ['enabled' => false, 'state' => 'green', 'direction' => null, 'level' => null, 'balance' => 0.0],
 				'overtimePayoutHistory' => ['items' => [], 'total' => 0],

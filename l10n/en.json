@@ -6166,7 +6166,14 @@
     "revision_stale": "revision_stale",
     "Adjust clock-out time (optional)": "Adjust clock-out time (optional)",
     "approved": "approved",
-    "Warning: this range overlaps an existing absence; saving will be rejected.": "Warning: this range overlaps an existing absence; saving will be rejected."
+    "Warning: this range overlaps an existing absence; saving will be rejected.": "Warning: this range overlaps an existing absence; saving will be rejected.",
+    "Absences and planned hours": "Absences and planned hours",
+    "How approved absences affect the flextime balance. Leave rules are on by default so vacation never creates minus hours; the sick-leave credit stays opt-in.": "How approved absences affect the flextime balance. Leave rules are on by default so vacation never creates minus hours; the sick-leave credit stays opt-in.",
+    "Apply leave rules to the flextime balance (vacation, leave, unpaid leave)": "Apply leave rules to the flextime balance (vacation, leave, unpaid leave)",
+    "On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.": "On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.",
+    "When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are handled by the leave-rules setting above.": "When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are handled by the leave-rules setting above.",
+    "Includes %s h credited from approved absences (planned hours).": "Includes %s h credited from approved absences (planned hours).",
+    "Excludes %s h of target time removed by unpaid or parental leave.": "Excludes %s h of target time removed by unpaid or parental leave."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

@@ -27,11 +27,13 @@ declare(strict_types=1);
  * degrades to built-ins only. Admin write paths must call
  * {@see resetCustomTypeCache()} after committing.
  *
- * Semantics live elsewhere by design: which types receive the opt-in planned-hours
- * credit is owned by {@see \OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService}
- * (built-ins) plus each custom row's `soll_credit` flag, and `overtime_comp`
- * deliberately stays outside that list — its Soll gap is the overtime-balance
- * debit ("Freizeitausgleich").
+ * Semantics live elsewhere by design: which gate applies to a creditable type is
+ * owned by {@see \OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService};
+ * the per-type Soll *effect* ({@see sollEffect()}) is the matrix owned here —
+ * paid leave credits planned hours (credit_ist), contract suspensions remove the
+ * day's Soll (reduce_soll), everything else leaves the balance untouched.
+ * `overtime_comp` deliberately stays outside the credit list — its Soll gap is
+ * the overtime-balance debit ("Freizeitausgleich").
  *
  * @copyright Copyright (c) 2026
  * @license AGPL-3.0-or-later
@@ -285,17 +287,78 @@ final class AbsenceTypeCatalog
 	}
 
 	/**
-	 * Whether the type joins the opt-in planned-hours Soll credit when the
-	 * feature is enabled. Built-in creditable types are fixed; custom types
-	 * follow their `soll_credit` flag.
+	 * Soll effects for the flextime balance (the absence-valuation matrix).
+	 *
+	 * - {@see SOLL_EFFECT_CREDIT_IST}: approved absence adds its planned net
+	 *   hours to Ist — the day cannot create Minusstunden (paid leave).
+	 * - {@see SOLL_EFFECT_REDUCE_SOLL}: approved absence removes the day's
+	 *   planned Soll — neutral balance, no invented paid hours (suspensions).
+	 * - {@see SOLL_EFFECT_NONE}: balance untouched — `overtime_comp` keeps its
+	 *   Soll gap as the deliberate Freizeitausgleich debit; `home_office` and
+	 *   `business_trip` are worked days the employee fills by stamping.
+	 */
+	public const SOLL_EFFECT_CREDIT_IST = 'credit_ist';
+	public const SOLL_EFFECT_REDUCE_SOLL = 'reduce_soll';
+	public const SOLL_EFFECT_NONE = 'none';
+
+	/**
+	 * Built-in valuation matrix — must cover every entry in {@see ORDER}.
+	 * A built-in absent from this map is a programming error (a type shipped
+	 * without a Soll decision is exactly how vacation produced Minusstunden):
+	 * {@see sollEffect()} fails closed on it, and the exhaustiveness test
+	 * blocks the release.
+	 *
+	 * NONE is an *explicit* decision: overtime_comp keeps its Soll gap as the
+	 * Freizeitausgleich debit; home_office / business_trip are worked days the
+	 * employee fills by stamping.
+	 *
+	 * @var array<string, string>
+	 */
+	private const SOLL_EFFECT_MATRIX = [
+		Absence::TYPE_VACATION => self::SOLL_EFFECT_CREDIT_IST,
+		Absence::TYPE_SICK_LEAVE => self::SOLL_EFFECT_CREDIT_IST,
+		Absence::TYPE_CHILD_SICK => self::SOLL_EFFECT_CREDIT_IST,
+		Absence::TYPE_PERSONAL_LEAVE => self::SOLL_EFFECT_CREDIT_IST,
+		Absence::TYPE_SPECIAL_LEAVE => self::SOLL_EFFECT_CREDIT_IST,
+		Absence::TYPE_UNPAID_LEAVE => self::SOLL_EFFECT_REDUCE_SOLL,
+		Absence::TYPE_PARENTAL_LEAVE => self::SOLL_EFFECT_REDUCE_SOLL,
+		Absence::TYPE_OVERTIME_COMP => self::SOLL_EFFECT_NONE,
+		Absence::TYPE_HOME_OFFICE => self::SOLL_EFFECT_NONE,
+		Absence::TYPE_BUSINESS_TRIP => self::SOLL_EFFECT_NONE,
+	];
+
+	/**
+	 * Per-type Soll effect. Custom types can only join `credit_ist` today
+	 * (their `soll_credit` flag); a reduce_soll dimension for custom types is
+	 * a deliberate follow-up, not an omission.
+	 *
+	 * @throws \LogicException when a built-in type has no matrix entry —
+	 *         every type in {@see ORDER} must carry an explicit valuation.
+	 */
+	public static function sollEffect(string $type): string
+	{
+		if (isset(self::SOLL_EFFECT_MATRIX[$type])) {
+			return self::SOLL_EFFECT_MATRIX[$type];
+		}
+		if (in_array($type, self::ORDER, true)) {
+			throw new \LogicException(
+				"Absence type '$type' has no SOLL_EFFECT_MATRIX entry — classify it before shipping"
+			);
+		}
+		$custom = self::customTypes()[$type] ?? null;
+		return ($custom !== null && (bool)$custom->getSollCredit())
+			? self::SOLL_EFFECT_CREDIT_IST
+			: self::SOLL_EFFECT_NONE;
+	}
+
+	/**
+	 * Whether the type joins the planned-hours Soll credit when its governing
+	 * gate is open. Thin alias for {@see sollEffect()} — unpaid types are
+	 * never creditable, they reduce Soll instead.
 	 */
 	public static function isSollCreditable(string $type): bool
 	{
-		if (in_array($type, [Absence::TYPE_SICK_LEAVE, Absence::TYPE_CHILD_SICK], true)) {
-			return true;
-		}
-		$custom = self::customTypes()[$type] ?? null;
-		return $custom !== null && (bool)$custom->getSollCredit();
+		return self::sollEffect($type) === self::SOLL_EFFECT_CREDIT_IST;
 	}
 
 	/**

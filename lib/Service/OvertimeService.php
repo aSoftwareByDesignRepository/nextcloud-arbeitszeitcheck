@@ -118,6 +118,7 @@ class OvertimeService
 				'period_end' => $endDate->format('Y-m-d'),
 				'total_hours_worked' => 0.0,
 				'absence_credit_hours' => 0.0,
+				'soll_reduction_hours' => 0.0,
 				'required_hours' => 0.0,
 				'overtime_hours' => 0.0,
 				'cumulative_balance_before' => round($balanceBefore, 2),
@@ -171,7 +172,17 @@ class OvertimeService
 			}
 		}
 
-		$requiredHours = $this->calculateRequiredHours($userId, $periodStart, $endDate, $dailyHours, $weeklyHours, $schedule, $rotationHours);
+		$suspensionReduction = $this->suspensionReductionHours($userId, $periodStart, $endDate);
+		$requiredHours = $this->calculateRequiredHours(
+			$userId,
+			$periodStart,
+			$endDate,
+			$dailyHours,
+			$weeklyHours,
+			$schedule,
+			$rotationHours,
+			$suspensionReduction,
+		);
 		// Overtime tracking "Stichtag": do not apply the full daily/weekly target to the
 		// anchor calendar day itself. Otherwise a new employee sees a full day of
 		// undertime at login before any work is recorded (confusing UX). From the next
@@ -187,6 +198,7 @@ class OvertimeService
 				$anchorEnd = clone $anchor;
 				$anchorEnd->setTime(23, 59, 59);
 				$anchorRotation = $this->tryRotationRequiredHours($userId, $anchor, $anchorEnd);
+				$anchorReduction = $this->suspensionReductionHours($userId, $anchor, $anchorEnd);
 				$requiredHours -= $this->calculateRequiredHours(
 					$userId,
 					$anchor,
@@ -195,6 +207,7 @@ class OvertimeService
 					$weeklyHours,
 					$schedule,
 					$anchorRotation,
+					$anchorReduction,
 				);
 				if ($requiredHours < 0) {
 					$requiredHours = 0.0;
@@ -226,6 +239,7 @@ class OvertimeService
 			'period_end' => $endDate->format('Y-m-d'),
 			'total_hours_worked' => round($totalHoursWorked, 2),
 			'absence_credit_hours' => round($absenceCreditHours, 2),
+			'soll_reduction_hours' => round($suspensionReduction, 2),
 			'required_hours' => round($requiredHours, 2),
 			'overtime_hours' => round($overtimeHours, 2),
 			'cumulative_balance_before' => round($balanceBefore, 2),
@@ -309,6 +323,7 @@ class OvertimeService
 		float $weeklyHours,
 		?\OCA\ArbeitszeitCheck\Support\WeekdaySchedule $schedule = null,
 		?float $precomputedRotationHours = null,
+		?float $precomputedSuspensionReduction = null,
 	): float {
 		// G2 on: Duty rotation Soll first; null → legacy weekday/weekly contract.
 		$rotationHours = $precomputedRotationHours;
@@ -316,21 +331,43 @@ class OvertimeService
 			$rotationHours = $this->tryRotationRequiredHours($userId, $startDate, $endDate);
 		}
 		if ($rotationHours !== null) {
-			return $rotationHours;
-		}
-
-		if ($schedule !== null) {
-			return $schedule->requiredHoursForDateRange(
+			$base = $rotationHours;
+		} elseif ($schedule !== null) {
+			$base = $schedule->requiredHoursForDateRange(
 				$startDate,
 				$endDate,
 				fn (\DateTime $day): float => $this->holidayCalendarService->getHolidayWeightForUser($userId, $day),
 			);
+		} else {
+			$workingDays = $this->countWorkingDays($userId, $startDate, $endDate);
+			$base = ($workingDays / 5.0) * $weeklyHours;
 		}
 
-		$workingDays = $this->countWorkingDays($userId, $startDate, $endDate);
-		$weeks = $workingDays / 5.0;
+		// Suspension absences (unpaid / parental leave) remove the day's Soll:
+		// the contract is dormant — the day must neither earn nor lose balance.
+		$reduction = $precomputedSuspensionReduction
+			?? $this->suspensionReductionHours($userId, $startDate, $endDate);
 
-		return $weeks * $weeklyHours;
+		return max(0.0, $base - $reduction);
+	}
+
+	/**
+	 * Planned Soll removed by approved suspension absences in the range.
+	 * Fails soft to 0 — a reduction outage must never inflate required hours
+	 * past what the employee would have owed before the matrix shipped.
+	 */
+	private function suspensionReductionHours(string $userId, \DateTime $startDate, \DateTime $endDate): float
+	{
+		if ($this->paidAbsenceCreditService === null) {
+			return 0.0;
+		}
+		try {
+			$result = $this->paidAbsenceCreditService->sollReductionHoursForRange($userId, $startDate, $endDate);
+			return max(0.0, (float)($result['hours'] ?? 0.0));
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('Absence Soll reduction failed: ' . $e->getMessage());
+			return 0.0;
+		}
 	}
 
 	private function tryRotationRequiredHours(string $userId, \DateTime $startDate, \DateTime $endDate): ?float

@@ -40,17 +40,27 @@ class PaidAbsenceCreditAdminGateContractTest extends TestCase
 		$src = (string)file_get_contents(
 			dirname(__DIR__, 3) . '/lib/Service/PaidAbsencePlannedHoursCreditService.php'
 		);
-		$this->assertStringContainsString('AbsenceTypeCatalog::isSollCreditable', $src);
+		// The per-type effect matrix (sollEffect) is what routes an absence to
+		// credit / reduce / none — unpaid leave lands in reduce_soll, never in
+		// the Ist credit.
+		$this->assertStringContainsString('AbsenceTypeCatalog::sollEffect', $src);
 
-		// The creditable-type whitelist lives in isSollCreditable — sick and
-		// sick-child are creditable, unpaid leave must never join them.
+		// The valuation matrix is the single source of truth: sick + paid
+		// leave credit Ist; suspensions reduce Soll and must never join the
+		// credit set. isSollCreditable is a thin alias for sollEffect, so pin
+		// the matrix itself.
 		$catalog = (string)file_get_contents(
 			dirname(__DIR__, 3) . '/lib/Support/AbsenceTypeCatalog.php'
 		);
-		$pos = strpos($catalog, 'function isSollCreditable');
+		$pos = strpos($catalog, 'SOLL_EFFECT_MATRIX = [');
 		$this->assertNotFalse($pos);
-		$body = substr($catalog, $pos, 1200);
-		$this->assertStringContainsString('TYPE_SICK_LEAVE', $body);
-		$this->assertStringNotContainsString('TYPE_UNPAID_LEAVE', $body);
+		$body = substr($catalog, $pos, 1400);
+		$this->assertStringContainsString('TYPE_SICK_LEAVE => self::SOLL_EFFECT_CREDIT_IST', $body);
+		$this->assertStringContainsString('TYPE_VACATION => self::SOLL_EFFECT_CREDIT_IST', $body);
+		$this->assertStringContainsString('TYPE_UNPAID_LEAVE => self::SOLL_EFFECT_REDUCE_SOLL', $body);
+		$this->assertStringContainsString('TYPE_PARENTAL_LEAVE => self::SOLL_EFFECT_REDUCE_SOLL', $body);
+		// Fail-closed: an ORDER type missing from the matrix throws, never
+		// silently degrades to NONE (that silence caused vacation Minusstunden).
+		$this->assertStringContainsString('LogicException', $catalog);
 	}
 }

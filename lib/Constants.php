@@ -475,7 +475,11 @@ final class Constants
 	public const CONFIG_PROJECTCHECK_INTEGRATION_DEFAULT = '0';
 
 	/** Overtime balance algorithm version for audit replay. */
-	public const OVERTIME_ALGORITHM_VERSION = 2;
+	/**
+	 * Saldo algorithm version. 2 → 3: absence Soll-effects matrix —
+	 * paid leave credits Ist, suspensions reduce Soll (2026-10-30).
+	 */
+	public const OVERTIME_ALGORITHM_VERSION = 3;
 
 	/** App config: when "1", overtime bank cap and month-end payout (Auszahlung) are active. */
 	public const CONFIG_OVERTIME_BANK_ENABLED = 'overtime_bank_enabled';
@@ -552,6 +556,23 @@ final class Constants
 
 	/** Default for {@see CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT}. */
 	public const CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT_DEFAULT = '0';
+
+	/**
+	 * When "1", the leave Soll matrix applies: approved vacation, personal
+	 * leave and special leave credit planned net hours into overtime Ist
+	 * (like worked time), while unpaid leave and parental leave reduce the
+	 * day's Soll instead — none of them may create Minusstunden.
+	 *
+	 * Default ON: leave pay continuation is not an org policy choice (BUrlG /
+	 * Entgeltfortzahlung). Admins can still opt out per-org; disabling restores
+	 * the pre-matrix behaviour (full Soll on leave days).
+	 *
+	 * @see \OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService
+	 */
+	public const CONFIG_LEAVE_SOLL_EFFECTS = 'leave_soll_effects';
+
+	/** Default for {@see CONFIG_LEAVE_SOLL_EFFECTS}. */
+	public const CONFIG_LEAVE_SOLL_EFFECTS_DEFAULT = '1';
 
 	/**
 	 * Manager emails for pending approvals (Kraft): absences / vacation requests.

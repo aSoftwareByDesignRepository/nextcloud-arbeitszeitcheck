@@ -431,6 +431,7 @@
 		const hasBank = !!form.querySelector('#overtimeBankEnabled');
 		const hasPremium = !!form.querySelector('#premiumSurchargesEnabled');
 		const hasPaidAbsenceCredit = !!form.querySelector('#paidAbsencePlannedHoursCreditEnabled');
+		const hasLeaveSollEffects = !!form.querySelector('#leaveSollEffectsEnabled');
 		const hasVacation = !!form.querySelector('input[name="vacationYearMode"]');
 		const hasReminders = !!form.querySelector('#missingClockInRemindersEnabled');
 		const hasCalendarEmail = !!form.querySelector('#sendIcalApprovedAbsences');
@@ -578,6 +579,10 @@
 
 			if (hasPaidAbsenceCredit) {
 				payload.paidAbsencePlannedHoursCreditEnabled = domChecked('#paidAbsencePlannedHoursCreditEnabled');
+			}
+
+			if (hasLeaveSollEffects) {
+				payload.leaveSollEffectsEnabled = domChecked('#leaveSollEffectsEnabled');
 			}
 
 			if (hasReminders) {

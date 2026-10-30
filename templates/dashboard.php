@@ -708,7 +708,15 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             if ($absenceCreditYtd >= 0.01):
                             ?>
                             <p class="form-help dashboard-overtime-card__absence-credit" id="dashboard-overtime-absence-credit">
-                                <?php p($l->t('Includes %s h credited from approved sick leave (planned hours).', [number_format($absenceCreditYtd, 2)])); ?>
+                                <?php p($l->t('Includes %s h credited from approved absences (planned hours).', [number_format($absenceCreditYtd, 2)])); ?>
+                            </p>
+                            <?php endif; ?>
+                            <?php
+                            $sollReductionYtd = round((float)($_['sollReductionHoursYtd'] ?? 0), 2);
+                            if ($sollReductionYtd >= 0.01):
+                            ?>
+                            <p class="form-help dashboard-overtime-card__soll-reduction" id="dashboard-overtime-soll-reduction">
+                                <?php p($l->t('Excludes %s h of target time removed by unpaid or parental leave.', [number_format($sollReductionYtd, 2)])); ?>
                             </p>
                             <?php endif; ?>
                             <?php

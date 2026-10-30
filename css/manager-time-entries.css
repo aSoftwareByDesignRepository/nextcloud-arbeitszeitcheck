@@ -151,7 +151,8 @@
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.description-cell,
 	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.reason-cell,
-	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell {
+	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell,
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell {
 		flex-direction: column;
 		align-items: stretch;
 		text-align: left;
@@ -159,15 +160,35 @@
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.description-cell::before,
 	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.reason-cell::before,
-	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell::before {
+	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell::before,
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell::before {
 		max-width: none;
 	}
 
 	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-table-actions,
-	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn {
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-table-actions,
+	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn,
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn {
 		width: 100%;
 		justify-content: center;
 		min-height: 44px;
+	}
+}
+
+/* Desktop: the actions column is the shared-pack overlay cell (zero-width
+ * sticky td + .azc-table-actions revealed on row hover/focus). Keep the cell
+ * collapsed — the pack's generic td.actions-cell min-width:max-content would
+ * otherwise reserve a full column. Mirrors manager-people.css. */
+@media (min-width: 769px) {
+	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table td.actions-cell,
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table td.actions-cell {
+		min-width: 0;
+		white-space: normal;
+	}
+
+	#app-content.azc-app--manager-time-entries .manager-scope-page__results-table td.actions-cell .azc-table-actions,
+	#app-content.azc-app--manager-absences .manager-scope-page__results-table td.actions-cell .azc-table-actions {
+		justify-content: flex-end;
 	}
 }
 

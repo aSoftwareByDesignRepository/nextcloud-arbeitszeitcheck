@@ -158,7 +158,7 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								<th scope="col" id="employee-absences-duration-heading"><?php p($l->t('Duration')); ?></th>
 								<th scope="col"><?php p($l->t('Status')); ?></th>
 								<th scope="col"><?php p($l->t('Reason')); ?></th>
-								<th scope="col"><?php p($l->t('Actions')); ?></th>
+								<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
 							</tr>
 						</thead>
 						<tbody id="employee-absences-body"></tbody>

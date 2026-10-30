@@ -217,6 +217,45 @@ test.describe('Vacation to sick conversion', () => {
 		await mgr.locator('#employee-absences-submit').click()
 		const btn = mgr.locator('[data-sick-convert][data-sick-convert-flow="manager"]').first()
 		await expect(btn).toBeAttached({ timeout: 15000 })
+
+		// The Actions cell is the shared-pack overlay column: exactly ONE
+		// .azc-table-actions wrapper may wrap the button — a nested duplicate
+		// shrink-wraps to ~0 width and its overflow:hidden clips the button
+		// out of the cell entirely (intake 20261030T182533Z).
+		await expect(
+			btn.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " azc-table-actions ")]'),
+		).toHaveCount(1)
+
+		// Reveal the overlay (row hover) and prove the button is not clipped:
+		// its centre hit-tests to itself and its box sits inside its wrapper
+		// and inside the row — a DOM click would never see the clip.
+		const row = btn.locator('xpath=ancestor::tr[1]')
+		await row.hover()
+		await expect(btn.locator('xpath=..')).toHaveCSS('opacity', '1')
+		const clip = await mgr.evaluate(() => {
+			const b = document.querySelector('[data-sick-convert][data-sick-convert-flow="manager"]')
+			const bb = b.getBoundingClientRect()
+			const wb = b.parentElement.getBoundingClientRect()
+			const rb = b.closest('tr').getBoundingClientRect()
+			const hit = document.elementFromPoint(bb.x + bb.width / 2, bb.y + bb.height / 2)
+			return {
+				hitIsButton: hit === b,
+				inWrapper: bb.left >= wb.left - 1 && bb.right <= wb.right + 1,
+				inRow: bb.left >= rb.left - 1 && bb.right <= rb.right + 1,
+				realBox: bb.width > 40 && bb.height > 20,
+			}
+		})
+		expect(clip, JSON.stringify(clip)).toEqual({
+			hitIsButton: true, inWrapper: true, inRow: true, realBox: true,
+		})
+
+		// <768.98px card layout: the action renders as a visible full-width
+		// row — no hover gate, no clip.
+		await mgr.setViewportSize({ width: 375, height: 700 })
+		const mobileBox = await btn.boundingBox()
+		expect(mobileBox && mobileBox.width > 40, 'actions button must paint a real box at 375px').toBeTruthy()
+		await mgr.setViewportSize({ width: 1280, height: 800 })
+
 		// Row actions reveal on hover (.azc-table-actions pattern) — the td
 		// owns pointer events until the row is hovered, like a real user.
 		// .azc-table-actions reveals on row hover/focus — the delegated click

@@ -476,9 +476,12 @@
 	white-space: normal;
 }
 
-/* Actions column: size to the buttons below 768px. From 768px the column
-   collapses and the buttons float on the hovered or focused row — see below.
-   Never shrink below button labels (avoid width:1% clipping). */
+/* Actions column alignment. Width lives in the two media blocks below:
+   below 769px the column sizes to the button labels; from 769px it
+   collapses and the buttons cover the inline end of the hovered or
+   focused row. That cover is the layout. Do not put min-width:max-content
+   back on these cells at desktop — it reserves a column and the release
+   check treats that as a regression. */
 #app-content.azc-app .table th.azc-table-actions-col,
 #app-content.azc-app .table th.actions-col,
 #app-content.azc-app .table td.actions-cell,
@@ -492,10 +495,26 @@
 	text-align: right;
 	vertical-align: middle;
 	white-space: nowrap;
-	width: auto;
-	min-width: max-content;
-	max-width: none;
 	overflow: visible;
+}
+
+/* Narrow tables: size the actions column to the button labels.
+   From 769px the column collapses — see the wide-table block below. */
+@media (max-width: 768.98px) {
+	#app-content.azc-app .table th.azc-table-actions-col,
+	#app-content.azc-app .table th.actions-col,
+	#app-content.azc-app .table td.actions-cell,
+	#app-content.azc-app .table td.azc-table-actions-col,
+	#app-content.azc-app .table td.admin-ot-audit__actions,
+	#app-content.azc-app .table td.admin-tariff-rules__row-actions,
+	#app-content.azc-app .table td.layer-card__history-actions,
+	#app-content.azc-app .grid-table th.azc-table-actions-col,
+	#app-content.azc-app .grid-table td.actions-cell,
+	#app-content.azc-app .grid-table td.azc-table-actions-col {
+		width: auto;
+		min-width: max-content;
+		max-width: none;
+	}
 }
 
 #app-content.azc-app .table td.actions-cell,
@@ -519,7 +538,9 @@
 
 /*
  * Wide tables: the actions column must not widen the table or sit on top of
- * the data while you scroll. The header text stays in the accessibility tree
+ * the data while you scroll. On hover, focus, or a touch screen the buttons
+ * do cover the inline end of that row — that overlap is intentional.
+ * The header text stays in the accessibility tree
  * and is clipped by the zero-width cell. Buttons stay in the tab order
  * (never display:none). A pointer reveals them on the row; keyboard focus
  * does too. Escape adds .azc-row-actions-dismissed until the pointer

@@ -36,7 +36,33 @@ class RowActionsRevealContractTest extends TestCase
 		$this->assertStringContainsString('overflow: hidden;', $layout);
 		$this->assertStringNotContainsString('flex-wrap: wrap', $layout);
 		$this->assertStringNotContainsString('translateY', $layout);
+		$this->assertStringNotContainsString('min-width: max-content', $layout);
 		$this->assertDoesNotMatchRegularExpression('/display:\s*none/', $layout);
+	}
+
+	public function testNarrowViewportSizesTheActionsColumnToTheButtons(): void
+	{
+		$css = (string)file_get_contents(dirname(__DIR__, 3) . '/css/common/page-patterns.css');
+		$marker = strpos($css, 'Narrow tables: size the actions column');
+		$this->assertNotFalse($marker);
+		$narrow = $this->mediaBody($css, '@media (max-width: 768.98px) {', $marker);
+
+		$this->assertStringContainsString('td.actions-cell', $narrow);
+		$this->assertStringContainsString('width: auto;', $narrow);
+		$this->assertStringContainsString('min-width: max-content;', $narrow);
+	}
+
+	public function testUnscopedActionsCellDoesNotReserveAColumn(): void
+	{
+		foreach (['page-patterns.css', 'components.css'] as $file) {
+			$css = (string)file_get_contents(dirname(__DIR__, 3) . '/css/common/' . $file);
+			$css = (string)preg_replace('/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/s', '', $css);
+			$this->assertDoesNotMatchRegularExpression(
+				'/td\.actions-cell[^{]*\{[^}]*min-width:\s*max-content/s',
+				$css,
+				$file . ' reserves an actions column outside the narrow viewport'
+			);
+		}
 	}
 
 	public function testHoverRevealKeepsKeyboardFocusAndEscapeDismiss(): void

@@ -4,9 +4,14 @@
 	flex-direction: column;
 	gap: var(--azc-space-6, 32px);
 	width: 100%;
-	max-width: 44rem;
+	max-width: 56rem;
 	min-width: 0;
 	box-sizing: border-box;
+}
+
+/* The shared page stack sets 24px. This page doubles that. */
+#app-content.azc-app.azc-app--get-the-app .azc-get-app-page.azc-page-stack {
+	gap: var(--azc-space-7, 48px);
 }
 
 .azc-get-app__hero {
@@ -66,15 +71,36 @@
 	color: var(--color-text-maxcontrast);
 }
 
-.azc-get-app__cta {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--azc-space-3, 12px);
+.azc-get-app__stores {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--azc-space-4, 16px);
 	width: 100%;
 	margin-top: var(--azc-space-2, 8px);
 }
 
+.azc-get-app__store {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--azc-space-2, 8px);
+	min-width: 0;
+	margin: 0;
+	padding: var(--azc-space-4, 16px);
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--color-main-background);
+}
+
+.azc-get-app__store-title {
+	margin: 0 0 var(--azc-space-2, 8px);
+	font-size: var(--azc-fs-md, 1rem);
+	font-weight: 700;
+	line-height: 1.25;
+	color: var(--color-main-text);
+}
+
+.azc-get-app__store-link,
 .azc-get-app__play {
 	display: inline-flex;
 	align-items: center;
@@ -85,44 +111,49 @@
 	padding: var(--azc-space-2, 8px) var(--azc-space-5, 24px);
 	border-radius: var(--border-radius-element, 10px);
 	border: 1px solid var(--color-primary-element);
-	background: var(--color-primary-element);
-	color: var(--color-primary-element-text);
+	background: transparent;
+	color: var(--azc-text, var(--color-main-text));
 	font-weight: 700;
 	font-size: var(--azc-fs-md, 1rem);
 	line-height: 1.25;
 	text-decoration: none;
+	width: 100%;
 	white-space: normal;
 	overflow-wrap: anywhere;
 	cursor: pointer;
-	box-shadow: 0 1px 2px color-mix(in srgb, var(--color-primary-element) 35%, transparent);
-	transition: background-color 0.15s ease, border-color 0.15s ease;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.azc-get-app__play:hover {
+.azc-get-app__store-link--primary:hover {
 	background: var(--color-primary-element-hover, var(--color-primary-element));
 	border-color: var(--color-primary-element-hover, var(--color-primary-element));
 	color: var(--color-primary-element-text);
 }
 
-#app-content.azc-app--get-the-app a.azc-get-app__play {
+#app-content.azc-app--get-the-app a.azc-get-app__store-link--primary,
+#app-content.azc-app--get-the-app a.azc-get-app__action--primary {
 	background-color: var(--color-primary-element) !important;
 	border-color: var(--color-primary-element) !important;
 	color: var(--color-primary-element-text) !important;
 	text-decoration: none !important;
+	box-shadow: 0 1px 2px color-mix(in srgb, var(--color-primary-element) 35%, transparent);
 }
 
-#app-content.azc-app--get-the-app a.azc-get-app__play:hover {
+#app-content.azc-app--get-the-app a.azc-get-app__store-link--primary:hover,
+#app-content.azc-app--get-the-app a.azc-get-app__action--primary:hover {
 	background-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
 	color: var(--color-primary-element-text) !important;
 }
 
-.azc-get-app__play:focus-visible {
+.azc-get-app__play:focus-visible,
+.azc-get-app__store-link:focus-visible {
 	outline: 2px solid var(--color-primary-element);
 	outline-offset: 3px;
 }
 
 .azc-get-app__play:focus:not(:focus-visible),
+.azc-get-app__store-link:focus:not(:focus-visible),
 .azc-get-app__action:focus:not(:focus-visible) {
 	outline: none;
 }
@@ -134,19 +165,24 @@
 	flex: 0 0 auto;
 	width: 1.5rem;
 	height: 1.5rem;
-	color: var(--color-primary-element-text);
+	color: inherit;
 	background: transparent;
 }
 
+.azc-get-app__play .azc-get-app__play-icon,
 .azc-get-app__play .azc-icon,
 .azc-get-app__play-icon svg,
 .azc-get-app__play-icon .azc-icon {
 	display: block;
 	width: 1.35rem;
 	height: 1.35rem;
-	color: var(--color-primary-element-text);
 	stroke: currentColor;
 	stroke-width: 2.25;
+}
+
+.azc-get-app__store-link--primary .azc-get-app__play-icon,
+.azc-get-app__store-link--primary .azc-icon {
+	color: var(--color-primary-element-text);
 }
 
 .azc-get-app__price-hint {
@@ -159,33 +195,79 @@
 }
 
 .azc-get-app__section-title {
-	margin: 0 0 var(--azc-space-4, 16px);
-	font-size: var(--azc-fs-lg, 1.125rem);
+	margin: 0 0 var(--azc-space-5, 24px);
+	font-size: clamp(1.5rem, 2.8vw, 2rem);
+	font-weight: 700;
+	letter-spacing: -0.015em;
+	line-height: 1.15;
+	color: var(--color-main-text);
+}
+
+/* A single class was losing to the server heading rules. These selectors hold the size. */
+#app-content.azc-app--get-the-app h2.azc-get-app__title {
+	margin: 0;
+	font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+	font-weight: 700;
+	line-height: 1.2;
+	color: var(--color-main-text);
+}
+
+#app-content.azc-app--get-the-app h2.azc-get-app__section-title {
+	margin: 0 0 var(--azc-space-5, 24px);
+	font-size: clamp(1.5rem, 2.8vw, 2rem);
+	font-weight: 700;
+	letter-spacing: -0.015em;
+	line-height: 1.15;
+	color: var(--color-main-text);
+}
+
+#app-content.azc-app--get-the-app h2.azc-get-app__vendor-title {
+	margin: 0;
+	font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+	font-weight: 700;
+	line-height: 1.2;
+	color: var(--color-main-text);
+}
+
+#app-content.azc-app--get-the-app h3.azc-get-app__store-title {
+	margin: 0 0 var(--azc-space-2, 8px);
+	font-size: 1.125rem;
 	font-weight: 700;
 	line-height: 1.25;
 	color: var(--color-main-text);
+}
+
+.azc-get-app__section-title::after {
+	content: "";
+	display: block;
+	width: 3.5rem;
+	height: 0.25rem;
+	margin-top: var(--azc-space-3, 12px);
+	border-radius: var(--azc-radius-pill, 999px);
+	background: var(--color-primary-element);
 }
 
 .azc-get-app__features {
 	list-style: none;
 	margin: 0;
 	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	border-top: 1px solid var(--azc-border, var(--color-border));
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--azc-space-4, 16px);
 }
 
 .azc-get-app__feature {
 	display: flex;
+	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--azc-space-3, 12px);
 	margin: 0;
-	padding: var(--azc-space-3, 12px) 0;
-	border: 0;
-	border-bottom: 1px solid var(--azc-border, var(--color-border));
-	border-radius: 0;
-	background: transparent;
+	min-width: 0;
+	padding: var(--azc-space-4, 16px);
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--azc-bg-card, var(--color-main-background));
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-main-background) 55%, transparent);
 	cursor: default;
 	user-select: text;
 }
@@ -231,39 +313,80 @@
 	stroke-width: 2.25;
 }
 
-.azc-get-app__actions {
+.azc-get-app__vendor {
 	display: flex;
 	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--azc-space-3, 12px);
+	padding: var(--azc-space-5, 24px);
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-inline-start: 4px solid var(--color-primary-element);
+	border-radius: var(--border-radius-large, 12px);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--color-primary-element) 8%, var(--color-main-background)) 0%,
+			var(--color-main-background) 70%
+		);
+}
+
+.azc-get-app__vendor-kicker {
+	margin: 0;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 650;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--azc-accent-ink, var(--color-primary-element));
+}
+
+.azc-get-app__vendor-title {
+	margin: 0;
+	font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+	font-weight: 700;
+	line-height: 1.2;
+	color: var(--color-main-text);
+}
+
+.azc-get-app__vendor-lead {
+	margin: 0;
+	max-width: 62ch;
+	font-size: var(--azc-fs-md, 1rem);
+	line-height: 1.5;
+	color: var(--color-text-maxcontrast);
+}
+
+.azc-get-app__actions {
+	display: flex;
+	flex-flow: row wrap;
 	gap: var(--azc-space-3, 12px);
 	width: 100%;
-	max-width: 28rem;
+	margin-top: var(--azc-space-2, 8px);
 }
 
 .azc-get-app__action {
 	display: inline-flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: var(--azc-space-3, 12px);
-	width: 100%;
+	justify-content: center;
+	gap: var(--azc-space-2, 8px);
+	flex: 1 1 14rem;
+	width: auto;
+	max-width: 100%;
 	min-height: var(--azc-touch, 44px);
 	min-width: var(--azc-touch, 44px);
-	padding: var(--azc-space-3, 12px) var(--azc-space-4, 16px);
-	border: 2px solid var(--color-primary-element);
+	padding: var(--azc-space-2, 8px) var(--azc-space-4, 16px);
+	border: 1px solid var(--color-primary-element);
 	border-radius: var(--border-radius-element, 10px);
 	background: transparent;
-	color: var(--azc-accent-ink, var(--color-primary-element));
+	color: var(--azc-text, var(--color-main-text));
 	font-weight: 700;
 	font-size: var(--azc-fs-md, 1rem);
 	line-height: 1.25;
+	text-align: center;
 	text-decoration: none;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	cursor: pointer;
 	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.azc-get-app__action:hover {
-	background: var(--color-primary-element);
-	color: var(--color-primary-element-text);
-	border-color: var(--color-primary-element);
 }
 
 .azc-get-app__action:focus-visible {
@@ -272,30 +395,26 @@
 }
 
 .azc-get-app__action-label {
-	flex: 1 1 auto;
 	min-width: 0;
-	text-align: start;
-}
-
-.azc-get-app__action-external {
-	flex: 0 0 auto;
-	font-size: 1.1em;
-	line-height: 1;
-	opacity: 0.9;
+	text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.azc-get-app__action,
-	.azc-get-app__play {
+	.azc-get-app__play,
+	.azc-get-app__store-link {
 		transition: none;
 	}
 }
 
-@media (max-width: 768.98px) {
-	.azc-get-app__play {
-		width: 100%;
+@media (min-width: 480px) {
+	.azc-get-app__stores,
+	.azc-get-app__features {
+		grid-template-columns: 1fr 1fr;
 	}
+}
 
+@media (max-width: 768.98px) {
 	.azc-get-app__hero {
 		padding: var(--azc-space-4, 16px);
 	}
@@ -306,14 +425,22 @@
 }
 
 @media (prefers-contrast: more) {
-	.azc-get-app__hero {
+	.azc-get-app__hero,
+	.azc-get-app__feature,
+	.azc-get-app__store,
+	.azc-get-app__vendor {
 		background: var(--color-main-background);
 		border-color: var(--color-main-text);
 		border-width: 2px;
 		box-shadow: none;
 	}
 
+	.azc-get-app__section-title::after {
+		background: var(--color-main-text);
+	}
+
 	.azc-get-app__play:focus-visible,
+	.azc-get-app__store-link:focus-visible,
 	.azc-get-app__action:focus-visible {
 		outline-width: 3px;
 		outline-color: var(--color-main-text);
@@ -322,14 +449,22 @@
 
 @media (forced-colors: active) {
 	.azc-get-app__play,
-	.azc-get-app__action {
+	.azc-get-app__store-link,
+	.azc-get-app__action,
+	.azc-get-app__vendor {
 		border: 2px solid ButtonText;
 		background: ButtonFace;
 		color: ButtonText;
 		forced-color-adjust: none;
 	}
 
+	.azc-get-app__section-title::after {
+		background: Highlight;
+		forced-color-adjust: none;
+	}
+
 	.azc-get-app__play:focus-visible,
+	.azc-get-app__store-link:focus-visible,
 	.azc-get-app__action:focus-visible {
 		outline: 3px solid Highlight;
 	}

@@ -1250,7 +1250,7 @@ class PageController extends Controller
 	}
 
 	/**
-	 * Official Android companions (phone + foyer terminal) on Google Play.
+	 * Official phone and foyer-terminal apps on Google Play and the App Store.
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
@@ -1263,15 +1263,18 @@ class PageController extends Controller
 		$params = $this->buildShellParams(
 			'get-the-app',
 			$this->l10n->t('Get the App'),
-			$this->l10n->t('Official Android apps for phone and foyer terminal.'),
+			$this->l10n->t('Official apps for Android and iOS, on your phone and at the foyer terminal.'),
 			$navFlags,
 		);
 		$params['urls'] = array_merge($params['urls'] ?? [], [
 			'playStore' => $links->playStoreUrl(),
 			'kioskPlayStore' => $links->kioskPlayStoreUrl(),
+			'appStore' => $links->appStoreUrl(),
+			'kioskAppStore' => $links->kioskAppStoreUrl(),
 			'mobileProductPage' => $links->productPageUrl($lang),
 			'mobilePrivacyPage' => $links->privacyPageUrl($lang),
 			'kioskPrivacyPage' => $links->kioskPrivacyPageUrl($lang),
+			'vendorApps' => $links->vendorAppsPageUrl($lang),
 		]);
 
 		return $this->configureCSP(new TemplateResponse('arbeitszeitcheck', 'get-the-app', $params));

@@ -123,7 +123,7 @@ test.describe('Get the App + Help footer theme × viewport a11y', () => {
 			await expect(page.locator('#azc-feedback-problem')).toBeVisible()
 			await expect(page.locator('#azc-feedback-idea')).toBeVisible()
 
-			const play = page.locator('a.azc-get-app__play').first()
+			const play = page.locator('a.azc-get-app__store-link--primary').first()
 			const playColor = await play.evaluate((el) => {
 				const s = getComputedStyle(el)
 				return { bg: s.backgroundColor, color: s.color }
@@ -137,7 +137,7 @@ test.describe('Get the App + Help footer theme × viewport a11y', () => {
 			}
 
 			await page.setViewportSize({ width: 320, height: 640 })
-			await assertTouchTargets(page, 'a.azc-get-app__play, #azc-nav-footer .azc-nav-footer__menu-item, #azc-nav-footer .azc-nav-footer__trigger')
+			await assertTouchTargets(page, 'a.azc-get-app__store-link, a.azc-get-app__action, #azc-nav-footer .azc-nav-footer__menu-item, #azc-nav-footer .azc-nav-footer__trigger')
 			await runAxe(page, `${theme}/get-the-app@320`)
 
 			await page.setViewportSize({ width: 1280, height: 800 })

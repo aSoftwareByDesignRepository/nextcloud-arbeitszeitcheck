@@ -872,6 +872,11 @@
     text-align: center;
 }
 
+#app-content.azc-app--dashboard .azc-dashboard-punch__projectcheck {
+    width: 100%;
+    text-align: start;
+}
+
 /* Clocked out: calm, centered punch panel */
 #app-content.azc-app--dashboard .azc-dashboard-punch--clocked_out .azc-dashboard-punch__inner {
     padding: clamp(1.75rem, 4vw, 2.5rem) var(--azc-space-6, 1.5rem);

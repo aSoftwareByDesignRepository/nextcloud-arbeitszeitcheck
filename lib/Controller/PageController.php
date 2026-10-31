@@ -497,6 +497,7 @@ class PageController extends Controller
 				'workingTimeModelMissing' => $workingTimeModelMissing,
 				'projectCheckAvailable' => $this->projectCheckIntegration->isProjectCheckAvailable(),
 				'projectCheckEnabled' => $projectCheckLinkingEnabled,
+				'dismissedHints' => $this->dismissedHintIds($userId),
 				'projectCheckProjects' => $projectCheckLinkingEnabled ? $this->projectCheckIntegration->getAvailableProjects($userId) : [],
 				'workLocation' => $this->workLocationChipContext($userId, $status),
 				'pendingExternalStamps' => $this->listPendingExternalStamps($userId),

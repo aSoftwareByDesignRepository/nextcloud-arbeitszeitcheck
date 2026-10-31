@@ -126,6 +126,7 @@
                 this.initClockButtons();
                 this.initWorkLocationPicker();
                 this.initEventListeners();
+                this.initDismissibleHints();
                 
                 // Initialize page-specific functionality
                 if (this.config.page === 'timeline') {
@@ -839,6 +840,53 @@
         },
 
         /**
+         * B-2 dismissible hints — server-persisted via user settings so
+         * the state survives sessions (never localStorage). Bound once for
+         * every page that loads this script, including the dashboard.
+         */
+        initDismissibleHints: function() {
+            if (this._hintDismissBound) {
+                return;
+            }
+            this._hintDismissBound = true;
+            document.addEventListener('click', (e) => {
+                const dismissBtn = e.target.closest ? e.target.closest('[data-hint-dismiss]') : null;
+                const showBtn = e.target.closest ? e.target.closest('[data-hint-show]') : null;
+                if (!dismissBtn && !showBtn) {
+                    return;
+                }
+                const wrap = (dismissBtn || showBtn).closest('.azc-hint');
+                const hintId = dismissBtn ? dismissBtn.getAttribute('data-hint-dismiss') : showBtn.getAttribute('data-hint-show');
+                if (!wrap || !hintId) {
+                    return;
+                }
+                e.preventDefault();
+                const body = wrap.querySelector('.azc-hint__body');
+                const showEl = wrap.querySelector('[data-hint-show]');
+                const dismissEl = wrap.querySelector('[data-hint-dismiss]');
+                const dismissed = !!dismissBtn;
+                const applyState = (isDismissed) => {
+                    if (body) body.hidden = isDismissed;
+                    if (showEl) showEl.hidden = !isDismissed;
+                    if (dismissEl) dismissEl.setAttribute('aria-expanded', String(!isDismissed));
+                    if (showEl) showEl.setAttribute('aria-expanded', String(!isDismissed));
+                };
+                applyState(dismissed);
+                // Focus stays on a real control: after dismiss, move to the
+                // show-link; after show, to the dismiss button (a11y).
+                const focusTarget = dismissed ? showEl : dismissEl;
+                if (focusTarget && !focusTarget.hidden && typeof focusTarget.focus === 'function') {
+                    focusTarget.focus();
+                }
+                this.persistDismissedHints(hintId, dismissed).then((ok) => {
+                    if (!ok) {
+                        applyState(!dismissed); // roll back on failure
+                    }
+                });
+            });
+        },
+
+        /**
          * Initialize time entries page functionality
          */
         initTimeEntries: function() {
@@ -924,44 +972,6 @@
                     window.location.href = window.location.pathname;
                 });
             }
-
-            // B-2 dismissible hints — server-persisted via user settings so
-            // the state survives sessions (never localStorage).
-            document.addEventListener('click', (e) => {
-                const dismissBtn = e.target.closest ? e.target.closest('[data-hint-dismiss]') : null;
-                const showBtn = e.target.closest ? e.target.closest('[data-hint-show]') : null;
-                if (!dismissBtn && !showBtn) {
-                    return;
-                }
-                const wrap = (dismissBtn || showBtn).closest('.azc-hint');
-                const hintId = dismissBtn ? dismissBtn.getAttribute('data-hint-dismiss') : showBtn.getAttribute('data-hint-show');
-                if (!wrap || !hintId) {
-                    return;
-                }
-                e.preventDefault();
-                const body = wrap.querySelector('.azc-hint__body');
-                const showEl = wrap.querySelector('[data-hint-show]');
-                const dismissEl = wrap.querySelector('[data-hint-dismiss]');
-                const dismissed = !!dismissBtn;
-                const applyState = (isDismissed) => {
-                    if (body) body.hidden = isDismissed;
-                    if (showEl) showEl.hidden = !isDismissed;
-                    if (dismissEl) dismissEl.setAttribute('aria-expanded', String(!isDismissed));
-                    if (showEl) showEl.setAttribute('aria-expanded', String(!isDismissed));
-                };
-                applyState(dismissed);
-                // Focus stays on a real control: after dismiss, move to the
-                // show-link; after show, to the dismiss button (a11y).
-                const focusTarget = dismissed ? showEl : dismissEl;
-                if (focusTarget && !focusTarget.hidden && typeof focusTarget.focus === 'function') {
-                    focusTarget.focus();
-                }
-                this.persistDismissedHints(hintId, dismissed).then((ok) => {
-                    if (!ok) {
-                        applyState(!dismissed); // roll back on failure
-                    }
-                });
-            });
 
             // PDF export of the *current* filter view (B-3). The URL params
             // are already ISO after filter apply — carry them over verbatim.

@@ -83,6 +83,27 @@ describe('persistDismissedHints', () => {
     expect(lastPostedBody().dismissed_hints).toEqual(['only-hint'])
   })
 
+  it('hides the dashboard ProjectCheck notice when its X is clicked', async () => {
+    document.body.innerHTML = `
+      <script type="application/json" id="azc-dismissed-hints-data">[]</script>
+      <div class="azc-hint" data-hint="dashboard-projectcheck-linking-off">
+        <div class="azc-hint__body" id="dashboard-projectcheck-linking-off">
+          <button type="button" data-hint-dismiss="dashboard-projectcheck-linking-off">x</button>
+        </div>
+        <button type="button" data-hint-show="dashboard-projectcheck-linking-off" hidden>Show hint</button>
+      </div>`
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }))
+
+    document.querySelector('[data-hint-dismiss]').click()
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled()
+    })
+
+    expect(document.querySelector('.azc-hint__body').hidden).toBe(true)
+    expect(document.querySelector('[data-hint-show]').hidden).toBe(false)
+    expect(lastPostedBody().dismissed_hints).toContain('dashboard-projectcheck-linking-off')
+  })
+
   it('resolves false when the settings write fails', async () => {
     document.body.innerHTML = '<div class="azc-hint" data-hint="h"><p class="azc-hint__body" hidden></p></div>'
     globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }))

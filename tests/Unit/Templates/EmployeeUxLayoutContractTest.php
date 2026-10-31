@@ -193,4 +193,29 @@ class EmployeeUxLayoutContractTest extends TestCase
 		$this->assertStringContainsString('.azc-dashboard-balance-row > .azc-card', $css);
 		$this->assertStringContainsString('.azc-dashboard-sick.azc-card', $css);
 	}
+
+	public function testProjectCheckLinkingOffSitsBelowTheTimezoneAndDismisses(): void
+	{
+		$dashboard = self::src(self::$dashboard);
+		$tz = strpos($dashboard, 'azc-dashboard-punch__tz');
+		$include = strpos($dashboard, 'projectcheck-linking-disabled-callout.php');
+		$this->assertNotFalse($tz);
+		$this->assertNotFalse($include);
+		$this->assertGreaterThan($tz, $include);
+		$this->assertSame(1, substr_count($dashboard, 'projectcheck-linking-disabled-callout.php'));
+		$this->assertStringContainsString('$azcProjectCheckCalloutDismissible = true', $dashboard);
+
+		$partial = self::src(__DIR__ . '/../../../templates/partials/projectcheck-linking-disabled-callout.php');
+		$this->assertStringContainsString('data-hint-dismiss="<?php p($hintId); ?>"', $partial);
+		$this->assertStringContainsString("\$hintId = 'dashboard-projectcheck-linking-off'", $partial);
+		$this->assertStringContainsString('azc-hint__dismiss', $partial);
+		$this->assertStringContainsString('Hide this help text permanently', $partial);
+		// Time-entry and edit keep the plain callout when the flag is off.
+		$this->assertStringContainsString('role="status"', $partial);
+
+		$js = self::src(__DIR__ . '/../../../js/arbeitszeitcheck-main.js');
+		$this->assertStringContainsString('this.initDismissibleHints()', $js);
+		$initPage = substr($js, (int)strpos($js, 'const initPage'), 600);
+		$this->assertStringContainsString('this.initDismissibleHints()', $initPage);
+	}
 }

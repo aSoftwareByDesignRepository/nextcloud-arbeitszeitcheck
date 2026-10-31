@@ -185,6 +185,7 @@ class PageControllerTest extends TestCase
 		$this->assertSame('dashboard', $params['pageId'] ?? null);
 		$this->assertNotEmpty($params['clientHints'] ?? null);
 		$this->assertIsArray($params['urls'] ?? null);
+		$this->assertIsArray($params['dismissedHints'] ?? null);
 	}
 
 	/**

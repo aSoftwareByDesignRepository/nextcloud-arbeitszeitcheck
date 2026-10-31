@@ -454,6 +454,25 @@
 	padding: var(--azc-space-5, 1.25rem) var(--azc-space-3, 0.75rem);
 }
 
+#app-content.azc-app .table td.azc-table-empty > .azc-empty-state,
+#app-content.azc-app .grid-table td.azc-table-empty > .azc-empty-state {
+	width: 100%;
+	max-width: 36rem;
+	margin-inline: auto;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+}
+
+#app-content.azc-app .table td.azc-table-empty .azc-empty-state__title,
+#app-content.azc-app .table td.azc-table-empty .azc-empty-state__text,
+#app-content.azc-app .grid-table td.azc-table-empty .azc-empty-state__title,
+#app-content.azc-app .grid-table td.azc-table-empty .azc-empty-state__text {
+	width: 100%;
+	margin-inline: auto;
+	text-align: center;
+}
+
 #app-content.azc-app .table .azc-table-actions,
 #app-content.azc-app .grid-table .azc-table-actions,
 #app-content.azc-app .table .admin-holidays__row-actions {
@@ -814,6 +833,22 @@
 		text-align: left;
 		font-weight: 600;
 		color: var(--azc-muted, var(--color-text-maxcontrast));
+	}
+
+	/* Card rows pin values to the right. An empty message is not a value. */
+	#app-content.azc-app .table.azc-table--responsive tbody td.azc-table-empty,
+	#app-content.azc-app .table.azc-table--responsive tbody td.azc-table-loading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		text-align: center;
+	}
+
+	#app-content.azc-app .table.azc-table--responsive tbody td.azc-table-empty::before,
+	#app-content.azc-app .table.azc-table--responsive tbody td.azc-table-loading::before {
+		content: none;
 	}
 
 	#app-content.azc-app .table.azc-table--responsive tbody td.description-cell,

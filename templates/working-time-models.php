@@ -63,8 +63,10 @@ $models = $_['models'] ?? [];
                 <tbody id="models-tbody">
                     <?php if (empty($models)): ?>
                         <tr>
-                            <td colspan="7" class="text-center">
-                                <?php p($l->t('No working time models available')); ?>
+                            <td colspan="7" class="azc-table-empty">
+                                <div class="azc-empty-state">
+                                    <h3 class="azc-empty-state__title"><?php p($l->t('No working time models available')); ?></h3>
+                                </div>
                             </td>
                         </tr>
                     <?php else: ?>

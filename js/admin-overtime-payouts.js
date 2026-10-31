@@ -158,10 +158,13 @@
 				eligible = Number(row.payout_eligible_hours || 0).toFixed(2);
 				const name = escapeHtml(row.display_name || row.user_id);
 				const hours = eligible;
+				const confirmLabel = i18n.confirmBtn || 'Confirm';
+				const confirmGlyph = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('check') : '';
 				action = '<div class="azc-table-actions" role="group" aria-label="' + escapeHtml(i18n.colActions || 'Actions') + '">'
-					+ '<button type="button" class="azc-btn azc-btn--primary azc-btn--sm ot-payout-one" data-user-id="'
-					+ escapeHtml(row.user_id) + '" data-name="' + name + '" data-hours="' + escapeHtml(hours) + '">'
-					+ escapeHtml(i18n.confirmBtn || 'Confirm') + '</button></div>';
+					+ '<button type="button" class="azc-btn azc-btn--primary azc-icon-btn ot-payout-one" data-user-id="'
+					+ escapeHtml(row.user_id) + '" data-name="' + name + '" data-hours="' + escapeHtml(hours) + '"'
+					+ ' aria-label="' + escapeHtml(confirmLabel) + '" title="' + escapeHtml(confirmLabel) + '">'
+					+ confirmGlyph + '</button></div>';
 			} else if (status === 'paid') {
 				paidH = Number(row.hours_paid || 0).toFixed(2);
 			}

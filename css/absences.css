@@ -1544,9 +1544,10 @@ html.entitlement-explain-page-locked .entitlement-explain-dialog__fallback-backd
 	box-sizing: border-box;
 }
 
-.btn-icon .icon {
-	width: 20px;
-	height: 20px;
+.btn-icon .icon,
+.btn-icon .azc-icon {
+	width: var(--azc-icon-md, 1.125rem);
+	height: var(--azc-icon-md, 1.125rem);
 	display: inline-block;
 }
 

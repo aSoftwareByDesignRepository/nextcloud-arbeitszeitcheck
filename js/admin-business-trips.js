@@ -292,8 +292,10 @@
 		inTarget.setAttribute('aria-label', t('Credits (h:mm)'));
 		const del = document.createElement('button');
 		del.type = 'button';
-		del.className = 'azc-btn azc-btn--icon';
-		del.textContent = t('Remove');
+		del.className = 'azc-btn azc-btn--danger azc-icon-btn';
+		del.setAttribute('aria-label', t('Remove'));
+		del.title = t('Remove');
+		del.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
 		del.addEventListener('click', () => { tr.remove(); runPreview(); });
 		inFrom.addEventListener('change', runPreview);
 		inTarget.addEventListener('change', runPreview);

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
 $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
@@ -258,9 +260,12 @@ $terminalRowIndex = 0;
 							<td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
 								<?php if ($canRevoke): ?>
 								<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
-									<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-revoke-terminal"
-										data-terminal-id="<?php p($tid); ?>">
-										<?php p($l->t('Revoke')); ?>
+									<?php $revokeLabel = $l->t('Revoke') . ': ' . (string)($t['label'] ?? ''); ?>
+									<button type="button" class="azc-btn azc-btn--danger azc-icon-btn azc-kiosk-revoke-terminal"
+										data-terminal-id="<?php p($tid); ?>"
+										aria-label="<?php p($revokeLabel); ?>"
+										title="<?php p($l->t('Revoke')); ?>">
+										<?php print_unescaped(IconCatalog::render('circle-x')); ?>
 									</button>
 								</div>
 								<?php else: ?>

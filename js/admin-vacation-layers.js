@@ -430,7 +430,7 @@
         <td data-label="${escape(t('Description', 'Description'))}">${escape(row.description || '')}</td>
         <td data-label="${escape(t('Actions', 'Actions'))}" class="actions-cell layer-card__history-actions">
           <div class="azc-table-actions" role="group" aria-label="${escape(t('Actions', 'Actions'))}">
-          <button type="button" class="azc-btn azc-btn--sm azc-btn--danger admin-vacation-layers__row-action" data-delete-org="${row.id}" aria-label="${escape(t('Delete organisation default', 'Delete organisation default'))} #${row.id}">${escape(t('Delete', 'Delete'))}</button>
+          <button type="button" class="azc-btn azc-btn--danger azc-icon-btn admin-vacation-layers__row-action" data-delete-org="${row.id}" aria-label="${escape(t('Delete organisation default', 'Delete organisation default'))} #${row.id}" title="${escape(t('Delete', 'Delete'))}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : ''}</button>
           </div>
         </td>
       </tr>
@@ -456,7 +456,7 @@
         <td data-label="${escape(t('Description', 'Description'))}">${escape(row.description || '')}</td>
         <td data-label="${escape(t('Actions', 'Actions'))}" class="actions-cell layer-card__history-actions">
           <div class="azc-table-actions" role="group" aria-label="${escape(t('Actions', 'Actions'))}">
-          <button type="button" class="azc-btn azc-btn--sm azc-btn--danger admin-vacation-layers__row-action" data-delete-model="${row.id}" aria-label="${escape(t('Delete model default', 'Delete model default'))} #${row.id}">${escape(t('Delete', 'Delete'))}</button>
+          <button type="button" class="azc-btn azc-btn--danger azc-icon-btn admin-vacation-layers__row-action" data-delete-model="${row.id}" aria-label="${escape(t('Delete model default', 'Delete model default'))} #${row.id}" title="${escape(t('Delete', 'Delete'))}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : ''}</button>
           </div>
         </td>
       </tr>
@@ -482,7 +482,7 @@
         <td data-label="${escape(t('Description', 'Description'))}">${escape(row.description || '')}</td>
         <td data-label="${escape(t('Actions', 'Actions'))}" class="actions-cell layer-card__history-actions">
           <div class="azc-table-actions" role="group" aria-label="${escape(t('Actions', 'Actions'))}">
-          <button type="button" class="azc-btn azc-btn--sm azc-btn--danger admin-vacation-layers__row-action" data-delete-team="${row.id}" aria-label="${escape(t('Delete team policy', 'Delete team policy'))} #${row.id}">${escape(t('Delete', 'Delete'))}</button>
+          <button type="button" class="azc-btn azc-btn--danger azc-icon-btn admin-vacation-layers__row-action" data-delete-team="${row.id}" aria-label="${escape(t('Delete team policy', 'Delete team policy'))} #${row.id}" title="${escape(t('Delete', 'Delete'))}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : ''}</button>
           </div>
         </td>
       </tr>

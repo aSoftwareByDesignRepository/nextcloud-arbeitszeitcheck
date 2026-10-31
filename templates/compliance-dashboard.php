@@ -398,10 +398,12 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                                                 <span class="badge badge--error"><?php p($l->t('Unresolved')); ?></span>
                                                 <?php if (!empty($violation['can_resolve']) && (string)($violation['id'] ?? '') !== ''): ?>
                                                     <button type="button"
-                                                        class="btn btn--sm btn--secondary"
+                                                        class="btn btn--sm btn--secondary azc-icon-btn"
                                                         id="btn-resolve-violation-<?php p((string)$violation['id']); ?>"
-                                                        data-violation-id="<?php p((string)$violation['id']); ?>">
-                                                        <?php p($l->t('Mark as fixed')); ?>
+                                                        data-violation-id="<?php p((string)$violation['id']); ?>"
+                                                        aria-label="<?php p($l->t('Mark as fixed')); ?>"
+                                                        title="<?php p($l->t('Mark as fixed')); ?>">
+                                                        <?php print_unescaped(IconCatalog::render('check')); ?>
                                                     </button>
                                                 <?php endif; ?>
                                             <?php endif; ?>

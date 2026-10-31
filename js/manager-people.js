@@ -290,15 +290,21 @@
 	function detailsCell(employee) {
 		const links = [];
 		const uid = employee.userId || '';
+		const name = employee.displayName || uid;
+		const glyph = (icon) => (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(icon) : '';
 		if (config.employeeAbsencesUrl) {
-			links.push('<a class="azc-btn azc-btn--secondary manager-people__action" href="'
-				+ escapeHtml(buildUrl(config.employeeAbsencesUrl, { employee_id: uid })) + '">'
-				+ escapeHtml(t('Absences', 'Absences')) + '</a>');
+			const label = t('Absences', 'Absences');
+			links.push('<a class="azc-btn azc-btn--secondary azc-icon-btn manager-people__action" href="'
+				+ escapeHtml(buildUrl(config.employeeAbsencesUrl, { employee_id: uid })) + '"'
+				+ ' aria-label="' + escapeHtml(label + ': ' + name) + '" title="' + escapeHtml(label) + '">'
+				+ glyph('calendar') + '</a>');
 		}
 		if (config.violationsUrl) {
-			links.push('<a class="azc-btn azc-btn--secondary manager-people__action" href="'
-				+ escapeHtml(buildUrl(config.violationsUrl, { userId: uid })) + '">'
-				+ escapeHtml(t('Violations', 'Violations')) + '</a>');
+			const label = t('Violations', 'Violations');
+			links.push('<a class="azc-btn azc-btn--secondary azc-icon-btn manager-people__action" href="'
+				+ escapeHtml(buildUrl(config.violationsUrl, { userId: uid })) + '"'
+				+ ' aria-label="' + escapeHtml(label + ': ' + name) + '" title="' + escapeHtml(label) + '">'
+				+ glyph('alert-triangle') + '</a>');
 		}
 		return '<span class="azc-table-actions">' + links.join('') + '</span>';
 	}

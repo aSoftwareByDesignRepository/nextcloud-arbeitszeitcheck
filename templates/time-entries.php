@@ -1053,47 +1053,48 @@ if ($mode === 'list') {
                                             // Rendered first and primary-styled so even keyboard/SR users land on it first.
                                             if ($isPaused):
                                             ?>
-                                                <button class="btn btn--sm btn--primary btn-complete-entry"
+                                                <button class="btn btn--sm btn--primary btn-complete-entry azc-icon-btn"
                                                     data-entry-id="<?php p($entry->getId()); ?>"
                                                     title="<?php p($l->t('Complete this paused session now. The end time will be set to when it was paused, and required breaks will be applied automatically.')); ?>"
                                                     type="button"
                                                     aria-label="<?php p($l->t('Complete this paused session')); ?>">
-                                                    <span class="btn__icon" aria-hidden="true"><?php print_unescaped(IconCatalog::render('check', 'btn__icon-svg')); ?></span>
-                                                    <?php p($l->t('Complete')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('check')); ?>
                                                 </button>
                                             <?php endif; ?>
                                             <?php
                                             if ($entry->getStatus() === \OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_PENDING_APPROVAL):
                                             ?>
-                                                <button class="btn btn--sm btn--secondary btn-cancel-correction"
+                                                <button class="btn btn--sm btn--secondary btn-cancel-correction azc-icon-btn"
                                                     data-entry-id="<?php p($entry->getId()); ?>"
                                                     type="button"
+                                                    title="<?php p($l->t('Withdraw')); ?>"
                                                     aria-label="<?php p($l->t('Withdraw pending correction')); ?>">
-                                                    <?php p($l->t('Withdraw')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('x')); ?>
                                                 </button>
                                             <?php endif; ?>
                                             <?php
                                             $canRequestCorrection = $entry->canRequestCorrection(\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS);
                                             if ($canRequestCorrection && !$entry->canEdit(\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS)):
                                             ?>
-                                                <button class="btn btn--sm btn--secondary btn-request-correction"
+                                                <button class="btn btn--sm btn--secondary btn-request-correction azc-icon-btn"
                                                     data-entry-id="<?php p($entry->getId()); ?>"
                                                     data-entry-summary="<?php echo $entrySummaryJson; ?>"
                                                     type="button"
+                                                    title="<?php p($l->t('Request correction')); ?>"
                                                     aria-label="<?php p($l->t('Request correction for manager approval')); ?>">
-                                                    <?php p($l->t('Request correction')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('file-text')); ?>
                                                 </button>
                                             <?php endif; ?>
                                             <?php
                                             $canEdit = $entry->canEdit(\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS);
                                             if ($canEdit):
                                             ?>
-                                                <button class="btn btn--sm btn--secondary btn-edit-entry"
+                                                <button class="btn btn--sm btn--secondary btn-edit-entry azc-icon-btn"
                                                     data-entry-id="<?php p($entry->getId()); ?>"
                                                     title="<?php p($isPaused ? $l->t('Edit start/end times and breaks for this paused session') : $l->t('Edit this time entry')); ?>"
                                                     type="button"
                                                     aria-label="<?php p($isPaused ? $l->t('Edit times for this paused time entry') : $l->t('Edit time entry')); ?>">
-                                                    <?php p($l->t('Edit')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('edit')); ?>
                                                 </button>
                                             <?php endif; ?>
                                             <?php
@@ -1117,7 +1118,7 @@ if ($mode === 'list') {
                                                     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
                                                 );
                                             ?>
-                                                <button class="btn btn--sm btn--danger btn-delete btn-delete-entry"
+                                                <button class="btn btn--sm btn--danger btn-delete btn-delete-entry azc-icon-btn"
                                                     data-entry-id="<?php p($entryId); ?>"
                                                     <?php if ($deleteWarningsJson !== false && $deleteWarningsJson !== '[]'): ?>
                                                     data-delete-warnings="<?php p($deleteWarningsJson); ?>"
@@ -1125,7 +1126,7 @@ if ($mode === 'list') {
                                                     title="<?php p($l->t('Delete this time entry permanently. This cannot be undone.')); ?>"
                                                     type="button"
                                                     aria-label="<?php p($l->t('Delete this time entry permanently')); ?>">
-                                                    <?php p($l->t('Delete')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('trash')); ?>
                                                 </button>
                                             <?php
                                             elseif (

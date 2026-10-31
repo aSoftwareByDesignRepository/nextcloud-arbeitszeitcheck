@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /**
  * Compliance violations template for arbeitszeitcheck app
  *
@@ -162,10 +164,12 @@ $colCount = $canSeeScope ? 6 : 5;
                                             <span class="badge badge--error"><?php p($l->t('Unresolved')); ?></span>
                                             <?php if (!empty($violation['can_resolve'])): ?>
                                                 <button type="button"
-                                                    class="btn btn--sm btn--secondary"
+                                                    class="btn btn--sm btn--secondary azc-icon-btn"
                                                     id="btn-resolve-violation-<?php p((string)($violation['id'] ?? '')); ?>"
-                                                    data-violation-id="<?php p((string)($violation['id'] ?? '')); ?>">
-                                                    <?php p($l->t('Mark as fixed')); ?>
+                                                    data-violation-id="<?php p((string)($violation['id'] ?? '')); ?>"
+                                                    aria-label="<?php p($l->t('Mark as fixed')); ?>"
+                                                    title="<?php p($l->t('Mark as fixed')); ?>">
+                                                    <?php print_unescaped(IconCatalog::render('check')); ?>
                                                 </button>
                                             <?php endif; ?>
                                         <?php endif; ?>

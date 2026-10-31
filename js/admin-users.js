@@ -507,19 +507,21 @@
                     const detailUrl = userDetailUrl(user.userId);
                     const name = user.displayName || user.userId;
                     return `<div class="user-actions azc-table-actions" role="group" aria-label="${Utils.escapeHtml(auMsg('actions', 'Actions') + ': ' + name)}">
-                        <a class="azc-btn azc-btn--sm azc-btn--ghost"
+                        <a class="azc-btn azc-btn--ghost azc-icon-btn"
                             href="${Utils.escapeHtml(detailUrl)}#assignment-history"
                             data-action="history-user"
                             data-user-id="${Utils.escapeHtml(user.userId)}"
-                            aria-label="${Utils.escapeHtml(auMsg('viewHistory', 'View history') + ': ' + name)}">
-                            ${Utils.escapeHtml(auMsg('history', 'History'))}
+                            aria-label="${Utils.escapeHtml(auMsg('viewHistory', 'View history') + ': ' + name)}"
+                            title="${Utils.escapeHtml(auMsg('history', 'History'))}">
+                            ${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('history') : ''}
                         </a>
-                        <a class="azc-btn azc-btn--sm azc-btn--secondary"
+                        <a class="azc-btn azc-btn--secondary azc-icon-btn"
                             href="${Utils.escapeHtml(detailUrl)}"
                             data-action="edit-user"
                             data-user-id="${Utils.escapeHtml(user.userId)}"
-                            aria-label="${Utils.escapeHtml(auMsg('editEmployee', 'Edit employee') + ': ' + name)}">
-                            ${Utils.escapeHtml(auMsg('edit', 'Edit'))}
+                            aria-label="${Utils.escapeHtml(auMsg('editEmployee', 'Edit employee') + ': ' + name)}"
+                            title="${Utils.escapeHtml(auMsg('edit', 'Edit'))}">
+                            ${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('edit') : ''}
                         </a>
                     </div>`;
                 })(), 'actions-cell')}

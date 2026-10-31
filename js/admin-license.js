@@ -272,6 +272,7 @@
 			seatEmpty.hidden = true;
 		}
 		const removeLabel = t('removeSeat', 'Remove');
+		const seatGlyph = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
 		const colEmployee = escapeAttr(t('colEmployee', 'Employee'));
 		const colUserId = escapeAttr(t('colUserId', 'User ID'));
 		const colAssigned = escapeAttr(t('colAssigned', 'Assigned'));
@@ -285,8 +286,8 @@
 				'<td data-label="' + colAssigned + '">' + escapeHtml(formatAssignedAt(seat.assignedAt)) + '</td>' +
 				'<td data-label="' + colActions + '" class="actions-cell">' +
 				'<div class="azc-table-actions" role="group" aria-label="' + colActions + '">' +
-				'<button type="button" class="azc-btn azc-btn--secondary azc-btn--small azc-seat-remove" data-user-id="' + escapeAttr(seat.userId) + '">' +
-				escapeHtml(removeLabel) + '</button></div></td>';
+				'<button type="button" class="azc-btn azc-btn--danger azc-icon-btn azc-seat-remove" data-user-id="' + escapeAttr(seat.userId) + '" aria-label="' + escapeAttr(removeLabel + ': ' + (seat.displayName || seat.userId || '')) + '" title="' + escapeAttr(removeLabel) + '">' +
+				seatGlyph + '</button></div></td>';
 			seatListBody.appendChild(tr);
 		});
 	}

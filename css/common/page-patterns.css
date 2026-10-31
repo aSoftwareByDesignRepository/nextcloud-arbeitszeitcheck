@@ -828,19 +828,31 @@
 	}
 
 	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .azc-table-actions {
-		width: 100%;
-		justify-content: stretch;
-		flex-direction: column;
+		width: auto;
+		align-self: flex-end;
+		justify-content: flex-end;
+		flex-direction: row;
+		flex-wrap: wrap;
 	}
 
-	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .azc-table-actions .btn,
-	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .btn,
-	#app-content.azc-app .table.azc-table--responsive tbody td.admin-ot-audit__actions .btn,
-	#app-content.azc-app .table.azc-table--responsive tbody td.admin-tariff-rules__row-actions .btn,
-	#app-content.azc-app .table.azc-table--responsive tbody td.layer-card__history-actions .btn {
+	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .azc-table-actions .btn:not(.azc-icon-btn),
+	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .btn:not(.azc-icon-btn),
+	#app-content.azc-app .table.azc-table--responsive tbody td.admin-ot-audit__actions .btn:not(.azc-icon-btn),
+	#app-content.azc-app .table.azc-table--responsive tbody td.admin-tariff-rules__row-actions .btn:not(.azc-icon-btn),
+	#app-content.azc-app .table.azc-table--responsive tbody td.layer-card__history-actions .btn:not(.azc-icon-btn) {
 		width: 100%;
 		justify-content: center;
 		min-height: 44px;
+	}
+
+	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .azc-icon-btn,
+	#app-content.azc-app .table.azc-table--responsive tbody td.admin-ot-audit__actions .azc-icon-btn,
+	#app-content.azc-app .table.azc-table--responsive tbody td.admin-tariff-rules__row-actions .azc-icon-btn,
+	#app-content.azc-app .table.azc-table--responsive tbody td.layer-card__history-actions .azc-icon-btn {
+		width: var(--azc-touch, 44px);
+		max-width: var(--azc-touch, 44px);
+		min-width: var(--azc-touch, 44px);
+		flex: 0 0 auto;
 	}
 
 	#app-content.azc-app .table.azc-table--responsive tbody td.actions-cell .btn-icon {

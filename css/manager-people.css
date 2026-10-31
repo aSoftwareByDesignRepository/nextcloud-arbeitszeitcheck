@@ -178,8 +178,15 @@
 		max-width: none;
 	}
 
-	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-table-actions,
-	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn {
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-table-actions {
+		width: auto;
+		align-self: flex-end;
+		justify-content: flex-end;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody td.actions-cell .azc-btn:not(.azc-icon-btn) {
 		width: 100%;
 		justify-content: center;
 		min-height: 44px;

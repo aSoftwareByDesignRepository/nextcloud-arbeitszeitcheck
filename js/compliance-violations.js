@@ -218,8 +218,9 @@
         };
 
         tbody.innerHTML = violations.map(v => {
+            const resolveLabel = cvT('Mark as fixed');
             const resolveBtn = (!v.resolved && v.can_resolve)
-                ? `<button type="button" class="btn btn--sm btn--secondary" id="btn-resolve-violation-${Utils.escapeHtml(String(v.id))}" data-violation-id="${Utils.escapeHtml(String(v.id))}">${Utils.escapeHtml(cvT('Mark as fixed'))}</button>`
+                ? `<button type="button" class="btn btn--sm btn--secondary azc-icon-btn" id="btn-resolve-violation-${Utils.escapeHtml(String(v.id))}" data-violation-id="${Utils.escapeHtml(String(v.id))}" aria-label="${Utils.escapeHtml(resolveLabel)}" title="${Utils.escapeHtml(resolveLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('check') : ''}</button>`
                 : '';
             const td = (label, html) => Utils.responsiveTd
                 ? Utils.responsiveTd(label, html)

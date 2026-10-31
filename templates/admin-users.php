@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 
 use OCA\ArbeitszeitCheck\Service\AdminEmployeeDirectoryService;
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
 use OCA\ArbeitszeitCheck\Util\TemplateL10n;
 
 /** @var array $_ */
@@ -226,21 +227,21 @@ $filterIntro = $isAccessRestricted
                                         </td>
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                             <div class="user-actions azc-table-actions" role="group" aria-label="<?php p($l->t('Actions for %s', [$user['displayName']])); ?>">
-                                                <a class="azc-btn azc-btn--sm azc-btn--ghost"
+                                                <a class="azc-btn azc-btn--ghost azc-icon-btn"
                                                         href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => $user['userId']])); ?>#assignment-history"
                                                         data-action="history-user"
                                                         data-user-id="<?php p($user['userId']); ?>"
                                                         aria-label="<?php p($l->t('View assignment history for %s', [$user['displayName']])); ?>"
                                                         title="<?php p($l->t('View model assignment history')); ?>">
-                                                    <?php p($l->t('History')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('history')); ?>
                                                 </a>
-                                                <a class="azc-btn azc-btn--sm azc-btn--secondary"
+                                                <a class="azc-btn azc-btn--secondary azc-icon-btn"
                                                         href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => $user['userId']])); ?>"
                                                         data-action="edit-user"
                                                         data-user-id="<?php p($user['userId']); ?>"
                                                         aria-label="<?php p($l->t('Edit this employee\'s work schedule')); ?>"
                                                         title="<?php p($l->t('Click to change this employee\'s work schedule or other settings')); ?>">
-                                                    <?php p($l->t('Edit')); ?>
+                                                    <?php print_unescaped(IconCatalog::render('edit')); ?>
                                                 </a>
                                             </div>
                                         </td>

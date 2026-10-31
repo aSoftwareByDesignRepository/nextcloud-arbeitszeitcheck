@@ -888,17 +888,23 @@
 
     #app-content.azc-app--time-entries .azc-row-actions__panel {
         display: none;
-        flex-direction: column;
-        align-items: stretch;
     }
 
     #app-content.azc-app--time-entries .azc-row-actions.is-open .azc-row-actions__panel {
         display: flex;
+        flex-flow: row wrap;
+        justify-content: flex-end;
     }
 
-    #app-content.azc-app--time-entries .azc-row-actions__panel .btn,
+    #app-content.azc-app--time-entries .azc-row-actions__panel .btn:not(.azc-icon-btn),
     #app-content.azc-app--time-entries .azc-row-actions__panel .azc-action-hint {
         width: 100%;
+    }
+
+    #app-content.azc-app--time-entries .azc-row-actions__panel .azc-icon-btn {
+        width: var(--azc-touch, 44px);
+        max-width: var(--azc-touch, 44px);
+        flex: 0 0 auto;
     }
 }
 

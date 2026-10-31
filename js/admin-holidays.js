@@ -621,16 +621,20 @@
         actionsCell.setAttribute('data-label', tAzc('Actions'));
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
-        saveBtn.className = 'azc-btn azc-btn--primary azc-btn--sm';
-        saveBtn.textContent = tAzc('Save');
+        saveBtn.className = 'azc-btn azc-btn--primary azc-icon-btn';
+        saveBtn.setAttribute('aria-label', tAzc('Save'));
+        saveBtn.title = tAzc('Save');
+        saveBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('check') : '';
         Utils.on(saveBtn, 'click', function() {
             saveHolidayRow(row);
         });
 
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
-        deleteBtn.className = 'azc-btn azc-btn--secondary azc-btn--sm';
-        deleteBtn.textContent = tAzc('Remove');
+        deleteBtn.className = 'azc-btn azc-btn--danger azc-icon-btn';
+        deleteBtn.setAttribute('aria-label', tAzc('Remove'));
+        deleteBtn.title = tAzc('Remove');
+        deleteBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
         Utils.on(deleteBtn, 'click', function() {
             row.remove();
         });
@@ -961,13 +965,14 @@
         {
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
-            deleteBtn.className = 'azc-btn azc-btn--secondary azc-btn--sm';
-            deleteBtn.textContent = tAzc('Remove');
+            deleteBtn.className = 'azc-btn azc-btn--danger azc-icon-btn';
+            deleteBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
             const labelTemplate = tAzc('Remove holiday {name} on {date}');
             const ariaLabel = labelTemplate
                 .replace('{name}', item.name || '')
                 .replace('{date}', displayDate || '');
             deleteBtn.setAttribute('aria-label', ariaLabel);
+            deleteBtn.title = ariaLabel;
             Utils.on(deleteBtn, 'click', function() {
                 confirmRemoveHoliday(item, row, displayDate);
             });

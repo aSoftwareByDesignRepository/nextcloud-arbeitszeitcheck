@@ -1079,6 +1079,35 @@ dialog .button.ghost,
 	}
 }
 
+/* Icon-only controls. The accessible name stays on aria-label / title.
+   Square 44px so a row of pen / bin / info buttons lines up. */
+#app-content.azc-app .azc-icon-btn,
+#app-content-wrapper .azc-icon-btn,
+.azc-nc-admin-settings .azc-icon-btn,
+.azc-nc-settings-panel .azc-icon-btn,
+.azc-app .btn.azc-icon-btn,
+.azc-dialog .azc-icon-btn,
+dialog .azc-icon-btn,
+[role="dialog"] .azc-icon-btn {
+	width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	max-width: var(--azc-touch, 44px);
+	min-height: var(--azc-touch, 44px);
+	padding: 0;
+	gap: 0;
+	flex: 0 0 auto;
+}
+
+#app-content.azc-app .azc-icon-btn .azc-icon,
+#app-content-wrapper .azc-icon-btn .azc-icon,
+.azc-nc-admin-settings .azc-icon-btn .azc-icon,
+.azc-app .btn.azc-icon-btn .azc-icon,
+.azc-dialog .azc-icon-btn .azc-icon {
+	width: var(--azc-icon-md, 1.125rem);
+	height: var(--azc-icon-md, 1.125rem);
+}
+
 #app-content.azc-app .azc-btn[aria-busy="true"],
 #app-content-wrapper .azc-btn[aria-busy="true"],
 .azc-nc-admin-settings .azc-btn[aria-busy="true"],

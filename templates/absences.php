@@ -947,24 +947,24 @@ if ($mode === 'list') {
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                             <div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
                                             <?php if (in_array($absence->getStatus(), ['pending', 'substitute_pending', 'substitute_declined'], true)): ?>
-                                                <button type="button" class="btn-icon btn-icon--edit" 
+                                                <button type="button" class="btn btn--sm btn--secondary azc-icon-btn btn-icon btn-icon--edit"
                                                         data-absence-id="<?php p($absence->getId()); ?>"
                                                         aria-label="<?php p($l->t('Edit this absence request')); ?>"
                                                         title="<?php p($l->t('Edit')); ?>">
-                                                    <span class="icon icon-rename" aria-hidden="true"></span>
+                                                    <?php print_unescaped(IconCatalog::render('edit')); ?>
                                                 </button>
-                                                <button type="button" class="btn-icon btn-icon--cancel" 
+                                                <button type="button" class="btn btn--sm btn--danger azc-icon-btn btn-icon btn-icon--cancel"
                                                         data-absence-id="<?php p($absence->getId()); ?>"
                                                         aria-label="<?php p($l->t('Cancel this absence request')); ?>"
                                                         title="<?php p($l->t('Cancel')); ?>">
-                                                    <span class="icon icon-delete" aria-hidden="true"></span>
+                                                    <?php print_unescaped(IconCatalog::render('trash')); ?>
                                                 </button>
                                             <?php else: ?>
-                                                <button type="button" class="btn-icon btn-icon--view" 
+                                                <button type="button" class="btn btn--sm btn--secondary azc-icon-btn btn-icon btn-icon--view"
                                                         data-absence-id="<?php p($absence->getId()); ?>"
                                                         aria-label="<?php p($l->t('View details of this absence')); ?>"
                                                         title="<?php p($l->t('View Details')); ?>">
-                                                    <span class="icon icon-details" aria-hidden="true"></span>
+                                                    <?php print_unescaped(IconCatalog::render('info')); ?>
                                                 </button>
                                             <?php endif; ?>
                                             </div>

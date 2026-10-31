@@ -34,6 +34,16 @@ class IconCatalogTest extends TestCase
 		$this->assertStringContainsString('m6 9 6 6 6-6', $chevron);
 	}
 
+	public function testTableActionIconsRenderHiddenGlyphs(): void
+	{
+		foreach (['edit', 'trash', 'info', 'copy', 'history', 'archive'] as $name) {
+			$svg = IconCatalog::render($name);
+			$this->assertNotSame('', $svg, $name);
+			$this->assertStringContainsString('aria-hidden="true"', $svg);
+			$this->assertStringContainsString('class="azc-icon"', $svg);
+		}
+	}
+
 	public function testRenderCalloutWellMapsErrorToDanger(): void
 	{
 		$html = IconCatalog::renderCalloutWell('circle-alert', 'error');

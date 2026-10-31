@@ -195,14 +195,17 @@
     border-right: 2px solid currentColor;
     border-bottom: 2px solid currentColor;
     transform: rotate(45deg);
-    transition: transform 0.2s ease;
-    margin-left: auto;
+    transform-origin: center;
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    margin-inline-start: auto;
     flex-shrink: 0;
     opacity: 0.7;
 }
 
-.nav-item-has-children.is-open .nav-parent-chevron {
-    transform: rotate(-135deg);
+/* Follow aria-expanded, which the toggle already updates. is-open stays on
+   the row for the current section and must not pin the chevron upward. */
+#app-navigation .nav-parent-toggle[aria-expanded="true"] .nav-parent-chevron {
+    transform: rotate(225deg);
     opacity: 1;
 }
 
@@ -565,6 +568,14 @@
     width: auto;
     max-width: none;
     text-align: left;
+}
+
+/* Accordion parents are <button>s. width:auto shrinks them to the label, so
+   hover stops early and the chevron sits beside the text. Links already fill
+   the row. Match that inset pill without width:100% (margin would overflow). */
+#content.app-arbeitszeitcheck #app-navigation .nav-menu > .nav-item-has-children > button.nav-parent-toggle {
+    width: calc(100% - (2 * var(--azc-nav-item-inset, 0.5rem)));
+    max-width: none;
 }
 
 #content.app-arbeitszeitcheck #app-navigation .nav-menu span:not(.nav-parent-chevron):not(.azc-nav__icon),

@@ -830,6 +830,21 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * One-sentence overview lead. The second sentence used to collapse into
+	 * "More help" under the title; this page does not show that disclosure.
+	 */
+	private function adminOverviewPageHelp(): string
+	{
+		$help = $this->l10n->t('Current key metrics and open working-time compliance issues. Detailed settings are available in the left navigation.');
+		$parts = preg_split('/(?<=[.!?])\s+/u', $help, 2);
+		if (is_array($parts) && ($parts[0] ?? '') !== '') {
+			return $parts[0];
+		}
+
+		return $help;
+	}
+
+	/**
 	 * Admin dashboard page (gated by AppAdminMiddleware / PermissionService::isAdmin)
 	 *
 	 */
@@ -885,8 +900,9 @@ class AdminController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'admin-dashboard', $this->buildAdminShellParams(
 				'admin-dashboard',
 				$this->l10n->t('Administration - Status'),
-				$this->l10n->t('Current key metrics and open working-time compliance issues. Detailed settings are available in the left navigation.'),
+				$this->adminOverviewPageHelp(),
 			) + [
+				'collapsePageHelp' => false,
 				'statistics' => [
 					'total_users' => $totalUsers,
 					'active_users_today' => $activeUsersToday,
@@ -907,8 +923,9 @@ class AdminController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'admin-dashboard', $this->buildAdminShellParams(
 				'admin-dashboard',
 				$this->l10n->t('Administration - Status'),
-				$this->l10n->t('Current key metrics and open working-time compliance issues. Detailed settings are available in the left navigation.'),
+				$this->adminOverviewPageHelp(),
 			) + [
+				'collapsePageHelp' => false,
 				'statistics' => [
 					'total_users' => 0,
 					'active_users_today' => 0,

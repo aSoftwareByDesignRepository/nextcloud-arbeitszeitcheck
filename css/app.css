@@ -5,8 +5,8 @@
 @import url('common/tokens.css?v=20261019-tint');
 @import url('common/icons.css');
 @import url('common/colors.css');
-@import url('common/typography.css');
-@import url('common/base.css');
+@import url('common/typography.css?v=20261031-tile');
+@import url('common/base.css?v=20261031-tile');
 @import url('common/components.css');
 @import url('common/user-picker.css');
 @import url('common/layout.css');
@@ -18,7 +18,7 @@
 @import url('common/utilities.css');
 @import url('common/responsive.css');
 @import url('common/mobile-nav.css');
-@import url('common/accessibility.css');
+@import url('common/accessibility.css?v=20261031-tile');
 @import url('common/semantic-surfaces.css');
 @import url('common/callout-banner.css');
 @import url('common/legacy-alert.css');

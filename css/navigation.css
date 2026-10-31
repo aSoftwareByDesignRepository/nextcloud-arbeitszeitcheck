@@ -99,6 +99,12 @@
     overflow-y: auto;
 }
 
+/* Set only when a saved scroll exists, and only until the inline script
+   applies it. A visit that starts at the top never blanks the menu. */
+html.azc-nav-scroll-pending #app-navigation .nav-menu {
+    visibility: hidden;
+}
+
 .nav-menu li {
     margin: 0;
     padding: 0;

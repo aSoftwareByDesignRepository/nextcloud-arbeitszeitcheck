@@ -23,6 +23,8 @@
         return fallback;
     }
 
+    const NAV_SCROLL_KEY = 'azc-nav-menu-scroll';
+
     const Navigation = {
         menuNav: null,
 
@@ -34,6 +36,78 @@
 
             this.setupSubmenuToggles();
             this.setupAccessibility();
+            this.rememberScrollOnNavigate();
+            this.restoreScroll();
+        },
+
+        /**
+         * The scrolling box is the menu list, not #app-navigation (that one
+         * clips). A full page load otherwise resets it to the top.
+         */
+        scrollport() {
+            const menu = this.menuNav.querySelector('.nav-menu');
+            return menu || this.menuNav;
+        },
+
+        rememberScrollOnNavigate() {
+            this.menuNav.addEventListener('click', (e) => {
+                const link = e.target && e.target.closest ? e.target.closest('a') : null;
+                if (!link || !link.closest('.nav-menu')) {
+                    return;
+                }
+                this.rememberScroll();
+            });
+        },
+
+        rememberScroll() {
+            const el = this.scrollport();
+            if (!el) {
+                return;
+            }
+            try {
+                sessionStorage.setItem(NAV_SCROLL_KEY, String(el.scrollTop || 0));
+            } catch (e) {
+                // Private mode or a full quota — the next page just starts at the top.
+            }
+        },
+
+        restoreScroll() {
+            const el = this.scrollport();
+            if (!el) {
+                document.documentElement.classList.remove('azc-nav-scroll-pending');
+                return;
+            }
+            // The template applies this before first paint. Running it again
+            // after DOMContentLoaded is what flashed the top of the menu.
+            if (el.dataset.azcNavScrollReady === '1') {
+                document.documentElement.classList.remove('azc-nav-scroll-pending');
+                return;
+            }
+            let saved = 0;
+            try {
+                saved = Number(sessionStorage.getItem(NAV_SCROLL_KEY));
+            } catch (e) {
+                saved = 0;
+            }
+            if (Number.isFinite(saved) && saved > 0) {
+                el.scrollTop = saved;
+            }
+            const current = this.menuNav.querySelector(
+                '.nav-menu a[aria-current="page"], .nav-menu li.active > a'
+            );
+            if (current && typeof current.getBoundingClientRect === 'function') {
+                const view = el.getBoundingClientRect();
+                const item = current.getBoundingClientRect();
+                if (view && item && view.height > 0) {
+                    if (item.top < view.top) {
+                        el.scrollTop -= (view.top - item.top);
+                    } else if (item.bottom > view.bottom) {
+                        el.scrollTop += (item.bottom - view.bottom);
+                    }
+                }
+            }
+            el.dataset.azcNavScrollReady = '1';
+            document.documentElement.classList.remove('azc-nav-scroll-pending');
         },
 
         setupSubmenuToggles() {

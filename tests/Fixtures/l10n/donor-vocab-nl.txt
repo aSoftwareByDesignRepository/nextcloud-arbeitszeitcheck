@@ -4881,7 +4881,6 @@ koers
 koeweit
 kogel
 kogellijst
-kokregistraties
 kollegenplan
 kolom
 kolomkoppen

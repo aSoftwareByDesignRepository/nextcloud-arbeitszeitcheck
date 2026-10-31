@@ -237,6 +237,7 @@ eksempel
 eksisterende
 eksisterer
 ekskl
+ekskluderer
 eksperimentel
 eksport
 eksporten
@@ -311,10 +312,13 @@ ferieberegningstilstand
 ferieberettigelseslagene
 ferieberettigelseslaget
 feriedag
+feriedagene
+feriefravær
 ferien
 ferieopdeling
 ferieoverførsel
 feriepuljer
+ferier
 ferieregel
 ferieregler
 ferierett
@@ -475,6 +479,7 @@ glemt
 glemte
 globale
 globalt
+godskrevet
 godskrive
 godskriver
 gratis
@@ -780,6 +785,7 @@ luzern
 lytte
 låser
 løbende
+lønnede
 lønnen
 lørdag
 lørdags
@@ -827,6 +833,7 @@ mindre
 minimal
 minimale
 minimumspauser
+minustimer
 minut
 minutes
 minutter
@@ -852,6 +859,7 @@ mulig
 muligvis
 måles
 målområdet
+måltid
 måned
 måneden
 månedens
@@ -874,6 +882,7 @@ nedarv
 nedenfor
 nederst
 nedgang
+nedgradering
 nedre
 nedtonede
 negativ

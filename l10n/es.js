@@ -3952,7 +3952,7 @@
 		"Rest \/ private time" : "Tiempo de descanso \/ privado",
 		"Rest period validation failed." : "Falló la validación del periodo de descanso.",
 		"Restricted — only allow-listed users and groups can open the app" : "Restringida — solo usuarios y grupos en la lista de permitidos pueden abrir la app",
-		"Resturlaub" : "Resturlaub",
+		"Resturlaub" : "Vacaciones restantes",
 		"Result" : "Resultado",
 		"Results pagination" : "Paginación de resultados",
 		"Resume after break" : "Reanudar tras la pausa",

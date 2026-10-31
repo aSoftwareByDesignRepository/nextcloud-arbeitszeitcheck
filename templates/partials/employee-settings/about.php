@@ -26,6 +26,7 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 		</div>
 	</header>
 	<div class="azc-card__body">
+		<?php include __DIR__ . '/_section-intro.php'; ?>
 		<div class="azc-callout azc-callout--neutral" role="note">
 			<p class="azc-callout__text"><strong><?php p((string)($complianceProfile['lawName'] ?? $l->t('German Labor Law (Arbeitszeitgesetz - ArbZG)'))); ?></strong></p>
 			<ul class="settings-callout-list">
@@ -39,26 +40,6 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 				<?php endif; ?>
 				<li><?php p((string)($complianceProfile['sundayNote'] ?? $l->t('Sunday work is generally prohibited with exceptions'))); ?></li>
 			</ul>
-		</div>
-
-		<?php
-		$azcDismissedCount = count(is_array($_['dismissedHints'] ?? null) ? $_['dismissedHints'] : []);
-		?>
-		<div class="settings-about-hints" aria-labelledby="settings-hints-heading">
-			<h3 id="settings-hints-heading" class="settings-about-version__title"><?php p($l->t('Help texts')); ?></h3>
-			<p class="settings-version-line"><?php p($l->t('Help texts you hid on pages stay hidden until you show them again here or use "Show hint" where they appear.')); ?></p>
-			<button type="button"
-				id="btn-show-all-hints"
-				class="azc-btn azc-btn--secondary azc-btn--small"
-				<?php echo $azcDismissedCount === 0 ? 'disabled' : ''; ?>
-				aria-describedby="show-all-hints-status">
-				<?php p($l->t('Show all help texts again')); ?>
-			</button>
-			<p id="show-all-hints-status" class="settings-version-line" aria-live="polite">
-				<?php if ($azcDismissedCount > 0): ?>
-					<?php p($l->n('%n help text hidden.', '%n help texts hidden.', $azcDismissedCount)); ?>
-				<?php endif; ?>
-			</p>
 		</div>
 
 		<div class="settings-about-version" aria-labelledby="settings-version-heading">

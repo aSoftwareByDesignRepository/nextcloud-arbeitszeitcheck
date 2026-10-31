@@ -1325,7 +1325,7 @@ class PageController extends Controller
 			$shell = $this->buildShellParams(
 				'settings',
 				$catalog->label($this->l10n, $section),
-				$catalog->help($this->l10n, $section),
+				'',
 				$navFlags,
 			);
 			// SETTINGS-PAGES-STANDARD §7: App → My settings (link) → section
@@ -1359,7 +1359,7 @@ class PageController extends Controller
 			$shell = $this->buildShellParams(
 				'settings',
 				$catalog->label($this->l10n, $section),
-				$catalog->help($this->l10n, $section),
+				'',
 				$navFlags,
 			);
 			$shell['breadcrumbSection'] = '';

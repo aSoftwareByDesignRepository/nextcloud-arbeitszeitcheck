@@ -25,7 +25,7 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('page#settingsSection', $routes);
 		$this->assertStringContainsString('/settings/{section}', $routes);
 		$this->assertStringContainsString('EmployeeSettingsSectionCatalog::routeRequirement()', $routes);
-		$this->assertSame('breaks|notifications|data-privacy|about', $req);
+		$this->assertSame('breaks|notifications|data-privacy|help-texts|about', $req);
 	}
 
 	public function testTopicGroupsCoverEverySectionOnce(): void
@@ -50,8 +50,10 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString("preg_match('#/apps/arbeitszeitcheck/settings", $nav);
 		$chipNav = file_get_contents(dirname(__DIR__, 3) . '/templates/common/azc-employee-settings-nav.php');
 		$this->assertNotFalse($chipNav);
-		$this->assertStringContainsString('azc-settings-nav__group', $chipNav);
-		$this->assertStringContainsString('Choose a topic', $chipNav);
+		$this->assertStringContainsString('azc-settings-nav__chips', $chipNav);
+		$this->assertStringNotContainsString('azc-settings-nav__group', $chipNav);
+		$this->assertStringNotContainsString('azc-settings-nav__title', $chipNav);
+		$this->assertStringNotContainsString('Choose a topic', $chipNav);
 	}
 
 	public function testDispatcherLiteralMapCoversEverySection(): void
@@ -84,6 +86,7 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 			'settings-notifications-heading' => EmployeeSettingsSectionCatalog::SECTION_NOTIFICATIONS,
 			'settings-data-privacy' => EmployeeSettingsSectionCatalog::SECTION_DATA_PRIVACY,
 			'settings-privacy-heading' => EmployeeSettingsSectionCatalog::SECTION_DATA_PRIVACY,
+			'settings-hints-heading' => EmployeeSettingsSectionCatalog::SECTION_HELP_TEXTS,
 			'settings-compliance-heading' => EmployeeSettingsSectionCatalog::SECTION_ABOUT,
 			'settings-version-heading' => EmployeeSettingsSectionCatalog::SECTION_ABOUT,
 		];
@@ -111,6 +114,23 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 		$this->assertNotFalse($css);
 		$this->assertStringNotContainsString('#0082c9', $css);
 		$this->assertStringContainsString('azc-settings-nav__link', $css);
+		$this->assertMatchesRegularExpression(
+			'/azc-employee-settings-pages a\.azc-settings-nav__link[^{]*\{[^}]*text-decoration:\s*none/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/azc-employee-settings-pages a\.azc-settings-nav__link\.is-active[^{]*\{[^}]*border-bottom-color:\s*var\(--color-primary-element\)/s',
+			$css
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/azc-employee-settings-pages a\.azc-settings-nav__link[^{]*\{[^}]*text-decoration:\s*underline/s',
+			$css
+		);
+		$this->assertStringContainsString('scrollbar-gutter: stable', $css);
+		$this->assertMatchesRegularExpression(
+			'/azc-card__header--page-title-only[^{]*\{[^}]*display:\s*contents/s',
+			$css
+		);
 	}
 
 	public function testPersonalPanelDeepLinksToCatalogSections(): void
@@ -145,5 +165,37 @@ class EmployeeSettingsSectionCatalogContractTest extends TestCase
 			$catalog->legacyRedirectTarget($urlGenerator, 'settings-version-heading')
 		);
 		$this->assertNull($catalog->legacyRedirectTarget($urlGenerator, 'never-an-anchor'));
+		$this->assertSame(
+			'/settings/help-texts#settings-hints-heading',
+			$catalog->legacyRedirectTarget($urlGenerator, 'settings-hints-heading')
+		);
+	}
+
+	public function testHelpTextsLeaveAboutAndCanHideEveryKnownHint(): void
+	{
+		$root = dirname(__DIR__, 3);
+		$about = (string)file_get_contents($root . '/templates/partials/employee-settings/about.php');
+		$help = (string)file_get_contents($root . '/templates/partials/employee-settings/help-texts.php');
+		$this->assertStringNotContainsString('btn-hide-all-hints', $about);
+		$this->assertStringNotContainsString('btn-show-all-hints', $about);
+		$this->assertStringContainsString('btn-hide-all-hints', $help);
+		$this->assertStringContainsString('Hide all help texts', $help);
+		$this->assertStringContainsString('%n of %s help text is shown.', $help);
+		$this->assertStringContainsString('DismissedHintCatalog::IDS', $help);
+		$this->assertSame(
+			[
+				'absence-past-entry-hint',
+				'dashboard-projectcheck-linking-off',
+				'time-entries-export-hint',
+			],
+			\OCA\ArbeitszeitCheck\Support\DismissedHintCatalog::IDS
+		);
+		$templates = $about;
+		foreach (['templates/absences.php', 'templates/time-entries.php', 'templates/partials/projectcheck-linking-disabled-callout.php'] as $rel) {
+			$templates .= (string)file_get_contents($root . '/' . $rel);
+		}
+		foreach (\OCA\ArbeitszeitCheck\Support\DismissedHintCatalog::IDS as $id) {
+			$this->assertStringContainsString($id, $templates);
+		}
 	}
 }

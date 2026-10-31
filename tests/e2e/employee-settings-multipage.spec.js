@@ -8,13 +8,14 @@ const SECTIONS = [
 	{ id: 'breaks', marker: '#hours-display' },
 	{ id: 'notifications', marker: '#notifications-enabled' },
 	{ id: 'data-privacy', marker: '#btn-gdpr-delete' },
+	{ id: 'help-texts', marker: '#btn-hide-all-hints' },
 	{ id: 'about', marker: '#settings-compliance-heading' },
 ]
 
 test.describe('Employee My settings multipage', () => {
 	test.skip(!process.env.NC_EMPLOYEE_USER, 'Requires NC_EMPLOYEE_USER')
 
-	test('clear hierarchy: one sidebar item + grouped topic chips', async ({ page }) => {
+	test('clear hierarchy: one sidebar item + one row of topic tabs', async ({ page }) => {
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await page.goto('/apps/arbeitszeitcheck/settings')
 		await page.waitForURL(/\/settings\/breaks/)
@@ -26,8 +27,9 @@ test.describe('Employee My settings multipage', () => {
 		).toBeVisible()
 
 		const topics = page.locator('#azc-employee-settings-pages')
-		await expect(topics.locator('.azc-settings-nav__title')).toBeVisible()
-		await expect(topics.locator('.azc-settings-nav__group')).toHaveCount(2)
+		await expect(topics.locator('.azc-settings-nav__title')).toHaveCount(0)
+		await expect(topics.locator('.azc-settings-nav__group')).toHaveCount(0)
+		await expect(topics.locator('.azc-settings-nav__group-label')).toHaveCount(0)
 		await expect(topics.locator('.azc-settings-nav__link')).toHaveCount(SECTIONS.length)
 		await expect(topics.locator('.azc-settings-nav__link.is-active')).toHaveAttribute('aria-current', 'page')
 

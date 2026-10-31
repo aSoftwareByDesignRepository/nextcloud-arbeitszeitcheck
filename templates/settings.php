@@ -21,7 +21,11 @@ $complianceProfile = is_array($_['complianceProfile'] ?? null) ? $_['complianceP
 $settingsSection = (string)($_['settingsSection'] ?? \OCA\ArbeitszeitCheck\Service\EmployeeSettingsSectionCatalog::DEFAULT_SECTION);
 $settingsPages = is_array($_['settingsPages'] ?? null) ? $_['settingsPages'] : [];
 $sectionFiles = \OCA\ArbeitszeitCheck\Service\EmployeeSettingsSectionCatalog::SECTION_FILES;
-// Shell owns H1/lead — hide duplicate card titles (design-system §14).
+// Shell H1 stays the section name. The section sentence lives in the card so
+// the header and topic row keep the same height on every tab.
+$settingsSectionHelp = (new \OCA\ArbeitszeitCheck\Service\EmployeeSettingsSectionCatalog())
+	->help($l, $settingsSection);
+// Shell owns H1 — hide duplicate card titles (design-system §14).
 $azcSettingsShowCardChrome = false;
 ?>
 

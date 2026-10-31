@@ -6,6 +6,11 @@
  * @license AGPL-3.0-or-later
  */
 
+/* Keep a scrollbar gutter so short and tall topics do not shift sideways. */
+#app-content.azc-app--settings {
+	scrollbar-gutter: stable;
+}
+
 #app-content.azc-app--settings .settings-container {
 	display: flex;
 	flex-direction: column;
@@ -15,90 +20,74 @@
 	min-width: 0;
 }
 
-/* SETTINGS-PAGES-STANDARD chip bar — grouped topics */
+/* One row of topic tabs. Underline only the active topic. */
 #app-content.azc-app--settings .azc-settings-nav {
-	display: flex;
-	flex-direction: column;
-	gap: var(--azc-space-4);
 	margin: 0 0 var(--azc-space-2);
-	padding: 0 0 var(--azc-space-4);
-	border-bottom: 1px solid var(--azc-border, var(--color-border));
+	padding: 0;
 	width: 100%;
-}
-
-#app-content.azc-app--settings .azc-settings-nav__title {
-	margin: 0;
-	font-size: var(--azc-fs-sm);
-	font-weight: 700;
-	line-height: var(--azc-line-tight, 1.2);
-	color: var(--azc-text, var(--color-main-text));
-}
-
-#app-content.azc-app--settings .azc-settings-nav__group {
-	display: flex;
-	flex-direction: column;
-	gap: var(--azc-space-2);
 	min-width: 0;
-}
-
-#app-content.azc-app--settings .azc-settings-nav__group-label {
-	margin: 0;
-	font-size: var(--azc-fs-xs);
-	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
 #app-content.azc-app--settings .azc-settings-nav__chips {
 	display: flex;
-	flex-wrap: wrap;
-	gap: var(--azc-space-2);
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: var(--azc-space-4);
+	width: 100%;
+	min-width: 0;
+	overflow-x: auto;
 }
 
-#app-content.azc-app--settings .azc-settings-nav__link {
+/* Beat #app-content-wrapper a:not(.btn):not(.azc-btn) { text-decoration: underline }. */
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link,
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link:hover,
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link:focus {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	flex: 0 0 auto;
 	min-height: var(--azc-touch, 44px);
 	min-width: var(--azc-touch, 44px);
-	padding: var(--azc-space-2) var(--azc-space-3);
-	border: 1px solid var(--azc-border);
-	border-radius: var(--azc-radius-sm);
-	background: var(--azc-bg-card);
-	color: var(--azc-text, var(--color-main-text)) !important;
+	padding: var(--azc-space-2) var(--azc-space-1);
+	border: 0;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	color: var(--azc-text, var(--color-main-text));
 	text-decoration: none;
 	font-weight: 600;
 	font-size: var(--azc-fs-sm);
 	line-height: 1.2;
+	box-shadow: none;
 }
 
-#app-content.azc-app--settings .azc-settings-nav__link:hover {
-	border-color: var(--color-primary-element);
-	background: var(--azc-bg-soft);
-	color: var(--azc-text, var(--color-main-text));
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link:hover {
+	color: var(--color-primary-element);
 	text-decoration: none;
+	border-bottom-color: transparent;
 }
 
-#app-content.azc-app--settings .azc-settings-nav__link:focus-visible {
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link:focus-visible {
 	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
 	outline-offset: 2px;
 }
 
-#app-content.azc-app--settings .azc-settings-nav__link.is-active,
-#app-content.azc-app--settings .azc-settings-nav__link[aria-current="page"] {
-	border-color: var(--color-primary-element);
-	background: var(--azc-tint-info, color-mix(in srgb, var(--color-primary-element) 16%, var(--color-main-background)));
-	color: var(--azc-text, var(--color-main-text)) !important;
-	font-weight: 700;
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link.is-active,
+#app-content.azc-app--settings #azc-employee-settings-pages a.azc-settings-nav__link[aria-current="page"] {
+	border-bottom-color: var(--color-primary-element);
+	background: transparent;
+	color: var(--azc-text, var(--color-main-text));
+	text-decoration: none;
+	font-weight: 600;
 }
 
-#app-content.azc-app--settings .azc-card__header--page-title-only {
-	padding-block-end: 0;
-	min-height: 0;
-}
-
+/* The page H1 already names the topic. Drop the empty soft header band. */
+#app-content.azc-app--settings .azc-card__header--page-title-only,
 #app-content.azc-app--settings .azc-card__header--page-title-only .azc-card__header-text {
+	display: contents;
+}
+
+#app-content.azc-app--settings .settings-section__intro {
 	margin: 0;
 }
 
@@ -232,28 +221,29 @@
 	margin: 0;
 }
 
-#app-content.azc-app--settings .settings-privacy-actions .azc-btn {
+#app-content.azc-app--settings .settings-privacy-actions .azc-btn,
+#app-content.azc-app--settings .settings-help-texts__actions .azc-btn {
 	min-height: 44px;
 }
 
+#app-content.azc-app--settings .settings-help-texts__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+	margin: 0;
+}
+
 @media (max-width: 639.98px) {
-	#app-content.azc-app--settings .azc-settings-nav__chips {
-		flex-direction: column;
-	}
-
-	#app-content.azc-app--settings .azc-settings-nav__link {
-		width: 100%;
-		justify-content: flex-start;
-	}
-
 	#app-content.azc-app--settings .settings-form__actions,
-	#app-content.azc-app--settings .settings-privacy-actions {
+	#app-content.azc-app--settings .settings-privacy-actions,
+	#app-content.azc-app--settings .settings-help-texts__actions {
 		flex-direction: column;
 		align-items: stretch;
 	}
 
 	#app-content.azc-app--settings .settings-form__actions .azc-btn,
-	#app-content.azc-app--settings .settings-privacy-actions .azc-btn {
+	#app-content.azc-app--settings .settings-privacy-actions .azc-btn,
+	#app-content.azc-app--settings .settings-help-texts__actions .azc-btn {
 		width: 100%;
 		min-width: 0;
 		justify-content: center;

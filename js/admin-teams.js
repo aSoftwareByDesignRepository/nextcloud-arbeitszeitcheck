@@ -227,7 +227,8 @@
         });
     }
 
-    function selectTeam(id) {
+    function selectTeam(id, options) {
+        const announce = !options || options.announce !== false;
         selectedTeamId = id;
         const detail = document.getElementById('admin-team-detail');
         const nameEl = document.getElementById('team-detail-name');
@@ -242,7 +243,9 @@
         showTab('members');
         loadTeamMembers(id);
         loadTeamManagers(id);
-        announceStatus(t('Unit selected', 'Unit selected'));
+        if (announce) {
+            announceStatus(t('Unit selected', 'Unit selected'));
+        }
     }
 
     function findTeamById(nodes, id) {
@@ -255,14 +258,24 @@
         return null;
     }
 
-    function showTab(tab) {
+    function showTab(tab, options) {
         const membersTab = document.getElementById('tab-members');
         const managersTab = document.getElementById('tab-managers');
         const membersPanel = document.getElementById('panel-members');
         const managersPanel = document.getElementById('panel-managers');
         const isMembers = tab === 'members';
-        if (membersTab) { membersTab.setAttribute('aria-selected', isMembers ? 'true' : 'false'); }
-        if (managersTab) { managersTab.setAttribute('aria-selected', !isMembers ? 'true' : 'false'); }
+        if (membersTab) {
+            membersTab.setAttribute('aria-selected', isMembers ? 'true' : 'false');
+            membersTab.tabIndex = isMembers ? 0 : -1;
+        }
+        if (managersTab) {
+            managersTab.setAttribute('aria-selected', !isMembers ? 'true' : 'false');
+            managersTab.tabIndex = isMembers ? -1 : 0;
+        }
+        if (options && options.focus) {
+            const active = isMembers ? membersTab : managersTab;
+            if (active) active.focus();
+        }
         if (membersPanel) {
             membersPanel.classList.toggle('hidden', !isMembers);
             membersPanel.hidden = !isMembers;
@@ -284,15 +297,14 @@
                 if (data.success && data.teams) {
                     teamsTreeData = data.teams;
                     renderTree(data.teams);
-                    if (selectedTeamId) {
-                        const stillExists = findTeamById(data.teams, selectedTeamId);
-                        if (!stillExists) {
-                            selectedTeamId = null;
-                            const detail = document.getElementById('admin-team-detail');
-                            if (detail) detail.classList.add('hidden');
-                        } else {
-                            selectTeam(selectedTeamId);
-                        }
+                    const keep = selectedTeamId && findTeamById(data.teams, selectedTeamId);
+                    const nextId = keep ? selectedTeamId : (data.teams[0] ? data.teams[0].id : null);
+                    if (nextId !== null && nextId !== undefined) {
+                        selectTeam(nextId, { announce: false });
+                    } else {
+                        selectedTeamId = null;
+                        const detail = document.getElementById('admin-team-detail');
+                        if (detail) detail.classList.add('hidden');
                     }
                 } else {
                     setEmpty(true);
@@ -891,16 +903,25 @@
         if (addTeamBtn) addTeamBtn.addEventListener('click', function() { openAddTeamModal(null); });
         var tabMembers = document.getElementById('tab-members');
         var tabManagers = document.getElementById('tab-managers');
-        if (tabMembers) tabMembers.addEventListener('click', function() { showTab('members'); });
-        if (tabManagers) tabManagers.addEventListener('click', function() { showTab('managers'); });
-        var addMemberBtn = document.getElementById('team-add-member');
-        if (addMemberBtn) addMemberBtn.addEventListener('click', function() {
-            if (selectedTeamId) openAddMemberModal(selectedTeamId);
-        });
-        var addManagerBtn = document.getElementById('team-add-manager');
-        if (addManagerBtn) addManagerBtn.addEventListener('click', function() {
-            if (selectedTeamId) openAddManagerModal(selectedTeamId);
-        });
+        function onTabKey(event, name) {
+            var next = null;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                next = name === 'members' ? 'managers' : 'members';
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                next = name === 'members' ? 'managers' : 'members';
+            }
+            if (!next) return;
+            event.preventDefault();
+            showTab(next, { focus: true });
+        }
+        if (tabMembers) {
+            tabMembers.addEventListener('click', function() { showTab('members'); });
+            tabMembers.addEventListener('keydown', function(event) { onTabKey(event, 'members'); });
+        }
+        if (tabManagers) {
+            tabManagers.addEventListener('click', function() { showTab('managers'); });
+            tabManagers.addEventListener('keydown', function(event) { onTabKey(event, 'managers'); });
+        }
         var addMembersBulkBtn = document.getElementById('team-add-members-bulk');
         if (addMembersBulkBtn) addMembersBulkBtn.addEventListener('click', function() {
             if (selectedTeamId) openBulkAddTeamPeopleModal(selectedTeamId, 'member');
@@ -923,9 +944,7 @@
         const modalId = isMember ? 'modal-bulk-add-members' : 'modal-bulk-add-managers';
         const formId = isMember ? 'form-bulk-add-members' : 'form-bulk-add-managers';
         const prefix = isMember ? 'bulk-member' : 'bulk-manager';
-        const title = isMember
-            ? t('Add several people…', 'Add several people…')
-            : t('Add several managers…', 'Add several managers…');
+        const title = t('Add people', 'Add people');
         // Same id as selectTeam() / templates/admin-teams.php (#team-detail-name).
         // Wrong id left confirm copy without the unit name (Atlas UX-R8-03 class).
         const teamName = (document.getElementById('team-detail-name') || {}).textContent || '';
@@ -946,6 +965,7 @@
                     + '<label for="' + prefix + '-search" class="form-label">' + esc(t('Find people', 'Find people')) + '</label>'
                     + '<input type="search" id="' + prefix + '-search" class="form-input" autocomplete="off"'
                     + ' placeholder="' + esc(t('Search by name or login…', 'Search by name or login…')) + '">'
+                    + '<ul id="' + prefix + '-selected" class="team-bulk-selected" hidden aria-label="' + esc(t('Selected people', 'Selected people')) + '"></ul>'
                     + '<div id="' + prefix + '-results" class="team-bulk-results" role="group" aria-label="' + esc(t('Matching users', 'Matching users')) + '"></div>'
                     + '<p id="' + prefix + '-status" class="azc-sr-only" role="status" aria-live="polite"></p>'
                     + '</div>'
@@ -981,67 +1001,125 @@
                     });
                 }
 
-                const selected = new Map();
+                const selectionApi = (typeof window !== 'undefined' && window.ArbeitszeitCheckTeamBulkSelection)
+                    ? window.ArbeitszeitCheckTeamBulkSelection
+                    : null;
+                const selection = selectionApi
+                    ? selectionApi.createBulkPeopleSelection()
+                    : null;
                 const resultsEl = document.getElementById(prefix + '-results');
+                const selectedEl = document.getElementById(prefix + '-selected');
                 const searchEl = document.getElementById(prefix + '-search');
                 const submitBtn = document.getElementById(prefix + '-submit');
                 const statusEl = document.getElementById(prefix + '-status');
                 const calloutEl = document.getElementById(prefix + '-result-callout');
                 let searchTimer = null;
 
+                function personLabel(user, uid) {
+                    const name = String((user && (user.displayName || user.name)) || uid).trim() || uid;
+                    return name + ' (' + uid + ')';
+                }
+
+                function renderChips() {
+                    if (!selectedEl || !selection) return;
+                    const entries = selection.entries();
+                    selectedEl.innerHTML = '';
+                    selectedEl.hidden = entries.length === 0;
+                    entries.forEach(function(pair) {
+                        const uid = pair[0];
+                        const labelText = pair[1];
+                        const item = document.createElement('li');
+                        item.className = 'team-bulk-chip';
+                        item.setAttribute('data-user-id', uid);
+                        const name = document.createElement('span');
+                        name.className = 'team-bulk-chip__name';
+                        name.textContent = labelText;
+                        const removeBtn = document.createElement('button');
+                        removeBtn.type = 'button';
+                        removeBtn.className = 'team-bulk-chip__remove';
+                        removeBtn.disabled = selection.isBusy();
+                        removeBtn.setAttribute('aria-label', t('Remove %s', 'Remove %s').replace('%s', labelText));
+                        removeBtn.textContent = '\u00d7';
+                        removeBtn.addEventListener('click', function() {
+                            if (!selection || selection.isBusy()) return;
+                            const match = resultsEl
+                                ? Array.prototype.find.call(resultsEl.querySelectorAll('input[type="checkbox"][data-user-id]'), function(cb) {
+                                    return String(cb.getAttribute('data-user-id') || '').trim() === uid;
+                                })
+                                : null;
+                            if (match) match.checked = false;
+                            selection.remove(uid);
+                            renderChips();
+                            refreshSubmit();
+                            const next = selectedEl.querySelector('.team-bulk-chip__remove');
+                            if (next) {
+                                next.focus();
+                            } else if (searchEl) {
+                                searchEl.focus();
+                            }
+                        });
+                        item.appendChild(name);
+                        item.appendChild(removeBtn);
+                        selectedEl.appendChild(item);
+                    });
+                }
+
                 function refreshSubmit() {
                     syncSelectionFromDom();
+                    renderChips();
+                    const count = selection ? selection.size() : 0;
+                    const locked = selection ? selection.isBusy() : false;
                     if (submitBtn) {
-                        submitBtn.disabled = selected.size === 0;
-                        submitBtn.textContent = selected.size === 0
+                        submitBtn.disabled = locked || count === 0;
+                        submitBtn.textContent = count === 0
                             ? t('Add selected', 'Add selected')
-                            : t('Add selected (%s)', 'Add selected (%s)').replace('%s', String(selected.size));
+                            : t('Add selected (%s)', 'Add selected (%s)').replace('%s', String(count));
                     }
                     if (statusEl) {
-                        statusEl.textContent = selected.size === 0
+                        statusEl.textContent = count === 0
                             ? ''
-                            : t('%s selected', '%s selected').replace('%s', String(selected.size));
+                            : t('%s selected', '%s selected').replace('%s', String(count));
                     }
                 }
 
                 /**
-                 * Keep Map ↔ visible checkboxes aligned. Playwright/automation and
-                 * label clicks can desync DOM `checked` from the change-handler Map
-                 * (Atlas live: two ticks, "Add selected (1)").
+                 * Keep the selection aligned with visible checkboxes. People who
+                 * are selected but not in this result list stay selected.
+                 * Playwright and label clicks can desync DOM `checked` from the
+                 * change handler (Atlas live: two ticks, "Add selected (1)").
                  */
                 function syncSelectionFromDom() {
-                    if (!resultsEl) return;
+                    if (!resultsEl || !selection) return;
+                    const boxes = [];
                     resultsEl.querySelectorAll('input[type="checkbox"][data-user-id]').forEach(function(cb) {
-                        const uid = String(cb.getAttribute('data-user-id') || '').trim();
-                        if (!uid) return;
-                        if (cb.checked) {
-                            if (!selected.has(uid)) {
-                                const span = cb.parentElement && cb.parentElement.querySelector('span');
-                                selected.set(uid, (span && span.textContent) || uid);
-                            }
-                        } else if (selected.has(uid)) {
-                            selected.delete(uid);
-                        }
+                        boxes.push({
+                            uid: cb.getAttribute('data-user-id'),
+                            checked: cb.checked,
+                            label: cb.getAttribute('data-label') || '',
+                        });
                     });
+                    selection.syncVisible(boxes);
                 }
 
                 function renderHits(users) {
-                    if (!resultsEl) return;
+                    if (!resultsEl || !selection) return;
                     resultsEl.innerHTML = '';
                     users.forEach(function(u) {
                         const uid = String(u.userId || u.uid || u.id || '').trim();
                         if (!uid || excludeIds.indexOf(uid) !== -1) return;
+                        const labelText = personLabel(u, uid);
                         const label = document.createElement('label');
                         label.className = 'team-bulk-results__item';
                         const cb = document.createElement('input');
                         cb.type = 'checkbox';
+                        cb.className = 'team-bulk-results__checkbox';
                         cb.setAttribute('data-user-id', uid);
-                        cb.checked = selected.has(uid);
+                        cb.setAttribute('data-label', labelText);
+                        cb.checked = selection.has(uid);
                         cb.addEventListener('change', function() {
-                            if (cb.checked) {
-                                selected.set(uid, u.displayName || uid);
-                            } else {
-                                selected.delete(uid);
+                            const ok = selection.toggle(uid, labelText, cb.checked);
+                            if (!ok) {
+                                cb.checked = selection.has(uid);
                             }
                             refreshSubmit();
                         });
@@ -1050,7 +1128,8 @@
                             setTimeout(refreshSubmit, 0);
                         });
                         const span = document.createElement('span');
-                        span.textContent = (u.displayName || uid) + ' (' + uid + ')';
+                        span.className = 'team-bulk-results__name';
+                        span.textContent = labelText;
                         label.appendChild(cb);
                         label.appendChild(span);
                         resultsEl.appendChild(label);
@@ -1065,15 +1144,16 @@
                     window.__azcBulkPeopleSelection = {
                         sync: syncSelectionFromDom,
                         refresh: refreshSubmit,
-                        size: function() { return selected.size; },
-                        ids: function() { return Array.from(selected.keys()); },
+                        size: function() { return selection ? selection.size() : 0; },
+                        ids: function() { return selection ? selection.ids() : []; },
                     };
                 }
 
-                if (searchEl) {
+                if (searchEl && selection) {
                     searchEl.addEventListener('input', function() {
                         clearTimeout(searchTimer);
                         const q = searchEl.value.trim();
+                        const token = selection.beginSearch();
                         if (q.length < 2) {
                             if (resultsEl) resultsEl.innerHTML = '';
                             refreshSubmit();
@@ -1090,13 +1170,19 @@
                             Utils.ajax(getAdminUserSearchUrl() + '?' + params.toString(), {
                                 method: 'GET',
                                 onSuccess: function(data) {
+                                    if (!selection.isCurrentSearch(token) || !resultsEl || !resultsEl.isConnected) {
+                                        return;
+                                    }
                                     const users = (data && data.success && Array.isArray(data.users))
                                         ? data.users
                                         : (data && Array.isArray(data.users)) ? data.users : [];
                                     renderHits(users);
                                 },
                                 onError: function() {
-                                    if (resultsEl) resultsEl.textContent = t('Failed to load users', 'Failed to load users');
+                                    if (!selection.isCurrentSearch(token) || !resultsEl || !resultsEl.isConnected) {
+                                        return;
+                                    }
+                                    resultsEl.textContent = t('Failed to load users', 'Failed to load users');
                                 }
                             });
                         }, 250);
@@ -1105,12 +1191,23 @@
                 }
 
                 const form = document.getElementById(formId);
-                if (form) {
+                if (form && selection) {
                     form.addEventListener('submit', async function(e) {
                         e.preventDefault();
                         syncSelectionFromDom();
-                        const userIds = Array.from(selected.keys());
+                        if (!selection.tryBeginSubmit()) {
+                            if (selection.size() === 0) {
+                                Messaging && Messaging.showError && Messaging.showError(t('Select at least one person.', 'Select at least one person.'));
+                            }
+                            return;
+                        }
+                        refreshSubmit();
+                        const userIds = selection.ids().filter(function(id) {
+                            return excludeIds.indexOf(id) === -1;
+                        });
                         if (!userIds.length) {
+                            selection.endSubmit();
+                            refreshSubmit();
                             Messaging && Messaging.showError && Messaging.showError(t('Select at least one person.', 'Select at least one person.'));
                             return;
                         }
@@ -1126,6 +1223,12 @@
                             variant: 'info',
                         });
                         if (confirmResult === null || confirmResult.confirmed !== true) {
+                            selection.endSubmit();
+                            refreshSubmit();
+                            return;
+                        }
+                        if (!document.getElementById(modalId)) {
+                            selection.endSubmit();
                             return;
                         }
                         Utils.ajax(batchUrl, {
@@ -1150,15 +1253,21 @@
                                     } else {
                                         loadTeamManagers(teamId);
                                     }
-                                    selected.clear();
+                                    selection.beginSearch();
+                                    selection.endSubmit();
+                                    selection.clear();
                                     refreshSubmit();
                                     if (resultsEl) resultsEl.innerHTML = '';
                                     if (searchEl) searchEl.value = '';
                                 } else {
+                                    selection.endSubmit();
+                                    refreshSubmit();
                                     Messaging && Messaging.showError && Messaging.showError(res.message || res.error || t('Failed to add member', 'Failed'));
                                 }
                             },
                             onError: function(err) {
+                                selection.endSubmit();
+                                refreshSubmit();
                                 Messaging && Messaging.showError && Messaging.showError((err && (err.message || err.error)) || t('Failed to add member', 'Failed'));
                             }
                         });

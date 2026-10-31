@@ -949,13 +949,35 @@ class AdminController extends Controller
 		$this->registerFrontEndAssets('admin-users', 'admin-users', [], ['common/datepicker']);
 
 		$pageSize = 50;
-		$listResult = $this->adminEmployeeDirectoryService->listUsers(
-			null,
-			'',
-			$pageSize,
-			0,
-			false,
-		);
+		$filterParam = $this->request->getParam('filter');
+		$filterRaw = is_string($filterParam) && trim($filterParam) !== '' ? trim($filterParam) : null;
+		$searchParam = $this->request->getParam('search');
+		$searchTerm = is_string($searchParam) ? trim($searchParam) : '';
+		if (mb_strlen($searchTerm) > self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH) {
+			$searchTerm = mb_substr($searchTerm, 0, self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH);
+		}
+		$filterError = null;
+		try {
+			$listResult = $this->adminEmployeeDirectoryService->listUsers(
+				$filterRaw,
+				$searchTerm,
+				$pageSize,
+				0,
+				false,
+				$this->readEmployeeListToken('model'),
+				$this->readEmployeeListToken('status'),
+			);
+		} catch (InvalidEmployeeListFilterException $e) {
+			$filterError = $this->l10n->t('Invalid employee list filter.');
+			$searchTerm = '';
+			$listResult = $this->adminEmployeeDirectoryService->listUsers(
+				null,
+				'',
+				$pageSize,
+				0,
+				false,
+			);
+		}
 
 		$usersData = [];
 		foreach ($listResult['users'] as $user) {
@@ -967,6 +989,17 @@ class AdminController extends Controller
 		$defaultFilter = $listResult['defaultFilter'];
 		$hiddenCount = $listResult['hiddenCount'] ?? 0;
 		$isAccessRestricted = $this->permissionService->isAccessRestrictionEnabled();
+		$workingTimeModelOptions = [];
+		try {
+			foreach ($this->workingTimeModelMapper->findAll() as $model) {
+				$workingTimeModelOptions[] = [
+					'id' => (int)$model->getId(),
+					'name' => (string)$model->getName(),
+				];
+			}
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning('Admin employee filter could not load working time models: ' . $e->getMessage());
+		}
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-users', array_merge(
 			$this->buildAdminShellParams(
@@ -982,6 +1015,11 @@ class AdminController extends Controller
 				'hiddenCount' => $hiddenCount,
 				'isAccessRestricted' => $isAccessRestricted,
 				'truncated' => $listResult['truncated'],
+				'workingTimeModels' => $workingTimeModelOptions,
+				'search' => $searchTerm,
+				'modelFilter' => $listResult['model'],
+				'statusFilter' => $listResult['status'],
+				'filterError' => $filterError,
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
 				'organizationTimeCapture' => $this->timeCaptureMethodService->getOrganizationDefaults(),
@@ -4806,6 +4844,24 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Optional employee-list query token. Arrays and other non-strings are rejected
+	 * so a crafted `model[]` cannot skip validation.
+	 */
+	private function readEmployeeListToken(string $key): ?string
+	{
+		$raw = $this->request->getParam($key);
+		if ($raw === null || $raw === '') {
+			return null;
+		}
+		if (!is_string($raw)) {
+			throw new InvalidEmployeeListFilterException(
+				$this->l10n->t('Invalid employee list filter.')
+			);
+		}
+		return $raw;
+	}
+
+	/**
 	 * Get list of all users with their working time models
 	 *
 	 * @param string|null $search Search query
@@ -4842,6 +4898,8 @@ class AdminController extends Controller
 				$normalizedLimit,
 				$normalizedOffset,
 				$activeTodayOnly,
+				$this->readEmployeeListToken('model'),
+				$this->readEmployeeListToken('status'),
 			);
 
 			$usersData = [];
@@ -4865,6 +4923,8 @@ class AdminController extends Controller
 				'filter' => $listResult['filter'],
 				'defaultFilter' => $listResult['defaultFilter'],
 				'activeToday' => $listResult['activeToday'],
+				'model' => $listResult['model'],
+				'status' => $listResult['status'],
 			];
 			if ($listResult['directoryTotal'] !== null) {
 				$response['directoryTotal'] = $listResult['directoryTotal'];
@@ -7109,13 +7169,20 @@ class AdminController extends Controller
 		try {
 			$filterParam = $this->request->getParam('filter');
 			$filterRaw = is_string($filterParam) && trim($filterParam) !== '' ? trim($filterParam) : null;
+			$searchParam = $this->request->getParam('search');
+			$searchTerm = is_string($searchParam) ? trim($searchParam) : '';
+			if (mb_strlen($searchTerm) > self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH) {
+				$searchTerm = mb_substr($searchTerm, 0, self::DASHBOARD_EMPLOYEES_MAX_SEARCH_LENGTH);
+			}
 
 			$listResult = $this->adminEmployeeDirectoryService->listUsers(
 				$filterRaw,
-				'',
+				$searchTerm,
 				Constants::ADMIN_EMPLOYEE_FILTER_MAX_SCAN,
 				0,
 				false,
+				$this->readEmployeeListToken('model'),
+				$this->readEmployeeListToken('status'),
 			);
 
 			$data = [];
@@ -7145,6 +7212,12 @@ class AdminController extends Controller
 			}
 
 			$filterSuffix = $listResult['filter'] === AdminEmployeeDirectoryService::FILTER_APP_ACCESS ? 'app-access' : 'all';
+			if ($listResult['model'] !== '') {
+				$filterSuffix .= '-model-' . $listResult['model'];
+			}
+			if ($listResult['status'] !== '') {
+				$filterSuffix .= '-' . $listResult['status'];
+			}
 			// AS-05 / NFR: surface scan-cap truncation in the download name so HR
 			// never mistakes a capped export for a complete directory dump.
 			$truncSuffix = !empty($listResult['truncated']) ? '-truncated' : '';
@@ -7410,7 +7483,7 @@ class AdminController extends Controller
 	#[NoCSRFRequired]
 	public function teams(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('admin-teams', 'admin-teams', [], ['common/admin-user-picker']);
+		$this->registerFrontEndAssets('admin-teams', 'admin-teams', [], ['common/admin-user-picker', 'team-bulk-selection']);
 		$useAppTeams = $this->appConfig->getAppValueString('use_app_teams', '0') === '1';
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-teams', $this->buildAdminShellParams(

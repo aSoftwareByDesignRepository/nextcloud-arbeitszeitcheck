@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\AppFramework\Db\QBMapper;
@@ -208,5 +209,42 @@ class WorkingTimeModelMapper extends QBMapper
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
 		return $qb->executeStatement();
+	}
+
+	/**
+	 * Whether each existing model is personal (user_id set).
+	 * Ids with no row are omitted — the assignment points at a deleted model.
+	 *
+	 * @param list<int> $ids
+	 * @return array<int, bool> model id => personal
+	 */
+	public function findPersonalFlagsByIds(array $ids): array
+	{
+		$wanted = [];
+		foreach ($ids as $id) {
+			$id = (int)$id;
+			if ($id > 0) {
+				$wanted[$id] = $id;
+			}
+		}
+		if ($wanted === []) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'user_id')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'id', array_values($wanted), IQueryBuilder::PARAM_INT_ARRAY));
+
+		$result = $qb->executeQuery();
+		$flags = [];
+		while ($row = $result->fetch()) {
+			$modelId = (int)$row['id'];
+			$userId = $row['user_id'];
+			$flags[$modelId] = $userId !== null && $userId !== '';
+		}
+		$result->closeCursor();
+
+		return $flags;
 	}
 }

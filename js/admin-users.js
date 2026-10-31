@@ -34,7 +34,6 @@
         return String(c === 1 ? singular : plural).replace('%n', String(c));
     }
 
-    let searchTimeout = null;
     const USERS_TABLE_COLS = 9;
     const FILTER_APP_ACCESS = 'app_access';
     const FILTER_ALL = 'all';
@@ -44,10 +43,14 @@
     const USERS_PAGE_SIZE = Number(cfg.pageSize) > 0 ? Number(cfg.pageSize) : 50;
     const USERS_MIN_SEARCH = Number(cfg.minSearchLength) >= 0 ? Number(cfg.minSearchLength) : 2;
     let listOffset = Number(cfg.initialOffset) >= 0 ? Number(cfg.initialOffset) : 0;
-    let listSearch = '';
+    let listSearch = String(cfg.search || '');
     let listTotal = Number(cfg.initialTotal) >= 0 ? Number(cfg.initialTotal) : 0;
     let lastShownCount = Number(cfg.initialShown) >= 0 ? Number(cfg.initialShown) : 0;
     let listAccessFilter = String(cfg.accessFilter || FILTER_ALL);
+    let listModel = String(cfg.modelFilter || '');
+    let listStatus = String(cfg.statusFilter || '');
+    const defaultAccessFilter = String(cfg.defaultFilter || listAccessFilter);
+    let loadRequestId = 0;
     let hiddenCount = Number(cfg.hiddenCount) >= 0 ? Number(cfg.hiddenCount) : 0;
     let isAccessRestricted = !!cfg.isAccessRestricted;
     let listTruncated = !!cfg.truncated;
@@ -80,6 +83,7 @@
      * Initialize users page
      */
     function init() {
+        setupFilterToggle();
         bindEvents();
         const initialShown = Number(cfg.initialShown) >= 0 ? Number(cfg.initialShown) : 0;
         const initialTotal = Number(cfg.initialTotal) >= 0 ? Number(cfg.initialTotal) : initialShown;
@@ -90,19 +94,49 @@
         updateUsersPagination(initialShown, initialTotal, {});
     }
 
+    function setFilterPanelOpen(open) {
+        const filterBtn = Utils.$('#btn-filter');
+        const filterSection = Utils.$('#filter-section');
+        if (!filterSection) {
+            return;
+        }
+        filterSection.style.display = open ? 'block' : 'none';
+        filterSection.classList.toggle('is-open', open);
+        filterSection.setAttribute('aria-hidden', open ? 'false' : 'true');
+        if (filterBtn) {
+            filterBtn.setAttribute('aria-controls', 'filter-section');
+            filterBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+    }
+
+    function setupFilterToggle() {
+        const filterBtn = Utils.$('#btn-filter');
+        const filterSection = Utils.$('#filter-section');
+        if (!filterBtn || !filterSection) {
+            return;
+        }
+        setFilterPanelOpen(filterSection.style.display !== 'none');
+        Utils.on(filterBtn, 'click', function() {
+            setFilterPanelOpen(filterSection.style.display === 'none');
+        });
+    }
+
     /**
      * Bind event listeners
      */
     function bindEvents() {
-        const searchInput = Utils.$('#user-search');
-        if (searchInput) {
-            Utils.on(searchInput, 'input', handleSearch);
+        const filterForm = Utils.$('#employee-list-filter-form');
+        if (filterForm) {
+            Utils.on(filterForm, 'submit', function(ev) {
+                ev.preventDefault();
+                applyFiltersFromForm();
+            });
         }
 
-        const refreshBtn = Utils.$('#refresh-users');
-        if (refreshBtn) {
-            Utils.on(refreshBtn, 'click', function() {
-                clearSearchAndReload();
+        const clearBtn = Utils.$('#employee-list-filter-clear');
+        if (clearBtn) {
+            Utils.on(clearBtn, 'click', function() {
+                resetAllFilters();
             });
         }
 
@@ -127,10 +161,6 @@
             });
         }
 
-        document.querySelectorAll('input[name="employee-list-access-filter"]').forEach(function(radio) {
-            Utils.on(radio, 'change', handleAccessFilterChange);
-        });
-
         const showAllBtn = Utils.$('#employee-list-show-all');
         if (showAllBtn) {
             Utils.on(showAllBtn, 'click', handleShowAllAccounts);
@@ -151,7 +181,7 @@
                     return;
                 }
                 if (target.getAttribute('data-action') === 'clear-employee-search') {
-                    clearSearchAndReload();
+                    resetAllFilters();
                 }
             });
         }
@@ -169,34 +199,100 @@
         // Edit / History are plain links to the employee detail page (progressive enhancement).
     }
 
-    function clearSearchAndReload() {
+    function readFiltersFromForm() {
         const searchInput = Utils.$('#user-search');
-        if (searchInput) {
-            searchInput.value = '';
-            searchInput.focus();
+        const access = Utils.$('#employee-list-access-filter');
+        const model = Utils.$('#employee-list-model-filter');
+        const status = Utils.$('#employee-list-status-filter');
+        const accessValue = access && access.value ? String(access.value) : listAccessFilter;
+        return {
+            search: searchInput ? searchInput.value.trim() : '',
+            access: accessValue === FILTER_APP_ACCESS || accessValue === FILTER_ALL ? accessValue : FILTER_ALL,
+            model: model ? String(model.value || '') : '',
+            status: status ? String(status.value || '') : '',
+        };
+    }
+
+    function setSearchError(message) {
+        const input = Utils.$('#user-search');
+        const error = Utils.$('#user-search-error');
+        if (input) {
+            if (message) {
+                input.setAttribute('aria-invalid', 'true');
+                input.setAttribute('aria-describedby', 'user-search-help user-search-error');
+            } else {
+                input.removeAttribute('aria-invalid');
+                input.setAttribute('aria-describedby', 'user-search-help');
+            }
         }
-        listSearch = '';
+        if (error) {
+            error.hidden = !message;
+            error.textContent = message || '';
+        }
+    }
+
+    function applyFiltersFromForm() {
+        const next = readFiltersFromForm();
+        if (next.search.length > 0 && next.search.length < USERS_MIN_SEARCH) {
+            setSearchError(auMsg('searchMinLength', 'Type at least 2 characters to search.'));
+            updateUsersPagination(lastShownCount, listTotal, { searchPending: true });
+            const searchInput = Utils.$('#user-search');
+            if (searchInput) {
+                searchInput.focus();
+            }
+            return;
+        }
+        setSearchError('');
+        listSearch = next.search;
+        listAccessFilter = next.access;
+        listModel = next.model;
+        listStatus = next.status;
         listOffset = 0;
+        updateExportLink();
         loadUsers();
     }
 
-    function handleAccessFilterChange(e) {
-        if (!e.target || !e.target.checked) {
-            return;
+    function resetAllFilters() {
+        const searchInput = Utils.$('#user-search');
+        const access = Utils.$('#employee-list-access-filter');
+        const model = Utils.$('#employee-list-model-filter');
+        const status = Utils.$('#employee-list-status-filter');
+        if (searchInput) {
+            searchInput.value = '';
         }
-        listAccessFilter = String(e.target.value || FILTER_ALL);
+        if (access) {
+            access.value = defaultAccessFilter;
+        }
+        if (model) {
+            model.value = '';
+        }
+        if (status) {
+            status.value = '';
+        }
+        setSearchError('');
+        listSearch = '';
+        listAccessFilter = defaultAccessFilter;
+        listModel = '';
+        listStatus = '';
         listOffset = 0;
+        updateExportLink();
         loadUsers();
+        setFilterPanelOpen(false);
+        const filterBtn = Utils.$('#btn-filter');
+        if (filterBtn) {
+            filterBtn.focus();
+        }
     }
 
     function handleShowAllAccounts() {
-        const allRadio = Utils.$('#employee-list-filter-all');
-        if (allRadio) {
-            allRadio.checked = true;
-            listAccessFilter = FILTER_ALL;
-            listOffset = 0;
-            loadUsers();
+        const access = Utils.$('#employee-list-access-filter');
+        if (access) {
+            access.value = FILTER_ALL;
         }
+        listAccessFilter = FILTER_ALL;
+        listOffset = 0;
+        updateExportLink();
+        loadUsers();
     }
 
     function updateExportLink() {
@@ -211,10 +307,36 @@
         try {
             const url = new URL(base, window.location.origin);
             url.searchParams.set('filter', listAccessFilter);
+            if (listModel) {
+                url.searchParams.set('model', listModel);
+            } else {
+                url.searchParams.delete('model');
+            }
+            if (listStatus) {
+                url.searchParams.set('status', listStatus);
+            } else {
+                url.searchParams.delete('status');
+            }
+            if (listSearch.trim() !== '') {
+                url.searchParams.set('search', listSearch.trim());
+            } else {
+                url.searchParams.delete('search');
+            }
             link.setAttribute('href', url.pathname + url.search);
         } catch (err) {
+            const params = new URLSearchParams();
+            params.set('filter', listAccessFilter);
+            if (listModel) {
+                params.set('model', listModel);
+            }
+            if (listStatus) {
+                params.set('status', listStatus);
+            }
+            if (listSearch.trim() !== '') {
+                params.set('search', listSearch.trim());
+            }
             const sep = base.indexOf('?') >= 0 ? '&' : '?';
-            link.setAttribute('href', base + sep + 'filter=' + encodeURIComponent(listAccessFilter));
+            link.setAttribute('href', base + sep + params.toString());
         }
     }
 
@@ -224,7 +346,10 @@
         const truncatedBanner = Utils.$('#employee-list-truncated-banner');
 
         if (hiddenBanner) {
-            const showHidden = hiddenCount > 0 && listAccessFilter === FILTER_APP_ACCESS;
+            const showHidden = hiddenCount > 0
+                && listAccessFilter === FILTER_APP_ACCESS
+                && listModel === ''
+                && listStatus === '';
             hiddenBanner.hidden = !showHidden;
             if (showHidden && hiddenText) {
                 const template = aun(
@@ -247,24 +372,6 @@
         if (truncatedBanner) {
             truncatedBanner.hidden = !listTruncated;
         }
-    }
-
-    /**
-     * Handle search input
-     */
-    function handleSearch(e) {
-        const query = e.target.value.trim();
-        listSearch = query;
-        listOffset = 0;
-
-        clearTimeout(searchTimeout);
-        if (query.length > 0 && query.length < USERS_MIN_SEARCH) {
-            updateUsersPagination(lastShownCount, listTotal, { searchPending: true });
-            return;
-        }
-        searchTimeout = setTimeout(function() {
-            loadUsers();
-        }, 300);
     }
 
     /**
@@ -299,6 +406,7 @@
             return;
         }
 
+        const requestId = ++loadRequestId;
         setTableBusy(true);
         tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-loading-cell">'
             + '<span class="admin-users-loading-label">' + Utils.escapeHtml(auMsg('loadingEllipsis', 'Loading…')) + '</span>'
@@ -308,6 +416,12 @@
             limit: String(USERS_PAGE_SIZE),
             filter: listAccessFilter,
         });
+        if (listModel) {
+            params.set('model', listModel);
+        }
+        if (listStatus) {
+            params.set('status', listStatus);
+        }
         if (search !== '') {
             params.set('search', search);
         } else {
@@ -318,6 +432,9 @@
         Utils.ajax(url, {
             method: 'GET',
             onSuccess: function(data) {
+                if (requestId !== loadRequestId) {
+                    return;
+                }
                 setTableBusy(false);
                 if (data.success && data.users) {
                     listTotal = Number.isFinite(data.total) ? Number(data.total) : data.users.length;
@@ -327,9 +444,26 @@
                     }
                     if (typeof data.filter === 'string' && data.filter) {
                         listAccessFilter = data.filter;
-                        document.querySelectorAll('input[name="employee-list-access-filter"]').forEach(function(radio) {
-                            radio.checked = radio.value === listAccessFilter;
-                        });
+                        const access = Utils.$('#employee-list-access-filter');
+                        if (access) {
+                            access.value = listAccessFilter;
+                        }
+                    }
+                    if (typeof data.model === 'string') {
+                        listModel = data.model;
+                        const model = Utils.$('#employee-list-model-filter');
+                        if (model && Array.prototype.some.call(model.options || [], function(option) {
+                            return option.value === listModel;
+                        })) {
+                            model.value = listModel;
+                        }
+                    }
+                    if (typeof data.status === 'string') {
+                        listStatus = data.status;
+                        const status = Utils.$('#employee-list-status-filter');
+                        if (status) {
+                            status.value = listStatus;
+                        }
                     }
                     if (typeof data.offset === 'number' && search === '') {
                         listOffset = data.offset;
@@ -340,19 +474,24 @@
                 } else {
                     tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
                         + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</p>'
+                        + '<div class="admin-users-empty-actions">'
                         + '<button type="button" class="azc-btn azc-btn--secondary" data-action="clear-employee-search">'
                         + Utils.escapeHtml(auMsg('tryAgainReset', 'Reset and try again'))
-                        + '</button></td></tr>';
+                        + '</button></div></td></tr>';
                     updateUsersPagination(0, 0, {});
                 }
             },
             onError: function() {
+                if (requestId !== loadRequestId) {
+                    return;
+                }
                 setTableBusy(false);
                 tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
                     + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</p>'
+                    + '<div class="admin-users-empty-actions">'
                     + '<button type="button" class="azc-btn azc-btn--secondary" data-action="clear-employee-search">'
                     + Utils.escapeHtml(auMsg('tryAgainReset', 'Reset and try again'))
-                    + '</button></td></tr>';
+                    + '</button></div></td></tr>';
                 if (Messaging && Messaging.showError) {
                     Messaging.showError(auMsg('failedToLoadUsersRetry', 'Failed to load users. Please try again.'));
                 }
@@ -381,7 +520,7 @@
             return text;
         }
         if (totalCount <= 0 || count <= 0) {
-            return auMsg('noUsersFound', 'No users found');
+            return '';
         }
         const from = listOffset + 1;
         const to = listOffset + count;
@@ -409,6 +548,10 @@
         } else if (meta) {
             meta.textContent = text;
         }
+        if (meta) {
+            const emptyList = !(options && options.searchPending) && (Number(total) <= 0 || Number(shown) <= 0);
+            meta.hidden = emptyList;
+        }
 
         const browseMode = listSearch.trim() === '' && !(options && options.searchPending);
         const showPager = browseMode && total > USERS_PAGE_SIZE;
@@ -427,12 +570,13 @@
      * Render users table
      */
     function buildEmptyStateHtml() {
-        if (listSearch.trim() !== '') {
+        if (listSearch.trim() !== '' || listModel !== '' || listStatus !== '') {
             return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
                 + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'
+                + '<div class="admin-users-empty-actions">'
                 + '<button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">'
                 + Utils.escapeHtml(auMsg('clearSearch', 'Clear search'))
-                + '</button></td></tr>';
+                + '</button></div></td></tr>';
         }
         if (isAccessRestricted && listAccessFilter === FILTER_APP_ACCESS) {
             const message = auMsg(

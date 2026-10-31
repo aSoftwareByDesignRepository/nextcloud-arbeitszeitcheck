@@ -21,6 +21,33 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 		$this->assertStringContainsString('u.userId || u.uid || u.id', $src);
 	}
 
+	public function testEmptyStructureUsesComplianceEmptyCopyWithoutANestedBox(): void
+	{
+		$tpl = (string)file_get_contents(__DIR__ . '/../../../templates/admin-teams.php');
+		$css = (string)file_get_contents(__DIR__ . '/../../../css/admin-teams.css');
+		$this->assertStringContainsString('id="teams-empty" class="empty-state admin-teams__empty hidden"', $tpl);
+		$this->assertStringContainsString('class="empty-state__title"', $tpl);
+		$this->assertStringContainsString('class="empty-state__description"', $tpl);
+		$this->assertStringNotContainsString('id="teams-empty" class="admin-teams__tree-message', $tpl);
+		$this->assertMatchesRegularExpression(
+			'/\.admin-teams__tree-panel\s*\{[^}]*border:\s*0/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.teams-tree__item\s*\{[^}]*border:\s*0/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.admin-teams__list\s*\{[^}]*border:\s*0/s',
+			$css
+		);
+		$js = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
+		$this->assertStringContainsString('data.teams[0] ? data.teams[0].id : null', $js);
+		$this->assertStringContainsString('selectTeam(nextId, { announce: false })', $js);
+		$this->assertStringContainsString('.admin-teams__empty .empty-state__title', $css);
+		$this->assertStringContainsString('max-width: none', $css);
+	}
+
 	public function testBulkConfirmUsesTeamDetailNameElement(): void
 	{
 		$src = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
@@ -36,6 +63,9 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 		$this->assertStringContainsString('function syncSelectionFromDom', $src);
 		$this->assertStringContainsString("setAttribute('data-user-id'", $src);
 		$this->assertStringContainsString('syncSelectionFromDom()', $src);
+		$this->assertStringContainsString('team-bulk-selected', $src);
+		$this->assertStringContainsString('isCurrentSearch(token)', $src);
+		$this->assertStringContainsString('tryBeginSubmit()', $src);
 	}
 
 	public function testInModalPickerCssKeepsListInFlow(): void
@@ -49,6 +79,29 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 	{
 		$css = (string)file_get_contents(__DIR__ . '/../../../css/admin-teams.css');
 		$this->assertStringContainsString('.team-bulk-results', $css);
+		$this->assertStringContainsString('color-scheme: light', $css);
+		$this->assertStringContainsString('body[data-theme-dark] .azc-dialog .team-bulk-results__checkbox', $css);
+		$controller = (string)file_get_contents(__DIR__ . '/../../../lib/Controller/AdminController.php');
+		$this->assertStringContainsString("'team-bulk-selection'", $controller);
+	}
+
+	public function testDetailTabsUseTheDefaultUnderlineRow(): void
+	{
+		$tpl = (string)file_get_contents(__DIR__ . '/../../../templates/admin-teams.php');
+		$css = (string)file_get_contents(__DIR__ . '/../../../css/admin-teams.css');
+		$js = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
+		$this->assertStringContainsString('class="azc-tabs admin-teams__tabs" role="tablist"', $tpl);
+		$this->assertStringContainsString('class="azc-tabs__row"', $tpl);
+		$this->assertStringContainsString('class="azc-tab"', $tpl);
+		$this->assertMatchesRegularExpression(
+			'/\.azc-tab\s*\{[^}]*border-bottom:\s*2px solid transparent/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.azc-tab\[aria-selected=\'true\'\][^{]*\{[^}]*font-weight:\s*600/s',
+			$css
+		);
+		$this->assertStringContainsString("showTab(next, { focus: true })", $js);
 	}
 
 	public function testTeamsL10nIncludesBulkAssignStrings(): void
@@ -58,6 +111,9 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 		foreach ([
 			'Find people',
 			'Find a person',
+			'Add people',
+			'Selected people',
+			'Remove %s',
 			'Add several people…',
 			'Add several managers…',
 			'Add selected',

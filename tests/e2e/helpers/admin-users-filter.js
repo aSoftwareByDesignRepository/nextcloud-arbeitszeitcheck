@@ -6,19 +6,36 @@
 const FILTER_API_TIMEOUT_MS = 120_000;
 
 /**
+ * The filter fields stay closed until Filtern is pressed, unless a filter is already active.
+ *
  * @param {import('@playwright/test').Page} page
- * @param {string} selector
+ */
+export async function openEmployeeListFilters(page) {
+	const section = page.locator('#filter-section');
+	if (await section.isVisible()) {
+		return;
+	}
+	await page.locator('#btn-filter').click();
+	await section.waitFor({ state: 'visible' });
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
  * @param {'app_access' | 'all'} filter
  */
-async function waitForFilterResponse(page, selector, filter) {
+async function applyAccessFilter(page, filter) {
+	await openEmployeeListFilters(page);
+	const select = page.locator('#employee-list-access-filter');
+	await select.selectOption(filter);
 	const responsePromise = page.waitForResponse(
 		(res) =>
 			res.url().includes('/api/admin/users')
 			&& res.url().includes(`filter=${filter}`)
+			&& !res.url().includes('picker=1')
 			&& res.request().method() === 'GET',
 		{ timeout: FILTER_API_TIMEOUT_MS },
 	);
-	await page.locator(`label:has(${selector})`).click();
+	await page.locator('#employee-list-filter-apply').click();
 	await responsePromise;
 }
 
@@ -29,12 +46,11 @@ async function waitForFilterResponse(page, selector, filter) {
  * @param {'app_access' | 'all'} filter
  */
 export async function selectEmployeeListAccessFilter(page, filter) {
-	const targetId = filter === 'app_access' ? '#employee-list-filter-app-access' : '#employee-list-filter-all';
-	const target = page.locator(targetId);
-	if (await target.isChecked()) {
+	const select = page.locator('#employee-list-access-filter');
+	if ((await select.inputValue()) === filter) {
 		return;
 	}
-	await waitForFilterResponse(page, targetId, filter);
+	await applyAccessFilter(page, filter);
 }
 
 /**
@@ -44,14 +60,10 @@ export async function selectEmployeeListAccessFilter(page, filter) {
  * @param {'app_access' | 'all'} filter
  */
 export async function switchEmployeeListAccessFilter(page, filter) {
-	const targetId = filter === 'app_access' ? '#employee-list-filter-app-access' : '#employee-list-filter-all';
-	const otherId = filter === 'app_access' ? '#employee-list-filter-all' : '#employee-list-filter-app-access';
-	const target = page.locator(targetId);
-
-	if (await target.isChecked()) {
-		const otherFilter = filter === 'app_access' ? 'all' : 'app_access';
-		await waitForFilterResponse(page, otherId, otherFilter);
+	const select = page.locator('#employee-list-access-filter');
+	if ((await select.inputValue()) === filter) {
+		const other = filter === 'app_access' ? 'all' : 'app_access';
+		await applyAccessFilter(page, other);
 	}
-
-	await waitForFilterResponse(page, targetId, filter);
+	await applyAccessFilter(page, filter);
 }

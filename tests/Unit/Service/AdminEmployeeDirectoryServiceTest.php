@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\InvalidEmployeeListFilterException;
 use OCA\ArbeitszeitCheck\Service\AdminEmployeeDirectoryService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IL10N;
 use OCP\IUser;
 use OCP\IUserManager;
@@ -19,6 +22,8 @@ final class AdminEmployeeDirectoryServiceTest extends TestCase
 	private IUserManager $userManager;
 	private PermissionService $permissionService;
 	private \OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper;
+	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
+	private WorkingTimeModelMapper $workingTimeModelMapper;
 	private AdminEmployeeDirectoryService $service;
 
 	protected function setUp(): void
@@ -28,6 +33,8 @@ final class AdminEmployeeDirectoryServiceTest extends TestCase
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->timeEntryMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
+		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$this->workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnArgument(0);
 
@@ -37,14 +44,17 @@ final class AdminEmployeeDirectoryServiceTest extends TestCase
 			$this->timeEntryMapper,
 			$l10n,
 			$this->createMock(LoggerInterface::class),
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
 		);
 	}
 
-	private function makeUser(string $uid, string $displayName): IUser
+	private function makeUser(string $uid, string $displayName, bool $enabled = true): IUser
 	{
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($uid);
 		$user->method('getDisplayName')->willReturn($displayName);
+		$user->method('isEnabled')->willReturn($enabled);
 		return $user;
 	}
 
@@ -232,5 +242,190 @@ final class AdminEmployeeDirectoryServiceTest extends TestCase
 
 		$this->assertSame(1, $result['total']);
 		$this->assertSame('ncadmin', $result['users'][0]->getUID());
+	}
+
+	public function testInvalidStatusThrowsBeforeScan(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->expects($this->never())->method('search');
+
+		$this->expectException(InvalidEmployeeListFilterException::class);
+		$this->service->listUsers(AdminEmployeeDirectoryService::FILTER_ALL, '', 50, 0, false, null, 'nope');
+	}
+
+	public function testInvalidModelTokensThrowBeforeScan(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->expects($this->never())->method('search');
+		$this->workingTimeModelMapper->expects($this->never())->method('find');
+
+		$this->expectException(InvalidEmployeeListFilterException::class);
+		$this->service->listUsers(AdminEmployeeDirectoryService::FILTER_ALL, '', 50, 0, false, '02', null);
+	}
+
+	public function testUnknownModelIdThrows(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->expects($this->never())->method('search');
+		$this->workingTimeModelMapper->method('find')->willThrowException(new DoesNotExistException('missing'));
+
+		$this->expectException(InvalidEmployeeListFilterException::class);
+		$this->service->listUsers(AdminEmployeeDirectoryService::FILTER_ALL, '', 50, 0, false, '15', null);
+	}
+
+	public function testModelAndStatusIntersectAndEchoCanonicalValues(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->method('search')->willReturn([
+			$this->makeUser('keep', 'Keep', true),
+			$this->makeUser('disabled', 'Disabled', false),
+			$this->makeUser('other', 'Other', true),
+		]);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn([
+			'keep' => 5,
+			'disabled' => 5,
+			'other' => 9,
+		]);
+
+		$result = $this->service->listUsers(
+			AdminEmployeeDirectoryService::FILTER_ALL,
+			'',
+			50,
+			0,
+			false,
+			' 5 ',
+			'ENABLED',
+		);
+
+		$this->assertSame(['keep'], array_map(static fn (IUser $u) => $u->getUID(), $result['users']));
+		$this->assertSame('5', $result['model']);
+		$this->assertSame(AdminEmployeeDirectoryService::STATUS_ENABLED, $result['status']);
+	}
+
+	public function testNoneIncludesUnassignedAndDeletedModelsOnly(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->method('search')->willReturn([
+			$this->makeUser('open', 'Open'),
+			$this->makeUser('gone', 'Gone'),
+			$this->makeUser('personal', 'Personal'),
+			$this->makeUser('org', 'Org'),
+		]);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn([
+			'gone' => 99,
+			'personal' => 8,
+			'org' => 5,
+		]);
+		$this->workingTimeModelMapper->method('findPersonalFlagsByIds')->willReturn([
+			8 => true,
+			5 => false,
+		]);
+
+		$result = $this->service->listUsers(
+			AdminEmployeeDirectoryService::FILTER_ALL,
+			'',
+			50,
+			0,
+			false,
+			'None',
+			null,
+		);
+
+		$uids = array_map(static fn (IUser $u) => $u->getUID(), $result['users']);
+		sort($uids);
+		$this->assertSame(['gone', 'open'], $uids);
+		$this->assertSame(AdminEmployeeDirectoryService::MODEL_NONE, $result['model']);
+	}
+
+	public function testPersonalBucketExcludesOrganisationModels(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->method('search')->willReturn([
+			$this->makeUser('personal', 'Personal'),
+			$this->makeUser('org', 'Org'),
+		]);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn([
+			'personal' => 8,
+			'org' => 5,
+		]);
+		$this->workingTimeModelMapper->method('findPersonalFlagsByIds')->willReturn([
+			8 => true,
+			5 => false,
+		]);
+
+		$result = $this->service->listUsers(
+			AdminEmployeeDirectoryService::FILTER_ALL,
+			'',
+			50,
+			0,
+			false,
+			'personal',
+			null,
+		);
+
+		$this->assertSame(['personal'], array_map(static fn (IUser $u) => $u->getUID(), $result['users']));
+	}
+
+	public function testModelFilterDoesNotChangeHiddenCount(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(true);
+		$this->userManager->method('search')->willReturn([
+			$this->makeUser('in', 'In'),
+			$this->makeUser('out', 'Out'),
+		]);
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturnCallback(
+			static fn (string $uid): bool => $uid === 'in',
+		);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn(['in' => 5]);
+
+		$result = $this->service->listUsers(
+			AdminEmployeeDirectoryService::FILTER_APP_ACCESS,
+			'',
+			50,
+			0,
+			false,
+			'5',
+			null,
+		);
+
+		$this->assertSame(1, $result['hiddenCount']);
+		$this->assertSame(1, $result['total']);
+		$this->assertSame('in', $result['users'][0]->getUID());
+	}
+
+	public function testEmptyModelAndStatusDoNotQueryAssignments(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->method('search')->willReturn([$this->makeUser('a', 'A')]);
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('findCurrentModelIdsByUserIds');
+		$this->workingTimeModelMapper->expects($this->never())->method('find');
+		$this->workingTimeModelMapper->expects($this->never())->method('findPersonalFlagsByIds');
+
+		$result = $this->service->listUsers(AdminEmployeeDirectoryService::FILTER_ALL, '', 50, 0);
+
+		$this->assertSame('', $result['model']);
+		$this->assertSame('', $result['status']);
+		$this->assertSame(1, $result['total']);
+	}
+
+	public function testPaginationAppliesAfterModelFilter(): void
+	{
+		$this->permissionService->method('isAccessRestrictionEnabled')->willReturn(false);
+		$this->userManager->method('search')->willReturn([
+			$this->makeUser('c', 'Cara'),
+			$this->makeUser('a', 'Anna'),
+			$this->makeUser('b', 'Bea'),
+			$this->makeUser('z', 'Zoe'),
+		]);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn([
+			'c' => 5,
+			'a' => 5,
+			'b' => 5,
+		]);
+
+		$page = $this->service->listUsers(AdminEmployeeDirectoryService::FILTER_ALL, '', 1, 1, false, '5', null);
+
+		$this->assertSame(3, $page['total']);
+		$this->assertSame('b', $page['users'][0]->getUID());
 	}
 }

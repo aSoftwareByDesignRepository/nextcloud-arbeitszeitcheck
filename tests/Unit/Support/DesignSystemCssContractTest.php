@@ -212,6 +212,15 @@ final class DesignSystemCssContractTest extends TestCase
 			"#app-content.azc-app input[type='checkbox']:not(.azc-switch-field__input)",
 			$appCss,
 		);
+		self::assertStringContainsString('body[data-theme-light]', $this->tokensCss);
+		self::assertMatchesRegularExpression(
+			'/body\[data-theme-light\][\s\S]*?color-scheme:\s*light/',
+			$this->tokensCss,
+		);
+		self::assertMatchesRegularExpression(
+			'/body\[data-theme-dark\][\s\S]*?color-scheme:\s*dark/',
+			$this->tokensCss,
+		);
 		self::assertStringContainsString('max-height: 1.25rem', $appCss);
 		self::assertStringContainsString(".form-toggle input[type='checkbox']", $appCss);
 		self::assertMatchesRegularExpression(

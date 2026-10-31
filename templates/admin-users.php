@@ -28,10 +28,41 @@ $listTruncated = (bool)($_['truncated'] ?? false);
 $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
 $accessSettingsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.settingsSection', ['section' => \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ACCESS]);
 $exportBaseUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.admin.exportUsers', ['format' => 'csv']);
-$exportHref = $exportBaseUrl . (str_contains($exportBaseUrl, '?') ? '&' : '?') . 'filter=' . rawurlencode($accessFilter);
-$filterIntro = $isAccessRestricted
-	? $l->t('Search by name. Choose who appears: people who can open the app, or every Nextcloud account.')
-	: $l->t('Search by name or login. Everyone with a Nextcloud account is listed.');
+$workingTimeModels = is_array($_['workingTimeModels'] ?? null) ? $_['workingTimeModels'] : [];
+$searchValue = (string)($_['search'] ?? '');
+$modelFilter = (string)($_['modelFilter'] ?? '');
+$statusFilter = (string)($_['statusFilter'] ?? '');
+$filterError = (string)($_['filterError'] ?? '');
+$exportQuery = ['filter' => $accessFilter];
+if ($modelFilter !== '') {
+	$exportQuery['model'] = $modelFilter;
+}
+if ($statusFilter !== '') {
+	$exportQuery['status'] = $statusFilter;
+}
+if ($searchValue !== '') {
+	$exportQuery['search'] = $searchValue;
+}
+$exportHref = $exportBaseUrl . (str_contains($exportBaseUrl, '?') ? '&' : '?') . http_build_query($exportQuery);
+$azcListFiltered = $searchValue !== ''
+	|| $modelFilter !== ''
+	|| $statusFilter !== ''
+	|| $accessFilter !== $defaultFilter
+	|| $filterError !== '';
+ob_start();
+?>
+            <button id="btn-filter"
+                    class="azc-btn azc-btn--secondary"
+                    type="button"
+                    aria-expanded="<?php p($azcListFiltered ? 'true' : 'false'); ?>"
+                    aria-controls="filter-section"
+                    aria-label="<?php p($l->t('Filter employees')); ?>">
+                <?php p($l->t('Filter')); ?>
+            </button>
+<?php
+$captured = ob_get_clean();
+$compact = preg_replace('/>\s+</', '><', (string)$captured);
+$pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -39,16 +70,15 @@ $filterIntro = $isAccessRestricted
 
         <div class="azc-page-stack">
 
-        <section class="azc-card azc-filter-panel admin-users-filter-panel" aria-labelledby="employee-list-filter-title">
+        <section id="filter-section" class="azc-card azc-filter-panel admin-users-filter-panel<?php if ($azcListFiltered): ?> is-open<?php endif; ?>"<?php if (!$azcListFiltered): ?> style="display: none;"<?php endif; ?> aria-labelledby="employee-list-filter-title">
             <header class="azc-filter-panel__head">
-                <h2 id="employee-list-filter-title"><?php p($l->t('Find employees')); ?></h2>
-                <p class="azc-filter-panel__intro"><?php p($filterIntro); ?></p>
+                <h2 id="employee-list-filter-title"><?php p($l->t('Filter')); ?></h2>
             </header>
             <div class="azc-filter-panel__body">
-                <form class="azc-filter-panel__form admin-users-filter-form" role="search" aria-labelledby="employee-list-filter-title" novalidate>
-                    <div class="azc-filter-grid azc-filter-grid--search admin-users-filter-grid">
+                <form id="employee-list-filter-form" class="azc-filter-panel__form admin-users-filter-form" method="get" role="search" aria-labelledby="employee-list-filter-title" novalidate>
+                    <div class="azc-filter-grid admin-users-filter-grid" role="group" aria-label="<?php p($l->t('Filter options')); ?>">
                         <div class="azc-filter-field admin-users-toolbar__search">
-                            <label for="user-search" class="azc-filter-field__label form-label visually-hidden"><?php p($l->t('Find an employee')); ?></label>
+                            <label for="user-search" class="azc-filter-field__label"><?php p($l->t('Name')); ?></label>
                             <div class="azc-filter-field__control admin-users-search-control">
                                 <input type="search"
                                     id="user-search"
@@ -57,40 +87,78 @@ $filterIntro = $isAccessRestricted
                                     autocapitalize="none"
                                     spellcheck="false"
                                     enterkeyhint="search"
-                                    placeholder="<?php p($l->t('Search by name or login…')); ?>"
-                                    aria-describedby="user-search-help users-pagination">
+                                    name="search"
+                                    value="<?php p($searchValue); ?>"
+                                    placeholder="<?php p($l->t('Type to search')); ?>"
+                                    aria-describedby="user-search-help">
+                                <p id="user-search-help" class="azc-sr-only">
+                                    <?php p($l->t('Type at least 2 characters. Leave empty to browse page by page.')); ?>
+                                </p>
+                                <p id="user-search-error" class="azc-field-error" hidden></p>
                             </div>
-                            <p id="user-search-help" class="form-help">
-                                <?php p($l->t('Type at least 2 characters. Leave empty to browse page by page.')); ?>
-                            </p>
                         </div>
-                        <fieldset class="azc-filter-field admin-users-access-filter" aria-labelledby="employee-access-filter-legend">
-                            <legend id="employee-access-filter-legend" class="azc-filter-field__label form-label"><?php p($l->t('Who to show')); ?></legend>
-                            <div class="admin-users-access-filter__options" role="presentation">
-                                <label class="admin-users-access-filter__option">
-                                    <input type="radio"
-                                        name="employee-list-access-filter"
-                                        id="employee-list-filter-app-access"
-                                        value="<?php p(AdminEmployeeDirectoryService::FILTER_APP_ACCESS); ?>"
-                                        <?php if ($accessFilter === AdminEmployeeDirectoryService::FILTER_APP_ACCESS) {
-                                        	p('checked');
-                                        } ?>>
-                                    <span><?php p($l->t('Can open ArbeitszeitCheck')); ?></span>
-                                </label>
-                                <label class="admin-users-access-filter__option">
-                                    <input type="radio"
-                                        name="employee-list-access-filter"
-                                        id="employee-list-filter-all"
-                                        value="<?php p(AdminEmployeeDirectoryService::FILTER_ALL); ?>"
-                                        <?php if ($accessFilter === AdminEmployeeDirectoryService::FILTER_ALL) {
-                                        	p('checked');
-                                        } ?>>
-                                    <span><?php p($l->t('All Nextcloud accounts')); ?></span>
-                                </label>
+                        <div class="azc-filter-field">
+                            <label for="employee-list-access-filter" class="azc-filter-field__label"><?php p($l->t('Who to show')); ?></label>
+                            <div class="azc-filter-field__control">
+                                <select id="employee-list-access-filter" class="form-input form-select" name="filter">
+                                    <option value="<?php p(AdminEmployeeDirectoryService::FILTER_APP_ACCESS); ?>"<?php if ($accessFilter === AdminEmployeeDirectoryService::FILTER_APP_ACCESS) { ?> selected<?php } ?>>
+                                        <?php p($l->t('Can open ArbeitszeitCheck')); ?>
+                                    </option>
+                                    <option value="<?php p(AdminEmployeeDirectoryService::FILTER_ALL); ?>"<?php if ($accessFilter === AdminEmployeeDirectoryService::FILTER_ALL) { ?> selected<?php } ?>>
+                                        <?php p($l->t('All Nextcloud accounts')); ?>
+                                    </option>
+                                </select>
                             </div>
-                        </fieldset>
+                        </div>
+                        <div class="azc-filter-field">
+                            <label for="employee-list-model-filter" class="azc-filter-field__label"><?php p($l->t('Working Time Model')); ?></label>
+                            <div class="azc-filter-field__control">
+                                <select id="employee-list-model-filter" class="form-input form-select" name="model">
+                                    <option value=""><?php p($l->t('All working time models')); ?></option>
+                                    <option value="<?php p(AdminEmployeeDirectoryService::MODEL_NONE); ?>"<?php if ($modelFilter === AdminEmployeeDirectoryService::MODEL_NONE) { ?> selected<?php } ?>><?php p($l->t('Not assigned')); ?></option>
+                                    <option value="<?php p(AdminEmployeeDirectoryService::MODEL_PERSONAL); ?>"<?php if ($modelFilter === AdminEmployeeDirectoryService::MODEL_PERSONAL) { ?> selected<?php } ?>><?php p($l->t('Personal schedule')); ?></option>
+                                    <?php foreach ($workingTimeModels as $modelOption): ?>
+                                        <?php
+                                        $modelId = (int)($modelOption['id'] ?? 0);
+                                        if ($modelId < 1) {
+                                        	continue;
+                                        }
+                                        ?>
+                                        <option value="<?php p((string)$modelId); ?>"<?php if ($modelFilter === (string)$modelId) { ?> selected<?php } ?>><?php p((string)($modelOption['name'] ?? '')); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="azc-filter-field">
+                            <label for="employee-list-status-filter" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
+                            <div class="azc-filter-field__control">
+                                <select id="employee-list-status-filter" class="form-input form-select" name="status">
+                                    <option value=""><?php p($l->t('All statuses')); ?></option>
+                                    <option value="<?php p(AdminEmployeeDirectoryService::STATUS_ENABLED); ?>"<?php if ($statusFilter === AdminEmployeeDirectoryService::STATUS_ENABLED) { ?> selected<?php } ?>><?php p($l->t('Enabled')); ?></option>
+                                    <option value="<?php p(AdminEmployeeDirectoryService::STATUS_DISABLED); ?>"<?php if ($statusFilter === AdminEmployeeDirectoryService::STATUS_DISABLED) { ?> selected<?php } ?>><?php p($l->t('Disabled')); ?></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="azc-filter-field azc-filter-field--actions">
+                            <span class="azc-filter-field__label" aria-hidden="true">&nbsp;</span>
+                            <div class="azc-filter-field__control azc-filter-field__control--actions admin-users-filter-actions">
+                                <button type="submit" id="employee-list-filter-apply" class="azc-btn azc-btn--primary">
+                                    <?php p($l->t('Apply')); ?>
+                                </button>
+                                <button type="button"
+                                    id="employee-list-filter-clear"
+                                    class="azc-btn azc-btn--secondary admin-users-filter-reset"
+                                    title="<?php p($l->t('Clear')); ?>"
+                                    aria-label="<?php p($l->t('Clear')); ?>">
+                                    <?php print_unescaped(IconCatalog::render('rotate', 'azc-btn__icon')); ?>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </form>
+                <?php if ($filterError !== ''): ?>
+                    <p class="azc-field-error" role="alert"><?php p($filterError); ?></p>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -133,9 +201,6 @@ $filterIntro = $isAccessRestricted
                         aria-label="<?php p($l->t('Export employee list as CSV')); ?>">
                         <?php p($l->t('Export CSV')); ?>
                     </a>
-                    <button type="button" id="refresh-users" class="azc-btn azc-btn--secondary" title="<?php p($l->t('Clear search and reload the list')); ?>">
-                        <?php p($l->t('Reset')); ?>
-                    </button>
                 </div>
             </header>
             <div class="azc-card__body">
@@ -174,6 +239,13 @@ $filterIntro = $isAccessRestricted
                                             </div>
                                         <?php else: ?>
                                             <p class="admin-users-empty-message"><?php p($l->t('No users found')); ?></p>
+                                            <?php if ($searchValue !== '' || $modelFilter !== '' || $statusFilter !== ''): ?>
+                                            <div class="admin-users-empty-actions">
+                                                <button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">
+                                                    <?php p($l->t('Clear search')); ?>
+                                                </button>
+                                            </div>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -260,7 +332,7 @@ $filterIntro = $isAccessRestricted
                         <?php p($l->t('Next page')); ?>
                     </button>
                 </nav>
-                <div class="azc-table-meta pagination-info admin-users-meta" id="users-pagination" aria-live="polite" aria-atomic="true">
+                <div class="azc-table-meta pagination-info admin-users-meta" id="users-pagination" aria-live="polite" aria-atomic="true"<?php if ($total <= 0) { ?> hidden<?php } ?>>
                     <p id="users-pagination-text"><?php
                         $shown = count($users);
                         $from = $shown > 0 ? 1 : 0;
@@ -302,6 +374,9 @@ $filterIntro = $isAccessRestricted
         'initialTotal' => (int) $total,
         'initialShown' => count($users),
         'accessFilter' => $accessFilter,
+        'modelFilter' => $modelFilter,
+        'statusFilter' => $statusFilter,
+        'search' => $searchValue,
         'defaultFilter' => $defaultFilter,
         'hiddenCount' => $hiddenCount,
         'isAccessRestricted' => $isAccessRestricted,

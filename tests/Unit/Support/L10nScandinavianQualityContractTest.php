@@ -898,11 +898,13 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// 2026-11-24: 'semantik' — genuine Swedish noun (cf. 'grammatik');
 		// identical spelling in da is shared vocabulary, not bleed.
 		'semantik',
-		// 2026-10-31: 'definitioner'/'måltid'/'nedgradering' — genuine
-		// Swedish nouns; identical spelling in da is shared vocabulary,
-		// not bleed (feature-enable downgrade warnings + leave-rule
-		// Soll-effects strings, 69a94d9).
-		'definitioner', 'måltid', 'nedgradering',
+		// 2026-10-31: 'definitioner'/'nedgradering' — genuine Swedish
+		// nouns; identical spelling in da is shared vocabulary, not
+		// bleed (feature-enable downgrade warnings, 69a94d9). 'måltid'
+		// was registered in the same batch but removed 2026-10-31: it
+		// only entered both catalogs via the wrong-sense 'target time'
+		// defect (r24) — keeping it whitelists the defect class.
+		'definitioner', 'nedgradering',
 	];
 
 	/**

@@ -859,7 +859,6 @@ mulig
 muligvis
 måles
 målområdet
-måltid
 måned
 måneden
 månedens
@@ -1355,6 +1354,7 @@ tidslinjeformat
 tidslinjen
 tidslinjer
 tidslinjevisning
+tidsmål
 tidsperiode
 tidsperioden
 tidspunkt

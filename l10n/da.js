@@ -1645,7 +1645,7 @@
 		"Dismiss" : "Afvis",
 		"Dismiss this welcome message" : "Afvis denne velkomstbesked",
 		"Display Name" : "Vist navn",
-		"Do these three steps before anyone records time. Until then, holidays, target hours, and break rules are not reliable." : "Udfør disse tre trin, før nogen registrerer tid. Indtil da er helligdage, måltimer og pauseregler ikke pålidelige.",
+		"Do these three steps before anyone records time. Until then, holidays, target hours, and break rules are not reliable." : "Udfør disse tre trin, før nogen registrerer tid. Indtil da er helligdage, tidsmål og pauseregler ikke pålidelige.",
 		"Do you really want to cancel this absence? This cannot be undone." : "Vil virkelig annullere dette fravær? Dette kan ikke fortrydes.",
 		"Do you really want to remove the holiday \"{name}\" on {date}?" : "Vil virkelig fjerne helligdagen \"{name}\" på {date}?",
 		"Documentation" : "Dokumentation",
@@ -3710,7 +3710,7 @@
 		"ProjectCheck linking is turned off" : "ProjectCheck-linkning er slået fra",
 		"ProjectCheck links your hours to a customer project when both apps are enabled. Projects with per-person pricing only appear if you are on the team." : "ProjectCheck linker dine timer til et kundeprojekt, når begge apps er aktiveret. Projekter med pris pr. person vises kun, Hvis der er på holdet.",
 		"ProjectCheck not installed" : "ProjectCheck ikke installeret",
-		"Proposed (Soll)" : "Foreslået (Sol)",
+		"Proposed (Soll)" : "Foreslået (Soll)",
 		"Proposed Changes" : "Foreslåede ændringer",
 		"Proposed:" : "Foreslået:",
 		"Prorated for partial year: {prorated} of {full} days (daily method)." : "Pro-rata for delvist år: {prorated} af {full} dage (daglig metode).",
@@ -6173,7 +6173,7 @@
 		"On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance." : "Slået til som standard. Godkendt ferie samt personlig og særlig orlov godskriver deres planlagte nettotimer som arbejdstid — en feriedag kan ikke længere skabe minustimer. Ulønnet orlov og forældreorlov fjerner i stedet dagens mål, så de forbliver neutrale uden at opfinde lønnede timer. Gælder for åbne (ikke forseglede) perioder og genberegner live-saldoen.",
 		"When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday\/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are handled by the leave-rules setting above." : "Når det er aktiveret, krediterer godkendt sygefravær dagens planlagte nettotimer til overtidssaldoen (ugeschedule eller vagtplan, inkl. planlagt lør\/søn). Frie weekender forbliver 0. Aktivering genberegner den live saldo for tidligere sygedage i åbne perioder — afstem med Betriebsvereinbarung eller Tarifvertrag. Ulønnet fri krediteres aldrig. Ferie og andre fraværstyper håndteres af orlovsregel-indstillingen ovenfor.",
 		"Includes %s h credited from approved absences (planned hours)." : "Inkluderer %s t godskrevet fra godkendte fravær (planlagte timer).",
-		"Excludes %s h of target time removed by unpaid or parental leave." : "Ekskluderer %s t måltid fjernet af ulønnet orlov eller forældreorlov."
+		"Excludes %s h of target time removed by unpaid or parental leave." : "Ekskluderer %s t tidsmål fjernet af ulønnet orlov eller forældreorlov."
 		},
 		"nplurals=2; plural=(n != 1);"
 	);

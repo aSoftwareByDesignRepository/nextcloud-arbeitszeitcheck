@@ -60,7 +60,9 @@
 		const buttons = item.querySelectorAll('.azc-ext-stamps__btn');
 		buttons.forEach(function (btn) { btn.disabled = true; });
 
-		const base = (window.OC && window.OC.webroot ? window.OC.webroot : '') + '/apps/arbeitszeitcheck';
+		const base = (window.OC && typeof OC.generateUrl === 'function')
+			? OC.generateUrl('/apps/arbeitszeitcheck')
+			: ((window.OC && window.OC.webroot ? window.OC.webroot : '') + '/index.php/apps/arbeitszeitcheck');
 		apiFetch(base + '/api/ext-stamps/' + encodeURIComponent(stampId) + '/' + action, 'POST')
 			.then(function (res) {
 				if (res.ok) {

@@ -435,6 +435,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 	private const ACTION_PARAM_REMOVALS = [
 		'AdminController::createTariffRuleSet' => ['status', 'createdAt', 'updatedAt'],
 		'AdminController::updateTariffRuleSet' => ['status', 'tariffCode', 'version'],
+		// 'status' fixture ('open') is an absence-state token; the employee-list
+		// status filter only accepts enabled|disabled and must see no value.
+		'AdminController::getUsers' => ['status'],
+		'AdminController::exportUsers' => ['status'],
 	];
 
 	/**

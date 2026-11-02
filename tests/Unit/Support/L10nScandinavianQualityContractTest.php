@@ -308,7 +308,8 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'%1$s t', '%1$s → %2$s', '%n teammedlem', '(ingen)', '0 poster', '1 post',
 		'%n poster',
 		'1 hel dag', '1 medlem', 'Administration', 'Administration (panel)',
-		'Aktiv', 'Aktiv i dag', 'Aldrig', 'ArbeitszeitCheck Mobile på Google Play',
+		'Aktiv', 'Aktiv i dag', 'Aldrig', 'ArbeitszeitCheck Mobile i App Store',
+		'ArbeitszeitCheck Mobile på Google Play',
 		'ArbeitszeitCheck-version:', 'Automatisk', 'Beta', 'Cykel',
 		'DATEV Lohnart-koder', 'DATEV-personalnummer', 'Dag', 'Dag (1-31)',
 		'Dagens statistik', 'Daglig rapport', 'Deldag', 'Delstat: %1$s', 'Deltid',
@@ -317,7 +318,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'Dokumentation', 'Dokumentversion', 'Drift', 'Effektiv', 'Enkel',
 		'Excel-fil (XLSX)', 'FA', 'Fast?', 'Filformat',
 		'Florians dag', 'Fre', 'Funktioner', 'Genève', 'HR', 'HR-kontor',
-		'Halv dag', 'Hej %s,', 'Hel dag', 'I dag', 'I dag: %1$s t · Session: %2$s',
+		'Halv dag', 'Hej %s,', 'Hel dag', 'I App Store', 'I dag', 'I dag: %1$s t · Session: %2$s',
 		'I år', 'Inaktiv', 'Ingen', 'Ja', 'Kalender', 'Kalenderikon', 'Kalenderår',
 		'Kamp', 'Kanton Aargau', 'Kanton Appenzell Ausserrhoden',
 		'Kanton Appenzell Innerrhoden', 'Kanton Basel-Landschaft',
@@ -338,7 +339,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'Organisation', 'Organisationen', 'Organisationslicens',
 		'Organisationsstruktur', 'Placering',
 		'Post-ID: %1$s', 'Prioritet', 'Pro-rata-regel', 'Procent', 'Projekt',
-		'Projekt #%s', 'Rapporter', 'Region (område)', 'Registreringsdetaljer',
+		'Projekt #%s', 'På Google Play', 'Rapporter', 'Region (område)', 'Registreringsdetaljer',
 		'Regler', 'Resultat', 'Ruperts dag', 'Sats', 'Schweiz', 'Session (aktiv)',
 		'Session: %1$s (aktiv)', 'Slut', 'Slutminut', 'Sluttid',
 		'Starttid', 'Station', 'Statistik', 'Status: %1$s - I dag: %2$s t',
@@ -939,7 +940,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	 * @var list<string>
 	 */
 	private const LEGIT_PL_NEAR_DONOR_TOKENS = [
-		'absolutne', 'administratora', 'administratorem', 'centralne', 'duplikaty', 'dyrektor',
+		'absolutne', 'administratora', 'administratorem', 'androida', 'centralne', 'duplikaty', 'dyrektor',
 		'elementem', 'elementu', 'elementy', 'formatu', 'formularz', 'globalne', 'hierarchii', 'historia',
 		'historii', 'historią', 'historię', 'importu', 'importy', 'kantonu', 'katalogu', 'kategoria',
 		'kategorii', 'kategorię', 'kohorty', 'komputer', 'kontrole', 'laptopa', 'leopolda', 'minimalne',

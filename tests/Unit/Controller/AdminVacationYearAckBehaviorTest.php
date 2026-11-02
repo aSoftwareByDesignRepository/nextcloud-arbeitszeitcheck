@@ -165,6 +165,8 @@ class AdminVacationYearAckBehaviorTest extends TestCase
 			$this->createMock(TimeEntryMapper::class),
 			$l10n,
 			$this->createMock(\Psr\Log\LoggerInterface::class),
+			$this->createMock(UserWorkingTimeModelMapper::class),
+			$this->createMock(WorkingTimeModelMapper::class),
 		);
 
 		$this->controller = new AdminController(

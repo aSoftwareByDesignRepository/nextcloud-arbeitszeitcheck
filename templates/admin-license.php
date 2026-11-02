@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
 $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
@@ -328,8 +330,9 @@ $licenseContactActions = static function (\OCP\IL10N $l) use ($licenseRenewMailt
 							<td data-label="<?php p($l->t('Assigned')); ?>"><?php p($formatAssignedAt((string)($seat['assignedAt'] ?? ''))); ?></td>
 							<td data-label="<?php p($l->t('Actions')); ?>" class="actions-cell">
 								<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
-									<button type="button" class="azc-btn azc-btn--secondary azc-btn--small azc-seat-remove" data-user-id="<?php p((string)($seat['userId'] ?? '')); ?>">
-										<?php p($l->t('Remove')); ?>
+									<?php $seatRemoveLabel = $l->t('Remove') . ': ' . (string)($seat['displayName'] ?? $seat['userId'] ?? ''); ?>
+									<button type="button" class="azc-btn azc-btn--danger azc-icon-btn azc-seat-remove" data-user-id="<?php p((string)($seat['userId'] ?? '')); ?>" aria-label="<?php p($seatRemoveLabel); ?>" title="<?php p($l->t('Remove')); ?>">
+										<?php print_unescaped(IconCatalog::render('trash')); ?>
 									</button>
 								</div>
 							</td>

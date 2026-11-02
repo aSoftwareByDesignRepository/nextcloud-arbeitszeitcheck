@@ -317,10 +317,16 @@
 		min-inline-size: 40rem;
 	}
 
-	#app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__actions .azc-btn {
+	#app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__actions .azc-btn:not(.azc-icon-btn) {
 		display: block;
 		width: 100%;
 		margin: var(--azc-space-1) 0;
+	}
+
+	#app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__actions .azc-icon-btn {
+		width: var(--azc-touch, 44px);
+		max-width: var(--azc-touch, 44px);
+		flex: 0 0 auto;
 	}
 }
 

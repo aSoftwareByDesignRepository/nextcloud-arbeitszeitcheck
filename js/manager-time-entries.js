@@ -391,7 +391,7 @@
 			};
 			const summaryJson = Utils.encodeAttributeJson(summaryPayload);
 			const actionCell = canCorrect
-				? `<button type="button" class="azc-btn azc-btn--secondary azc-btn--sm btn-manager-correct" data-entry-id="${escapeHtml(String(entry.id))}" data-entry-updated="${escapeHtml(entry.updatedAt || '')}" data-entry-summary="${summaryJson}" aria-label="${escapeHtml(t('Correct time entry', 'Correct time entry'))}">${escapeHtml(t('Correct', 'Correct'))}</button>`
+				? `<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn btn-manager-correct" data-entry-id="${escapeHtml(String(entry.id))}" data-entry-updated="${escapeHtml(entry.updatedAt || '')}" data-entry-summary="${summaryJson}" aria-label="${escapeHtml(t('Correct time entry', 'Correct time entry'))}" title="${escapeHtml(t('Correct', 'Correct'))}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('edit') : ''}</button>`
 				: '<span class="text-muted">–</span>';
 			const td = (label, html, cls = '') => Utils.responsiveTd
 				? Utils.responsiveTd(label, html, cls)

@@ -82,9 +82,22 @@ $useAppTeams = (bool)($_['useAppTeams'] ?? false);
 			</div>
 		</header>
 		<div class="azc-card__body">
+			<?php
+			$teamsEmpty = $l->t('No units yet. Add a unit to build your organization structure.');
+			$teamsEmptyParts = preg_split('/(?<=[.!?])\s+/u', $teamsEmpty, 2);
+			$teamsEmptyTitle = is_array($teamsEmptyParts) && ($teamsEmptyParts[0] ?? '') !== ''
+				? $teamsEmptyParts[0]
+				: $teamsEmpty;
+			$teamsEmptyDescription = is_array($teamsEmptyParts) ? trim((string)($teamsEmptyParts[1] ?? '')) : '';
+			?>
 			<div id="admin-teams-tree" class="admin-teams__tree-panel teams-tree org-tree" role="tree" aria-label="<?php p($l->t('Organization structure')); ?>">
 				<p id="teams-loading" class="admin-teams__tree-message" aria-live="polite"><?php p($l->t('Loading…')); ?></p>
-				<p id="teams-empty" class="admin-teams__tree-message hidden" aria-live="polite"><?php p($l->t('No units yet. Add a unit to build your organization structure.')); ?></p>
+				<div id="teams-empty" class="empty-state admin-teams__empty hidden" aria-live="polite">
+					<p class="empty-state__title"><?php p($teamsEmptyTitle); ?></p>
+					<?php if ($teamsEmptyDescription !== ''): ?>
+					<p class="empty-state__description"><?php p($teamsEmptyDescription); ?></p>
+					<?php endif; ?>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -99,36 +112,28 @@ $useAppTeams = (bool)($_['useAppTeams'] ?? false);
 			</div>
 		</header>
 		<div class="azc-card__body">
-			<div class="admin-teams__tabs team-detail-tabs" role="tablist" aria-label="<?php p($l->t('Team members and managers')); ?>">
-				<button type="button" id="tab-members" class="admin-teams__tab" role="tab" aria-selected="true" aria-controls="panel-members">
-					<?php p($l->t('Members')); ?>
-				</button>
-				<button type="button" id="tab-managers" class="admin-teams__tab" role="tab" aria-selected="false" aria-controls="panel-managers">
-					<?php p($l->t('Managers')); ?>
-				</button>
+			<div class="azc-tabs admin-teams__tabs" role="tablist" aria-label="<?php p($l->t('Team members and managers')); ?>">
+				<div class="azc-tabs__row">
+					<button type="button" id="tab-members" class="azc-tab" role="tab" aria-selected="true" aria-controls="panel-members" tabindex="0">
+						<?php p($l->t('Members')); ?>
+					</button>
+					<button type="button" id="tab-managers" class="azc-tab" role="tab" aria-selected="false" aria-controls="panel-managers" tabindex="-1">
+						<?php p($l->t('Managers')); ?>
+					</button>
+				</div>
 			</div>
 			<div id="panel-members" role="tabpanel" aria-labelledby="tab-members" class="admin-teams__panel team-panel">
 				<div class="admin-teams__panel-actions panel-actions">
-					<button type="button" id="team-add-member" class="azc-btn azc-btn--secondary"
-						aria-label="<?php p($l->t('Add member to team')); ?>">
-						<?php p($l->t('Add member')); ?>
-					</button>
-					<button type="button" id="team-add-members-bulk" class="azc-btn azc-btn--primary"
-						aria-label="<?php p($l->t('Add several people to this team')); ?>">
-						<?php p($l->t('Add several people…')); ?>
+					<button type="button" id="team-add-members-bulk" class="azc-btn azc-btn--primary">
+						<?php p($l->t('Add people')); ?>
 					</button>
 				</div>
 				<ul id="team-members-list" class="admin-teams__list team-list" aria-label="<?php p($l->t('Team members')); ?>"></ul>
 			</div>
 			<div id="panel-managers" role="tabpanel" aria-labelledby="tab-managers" class="admin-teams__panel team-panel hidden" hidden>
 				<div class="admin-teams__panel-actions panel-actions">
-					<button type="button" id="team-add-manager" class="azc-btn azc-btn--secondary"
-						aria-label="<?php p($l->t('Add manager to team')); ?>">
-						<?php p($l->t('Add manager')); ?>
-					</button>
-					<button type="button" id="team-add-managers-bulk" class="azc-btn azc-btn--primary"
-						aria-label="<?php p($l->t('Add several managers to this team')); ?>">
-						<?php p($l->t('Add several managers…')); ?>
+					<button type="button" id="team-add-managers-bulk" class="azc-btn azc-btn--primary">
+						<?php p($l->t('Add people')); ?>
 					</button>
 				</div>
 				<ul id="team-managers-list" class="admin-teams__list team-list" aria-label="<?php p($l->t('Team managers')); ?>"></ul>

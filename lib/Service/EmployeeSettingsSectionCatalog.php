@@ -21,6 +21,7 @@ final class EmployeeSettingsSectionCatalog
 	public const SECTION_BREAKS = 'breaks';
 	public const SECTION_NOTIFICATIONS = 'notifications';
 	public const SECTION_DATA_PRIVACY = 'data-privacy';
+	public const SECTION_HELP_TEXTS = 'help-texts';
 	public const SECTION_ABOUT = 'about';
 
 	/**
@@ -32,6 +33,7 @@ final class EmployeeSettingsSectionCatalog
 		self::SECTION_BREAKS,
 		self::SECTION_NOTIFICATIONS,
 		self::SECTION_DATA_PRIVACY,
+		self::SECTION_HELP_TEXTS,
 		self::SECTION_ABOUT,
 	];
 
@@ -47,6 +49,7 @@ final class EmployeeSettingsSectionCatalog
 		],
 		'account' => [
 			self::SECTION_DATA_PRIVACY,
+			self::SECTION_HELP_TEXTS,
 			self::SECTION_ABOUT,
 		],
 	];
@@ -60,6 +63,7 @@ final class EmployeeSettingsSectionCatalog
 		self::SECTION_BREAKS => 'breaks.php',
 		self::SECTION_NOTIFICATIONS => 'notifications.php',
 		self::SECTION_DATA_PRIVACY => 'data-privacy.php',
+		self::SECTION_HELP_TEXTS => 'help-texts.php',
 		self::SECTION_ABOUT => 'about.php',
 	];
 
@@ -75,6 +79,7 @@ final class EmployeeSettingsSectionCatalog
 		'settings-notifications-heading' => self::SECTION_NOTIFICATIONS,
 		'settings-data-privacy' => self::SECTION_DATA_PRIVACY,
 		'settings-privacy-heading' => self::SECTION_DATA_PRIVACY,
+		'settings-hints-heading' => self::SECTION_HELP_TEXTS,
 		'settings-compliance-heading' => self::SECTION_ABOUT,
 		'settings-version-heading' => self::SECTION_ABOUT,
 	];
@@ -100,6 +105,7 @@ final class EmployeeSettingsSectionCatalog
 			self::SECTION_BREAKS => $l->t('Breaks'),
 			self::SECTION_NOTIFICATIONS => $l->t('Notifications'),
 			self::SECTION_DATA_PRIVACY => $l->t('Data and privacy'),
+			self::SECTION_HELP_TEXTS => $l->t('Help texts'),
 			self::SECTION_ABOUT => $l->t('About'),
 			default => $l->t('My settings'),
 		};
@@ -111,6 +117,7 @@ final class EmployeeSettingsSectionCatalog
 			self::SECTION_BREAKS => $l->t('Breaks'),
 			self::SECTION_NOTIFICATIONS => $l->t('Notifications'),
 			self::SECTION_DATA_PRIVACY => $l->t('Data & privacy'),
+			self::SECTION_HELP_TEXTS => $l->t('Help texts'),
 			self::SECTION_ABOUT => $l->t('About'),
 			default => $l->t('Settings'),
 		};
@@ -122,6 +129,7 @@ final class EmployeeSettingsSectionCatalog
 			self::SECTION_BREAKS => $l->t('How the app calculates your breaks, and your assigned schedule.'),
 			self::SECTION_NOTIFICATIONS => $l->t('Choose which reminders you want to receive.'),
 			self::SECTION_DATA_PRIVACY => $l->t('Export or permanently delete your personal ArbeitszeitCheck data.'),
+			self::SECTION_HELP_TEXTS => $l->t('Help texts you hid on pages stay hidden until you show them again here or use "Show hint" where they appear.'),
 			self::SECTION_ABOUT => $l->t('Working-time law summary and installed app version.'),
 			default => $l->t('Your personal preferences.'),
 		};

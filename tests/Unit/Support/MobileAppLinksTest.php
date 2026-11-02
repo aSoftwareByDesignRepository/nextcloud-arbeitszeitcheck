@@ -25,6 +25,14 @@ final class MobileAppLinksTest extends TestCase
 			$links->kioskPlayStoreUrl(),
 		);
 		self::assertSame('de.softwarebydesign.arbeitszeitcheck.kiosk', $links->kioskPlayStorePackageId());
+		self::assertSame(
+			'https://apps.apple.com/app/arbeitszeitcheck/id6803192234',
+			$links->appStoreUrl(),
+		);
+		self::assertSame(
+			'https://apps.apple.com/app/arbeitszeitcheck-terminal/id6806563753',
+			$links->kioskAppStoreUrl(),
+		);
 		self::assertTrue($links->playListed());
 	}
 
@@ -48,6 +56,47 @@ final class MobileAppLinksTest extends TestCase
 		self::assertStringContainsString('datenschutz-arbeitszeitcheck-mobile', $dePrivacy);
 		self::assertStringContainsString('privacy-arbeitszeitcheck-terminal', $enKiosk);
 		self::assertStringContainsString('datenschutz-arbeitszeitcheck-terminal', $deKiosk);
+	}
+
+	public function testVendorAppsPageStaysOnTheVendorSite(): void
+	{
+		$links = new MobileAppLinks();
+		self::assertSame(
+			'https://nextcloud.software-by-design.de/en/apps.html',
+			$links->vendorAppsPageUrl('en'),
+		);
+		self::assertSame(
+			'https://nextcloud.software-by-design.de/de/apps.html',
+			$links->vendorAppsPageUrl('de_DE'),
+		);
+	}
+
+	public function testPublicHttpsUrlKeepsOnlyTheExpectedHost(): void
+	{
+		$play = 'https://play.google.com/';
+		$fallback = MobileAppLinks::PLAY_STORE_URL;
+
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl($fallback, $play, $fallback));
+		self::assertSame(
+			'https://play.google.com/store/apps/details?id=other',
+			MobileAppLinks::publicHttpsUrl('  https://play.google.com/store/apps/details?id=other  ', $play, $fallback),
+		);
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('', $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('javascript:alert(1)', $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('data:text/html,hi', $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('http://play.google.com/store', $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('https://play.google.com.evil.com/phish', $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl("https://play.google.com/\nhttps://evil.example", $play, $fallback));
+		self::assertSame($fallback, MobileAppLinks::publicHttpsUrl('https://evil.example/play.google.com/', $play, $fallback));
+		self::assertSame('', MobileAppLinks::publicHttpsUrl('https://play.google.com.evil.com/phish', 'https://play.google.com', $fallback));
+		self::assertSame('', MobileAppLinks::publicHttpsUrl('http://play.google.com/store', 'http://play.google.com/', $fallback));
+		self::assertSame('', MobileAppLinks::publicHttpsUrl('javascript:alert(1)', $play, 'http://evil.example'));
+		self::assertSame('', MobileAppLinks::publicHttpsUrl('', $play, ''));
+		self::assertSame(
+			'https://nextcloud.software-by-design.de/de/apps.html',
+			MobileAppLinks::publicHttpsUrl('https://nextcloud.software-by-design.de/de/apps.html', 'https://nextcloud.software-by-design.de/', ''),
+		);
+		self::assertSame('', MobileAppLinks::publicHttpsUrl('https://evil.example/de/apps.html', 'https://nextcloud.software-by-design.de/', ''));
 	}
 
 	public function testGermanLocaleDetection(): void

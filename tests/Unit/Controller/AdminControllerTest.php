@@ -264,6 +264,8 @@ class AdminControllerTest extends TestCase
 			$this->timeEntryMapper,
 			$l10n,
 			$this->createMock(\Psr\Log\LoggerInterface::class),
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
 		);
 
 		$this->controller = new AdminController(
@@ -1572,6 +1574,65 @@ class AdminControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertFalse($data['success']);
 		$this->assertSame('INVALID_EMPLOYEE_LIST_FILTER', $data['code']);
+	}
+
+	public function testGetUsersRejectsNonStringModel(): void
+	{
+		$this->request->method('getParam')->willReturnCallback(
+			static function (string $key, $default = null) {
+				return match ($key) {
+					'model' => ['5'],
+					default => $default,
+				};
+			}
+		);
+		$this->userManager->expects($this->never())->method('search');
+
+		$response = $this->controller->getUsers();
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('INVALID_EMPLOYEE_LIST_FILTER', $data['code']);
+	}
+
+	public function testGetUsersFiltersByModelAndStatus(): void
+	{
+		$keep = $this->createMock(IUser::class);
+		$keep->method('getUID')->willReturn('keep');
+		$keep->method('getDisplayName')->willReturn('Keep');
+		$keep->method('getEMailAddress')->willReturn('keep@example.com');
+		$keep->method('isEnabled')->willReturn(true);
+
+		$drop = $this->createMock(IUser::class);
+		$drop->method('getUID')->willReturn('drop');
+		$drop->method('getDisplayName')->willReturn('Drop');
+		$drop->method('getEMailAddress')->willReturn('drop@example.com');
+		$drop->method('isEnabled')->willReturn(false);
+
+		$this->userManager->method('search')->willReturn([$keep, $drop]);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findCurrentModelIdsByUserIds')->willReturn([
+			'keep' => 5,
+			'drop' => 5,
+		]);
+		$this->request->method('getParam')->willReturnCallback(
+			static function (string $key, $default = null) {
+				return match ($key) {
+					'model' => '5',
+					'status' => 'enabled',
+					default => $default,
+				};
+			}
+		);
+
+		$response = $this->controller->getUsers();
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertCount(1, $data['users']);
+		$this->assertSame('keep', $data['users'][0]['userId']);
+		$this->assertSame('5', $data['model']);
+		$this->assertSame('enabled', $data['status']);
 	}
 
 	/**
@@ -3225,6 +3286,25 @@ class AdminControllerTest extends TestCase
 
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertFalse($data['success']);
+		$this->assertSame('INVALID_EMPLOYEE_LIST_FILTER', $data['code']);
+	}
+
+	public function testExportUsersRejectsInvalidModel(): void
+	{
+		$this->request->method('getParam')->willReturnCallback(
+			static function (string $key, $default = null) {
+				return match ($key) {
+					'model' => '1e2',
+					default => $default,
+				};
+			}
+		);
+
+		$response = $this->controller->exportUsers('csv');
+		$this->assertInstanceOf(JSONResponse::class, $response);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertSame('INVALID_EMPLOYEE_LIST_FILTER', $data['code']);
 	}
 

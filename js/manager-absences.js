@@ -206,13 +206,16 @@
 			const td = (label, html, cls = '') => Utils.responsiveTd
 				? Utils.responsiveTd(label, html, cls)
 				: `<td${cls ? ` class="${cls}"` : ''}>${html}</td>`;
+			const convertLabel = t('Convert to sick', 'Convert to sick');
 			const actionCell = (entry.type === 'vacation' && entry.status === 'approved')
-				? `<button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-sick-convert
+				? `<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-sick-convert
 						data-sick-convert-flow="manager"
 						data-sick-convert-url="${escapeHtml(Utils.buildAppUrl(`/apps/arbeitszeitcheck/api/manager/employee-absences/${encodeURIComponent(String(entry.id))}/convert-to-sick`))}"
 						data-vac-start="${escapeHtml(entry.startDate || '')}"
 						data-vac-end="${escapeHtml(entry.endDate || '')}"
-						data-updated-at="${escapeHtml(entry.updatedAt || '')}">${escapeHtml(t('Convert to sick', 'Convert to sick'))}</button>`
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						aria-label="${escapeHtml(convertLabel)}"
+						title="${escapeHtml(convertLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('activity') : ''}</button>`
 				: '<span class="text-muted">–</span>';
 			return [
 			'<tr>',

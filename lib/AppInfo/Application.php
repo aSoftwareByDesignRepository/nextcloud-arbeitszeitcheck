@@ -1339,6 +1339,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class),
 				$c->query(\OCP\IL10N::class),
 				$c->query(\Psr\Log\LoggerInterface::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
 			);
 		});
 

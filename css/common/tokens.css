@@ -135,3 +135,24 @@ body[data-theme-dark],
 body[data-theme-dark-highcontrast] {
 	--azc-accent-ink: color-mix(in srgb, var(--color-primary-element) 70%, var(--color-main-text));
 }
+
+/*
+ * Native checkboxes, radios, and other UA widgets inherit color-scheme.
+ * Without this they follow the operating system, so a light Nextcloud on a
+ * dark Mac paints dark boxes. Explicit light/dark themes win; "system default"
+ * is left alone so it can still follow the OS.
+ */
+body[data-theme-light],
+body[data-theme-light-highcontrast],
+body.theme--light,
+body.theme--light-highcontrast {
+	color-scheme: light;
+}
+
+body[data-theme-dark],
+body[data-theme-dark-highcontrast],
+body.theme--dark,
+body.theme--dark-highcontrast,
+html[data-theme="dark"] {
+	color-scheme: dark;
+}

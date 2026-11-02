@@ -490,24 +490,29 @@
 				const btnLabel = c.type === 'pin'
 					? t('deletePin', 'Delete PIN')
 					: t('deleteBadge', 'Delete badge');
-				return '<button type="button" class="azc-btn azc-btn--small azc-btn--danger azc-kiosk-delete-cred" data-id="'
-					+ escapeHtml(String(c.id)) + '">' + escapeHtml(btnLabel) + '</button>';
+				const who = g.displayName || g.userId;
+				const glyph = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
+				return '<button type="button" class="azc-btn azc-btn--danger azc-icon-btn azc-kiosk-delete-cred" data-id="'
+					+ escapeHtml(String(c.id)) + '" aria-label="' + escapeHtml(btnLabel + ': ' + who) + '" title="' + escapeHtml(btnLabel) + '">'
+					+ glyph + '</button>';
 			}).join('');
 			const pinBtnLabel = hasPin
 				? t('newPin', 'New PIN')
 				: t('generatePin', 'Generate PIN');
 			const pinDisabled = (g.kioskAllowed && !pinGenerateInFlight) ? '' : ' disabled aria-disabled="true"';
 			const pinTitle = g.kioskAllowed
-				? ''
-				: ' title="' + escapeHtml(t('enableAccessFirst', 'Allow kiosk access for this employee first')) + '"';
-			const pinAction = '<button type="button" class="azc-btn azc-btn--small azc-kiosk-row-pin"'
+				? pinBtnLabel
+				: t('enableAccessFirst', 'Allow kiosk access for this employee first');
+			const pinGlyph = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('key') : '';
+			const pinAction = '<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn azc-kiosk-row-pin"'
 				+ ' data-user-id="' + escapeHtml(g.userId) + '"'
 				+ ' data-display-name="' + escapeHtml(g.displayName || g.userId) + '"'
 				+ ' data-has-pin="' + (hasPin ? '1' : '0') + '"'
 				+ ' data-kiosk-allowed="' + (g.kioskAllowed ? '1' : '0') + '"'
-				+ pinDisabled + pinTitle
+				+ pinDisabled
+				+ ' title="' + escapeHtml(pinTitle) + '"'
 				+ ' aria-label="' + escapeHtml(pinBtnLabel + ': ' + (g.displayName || g.userId)) + '">'
-				+ escapeHtml(pinBtnLabel) + '</button>';
+				+ pinGlyph + '</button>';
 			const actions = pinAction + deleteActions;
 			return '<tr data-user-id="' + escapeHtml(g.userId) + '">'
 				+ '<td data-label="' + escapeHtml(labels.employee) + '">'

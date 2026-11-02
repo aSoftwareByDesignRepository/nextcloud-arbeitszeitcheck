@@ -26,6 +26,7 @@ $showChrome = !empty($azcSettingsShowCardChrome);
 		</div>
 	</header>
 	<div class="azc-card__body">
+		<?php include __DIR__ . '/_section-intro.php'; ?>
 		<div class="settings-privacy-actions">
 			<a href="<?php print_unescaped((string)($urls['gdprExport'] ?? $urlGenerator->linkToRoute('arbeitszeitcheck.gdpr.export'))); ?>"
 				class="azc-btn azc-btn--secondary"

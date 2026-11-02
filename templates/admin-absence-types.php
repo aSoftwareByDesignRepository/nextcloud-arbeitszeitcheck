@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /**
  * Admin page: custom absence types ("weitere betriebliche Fehlzeiten")
  *
@@ -93,27 +95,39 @@ $localeOptions = $_['localeOptions'] ?? [];
 									<td data-label="<?php p($l->t('Max. days')); ?>"><?php p((string)$type['maxDays']); ?></td>
 									<td data-label="<?php p($l->t('In use')); ?>"><?php p((string)$type['absenceCount']); ?></td>
 									<td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
+										<?php
+										$catName = (string)$type['resolvedLabel'];
+										$catEditLabel = $l->t('Edit') . ': ' . $catName;
+										$catToggleLabel = ($type['active'] ? $l->t('Deactivate') : $l->t('Activate')) . ': ' . $catName;
+										$catDeleteLabel = $l->t('Delete') . ': ' . $catName;
+										?>
 										<div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
 											<button type="button"
-													class="btn btn--sm btn--secondary"
+													class="btn btn--sm btn--secondary azc-icon-btn"
 													data-action="cat-edit"
-													data-type-id="<?php p((string)$type['id']); ?>">
-												<?php p($l->t('Edit')); ?>
+													data-type-id="<?php p((string)$type['id']); ?>"
+													aria-label="<?php p($catEditLabel); ?>"
+													title="<?php p($l->t('Edit')); ?>">
+												<?php print_unescaped(IconCatalog::render('edit')); ?>
 											</button>
 											<button type="button"
-													class="btn btn--sm btn--secondary"
+													class="btn btn--sm btn--secondary azc-icon-btn"
 													data-action="cat-toggle"
 													data-type-id="<?php p((string)$type['id']); ?>"
-													data-active="<?php p($type['active'] ? '1' : '0'); ?>">
-												<?php echo $type['active'] ? p($l->t('Deactivate')) : p($l->t('Activate')); ?>
+													data-active="<?php p($type['active'] ? '1' : '0'); ?>"
+													aria-label="<?php p($catToggleLabel); ?>"
+													title="<?php p($type['active'] ? $l->t('Deactivate') : $l->t('Activate')); ?>">
+												<?php print_unescaped(IconCatalog::render($type['active'] ? 'pause' : 'check')); ?>
 											</button>
 											<button type="button"
-													class="btn btn--sm btn--danger"
+													class="btn btn--sm btn--danger azc-icon-btn"
 													data-action="cat-delete"
 													data-type-id="<?php p((string)$type['id']); ?>"
 													data-type-name="<?php p($type['resolvedLabel']); ?>"
-													data-in-use="<?php p((string)$type['absenceCount']); ?>">
-												<?php p($l->t('Delete')); ?>
+													data-in-use="<?php p((string)$type['absenceCount']); ?>"
+													aria-label="<?php p($catDeleteLabel); ?>"
+													title="<?php p($l->t('Delete')); ?>">
+												<?php print_unescaped(IconCatalog::render('trash')); ?>
 											</button>
 										</div>
 									</td>

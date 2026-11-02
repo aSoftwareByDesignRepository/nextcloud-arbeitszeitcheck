@@ -83,6 +83,7 @@ const EMPLOYEE_VIEWS = [
 	['settings-breaks', '/apps/arbeitszeitcheck/settings/breaks', '#azc-main-content'],
 	['settings-notifications', '/apps/arbeitszeitcheck/settings/notifications', '#azc-main-content'],
 	['settings-data-privacy', '/apps/arbeitszeitcheck/settings/data-privacy', '#azc-main-content'],
+	['settings-help-texts', '/apps/arbeitszeitcheck/settings/help-texts', '#btn-hide-all-hints'],
 	['settings-about', '/apps/arbeitszeitcheck/settings/about', '#azc-main-content'],
 	['get-the-app', '/apps/arbeitszeitcheck/get-the-app', '#azc-main-content'],
 	['substitution-requests', '/apps/arbeitszeitcheck/substitution-requests', '#azc-main-content'],

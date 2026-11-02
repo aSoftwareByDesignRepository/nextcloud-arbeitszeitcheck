@@ -184,6 +184,19 @@ $businessTripsEnabledNav = array_key_exists('businessTripsEnabled', $_)
         </div>
 
         <!-- Navigation Menu -->
+        <style nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+        html.azc-nav-scroll-pending #app-navigation .nav-menu { visibility: hidden; }
+        </style>
+        <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+        (function () {
+            try {
+                var saved = Number(sessionStorage.getItem('azc-nav-menu-scroll'));
+                if (Number.isFinite(saved) && saved > 0) {
+                    document.documentElement.classList.add('azc-nav-scroll-pending');
+                }
+            } catch (e) {}
+        })();
+        </script>
         <ul class="nav-menu">
             <li class="<?php p($isDashboard ? 'active' : ''); ?>" <?php p($isDashboard ? 'aria-current="page"' : ''); ?>>
                 <a href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.page.index')); ?>"
@@ -500,6 +513,42 @@ $businessTripsEnabledNav = array_key_exists('businessTripsEnabled', $_)
             <?php endif; ?>
         </ul>
 		<?php include __DIR__ . '/../parts/feedback-nav-footer.php'; ?>
+        <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
+        (function () {
+            var root = document.getElementById('app-navigation');
+            var menu = root && root.querySelector('.nav-menu');
+            if (!menu) {
+                document.documentElement.classList.remove('azc-nav-scroll-pending');
+                return;
+            }
+            try {
+                var saved = 0;
+                try {
+                    saved = Number(sessionStorage.getItem('azc-nav-menu-scroll'));
+                } catch (e) {
+                    saved = 0;
+                }
+                if (Number.isFinite(saved) && saved > 0) {
+                    menu.scrollTop = saved;
+                }
+                var current = root.querySelector('.nav-menu a[aria-current="page"], .nav-menu li.active > a');
+                if (current && typeof current.getBoundingClientRect === 'function') {
+                    var view = menu.getBoundingClientRect();
+                    var item = current.getBoundingClientRect();
+                    if (view && item && view.height > 0) {
+                        if (item.top < view.top) {
+                            menu.scrollTop -= (view.top - item.top);
+                        } else if (item.bottom > view.bottom) {
+                            menu.scrollTop += (item.bottom - view.bottom);
+                        }
+                    }
+                }
+                menu.dataset.azcNavScrollReady = '1';
+            } finally {
+                document.documentElement.classList.remove('azc-nav-scroll-pending');
+            }
+        })();
+        </script>
     </div>
 
     <!-- Icon rendering now handled by bundled JS: js/common/navigation-icons.js -->

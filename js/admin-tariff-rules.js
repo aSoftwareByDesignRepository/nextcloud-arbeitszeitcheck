@@ -213,20 +213,23 @@
 
 		tbody.innerHTML = ruleSets.map((rs) => {
 			const id = String(rs.id);
+			const glyph = (name) => (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(name) : '';
+			const iconBtn = (action, variant, icon, label, extra = '') =>
+				`<button type="button" class="azc-btn azc-btn--${variant} azc-icon-btn" data-action="${action}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" ${extra}>${glyph(icon)}</button>`;
 			const actions = [];
 			if (rs.status === 'draft') {
-				actions.push(`<button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="edit" data-id="${escapeHtml(id)}">${escapeHtml(l10n('edit'))}</button>`);
+				actions.push(iconBtn('edit', 'secondary', 'edit', l10n('edit')));
 				if (canActivateRuleSet(rs)) {
-					actions.push(`<button type="button" class="azc-btn azc-btn--primary azc-btn--sm" data-action="activate" data-id="${escapeHtml(id)}">${escapeHtml(l10n('activate'))}</button>`);
+					actions.push(iconBtn('activate', 'primary', 'check', l10n('activate')));
 				} else {
-					actions.push(`<button type="button" class="azc-btn azc-btn--primary azc-btn--sm" data-action="activate" data-id="${escapeHtml(id)}" disabled aria-disabled="true" aria-label="${escapeHtml(l10n('activateIncompleteHint'))}">${escapeHtml(l10n('activate'))}</button>`);
+					actions.push(iconBtn('activate', 'primary', 'check', l10n('activateIncompleteHint'), 'disabled aria-disabled="true"'));
 				}
-				actions.push(`<button type="button" class="azc-btn azc-btn--danger azc-btn--sm" data-action="delete" data-id="${escapeHtml(id)}">${escapeHtml(l10n('delete'))}</button>`);
+				actions.push(iconBtn('delete', 'danger', 'trash', l10n('delete')));
 			} else if (rs.status === 'active') {
-				actions.push(`<button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="view" data-id="${escapeHtml(id)}">${escapeHtml(l10n('view'))}</button>`);
-				actions.push(`<button type="button" class="azc-btn azc-btn--danger azc-btn--sm" data-action="retire" data-id="${escapeHtml(id)}">${escapeHtml(l10n('retire'))}</button>`);
+				actions.push(iconBtn('view', 'secondary', 'info', l10n('view')));
+				actions.push(iconBtn('retire', 'danger', 'archive', l10n('retire')));
 			} else {
-				actions.push(`<button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="view" data-id="${escapeHtml(id)}">${escapeHtml(l10n('view'))}</button>`);
+				actions.push(iconBtn('view', 'secondary', 'info', l10n('view')));
 			}
 			const td = (label, html, cls) => Utils.responsiveTd
 				? Utils.responsiveTd(label, html, cls)

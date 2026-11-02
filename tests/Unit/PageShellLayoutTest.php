@@ -33,6 +33,18 @@ class PageShellLayoutTest extends TestCase
 		}
 	}
 
+	public function testAdminOverviewKeepsASingleLeadWithoutMoreHelp(): void
+	{
+		$content = (string)file_get_contents(__DIR__ . '/../../lib/Controller/AdminController.php');
+		$this->assertStringContainsString('function adminOverviewPageHelp(): string', $content);
+		$this->assertSame(2, substr_count($content, "'collapsePageHelp' => false"));
+		$this->assertSame(2, substr_count($content, '$this->adminOverviewPageHelp()'));
+		$this->assertStringNotContainsString(
+			"t('Current key metrics and open working-time compliance issues. Detailed settings are available in the left navigation.'),",
+			$content
+		);
+	}
+
 	public function testAdminUsersControllerMergesShellParams(): void
 	{
 		$content = (string)file_get_contents(__DIR__ . '/../../lib/Controller/AdminController.php');

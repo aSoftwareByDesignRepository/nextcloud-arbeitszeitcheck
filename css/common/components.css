@@ -1068,14 +1068,18 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 .table td.actions-cell {
   text-align: right;
   white-space: nowrap;
-  width: auto;
-  min-width: max-content;
-  max-width: none;
   overflow: visible;
 }
 
 /* Table Responsive */
 @media (max-width: 768.98px) {
+  .table th.azc-table-actions-col,
+  .table td.actions-cell {
+    width: auto;
+    min-width: max-content;
+    max-width: none;
+  }
+
   .table-responsive,
   .table-container,
   .azc-table-wrap {

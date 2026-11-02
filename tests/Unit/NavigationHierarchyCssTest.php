@@ -27,6 +27,12 @@ final class NavigationHierarchyCssTest extends TestCase {
 			$css
 		);
 		self::assertStringContainsString('nav-parent-chevron', $css);
+		self::assertStringContainsString(
+			'.nav-parent-toggle[aria-expanded="true"] .nav-parent-chevron',
+			$css
+		);
+		self::assertStringContainsString('transform: rotate(225deg);', $css);
+		self::assertStringContainsString('cubic-bezier(0.22, 1, 0.36, 1)', $css);
 	}
 
 	public function testInteractionChromeIsInsetRoundedWithoutHoverShift(): void {
@@ -45,6 +51,12 @@ final class NavigationHierarchyCssTest extends TestCase {
 		// Active page uses solid primary fill (not inset bar + light bg).
 		self::assertStringNotContainsString('inset 4px 0 0', $css);
 		self::assertStringContainsString('color-primary-element-hover', $css);
+		// Accordion buttons must fill the same inset row as the links.
+		self::assertStringContainsString(
+			'width: calc(100% - (2 * var(--azc-nav-item-inset, 0.5rem)));',
+			$css
+		);
+		self::assertStringContainsString('margin-inline-start: auto;', $css);
 		// Submenu hover/active surface clears the tree rail via ::after.
 		self::assertStringContainsString('.nav-submenu > li > a::after', $css);
 		self::assertStringContainsString('azc-nav-rail-left) - var(--azc-nav-item-inset)', $css);

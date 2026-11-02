@@ -155,6 +155,26 @@ test.describe('Admin teams bulk Find people (Kraft live)', () => {
 		await expect(hit).toContainText(/\(/) // displayName (uid) shape
 	})
 
+	test('selected person stays as a chip when the search changes', async ({ page }) => {
+		await openBulkMembersModal(page)
+		await typeBulkSearch(page, EMPLOYEE_UID)
+		const hit = page.locator('#bulk-member-results .team-bulk-results__item', { hasText: EMPLOYEE_UID })
+		await expect(hit).toBeVisible({ timeout: 15_000 })
+		await hit.click()
+		const chip = page.locator('#bulk-member-selected .team-bulk-chip', { hasText: EMPLOYEE_UID })
+		await expect(chip).toBeVisible()
+		await expect(hit.locator('input[type="checkbox"]')).toBeChecked()
+		await typeBulkSearch(page, `zzznomatch-${Date.now()}`)
+		await expect(page.locator('#bulk-member-results')).toContainText(
+			/No matching users found|Keine passenden Benutzer gefunden/i,
+		)
+		await expect(chip).toBeVisible()
+		await expect(page.locator('#bulk-member-submit')).toBeEnabled()
+		await chip.locator('.team-bulk-chip__remove').click()
+		await expect(page.locator('#bulk-member-selected')).toBeHidden()
+		await expect(page.locator('#bulk-member-submit')).toBeDisabled()
+	})
+
 	test('no matching users shows empty copy', async ({ page }) => {
 		await openBulkMembersModal(page)
 		const nonsense = `zzznomatch-${Date.now()}`

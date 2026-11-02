@@ -17,6 +17,8 @@ final class MobileAppLinks
 	public const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=de.softwarebydesign.arbeitszeitcheck';
 	public const KIOSK_PLAY_STORE_PACKAGE_ID = 'de.softwarebydesign.arbeitszeitcheck.kiosk';
 	public const KIOSK_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=de.softwarebydesign.arbeitszeitcheck.kiosk';
+	public const APP_STORE_URL = 'https://apps.apple.com/app/arbeitszeitcheck/id6803192234';
+	public const KIOSK_APP_STORE_URL = 'https://apps.apple.com/app/arbeitszeitcheck-terminal/id6806563753';
 	public const PRODUCT_PAGE_PATH = '/en/apps/arbeitszeitcheck.html#mobile-app';
 	public const PRODUCT_PAGE_PATH_DE = '/de/apps/arbeitszeitcheck.html#mobile-app';
 	public const PRIVACY_PAGE_PATH = '/en/privacy-arbeitszeitcheck-mobile.html';
@@ -43,6 +45,45 @@ final class MobileAppLinks
 	public function kioskPlayStorePackageId(): string
 	{
 		return self::KIOSK_PLAY_STORE_PACKAGE_ID;
+	}
+
+	public function appStoreUrl(): string
+	{
+		return self::APP_STORE_URL;
+	}
+
+	public function kioskAppStoreUrl(): string
+	{
+		return self::KIOSK_APP_STORE_URL;
+	}
+
+	public function vendorAppsPageUrl(string $languageCode): string
+	{
+		return (new SupportUsLinks('ArbeitszeitCheck'))->appsPageUrl($languageCode);
+	}
+
+	/**
+	 * Accept an href only when it is https and begins with a host prefix that itself
+	 * ends in "/". A missing slash would treat play.google.com.evil.com as Play.
+	 * Empty or hostile values use $fallback when that fallback is https; otherwise "".
+	 */
+	public static function publicHttpsUrl(string $candidate, string $requiredPrefix, string $fallback): string
+	{
+		if (!str_starts_with($requiredPrefix, 'https://') || !str_ends_with($requiredPrefix, '/')) {
+			return '';
+		}
+		if ($fallback !== '' && !str_starts_with($fallback, 'https://')) {
+			return '';
+		}
+		$candidate = trim($candidate);
+		if ($candidate === '' || preg_match('/[\x00-\x20\x7F\\\\]/', $candidate) === 1) {
+			return $fallback;
+		}
+		if (!str_starts_with($candidate, $requiredPrefix)) {
+			return $fallback;
+		}
+
+		return $candidate;
 	}
 
 	public function playListed(): bool

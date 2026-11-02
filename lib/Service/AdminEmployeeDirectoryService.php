@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\InvalidEmployeeListFilterException;
 use OCA\ArbeitszeitCheck\Support\UserDirectorySearch;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\IL10N;
@@ -19,6 +23,10 @@ final class AdminEmployeeDirectoryService
 {
 	public const FILTER_ALL = 'all';
 	public const FILTER_APP_ACCESS = 'app_access';
+	public const MODEL_NONE = 'none';
+	public const MODEL_PERSONAL = 'personal';
+	public const STATUS_ENABLED = 'enabled';
+	public const STATUS_DISABLED = 'disabled';
 
 	private const MAX_SEARCH_LENGTH = 200;
 
@@ -28,6 +36,8 @@ final class AdminEmployeeDirectoryService
 		private readonly \OCA\ArbeitszeitCheck\Db\TimeEntryMapper $timeEntryMapper,
 		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger,
+		private readonly UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
+		private readonly WorkingTimeModelMapper $workingTimeModelMapper,
 	) {
 	}
 
@@ -56,7 +66,9 @@ final class AdminEmployeeDirectoryService
 	 *   truncated: bool,
 	 *   filter: string,
 	 *   defaultFilter: string,
-	 *   activeToday: bool
+	 *   activeToday: bool,
+	 *   model: string,
+	 *   status: string
 	 * }
 	 */
 	public function listUsers(
@@ -65,6 +77,8 @@ final class AdminEmployeeDirectoryService
 		int $limit,
 		int $offset,
 		bool $activeTodayOnly = false,
+		?string $model = null,
+		?string $status = null,
 	): array {
 		$defaultFilter = $this->resolveDefaultFilter();
 		$normalizedFilter = $filter !== null ? strtolower(trim($filter)) : '';
@@ -76,6 +90,9 @@ final class AdminEmployeeDirectoryService
 				$this->l10n->t('Invalid employee list filter.')
 			);
 		}
+
+		$normalizedModel = $this->normalizeModel($model);
+		$normalizedStatus = $this->normalizeStatus($status);
 
 		$searchTerm = trim($search);
 		if (mb_strlen($searchTerm) > self::MAX_SEARCH_LENGTH) {
@@ -120,6 +137,9 @@ final class AdminEmployeeDirectoryService
 			));
 		}
 
+		$filtered = $this->applyStatusFilter($filtered, $normalizedStatus);
+		$filtered = $this->applyModelFilter($filtered, $normalizedModel);
+
 		usort($filtered, static function (IUser $a, IUser $b): int {
 			$byName = strcasecmp((string)$a->getDisplayName(), (string)$b->getDisplayName());
 			if ($byName !== 0) {
@@ -151,7 +171,111 @@ final class AdminEmployeeDirectoryService
 			'filter' => $normalizedFilter,
 			'defaultFilter' => $defaultFilter,
 			'activeToday' => $activeTodayOnly,
+			'model' => $normalizedModel,
+			'status' => $normalizedStatus,
 		];
+	}
+
+	private function normalizeModel(?string $model): string
+	{
+		if ($model === null) {
+			return '';
+		}
+		$model = strtolower(trim($model));
+		if ($model === '') {
+			return '';
+		}
+		if ($model === self::MODEL_NONE || $model === self::MODEL_PERSONAL) {
+			return $model;
+		}
+		if (preg_match('/^[1-9]\d{0,8}$/', $model) !== 1) {
+			throw new InvalidEmployeeListFilterException(
+				$this->l10n->t('Invalid employee list filter.')
+			);
+		}
+		$id = (int)$model;
+		try {
+			$this->workingTimeModelMapper->find($id);
+		} catch (DoesNotExistException|MultipleObjectsReturnedException) {
+			throw new InvalidEmployeeListFilterException(
+				$this->l10n->t('Invalid employee list filter.')
+			);
+		}
+		return (string)$id;
+	}
+
+	private function normalizeStatus(?string $status): string
+	{
+		if ($status === null) {
+			return '';
+		}
+		$status = strtolower(trim($status));
+		if ($status === '') {
+			return '';
+		}
+		if ($status !== self::STATUS_ENABLED && $status !== self::STATUS_DISABLED) {
+			throw new InvalidEmployeeListFilterException(
+				$this->l10n->t('Invalid employee list filter.')
+			);
+		}
+		return $status;
+	}
+
+	/**
+	 * @param list<IUser> $users
+	 * @return list<IUser>
+	 */
+	private function applyStatusFilter(array $users, string $status): array
+	{
+		if ($status === '') {
+			return $users;
+		}
+		$wantEnabled = $status === self::STATUS_ENABLED;
+		return array_values(array_filter(
+			$users,
+			static fn (IUser $user): bool => $user->isEnabled() === $wantEnabled
+		));
+	}
+
+	/**
+	 * @param list<IUser> $users
+	 * @return list<IUser>
+	 */
+	private function applyModelFilter(array $users, string $model): array
+	{
+		if ($model === '' || $users === []) {
+			return $users;
+		}
+
+		$ids = [];
+		foreach ($users as $user) {
+			$ids[] = (string)$user->getUID();
+		}
+		$today = (new \DateTime())->format('Y-m-d');
+		$current = $this->userWorkingTimeModelMapper->findCurrentModelIdsByUserIds($ids, $today);
+
+		if ($model === self::MODEL_NONE || $model === self::MODEL_PERSONAL) {
+			$flags = $this->workingTimeModelMapper->findPersonalFlagsByIds(array_values($current));
+			return array_values(array_filter(
+				$users,
+				static function (IUser $user) use ($current, $flags, $model): bool {
+					$uid = (string)$user->getUID();
+					$modelId = $current[$uid] ?? null;
+					if ($model === self::MODEL_NONE) {
+						return $modelId === null || !isset($flags[$modelId]);
+					}
+					return $modelId !== null && ($flags[$modelId] ?? false) === true;
+				}
+			));
+		}
+
+		$wanted = (int)$model;
+		return array_values(array_filter(
+			$users,
+			static function (IUser $user) use ($current, $wanted): bool {
+				return ($current[(string)$user->getUID()] ?? null) === $wanted;
+			}
+		));
 	}
 
 	private function matchesAccessFilter(string $userId, string $filter): bool

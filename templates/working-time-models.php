@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /**
  * Working time models template for arbeitszeitcheck app
  *
@@ -61,8 +63,10 @@ $models = $_['models'] ?? [];
                 <tbody id="models-tbody">
                     <?php if (empty($models)): ?>
                         <tr>
-                            <td colspan="7" class="text-center">
-                                <?php p($l->t('No working time models available')); ?>
+                            <td colspan="7" class="azc-table-empty">
+                                <div class="azc-empty-state">
+                                    <h3 class="azc-empty-state__title"><?php p($l->t('No working time models available')); ?></h3>
+                                </div>
                             </td>
                         </tr>
                     <?php else: ?>
@@ -96,28 +100,28 @@ $models = $_['models'] ?? [];
                                 <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                     <div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
                                     <button type="button"
-                                            class="btn btn--sm btn--secondary"
+                                            class="btn btn--sm btn--secondary azc-icon-btn"
                                             data-action="duplicate-model"
                                             data-model-id="<?php p($model['id']); ?>"
                                             aria-label="<?php p($l->t('Copy this work schedule')); ?>"
                                             title="<?php p($l->t('Create a copy of this work schedule as a starting point for a new one')); ?>">
-                                        <?php p($l->t('Copy')); ?>
+                                        <?php print_unescaped(IconCatalog::render('copy')); ?>
                                     </button>
-                                    <button type="button" 
-                                            class="btn btn--sm btn--secondary" 
-                                            data-action="edit-model" 
+                                    <button type="button"
+                                            class="btn btn--sm btn--secondary azc-icon-btn"
+                                            data-action="edit-model"
                                             data-model-id="<?php p($model['id']); ?>"
                                             aria-label="<?php p($l->t('Edit this work schedule')); ?>"
                                             title="<?php p($l->t('Click to change the working hours or name of this work schedule')); ?>">
-                                        <?php p($l->t('Edit')); ?>
+                                        <?php print_unescaped(IconCatalog::render('edit')); ?>
                                     </button>
-                                    <button type="button" 
-                                            class="btn btn--sm btn--danger" 
-                                            data-action="delete-model" 
+                                    <button type="button"
+                                            class="btn btn--sm btn--danger azc-icon-btn"
+                                            data-action="delete-model"
                                             data-model-id="<?php p($model['id']); ?>"
                                             aria-label="<?php p($l->t('Delete this work schedule')); ?>"
                                             title="<?php p($l->t('Click to delete this work schedule. This cannot be undone, so make sure no employees are using it first.')); ?>">
-                                        <?php p($l->t('Delete')); ?>
+                                        <?php print_unescaped(IconCatalog::render('trash')); ?>
                                     </button>
                                     </div>
                                 </td>

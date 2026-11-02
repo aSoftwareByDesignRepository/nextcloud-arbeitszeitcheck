@@ -23,6 +23,10 @@ class WorkingTimeModelsInlineEditorContractTest extends TestCase
 		$this->assertStringContainsString('wtm-editor-panel', $tpl);
 		$this->assertStringContainsString('descriptionOptional', $tpl);
 		$this->assertStringContainsString('editorLead', $tpl);
+		$this->assertStringContainsString('class="azc-table-empty"', $tpl);
+		$this->assertStringContainsString('class="azc-empty-state"', $tpl);
+		$this->assertStringContainsString('class="azc-empty-state__title"', $tpl);
+		$this->assertStringNotContainsString('colspan="7" class="text-center"', $tpl);
 	}
 
 	public function testJsUsesInlinePanelNotCreateEditModals(): void

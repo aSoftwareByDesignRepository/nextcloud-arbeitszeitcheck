@@ -29,6 +29,7 @@ $breakPolicyPresenceLines = is_array($breakPolicy['presenceLines'] ?? null) ? $b
 		</div>
 	</header>
 	<div class="azc-card__body">
+		<?php include __DIR__ . '/_section-intro.php'; ?>
 		<form id="working-time-settings-form" class="settings-form">
 			<div class="settings-form__group">
 				<div class="settings-form__checkbox">

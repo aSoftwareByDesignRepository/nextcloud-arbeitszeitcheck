@@ -27,11 +27,13 @@ final class KraftBulkRoutesContractTest extends TestCase
 		}
 	}
 
-	public function testTeamsUiKeepsSingleAddAndAddsBulk(): void
+	public function testTeamsUiHasOneAddPeopleButtonPerPanel(): void
 	{
 		$tpl = (string)file_get_contents(__DIR__ . '/../../../templates/admin-teams.php');
-		$this->assertStringContainsString('id="team-add-member"', $tpl);
+		$this->assertStringNotContainsString('id="team-add-member"', $tpl);
+		$this->assertStringNotContainsString('id="team-add-manager"', $tpl);
 		$this->assertStringContainsString('id="team-add-members-bulk"', $tpl);
 		$this->assertStringContainsString('id="team-add-managers-bulk"', $tpl);
+		$this->assertSame(2, substr_count($tpl, "t('Add people')"));
 	}
 }

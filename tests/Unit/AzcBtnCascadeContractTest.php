@@ -15,6 +15,28 @@ use PHPUnit\Framework\TestCase;
  * hardened scopes / lacked button CSS entirely.
  */
 final class AzcBtnCascadeContractTest extends TestCase {
+	public function testStatTileAnchorsStayOutOfProseLinkUnderline(): void {
+		$root = dirname(__DIR__, 2);
+		$files = [
+			$root . '/css/common/base.css',
+			$root . '/css/common/typography.css',
+			$root . '/css/common/accessibility.css',
+		];
+		foreach ($files as $path) {
+			$css = (string)file_get_contents($path);
+			$matched = preg_match_all(
+				'/#app-content-wrapper a:[^{]*\{[^}]*(?:text-decoration:\s*underline|text-decoration:\s*var\(--arbeitszeitcheck-link-decoration\))/',
+				$css,
+				$rules
+			);
+			self::assertNotFalse($matched, $path);
+			self::assertGreaterThan(0, $matched, $path);
+			foreach ($rules[0] as $rule) {
+				self::assertStringContainsString(':not(.azc-stat-tile)', $rule, $path);
+			}
+		}
+	}
+
 	public function testLinkResetsExcludeAzcBtn(): void {
 		$root = dirname(__DIR__, 2);
 		$files = [

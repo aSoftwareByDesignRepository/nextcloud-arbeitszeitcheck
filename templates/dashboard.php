@@ -317,9 +317,6 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             && !$projectCheckEnabled
                             && $showClockInButton;
                         ?>
-                        <?php if ($showProjectCheckLinkingOffHint): ?>
-                            <?php $azcProjectCheckCalloutContext = 'dashboard'; include __DIR__ . '/partials/projectcheck-linking-disabled-callout.php'; ?>
-                        <?php endif; ?>
                         <?php if ($showProjectCheckEmptyHint): ?>
                         <div class="azc-callout azc-callout--info azc-dashboard-project-picker-empty" role="status">
                             <span class="azc-callout__icon azc-notif-icon-well" aria-hidden="true"><?php print_unescaped(IconCatalog::render('briefcase', 'azc-callout__icon-svg')); ?></span>
@@ -505,6 +502,13 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                            aria-label="<?php p($l->t('Times are shown in your timezone (%s).', [$arbeitszeitCheckUserDisplayTz->getName()])); ?>">
                             <?php p($l->t('All times in %s', [$arbeitszeitCheckUserDisplayTz->getName()])); ?>
                         </p>
+                        <?php if ($showProjectCheckLinkingOffHint): ?>
+                            <?php
+                            $azcProjectCheckCalloutContext = 'dashboard';
+                            $azcProjectCheckCalloutDismissible = true;
+                            include __DIR__ . '/partials/projectcheck-linking-disabled-callout.php';
+                            ?>
+                        <?php endif; ?>
                     </div>
                 </article>
                 <?php endif; ?>
@@ -1170,12 +1174,12 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                         $canEdit = $entry->canEdit(\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS);
                                         if ($canEdit):
                                         ?>
-                                            <button class="btn btn--sm btn--secondary"
+                                            <button class="btn btn--sm btn--secondary azc-icon-btn"
                                                 data-entry-id="<?php p($entry->getId()); ?>"
                                                 type="button"
                                                 aria-label="<?php p($l->t('Edit this time entry')); ?>"
                                                 title="<?php p($l->t('Click to edit this time entry')); ?>">
-                                                <?php p($l->t('Edit')); ?>
+                                                <?php print_unescaped(IconCatalog::render('edit')); ?>
                                             </button>
                                         <?php endif; ?>
                                         </div>

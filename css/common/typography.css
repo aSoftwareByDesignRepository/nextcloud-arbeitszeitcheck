@@ -150,19 +150,19 @@
 }
 
 /* Link Styles - Scoped to app content only to avoid affecting Nextcloud navigation.
- * Exclude button-styled anchors, badge chips, and settings chip-bar links so semantic ink wins. */
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link) {
+ * Exclude button-styled anchors, badge chips, settings chip-bar links, and stat tiles so semantic ink wins. */
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile) {
   color: var(--arbeitszeitcheck-link-color);
   text-decoration: var(--arbeitszeitcheck-link-decoration);
   transition: var(--arbeitszeitcheck-link-transition);
 }
 
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):hover {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile):hover {
   color: var(--arbeitszeitcheck-link-color-hover);
   text-decoration: var(--arbeitszeitcheck-link-decoration-hover);
 }
 
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):focus {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile):focus {
   outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
   outline-offset: 2px;
 }

@@ -5,8 +5,8 @@
 @import url('common/tokens.css?v=20261019-tint');
 @import url('common/icons.css');
 @import url('common/colors.css');
-@import url('common/typography.css');
-@import url('common/base.css');
+@import url('common/typography.css?v=20261031-tile');
+@import url('common/base.css?v=20261031-tile');
 @import url('common/components.css');
 @import url('common/user-picker.css');
 @import url('common/layout.css');
@@ -18,7 +18,7 @@
 @import url('common/utilities.css');
 @import url('common/responsive.css');
 @import url('common/mobile-nav.css');
-@import url('common/accessibility.css');
+@import url('common/accessibility.css?v=20261031-tile');
 @import url('common/semantic-surfaces.css');
 @import url('common/callout-banner.css');
 @import url('common/legacy-alert.css');
@@ -1077,6 +1077,35 @@ dialog .button.ghost,
 		min-height: var(--azc-touch, 44px);
 		min-width: 0;
 	}
+}
+
+/* Icon-only controls. The accessible name stays on aria-label / title.
+   Square 44px so a row of pen / bin / info buttons lines up. */
+#app-content.azc-app .azc-icon-btn,
+#app-content-wrapper .azc-icon-btn,
+.azc-nc-admin-settings .azc-icon-btn,
+.azc-nc-settings-panel .azc-icon-btn,
+.azc-app .btn.azc-icon-btn,
+.azc-dialog .azc-icon-btn,
+dialog .azc-icon-btn,
+[role="dialog"] .azc-icon-btn {
+	width: var(--azc-touch, 44px);
+	height: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	max-width: var(--azc-touch, 44px);
+	min-height: var(--azc-touch, 44px);
+	padding: 0;
+	gap: 0;
+	flex: 0 0 auto;
+}
+
+#app-content.azc-app .azc-icon-btn .azc-icon,
+#app-content-wrapper .azc-icon-btn .azc-icon,
+.azc-nc-admin-settings .azc-icon-btn .azc-icon,
+.azc-app .btn.azc-icon-btn .azc-icon,
+.azc-dialog .azc-icon-btn .azc-icon {
+	width: var(--azc-icon-md, 1.125rem);
+	height: var(--azc-icon-md, 1.125rem);
 }
 
 #app-content.azc-app .azc-btn[aria-busy="true"],

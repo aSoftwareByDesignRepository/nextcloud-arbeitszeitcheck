@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
@@ -276,5 +277,82 @@ class UserWorkingTimeModelMapper extends QBMapper
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
 		return $qb->executeStatement();
+	}
+
+	/**
+	 * Current working-time-model id for each user, matching {@see findCurrentByUser}.
+	 *
+	 * Overlapping rows: the latest start_date wins, then the highest id.
+	 * Users with no assignment that covers $today are omitted.
+	 *
+	 * @param list<string> $userIds
+	 * @return array<string, int> user id => model id
+	 */
+	public function findCurrentModelIdsByUserIds(array $userIds, string $today): array
+	{
+		$ids = [];
+		foreach ($userIds as $userId) {
+			$userId = trim((string)$userId);
+			if ($userId !== '') {
+				$ids[$userId] = $userId;
+			}
+		}
+		if ($ids === []) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('user_id', 'working_time_model_id', 'start_date', 'id')
+			->from($this->getTableName())
+			->where(QueryInChunker::in($qb, 'user_id', array_values($ids), IQueryBuilder::PARAM_STR_ARRAY))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($today, IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->isNull('end_date'),
+				$qb->expr()->gte('end_date', $qb->createNamedParameter($today, IQueryBuilder::PARAM_STR))
+			));
+
+		$result = $qb->executeQuery();
+		$rows = [];
+		while ($row = $result->fetch()) {
+			$rows[] = $row;
+		}
+		$result->closeCursor();
+
+		return self::pickCurrentModelIds($rows);
+	}
+
+	/**
+	 * Collapse assignment rows to one model id per user.
+	 *
+	 * @param list<array<string, mixed>> $rows
+	 * @return array<string, int>
+	 */
+	public static function pickCurrentModelIds(array $rows): array
+	{
+		$best = [];
+		foreach ($rows as $row) {
+			$uid = trim((string)($row['user_id'] ?? ''));
+			if ($uid === '') {
+				continue;
+			}
+			$modelId = (int)($row['working_time_model_id'] ?? 0);
+			if ($modelId < 1) {
+				continue;
+			}
+			$start = (string)($row['start_date'] ?? '');
+			$id = (int)($row['id'] ?? 0);
+			$current = $best[$uid] ?? null;
+			if ($current === null
+				|| $start > $current['start']
+				|| ($start === $current['start'] && $id > $current['id'])) {
+				$best[$uid] = ['start' => $start, 'id' => $id, 'model' => $modelId];
+			}
+		}
+
+		$map = [];
+		foreach ($best as $uid => $row) {
+			$map[$uid] = $row['model'];
+		}
+		return $map;
 	}
 }

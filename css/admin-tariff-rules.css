@@ -265,13 +265,21 @@
 	}
 
 	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__row-actions {
-		flex-direction: column;
-		align-items: stretch;
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		align-items: center;
 	}
 
-	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__row-actions .azc-btn {
+	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__row-actions .azc-btn:not(.azc-icon-btn) {
 		width: 100%;
 		justify-content: center;
+	}
+
+	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__row-actions .azc-icon-btn {
+		width: var(--azc-touch, 44px);
+		max-width: var(--azc-touch, 44px);
+		flex: 0 0 auto;
 	}
 
 	#app-content.azc-app--admin-tariff-rules .admin-tariff-rules__modal,

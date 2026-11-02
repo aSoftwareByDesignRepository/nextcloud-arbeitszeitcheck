@@ -33,6 +33,9 @@ final class GetTheAppPageContractTest extends TestCase
 		self::assertStringContainsString('MobileAppLinks', $php);
 		self::assertStringContainsString("'playStore'", $php);
 		self::assertStringContainsString("'kioskPlayStore'", $php);
+		self::assertStringContainsString("'appStore'", $php);
+		self::assertStringContainsString("'kioskAppStore'", $php);
+		self::assertStringContainsString("'vendorApps'", $php);
 
 		$shell = (string) file_get_contents($this->root . '/lib/Controller/PageShellTrait.php');
 		self::assertStringContainsString('arbeitszeitcheck.page.getTheApp', $shell);
@@ -56,14 +59,47 @@ final class GetTheAppPageContractTest extends TestCase
 		self::assertStringContainsString('azc-get-app__features', $tpl);
 		self::assertStringContainsString('azc-get-app__actions', $tpl);
 		self::assertStringContainsString('azc-get-app__play', $tpl);
-		self::assertStringContainsString('azc-btn azc-btn--primary azc-get-app__play', $tpl);
+		self::assertStringContainsString('azc-get-app__vendor', $tpl);
+		self::assertStringContainsString('azc-btn azc-btn--primary azc-get-app__store-link azc-get-app__store-link--primary azc-get-app__play', $tpl);
+		self::assertStringContainsString('azc-btn azc-btn--secondary azc-get-app__store-link azc-get-app__play', $tpl);
+		self::assertStringContainsString('azc-btn azc-btn--secondary azc-get-app__store-link"', $tpl);
 		self::assertStringContainsString('rel="noopener noreferrer"', $tpl);
 		self::assertStringContainsString('target="_blank"', $tpl);
+		self::assertStringContainsString('MobileAppLinks::publicHttpsUrl(', $tpl);
 		self::assertStringContainsString('MobileAppLinks::PLAY_STORE_URL', $tpl);
 		self::assertStringContainsString('MobileAppLinks::KIOSK_PLAY_STORE_URL', $tpl);
-		self::assertStringContainsString("str_starts_with(\$playStore, 'https://play.google.com/')", $tpl);
-		self::assertStringContainsString("str_starts_with(\$kioskPlay, 'https://play.google.com/')", $tpl);
+		self::assertStringContainsString('MobileAppLinks::APP_STORE_URL', $tpl);
+		self::assertStringContainsString('MobileAppLinks::KIOSK_APP_STORE_URL', $tpl);
+		self::assertStringContainsString("'https://play.google.com/'", $tpl);
+		self::assertStringContainsString("'https://apps.apple.com/'", $tpl);
+		self::assertStringContainsString('SupportUsLinks::SITE_ORIGIN', $tpl);
+		self::assertStringContainsString('On Google Play', $tpl);
+		self::assertStringContainsString('On the App Store', $tpl);
+		self::assertStringContainsString('Built by Software by Design', $tpl);
+		self::assertStringContainsString('All Check apps', $tpl);
+		self::assertStringContainsString('azc-btn azc-btn--primary azc-get-app__action azc-get-app__action--primary', $tpl);
+		self::assertStringContainsString('azc-btn azc-btn--secondary azc-get-app__action', $tpl);
+		self::assertStringContainsString('gap: var(--azc-space-7, 48px)', (string) file_get_contents($this->root . '/css/get-the-app.css'));
+		self::assertStringContainsString('Benefits of the mobile apps', $tpl);
+		self::assertStringContainsString('Official apps for Android and iOS', $tpl);
 		self::assertStringNotContainsString('The Nextcloud web app stays free (AGPL)', $tpl);
+		$playHeading = strpos($tpl, 'On Google Play');
+		$mobilePlay = strpos($tpl, 'ArbeitszeitCheck Mobile on Google Play');
+		$terminalPlay = strpos($tpl, 'Terminal app on Google Play');
+		$appleHeading = strpos($tpl, 'On the App Store');
+		$mobileApple = strpos($tpl, 'ArbeitszeitCheck Mobile on the App Store');
+		$terminalApple = strpos($tpl, 'Terminal app on the App Store');
+		self::assertNotFalse($playHeading);
+		self::assertNotFalse($mobilePlay);
+		self::assertNotFalse($terminalPlay);
+		self::assertNotFalse($appleHeading);
+		self::assertNotFalse($mobileApple);
+		self::assertNotFalse($terminalApple);
+		self::assertLessThan($mobilePlay, $playHeading);
+		self::assertLessThan($terminalPlay, $mobilePlay);
+		self::assertLessThan($appleHeading, $terminalPlay);
+		self::assertLessThan($mobileApple, $appleHeading);
+		self::assertLessThan($terminalApple, $mobileApple);
 	}
 
 	public function testIconsAndChromeIncludeSmartphone(): void
@@ -90,11 +126,15 @@ final class GetTheAppPageContractTest extends TestCase
 			$css,
 		);
 		self::assertMatchesRegularExpression(
-			'/\.azc-get-app__feature[^{]*\{[^}]*background:\s*transparent/s',
+			'/\.azc-get-app__features[^{]*\{[^}]*grid-template-columns:\s*1fr/s',
 			$css,
 		);
 		self::assertMatchesRegularExpression(
-			'/#app-content\.azc-app--get-the-app a\.azc-get-app__play[^{]*\{[^}]*background-color:\s*var\(--color-primary-element\)\s*!important/s',
+			'/\.azc-get-app__feature[^{]*\{[^}]*background:\s*var\(--azc-bg-card,\s*var\(--color-main-background\)\)/s',
+			$css,
+		);
+		self::assertMatchesRegularExpression(
+			'/#app-content\.azc-app--get-the-app a\.azc-get-app__store-link--primary[^{]*\{[^}]*background-color:\s*var\(--color-primary-element\)\s*!important/s',
 			$css,
 		);
 		self::assertMatchesRegularExpression(
@@ -102,7 +142,7 @@ final class GetTheAppPageContractTest extends TestCase
 			$css,
 		);
 		self::assertMatchesRegularExpression(
-			'/\.azc-get-app__action[^{]*\{[^}]*border:\s*2px\s+solid\s+var\(--color-primary-element\)/s',
+			'/\.azc-get-app__action[^{]*\{[^}]*border:\s*1px\s+solid\s+var\(--color-primary-element\)/s',
 			$css,
 		);
 		self::assertMatchesRegularExpression(
@@ -115,6 +155,15 @@ final class GetTheAppPageContractTest extends TestCase
 		self::assertStringContainsString(':focus:not(:focus-visible)', $css);
 		self::assertStringContainsString('var(--color-primary-element)', $css);
 		self::assertStringContainsString('var(--color-primary-element-text)', $css);
+		self::assertMatchesRegularExpression(
+			'/\.azc-get-app__section-title[^{]*\{[^}]*font-size:\s*clamp\(/s',
+			$css,
+		);
+		self::assertMatchesRegularExpression(
+			'/\.azc-get-app__section-title::after[^{]*\{[^}]*background:\s*var\(--color-primary-element\)/s',
+			$css,
+		);
+		self::assertStringContainsString('.azc-get-app__vendor', $css);
 		self::assertDoesNotMatchRegularExpression('/#[0-9a-fA-F]{3,8}\\b/', $css);
 		self::assertSame(MobileAppLinks::PLAY_STORE_PACKAGE_ID, 'de.softwarebydesign.arbeitszeitcheck');
 		self::assertTrue(MobileAppLinks::PLAY_LISTED);

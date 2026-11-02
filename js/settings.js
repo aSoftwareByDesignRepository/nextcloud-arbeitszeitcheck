@@ -38,6 +38,15 @@
          * Initialize the settings page
          */
         init: function() {
+            this.setupSectionSwitch();
+            this.refreshSection();
+        },
+
+        /**
+         * Bind the forms that belong to the topic currently in the page.
+         * Called again after a topic swap, because those nodes are new.
+         */
+        refreshSection: function() {
             this.loadCurrentSettings().then(() => {
                 if (document.getElementById('working-time-settings-form')) {
                     this.setupWorkingTimeForm();
@@ -46,26 +55,206 @@
                     this.setupNotificationForm();
                 }
                 this.setupGdprDelete();
-                this.setupShowAllHints();
+                this.setupHelpTextShortcuts();
                 this.loadWorkingTimeModelInfo();
             });
         },
 
         /**
-         * B-2: "Show all help texts again" — clears the dismissed_hints set.
+         * Swap only the topic panel. The header, topic row, and card top stay put,
+         * so a full document load cannot flash or shift them.
          */
-        setupShowAllHints: function() {
-            const btn = document.getElementById('btn-show-all-hints');
-            if (!btn) {
+        setupSectionSwitch: function() {
+            const nav = document.getElementById('azc-employee-settings-pages');
+            if (!nav || nav.dataset.azcSwitchBound === '1') {
+                return;
+            }
+            nav.dataset.azcSwitchBound = '1';
+            const self = this;
+            let requestId = 0;
+
+            const sectionPath = function(href) {
+                try {
+                    return new URL(href, window.location.href).pathname.replace(/\/+$/, '');
+                } catch (e) {
+                    return '';
+                }
+            };
+
+            const applyDocument = function(html, url) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const nextContainer = doc.querySelector('.settings-container');
+                const container = document.querySelector('.settings-container');
+                const currentNav = document.getElementById('azc-employee-settings-pages');
+                if (!nextContainer || !container || !currentNav) {
+                    window.location.assign(url);
+                    return false;
+                }
+                const incomingNav = nextContainer.querySelector('#azc-employee-settings-pages');
+                let node = incomingNav ? incomingNav.nextSibling : null;
+                while (currentNav.nextSibling) {
+                    currentNav.nextSibling.remove();
+                }
+                while (node) {
+                    const following = node.nextSibling;
+                    container.appendChild(document.importNode(node, true));
+                    node = following;
+                }
+                const targetPath = sectionPath(url);
+                currentNav.querySelectorAll('a.azc-settings-nav__link').forEach(function(link) {
+                    const active = sectionPath(link.href) === targetPath;
+                    link.classList.toggle('is-active', active);
+                    if (active) {
+                        link.setAttribute('aria-current', 'page');
+                    } else {
+                        link.removeAttribute('aria-current');
+                    }
+                });
+                const nextTitle = doc.querySelector('#azc-page-title');
+                const liveTitle = document.querySelector('#azc-page-title');
+                if (nextTitle && liveTitle) {
+                    liveTitle.textContent = nextTitle.textContent;
+                }
+                const nextCrumb = doc.querySelector('.azc-breadcrumb__current');
+                const liveCrumb = document.querySelector('.azc-breadcrumb__current');
+                if (nextCrumb && liveCrumb) {
+                    liveCrumb.textContent = nextCrumb.textContent;
+                }
+                if (doc.title) {
+                    document.title = doc.title;
+                }
+                if (window.ArbeitszeitCheck) {
+                    const parts = targetPath.split('/');
+                    window.ArbeitszeitCheck.settingsSection = parts[parts.length - 1] || '';
+                }
+                return true;
+            };
+
+            const load = function(url, push) {
+                const id = ++requestId;
+                const container = document.querySelector('.settings-container');
+                if (container) {
+                    container.setAttribute('aria-busy', 'true');
+                }
+                fetch(url, {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'text/html' }
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(function(html) {
+                    if (id !== requestId) {
+                        return;
+                    }
+                    if (!applyDocument(html, url)) {
+                        return;
+                    }
+                    if (push) {
+                        window.history.pushState({ azcSettingsSection: true }, '', url);
+                    }
+                    self.refreshSection();
+                })
+                .catch(function() {
+                    if (id === requestId) {
+                        window.location.assign(url);
+                    }
+                })
+                .finally(function() {
+                    if (id === requestId && container) {
+                        container.removeAttribute('aria-busy');
+                    }
+                });
+            };
+
+            nav.addEventListener('click', function(event) {
+                if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                }
+                const link = event.target && event.target.closest
+                    ? event.target.closest('a.azc-settings-nav__link')
+                    : null;
+                if (!link || !nav.contains(link)) {
+                    return;
+                }
+                if (link.getAttribute('aria-current') === 'page') {
+                    event.preventDefault();
+                    return;
+                }
+                event.preventDefault();
+                load(link.href, true);
+            });
+
+            window.addEventListener('popstate', function() {
+                const path = sectionPath(window.location.href);
+                const known = Array.from(nav.querySelectorAll('a.azc-settings-nav__link')).some(function(link) {
+                    return sectionPath(link.href) === path;
+                });
+                if (!known) {
+                    window.location.reload();
+                    return;
+                }
+                load(window.location.href, false);
+            });
+        },
+
+        /**
+         * Help texts tab: hide every known hint, or show them all again.
+         * Hide sends the stored set plus the catalog, so unknown ids stay dismissed.
+         */
+        setupHelpTextShortcuts: function() {
+            const hideBtn = document.getElementById('btn-hide-all-hints');
+            const showBtn = document.getElementById('btn-show-all-hints');
+            if (!hideBtn && !showBtn) {
                 return;
             }
             const status = document.getElementById('show-all-hints-status');
-            btn.addEventListener('click', function() {
-                if (btn.disabled) {
+            const readIds = function(elementId) {
+                const tag = document.getElementById(elementId);
+                if (!tag) {
+                    return [];
+                }
+                try {
+                    const parsed = JSON.parse(tag.textContent || '[]');
+                    if (!Array.isArray(parsed)) {
+                        return [];
+                    }
+                    return parsed.filter((id) => typeof id === 'string' && id !== '');
+                } catch (e) {
+                    return [];
+                }
+            };
+            const say = function(msgid) {
+                return (typeof window.t === 'function')
+                    ? window.t('arbeitszeitcheck', msgid)
+                    : msgid;
+            };
+            const paintCount = function(shown) {
+                if (!status) {
                     return;
                 }
-                btn.disabled = true;
-                btn.setAttribute('aria-busy', 'true');
+                const total = status.getAttribute('data-total') || '0';
+                const template = Number(shown) === 1
+                    ? status.getAttribute('data-one')
+                    : status.getAttribute('data-many');
+                if (!template) {
+                    return;
+                }
+                status.textContent = template
+                    .replace('%n', String(shown))
+                    .replace('%s', total)
+                    .replace('{count}', String(shown))
+                    .replace('{total}', total);
+            };
+            const postHints = function(ids, busyBtn, onOk) {
+                if (busyBtn.disabled && busyBtn.getAttribute('aria-busy') === 'true') {
+                    return;
+                }
+                busyBtn.disabled = true;
+                busyBtn.setAttribute('aria-busy', 'true');
                 const apiUrl = (window.ArbeitszeitCheck?.apiUrl?.updateSettings)
                     || azcGenerateUrl('/apps/arbeitszeitcheck/settings');
                 fetch(apiUrl, {
@@ -75,33 +264,70 @@
                         'requesttoken': azcRequestToken()
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ dismissed_hints: [] })
+                    body: JSON.stringify({ dismissed_hints: ids })
                 })
                 .then((r) => r.json())
                 .then((result) => {
                     if (result && result.success) {
-                        if (status) {
-                            status.textContent = (typeof window.t === 'function')
-                                ? window.t('arbeitszeitcheck', 'All help texts are visible again.')
-                                : 'All help texts are visible again.';
-                        }
+                        onOk();
                     } else {
-                        btn.disabled = false;
+                        busyBtn.disabled = false;
                         if (status) {
-                            status.textContent = (result && result.error) || ((typeof window.t === 'function') ? window.t('arbeitszeitcheck', 'Could not save. Please try again.') : 'Could not save. Please try again.');
+                            status.textContent = (result && result.error) || say('Could not save. Please try again.');
                         }
                     }
                 })
                 .catch(() => {
-                    btn.disabled = false;
+                    busyBtn.disabled = false;
                     if (status) {
-                        status.textContent = (typeof window.t === 'function') ? window.t('arbeitszeitcheck', 'Could not save. Please try again.') : 'Could not save. Please try again.';
+                        status.textContent = say('Could not save. Please try again.');
                     }
                 })
                 .finally(() => {
-                    btn.removeAttribute('aria-busy');
+                    busyBtn.removeAttribute('aria-busy');
                 });
-            });
+            };
+
+            if (hideBtn) {
+                hideBtn.addEventListener('click', function() {
+                    if (hideBtn.disabled) {
+                        return;
+                    }
+                    const known = readIds('azc-help-text-ids');
+                    if (known.length === 0) {
+                        return;
+                    }
+                    const current = readIds('azc-dismissed-hints-data');
+                    const next = [];
+                    const seen = new Set();
+                    known.concat(current).forEach((id) => {
+                        if (!seen.has(id)) {
+                            seen.add(id);
+                            next.push(id);
+                        }
+                    });
+                    postHints(next, hideBtn, function() {
+                        if (showBtn) {
+                            showBtn.disabled = false;
+                        }
+                        paintCount(0);
+                    });
+                });
+            }
+
+            if (showBtn) {
+                showBtn.addEventListener('click', function() {
+                    if (showBtn.disabled) {
+                        return;
+                    }
+                    postHints([], showBtn, function() {
+                        if (hideBtn) {
+                            hideBtn.disabled = false;
+                        }
+                        paintCount(Number(status && status.getAttribute('data-total')) || 0);
+                    });
+                });
+            }
         },
 
         /**

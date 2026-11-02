@@ -242,16 +242,19 @@
 						const hours = formatHours(row.hours_paid);
 						const processed = formatProcessedAt(row.created_at || row.processed_at);
 						const links = [];
+						const glyph = (icon) => (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(icon) : '';
 						if (row.audit_log_url) {
-							links.push('<a href="' + escapeHtml(row.audit_log_url) + '" class="azc-btn azc-btn--secondary azc-btn--sm">'
-								+ escapeHtml(i18n.auditLog || 'Activity log') + '</a>');
+							const auditLabel = i18n.auditLog || 'Activity log';
+							links.push('<a href="' + escapeHtml(row.audit_log_url) + '" class="azc-btn azc-btn--secondary azc-icon-btn" aria-label="' + escapeHtml(auditLabel) + '" title="' + escapeHtml(auditLabel) + '">'
+								+ glyph('scroll-text') + '</a>');
 						}
 						if (row.pdf_url) {
-							links.push('<a href="' + escapeHtml(row.pdf_url) + '" class="azc-btn azc-btn--secondary azc-btn--sm" target="_blank" rel="noopener noreferrer">'
-								+ escapeHtml(i18n.monthPdf || 'Month-closure PDF') + '</a>');
+							const pdfLabel = i18n.monthPdf || 'Month-closure PDF';
+							links.push('<a href="' + escapeHtml(row.pdf_url) + '" class="azc-btn azc-btn--secondary azc-icon-btn" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(pdfLabel) + '" title="' + escapeHtml(pdfLabel) + '">'
+								+ glyph('file-down') + '</a>');
 						}
 						const actionsHtml = links.length > 0
-							? links.join(' ')
+							? '<div class="azc-table-actions" role="group" aria-label="' + escapeHtml(i18n.colActions || 'Actions') + '">' + links.join('') + '</div>'
 							: '<span class="admin-ot-audit__muted">' + escapeHtml(i18n.noActions || '—') + '</span>';
 						const timeCell = processed.datetime
 							? '<time datetime="' + escapeHtml(processed.datetime) + '">' + escapeHtml(processed.display) + '</time>'

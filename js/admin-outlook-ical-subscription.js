@@ -135,8 +135,11 @@
 		const windowLine = escapeHtml(formatWindowRange(entry.windowStart, entry.windowEnd) || '—')
 		const feedFieldId = 'outlookIcalFeedUrl-' + subscriptionId
 		const webcalUrl = String(entry.feedWebcalUrl || entry.feedUrl || '')
-		const copyLabel = escapeHtml(l10n.outlookCopyLink || 'Copy link')
-		const rotateLabel = escapeHtml(l10n.outlookRotateLink || 'Rotate link')
+		const copyLabelRaw = l10n.outlookCopyLink || 'Copy link'
+		const rotateLabelRaw = l10n.outlookRotateLink || 'Rotate link'
+		const copyLabel = escapeHtml(copyLabelRaw)
+		const rotateLabel = escapeHtml(rotateLabelRaw)
+		const glyph = (name) => (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(name) : ''
 		const col = (key) => escapeHtml(colLabels[key] || key)
 
 		const hasCopyableUrl = entry.urlAvailable && webcalUrl !== ''
@@ -154,12 +157,13 @@
 
 		const actions = '<div class="azc-table-actions outlook-ical-subscription-table__actions" role="group" aria-label="' + col('actions') + '">'
 			+ (hasCopyableUrl
-				? '<button type="button" class="azc-btn azc-btn--secondary azc-btn--touch outlook-ical-subscription-table__copy">' + copyLabel + '</button>'
+				? '<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn outlook-ical-subscription-table__copy" aria-label="' + copyLabel + '" title="' + copyLabel + '">' + glyph('copy') + '</button>'
 				: '')
-			+ '<button type="button" class="azc-btn azc-btn--secondary azc-btn--touch outlook-ical-subscription-table__rotate"'
+			+ '<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn outlook-ical-subscription-table__rotate"'
 			+ ' data-team-id="' + escapeHtml(String(entry.teamId)) + '"'
-			+ ' data-language-code="' + escapeHtml(String(entry.feedLanguageCode || '')) + '">'
-			+ rotateLabel
+			+ ' data-language-code="' + escapeHtml(String(entry.feedLanguageCode || '')) + '"'
+			+ ' aria-label="' + rotateLabel + '" title="' + rotateLabel + '">'
+			+ glyph('rotate')
 			+ '</button>'
 			+ '</div>'
 

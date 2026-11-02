@@ -17,13 +17,34 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
-/* Tree panel inside card body */
+/* The card is the only box. Rows are dividers, empty or not. */
 #app-content.azc-app--admin-teams .admin-teams__tree-panel {
-	min-height: 10rem;
-	padding: var(--azc-space-4, 1rem);
-	border: 1px solid var(--azc-border, var(--color-border));
-	border-radius: var(--azc-radius-sm, 6px);
-	background: var(--color-main-background, var(--azc-bg));
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+}
+
+#app-content.azc-app--admin-teams .admin-teams__empty {
+	padding: var(--azc-space-6, 1.5rem) var(--azc-space-4, 1rem);
+	text-align: center;
+	background: transparent;
+	border: 0;
+}
+
+#app-content.azc-app--admin-teams .admin-teams__empty .empty-state__title,
+#app-content.azc-app--admin-teams .admin-teams__empty .empty-state__description {
+	display: block;
+	width: 100%;
+	max-width: none;
+	margin: 0;
+	text-align: center;
+	white-space: normal;
+}
+
+#app-content.azc-app--admin-teams .admin-teams__empty .empty-state__title {
+	margin-bottom: 0.25rem;
 }
 
 #app-content.azc-app--admin-teams .admin-teams__tree-message {
@@ -57,14 +78,15 @@
 	justify-content: space-between;
 	gap: var(--azc-space-2, 0.5rem);
 	min-height: 44px;
-	margin: var(--azc-space-1, 0.25rem) 0;
+	margin: 0;
 	padding: var(--azc-space-2, 0.5rem) var(--azc-space-3, 0.75rem);
-	border-radius: var(--azc-radius-sm, 6px);
+	border: 0;
+	border-bottom: 1px solid var(--azc-border, var(--color-border));
+	border-radius: 0;
 	color: var(--color-main-text, var(--azc-text));
 	cursor: pointer;
-	background: var(--color-main-background, var(--azc-bg));
-	border: 1px solid var(--azc-border, var(--color-border));
-	transition: background 0.15s ease, border-color 0.15s ease;
+	background: transparent;
+	transition: background 0.15s ease;
 }
 
 #app-content.azc-app--admin-teams .teams-tree__item:hover,
@@ -77,7 +99,6 @@
 #app-content.azc-app--admin-teams .teams-tree__item--selected:focus-within {
 	background: var(--color-primary-element-light, var(--color-primary-light));
 	color: var(--color-primary-element-light-text, var(--color-main-text));
-	border-color: var(--color-primary-element);
 }
 
 #app-content.azc-app--admin-teams .teams-tree__item--selected .teams-tree__edit,
@@ -131,42 +152,63 @@
 	outline-offset: 2px;
 }
 
-/* Detail card tabs */
+/* In-card tabs: same row as My settings (§3.12). Underline only the active tab. */
 #app-content.azc-app--admin-teams .admin-teams__tabs {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--azc-space-1, 0.25rem);
 	margin: 0;
 	padding: 0;
-	border-bottom: 1px solid var(--azc-border, var(--color-border));
+	width: 100%;
+	min-width: 0;
 }
 
-#app-content.azc-app--admin-teams .admin-teams__tab {
+#app-content.azc-app--admin-teams .azc-tabs__row {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: var(--azc-space-4, 1rem);
+	width: 100%;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+#app-content.azc-app--admin-teams .azc-tab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
 	margin: 0;
-	padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
-	min-height: 44px;
-	border: none;
-	border-bottom: 3px solid transparent;
+	min-height: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	padding: var(--azc-space-2, 0.5rem) var(--azc-space-1, 0.25rem);
+	border: 0;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
 	background: transparent;
-	color: var(--azc-muted, var(--color-text-maxcontrast));
+	box-shadow: none;
+	color: var(--azc-text, var(--color-main-text));
 	font-size: var(--azc-fs-sm, 0.875rem);
-	font-weight: 500;
+	font-weight: 600;
+	line-height: 1.2;
+	text-decoration: none;
 	cursor: pointer;
 }
 
-#app-content.azc-app--admin-teams .admin-teams__tab:hover {
-	color: var(--color-main-text, var(--azc-text));
-	background: var(--color-background-hover, var(--azc-bg-soft));
+#app-content.azc-app--admin-teams .azc-tab:hover {
+	color: var(--color-primary-element);
+	background: transparent;
+	border-bottom-color: transparent;
+	text-decoration: none;
 }
 
-#app-content.azc-app--admin-teams .admin-teams__tab[aria-selected='true'] {
-	color: var(--azc-accent-ink, var(--color-primary-element));
+#app-content.azc-app--admin-teams .azc-tab[aria-selected='true'],
+#app-content.azc-app--admin-teams .azc-tab[aria-selected='true']:hover {
 	border-bottom-color: var(--color-primary-element);
+	background: transparent;
+	color: var(--azc-text, var(--color-main-text));
 	font-weight: 600;
 }
 
-#app-content.azc-app--admin-teams .admin-teams__tab:focus-visible {
-	outline: 3px solid var(--color-primary-element);
+#app-content.azc-app--admin-teams .azc-tab:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
 	outline-offset: 2px;
 }
 
@@ -182,9 +224,9 @@
 	list-style: none;
 	margin: 0;
 	padding: 0;
-	border: 1px solid var(--azc-border, var(--color-border));
-	border-radius: var(--azc-radius-sm, 6px);
-	background: var(--color-main-background, var(--azc-bg));
+	border: 0;
+	border-radius: 0;
+	background: transparent;
 	overflow: hidden;
 }
 
@@ -242,25 +284,125 @@
 	margin-bottom: var(--azc-space-4, 1rem);
 }
 
-/* Bulk add members/managers (F5) — lives on teams page, not admin-users.css */
-#app-content.azc-app--admin-teams .team-bulk-results {
+/* Bulk add lives in a dialog on document.body, outside #app-content.
+   Nextcloud sizes every input to the click target, which misaligns a bare
+   checkbox, and a native box follows the OS scheme unless we pin it. */
+.azc-dialog .team-bulk-selected {
 	display: flex;
-	flex-direction: column;
-	gap: 0.35rem;
-	max-height: 14rem;
-	overflow: auto;
-	margin-top: 0.5rem;
-	padding: 0.35rem;
-	border: 1px solid var(--color-border);
-	border-radius: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--azc-space-2, 0.5rem);
+	margin: var(--azc-space-3, 0.75rem) 0 0;
+	padding: 0;
+	list-style: none;
 }
 
-#app-content.azc-app--admin-teams .team-bulk-results__item {
-	display: flex;
+.azc-dialog .team-bulk-selected[hidden] {
+	display: none;
+}
+
+.azc-dialog .team-bulk-chip {
+	display: inline-flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--azc-space-1, 0.25rem);
+	max-width: 100%;
 	min-height: 44px;
+	margin: 0;
+	padding: 0 var(--azc-space-1, 0.25rem) 0 var(--azc-space-3, 0.75rem);
+	border: 1px solid var(--color-border);
+	border-radius: 999px;
+	background: var(--color-background-hover);
+	color: var(--color-main-text);
+}
+
+.azc-dialog .team-bulk-chip__name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	line-height: 1.3;
+}
+
+.azc-dialog .team-bulk-chip__remove {
+	flex: 0 0 auto;
+	width: 44px;
+	max-width: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--color-main-text);
+	font-size: 1.25rem;
+	line-height: 1;
 	cursor: pointer;
+}
+
+.azc-dialog .team-bulk-chip__remove:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
+	outline-offset: 2px;
+}
+
+.azc-dialog .team-bulk-chip__remove:disabled {
+	cursor: not-allowed;
+	opacity: 0.72;
+}
+
+.azc-dialog .team-bulk-results {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	max-height: 14rem;
+	overflow: auto;
+	margin-top: var(--azc-space-2, 0.5rem);
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+.azc-dialog .team-bulk-results__item {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: var(--azc-space-3, 0.75rem);
+	min-height: 44px;
+	margin: 0;
+	padding: 0 var(--azc-space-1, 0.25rem);
+	cursor: pointer;
+	text-align: start;
+}
+
+.azc-dialog .team-bulk-results__name {
+	flex: 1 1 auto;
+	min-width: 0;
+	line-height: 1.3;
+	color: var(--color-main-text);
+}
+
+.azc-dialog .team-bulk-results__checkbox {
+	width: 1.25rem;
+	height: 1.25rem;
+	min-width: 1.25rem;
+	min-height: 1.25rem;
+	max-width: 1.25rem;
+	max-height: 1.25rem;
+	margin: 0;
+	padding: 0;
+	flex: 0 0 auto;
+	box-sizing: border-box;
+	cursor: pointer;
+	accent-color: var(--color-primary-element);
+	background-color: var(--color-main-background);
+	color-scheme: light;
+	appearance: auto;
+}
+
+body[data-theme-dark] .azc-dialog .team-bulk-results__checkbox,
+body[data-theme-dark-highcontrast] .azc-dialog .team-bulk-results__checkbox,
+html[data-theme="dark"] .azc-dialog .team-bulk-results__checkbox {
+	color-scheme: dark;
 }
 
 @media (max-width: 768.98px) {
@@ -271,15 +413,10 @@
 	#app-content.azc-app--admin-teams .teams-tree__actions {
 		opacity: 1;
 	}
-
-	#app-content.azc-app--admin-teams .admin-teams__tab {
-		flex: 1 1 auto;
-		justify-content: center;
-	}
 }
 
 @media (forced-colors: active) {
 	#app-content.azc-app--admin-teams .teams-tree__item--selected {
-		border-width: 2px;
+		border-bottom-width: 2px;
 	}
 }

@@ -117,9 +117,12 @@ class Version1034Date20260724120000 extends SimpleMigrationStep
 			try {
 				$qb->executeStatement();
 				$created++;
-			} catch (\Throwable) {
-				// Unique (state, date) race with a parallel request: the
-				// suppression already exists, which is the desired end state.
+			} catch (\Throwable $e) {
+				// non-fatal: unique (state, date) race with a parallel request —
+				// the suppression already exists, which is the desired end state.
+				\OCP\Log\logger('arbeitszeitcheck')->debug(
+					'Holiday suppression insert skipped for ' . $state . ' ' . $dateYmd . ': ' . $e->getMessage()
+				);
 			}
 		}
 

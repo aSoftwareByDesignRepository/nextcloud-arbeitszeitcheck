@@ -469,10 +469,79 @@ class PageControllerTest extends TestCase
 	 * @param list<\OCA\ArbeitszeitCheck\Db\TimeEntry> $entries
 	 * @param array<string, string> $query
 	 */
+	public function testTimeEntriesFilterReadsBeyondNewestWindow(): void
+	{
+		// Regression for limit_before_scope_filter: the filtered list must come
+		// from the SQL-scoped query, not the newest-100 KPI window — a matching
+		// row absent from the window must still render.
+		$old = $this->entryWithLocation(99, 'home');
+		$old->setStartTime(new \DateTime('1993-03-02 09:00:00'));
+		$old->setEndTime(new \DateTime('1993-03-02 17:45:00'));
+		$window = [$this->entryWithLocation(1, 'office')];
+
+		$mapper = $this->createMock(TimeEntryMapper::class);
+		$mapper->method('findByUser')->willReturn($window);
+		$mapper->method('findByUserFiltered')
+			->with('test-user', $this->isInstanceOf(\DateTime::class), $this->isInstanceOf(\DateTime::class), '', '')
+			->willReturn([$old]);
+		$mapper->method('findByUserAndStatus')->willReturn([]);
+		$mapper->method('countByUser')->willReturn(107);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParam')->willReturnCallback(
+			static fn (string $key) => match ($key) {
+				'start_date' => '1993-03-01',
+				'end_date' => '1993-03-31',
+				default => null,
+			}
+		);
+		$this->setControllerProperty('timeEntryMapper', $mapper);
+		$this->setControllerProperty('request', $request);
+		$config = $this->readControllerProperty('config');
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, mixed $default = ''): string {
+				return is_string($default) ? $default : '';
+			}
+		);
+
+		$params = $this->controller->timeEntries()->getParams();
+		$this->assertArrayNotHasKey('error', $params);
+		$this->assertCount(1, $params['entries']);
+		$this->assertSame(99, $params['entries'][0]->getId());
+		// Filtered lists show every match — no "latest N of M" window banner.
+		$this->assertSame(1, $params['entryListLoaded']);
+		$this->assertSame(1, $params['entryListTotal']);
+		// KPI stays global.
+		$this->assertSame(107, $params['stats']['total_time_entries']);
+		$this->assertSame(['start_date' => '1993-03-01', 'end_date' => '1993-03-31'], $params['entryPager']['filters']);
+	}
+
+	/**
+	 * @param list<\OCA\ArbeitszeitCheck\Db\TimeEntry> $entries
+	 * @param array<string, string> $query
+	 */
 	private function useTimeEntryList(array $entries, array $query): void
 	{
 		$mapper = $this->createMock(TimeEntryMapper::class);
 		$mapper->method('findByUser')->willReturn($entries);
+		$mapper->method('findByUserFiltered')->willReturnCallback(
+			static function (string $userId, ?\DateTime $startFrom = null, ?\DateTime $endBefore = null, string $status = '', string $workLocation = '') use ($entries) {
+				return array_values(array_filter($entries, static function ($entry) use ($startFrom, $endBefore, $status, $workLocation) {
+					if ($startFrom !== null) {
+						$start = $entry->getStartTime();
+						if (!$start || $start < $startFrom || $start > $endBefore) {
+							return false;
+						}
+					}
+					if ($status !== '' && $entry->getStatus() !== $status) {
+						return false;
+					}
+					if ($workLocation !== '' && $entry->getWorkLocation() !== $workLocation) {
+						return false;
+					}
+					return true;
+				}));
+			}
+		);
 		$mapper->method('findByUserAndStatus')->willReturn([]);
 		$mapper->method('countByUser')->willReturn(count($entries));
 		$request = $this->createMock(IRequest::class);

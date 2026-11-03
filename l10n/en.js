@@ -24,8 +24,6 @@
 	__azcBootL10n(function (OC) {	OC.L10N.register(
 		"arbeitszeitcheck",
 		{
-		"Remove %s" : "Remove %s",
-		"Selected people" : "Selected people",
 		"\"Scope\" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are always treated as full-day holidays." : "\"Scope\" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are always treated as full-day holidays.",
 		"\"Scope\" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are usually full-day; in Switzerland some statutory days (e.g. Sechseläuten) are half-day and count as 0.5." : "\"Scope\" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are usually full-day; in Switzerland some statutory days (e.g. Sechseläuten) are half-day and count as 0.5.",
 		"\"Type\" determines whether a day is treated as a full-day holiday (not counted as a working day) or as a half-day holiday (e.g., 0.5 vacation day)." : "\"Type\" determines whether a day is treated as a full-day holiday (not counted as a working day) or as a half-day holiday (e.g., 0.5 vacation day).",
@@ -3863,6 +3861,7 @@
 		"Remove" : "Remove",
 		"Remove \"%s\" as manager?" : "Remove \"%s\" as manager?",
 		"Remove \"%s\" from this team?" : "Remove \"%s\" from this team?",
+		"Remove %s" : "Remove %s",
 		"Remove break" : "Remove break",
 		"Remove credential" : "Remove credential",
 		"Remove holiday" : "Remove holiday",
@@ -4226,6 +4225,7 @@
 		"Select {type} report" : "Select {type} report",
 		"Selected" : "Selected",
 		"Selected employee" : "Selected employee",
+		"Selected people" : "Selected people",
 		"Selected project does not exist" : "Selected project does not exist",
 		"Selected unit" : "Selected unit",
 		"Selected: %s" : "Selected: %s",

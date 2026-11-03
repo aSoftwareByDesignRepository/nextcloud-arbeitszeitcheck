@@ -43,8 +43,16 @@ if (!isset($appFeedbackLinks) || !$appFeedbackLinks instanceof AppFeedbackLinks)
 	$appFeedbackLinks = new AppFeedbackLinks('arbeitszeitcheck', 'ArbeitszeitCheck', $version);
 }
 $pageUrl = '';
-if (isset($_SERVER['REQUEST_URI']) && is_string($_SERVER['REQUEST_URI'])) {
-	$pageUrl = $appFeedbackLinks->sanitizePageUrl((string)$_SERVER['REQUEST_URI']);
+if (isset($appFeedbackPageUrl) && is_string($appFeedbackPageUrl)) {
+	// Callers that already resolved the current request path may inject it.
+	$pageUrl = $appFeedbackLinks->sanitizePageUrl($appFeedbackPageUrl);
+} elseif (class_exists(\OCP\Server::class)) {
+	try {
+		$feedbackRequest = \OCP\Server::get(\OCP\IRequest::class);
+		$pageUrl = $appFeedbackLinks->sanitizePageUrl($feedbackRequest->getRequestUri());
+	} catch (\Throwable) {
+		$pageUrl = '';
+	}
 }
 $ncVersion = '';
 if (class_exists(\OCP\Server::class)) {
@@ -66,14 +74,30 @@ $footerId = $prefix . '-nav-footer';
 $menuId = $prefix . '-feedback-menu';
 $newTab = $l->t('(opens in a new tab)');
 
-$sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
-	$class = htmlspecialchars($iconPrefix . '-icon', ENT_QUOTES, 'UTF-8');
-
-	return sprintf(
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="%s" aria-hidden="true" focusable="false">%s</svg>',
-		$class,
-		$inner
-	);
+// Decorative nav-footer glyphs come from the app's IconCatalog (no inline SVG
+// in templates — the catalog is the single icon source). Candidate lists keep
+// the partial working across family apps whose catalogs diverged; when no
+// catalog/icon resolves, the item still renders its text label (aria-hidden
+// decoration is never required for comprehension).
+$sbdFeedbackIcon = static function (string $iconPrefix, array $candidates): string {
+	$catalog = '\\' . 'OCA\ArbeitszeitCheck' . '\\Service\\IconCatalog';
+	if (!class_exists($catalog) || !method_exists($catalog, 'render')) {
+		return '';
+	}
+	foreach ($candidates as $name) {
+		try {
+			if (method_exists($catalog, 'has') && !$catalog::has($name)) {
+				continue;
+			}
+			$html = $catalog::render($name, $iconPrefix . '-icon');
+			if (is_string($html) && $html !== '') {
+				return $html;
+			}
+		} catch (\Throwable) {
+			// try the next candidate
+		}
+	}
+	return '';
 };
 ?>
 <nav
@@ -92,7 +116,7 @@ $sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
 			aria-haspopup="true"
 		>
 			<span class="<?php p($prefix); ?>-nav-footer__trigger-icon" aria-hidden="true"><?php
-				print_unescaped($sbdFeedbackIcon($prefix, '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/>'));
+				print_unescaped($sbdFeedbackIcon($prefix, ['help-circle', 'circle-help', 'help', 'info']));
 			?></span>
 			<span class="<?php p($prefix); ?>-nav-footer__trigger-label"><?php p($l->t('Help')); ?></span>
 		</button>
@@ -111,7 +135,7 @@ $sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
 					data-app-feedback-kind="problem"
 				>
 					<span class="<?php p($prefix); ?>-nav-footer__menu-icon" aria-hidden="true"><?php
-						print_unescaped($sbdFeedbackIcon($prefix, '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/>'));
+						print_unescaped($sbdFeedbackIcon($prefix, ['alert-circle', 'circle-alert', 'alert-triangle', 'triangle-alert', 'info']));
 					?></span>
 					<?php p($l->t('Report a problem')); ?>
 				</a>
@@ -125,7 +149,7 @@ $sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
 					data-app-feedback-kind="idea"
 				>
 					<span class="<?php p($prefix); ?>-nav-footer__menu-icon" aria-hidden="true"><?php
-						print_unescaped($sbdFeedbackIcon($prefix, '<path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/>'));
+						print_unescaped($sbdFeedbackIcon($prefix, ['square-pen', 'edit', 'pencil']));
 					?></span>
 					<?php p($l->t('Suggest an improvement')); ?>
 				</a>
@@ -141,7 +165,7 @@ $sbdFeedbackIcon = static function (string $iconPrefix, string $inner): string {
 					rel="noopener noreferrer"
 				>
 					<span class="<?php p($prefix); ?>-nav-footer__menu-icon" aria-hidden="true"><?php
-						print_unescaped($sbdFeedbackIcon($prefix, '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>'));
+						print_unescaped($sbdFeedbackIcon($prefix, ['file-text', 'file', 'book', 'info']));
 					?></span>
 					<?php p($l->t('Open GitHub Issues')); ?>
 					<span class="<?php p($prefix); ?>-nav-footer__new-tab"><?php p($newTab); ?></span>

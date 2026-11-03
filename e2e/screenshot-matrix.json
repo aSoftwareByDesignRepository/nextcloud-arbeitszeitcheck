@@ -16,6 +16,7 @@
 		{ "id": "compliance", "path": "/compliance", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "business-trips", "path": "/business-trips", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "settings", "path": "/settings", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "settings-help-texts", "path": "/settings/help-texts", "role": "EMPLOYEE", "states": ["current"], "dark": true },
 		{ "id": "get-the-app", "path": "/get-the-app", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "manager-dashboard", "path": "/manager", "role": "MANAGER", "states": ["current"] },
 		{ "id": "manager-time-entries", "path": "/manager/time-entries", "role": "MANAGER", "states": ["populated"] },

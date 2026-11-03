@@ -166,7 +166,7 @@ $pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
             class="azc-inline-hint admin-users-hidden-banner"
             role="status"
             aria-live="polite"
-            <?php if ($hiddenCount <= 0 || $accessFilter !== AdminEmployeeDirectoryService::FILTER_APP_ACCESS) {
+            <?php if ($hiddenCount <= 0 || $accessFilter !== AdminEmployeeDirectoryService::FILTER_APP_ACCESS || $modelFilter !== '' || $statusFilter !== '') {
             	p('hidden');
             } ?>>
             <p class="admin-users-hidden-banner__text">

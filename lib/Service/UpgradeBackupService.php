@@ -412,7 +412,9 @@ class UpgradeBackupService
 	{
 		try {
 			$this->getSnapshotFolder($snapshotId)->delete();
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
+			// non-fatal: snapshot already gone or locked — removal is best-effort.
+			$this->logger->debug('Snapshot folder delete skipped for ' . $snapshotId . ': ' . $e->getMessage());
 		}
 	}
 
@@ -616,7 +618,9 @@ class UpgradeBackupService
 		$destPath = $this->getAppDataPath($folderName);
 		try {
 			$this->rootFolder->get($destPath)->delete();
-		} catch (NotFoundException) {
+		} catch (NotFoundException $e) {
+			// non-fatal: destination absent — nothing to replace before restore.
+			$this->logger->debug('Restore destination absent for ' . $folderName . ': ' . $e->getMessage());
 		}
 
 		try {

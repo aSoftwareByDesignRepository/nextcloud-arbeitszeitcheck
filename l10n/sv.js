@@ -3341,7 +3341,7 @@
 		"Operations" : "Drift",
 		"Optional" : "Valfritt",
 		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Valfri Entgeltausfall \/ Ausfallprinzip för flextidssaldot. Avstängd som standard så att befintliga saldon förblir oförändrade.",
-		"Optional description" : "Valfri beskrivning",
+		"Description (optional)" : "Beskrivning (valfri)",
 		"Optional description for this time entry" : "Valfri beskrivning för denna tidsregistrering",
 		"Optional description or notes about this work period" : "Valfri beskrivning eller anteckningar om denna arbetsperiod",
 		"Optional link from time entries to ProjectCheck projects." : "Valfri koppling från tidposter till ProjectCheck-projekt.",

@@ -3341,7 +3341,7 @@
 		"Operations" : "Betrieb",
 		"Optional" : "Freiwillig",
 		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Optionaler Entgeltausfall \/ Ausfallprinzip für das Arbeitszeitkonto. Standardmäßig aus, damit bestehende Salden unverändert bleiben.",
-		"Optional description" : "Optionale Beschreibung",
+		"Description (optional)" : "Beschreibung (optional)",
 		"Optional description for this time entry" : "Optionale Beschreibung für diesen Zeiteintrag",
 		"Optional description or notes about this work period" : "Optionale Beschreibung oder Notizen zu diesem Arbeitszeitraum",
 		"Optional link from time entries to ProjectCheck projects." : "Optionaler Link von Zeiteinträgen zu ProjectCheck-Projekten.",

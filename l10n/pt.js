@@ -3341,7 +3341,7 @@
 		"Operations" : "Operações",
 		"Optional" : "Opcional",
 		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Entgeltausfall \/ Ausfallprinzip opcional para o saldo de horário flexível. Desligado por predefinição para os saldos existentes ficarem inalterados.",
-		"Optional description" : "Descrição opcional",
+		"Description (optional)" : "Descrição (opcional)",
 		"Optional description for this time entry" : "Descrição opcional para este registo de horas",
 		"Optional description or notes about this work period" : "Descrição ou notas opcionais sobre este período de trabalho",
 		"Optional link from time entries to ProjectCheck projects." : "Associação opcional de registos de horas a projetos do ProjectCheck.",

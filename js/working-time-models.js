@@ -698,9 +698,8 @@
             : (window.ArbeitszeitCheck?.l10n?.create || 'Create');
         const cancelLabel = window.ArbeitszeitCheck?.l10n?.cancel || 'Cancel';
         const nameLabel = window.ArbeitszeitCheck?.l10n?.name || 'Name';
-        const descriptionLabel = window.ArbeitszeitCheck?.l10n?.description || 'Description';
-        const descriptionMore = window.ArbeitszeitCheck?.l10n?.descriptionOptional
-            || (window.t ? window.t('arbeitszeitcheck', 'Optional description') : 'Optional description');
+        const descriptionLabel = window.ArbeitszeitCheck?.l10n?.descriptionOptional
+            || (window.t ? window.t('arbeitszeitcheck', 'Description (optional)') : 'Description (optional)');
         const typeLabel = window.ArbeitszeitCheck?.l10n?.type || 'Type';
         const weeklyHoursLabel = window.ArbeitszeitCheck?.l10n?.weeklyHours || 'Weekly Hours';
         const dailyHoursLabel = window.ArbeitszeitCheck?.l10n?.dailyHours || 'Daily Hours';
@@ -715,7 +714,6 @@
 
         const nameVal = isEdit ? Utils.escapeHtml(model.name || '') : '';
         const descVal = isEdit ? Utils.escapeHtml(model.description || '') : '';
-        const descOpen = isEdit && String(model.description || '').trim() !== '' ? ' open' : '';
         const weeklyVal = isEdit ? (model.weeklyHours || 40) : 40;
         const dailyVal = isEdit ? (model.dailyHours || 8) : 8;
         const workDaysVal = isEdit ? (model.workDaysPerWeek || 5) : 5;
@@ -775,6 +773,7 @@
                            autocomplete="off">
                     <p id="wtm-model-name-help" class="form-help">${Utils.escapeHtml(window.ArbeitszeitCheck?.l10n?.modelNameHelp || 'Enter a name for this work schedule (e.g., "Full-Time", "Part-Time")')}</p>
                 </div>
+                <div class="wtm-field-grid">
                 <div class="form-group">
                     <label for="wtm-model-type" class="form-label">${Utils.escapeHtml(typeLabel)}</label>
                     <select id="wtm-model-type" name="type" class="form-select">
@@ -801,6 +800,7 @@
                            inputmode="decimal" pattern="^[0-9]+([\\.,][0-9]{1,2})?$" min="1" max="7" step="0.01" value="${workDaysVal}" required
                            aria-describedby="wtm-model-work-days-per-week-help">
                     <p id="wtm-model-work-days-per-week-help" class="form-help">${Utils.escapeHtml(window.ArbeitszeitCheck?.l10n?.workDaysPerWeekHelp || '')}</p>
+                </div>
                 </div>
                 <div class="form-group">
                     <div class="form-checkbox">
@@ -837,14 +837,10 @@
                         <p class="azc-callout__text" id="wtm-model-paid-break-impact-text"></p>
                     </div>
                 </div>
-                <details class="wtm-editor-desc"${descOpen}>
-                    <summary class="wtm-editor-desc__summary">${Utils.escapeHtml(descriptionMore)}</summary>
-                    <div class="form-group">
-                        <label for="wtm-model-description" class="form-label visually-hidden">${Utils.escapeHtml(descriptionLabel)}</label>
-                        <textarea id="wtm-model-description" name="description" class="form-textarea" rows="3"
-                                  placeholder="${Utils.escapeHtml(descriptionLabel)}">${descVal}</textarea>
-                    </div>
-                </details>
+                <div class="form-group">
+                    <label for="wtm-model-description" class="form-label">${Utils.escapeHtml(descriptionLabel)}</label>
+                    <textarea id="wtm-model-description" name="description" class="form-textarea" rows="3">${descVal}</textarea>
+                </div>
                 ${weekdayScheduleSectionHtml(schedulePrefix, existingSchedule)}
                 ${ueHelperSectionHtml(schedulePrefix, existingUeLabel)}
                 ${presenceWindowsSectionHtml(schedulePrefix, existingPresence)}
@@ -1344,6 +1340,7 @@
     if (typeof window !== 'undefined') {
         window.__ArbeitszeitCheckWorkingTimeModelsTestables = {
             handleDeleteModel: handleDeleteModel,
+            openEditorPanel: openEditorPanel,
             computeUeConversion: computeUeConversion,
             ueHelperSectionHtml: ueHelperSectionHtml,
             bindUeHelper: bindUeHelper,

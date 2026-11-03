@@ -3341,7 +3341,7 @@
 		"Operations" : "Operaties",
 		"Optional" : "Optioneel",
 		"Optional Entgeltausfall \/ Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged." : "Optionele Entgeltausfall \/ Ausfallprinzip voor het urensaldo. Standaard uit, zodat bestaande saldi ongewijzigd blijven.",
-		"Optional description" : "Optionele beschrijving",
+		"Description (optional)" : "Beschrijving (optioneel)",
 		"Optional description for this time entry" : "Optionele beschrijving voor deze tijdregistratie",
 		"Optional description or notes about this work period" : "Optionele beschrijving of notities over deze werkperiode",
 		"Optional link from time entries to ProjectCheck projects." : "Optionele koppeling van tijdregistraties naar ProjectCheck-projecten.",

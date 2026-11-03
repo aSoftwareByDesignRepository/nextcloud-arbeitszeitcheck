@@ -3315,7 +3315,7 @@
         "Operations": "Operazioni",
         "Optional": "Facoltativo",
         "Optional Entgeltausfall / Ausfallprinzip for the flextime balance. Off by default so existing balances stay unchanged.": "Entgeltausfall / Ausfallprinzip opzionale per il saldo ore. Disattivato di default così i saldi esistenti restano invariati.",
-        "Optional description": "Descrizione facoltativa",
+        "Description (optional)": "Descrizione (facoltativa)",
         "Optional description for this time entry": "Descrizione facoltativa per questa registrazione tempo",
         "Optional description or notes about this work period": "Descrizione o note facoltative su questo periodo di lavoro",
         "Optional link from time entries to ProjectCheck projects.": "Collegamento facoltativo dalle registrazioni orarie ai progetti ProjectCheck.",

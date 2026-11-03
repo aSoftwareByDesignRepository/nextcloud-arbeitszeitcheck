@@ -220,6 +220,65 @@ class CapabilitiesComplianceTest extends TestCase
 		$this->assertSame(72, $caps['arbeitszeitcheck']['mobile']['offlineStampQueue']['maxOccurredSkewPastHours']);
 	}
 
+	/**
+	 * GH #50 — the mobile edit-policy block must mirror Constants and the org
+	 * flag exactly; a drifted window or wrong approval flag lets clients show
+	 * an affordance the update endpoint then rejects.
+	 */
+	public function testMobileTimeEntryEditingBlock(): void
+	{
+		$mobile = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)
+			->getCapabilities()['arbeitszeitcheck']['mobile'];
+
+		$this->assertSame(
+			\OCA\ArbeitszeitCheck\Constants::EDIT_WINDOW_DAYS,
+			$mobile['timeEntryEditing']['editWindowDays']
+		);
+		$this->assertFalse($mobile['timeEntryEditing']['changesRequireApproval']);
+		$this->assertTrue($mobile['managerAbsenceRecording']);
+	}
+
+	public function testMobileTimeEntryEditingReflectsApprovalFlag(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $app, string $key, $default = '') {
+				if ($app === 'arbeitszeitcheck' && $key === 'country') {
+					return RegionRegistry::COUNTRY_DE;
+				}
+				if ($app === 'arbeitszeitcheck' && $key === \OCA\ArbeitszeitCheck\Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL) {
+					return '1';
+				}
+				return is_string($default) ? $default : (string)$default;
+			}
+		);
+		$appConfig = $this->createMock(IAppConfig::class);
+		$appConfig->method('getAppValueString')->willReturnCallback(
+			static fn (string $key, string $default = '') => $default
+		);
+		$appManager = $this->createMock(IAppManager::class);
+		$appManager->method('getAppVersion')->willReturn('1.9.10');
+		$appManager->method('isEnabledForUser')->willReturn(false);
+		$appManager->method('isInstalled')->willReturn(false);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn(null);
+		$overtimeBank = $this->createMock(OvertimeBankService::class);
+		$overtimeBank->method('isEnabled')->willReturn(false);
+		$timeCapture = $this->createMock(TimeCaptureMethodService::class);
+
+		$mobile = (new Capabilities(
+			$config,
+			$appConfig,
+			$overtimeBank,
+			$appManager,
+			$userSession,
+			$timeCapture,
+			new LaborLawProfileFactory($config),
+		))->getCapabilities()['arbeitszeitcheck']['mobile'];
+
+		$this->assertTrue($mobile['timeEntryEditing']['changesRequireApproval']);
+	}
+
 	public function testProjectCheckAvailableUsesInstanceInstallNotCurrentUser(): void
 	{
 		$config = $this->createMock(IConfig::class);

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- mobile capabilities: `mobile.timeEntryEditing` (edit window + whether the
+  org requires manager approval for changes) and
+  `mobile.managerAbsenceRecording` so the companion app can offer direct
+  time-entry edits (GH #50) and manager absence recording (GH #49) with
+  fail-closed gating on older servers
+
 ## 1.9.10 - 2026-10-29
 
 ### Added

@@ -173,7 +173,7 @@ for ($m = 1; $m <= 12; $m++) {
                                 </tr>
                             </thead>
                             <tbody id="ot-payout-tbody">
-                                <tr><td colspan="5"><?php p($l->t('Choose a month and click Load list.')); ?></td></tr>
+                                <tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Choose a month and click Load list.')); ?></h3></div></td></tr>
                             </tbody>
                         </table>
                     </div>

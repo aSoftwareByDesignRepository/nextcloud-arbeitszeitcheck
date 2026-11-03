@@ -907,14 +907,6 @@ body.azc-kiosk-modal-open {
 	font-size: var(--azc-fs-sm, 0.875rem);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
-
-#app-content.azc-app .azc-kiosk-empty-row td,
-#app-content.azc-app .azc-kiosk-empty-cell {
-	color: var(--azc-muted, var(--color-text-maxcontrast));
-	font-style: italic;
-	padding: 1rem 0.5rem;
-}
-
 #app-content.azc-app .azc-kiosk-allowed-toggle {
 	display: inline-flex;
 	align-items: center;

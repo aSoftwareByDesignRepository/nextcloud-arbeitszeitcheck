@@ -197,7 +197,7 @@ $content = '';
                                 <?php endforeach; ?>
                                 <?php if (empty($_['recentEntries'])): ?>
                                     <tr>
-                                        <td colspan="5" class="empty-state"><?php p($l->t('No recent entries found')); ?></td>
+                                        <td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('No recent entries found')); ?></h3></div></td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -223,7 +223,7 @@ $content = '';
                         <tbody>
                             <?php if (empty($_['entries'] ?? [])): ?>
                                 <tr>
-                                    <td colspan="5" class="empty-state"><?php p($l->t('No time entries found')); ?></td>
+                                    <td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('No time entries found')); ?></h3></div></td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($_['entries'] as $entry):
@@ -291,7 +291,7 @@ $content = '';
                             <?php endforeach; ?>
                             <?php if (empty($_['absences'])): ?>
                                 <tr>
-                                    <td colspan="4" class="empty-state"><?php p($l->t('No absences found')); ?></td>
+                                    <td colspan="4" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('No absences found')); ?></h3></div></td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>

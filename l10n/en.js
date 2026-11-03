@@ -3006,7 +3006,7 @@
 		"No business trips yet." : "No business trips yet.",
 		"No completed months with time entries yet." : "No completed months with time entries yet.",
 		"No connection to the server. Check your network and try again." : "No connection to the server. Check your network and try again.",
-		"No custom absence types yet. Use “New absence type” to create one." : "No custom absence types yet. Use “New absence type” to create one.",
+		"No custom absence types yet." : "No custom absence types yet.",
 		"No customer" : "No customer",
 		"No data available" : "No data available",
 		"No description" : "No description",

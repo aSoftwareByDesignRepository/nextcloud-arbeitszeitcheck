@@ -3006,7 +3006,7 @@
 		"No business trips yet." : "Ancora nessuna trasferta.",
 		"No completed months with time entries yet." : "Ancora nessun mese completato con registrazioni tempo.",
 		"No connection to the server. Check your network and try again." : "Nessuna connessione al server. Controlli la rete e riprovi.",
-		"No custom absence types yet. Use “New absence type” to create one." : "Nessun tipo di assenza personalizzato. Usa “Nuovo tipo di assenza” per crearne uno.",
+		"No custom absence types yet." : "Nessun tipo di assenza personalizzato.",
 		"No customer" : "Nessun cliente",
 		"No data available" : "Nessun dato disponibile",
 		"No description" : "Nessuna descrizione",

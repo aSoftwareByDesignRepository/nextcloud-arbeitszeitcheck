@@ -67,9 +67,7 @@ $localeOptions = $_['localeOptions'] ?? [];
 					<tbody id="cat-tbody">
 						<?php if (empty($absenceTypes)): ?>
 							<tr>
-								<td colspan="7" class="text-center cat-empty">
-									<?php p($l->t('No custom absence types yet. Use “New absence type” to create one.')); ?>
-								</td>
+								<td colspan="7" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('No custom absence types yet.')); ?></h3></div></td>
 							</tr>
 						<?php else: ?>
 							<?php foreach ($absenceTypes as $type): ?>

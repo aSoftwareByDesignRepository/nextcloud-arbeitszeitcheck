@@ -366,9 +366,9 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                         <tbody id="violations-tbody">
                             <?php if ($violations === []): ?>
                                 <tr>
-                                    <td colspan="5" class="empty-state">
-                                        <p class="empty-state__title"><?php p($l->t('No problems found')); ?></p>
-                                        <p class="empty-state__description">
+                                    <td colspan="5" class="azc-table-empty">
+                                        <p class="azc-empty-state__title"><?php p($l->t('No problems found')); ?></p>
+                                        <p class="azc-empty-state__text">
                                             <?php p($l->t('Great! No working time rule violations were found for the selected time period.')); ?>
                                         </p>
                                     </td>

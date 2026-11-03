@@ -275,9 +275,9 @@
 		}
 
 		if (!logs.length) {
-			tbody.innerHTML = '<tr class="audit-log-empty-row"><td colspan="5" class="text-center audit-log-empty">' +
-				'<div class="empty-state">' +
-				'<h3 class="empty-state__title">' + escapeHtml(alT('No audit log entries found')) + '</h3>' +
+			tbody.innerHTML = '<tr class="audit-log-empty-row"><td colspan="5" class="azc-table-empty">' +
+				'<div class="azc-empty-state">' +
+				'<h3 class="azc-empty-state__title">' + escapeHtml(alT('No audit log entries found')) + '</h3>' +
 				'</div></td></tr>';
 			updatePaginationUi();
 			return;
@@ -326,7 +326,7 @@
 
 		const tbody = $('#audit-log-tbody');
 		if (tbody) {
-			tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + escapeHtml(alT('Loading…')) + '</td></tr>';
+			tbody.innerHTML = '<tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + escapeHtml(alT('Loading…')) + '</h3></div></td></tr>';
 		}
 		setLoading(true);
 		const seq = ++state.loadSeq;
@@ -353,7 +353,7 @@
 				}
 				state.total = 0;
 				if (tbody) {
-					tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + escapeHtml(alT('Error loading audit logs')) + '</td></tr>';
+					tbody.innerHTML = '<tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + escapeHtml(alT('Error loading audit logs')) + '</h3></div></td></tr>';
 				}
 				updatePaginationUi();
 			},
@@ -364,7 +364,7 @@
 				setLoading(false);
 				state.total = 0;
 				if (tbody) {
-					tbody.innerHTML = '<tr><td colspan="5" class="text-center">' + escapeHtml(alT('Error loading audit logs')) + '</td></tr>';
+					tbody.innerHTML = '<tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + escapeHtml(alT('Error loading audit logs')) + '</h3></div></td></tr>';
 				}
 				updatePaginationUi();
 				if (Messaging && Messaging.showError) {

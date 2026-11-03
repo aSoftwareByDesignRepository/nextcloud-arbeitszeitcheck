@@ -201,7 +201,7 @@
 		if (!ruleSets.length) {
 			tbody.innerHTML = `
 				<tr>
-					<td colspan="8">
+					<td colspan="8" class="azc-table-empty">
 						<div class="azc-empty-state admin-tariff-rules__empty">
 							<p class="azc-empty-state__title">${escapeHtml(l10n('noRuleSets'))}</p>
 							<p class="azc-empty-state__lead">${escapeHtml(l10n('noRuleSetsHelp'))}</p>
@@ -259,13 +259,13 @@
 	async function loadRuleSets() {
 		const tbody = document.getElementById('tariff-rules-tbody');
 		if (tbody) {
-			tbody.innerHTML = `<tr><td colspan="8" class="admin-tariff-rules__empty">${escapeHtml(l10n('loading'))}</td></tr>`;
+			tbody.innerHTML = `<tr><td colspan="8" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">${escapeHtml(l10n('loading'))}</h3></div></td></tr>`;
 		}
 		const { ok, payload } = await apiFetch(API_LIST, { method: 'GET' });
 		if (!ok || !payload || !payload.success) {
 			const msg = (payload && payload.error) || l10n('loadingError');
 			if (tbody) {
-				tbody.innerHTML = `<tr><td colspan="8" class="admin-tariff-rules__empty">${escapeHtml(msg)}</td></tr>`;
+				tbody.innerHTML = `<tr><td colspan="8" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">${escapeHtml(msg)}</h3></div></td></tr>`;
 			}
 			if (Messaging.showError) {
 				Messaging.showError(msg);

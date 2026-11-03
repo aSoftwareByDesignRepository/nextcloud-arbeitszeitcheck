@@ -156,7 +156,7 @@ describe('employee list filters', () => {
 			model: '',
 			status: 'disabled',
 		})
-		const copies = [...document.querySelectorAll('p')]
+		const copies = [...document.querySelectorAll('.azc-empty-state__title')]
 			.map((el) => el.textContent.trim())
 			.filter((text) => text === 'No users found')
 		expect(copies).toEqual(['No users found'])

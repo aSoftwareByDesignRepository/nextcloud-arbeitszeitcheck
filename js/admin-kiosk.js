@@ -474,9 +474,10 @@
 		const allowedLabel = t('kioskAllowedLabel', 'Allow kiosk access');
 
 		if (groups.length === 0) {
-			tbody.innerHTML = '<tr class="azc-kiosk-empty-row"><td class="azc-kiosk-empty-cell" colspan="4">'
+			tbody.innerHTML = '<tr class="azc-kiosk-empty-row"><td class="azc-table-empty" colspan="4">'
+				+ '<div class="azc-empty-state"><h3 class="azc-empty-state__title">'
 				+ escapeHtml(t('noCredentials', 'No badges or PINs yet. Select an employee above to get started.'))
-				+ '</td></tr>';
+				+ '</h3></div></td></tr>';
 			return;
 		}
 

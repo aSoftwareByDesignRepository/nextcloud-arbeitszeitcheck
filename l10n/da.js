@@ -3006,7 +3006,7 @@
 		"No business trips yet." : "Ingen forretningsrejser endnu.",
 		"No completed months with time entries yet." : "Ingen afsluttede måneder med tidsregistreringer endnu.",
 		"No connection to the server. Check your network and try again." : "Ingen forbindelse til serveren. Tjek dit netværk, og prøv igen.",
-		"No custom absence types yet. Use “New absence type” to create one." : "Ingen brugerdefinerede fraværstyper endnu. Brug “Ny fraværstype” for at oprette en.",
+		"No custom absence types yet." : "Ingen brugerdefinerede fraværstyper endnu.",
 		"No customer" : "Ingen kunde",
 		"No data available" : "Ingen tilgængelige data",
 		"No description" : "Ingen beskrivelse",

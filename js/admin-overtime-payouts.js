@@ -144,7 +144,7 @@
 		const ordered = pending.concat(paid).concat((items || []).filter((r) => r.status === 'none'));
 
 		if (!ordered.length) {
-			tbody.innerHTML = '<tr><td colspan="5">' + escapeHtml(i18n.empty || '') + '</td></tr>';
+			tbody.innerHTML = '<tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + escapeHtml(i18n.empty || '') + '</h3></div></td></tr>';
 			return;
 		}
 

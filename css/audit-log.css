@@ -320,11 +320,6 @@
 #app-content.azc-app--admin-audit-log .audit-log-table tbody tr:hover {
 	background: var(--color-background-hover);
 }
-
-#app-content.azc-app--admin-audit-log .audit-log-empty {
-	padding: 3rem 1rem !important;
-}
-
 #app-content.azc-app--admin-audit-log .audit-log-page__pagination {
 	display: flex;
 	flex-wrap: wrap;

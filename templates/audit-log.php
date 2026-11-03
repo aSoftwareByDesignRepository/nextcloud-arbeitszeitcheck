@@ -221,10 +221,10 @@ $rangeEnd = min($total, $offset + $shownCount);
 						<tbody id="audit-log-tbody">
 							<?php if (empty($logs)): ?>
 								<tr>
-									<td colspan="5" class="text-center audit-log-empty">
-										<div class="empty-state">
-											<h3 class="empty-state__title"><?php p($l->t('No activities found')); ?></h3>
-											<p class="empty-state__description">
+									<td colspan="5" class="azc-table-empty">
+										<div class="azc-empty-state">
+											<h3 class="azc-empty-state__title"><?php p($l->t('No activities found')); ?></h3>
+											<p class="azc-empty-state__text">
 												<?php p($l->t('No activities were logged for the selected period.')); ?>
 											</p>
 										</div>

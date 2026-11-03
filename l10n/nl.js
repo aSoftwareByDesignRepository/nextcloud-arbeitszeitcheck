@@ -3006,7 +3006,7 @@
 		"No business trips yet." : "Nog geen zakenreizen.",
 		"No completed months with time entries yet." : "Nog geen afgeronde maanden met tijdregistraties.",
 		"No connection to the server. Check your network and try again." : "Geen verbinding met de server. Controleer uw netwerk en probeer opnieuw.",
-		"No custom absence types yet. Use “New absence type” to create one." : "Nog geen aangepaste afwezigheidstypes. Gebruik “Nieuw afwezigheidstype” om er een aan te maken.",
+		"No custom absence types yet." : "Nog geen aangepaste afwezigheidstypes.",
 		"No customer" : "Geen klant",
 		"No data available" : "Geen gegevens beschikbaar",
 		"No description" : "Geen beschrijving",

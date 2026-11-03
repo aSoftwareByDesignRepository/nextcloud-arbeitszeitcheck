@@ -234,7 +234,7 @@ $terminalRowIndex = 0;
 					<tbody id="azc-kiosk-terminals-body">
 						<?php if ($terminals === []): ?>
 						<tr class="azc-kiosk-empty-row">
-							<td colspan="4"><?php p($l->t('No terminals yet. Click “Add a tablet” to get a pairing code.')); ?></td>
+							<td colspan="4" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('No terminals yet. Click “Add a tablet” to get a pairing code.')); ?></h3></div></td>
 						</tr>
 						<?php endif; ?>
 						<?php foreach ($terminals as $t): ?>

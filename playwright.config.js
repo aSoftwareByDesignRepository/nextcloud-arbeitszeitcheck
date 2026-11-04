@@ -117,6 +117,9 @@ const STATEFUL_SPECS = [
   // Flips the shared employee's theme via OCS (light/dark) mid-probe —
   // same race class as the theme-responsive specs.
   /atlas-btn-variant-dialog\.spec\.js/,
+  // Flips the shared employee's theme via OCS (light/dark) mid-probe —
+  // same race class as the theme-responsive specs.
+  /select-chevron-contract\.spec\.js/,
 ]
 
 export default defineConfig({

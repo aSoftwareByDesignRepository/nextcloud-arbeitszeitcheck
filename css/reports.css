@@ -460,7 +460,7 @@
 	padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
 	border: 2px solid var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
 	border-radius: var(--border-radius);
-	background: var(--color-main-background);
+	background-color: var(--color-main-background);
 	color: var(--color-main-text);
 	font-size: 1rem;
 	box-sizing: border-box;

@@ -148,6 +148,47 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Find time entries for the list-page filter scope.
+	 *
+	 * Filters apply in SQL — never as a post-limit PHP pass — so matching rows
+	 * outside the newest-N window stay visible (a LIMIT before the scope filter
+	 * would silently drop them). Ordered newest-first like findByUser; no row
+	 * cap — a filtered list is expected to show every match.
+	 *
+	 * @param \DateTime|null $startFrom inclusive lower bound on start_time
+	 * @param \DateTime|null $endBefore inclusive upper bound on start_time
+	 * @return TimeEntry[]
+	 */
+	public function findByUserFiltered(
+		string $userId,
+		?\DateTime $startFrom = null,
+		?\DateTime $endBefore = null,
+		string $status = '',
+		string $workLocation = '',
+	): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->orderBy('start_time', 'DESC');
+
+		if ($startFrom !== null) {
+			$qb->andWhere($qb->expr()->gte('start_time', $qb->createNamedParameter($startFrom->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($endBefore !== null) {
+			$qb->andWhere($qb->expr()->lte('start_time', $qb->createNamedParameter($endBefore->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)));
+		}
+		if ($status !== '') {
+			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status)));
+		}
+		if ($workLocation !== '') {
+			$qb->andWhere($qb->expr()->eq('work_location', $qb->createNamedParameter($workLocation)));
+		}
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Cursor-based chunk scan for background recomputation: entries of a user
 	 * ordered by primary key, optionally limited to a start_time window
 	 * (e.g. a working-time-model assignment window). Stable pagination is via

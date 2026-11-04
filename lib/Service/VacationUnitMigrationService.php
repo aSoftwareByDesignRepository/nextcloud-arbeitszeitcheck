@@ -667,8 +667,12 @@ final class VacationUnitMigrationService
 				$upd->executeStatement();
 			}
 			$result->closeCursor();
-		} catch (\Throwable) {
-			// Table may not exist on older DBs; skip.
+		} catch (\Throwable $e) {
+			// non-fatal: table may not exist on older DBs — a mid-loop failure
+			// surfaces in the log so a partial rescale is observable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Vacation-unit rescale of manual amounts failed for ' . $table . '.' . $column . ': ' . $e->getMessage()
+			);
 		}
 	}
 
@@ -710,8 +714,12 @@ final class VacationUnitMigrationService
 				$upd->executeStatement();
 			}
 			$result->closeCursor();
-		} catch (\Throwable) {
-			// Optional on older installs.
+		} catch (\Throwable $e) {
+			// non-fatal: optional on older installs — logged so a partial
+			// rescale of at_settings stays observable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Vacation-unit rescale of at_settings.vacation_days_per_year failed: ' . $e->getMessage()
+			);
 		}
 	}
 
@@ -768,8 +776,12 @@ final class VacationUnitMigrationService
 				$upd->executeStatement();
 			}
 			$result->closeCursor();
-		} catch (\Throwable) {
-			// Tariff tables may be absent.
+		} catch (\Throwable $e) {
+			// non-fatal: tariff tables may be absent — logged so a partial
+			// rescale of rule-module day amounts stays observable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Vacation-unit rescale of at_tariff_rule_modules failed: ' . $e->getMessage()
+			);
 		}
 	}
 

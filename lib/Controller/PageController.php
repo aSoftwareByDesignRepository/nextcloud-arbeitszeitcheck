@@ -612,8 +612,8 @@ class PageController extends Controller
 
 		try {
 			$userId = $this->getUserId();
-			$entries = $this->timeEntryMapper->findByUser($userId, 100);
-			$allEntries = $entries;
+			// KPI basis: the unfiltered newest-100 window (unchanged semantics).
+			$allEntries = $this->timeEntryMapper->findByUser($userId, 100);
 
 			// Read filter params (query string: start_date, end_date, status).
 			// The list page filter panel navigates with these params — they must
@@ -642,22 +642,19 @@ class PageController extends Controller
 				? $statusParam
 				: '';
 			$filterWorkLocation = $this->normalizeWorkLocationFilter($this->request->getParam('work_location'));
-			if ($filterStartDt !== null || $filterStatus !== '' || $filterWorkLocation !== '') {
-				$entries = array_values(array_filter($entries, function ($entry) use ($filterStartDt, $filterEndDt, $filterStatus, $filterWorkLocation) {
-					if ($filterStartDt !== null) {
-						$start = $entry->getStartTime();
-						if (!$start || $start < $filterStartDt || $start > $filterEndDt) {
-							return false;
-						}
-					}
-					if ($filterStatus !== '' && $entry->getStatus() !== $filterStatus) {
-						return false;
-					}
-					if ($filterWorkLocation !== '' && $entry->getWorkLocation() !== $filterWorkLocation) {
-						return false;
-					}
-					return true;
-				}));
+			$filtersActive = $filterStartDt !== null || $filterStatus !== '' || $filterWorkLocation !== '';
+			if ($filtersActive) {
+				// The filter scope runs in SQL — filtering the newest-100 window
+				// in PHP would silently hide matching rows outside it.
+				$entries = $this->timeEntryMapper->findByUserFiltered(
+					$userId,
+					$filterStartDt,
+					$filterEndDt,
+					$filterStatus,
+					$filterWorkLocation,
+				);
+			} else {
+				$entries = $allEntries;
 			}
 			// Filter form repopulation (European format for date inputs).
 			$filterStartDate = $filterStartDt ? $filterStartDt->format('d.m.Y') : '';
@@ -703,8 +700,10 @@ class PageController extends Controller
 			$params = $this->buildTimeEntriesShellParams('list', $navFlags) + [
 				'entries' => $entries,
 				'entryPager' => $entryPager,
-				'entryListLoaded' => count($allEntries),
-				'entryListTotal' => $timeEntryCount,
+				// Filtered lists load every match — the "latest N of M" window
+				// disclosure only applies to the unfiltered newest-100 list.
+				'entryListLoaded' => count($entries),
+				'entryListTotal' => $filtersActive ? count($entries) : $timeEntryCount,
 				'deletionEligibility' => $deletionEligibility,
 				'mode' => 'list',
 				'filterStartDate' => $filterStartDate,

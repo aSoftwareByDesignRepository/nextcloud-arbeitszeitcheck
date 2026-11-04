@@ -54,7 +54,9 @@ class Version1018Date20260420123000 extends SimpleMigrationStep {
 				$insertQb->executeStatement();
 			}
 		} catch (\Throwable $e) {
-			// no-op: migration is best-effort and idempotent
+			// non-fatal: migration seed is best-effort and idempotent — a retry on
+			// the next upgrade run reaches the same end state.
+			$output->warning('Vacation policy seed skipped: ' . $e->getMessage());
 		}
 	}
 

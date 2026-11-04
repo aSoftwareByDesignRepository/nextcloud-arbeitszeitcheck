@@ -73,10 +73,10 @@
 .admin-users-filter-panel .azc-field-error {
   margin: var(--space-1, 0.25rem) 0 0;
   font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
-  color: var(--color-error-text);
-  background-color: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
-  border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border));
-  border-left: 4px solid var(--color-error);
+  color: var(--color-error-text, var(--azc-danger-ink, var(--color-error)));
+  background-color: var(--azc-tint-danger);
+  border: 1px solid var(--color-error-text, var(--color-error));
+  border-left: 4px solid var(--color-error-text, var(--color-error));
   border-radius: var(--radius-base, 8px);
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
 }

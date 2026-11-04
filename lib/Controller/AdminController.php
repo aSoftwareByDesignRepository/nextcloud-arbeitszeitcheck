@@ -2249,15 +2249,24 @@ class AdminController extends Controller
 
 					try {
 						$this->holidayMapper->insert($holiday);
-					} catch (\Throwable) {
-						// ignore individual insert errors, continue with others
+					} catch (\Throwable $e) {
+						// non-fatal: skip this row, keep migrating the rest — a
+						// dropped insert would otherwise vanish silently once the
+						// migrated flag is set below.
+						\OCP\Log\logger('arbeitszeitcheck')->warning(
+							'Legacy company holiday insert skipped for ' . $name . ' ' . $dateStr . ' in ' . $state . ': ' . $e->getMessage()
+						);
 					}
 				}
 			}
 
 			$this->appConfig->setAppValueString('company_holidays_migrated', '1');
-		} catch (\Throwable) {
-			// Never break admin UI because of a failed migration; it can be retried later.
+		} catch (\Throwable $e) {
+			// non-fatal: never break admin UI over a failed migration — it is
+			// retried on the next run, and the failure stays observable.
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Legacy company holidays migration failed (will retry): ' . $e->getMessage()
+			);
 		}
 	}
 

@@ -136,6 +136,7 @@ const EMPLOYEE_THEME_VIEWS = [
 	['absences', '/apps/arbeitszeitcheck/absences', '#azc-main-content'],
 	['calendar', '/apps/arbeitszeitcheck/calendar', '#azc-main-content'],
 	['settings-breaks', '/apps/arbeitszeitcheck/settings/breaks', '#azc-main-content'],
+	['settings-help-texts', '/apps/arbeitszeitcheck/settings/help-texts', '#btn-hide-all-hints'],
 ];
 
 const ADMIN_THEME_VIEWS = [
@@ -702,7 +703,8 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		   preview (TVöD §6), and the employee time-entries paid line.
 		   Seed a dedicated model via API, assign the shared employee to it
 		   (assignment restored in finally), let the employee record one
-		   9h+1h-break day in 1993 so the allocator snapshots a paid portion,
+		   9h+1h-break day on a recent free date so the allocator snapshots
+		   a paid portion and the row survives the newest-100 list window,
 		   then: (a) open the model editor, change the cap → the debounced
 		   preview GET fires with REAL affected counts (the callout only
 		   renders in edit mode when flag/cap differ from persisted state);
@@ -714,6 +716,10 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		let empCtx = null;
 		let empPage = null;
 		try {
+			// The employee-side API calls below ride the mobile license gate —
+			// re-seat it defensively (sibling lanes may have cleared it).
+			const pbLicense = await applyLabLicense(page, apiAllowFailure);
+			expect(pbLicense.ok, `license seed failed: ${JSON.stringify(pbLicense.res?.json)}`).toBe(true);
 			const pbModel = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/admin/working-time-models', {
 				data: {
 					name: `AZC craft paid-break ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -747,12 +753,16 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 				empCtx = await browser.newContext();
 				empPage = await empCtx.newPage();
 				await login(empPage, credsFromEnv('EMPLOYEE'));
-				// Scan 1993 for a free day (same convention as paid-breaks.spec).
-				const pbBase = new Date('1993-03-01T00:00:00Z');
+				// Scan recent days backwards for a free slot. The list page
+				// renders only the newest-100 window (see PageController::
+				// timeEntries findByUser limit), so a 1993-era seed falls
+				// outside it once the fixture passes 100 entries — the shot
+				// must use a date that survives the window.
+				const pbBase = new Date();
 				let pbWorkDate = null;
-				for (let i = 0; i < 40 && !pbWorkDate; i++) {
+				for (let i = 1; i <= 60 && !pbWorkDate; i++) {
 					const d = new Date(pbBase);
-					d.setUTCDate(d.getUTCDate() + i + Math.floor(Math.random() * 200));
+					d.setUTCDate(d.getUTCDate() - i);
 					const date = d.toISOString().slice(0, 10);
 					const res = await apiAllowFailure(empPage, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
 						data: {

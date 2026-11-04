@@ -123,6 +123,27 @@ class Capabilities implements ICapability {
 						: Constants::VACATION_UNIT_DAYS,
 					'vacationUnitAware' => true,
 					'timeCapture' => $timeCapture,
+					// GH #50: whether the owner may directly edit their own
+					// completed/paused entries (PUT /api/time-entries/{id})
+					// or must route every change through a correction request.
+					// `editWindowDays` mirrors Constants::EDIT_WINDOW_DAYS so
+					// clients hide the affordance for entries the server would
+					// reject anyway. `changesRequireApproval` === true maps to
+					// the org flag that answers direct edits with
+					// `correction_required` (403).
+					'timeEntryEditing' => [
+						'editWindowDays' => Constants::EDIT_WINDOW_DAYS,
+						'changesRequireApproval' => $this->config->getAppValue(
+							'arbeitszeitcheck',
+							Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL,
+							'0'
+						) === '1',
+					],
+					// GH #49: POST /api/manager/employee-absences exists and
+					// stores the absence directly as approved. Clients gate the
+					// manager "record absence" surface on this flag so older
+					// servers fail closed instead of 404ing on submit.
+					'managerAbsenceRecording' => true,
 					'projectCheck' => [
 						'available' => $projectCheckAvailable,
 						'linkingEnabled' => $projectCheckAvailable

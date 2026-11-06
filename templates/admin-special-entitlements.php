@@ -44,39 +44,6 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 	</div>
 	<?php endif; ?>
 
-	<section class="azc-card" aria-labelledby="se-types-title" <?php echo $enabled ? '' : 'hidden'; ?>>
-		<header class="azc-card__header azc-card__header--row">
-			<div class="azc-card__header-text">
-				<h2 id="se-types-title" class="azc-card__title"><?php p($l->t('Special leave entitlements')); ?></h2>
-				<p class="azc-card__lead"><?php p($l->t('Here you define additional leave entitlements and their quotas.')); ?></p>
-			</div>
-			<button id="se-new-type" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Create special leave entitlement')); ?></button>
-		</header>
-		<div class="azc-card__body">
-			<div class="azc-filter-grid se-toolbar" role="search">
-				<div class="azc-filter-field">
-					<label for="se-search" class="azc-filter-field__label"><?php p($l->t('Search')); ?></label>
-					<div class="azc-filter-field__control">
-						<input type="search" id="se-search" class="form-input" autocomplete="off">
-					</div>
-				</div>
-				<div class="azc-filter-field">
-					<label for="se-filter-active" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
-					<div class="azc-filter-field__control">
-						<select id="se-filter-active" class="form-select">
-							<option value="all"><?php p($l->t('All')); ?></option>
-							<option value="active" selected><?php p($l->t('Active')); ?></option>
-							<option value="inactive"><?php p($l->t('Inactive')); ?></option>
-						</select>
-					</div>
-				</div>
-			</div>
-			<p id="se-list-status" role="status" aria-live="polite" class="form-help"></p>
-			<ul id="se-type-list" class="azc-list se-type-list" aria-label="<?php p($l->t('Special leave entitlements')); ?>"></ul>
-			<p id="se-empty" class="azc-empty-state" hidden><?php p($l->t('No additional leave accounts exist.')); ?></p>
-		</div>
-	</section>
-
 	<section class="azc-card" id="se-editor" aria-labelledby="se-editor-title" hidden>
 		<header class="azc-card__header">
 			<div class="azc-card__header-text">
@@ -94,7 +61,7 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 					<legend class="absence-form-fieldset__legend"><?php p($l->t('Definition')); ?></legend>
 					<div class="form-group">
 						<label for="se-label" class="form-label"><?php p($l->t('Name')); ?> <span class="form-required" aria-hidden="true">*</span></label>
-						<input id="se-label" name="publicLabel" maxlength="80" required aria-describedby="se-label-error">
+						<input id="se-label" name="publicLabel" type="text" class="form-input" maxlength="80" required aria-describedby="se-label-error">
 						<p id="se-label-error" class="azc-field-error" hidden></p>
 					</div>
 					<div class="form-grid">
@@ -166,13 +133,13 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 					</div>
 					<div class="form-group">
 						<label for="se-confidential" class="form-label"><?php p($l->t('Confidential label')); ?></label>
-						<input id="se-confidential" name="confidentialLabel" maxlength="80" aria-describedby="se-confidential-help se-confidentialLabel-error">
+						<input id="se-confidential" name="confidentialLabel" type="text" class="form-input" maxlength="80" aria-describedby="se-confidential-help se-confidentialLabel-error">
 						<p id="se-confidential-help" class="form-help"><?php p($l->t('Only app administrators see this label. Employees and managers always see the public name.')); ?></p>
 						<p id="se-confidentialLabel-error" class="azc-field-error" hidden></p>
 					</div>
 					<div class="form-group">
 						<label for="se-absence-type" class="form-label"><?php p($l->t('Linked absence type')); ?></label>
-						<input id="se-absence-type" name="absenceTypeCode" maxlength="64" pattern="custom_[a-z0-9_]+" aria-describedby="se-absence-type-help se-absenceTypeCode-error">
+						<input id="se-absence-type" name="absenceTypeCode" type="text" class="form-input" maxlength="64" pattern="custom_[a-z0-9_]+" aria-describedby="se-absence-type-help se-absenceTypeCode-error">
 						<p id="se-absence-type-help" class="form-help"><?php p($l->t('Leave empty to create a matching custom absence type automatically. Only existing active custom types can be linked.')); ?></p>
 						<p id="se-absenceTypeCode-error" class="azc-field-error" hidden></p>
 					</div>
@@ -188,7 +155,7 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 					</div>
 					<div class="form-group">
 						<label for="se-reason" class="form-label"><?php p($l->t('Legal or contract reference')); ?></label>
-						<input id="se-reason" name="reason" maxlength="500" aria-describedby="se-reason-error">
+						<input id="se-reason" name="reason" type="text" class="form-input" maxlength="500" aria-describedby="se-reason-error">
 						<p id="se-reason-error" class="azc-field-error" hidden></p>
 					</div>
 				</details>
@@ -247,6 +214,57 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 		</div>
 	</section>
 
+	<section class="azc-card" aria-labelledby="se-types-title" <?php echo $enabled ? '' : 'hidden'; ?>>
+		<header class="azc-card__header azc-card__header--row">
+			<div class="azc-card__header-text">
+				<h2 id="se-types-title" class="azc-card__title"><?php p($l->t('Special leave entitlements')); ?></h2>
+				<p class="azc-card__lead"><?php p($l->t('Here you define additional leave entitlements and their quotas.')); ?></p>
+			</div>
+			<button id="se-new-type" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Create special leave entitlement')); ?></button>
+		</header>
+		<div class="azc-card__body">
+			<div class="azc-filter-grid se-toolbar" role="search">
+				<div class="azc-filter-field">
+					<label for="se-search" class="azc-filter-field__label"><?php p($l->t('Search')); ?></label>
+					<div class="azc-filter-field__control">
+						<input type="search" id="se-search" class="form-input" autocomplete="off">
+					</div>
+				</div>
+				<div class="azc-filter-field">
+					<label for="se-filter-active" class="azc-filter-field__label"><?php p($l->t('Status')); ?></label>
+					<div class="azc-filter-field__control">
+						<select id="se-filter-active" class="form-select">
+							<option value="all"><?php p($l->t('All')); ?></option>
+							<option value="active" selected><?php p($l->t('Active')); ?></option>
+							<option value="inactive"><?php p($l->t('Inactive')); ?></option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<p id="se-list-status" role="status" aria-live="polite" class="form-help"></p>
+			<div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Special leave entitlements')); ?>">
+				<table class="table table--hover azc-table--responsive" id="se-type-list" role="table" aria-label="<?php p($l->t('Special leave entitlements')); ?>">
+					<thead>
+						<tr>
+							<th scope="col"><?php p($l->t('Name')); ?></th>
+							<th scope="col"><?php p($l->t('Amount')); ?></th>
+							<th scope="col"><?php p($l->t('For whom?')); ?></th>
+							<th scope="col"><?php p($l->t('Unit')); ?></th>
+							<th scope="col"><?php p($l->t('Period')); ?></th>
+							<th scope="col"><?php p($l->t('Status')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
+						</tr>
+					</thead>
+					<tbody id="se-type-tbody">
+						<tr>
+							<td colspan="7" class="azc-table-loading"><div class="azc-loading" aria-busy="true" aria-live="polite"><?php p($l->t('Loading…')); ?></div></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</section>
+
 	<section class="azc-card" id="se-cohorts-card" aria-labelledby="se-cohorts-title" <?php echo $enabled ? '' : 'hidden'; ?>>
 		<header class="azc-card__header">
 			<div class="azc-card__header-text">
@@ -259,12 +277,12 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 				<div class="form-grid">
 					<div class="form-group">
 						<label for="se-cohort-label" class="form-label"><?php p($l->t('Group name')); ?> <span class="form-required" aria-hidden="true">*</span></label>
-						<input id="se-cohort-label" name="label" maxlength="80" required aria-describedby="se-cohort-label-error">
+						<input id="se-cohort-label" name="label" type="text" class="form-input" maxlength="80" required aria-describedby="se-cohort-label-error">
 						<p id="se-cohort-label-error" class="azc-field-error" hidden></p>
 					</div>
 					<div class="form-group">
 						<label for="se-cohort-confidential" class="form-label"><?php p($l->t('Confidential label')); ?></label>
-						<input id="se-cohort-confidential" name="confidentialLabel" maxlength="80">
+						<input id="se-cohort-confidential" name="confidentialLabel" type="text" class="form-input" maxlength="80">
 					</div>
 				</div>
 				<button class="azc-btn azc-btn--primary" type="submit"><?php p($l->t('Create protected group')); ?></button>

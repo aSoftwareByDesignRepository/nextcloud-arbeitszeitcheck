@@ -92,6 +92,9 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		?\OCA\ArbeitszeitCheck\Db\TeamMemberMapper $teamMembers = null,
 		?\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper $userModels = null,
 		?\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper $cohortMemberships = null,
+		?WorkingTimeModelMapper $models = null,
+		?TeamMapper $teams = null,
+		?PolicyCohortMapper $cohorts = null,
 	): SpecialEntitlementAdminService {
 		$entitlements = new SpecialEntitlementService(
 			$this->cfg,
@@ -119,9 +122,9 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 			$entitlements,
 			$this->createMock(EntitlementComputationSnapshotMapper::class),
 			$this->customTypes,
-			$this->createMock(WorkingTimeModelMapper::class),
-			$this->createMock(TeamMapper::class),
-			$this->createMock(PolicyCohortMapper::class),
+			$models ?? $this->createMock(WorkingTimeModelMapper::class),
+			$teams ?? $this->createMock(TeamMapper::class),
+			$cohorts ?? $this->createMock(PolicyCohortMapper::class),
 			$this->createMock(TariffRuleSetMapper::class),
 			$this->users,
 			$this->audit,
@@ -212,6 +215,63 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		$policy->setEffectiveTo(null);
 		$policy->setVersion(4);
 		return $policy;
+	}
+
+	public function testListTypesIncludesActivePoliciesWithResolvedScopeLabels(): void
+	{
+		$userPolicy = new SpecialEntitlementPolicy();
+		$userPolicy->setId(14);
+		$userPolicy->setEntitlementTypeId(7);
+		$userPolicy->setScopeType(SpecialEntitlementPolicy::SCOPE_USER);
+		$userPolicy->setScopeId('u9');
+		$userPolicy->setOperation(SpecialEntitlementPolicy::OP_DISABLE);
+		$userPolicy->setAmount(null);
+		$userPolicy->setEffectiveFrom(new \DateTime('2026-01-01'));
+		$userPolicy->setEffectiveTo(null);
+		$userPolicy->setVersion(1);
+
+		$ended = new SpecialEntitlementPolicy();
+		$ended->setId(15);
+		$ended->setEntitlementTypeId(7);
+		$ended->setScopeType(SpecialEntitlementPolicy::SCOPE_ORG);
+		$ended->setScopeId(SpecialEntitlementPolicy::ORG_SCOPE_ID);
+		$ended->setOperation(SpecialEntitlementPolicy::OP_ADD);
+		$ended->setAmount(1.0);
+		$ended->setEffectiveFrom(new \DateTime('2020-01-01'));
+		$ended->setEffectiveTo(new \DateTime('2020-12-31'));
+		$ended->setVersion(1);
+
+		$this->types->method('findAll')->willReturn([$this->type()]);
+		$this->policies->method('findByType')->with(7)->willReturn([$this->policy(), $userPolicy, $ended]);
+
+		$team = new \OCA\ArbeitszeitCheck\Db\Team();
+		$team->setName('Night shift');
+		$teams = $this->createMock(TeamMapper::class);
+		$teams->method('find')->with(42)->willReturn($team);
+
+		$user = $this->createMock(\OCP\IUser::class);
+		$user->method('getDisplayName')->willReturn('Max Muster');
+		$this->users->method('get')->with('u9')->willReturn($user);
+
+		$items = $this->makeService(null, null, null, null, $teams)->listTypes();
+
+		self::assertCount(1, $items);
+		$policies = $items[0]['policies'];
+		// The expired rule is filtered out; team + user targets resolve names.
+		self::assertCount(2, $policies);
+		self::assertSame('Night shift', $policies[0]['scopeLabel']);
+		self::assertSame('Max Muster', $policies[1]['scopeLabel']);
+	}
+
+	public function testPolicySummaryScopeLabelFallsBackOnStaleReference(): void
+	{
+		$teams = $this->createMock(TeamMapper::class);
+		$teams->method('find')->willThrowException(new DoesNotExistException('gone'));
+
+		$summary = $this->makeService(null, null, null, null, $teams)->policySummary($this->policy());
+
+		self::assertNull($summary['scopeLabel']);
+		self::assertSame('42', $summary['scopeId']);
 	}
 
 	public function testClosePeriodRejectsMissingRevisionFailClosed(): void

@@ -73,6 +73,9 @@ final class SpecialEntitlementAdminService
 	) {
 	}
 
+	/** @var array<string, ?string> Memoized scope-target labels for this request. */
+	private array $scopeLabelCache = [];
+
 	public function assertEnabled(): void
 	{
 		if (!$this->suiteConfig->isEnabled('special_entitlements_enabled') || !$this->suiteConfig->isEnabled('policy_cohorts_enabled')) {
@@ -107,7 +110,22 @@ final class SpecialEntitlementAdminService
 	public function listTypes(): array
 	{
 		$this->assertEnabled();
-		return array_map([$this, 'adminTypeSummary'], $this->types->findAll(false));
+		$today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+		return array_map(function (SpecialEntitlementType $type) use ($today): array {
+			$item = $this->adminTypeSummary($type);
+			// Rules that still apply (current or future-dated) — expired rules
+			// must not surface as an active quota in the list columns.
+			$item['policies'] = array_map(
+				[$this, 'policySummary'],
+				array_values(array_filter(
+					$this->policies->findByType((int)$type->getId()),
+					static fn (SpecialEntitlementPolicy $p): bool =>
+						$p->getEffectiveTo() === null
+						|| $p->getEffectiveTo()->format('Y-m-d') >= $today
+				))
+			);
+			return $item;
+		}, $this->types->findAll(false));
 	}
 
 	/** @return array<string,mixed> */
@@ -1111,11 +1129,14 @@ final class SpecialEntitlementAdminService
 	/** @return array<string,mixed> */
 	public function policySummary(SpecialEntitlementPolicy $policy): array
 	{
+		$scopeType = (string)$policy->getScopeType();
+		$scopeId = (string)$policy->getScopeId();
 		return [
 			'id' => (int)$policy->getId(),
 			'entitlementTypeId' => (int)$policy->getEntitlementTypeId(),
-			'scopeType' => (string)$policy->getScopeType(),
-			'scopeId' => (string)$policy->getScopeId(),
+			'scopeType' => $scopeType,
+			'scopeId' => $scopeId,
+			'scopeLabel' => $this->resolveScopeLabel($scopeType, $scopeId),
 			'operation' => (string)$policy->getOperation(),
 			'amount' => $policy->getAmount() !== null ? number_format((float)$policy->getAmount(), 2, '.', '') : null,
 			'tariffRuleSetId' => $policy->getTariffRuleSetId(),
@@ -1127,6 +1148,31 @@ final class SpecialEntitlementAdminService
 			'createdBy' => $policy->getCreatedBy(),
 			'updatedBy' => $policy->getUpdatedBy(),
 		];
+	}
+
+	/**
+	 * Display name of a policy scope target (cohort/team/model/person).
+	 * Returns null for org scopes and for stale references (deleted targets)
+	 * so the UI can fall back to the raw id instead of failing the list.
+	 */
+	private function resolveScopeLabel(string $scopeType, string $scopeId): ?string
+	{
+		$key = $scopeType . ':' . $scopeId;
+		if (array_key_exists($key, $this->scopeLabelCache)) {
+			return $this->scopeLabelCache[$key];
+		}
+		try {
+			$label = match ($scopeType) {
+				SpecialEntitlementPolicy::SCOPE_GROUP => $this->cohorts->find((int)$scopeId)->getPublicLabel(),
+				SpecialEntitlementPolicy::SCOPE_TEAM => $this->teams->find((int)$scopeId)->getName(),
+				SpecialEntitlementPolicy::SCOPE_MODEL => $this->workingTimeModels->find((int)$scopeId)->getName(),
+				SpecialEntitlementPolicy::SCOPE_USER => $this->users->get($scopeId)?->getDisplayName() ?? $scopeId,
+				default => null,
+			};
+		} catch (DoesNotExistException) {
+			$label = null;
+		}
+		return $this->scopeLabelCache[$key] = $label;
 	}
 
 	/** @return array<string,mixed> */

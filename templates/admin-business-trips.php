@@ -31,7 +31,9 @@ $enabled = !empty($_['businessTripsEnabled']);
 	data-presets-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.presets')); ?>"
 	data-preset-create-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.business_trip_admin.createPreset', 'jurisdiction', '__ID__', 'DE')); ?>"
 	data-credit-enable-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.business_trip_admin.enableCredit')); ?>"
-	data-mark-reviewed-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.business_trip_admin.markReviewed', 'id')); ?>">
+	data-mark-reviewed-template="<?php p(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.business_trip_admin.markReviewed', 'id')); ?>"
+	data-manager-absences-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.employeeAbsencesPage')); ?>"
+	data-manager-trips-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.manager.businessTripsPage')); ?>">
 
 	<?php if (!$enabled): ?>
 	<div class="azc-callout azc-callout--info" role="status">
@@ -52,26 +54,43 @@ $enabled = !empty($_['businessTripsEnabled']);
 		</header>
 		<div class="azc-card__body">
 			<p id="bta-rollout-status" role="status" aria-live="polite" class="form-help"></p>
-			<ul id="bta-rollout-checks" class="azc-list" aria-label="<?php p($l->t('Readiness checks')); ?>"></ul>
-			<div class="form-actions">
-				<button id="bta-enable" class="azc-btn azc-btn--primary" type="button" hidden>
-					<?php p($l->t('Enable business trips')); ?>
-				</button>
-				<button id="bta-enable-credit" class="azc-btn azc-btn--primary" type="button" hidden>
-					<?php p($l->t('Enable time-account credit postings')); ?>
-				</button>
-				<button id="bta-disable-legacy" class="azc-btn azc-btn--secondary" type="button" disabled>
+
+			<div class="bta-rollout-group" id="bta-rollout-todo-group" hidden>
+				<h3 class="bta-rollout-group__title" id="bta-rollout-todo-title"><?php p($l->t('To do')); ?></h3>
+				<ul id="bta-rollout-todo" class="bta-steps" aria-labelledby="bta-rollout-todo-title"></ul>
+			</div>
+
+			<div class="bta-rollout-group" id="bta-rollout-done-group" hidden>
+				<h3 class="bta-rollout-group__title" id="bta-rollout-done-title"><?php p($l->t('Done')); ?></h3>
+				<ul id="bta-rollout-done" class="bta-steps" aria-labelledby="bta-rollout-done-title"></ul>
+			</div>
+
+			<div class="bta-rollout-group" id="bta-rollout-info-group" hidden>
+				<h3 class="bta-rollout-group__title" id="bta-rollout-info-title"><?php p($l->t('Good to know')); ?></h3>
+				<ul id="bta-rollout-info" class="bta-steps" aria-labelledby="bta-rollout-info-title"></ul>
+			</div>
+
+			<div class="form-actions" id="bta-cutover" hidden>
+				<button id="bta-disable-legacy" class="azc-btn azc-btn--primary" type="button" disabled aria-describedby="bta-cutover-help">
 					<?php p($l->t('Stop new legacy business-trip requests')); ?>
 				</button>
-				<p class="form-help"><?php p($l->t('Existing legacy requests stay readable and editable forever — this only stops creating new ones.')); ?></p>
+				<p class="form-help" id="bta-cutover-help"><?php p($l->t('Existing legacy requests stay readable and editable forever — this only stops creating new ones.')); ?></p>
 			</div>
+
+			<!-- Step action buttons: JS moves each into its matching to-do row. -->
+			<button id="bta-enable" class="azc-btn azc-btn--primary" type="button" hidden>
+				<?php p($l->t('Enable business trips')); ?>
+			</button>
+			<button id="bta-enable-credit" class="azc-btn azc-btn--secondary" type="button" hidden>
+				<?php p($l->t('Enable time-account credit postings')); ?>
+			</button>
 		</div>
 	</section>
 
 	<div id="bta-enabled" <?php echo $enabled ? '' : 'hidden'; ?>>
 
 		<!-- Rule sets -->
-		<section class="azc-card" aria-labelledby="bta-sets-title">
+		<section class="azc-card" aria-labelledby="bta-sets-title" id="bta-sets">
 			<header class="azc-card__header azc-card__header--row">
 				<div class="azc-card__header-text">
 					<h2 id="bta-sets-title" class="azc-card__title"><?php p($l->t('Rule sets')); ?></h2>
@@ -308,7 +327,7 @@ $enabled = !empty($_['businessTripsEnabled']);
 		</section>
 
 		<!-- Assignments -->
-		<section class="azc-card" aria-labelledby="bta-assign-title">
+		<section class="azc-card" aria-labelledby="bta-assign-title" id="bta-assignments">
 			<header class="azc-card__header azc-card__header--row">
 				<div class="azc-card__header-text">
 					<h2 id="bta-assign-title" class="azc-card__title"><?php p($l->t('Assignments')); ?></h2>

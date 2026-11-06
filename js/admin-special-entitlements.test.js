@@ -59,6 +59,7 @@ function stageDom({ enabled = '1' } = {}) {
 	data-cohort-create-url="/api/cohorts"
 	data-cohort-members-template="/api/cohorts/__ID__/members"
 	data-cohort-membership-template="/api/memberships/__ID__"
+	data-cohort-update-template="/api/cohorts/__ID__"
 	data-users-url="/api/users"
 	data-teams-url="/api/teams"
 	data-models-url="/api/models"
@@ -117,13 +118,14 @@ function stageDom({ enabled = '1' } = {}) {
 		</form>
 	</section>
 	<section id="se-detail" hidden>
-		<h2 id="se-detail-title"></h2><p id="se-detail-meta"></p>
+		<h2 id="se-detail-title"></h2>
 		<button id="se-detail-add-policy" type="button"></button>
 		<button id="se-detail-close" type="button"></button>
 		<div id="se-conflict" hidden><p id="se-conflict-text"></p><button id="se-conflict-reload" type="button"></button></div>
 		<p id="se-policy-status"></p>
 		<div id="se-policy-groups"></div>
-		<input id="se-trace-user"><input id="se-trace-date" type="date">
+		<div id="se-trace-user-wrap"><input type="hidden" id="se-trace-uid"><input id="se-trace-user-search"><div id="se-trace-user-list"></div><p id="se-trace-user-status"></p></div>
+		<input id="se-trace-date" type="date">
 		<button id="se-trace-run" type="button"></button><pre id="se-trace-out"></pre>
 	</section>
 	<section>
@@ -136,14 +138,19 @@ function stageDom({ enabled = '1' } = {}) {
 		<table id="se-type-list"><tbody id="se-type-tbody"></tbody></table>
 	</section>
 	<section>
-		<form id="se-cohort-form">
-			<input id="se-cohort-label" name="label" required maxlength="80">
-			<p id="se-cohort-label-error" class="azc-field-error" hidden></p>
-			<input id="se-cohort-confidential" name="confidentialLabel" maxlength="80">
-			<button type="submit"></button>
-		</form>
+		<section id="se-cohort-editor" hidden>
+			<form id="se-cohort-form">
+				<input id="se-cohort-label" name="label" required maxlength="80">
+				<p id="se-cohort-label-error" class="azc-field-error" hidden></p>
+				<input id="se-cohort-confidential" name="confidentialLabel" maxlength="80">
+				<div id="se-cohort-members-wrap"><input type="hidden" id="se-cohort-member-uid"><input id="se-cohort-member-search"><div id="se-cohort-member-list"></div><div id="se-cohort-member-chips"></div><p id="se-cohort-member-status"></p></div>
+				<button type="submit"></button>
+			</form>
+		</section>
+		<section><button id="se-new-cohort" type="button"></button>
+			<table><tbody id="se-cohort-list"></tbody></table>
+		</section>
 		<p id="se-cohort-status"></p>
-		<ul id="se-cohort-list"></ul>
 	</section>
 </div>`
 }
@@ -189,7 +196,10 @@ beforeEach(async () => {
 		'/api/preview': { success: true, recipientCount: 0, summary: { amount: 0 }, warnings: [], samples: [] },
 	})
 	window.ArbeitszeitCheck = {
-		initAdminUserPicker: () => ({ destroy: vi.fn(), clear: vi.fn() }),
+		initAdminUserPicker: vi.fn((opts) => {
+			window.__pickerOpts = opts
+			return { destroy: vi.fn(), clear: vi.fn() }
+		}),
 	}
 	window.ArbeitszeitCheckTime = {
 		ymd: (d) => d.toISOString().slice(0, 10),
@@ -324,9 +334,47 @@ describe('row actions', () => {
 		const detail = document.getElementById('se-detail')
 		expect(detail.hidden).toBe(false)
 		expect(document.getElementById('se-detail-title').textContent).toBe('Betriebsjubiläum')
-		expect(document.getElementById('se-detail-meta').textContent).toContain('se_sonderurlaub')
+		expect(document.getElementById('se-detail-meta')).toBeNull()
 		expect(calls).toHaveLength(1)
 		expect(document.getElementById('se-policy-status').textContent).toBe('No rules yet.')
+	})
+
+	it('end-date chip x clears the end date via PUT effectiveTo null', async () => {
+		const puts = []
+		const policy = {
+			id: 21, entitlementTypeId: 7, scopeType: 'org', scopeId: 'org', scopeLabel: null,
+			operation: 'add', amount: '10.00', priority: 0,
+			effectiveFrom: '2026-01-01', effectiveTo: '2027-01-31', version: 2,
+		}
+		const openPolicy = {
+			id: 22, entitlementTypeId: 7, scopeType: 'team', scopeId: '42', scopeLabel: 'Nachtschicht',
+			operation: 'add', amount: '2.00', priority: 0,
+			effectiveFrom: '2026-01-01', effectiveTo: null, version: 1,
+		}
+		routeFetch({
+			'/api/types': { success: true, items: [TYPE_A] },
+			'/api/types/7/policies': { success: true, items: [policy, openPolicy] },
+			'/api/policies/21': (url, opts) => { puts.push(JSON.parse(opts.body)); return { success: true } },
+		})
+		await T().loadTypes()
+		await flush()
+
+		document.querySelector('#se-type-tbody .azc-table-actions button[aria-label^="Manage rules"]').click()
+		await flush()
+
+		const x = document.querySelector('.se-policy-chip__remove')
+		expect(x).toBeTruthy()
+		expect(x.getAttribute('aria-label')).toContain('Remove end date')
+		// Rule with an end date: chip ×, no date picker; open-ended rule: picker, no ×.
+		const items = document.querySelectorAll('.se-policy-item')
+		expect(items[0].querySelector('.se-policy-end')).toBeNull()
+		expect(items[1].querySelector('.se-policy-end')).toBeTruthy()
+		expect(items[1].querySelector('.se-policy-chip__remove')).toBeNull()
+		expect(items[1].querySelector('.se-policy-end button').textContent).toBe('Set end date')
+		x.click()
+		await flush()
+
+		expect(puts).toEqual([{ revision: 2, effectiveTo: null }])
 	})
 })
 
@@ -394,6 +442,109 @@ describe('field errors', () => {
 		expect(document.getElementById('se-cohort-label-error').hidden).toBe(false)
 		// The editor's identically-named error element stays untouched.
 		expect(document.getElementById('se-label-error').hidden).toBe(true)
+	})
+
+	it('opens the cohort editor single-flight and posts selected members', async () => {
+		const posts = []
+		routeFetch({
+			'/api/types': { success: true, items: [] },
+			'/api/cohorts': (url, opts) => {
+				if (opts.method === 'POST') posts.push(JSON.parse(opts.body))
+				return { success: true, items: [] }
+			},
+			'/api/targets': { success: true, items: [] },
+		})
+		await T().loadTypes()
+		await flush()
+
+		document.getElementById('se-new-cohort').click()
+		expect(document.getElementById('se-cohort-editor').hidden).toBe(false)
+		expect(document.getElementById('se-editor').hidden).toBe(true)
+		expect(document.getElementById('se-detail').hidden).toBe(true)
+
+		// The last picker initialised is the cohort member picker — its
+		// onChange feeds the chip list, not a single hidden uid.
+		window.__pickerOpts.onChange('u9', { displayName: 'Max Muster' })
+		const chips = document.querySelectorAll('.se-member-chip')
+		expect(chips).toHaveLength(1)
+		expect(chips[0].textContent).toContain('Max Muster')
+		expect(chips[0].querySelector('.se-policy-chip__remove')).toBeTruthy()
+
+		document.getElementById('se-cohort-label').value = 'SBB'
+		document.getElementById('se-cohort-form').requestSubmit()
+		await flush()
+
+		expect(posts).toHaveLength(1)
+		expect(posts[0].members).toEqual(['u9'])
+		expect(posts[0].label).toBe('SBB')
+		expect(document.getElementById('se-cohort-editor').hidden).toBe(true)
+		expect(document.querySelectorAll('.se-member-chip')).toHaveLength(0)
+	})
+
+	it('renders cohort rows with confidential label and CAS deactivation', async () => {
+		const puts = []
+		routeFetch({
+			'/api/types': { success: true, items: [] },
+			'/api/cohorts': (url, opts) => {
+				if (opts.method === 'PUT') puts.push({ url, body: JSON.parse(opts.body) })
+				return {
+					success: true,
+					items: [{ id: 3, publicLabel: 'SBB', code: 'sbb', confidentialLabel: 'Tarifgruppe X', memberCount: 2, active: true, revision: 7 }],
+				}
+			},
+			'/api/targets': { success: true, items: [] },
+		})
+		await T().loadTypes()
+		await flush()
+		await T().loadCohorts()
+		await flush()
+
+		const row = document.querySelector('#se-cohort-list tr')
+		const cells = row.querySelectorAll('td')
+		expect(cells).toHaveLength(5)
+		expect(cells[0].dataset.label).toBe('Name')
+		expect(cells[1].dataset.label).toBe('Confidential label')
+		expect(cells[1].textContent).toBe('Tarifgruppe X')
+		expect(cells[2].dataset.label).toBe('Members')
+		expect(cells[3].dataset.label).toBe('Status')
+		expect(cells[4].dataset.label).toBe('Actions')
+
+		const toggle = row.querySelector('.azc-icon-btn')
+		expect(toggle.getAttribute('aria-label')).toBe('Deactivate: SBB')
+		toggle.click()
+		await flush()
+		expect(puts).toHaveLength(1)
+		expect(puts[0].url).toBe('/api/cohorts/3')
+		expect(puts[0].body).toEqual({ active: '0', revision: 7 })
+	})
+
+	it('members panel opens and closes via its close button', async () => {
+		routeFetch({
+			'/api/types': { success: true, items: [] },
+			'/api/cohorts': {
+				success: true,
+				items: [{ id: 4, publicLabel: 'G1', code: 'g1', memberCount: 0, active: true, revision: 1 }],
+			},
+			'/api/cohorts/4/members': { success: true, items: [] },
+			'/api/targets': { success: true, items: [] },
+		})
+		await T().loadTypes()
+		await flush()
+		await T().loadCohorts()
+		await flush()
+
+		const manage = document.querySelector('[data-cohort-id="4"]')
+		manage.click()
+		await flush()
+		const panelRow = document.querySelector('tr.se-cohort-panel')
+		expect(panelRow).toBeTruthy()
+		// Member picker init is deferred until the panel is connected.
+		expect(window.ArbeitszeitCheck.initAdminUserPicker).toHaveBeenCalled()
+
+		panelRow.querySelector('.se-cohort-panel__header .azc-icon-btn').click()
+		await flush()
+		expect(document.querySelector('tr.se-cohort-panel')).toBeNull()
+		expect(document.activeElement.getAttribute('data-cohort-id')).toBe('4')
 	})
 })
 

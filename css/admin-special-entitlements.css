@@ -17,6 +17,95 @@
 .azc-se-admin .se-type-rule {
 	display: block;
 }
+.azc-se-admin .se-policy-text {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.375rem 0.75rem;
+}
+.azc-se-admin .se-policy-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+}
+.azc-se-admin .se-policy-end {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: nowrap;
+	white-space: nowrap;
+	margin-left: auto;
+}
+.azc-se-admin .se-policy-end-label {
+	font-size: 0.875rem;
+	color: var(--color-text-maxcontrast);
+}
+.azc-se-admin .se-policy-end-date {
+	max-width: 11rem;
+}
+.azc-se-admin .se-policy-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 1.5rem;
+}
+.azc-se-admin .se-policy-chip--removable {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.125rem;
+}
+/* The x must never make the chip taller or wider than its siblings:
+ * 1em tracks the badge font-size exactly, so the chip keeps the same
+ * box height with or without the button inside. */
+.azc-se-admin .se-policy-chip__remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1em;
+	height: 1em;
+	margin: 0 0.125rem 0 0;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	font-size: 0.75em;
+	line-height: 1;
+	cursor: pointer;
+}
+.azc-se-admin .se-policy-chip__remove:hover {
+	background-color: rgba(0, 0, 0, 0.12);
+}
+.azc-se-admin .se-policy-chip__remove:focus-visible {
+	outline: 3px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+.azc-se-admin .se-policy-chip__remove:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+.azc-se-admin .se-member-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+	margin-top: 0.375rem;
+}
+.azc-se-admin .se-member-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.125rem;
+}
+.azc-se-admin .se-cohort-panel > td {
+	padding: 0.75rem 1rem;
+	background: var(--color-background-hover, #f7f7f7);
+}
+.azc-se-admin .se-cohort-panel__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 0.5rem;
+}
 .azc-se-admin .se-advanced {
 	margin: 0.75rem 0;
 	padding: 0.75rem;

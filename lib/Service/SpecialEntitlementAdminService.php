@@ -649,6 +649,21 @@ final class SpecialEntitlementAdminService
 		$label = $this->requiredLabel($params['publicLabel'] ?? $params['public_label'] ?? $params['label'] ?? null, 'label');
 		$confidentialLabel = $this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'] ?? null, 'confidentialLabel');
 		$code = $this->cohortCode($params['code'] ?? null, $label);
+		$members = array_values(array_unique(array_filter(array_map(
+			fn ($m) => $this->nullableString(is_array($m) ? ($m['userId'] ?? $m['user_id'] ?? null) : $m, 'userId', 64),
+			is_array($params['members'] ?? null) ? $params['members'] : []
+		))));
+		if ($members !== [] && $this->cohortMemberships === null) {
+			throw new SpecialEntitlementException('VALIDATION_ERROR', 'Membership management is unavailable.', 400);
+		}
+		// Fail fast before the transaction — a bad uid must not create a
+		// half-populated cohort. Memberships go in the same transaction below.
+		foreach ($members as $userId) {
+			$user = $this->users->get($userId);
+			if ($user === null || !$user->isEnabled()) {
+				throw new SpecialEntitlementException('NOT_FOUND', 'Not found.', 404);
+			}
+		}
 
 		$this->lockingProvider->acquireLock(DbLockKeys::policyCatalog('policy_cohort'), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort catalog');
 		try {
@@ -671,13 +686,28 @@ final class SpecialEntitlementAdminService
 				$cohort->setCreatedAt($now);
 				$cohort->setUpdatedAt($now);
 				$cohort = $this->cohorts->insert($cohort);
-				$this->audit->logAction($actorUid, 'policy_cohort_created', 'policy_cohort', (int)$cohort->getId(), null, $this->cohortSummary($cohort), $actorUid);
+				$memberSummaries = [];
+				foreach ($members as $userId) {
+					$m = new \OCA\ArbeitszeitCheck\Db\PolicyCohortMembership();
+					$m->setCohortId((int)$cohort->getId());
+					$m->setUserId($userId);
+					$m->setEffectiveFrom((new \DateTimeImmutable('today'))->format('Y-m-d'));
+					$m->setEffectiveTo(null);
+					$m->setRevision(1);
+					$m->setCreatedBy($actorUid);
+					$m->setUpdatedBy($actorUid);
+					$m->setCreatedAt($now);
+					$m->setUpdatedAt($now);
+					$memberSummaries[] = $this->membershipSummary($this->cohortMemberships->insert($m));
+				}
+				$summary = $this->cohortSummary($cohort) + ['memberUserIds' => $members, 'members' => $memberSummaries];
+				$this->audit->logAction($actorUid, 'policy_cohort_created', 'policy_cohort', (int)$cohort->getId(), null, $summary, $actorUid);
 				$this->db->commit();
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
 				throw $e;
 			}
-			return $this->cohortSummary($cohort);
+			return $summary;
 		} finally {
 			$this->lockingProvider->releaseLock(DbLockKeys::policyCatalog('policy_cohort'), ILockingProvider::LOCK_EXCLUSIVE);
 		}
@@ -706,7 +736,7 @@ final class SpecialEntitlementAdminService
 				$cohort->setConfidentialLabel($this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'], 'confidentialLabel'));
 			}
 			if (array_key_exists('active', $params)) {
-				$cohort->setActive($this->boolParam($params['active']));
+				$cohort->setActive($this->parseBool($params['active']));
 			}
 			$cohort->setRevision((int)$cohort->getRevision() + 1);
 			$cohort->setUpdatedBy($actorUid);

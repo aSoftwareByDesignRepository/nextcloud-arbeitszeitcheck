@@ -138,6 +138,22 @@
 
 	function escapeText(v) { return String(v ?? ''); }
 
+	function chip(text, variant) {
+		const c = document.createElement('span');
+		c.className = `badge badge--${variant}`;
+		c.textContent = text;
+		return c;
+	}
+
+	function operationChip(operation) {
+		return {
+			add: { label: t('Additionally'), variant: 'success' },
+			replace: { label: t('Replaces'), variant: 'warning' },
+			disable: { label: t('Disabled'), variant: 'error' },
+			inherit: { label: t('Inherits'), variant: 'neutral' },
+		}[operation] || { label: operation, variant: 'neutral' };
+	}
+
 	function glyph(name) {
 		return (window.AzcCatalog && typeof window.AzcCatalog.render === 'function')
 			? window.AzcCatalog.render(name)
@@ -358,6 +374,24 @@
 	const userWrap = document.getElementById('se-user-wrap');
 	const userHidden = document.getElementById('se-user-id');
 
+	// The "Explain calculation" surface is commented out in the template;
+	// keep the wiring guarded so re-enabling needs no JS change.
+	const _traceUserPicker = document.getElementById('se-trace-user-wrap')
+		? window.ArbeitszeitCheck?.initAdminUserPicker({
+		wrapSelector: '#se-trace-user-wrap',
+		hiddenSelector: '#se-trace-uid',
+		searchSelector: '#se-trace-user-search',
+		listSelector: '#se-trace-user-list',
+		statusSelector: '#se-trace-user-status',
+		searchUrl: root.dataset.usersUrl,
+		l10n: {
+			typeToSearch: t('Type to search for people'),
+			noResults: t('No results'),
+			loading: t('Loading…'),
+		},
+	})
+		: null;
+
 	const _userPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
 		wrapSelector: '#se-user-wrap',
 		hiddenSelector: '#se-user-id',
@@ -548,6 +582,7 @@
 		conflictBox.hidden = true;
 		editor.hidden = false;
 		detail.hidden = true;
+		cohortEditor.hidden = true;
 		loadTargets();
 		scrollToPanel(editor);
 		document.getElementById('se-label').focus();
@@ -567,6 +602,7 @@
 		document.getElementById('se-period').value = currentType.periodType;
 		formErrorBox.hidden = true;
 		editor.hidden = false;
+		cohortEditor.hidden = true;
 		loadTargets();
 		schedulePreview();
 		scrollToPanel(editor);
@@ -686,11 +722,49 @@
 		editor.hidden = true;
 		editorMode = null;
 		conflictBox.hidden = true;
+		cohortEditor.hidden = true;
 		detail.hidden = false;
 		document.getElementById('se-detail-title').textContent = item.publicLabel;
-		document.getElementById('se-detail-meta').textContent = `${item.code} · ${item.unit} · ${item.periodType} · ${item.active ? t('Active') : t('Inactive')}`;
+		const addRuleBtn = document.getElementById('se-add-rule');
+		if (addRuleBtn) {
+			addRuleBtn.textContent = t('Add rule to %1$s').replace('%1$s', item.publicLabel);
+		}
+		
 		await loadPolicies(item.id);
 		scrollToPanel(detail);
+	}
+
+	function untilChip(p) {
+		const c = chip(p.effectiveTo ? `${t('Valid until')} ${p.effectiveTo}` : t('open-ended'), 'neutral');
+		if (!p.effectiveTo) return c;
+		c.classList.add('se-policy-chip--removable');
+		const x = document.createElement('button');
+		x.type = 'button';
+		x.className = 'se-policy-chip__remove';
+		x.setAttribute('aria-label', `${t('Remove end date')}: ${scopeHuman(p.scopeType)}${p.scopeType !== 'org' ? ` ${p.scopeLabel || `#${escapeText(p.scopeId)}`}` : ''}`);
+		x.textContent = '×';
+		x.addEventListener('click', () => { void updatePolicyEnd(p, null, x); });
+		c.append(x);
+		return c;
+	}
+
+	async function updatePolicyEnd(p, effectiveTo, busyEl) {
+		setBusy(busyEl, true);
+		try {
+			await request(tpl('policyUpdateTemplate', p.id), {
+				method: 'PUT',
+				body: JSON.stringify({ revision: p.version, effectiveTo }),
+			});
+			await loadPolicies(currentType.id);
+			await loadTypes();
+		} catch (e) {
+			if (e.status === 409) {
+				conflictBox.hidden = false;
+				document.getElementById('se-conflict-text').textContent = e.message;
+			} else {
+				document.getElementById('se-policy-status').textContent = e.message;
+			}
+		} finally { setBusy(busyEl, false); }
 	}
 
 	function renderPolicies() {
@@ -713,43 +787,54 @@
 			ul.className = 'azc-list';
 			g.rows.forEach((p) => {
 				const li = document.createElement('li');
-				li.className = 'azc-list__item';
+				li.className = 'azc-list__item se-policy-item';
 				const text = document.createElement('div');
+				text.className = 'se-policy-text';
 				const title = document.createElement('strong');
-				title.textContent = `${scopeHuman(p.scopeType)} ${p.scopeType !== 'org' ? (p.scopeLabel || `#${escapeText(p.scopeId)}`) : ''} → ${fmtAmount(p.amount, currentType?.unit)}`;
-				const meta = document.createElement('p');
-				meta.className = 'form-help';
-				meta.textContent = `${p.operation} · ${p.effectiveFrom} – ${p.effectiveTo || t('open')} · ${t('Priority')} ${p.priority}`;
-				text.append(title, meta);
-				const actions = document.createElement('span');
-				actions.className = 'azc-list__actions';
-				const endInput = document.createElement('input');
-				endInput.type = 'date';
-				endInput.setAttribute('aria-label', t('Last valid date'));
-				const endBtn = document.createElement('button');
-				endBtn.type = 'button';
-				endBtn.className = 'azc-btn azc-btn--secondary';
-				endBtn.textContent = t('End rule');
-				endBtn.addEventListener('click', async () => {
-					if (!endInput.reportValidity() || endInput.value === '') { endInput.focus(); return; }
-					setBusy(endBtn, true);
-					try {
-						await request(tpl('policyUpdateTemplate', p.id), {
-							method: 'PUT',
-							body: JSON.stringify({ revision: p.version, effectiveTo: endInput.value }),
-						});
-						await loadPolicies(currentType.id);
-					} catch (e) {
-						if (e.status === 409) {
-							conflictBox.hidden = false;
-							document.getElementById('se-conflict-text').textContent = e.message;
-						} else {
-							document.getElementById('se-policy-status').textContent = e.message;
-						}
-					} finally { setBusy(endBtn, false); }
-				});
-				actions.append(endInput, endBtn);
-				li.append(text, actions);
+				title.textContent = `${scopeHuman(p.scopeType)}${p.scopeType !== 'org' ? ` ${p.scopeLabel || `#${escapeText(p.scopeId)}`}` : ''} → ${fmtAmount(p.amount, currentType?.unit)}`;
+				const chips = document.createElement('span');
+				chips.className = 'se-policy-chips';
+				const op = operationChip(p.operation);
+				chips.append(
+					chip(op.label, op.variant),
+					chip(`${t('From')} ${p.effectiveFrom}`, 'neutral'),
+					untilChip(p),
+				);
+				if (Number(p.priority) !== 0) {
+					chips.append(chip(`${t('Priority')} ${p.priority}`, 'neutral'));
+				}
+				text.append(title, chips);
+				if (p.reason) {
+					const reason = document.createElement('p');
+					reason.className = 'form-help';
+					reason.textContent = p.reason;
+					text.append(reason);
+				}
+				li.append(text);
+				// The end-date control only appears while the rule is
+				// open-ended; once an end date exists, the removable
+				// "Valid until" chip takes over that role.
+				if (!p.effectiveTo) {
+					const actions = document.createElement('span');
+					actions.className = 'azc-list__actions se-policy-end';
+					const endLabel = document.createElement('span');
+					endLabel.className = 'se-policy-end-label';
+					endLabel.textContent = `${t('End on')}:`;
+					const endInput = document.createElement('input');
+					endInput.type = 'date';
+					endInput.className = 'form-input se-policy-end-date';
+					endInput.setAttribute('aria-label', `${t('End on')}: ${title.textContent}`);
+					const endBtn = document.createElement('button');
+					endBtn.type = 'button';
+					endBtn.className = 'azc-btn azc-btn--secondary';
+					endBtn.textContent = t('Set end date');
+					endBtn.addEventListener('click', async () => {
+						if (!endInput.reportValidity() || endInput.value === '') { endInput.focus(); return; }
+						await updatePolicyEnd(p, endInput.value, endBtn);
+					});
+					actions.append(endLabel, endInput, endBtn);
+					li.append(actions);
+				}
 				ul.append(li);
 			});
 			wrap.append(h, ul);
@@ -781,12 +866,13 @@
 
 	detailAddPolicyBtn.addEventListener('click', () => openPolicyEditor(detailAddPolicyBtn));
 
-	document.getElementById('se-trace-run').addEventListener('click', async () => {
+	const traceRunEl = document.getElementById('se-trace-run');
+	if (traceRunEl) traceRunEl.addEventListener('click', async () => {
 		if (!currentType) return;
 		const out = document.getElementById('se-trace-out');
-		const uid = document.getElementById('se-trace-user').value.trim();
+		const uid = document.getElementById('se-trace-uid').value.trim();
 		const date = document.getElementById('se-trace-date').value || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
-		if (!uid) { out.textContent = t('Enter a user id.'); return; }
+		if (!uid) { out.textContent = t('Choose a person first.'); return; }
 		out.textContent = t('Resolving…');
 		try {
 			const q = new URLSearchParams({ userId: uid, asOf: date });
@@ -799,49 +885,155 @@
 
 	/* ---------- cohorts ---------- */
 
+	const COHORT_TABLE_COLUMNS = 5;
 	const cohortList = document.getElementById('se-cohort-list');
 	const cohortStatus = document.getElementById('se-cohort-status');
-
+	const cohortEditor = document.getElementById('se-cohort-editor');
+	const selectedCohortMembers = [];
+	const cohortChipsEl = document.getElementById('se-cohort-member-chips');
 	let openCohortId = null;
 	let memberPicker = null;
+	let cohortReturnFocus = null;
+
+	function renderCohortMemberChips() {
+		if (!cohortChipsEl) return;
+		cohortChipsEl.replaceChildren();
+		selectedCohortMembers.forEach((m, idx) => {
+			const c = document.createElement('span');
+			c.className = 'badge badge--neutral se-member-chip';
+			c.textContent = m.displayName || m.userId;
+			const x = document.createElement('button');
+			x.type = 'button';
+			x.className = 'se-policy-chip__remove';
+			x.setAttribute('aria-label', t('Remove %s', 'Remove %s').replace('%s', m.displayName || m.userId));
+			x.textContent = '×';
+			x.addEventListener('click', () => { selectedCohortMembers.splice(idx, 1); renderCohortMemberChips(); });
+			c.append(x);
+			cohortChipsEl.append(c);
+		});
+	}
+
+	const _cohortCreatePicker = document.getElementById('se-cohort-members-wrap')
+		? window.ArbeitszeitCheck?.initAdminUserPicker({
+			wrapSelector: '#se-cohort-members-wrap',
+			hiddenSelector: '#se-cohort-member-uid',
+			searchSelector: '#se-cohort-member-search',
+			listSelector: '#se-cohort-member-list',
+			statusSelector: '#se-cohort-member-status',
+			searchUrl: root.dataset.usersUrl,
+			l10n: {
+				typeToSearch: t('Type to search for people'),
+				noResults: t('No results'),
+				loading: t('Loading…'),
+			},
+			onChange: (id, meta) => {
+				if (!id) return;
+				if (!selectedCohortMembers.some((m) => m.userId === id)) {
+					selectedCohortMembers.push({ userId: id, displayName: meta.displayName || meta.label || id });
+					renderCohortMemberChips();
+				}
+				// Free the picker for the next person — the chip list owns the selection.
+				_cohortCreatePicker?.clear();
+			},
+		})
+		: null;
+
+	function openCohortEditor() {
+		editor.hidden = true;
+		editorMode = null;
+		detail.hidden = true;
+		conflictBox.hidden = true;
+		cohortReturnFocus = document.activeElement;
+		cohortEditor.hidden = false;
+		scrollToPanel(cohortEditor);
+		document.getElementById('se-cohort-label').focus();
+	}
+
+	function hideCohortEditor() {
+		cohortEditor.hidden = true;
+		cohortReturnFocus?.focus?.();
+		cohortReturnFocus = null;
+	}
+
+	document.getElementById('se-new-cohort')?.addEventListener('click', () => {
+		if (cohortEditor.hidden) { openCohortEditor(); } else { hideCohortEditor(); }
+	});
+	cohortEditor?.querySelector('[data-close-panel]')?.addEventListener('click', hideCohortEditor);
 
 	function renderCohorts() {
 		cohortList.replaceChildren();
 		cohorts.forEach((c) => {
-			const li = document.createElement('li');
-			li.className = 'azc-list__item se-cohort-item';
-			const text = document.createElement('div');
-			const title = document.createElement('strong');
-			title.textContent = c.publicLabel;
-			const meta = document.createElement('p');
-			meta.className = 'form-help';
+			const tr = document.createElement('tr');
+			const nameTd = cell(t('Name'));
+			const nameEl = document.createElement('span');
+			nameEl.className = 'se-type-name';
+			nameEl.textContent = c.publicLabel;
+			const code = document.createElement('span');
+			code.className = 'se-type-code';
+			code.title = t('Technical identifier');
+			code.textContent = c.code;
+			nameTd.append(nameEl, code);
+			const confTd = cell(t('Confidential label'));
+			confTd.textContent = c.confidentialLabel || '—';
 			const memberText = typeof window.n === 'function'
 				? window.n('arbeitszeitcheck', '1 member', '%n members', c.memberCount)
 				: `${c.memberCount} ${c.memberCount === 1 ? t('member') : t('members')}`;
-			meta.textContent = `${c.code} · ${memberText} · ${c.active ? t('Active') : t('Inactive')}`;
-			text.append(title, meta);
-			const actions = document.createElement('span');
-			actions.className = 'azc-list__actions';
+			const membersTd = cell(t('Members'));
+			membersTd.textContent = memberText;
+			const statusTd = cell(t('Status'));
+			const badge = document.createElement('span');
+			badge.className = `badge badge--${c.active ? 'success' : 'neutral'}`;
+			badge.textContent = c.active ? t('Active') : t('Inactive');
+			statusTd.append(badge);
+			const actTd = cell(t('Actions'));
+			actTd.className = 'actions-cell';
+			const group = document.createElement('span');
+			group.className = 'azc-table-actions';
+			group.setAttribute('role', 'group');
+			group.setAttribute('aria-label', `${t('Actions')}: ${c.publicLabel}`);
 			const manageBtn = document.createElement('button');
 			manageBtn.type = 'button';
 			manageBtn.className = 'azc-btn azc-btn--secondary';
+			manageBtn.dataset.cohortId = String(c.id);
 			manageBtn.textContent = t('Manage members');
 			manageBtn.setAttribute('aria-expanded', openCohortId === c.id ? 'true' : 'false');
 			manageBtn.addEventListener('click', () => {
 				openCohortId = openCohortId === c.id ? null : c.id;
 				renderCohorts();
 			});
-			actions.append(manageBtn);
-			li.append(text, actions);
-			cohortList.append(li);
+			const toggleBtn = iconBtn(c.active ? 'pause' : 'check',
+				`${c.active ? t('Deactivate') : t('Activate')}: ${c.publicLabel}`);
+			toggleBtn.addEventListener('click', async () => {
+				setBusy(toggleBtn, true);
+				try {
+					await request(tpl('cohortUpdateTemplate', c.id), {
+						method: 'PUT',
+						body: JSON.stringify({ active: c.active ? '0' : '1', revision: c.revision }),
+					});
+					cohortStatus.textContent = '';
+				} catch (e) {
+					cohortStatus.textContent = e.message;
+				}
+				await loadCohorts();
+			});
+			group.append(manageBtn, toggleBtn);
+			actTd.append(group);
+			tr.append(nameTd, confTd, membersTd, statusTd, actTd);
+			cohortList.append(tr);
 			if (openCohortId === c.id) {
-				const panelLi = document.createElement('li');
-				panelLi.className = 'azc-list__item se-cohort-panel-wrap';
-				panelLi.append(buildCohortPanel(c));
-				cohortList.append(panelLi);
+				const pr = document.createElement('tr');
+				pr.className = 'se-cohort-panel';
+				const td = document.createElement('td');
+				td.colSpan = COHORT_TABLE_COLUMNS;
+				td.append(buildCohortPanel(c));
+				pr.append(td);
+				cohortList.append(pr);
 			}
 		});
-		cohortStatus.textContent = cohorts.length === 0 ? t('No protected groups yet.') : '';
+		if (cohorts.length === 0) {
+			cohortList.append(emptyRow(COHORT_TABLE_COLUMNS, t('No protected groups yet.')));
+		}
+		cohortStatus.textContent = '';
 	}
 
 	function buildCohortPanel(cohort) {
@@ -850,6 +1042,19 @@
 		const panel = document.createElement('div');
 		panel.className = 'se-cohort-panel';
 		const prefix = `se-member-${cohort.id}`;
+
+		const header = document.createElement('div');
+		header.className = 'se-cohort-panel__header';
+		const headerTitle = document.createElement('strong');
+		headerTitle.textContent = `${t('Members')}: ${cohort.publicLabel}`;
+		const closeBtn = iconBtn('x', `${t('Close')}: ${cohort.publicLabel}`);
+		closeBtn.addEventListener('click', () => {
+			openCohortId = null;
+			renderCohorts();
+			cohortList.querySelector(`[data-cohort-id="${cohort.id}"]`)?.focus();
+		});
+		header.append(headerTitle, closeBtn);
+		panel.append(header);
 
 		const membersList = document.createElement('ul');
 		membersList.className = 'azc-list';
@@ -923,18 +1128,24 @@
 
 		panel.append(membersList, memberStatus, addForm);
 
-		memberPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
-			wrapSelector: `#${prefix}-wrap`,
-			hiddenSelector: `#${prefix}-uid`,
-			searchSelector: `#${prefix}-search`,
-			listSelector: `#${prefix}-list`,
-			statusSelector: `#${prefix}-status`,
-			searchUrl: root.dataset.usersUrl,
-			l10n: {
-				typeToSearch: t('Type at least 2 characters to search.'),
-				noResults: t('No matching people.'),
-				loading: t('Searching…'),
-			},
+		// initAdminUserPicker resolves its elements via document.querySelector —
+		// the panel is still detached at this point, so defer the init until the
+		// row has been connected to the DOM (after renderCohorts finishes).
+		queueMicrotask(() => {
+			if (!panel.isConnected) return;
+			memberPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
+				wrapSelector: `#${prefix}-wrap`,
+				hiddenSelector: `#${prefix}-uid`,
+				searchSelector: `#${prefix}-search`,
+				listSelector: `#${prefix}-list`,
+				statusSelector: `#${prefix}-status`,
+				searchUrl: root.dataset.usersUrl,
+				l10n: {
+					typeToSearch: t('Type at least 2 characters to search.'),
+					noResults: t('No matching people.'),
+					loading: t('Searching…'),
+				},
+			});
 		});
 
 		async function loadMembers() {
@@ -1041,12 +1252,17 @@
 		const submit = formEl.querySelector('[type="submit"]');
 		setBusy(submit, true);
 		try {
+			const payload = Object.fromEntries(new FormData(formEl));
+			payload.members = selectedCohortMembers.map((m) => m.userId);
 			await request(root.dataset.cohortCreateUrl, {
 				method: 'POST',
-				body: JSON.stringify(Object.fromEntries(new FormData(formEl))),
+				body: JSON.stringify(payload),
 			});
 			formEl.reset();
+			selectedCohortMembers.length = 0;
+			renderCohortMemberChips();
 			cohortStatus.textContent = t('Protected group created.');
+			hideCohortEditor();
 			await loadCohorts();
 			await loadTargets();
 		} catch (e) {
@@ -1102,6 +1318,7 @@
 		renderCohorts,
 		loadTypes,
 		loadTargets,
+		loadCohorts,
 		openDetail,
 		openCreateEditor,
 		openPolicyEditor,

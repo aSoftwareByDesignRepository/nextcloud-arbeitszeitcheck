@@ -89,6 +89,15 @@ class AdminSpecialEntitlementsLayoutContractTest extends TestCase
 		$this->assertStringContainsString('scopeLabel', $js);
 		// Text inputs carry the shared form-input styling contract.
 		$this->assertStringContainsString('class="form-input"', $this->tpl());
+		// Cohort editor opens above its table, mirroring the entitlement flow.
+		$this->assertLessThan(
+			strpos($this->tpl(), 'id="se-cohorts-card"'),
+			strpos($this->tpl(), 'id="se-cohort-editor"')
+		);
+		$this->assertStringContainsString('id="se-cohort-table"', $this->tpl());
+		$this->assertStringContainsString('id="se-cohort-member-chips"', $this->tpl());
+		$this->assertStringContainsString('id="se-cohort-member-uid"', $this->tpl());
+		$this->assertStringContainsString('id="se-new-cohort"', $this->tpl());
 		// Panels surface in view like the absence-types editor.
 		$this->assertStringContainsString('scrollIntoView', $js);
 		$this->assertStringContainsString('prefersReducedMotion', $js);

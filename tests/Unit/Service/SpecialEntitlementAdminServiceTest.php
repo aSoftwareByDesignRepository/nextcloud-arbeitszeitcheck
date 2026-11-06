@@ -274,6 +274,61 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		self::assertSame('42', $summary['scopeId']);
 	}
 
+	public function testCreateCohortInsertsMembersAtomically(): void
+	{
+		$memberships = $this->createMock(\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper::class);
+		$cohorts = $this->createMock(PolicyCohortMapper::class);
+		$cohorts->method('findAll')->willReturn([]);
+		$cohorts->method('insert')->willReturnCallback(static function ($c) { $c->setId(9); return $c; });
+		$user = $this->createMock(\OCP\IUser::class);
+		$user->method('isEnabled')->willReturn(true);
+		$this->users->method('get')->willReturnMap([['u1', $user], ['u2', $user]]);
+		$memberships->expects($this->exactly(2))->method('insert')->willReturnArgument(0);
+		$memberships->method('countForCohort')->willReturn(2);
+
+		$out = $this->makeService(null, null, $memberships, null, null, $cohorts)
+			->createCohort(['label' => 'G1', 'members' => ['u1', 'u2', 'u1']], 'admin');
+
+		self::assertSame(['u1', 'u2'], $out['memberUserIds']);
+		self::assertCount(2, $out['members']);
+	}
+
+	public function testUpdateCohortTogglesActiveWithCas(): void
+	{
+		$cohort = new \OCA\ArbeitszeitCheck\Db\PolicyCohort();
+		$cohort->setId(9);
+		$cohort->setCode('g1');
+		$cohort->setPublicLabel('G1');
+		$cohort->setActive(true);
+		$cohort->setRevision(3);
+		$cohorts = $this->createMock(PolicyCohortMapper::class);
+		$cohorts->method('find')->willReturn($cohort);
+		$cohorts->expects($this->once())->method('update')->willReturnArgument(0);
+
+		$out = $this->makeService(null, null, null, null, null, $cohorts)
+			->updateCohort(9, ['active' => '0', 'revision' => 3], 'admin');
+
+		self::assertFalse($out['active']);
+		self::assertSame(4, $out['revision']);
+	}
+
+	public function testCreateCohortRejectsDisabledMemberBeforeAnyInsert(): void
+	{
+		$memberships = $this->createMock(\OCA\ArbeitszeitCheck\Db\PolicyCohortMembershipMapper::class);
+		$cohorts = $this->createMock(PolicyCohortMapper::class);
+		$cohorts->method('findAll')->willReturn([]);
+		$cohorts->expects($this->never())->method('insert');
+		$memberships->expects($this->never())->method('insert');
+		$user = $this->createMock(\OCP\IUser::class);
+		$user->method('isEnabled')->willReturn(false);
+		$this->users->method('get')->willReturn($user);
+
+		$this->expectException(SpecialEntitlementException::class);
+		$this->expectExceptionMessage('Not found');
+		$this->makeService(null, null, $memberships, null, null, $cohorts)
+			->createCohort(['label' => 'G1', 'members' => ['u1']], 'admin');
+	}
+
 	public function testClosePeriodRejectsMissingRevisionFailClosed(): void
 	{
 		$this->periods->method('find')->willReturn($this->period(end: '2020-01-31'));

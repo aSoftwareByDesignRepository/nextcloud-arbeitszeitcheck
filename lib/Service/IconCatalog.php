@@ -74,6 +74,11 @@ final class IconCatalog
 		'pause' => '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
 	];
 
+	public static function has(string $name): bool
+	{
+		return isset(self::ICONS[$name]);
+	}
+
 	public static function render(string $name, ?string $extraClass = null, float $strokeWidth = 2.0): string
 	{
 		$inner = self::ICONS[$name] ?? null;

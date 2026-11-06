@@ -1586,3 +1586,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GDPR-compliant data processing
 - English and German translations
 - WCAG 2.1 AAA accessibility compliance
+
+## [1.9.11] — 2026-11-05
+
+### Added
+
+- + manager absence recording (GH #49, GH #50)
+
+### Fixed
+
+- runs
+- rules, never the shorthand
+- — SQL-scoped entry filters, logged swallowed writes, l10n sweep adjudication
+- OC.generateUrl + index.php fallback
+- da/nb/sv wrong-sense 'target time' rendered as meal vocab
+- kok->klok typo, Resturlaub translations, donor-vocab/registry repair
+- column
+- cell
+- — escape template apostrophe, translate Soll-effects into 10 locales
+- — paid leave credits, suspensions reduce Soll
+
+### Changed
+
+- Refresh App Store screenshots from clean marketing captures
+- lara/ui-improvements merge
+- Filter the employee list like the other admin tables, and keep team selections while searching.
+- Style the empty working time models row like the other tables.
+- Keep the left menu where you scrolled it when a page opens.
+- Drop More help on the admin overview and stop underlining the open-issues tile.
+- Give help texts their own settings tab and keep the topic row still.
+- Turn Get the App into a store promo for Android and iOS.
+- Make Administration and Manager nav rows match the other entries.
+- Put the ProjectCheck linking notice under the timezone and make it dismissible.
+- Show table row actions as icons, and keep the label for assistive tech.
+

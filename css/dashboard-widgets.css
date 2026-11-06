@@ -257,7 +257,7 @@
 	padding: 0.5rem 0.75rem;
 	border: 1px solid var(--color-border-maxcontrast, var(--color-border));
 	border-radius: var(--radius-base, 6px);
-	background: var(--color-main-background);
+	background-color: var(--color-main-background);
 	color: var(--color-main-text);
 	font-size: var(--arbeitszeitcheck-font-size-md, 1rem);
 	line-height: 1.4;

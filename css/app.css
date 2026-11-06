@@ -2226,7 +2226,7 @@ dialog.entitlement-explain-dialog::backdrop {
 .form-input[readonly] {
 	opacity: 0.92;
 	cursor: default;
-	background: var(--azc-surface-muted, var(--color-background-dark));
+	background-color: var(--azc-surface-muted, var(--color-background-dark));
 }
 
 @media (max-width: 720px) {

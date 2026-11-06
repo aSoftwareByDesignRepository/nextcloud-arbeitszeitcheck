@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 1.9.11 - 2026-11-05
+
 ### Added
 
 - mobile capabilities: `mobile.timeEntryEditing` (edit window + whether the
@@ -14,6 +16,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `mobile.managerAbsenceRecording` so the companion app can offer direct
   time-entry edits (GH #50) and manager absence recording (GH #49) with
   fail-closed gating on older servers
+
+### Fixed
+
+- manager absence list: the Convert-to-sick action was clipped out of the
+  row's Actions cell
+- table row hover actions could collapse back into a visible column
+- app URLs are routed through `OC.generateUrl` with an `index.php`
+  fallback, so links resolve on instances without pretty URLs
+- time-entry filters are scoped in SQL, and previously swallowed write
+  errors are logged instead of disappearing silently
+- footer icon candidates are guarded by `IconCatalog::has()` so the
+  candidate check actually runs
+- selects paint `background-color` on the matching rules instead of the
+  shorthand, so the dropdown chevron keeps its background
+- l10n: da/nb/sv "target time" no longer renders as meal vocabulary;
+  nl "kok" → "klok" typo corrected; Resturlaub translations and the
+  donor-vocab registry repaired; a template apostrophe escaped and the
+  Soll-effects copy translated into all 10 locales
+- Soll-effects matrix: paid leave credits and suspensions now reduce the
+  target time as documented
+
+### Changed
+
+- Filter the employee list like the other admin tables, and keep team
+  selections while searching.
+- Style the empty working time models row like the other tables.
+- Keep the left menu where you scrolled it when a page opens.
+- Drop More help on the admin overview and stop underlining the
+  open-issues tile.
+- Give help texts their own settings tab and keep the topic row still.
+- Turn Get the App into a store promo for Android and iOS.
+- Make Administration and Manager nav rows match the other entries.
+- Put the ProjectCheck linking notice under the timezone and make it
+  dismissible.
+- Show table row actions as icons, and keep the label for assistive tech.
+- Refresh App Store screenshots from clean marketing captures.
 
 ## 1.9.10 - 2026-10-29
 
@@ -199,6 +237,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - walk forward to next working day in legacy clock isolation
 - Atlas farm v3.5.14: uniform-404 hardening, strict form booleans, typed config writes, kiosk typed errors
 
+## 1.7.13 - 2026-10-05
+
+### Fixed
+- **Working-time model rules silently dropped on save:** `setBreakRulesArray()`/`setOvertimeRulesArray()` assigned entity properties directly, bypassing Nextcloud's `markFieldUpdated()`, so `break_rules` and `overtime_rules` — including `weekday_schedule` and `allow_sunday_work` — were never written to the database. A 20h/4-day model therefore fell back to spreading hours over Monday–Friday and mis-calculated required hours around holidays. Both helpers now route through the entity setters; regression-locked by unit tests on `getUpdatedFields()` and a real-database round-trip integration test. Existing rows saved while the bug was active must be re-saved once (the data was never stored).
+- **Entitlement snapshots never persisted:** `EntitlementSnapshotService::store()` passed `DateTimeImmutable` to a `datetime`-typed entity setter (Nextcloud expects mutable `DateTime`), so every call fataled and the audit trail silently stayed empty.
+- **Vacation-unit migration silently zeroed malformed amounts:** a stored value like `abc,5` cast through `(float)` became `0.0`, passed the `is_finite` guard, and overwrote the real entitlement with zero. Non-numeric input is now rejected before the cast.
+- **Schema repair blind to stamp-idempotency tables:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` were missing from the schema-health catalog, so `EnsureArbeitszeitCheckSchema` could not detect or recreate them. Catalog synchronized; drop → detect → migrate → recreate is covered by an integration test.
+- **Time-entries error fallback could 500 without a session:** the safe fallback path called `getUserId()` unconditionally; it now renders unauthenticated. Strict-mode compliance checks after entry writes now run inside the same transaction, so a violation genuinely prevents the save instead of persisting the row and returning 500.
+- **Enabled app broke the Nextcloud Dashboard:** The dashboard desklet rendered its workspace partial through `\OCP\Template` with a truthy renderAs, which wraps the partial in a `TemplateLayout` mid-request (inside the Dashboard controller). That layout consumes the request's script registry: apps registered so far are marked visited and their resolved files are appended to the shared resource list, so the final page emitted app `l10n`/`dashboard` scripts **before** `core-main.js` — `window.OC`/`window.OCA` missing → dead Dashboard and no "Customize" button. The renderer now uses `TemplateResponse::RENDER_AS_BLANK`, returning only the partial markup without touching the page asset pipeline. Guarded by source/integration tests, a strengthened `dashboard-oc-safety` E2E spec (script-order invariant + functional Customize check), and a dedicated mutation harness.
+
 ## 1.7.12 - 2026-10-04
 
 ### Fixed
@@ -210,16 +258,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Atlas v3.5.14 verification pass: expanded contract coverage and store screenshot pipeline fixes.
-
-## 1.7.13 - 2026-10-05
-
-### Fixed
-- **Working-time model rules silently dropped on save:** `setBreakRulesArray()`/`setOvertimeRulesArray()` assigned entity properties directly, bypassing Nextcloud's `markFieldUpdated()`, so `break_rules` and `overtime_rules` — including `weekday_schedule` and `allow_sunday_work` — were never written to the database. A 20h/4-day model therefore fell back to spreading hours over Monday–Friday and mis-calculated required hours around holidays. Both helpers now route through the entity setters; regression-locked by unit tests on `getUpdatedFields()` and a real-database round-trip integration test. Existing rows saved while the bug was active must be re-saved once (the data was never stored).
-- **Entitlement snapshots never persisted:** `EntitlementSnapshotService::store()` passed `DateTimeImmutable` to a `datetime`-typed entity setter (Nextcloud expects mutable `DateTime`), so every call fataled and the audit trail silently stayed empty.
-- **Vacation-unit migration silently zeroed malformed amounts:** a stored value like `abc,5` cast through `(float)` became `0.0`, passed the `is_finite` guard, and overwrote the real entitlement with zero. Non-numeric input is now rejected before the cast.
-- **Schema repair blind to stamp-idempotency tables:** `at_mob_stamp_idem` / `at_kiosk_stamp_idem` were missing from the schema-health catalog, so `EnsureArbeitszeitCheckSchema` could not detect or recreate them. Catalog synchronized; drop → detect → migrate → recreate is covered by an integration test.
-- **Time-entries error fallback could 500 without a session:** the safe fallback path called `getUserId()` unconditionally; it now renders unauthenticated. Strict-mode compliance checks after entry writes now run inside the same transaction, so a violation genuinely prevents the save instead of persisting the row and returning 500.
-- **Enabled app broke the Nextcloud Dashboard:** The dashboard desklet rendered its workspace partial through `\OCP\Template` with a truthy renderAs, which wraps the partial in a `TemplateLayout` mid-request (inside the Dashboard controller). That layout consumes the request's script registry: apps registered so far are marked visited and their resolved files are appended to the shared resource list, so the final page emitted app `l10n`/`dashboard` scripts **before** `core-main.js` — `window.OC`/`window.OCA` missing → dead Dashboard and no "Customize" button. The renderer now uses `TemplateResponse::RENDER_AS_BLANK`, returning only the partial markup without touching the page asset pipeline. Guarded by source/integration tests, a strengthened `dashboard-oc-safety` E2E spec (script-order invariant + functional Customize check), and a dedicated mutation harness.
 
 ## 1.7.11 - 2026-09-22
 
@@ -1470,7 +1508,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin settings API URL handling**: Prevented duplicate `index.php/index.php` path generation when a route URL is already pre-generated by Nextcloud.
 - **Frontend error handling**: Avoided unhandled Promise rejections in callback-based `Utils.ajax()` consumers after expected API failures.
 
-## 1.1.4 – 2026-03-25
+## 1.1.4 - 2026-03-25
 
 ### Fixed
 - **Routing/compatibility**: Added `indexApi()` compatibility aliases for legacy endpoints to prevent 500 errors in the Nextcloud log.
@@ -1483,7 +1521,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reports UI semantics**: Team scope is limited to the team overview/export semantics that the backend actually returns (prevents misleading previews/downloads).
 - **Organization download guidance**: Added explicit UI messaging for organization scope download limitations until organization-wide export endpoints are implemented.
 
-## 1.1.3 – 2025-03-14
+## 1.1.3 - 2025-03-14
 
 ### Fixed
 
@@ -1519,7 +1557,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Version1010 migration**: Compound indices on at_entries, at_violations, at_holidays, at_absences
 
-## 1.1.2 – 2025-03-07
+## 1.1.2 - 2025-03-07
 
 ### Changed
 
@@ -1533,7 +1571,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added GitHub Actions release workflow (`.github/workflows/release.yml`)
 - Updated PageControllerTest with full constructor mocks
 
-## 1.1.1 – 2025-01-07
+## 1.1.1 - 2025-01-07
 
 ### Fixed
 
@@ -1545,27 +1583,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed non-existent screenshot references from info.xml until real screenshots are captured
 
-## 1.1.0 – 2025-01-04
+## 1.1.0 - 2025-01-04
 
 ### Added
 
 - ProjectCheck integration for project time tracking
 - Additional migrations for schema updates
 
-## 1.0.3 – 2025-01-03
+## 1.0.3 - 2025-01-03
 
 ### Added
 
 - Further database schema refinements
 
-## 1.0.2 – 2025-01-02
+## 1.0.2 - 2025-01-02
 
 ### Added
 
 - Working time models
 - User working time model assignments
 
-## 1.0.1 – 2025-01-01
+## 1.0.1 - 2025-01-01
 
 ### Added
 
@@ -1574,7 +1612,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User settings
 - Compliance violation tracking
 
-## 1.0.0 – 2024-12-29
+## 1.0.0 - 2024-12-29
 
 ### Added
 
@@ -1586,37 +1624,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GDPR-compliant data processing
 - English and German translations
 - WCAG 2.1 AAA accessibility compliance
-
-## [1.9.11] — 2026-11-05
-
-### Added
-
-- + manager absence recording (GH #49, GH #50)
-
-### Fixed
-
-- runs
-- rules, never the shorthand
-- — SQL-scoped entry filters, logged swallowed writes, l10n sweep adjudication
-- OC.generateUrl + index.php fallback
-- da/nb/sv wrong-sense 'target time' rendered as meal vocab
-- kok->klok typo, Resturlaub translations, donor-vocab/registry repair
-- column
-- cell
-- — escape template apostrophe, translate Soll-effects into 10 locales
-- — paid leave credits, suspensions reduce Soll
-
-### Changed
-
-- Refresh App Store screenshots from clean marketing captures
-- lara/ui-improvements merge
-- Filter the employee list like the other admin tables, and keep team selections while searching.
-- Style the empty working time models row like the other tables.
-- Keep the left menu where you scrolled it when a page opens.
-- Drop More help on the admin overview and stop underlining the open-issues tile.
-- Give help texts their own settings tab and keep the topic row still.
-- Turn Get the App into a store promo for Android and iOS.
-- Make Administration and Manager nav rows match the other entries.
-- Put the ProjectCheck linking notice under the timezone and make it dismissible.
-- Show table row actions as icons, and keep the label for assistive tech.
 

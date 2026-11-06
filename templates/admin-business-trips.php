@@ -70,9 +70,9 @@ $enabled = !empty($_['businessTripsEnabled']);
 				<ul id="bta-rollout-info" class="bta-steps" aria-labelledby="bta-rollout-info-title"></ul>
 			</div>
 
-			<div class="form-actions" id="bta-cutover" hidden>
+			<div class="form-actions form-actions--left" id="bta-cutover" hidden>
 				<button id="bta-disable-legacy" class="azc-btn azc-btn--primary" type="button" disabled aria-describedby="bta-cutover-help">
-					<?php p($l->t('Stop new legacy business-trip requests')); ?>
+					<?php p($l->t('Complete the switch to the new workflow')); ?>
 				</button>
 				<p class="form-help" id="bta-cutover-help"><?php p($l->t('Existing legacy requests stay readable and editable forever — this only stops creating new ones.')); ?></p>
 			</div>

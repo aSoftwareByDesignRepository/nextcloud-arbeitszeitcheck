@@ -12,6 +12,7 @@ const fetchMock = vi.fn()
 
 function stageDom() {
 	document.body.innerHTML = `
+		<section id="bta-rollout"></section>
 		<div id="bta-root"
 			data-enabled="0"
 			data-rollout-url="/rollout"
@@ -198,26 +199,25 @@ describe('rollout checklist', () => {
 		expect(texts('#bta-rollout-info li')[0]).toBe('Submitted trips awaiting a decision: 4')
 	})
 
-	it('shows the finished state after the cutover and keeps flags from the earlier load', async () => {
+	it('hides the whole card after the cutover completes the rollout', async () => {
 		stubRollout(rolloutPayload({
 			preflight: { pendingLegacyTripAbsences: 1, activeRuleSets: 1, effectiveAssignments: 1, ready: true },
 			flags: { business_trips_enabled: true, business_trip_credit_enabled: true },
 		}))
 		await import('./admin-business-trips.js?done=1')
 		await vi.waitFor(() => expect(document.getElementById('bta-disable-legacy').disabled).toBe(false))
+		expect(document.getElementById('bta-rollout').hidden).toBe(false)
 
 		document.getElementById('bta-disable-legacy').click()
-		await vi.waitFor(() => expect(document.getElementById('bta-rollout-status').textContent)
-			.toBe('Rollout complete — new requests use the business-trip workflow.'))
+		await vi.waitFor(() => expect(document.getElementById('bta-rollout').hidden).toBe(true))
+	})
 
-		expect(document.getElementById('bta-cutover').hidden).toBe(true)
-		expect(texts('#bta-rollout-done li')).toContain('New legacy business-trip requests are closed')
-		// The cutover response echoes only the changed flags — the credit step
-		// must stay done instead of flipping back into the to-do list.
-		expect(texts('#bta-rollout-done li')).toContain('Time-account credit postings are on')
-		expect(texts('#bta-rollout-todo li')).toEqual([])
-		// Still-pending legacy requests stay reachable as information, not a gate.
-		const infoLink = document.querySelector('#bta-rollout-info a.azc-btn')
-		expect(infoLink.getAttribute('href')).toBe('/manager/absences')
+	it('shows the card again when a loaded rollout is not yet complete', async () => {
+		stubRollout(rolloutPayload({
+			flags: { business_trips_enabled: true, business_trip_credit_enabled: true },
+		}))
+		await import('./admin-business-trips.js?visible=1')
+		await vi.waitFor(() => expect(document.querySelectorAll('#bta-rollout-todo li').length).toBeGreaterThan(0))
+		expect(document.getElementById('bta-rollout').hidden).toBe(false)
 	})
 })

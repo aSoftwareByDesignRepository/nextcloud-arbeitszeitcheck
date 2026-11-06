@@ -90,6 +90,7 @@
 		pUser: $('bta-p-user'),
 		pMinutes: $('bta-p-minutes'),
 		pFrom: $('bta-p-from'),
+		rolloutCard: $('bta-rollout'),
 		rolloutStatus: $('bta-rollout-status'),
 		rolloutTodoGroup: $('bta-rollout-todo-group'),
 		rolloutTodo: $('bta-rollout-todo'),
@@ -214,6 +215,24 @@
 				review.dataset.status = set.reviewedAt ? 'approved' : 'pending';
 				review.textContent = set.reviewedAt ? t('Reviewed') : t('Review pending');
 				actions.appendChild(review);
+				if (set.reviewedAt) {
+					const activate = document.createElement('button');
+					activate.type = 'button';
+					activate.className = 'azc-btn azc-btn--primary';
+					activate.textContent = t('Activate');
+					activate.addEventListener('click', async () => {
+						activate.disabled = true;
+						try {
+							await call(tpl('ruleSetActivateTemplate', set.id), { method: 'POST' });
+							await loadSets();
+							await loadRollout();
+						} catch (e) {
+							els.setsStatus.textContent = e.message;
+							activate.disabled = false;
+						}
+					});
+					actions.appendChild(activate);
+				}
 				if (!set.reviewedAt) {
 					const mark = document.createElement('button');
 					mark.type = 'button';
@@ -822,6 +841,13 @@
 		const featureOn = flags.business_trips_enabled === true;
 		const creditOn = flags.business_trip_credit_enabled === true;
 		const cutoverDone = flags.legacy_trip_absence_create_enabled === false;
+		// Rollout finished — the card's job is done, remove it entirely.
+		if (els.rolloutCard) {
+			els.rolloutCard.hidden = cutoverDone;
+		}
+		if (cutoverDone) {
+			return;
+		}
 		const pending = p.pendingLegacyTripAbsences || 0;
 		const ruleSetReady = (p.activeRuleSets || 0) > 0;
 		const assigned = (p.effectiveAssignments || 0) > 0;

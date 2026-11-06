@@ -27,7 +27,6 @@
 		tripList: $('bt-trip-list'),
 		empty: $('bt-empty'),
 		newTrip: $('bt-new-trip'),
-		emptyCreate: $('bt-empty-create'),
 		createForm: $('bt-create-form'),
 		createTitle: $('bt-create-title'),
 		createLead: $('bt-create-lead'),
@@ -97,10 +96,18 @@
 		if (!res.ok || !api.isApiSuccess(res)) {
 			const err = new Error(res.error || t('The request could not be completed.'));
 			err.status = res.status;
+			err.errorCode = res.data && res.data.error_code ? res.data.error_code : '';
 			err.fields = res.data && res.data.fields ? res.data.fields : {};
 			throw err;
 		}
 		return res.data;
+	}
+
+	// The "changed in another window" callout is only true for CAS staleness —
+	// domain 409s (overlap, month finalized, invalid transition, taken link)
+	// are plain errors, never a fake merge conflict.
+	function isStaleConflict(e) {
+		return e.status === 409 && (e.errorCode === 'TRIP_REVISION_STALE' || e.errorCode === 'TRIP_SNAPSHOT_STALE');
 	}
 
 	function setFieldError(input, errorEl, message) {
@@ -205,34 +212,131 @@
 
 	// ---------- list ----------
 
+	function icon(name) {
+		return (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(name) : '';
+	}
+
+	function cell(label) {
+		const td = document.createElement('td');
+		td.dataset.label = label;
+		return td;
+	}
+
+	function actionLink(item, range) {
+		const a = document.createElement('a');
+		a.href = tpl('detailPageTemplate', item.id);
+		a.className = 'azc-btn azc-btn--secondary azc-icon-btn';
+		const isDraft = item.status === 'draft';
+		a.setAttribute('aria-label', (isDraft ? t('Edit business trip') : t('View business trip')) + ': ' + range);
+		a.title = isDraft ? t('Edit') : t('View Details');
+		a.innerHTML = icon(isDraft ? 'edit' : 'info');
+		return a;
+	}
+
+	function actionButton(item, range, iconName, labelKey, tipKey, onClick) {
+		const b = document.createElement('button');
+		b.type = 'button';
+		b.className = 'azc-btn azc-btn--danger azc-icon-btn';
+		b.setAttribute('aria-label', t(labelKey) + ': ' + range);
+		b.title = t(tipKey);
+		b.innerHTML = icon(iconName);
+		b.addEventListener('click', () => { void onClick(item, b); });
+		return b;
+	}
+
+	async function confirmAction(opts) {
+		const comp = window.AzcComponents || window.ArbeitszeitCheckComponents;
+		if (!comp || typeof comp.confirmDialog !== 'function') {
+			return false;
+		}
+		return comp.confirmDialog(opts);
+	}
+
+	async function removeListTrip(item, btn) {
+		const ok = await confirmAction({
+			title: t('Delete this draft?'),
+			message: t('This cannot be undone.'),
+			confirmLabel: t('Delete'),
+			variant: 'danger',
+		});
+		if (!ok) return;
+		btn.disabled = true;
+		try {
+			await call(tpl('deleteTemplate', item.id) + '?revision=' + item.revision, { method: 'DELETE' });
+			await loadList();
+		} catch (e) {
+			if (e.status === 404 || isStaleConflict(e)) {
+				await loadList(); // stale view — reload shows the truth
+			} else {
+				btn.disabled = false;
+			}
+			els.listStatus.textContent = e.message;
+		}
+	}
+
+	async function withdrawListTrip(item, btn) {
+		const ok = await confirmAction({
+			title: t('Withdraw business trip?'),
+			message: t('Credits already posted are reversed.'),
+			confirmLabel: t('Withdraw'),
+			variant: 'danger',
+		});
+		if (!ok) return;
+		btn.disabled = true;
+		try {
+			await call(tpl('cancelTemplate', item.id), { method: 'POST', json: { revision: item.revision } });
+			await loadList();
+		} catch (e) {
+			if (e.status === 404 || isStaleConflict(e)) {
+				await loadList(); // stale view — reload shows the truth
+			} else {
+				btn.disabled = false;
+			}
+			els.listStatus.textContent = e.message;
+		}
+	}
+
 	async function loadList() {
 		els.listStatus.textContent = t('Loading…');
 		try {
 			const body = await call(root.dataset.listUrl);
 			const items = body.items || [];
-			els.tripList.replaceChildren();
-			els.empty.hidden = items.length !== 0;
-			items.forEach((item) => {
-				const li = document.createElement('li');
-				li.className = 'azc-list__item bt-trip-item';
+			const rows = items.map((item) => {
+				const range = fmtDateTime(item.startsAtUtc) + ' – ' + fmtDateTime(item.endsAtUtc);
+				const tr = document.createElement('tr');
+				const tdTrip = cell(t('Business trip'));
 				const link = document.createElement('a');
-				link.className = 'bt-trip-item__link';
 				link.href = tpl('detailPageTemplate', item.id);
-				const title = document.createElement('span');
-				title.className = 'bt-trip-item__title';
-				title.textContent = fmtDateTime(item.startsAtUtc) + ' – ' + fmtDateTime(item.endsAtUtc);
-				const sub = document.createElement('span');
-				sub.className = 'bt-trip-item__sub';
-				sub.textContent = item.purpose || '';
+				link.textContent = range;
+				tdTrip.appendChild(link);
+				const tdPurpose = cell(t('Purpose'));
+				tdPurpose.textContent = item.purpose || '—';
+				const tdStatus = cell(t('Status'));
 				const chip = document.createElement('span');
 				chip.className = 'azc-status-chip';
 				chip.dataset.status = item.status;
 				chip.textContent = STATUS_LABELS[item.status] || item.status;
-				link.append(title, sub);
-				li.append(link, chip);
-				els.tripList.appendChild(li);
+				tdStatus.appendChild(chip);
+				const tdActions = cell(t('Actions'));
+				tdActions.className = 'actions-cell';
+				const group = document.createElement('div');
+				group.className = 'azc-table-actions';
+				group.setAttribute('role', 'group');
+				group.setAttribute('aria-label', t('Actions'));
+				group.appendChild(actionLink(item, range));
+				if (item.status === 'draft') {
+					group.appendChild(actionButton(item, range, 'trash', 'Delete business trip draft', 'Delete draft', removeListTrip));
+				}
+				if (item.status === 'submitted' || item.status === 'approved') {
+					group.appendChild(actionButton(item, range, 'x', 'Withdraw business trip', 'Withdraw', withdrawListTrip));
+				}
+				tdActions.appendChild(group);
+				tr.append(tdTrip, tdPurpose, tdStatus, tdActions);
+				return tr;
 			});
-			els.listStatus.textContent = items.length === 0 ? '' : '';
+			els.tripList.replaceChildren(els.empty, ...rows);
+			els.empty.hidden = items.length !== 0;
+			els.listStatus.textContent = '';
 		} catch (e) {
 			els.listStatus.textContent = e.message;
 		}
@@ -243,7 +347,10 @@
 	function isoFromLocal(value) {
 		if (!value) return null;
 		const d = new Date(value);
-		return Number.isNaN(d.getTime()) ? null : d.toISOString();
+		if (Number.isNaN(d.getTime())) return null;
+		// Canonical payload — the API accepts ISO 8601 without sub-second
+		// precision, so drop toISOString()'s fixed .000 tail.
+		return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 	}
 
 	function openCreateForm() {
@@ -327,7 +434,7 @@
 				editing = false;
 				await openDetail(body.trip.id);
 			} catch (e) {
-				if (e.status === 409) {
+				if (isStaleConflict(e)) {
 					els.conflict.hidden = false;
 				}
 				showCreateError(e.message, e.fields);
@@ -355,7 +462,6 @@
 	});
 
 	els.newTrip.addEventListener('click', openCreateForm);
-	els.emptyCreate.addEventListener('click', openCreateForm);
 	els.createCancel.addEventListener('click', () => {
 		if (editing && trip) {
 			editing = false;
@@ -419,7 +525,7 @@
 			renderSegments();
 			await refreshPreview();
 		} catch (e) {
-			if (e.status === 409) {
+			if (isStaleConflict(e)) {
 				els.conflict.hidden = false;
 			}
 			els.segError.textContent = e.message;
@@ -567,7 +673,7 @@
 			els.submit.disabled = false;
 		} catch (e) {
 			els.submit.disabled = true;
-			if (e.status === 409) {
+			if (isStaleConflict(e)) {
 				els.conflict.hidden = false;
 			}
 			els.detailErrorText.textContent = e.message;

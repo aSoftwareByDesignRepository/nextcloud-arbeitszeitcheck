@@ -52,10 +52,26 @@ $initialTripId = (int)($_['initialTripId'] ?? 0);
 			</header>
 			<div class="azc-card__body">
 				<p id="bt-list-status" role="status" aria-live="polite" class="form-help"></p>
-				<ul id="bt-trip-list" class="azc-list bt-trip-list" aria-label="<?php p($l->t('Business trips')); ?>"></ul>
-				<div id="bt-empty" class="azc-empty-state" hidden>
-					<p class="azc-empty-state__text"><?php p($l->t('No business trips yet.')); ?></p>
-					<button id="bt-empty-create" class="azc-btn azc-btn--primary" type="button"><?php p($l->t('Record your first business trip')); ?></button>
+				<div class="table-container">
+					<table class="table table--hover azc-table--responsive" id="bt-trip-table" aria-labelledby="bt-list-title">
+						<thead>
+							<tr>
+								<th scope="col"><?php p($l->t('Business trip')); ?></th>
+								<th scope="col"><?php p($l->t('Purpose')); ?></th>
+								<th scope="col"><?php p($l->t('Status')); ?></th>
+								<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
+							</tr>
+						</thead>
+						<tbody id="bt-trip-list">
+							<tr id="bt-empty" hidden>
+								<td colspan="4" class="azc-table-empty">
+									<div class="azc-empty-state">
+										<h3 class="azc-empty-state__title"><?php p($l->t('No business trips yet.')); ?></h3>
+									</div>
+								</td>
+							</tr>
+						</tbody>
+					</table>
 				</div>
 			</div>
 		</section>
@@ -73,7 +89,7 @@ $initialTripId = (int)($_['initialTripId'] ?? 0);
 					<p id="bt-create-error-text" class="azc-callout__text"></p>
 				</div>
 				<form id="bt-create-form" class="form" novalidate>
-					<div class="form-grid">
+					<div class="bt-create-grid">
 						<div class="form-group">
 							<label for="bt-start" class="form-label"><?php p($l->t('Start')); ?> <span class="form-required" aria-hidden="true">*</span></label>
 							<input id="bt-start" name="startsAt" type="datetime-local" required aria-describedby="bt-start-error">
@@ -84,8 +100,6 @@ $initialTripId = (int)($_['initialTripId'] ?? 0);
 							<input id="bt-end" name="endsAt" type="datetime-local" required aria-describedby="bt-end-error">
 							<p id="bt-end-error" class="azc-field-error" hidden></p>
 						</div>
-					</div>
-					<div class="form-grid">
 						<div class="form-group">
 							<label for="bt-origin-tz" class="form-label"><?php p($l->t('Departure time zone')); ?> <span class="form-required" aria-hidden="true">*</span></label>
 							<select id="bt-origin-tz" name="originTimezone" required aria-describedby="bt-origin-tz-error"></select>
@@ -96,12 +110,12 @@ $initialTripId = (int)($_['initialTripId'] ?? 0);
 							<select id="bt-destination-tz" name="destinationTimezone" required aria-describedby="bt-destination-tz-error"></select>
 							<p id="bt-destination-tz-error" class="azc-field-error" hidden></p>
 						</div>
-					</div>
-					<div class="form-group">
-						<label for="bt-purpose" class="form-label"><?php p($l->t('Purpose (optional)')); ?></label>
-						<input id="bt-purpose" name="purpose" maxlength="200" aria-describedby="bt-purpose-help bt-purpose-error">
-						<p id="bt-purpose-help" class="form-help"><?php p($l->t('Short label only — no customer names needed. Maximum 200 characters.')); ?></p>
-						<p id="bt-purpose-error" class="azc-field-error" hidden></p>
+						<div class="form-group bt-create-grid__span">
+							<label for="bt-purpose" class="form-label"><?php p($l->t('Purpose (optional)')); ?></label>
+							<input id="bt-purpose" name="purpose" type="text" maxlength="200" aria-describedby="bt-purpose-help bt-purpose-error">
+							<p id="bt-purpose-help" class="form-help"><?php p($l->t('Short label only — no customer names needed. Maximum 200 characters.')); ?></p>
+							<p id="bt-purpose-error" class="azc-field-error" hidden></p>
+						</div>
 					</div>
 					<div class="form-actions">
 						<button type="submit" class="azc-btn azc-btn--primary" id="bt-create-submit"><?php p($l->t('Continue')); ?></button>
@@ -139,7 +153,7 @@ $initialTripId = (int)($_['initialTripId'] ?? 0);
 					<p class="form-help"><?php p($l->t('Describe how you travelled. Add a block for each part — for example outbound drive, flight, return trip.')); ?></p>
 					<ul id="bt-segment-list" class="azc-list bt-segment-list" aria-label="<?php p($l->t('Travel blocks')); ?>"></ul>
 					<form id="bt-segment-form" class="form bt-segment-form" novalidate>
-						<div class="form-grid form-grid--4">
+						<div class="bt-create-grid">
 							<div class="form-group">
 								<label for="bt-seg-start" class="form-label"><?php p($l->t('Start')); ?></label>
 								<input id="bt-seg-start" type="datetime-local" required>

@@ -203,6 +203,10 @@ class TimeTrackingControllerTest extends TestCase
 
 	/**
 	 * Test clockIn handles service exceptions
+	 *
+	 * The thrown message must stay UNCATALOGED: toHttpPayload() re-translates
+	 * catalog msgids via WireText::t() for the current user, so asserting an
+	 * English catalog literal here would be locale-dependent.
 	 */
 	public function testClockInHandlesException(): void
 	{
@@ -212,9 +216,10 @@ class TimeTrackingControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
+		$message = 'Synthetic rule violation: already clocked';
 		$this->timeTrackingService->expects($this->once())
 			->method('clockIn')
-			->willThrowException(new BusinessRuleException('User is already clocked in', 'already_clocked_in'));
+			->willThrowException(new BusinessRuleException($message, 'already_clocked_in'));
 
 		$response = $this->controller->clockIn();
 
@@ -222,8 +227,8 @@ class TimeTrackingControllerTest extends TestCase
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('User is already clocked in', $data['error']);
-		$this->assertEquals('User is already clocked in', $data['message']);
+		$this->assertSame($message, $data['error']);
+		$this->assertSame($message, $data['message']);
 		$this->assertEquals('already_clocked_in', $data['error_code']);
 	}
 
@@ -355,16 +360,17 @@ class TimeTrackingControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
+		$message = 'Synthetic rule violation: not clocked in';
 		$this->timeTrackingService->expects($this->once())
 			->method('clockOut')
-			->willThrowException(new BusinessRuleException('User is not currently clocked in'));
+			->willThrowException(new BusinessRuleException($message));
 
 		$response = $this->controller->clockOut();
 
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('User is not currently clocked in', $data['error']);
+		$this->assertSame($message, $data['error']);
 	}
 
 	/**
@@ -461,16 +467,17 @@ class TimeTrackingControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
+		$message = 'Synthetic rule violation: break without clock-in';
 		$this->timeTrackingService->expects($this->once())
 			->method('startBreak')
-			->willThrowException(new BusinessRuleException('User is not currently clocked in'));
+			->willThrowException(new BusinessRuleException($message));
 
 		$response = $this->controller->startBreak();
 
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('User is not currently clocked in', $data['error']);
+		$this->assertSame($message, $data['error']);
 	}
 
 	/**
@@ -484,16 +491,17 @@ class TimeTrackingControllerTest extends TestCase
 
 		$this->userSession->method('getUser')->willReturn($user);
 
+		$message = 'Synthetic rule violation: not on break';
 		$this->timeTrackingService->expects($this->once())
 			->method('endBreak')
-			->willThrowException(new BusinessRuleException('User is not currently on break'));
+			->willThrowException(new BusinessRuleException($message));
 
 		$response = $this->controller->endBreak();
 
 		$this->assertEquals(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$data = $response->getData();
 		$this->assertFalse($data['success']);
-		$this->assertEquals('User is not currently on break', $data['error']);
+		$this->assertSame($message, $data['error']);
 	}
 
 	public function testGetBreakStatusSuccess(): void

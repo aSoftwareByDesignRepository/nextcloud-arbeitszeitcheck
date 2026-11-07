@@ -40,10 +40,17 @@ return [
 
 		// Dashboard widget API routes
 		['name' => 'dashboard_widget#employeeData', 'url' => '/api/dashboard-widget/employee', 'verb' => 'GET'],
+		['name' => 'dashboard_widget#widgetSnapshot', 'url' => '/api/widget-snapshot', 'verb' => 'GET'],
 		['name' => 'dashboard_widget#managerData', 'url' => '/api/dashboard-widget/manager', 'verb' => 'GET'],
 		['name' => 'dashboard_widget#adminData', 'url' => '/api/dashboard-widget/admin', 'verb' => 'GET'],
 		['name' => 'dashboard_widget#clockIn', 'url' => '/api/dashboard-widget/clock/in', 'verb' => 'POST'],
 		['name' => 'dashboard_widget#startBreak', 'url' => '/api/dashboard-widget/break/start', 'verb' => 'POST'],
+		// Scoped widget tokens (suite widget spec D-03 / E.6)
+		['name' => 'widget_token#issue', 'url' => '/api/widget-tokens', 'verb' => 'POST'],
+		['name' => 'widget_token#index', 'url' => '/api/widget-tokens', 'verb' => 'GET'],
+		['name' => 'widget_token#revoke', 'url' => '/api/widget-tokens/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+		// Token-authed widget execution — azc-clock scope only
+		['name' => 'widget_token#clockToggle', 'url' => '/api/widget/clock-toggle', 'verb' => 'POST'],
 		['name' => 'dashboard_widget#endBreak', 'url' => '/api/dashboard-widget/break/end', 'verb' => 'POST'],
 		['name' => 'dashboard_widget#clockOut', 'url' => '/api/dashboard-widget/clock/out', 'verb' => 'POST'],
 

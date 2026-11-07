@@ -51,6 +51,32 @@ class DashboardWidgetController extends Controller {
 		]);
 	}
 
+	/**
+	 * Compact widget snapshot (suite widget spec NH-P2): the ONE document the
+	 * home/lock-screen widget pipeline needs — one query-family, cacheable.
+	 * Fields mirror exactly what the azc-clock snapshot builder consumes so
+	 * the app never has to assemble N calls for a widget write.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function widgetSnapshot(): JSONResponse {
+		$userId = $this->getUserId();
+		$summary = $this->widgetDataService->getEmployeeStatusSummary($userId);
+		$res = new JSONResponse([
+			'success' => true,
+			'data' => [
+				'serverNow' => (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('c'),
+				'status' => $summary['status'] ?? 'unknown',
+				'stateSince' => $summary['sessionStart'] ?? null,
+				'workingTodayHours' => $summary['workingTodayHours'] ?? 0,
+				'weekHoursWorked' => $summary['weekHoursWorked'] ?? 0,
+				'weekHoursRequired' => $summary['weekHoursRequired'] ?? 0,
+			],
+		]);
+		$res->cacheFor(60); // NH-P2: one query-family, cached ≥60 s
+		return $res;
+	}
+
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function managerData(?int $limit = 7): JSONResponse {

@@ -2558,6 +2558,13 @@ class AdminController extends Controller
 				'isOfflineSync' => true,
 			];
 		}
+		if (is_string($col) && \in_array(trim($col), Constants::AUDIT_CAPTURE_SOURCES, true)) {
+			return [
+				'captureSource' => trim($col),
+				'clientOccurredAtIso' => null,
+				'isOfflineSync' => false,
+			];
+		}
 
 		return $fromJson;
 	}
@@ -2582,8 +2589,15 @@ class AdminController extends Controller
 			return $empty;
 		}
 		$source = isset($decoded['capture_source']) ? trim((string)$decoded['capture_source']) : '';
-		if ($source !== Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
+		if (!\in_array($source, Constants::AUDIT_CAPTURE_SOURCES, true)) {
 			return $empty;
+		}
+		if ($source !== Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
+			return [
+				'captureSource' => $source,
+				'clientOccurredAtIso' => null,
+				'isOfflineSync' => false,
+			];
 		}
 		$occurred = isset($decoded['client_occurred_at']) ? trim((string)$decoded['client_occurred_at']) : '';
 		return [

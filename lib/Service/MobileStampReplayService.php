@@ -47,6 +47,7 @@ class MobileStampReplayService
 		?string $clientRequestIdRaw,
 		?string $occurredAtRaw,
 		?string $workLocation = null,
+		?string $captureSource = null,
 	): array {
 		return $this->replay(
 			$userId,
@@ -58,6 +59,7 @@ class MobileStampReplayService
 				$description,
 				$at,
 				$workLocation,
+				$captureSource,
 			),
 			fn (?\DateTimeInterface $at) => self::fingerprint([
 				'clock_in',
@@ -72,13 +74,13 @@ class MobileStampReplayService
 	/**
 	 * @return array{success: bool, timeEntry: array<string, mixed>}
 	 */
-	public function clockOut(string $userId, ?string $clientRequestIdRaw, ?string $occurredAtRaw): array
+	public function clockOut(string $userId, ?string $clientRequestIdRaw, ?string $occurredAtRaw, ?string $captureSource = null): array
 	{
 		return $this->replay(
 			$userId,
 			$clientRequestIdRaw,
 			$occurredAtRaw,
-			fn (?\DateTimeInterface $at) => $this->timeTrackingService->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', $at),
+			fn (?\DateTimeInterface $at) => $this->timeTrackingService->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', $at, $captureSource),
 			fn (?\DateTimeInterface $at) => self::fingerprint(['clock_out', $at?->getTimestamp() ?? 'now']),
 		);
 	}

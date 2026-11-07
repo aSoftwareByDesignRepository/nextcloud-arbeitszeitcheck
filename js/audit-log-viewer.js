@@ -291,6 +291,7 @@
 			const action = log.action || '-';
 			const isOffline = !!(log.is_offline_sync || log.isOfflineSync);
 			const occurred = log.client_occurred_at || log.clientOccurredAtIso || '';
+			const captureSource = log.captureSource || log.capture_source || null;
 			const td = Utils.responsiveTd
 				? function (label, html) { return Utils.responsiveTd(label, html); }
 				: function (_label, html) { return '<td>' + html + '</td>'; };
@@ -301,6 +302,8 @@
 				if (occurred) {
 					whenHtml += ' <span class="audit-log-offline-occurred">' + escapeHtml(alT('Occurred: %s', [occurred])) + '</span>';
 				}
+			} else if (captureSource) {
+				whenHtml += ' <span class="azc-badge azc-badge--info audit-log-channel-badge">' + escapeHtml(String(captureSource)) + '</span>';
 			}
 
 			return '<tr>' +

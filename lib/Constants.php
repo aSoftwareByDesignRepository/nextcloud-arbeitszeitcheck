@@ -119,6 +119,22 @@ final class Constants
 	 */
 	public const AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC = 'offline_sync';
 
+	/**
+	 * Audit capture_source values promoted to the indexed audit_log column.
+	 * `offline_sync` marks replayed offline punches; the remaining values are
+	 * the non-default live capture channels a stamp may declare (MH-P24 —
+	 * provenance on compliance records is not optional; 'app' is the default
+	 * channel and deliberately unlisted, an explicit app stamp needs no
+	 * attribution marker).
+	 */
+	public const AUDIT_CAPTURE_SOURCES = [
+		self::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
+		'widget',
+		'kiosk',
+		'api',
+		'sync',
+	];
+
 	public const TARIFF_RULE_SET_STATUS_DRAFT = 'draft';
 	public const TARIFF_RULE_SET_STATUS_ACTIVE = 'active';
 	public const TARIFF_RULE_SET_STATUS_RETIRED = 'retired';

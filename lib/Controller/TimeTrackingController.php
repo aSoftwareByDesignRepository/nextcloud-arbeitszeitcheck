@@ -151,9 +151,12 @@ class TimeTrackingController extends Controller
 		?string $occurred_at = null,
 		?string $workLocation = null,
 		?string $work_location = null,
+		?string $channel = null,
 	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
+			$channel = $this->normalizeCaptureChannel($channel);
+			$this->logCaptureChannel('clock_in', $channel);
 			$payload = $this->stampReplayService->clockIn(
 				$userId,
 				$projectCheckProjectId,
@@ -161,6 +164,7 @@ class TimeTrackingController extends Controller
 				$clientRequestId ?? $client_request_id,
 				$occurredAt ?? $occurred_at,
 				$workLocation ?? $work_location,
+				$channel,
 			);
 			return new JSONResponse($payload);
 		} catch (StampReplayException $e) {
@@ -185,13 +189,17 @@ class TimeTrackingController extends Controller
 		?string $client_request_id = null,
 		?string $occurredAt = null,
 		?string $occurred_at = null,
+		?string $channel = null,
 	): JSONResponse {
 		try {
 			$userId = $this->getUserId();
+			$channel = $this->normalizeCaptureChannel($channel);
+			$this->logCaptureChannel('clock_out', $channel);
 			$payload = $this->stampReplayService->clockOut(
 				$userId,
 				$clientRequestId ?? $client_request_id,
 				$occurredAt ?? $occurred_at,
+				$channel,
 			);
 			return new JSONResponse($payload);
 		} catch (StampReplayException $e) {
@@ -386,5 +394,37 @@ class TimeTrackingController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in TimeTrackingController::getBreakStatus: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString(), ["exception" => $e]);
 			return $this->buildSafeErrorResponse($e);
 		}
+	}
+
+	/**
+	 * Widget-initiated mutations carry channel=widget (suite widget spec
+	 * MH-P24). Normalize the provenance hint against an allowlist; anything
+	 * else collapses to 'app' — a wrong value must never reject a legal stamp,
+	 * so unrecognized values degrade to no attribution with a warning log.
+	 */
+	private const CAPTURE_CHANNELS = ['app', 'widget', 'kiosk', 'api', 'sync'];
+
+	private function normalizeCaptureChannel(?string $channel): ?string {
+		if ($channel === null || $channel === '' || $channel === 'app') {
+			return null;
+		}
+		if (!\in_array($channel, self::CAPTURE_CHANNELS, true)) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Ignoring unrecognized capture channel on stamp',
+				['channel' => $channel, 'user' => $this->getUserId()]
+			);
+			return null;
+		}
+		return $channel;
+	}
+
+	private function logCaptureChannel(string $action, ?string $channel): void {
+		if ($channel === null || $channel === '' || $channel === 'app') {
+			return; // default channel — nothing to attribute
+		}
+		\OCP\Log\logger('arbeitszeitcheck')->info(
+			'capture_channel stamp via ' . $channel,
+			['action' => $action, 'capture_source' => $channel, 'user' => $this->getUserId()]
+		);
 	}
 }

@@ -32,6 +32,27 @@ class AuditLogCaptureSourceTest extends TestCase
 		$this->assertNull($method->invoke($mapper, []));
 	}
 
+	public function testExtractCaptureSourcePromotesAllowlistedChannels(): void
+	{
+		$mapper = new AuditLogMapper($this->createMock(IDBConnection::class));
+		$method = new ReflectionMethod(AuditLogMapper::class, 'extractCaptureSource');
+		$method->setAccessible(true);
+
+		// MH-P24 channel attribution promotes to the indexed column.
+		foreach (['widget', 'kiosk', 'api', 'sync'] as $channel) {
+			$this->assertSame(
+				$channel,
+				$method->invoke($mapper, ['capture_source' => $channel]),
+				"channel {$channel} must promote to the indexed capture_source column"
+			);
+		}
+		// 'app' is the default channel — no attribution marker.
+		$this->assertNull($method->invoke($mapper, ['capture_source' => 'app']));
+		// Unknown/garbage values stay unpromoted (deny-by-default vocabulary).
+		$this->assertNull($method->invoke($mapper, ['capture_source' => 'browser']));
+		$this->assertNull($method->invoke($mapper, ['capture_source' => ' WIDGET ']));
+	}
+
 	public function testBuildDateRangeQueryUsesIndexedEqualityNotLike(): void
 	{
 		$src = (string)file_get_contents(__DIR__ . '/../../../lib/Db/AuditLogMapper.php');

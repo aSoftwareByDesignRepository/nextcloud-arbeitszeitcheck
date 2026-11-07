@@ -86,8 +86,8 @@ class AuditLogMapper extends QBMapper
 			return null;
 		}
 		$raw = trim((string)$newValues['capture_source']);
-		if ($raw === Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC) {
-			return Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC;
+		if (\in_array($raw, Constants::AUDIT_CAPTURE_SOURCES, true)) {
+			return $raw;
 		}
 
 		return null;

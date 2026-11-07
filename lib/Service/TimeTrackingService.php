@@ -229,6 +229,23 @@ class TimeTrackingService
 	}
 
 	/**
+	 * Explicit capture-channel attribution for live stamps (MH-P24 — widget /
+	 * kiosk / api callers declare their provenance; 'app' is the default and
+	 * stays unmarked). Merge this BEFORE {@see offlineCaptureAuditMeta()}: a
+	 * replayed punch keeps the stricter offline_sync marker (client-supplied
+	 * timestamp is the higher-integrity signal for the audit trail).
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function channelCaptureAuditMeta(?string $captureSource): array
+	{
+		if ($captureSource === null || $captureSource === 'app') {
+			return [];
+		}
+		return ['capture_source' => $captureSource];
+	}
+
+	/**
 	 * Inclusive/exclusive bounds of the current calendar day in {@see getAppConfiguredTimeZone()},
 	 * formatted as naive `Y-m-d H:i:s` values (same convention as stored `at_entries` timestamps).
 	 *
@@ -426,6 +443,7 @@ class TimeTrackingService
 		?string $description = null,
 		?\DateTimeInterface $effectiveAt = null,
 		?string $workLocation = null,
+		?string $captureSource = null,
 	): TimeEntry {
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
@@ -470,10 +488,10 @@ class TimeTrackingService
 					// Never overwrite the paused row's project — that would re-bill earlier
 					// hours onto the newly selected customer project.
 					if ($requestedNorm !== '' && $requestedNorm !== $existingNorm) {
-						$this->completePausedEntryBeforeProjectSwitch($userId, $pausedTodayEntry);
+						$this->completePausedEntryBeforeProjectSwitch($userId, $pausedTodayEntry, $captureSource);
 						// Fall through to create a fresh clock-in with the new project.
 					} else {
-						$resumed = $this->resumePausedEntry($userId, $pausedTodayEntry, $projectCheckProjectId, $description);
+						$resumed = $this->resumePausedEntry($userId, $pausedTodayEntry, $projectCheckProjectId, $description, $captureSource);
 						$this->db->commit();
 						return $resumed;
 					}
@@ -524,7 +542,11 @@ class TimeTrackingService
 					'time_entry',
 					$savedEntry->getId(),
 					null,
-					array_merge($this->safeGetSummary($savedEntry, $userId), $this->offlineCaptureAuditMeta($effectiveAt, $userId))
+					array_merge(
+						$this->safeGetSummary($savedEntry, $userId),
+						$this->channelCaptureAuditMeta($captureSource),
+						$this->offlineCaptureAuditMeta($effectiveAt, $userId)
+					)
 				);
 				$this->clearAutoClockoutNotice($userId);
 				$this->db->commit();
@@ -550,6 +572,7 @@ class TimeTrackingService
 		string $endedReason = TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT,
 		string $policyApplied = 'standard',
 		?\DateTimeInterface $effectiveAt = null,
+		?string $captureSource = null,
 	): TimeEntry {
 		$lockKey = $this->acquireUserMutationLock($userId);
 		try {
@@ -611,7 +634,7 @@ class TimeTrackingService
 					'time_entry',
 					$updatedEntry->getId(),
 					$oldSummary,
-					$this->safeGetSummary($updatedEntry, $userId)
+					array_merge($this->safeGetSummary($updatedEntry, $userId), $this->channelCaptureAuditMeta($captureSource))
 				);
 				$this->db->commit();
 			} catch (\Throwable $e) {
@@ -660,7 +683,7 @@ class TimeTrackingService
 	 * End time is the pause moment ({@see TimeEntry::getUpdatedAt()}), not "now",
 	 * so idle time after pause is not billed as work.
 	 */
-	private function completePausedEntryBeforeProjectSwitch(string $userId, TimeEntry $pausedEntry): void
+	private function completePausedEntryBeforeProjectSwitch(string $userId, TimeEntry $pausedEntry, ?string $captureSource = null): void
 	{
 		$this->monthClosureGuard->assertTimeEntryMutable($pausedEntry);
 
@@ -700,7 +723,7 @@ class TimeTrackingService
 			'time_entry',
 			$updated->getId(),
 			$oldSummary,
-			$this->safeGetSummary($updated, $userId)
+			array_merge($this->safeGetSummary($updated, $userId), $this->channelCaptureAuditMeta($captureSource))
 		);
 
 		if ($this->projectCheckLaborSync !== null) {
@@ -730,7 +753,8 @@ class TimeTrackingService
 		string $userId,
 		TimeEntry $pausedEntry,
 		?string $projectCheckProjectId = null,
-		?string $description = null
+		?string $description = null,
+		?string $captureSource = null
 	): TimeEntry {
 		$this->monthClosureGuard->assertTimeEntryMutable($pausedEntry);
 
@@ -787,7 +811,7 @@ class TimeTrackingService
 			'time_entry',
 			$resumed->getId(),
 			null,
-			$this->safeGetSummary($resumed, $userId)
+			array_merge($this->safeGetSummary($resumed, $userId), $this->channelCaptureAuditMeta($captureSource))
 		);
 
 		$this->clearAutoClockoutNotice($userId);

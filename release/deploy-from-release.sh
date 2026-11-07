@@ -103,13 +103,51 @@ if ! tar -tzf "${ARCHIVE_PATH}" | grep -Eq "^${APP_ID}/appinfo/info.xml$"; then
 	exit 1
 fi
 
-if tar -tzf "${ARCHIVE_PATH}" | grep -Eq "/(\.git/|node_modules/|tests/|build/|scripts/)"; then
+# Dev/QA artifact paths that must never ship inside a release tarball.
+# This denylist mirrors the pack step's --exclude set (Makefile) — the
+# deploy-time scan below fails closed when a wrongly-built archive leaks
+# development files instead of silently installing them.
+DEV_ARTIFACT_EXCLUDES=(
+	'.git' '.github' '.auth' '.vscode' '.idea'
+	'build' 'docs' 'documentation' 'e2e' 'scripts' 'tests' 'tools'
+	'test-results' 'playwright-report' 'blob-report' 'qa-report' 'atlas'
+	'node_modules' 'node_modules.broken-*'
+	'.phpunit.result.cache' '.DS_Store'
+	'Makefile' 'composer.lock' 'package.json' 'package-lock.json'
+	'phpunit.xml' 'phpunit.cov.xml' 'playwright.config.js' 'playwright.config.ts'
+	'vitest.config.js' 'vitest.config.ts' 'infection.json5' 'infection-security.json5'
+	'*.tar.gz' '*.tgz'
+)
+
+# ERE alternation over the denylist ('*' entries become '.*').
+deny_ere="$(printf '%s\n' "${DEV_ARTIFACT_EXCLUDES[@]}" \
+	| sed -e 's/[][\.^$*]/\\&/g' -e 's/\\\*/.*/g' \
+	| paste -sd'|' -)"
+# Top-level app members matching the denylist (vendor/ internals exempt —
+# dependency packages own their trees).
+TOP_DENY_RE="^${APP_ID}/(${deny_ere})(/|$)"
+# Never legitimate in ANY position (dev caches, QA captures, audit docs).
+ANYWHERE_DENY_RE='\.phpunit\.result\.cache|\.DS_Store|ATLAS-[^/]*\.md|qa-report/|\.(trace\.zip|webm)$'
+# Forbidden in the app's own surface but permissible inside vendor/.
+NONVENDOR_DENY_RE='atlas(/|-)[^/]*|[^/]*\.(tar\.gz|tgz)$'
+
+archive_members="$(tar -tzf "${ARCHIVE_PATH}")"
+
+forbidden_members="$(
+	printf '%s\n' "${archive_members}" \
+		| awk -v app="${APP_ID}" -v top="${TOP_DENY_RE}" -v any="${ANYWHERE_DENY_RE}" -v nv="${NONVENDOR_DENY_RE}" '
+			/^'"${APP_ID}"'\/vendor\// { if ($0 ~ any) print; next }
+			{ if ($0 ~ top || $0 ~ any || $0 ~ nv) print }
+		'
+)"
+
+if [[ -n "${forbidden_members}" ]]; then
 	echo "Error: archive contains forbidden development paths:" >&2
-	tar -tzf "${ARCHIVE_PATH}" | grep -E "/(\.git/|node_modules/|tests/|build/|scripts/)" || true
+	printf '%s\n' "${forbidden_members}" >&2
 	exit 1
 fi
 
-if ! tar -tzf "${ARCHIVE_PATH}" | grep -Eq "^${APP_ID}/appinfo/signature.json$"; then
+if ! printf '%s\n' "${archive_members}" | grep -Eq "^${APP_ID}/appinfo/signature.json$"; then
 	echo "Error: archive is missing appinfo/signature.json (unsigned release)." >&2
 	exit 1
 fi
@@ -119,9 +157,11 @@ if ! tar -xOf "${ARCHIVE_PATH}" "${APP_ID}/appinfo/signature.json" | grep -Eq .;
 	exit 1
 fi
 
-if tar -xOf "${ARCHIVE_PATH}" "${APP_ID}/appinfo/signature.json" | grep -Eq '"([^"]*/)?(\.git|node_modules|tests|build|scripts)\\/'; then
+# Signature paths are app-root-relative — scan them against the same
+# denylist (unanchored) so a signature minted over a polluted tree fails too.
+if tar -xOf "${ARCHIVE_PATH}" "${APP_ID}/appinfo/signature.json" \
+	| grep -Eq '"('"$deny_ere"')/|"[^"]*/('"$deny_ere"')/|'"${ANYWHERE_DENY_RE}"; then
 	echo "Error: signature.json references forbidden development paths." >&2
-	tar -xOf "${ARCHIVE_PATH}" "${APP_ID}/appinfo/signature.json" | grep -E '"([^"]*/)?(\.git|node_modules|tests|build|scripts)\\/' || true
 	exit 1
 fi
 

@@ -20,6 +20,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Exception\WidgetTokenLimitException;
 use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
+use OCA\ArbeitszeitCheck\Service\LiveActivityPushService;
 use OCA\ArbeitszeitCheck\Service\WidgetTokenService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -40,6 +41,7 @@ class WidgetTokenController extends Controller
 		private MobileStampReplayService $stampReplay,
 		private TimeEntryMapper $timeEntryMapper,
 		private IUserSession $userSession,
+		private LiveActivityPushService $livePush,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -136,6 +138,10 @@ class WidgetTokenController extends Controller
 			}
 			\OCP\Log\logger('arbeitszeitcheck')->info('capture_channel stamp via widget',
 				['action' => 'clock-toggle', 'capture_source' => 'widget', 'user' => $uid]);
+			try {
+				$on = $active === null;
+				$this->livePush->sendClockUpdate($uid, $on, $on ? 'Clocked in' : 'Clocked out');
+			} catch (\Throwable) { /* push is best-effort (NH-P3) */ }
 			return new JSONResponse([
 				'action' => 'executed',
 				'clockedIn' => $active === null,
@@ -145,5 +151,36 @@ class WidgetTokenController extends Controller
 			\OCP\Log\logger('arbeitszeitcheck')->error('Widget clock-toggle failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['action' => 'navigate'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/** Register this device's Activity push token (session-authed, NH-P3). */
+	#[NoAdminRequired]
+	public function liveActivityToken(?string $activityToken = null, ?string $deviceLabel = null): JSONResponse
+	{
+		$uid = $this->uid();
+		if ($uid === null) {
+			return new JSONResponse(['error' => 'unauthenticated'], Http::STATUS_UNAUTHORIZED);
+		}
+		if ($activityToken === null || $activityToken === '') {
+			return new JSONResponse(['error' => 'missing_token'], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$this->livePush->registerToken($uid, $activityToken, $deviceLabel);
+		} catch (\InvalidArgumentException) {
+			return new JSONResponse(['error' => 'invalid_token'], Http::STATUS_BAD_REQUEST);
+		}
+		return new JSONResponse(['ok' => true], Http::STATUS_CREATED);
+	}
+
+	/** Unregister this device's token (logout/rotate, NH-P3). */
+	#[NoAdminRequired]
+	public function deleteLiveActivityToken(?string $deviceLabel = null): JSONResponse
+	{
+		$uid = $this->uid();
+		if ($uid === null) {
+			return new JSONResponse(['error' => 'unauthenticated'], Http::STATUS_UNAUTHORIZED);
+		}
+		$this->livePush->unregisterToken($uid, $deviceLabel);
+		return new JSONResponse(['ok' => true]);
 	}
 }

@@ -49,6 +49,8 @@ return [
 		['name' => 'widget_token#issue', 'url' => '/api/widget-tokens', 'verb' => 'POST'],
 		['name' => 'widget_token#index', 'url' => '/api/widget-tokens', 'verb' => 'GET'],
 		['name' => 'widget_token#revoke', 'url' => '/api/widget-tokens/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+		['name' => 'widget_token#liveActivityToken', 'url' => '/api/widget/live-activity-token', 'verb' => 'POST'],
+		['name' => 'widget_token#deleteLiveActivityToken', 'url' => '/api/widget/live-activity-token', 'verb' => 'DELETE'],
 		// Token-authed widget execution — azc-clock scope only
 		['name' => 'widget_token#clockToggle', 'url' => '/api/widget/clock-toggle', 'verb' => 'POST'],
 		['name' => 'dashboard_widget#endBreak', 'url' => '/api/dashboard-widget/break/end', 'verb' => 'POST'],

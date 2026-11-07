@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Db;
 
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -73,7 +74,15 @@ class HolidaySuppressionMapper extends QBMapper
 		$entity->setCreatedAt(new \DateTime());
 		$entity->setSuppressedBy($suppressedBy);
 
-		$this->insert($entity);
+		try {
+			$this->insert($entity);
+		} catch (DbException $e) {
+			// Lost the isSuppressed()→insert race: the unique (state, date) row
+			// now exists, which is the state this call wanted — idempotent.
+			if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $e;
+			}
+		}
 	}
 
 	public function removeSuppression(string $state, string $dateYmd): void

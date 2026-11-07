@@ -99,6 +99,11 @@ class UserSettingsMapper extends QBMapper
 	 * @param string|null $settingValue
 	 * @return UserSetting
 	 * @throws \RuntimeException If the upsert cannot be reconciled after a retry.
+	 *
+	 * unique-conflict:ok — the update() calls in this upsert only mutate
+	 * setting_value/updated_at on a row re-read by its (user_id, setting_key)
+	 * unique key; the insert carries a REASON_UNIQUE_CONSTRAINT_VIOLATION
+	 * catch that falls through to a re-read + update of the winner row.
 	 */
 	public function setSetting(string $userId, string $settingKey, ?string $settingValue): UserSetting
 	{

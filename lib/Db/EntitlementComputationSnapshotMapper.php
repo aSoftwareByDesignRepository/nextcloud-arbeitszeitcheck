@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -96,6 +96,11 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 			$this->copySpecialEntitlementFields($snapshot, $existing);
 			return $this->update($existing);
 		}
+		// unique-conflict:ok — every update() in this method mutates non-key
+		// columns only on rows re-read by their (user_id, period_key,
+		// as_of_date) unique key; the legacy-repair as_of_date SET rewrites the
+		// same value the row was found by, so no update can collide. The
+		// insert below carries the reason check.
 		if ($existing !== null && $existingAsOfDate !== null) {
 			$existing->setEffectiveEntitlementDays($snapshot->getEffectiveEntitlementDays());
 			$existing->setSource($snapshot->getSource());
@@ -109,7 +114,12 @@ class EntitlementComputationSnapshotMapper extends QBMapper {
 		}
 		try {
 			return $this->insert($snapshot);
-		} catch (UniqueConstraintViolationException) {
+		} catch (DbException $e) {
+			// NC wraps DBAL errors in DbalException — catch by reason, never by
+			// the Doctrine subtype (it is the wrapped getPrevious(), not thrown).
+			if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $e;
+			}
 			// Concurrent writer inserted the same (user_id, period_key, as_of_date) row.
 			// Re-read and update to keep deterministic latest values.
 			$conflict = $this->findByUserPeriodAndAsOfDate(

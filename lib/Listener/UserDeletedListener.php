@@ -43,6 +43,10 @@ use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCP\IL10N;
 use Psr\Log\LoggerInterface;
 
+// unique-conflict:ok — every UNIQUE-indexed table referenced here is
+// written via deleteByUserId()/deleteByUser() deletes (a delete cannot hit
+// a unique index); the only entity write, absenceMapper->update(), mutates
+// non-key columns on at_absences, which carries no unique index at all.
 /**
  * Listener for user deletion events
  *

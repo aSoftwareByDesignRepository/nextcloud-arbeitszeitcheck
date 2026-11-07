@@ -36,6 +36,12 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
+// unique-conflict:ok — dev-only fixture generator (interactive CLI): the
+// flagged insert sites all write tables with no unique index (time entries,
+// absences, violations, working-time models, teams); the only UNIQUE-indexed
+// writes (at_team_managers/at_team_members) go through the ensureTeam*Link
+// helpers below, which existence-check via findByTeamId, and the mappers
+// themselves catch a lost race and return the winner row.
 class GenerateTestDataCommand extends Command
 {
 	private const DEMO_MARKER = '###AZC_DEMO###';

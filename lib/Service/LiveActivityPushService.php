@@ -6,7 +6,7 @@ declare(strict_types=1);
  * APNs Live-Activity push plumbing (SPEC NH-P3, D-03 scope: azc-clock only).
  *
  * Stores per-device Activity push tokens as user values (no schema change —
- * 'azc_la_token_<deviceHash>' keys, wiped with the account) and sends
+ * 'azc_la_token_<deviceHash48>' keys, wiped with the account) and sends
  * push-type=liveactivity updates over the APNs HTTP/2 provider API using an
  * ES256 provider-token JWT built from the configured .p8 key.
  *
@@ -42,14 +42,13 @@ class LiveActivityPushService
 		if (!preg_match('/^[0-9a-f]{64,128}$/i', $activityToken)) {
 			throw new \InvalidArgumentException('invalid activity push token');
 		}
-		$key = self::TOKEN_PREFIX . hash('sha256', $deviceLabel ?? $activityToken);
-		$this->config->setUserValue($uid, 'arbeitszeitcheck', $key, $activityToken);
+		$this->config->setUserValue($uid, 'arbeitszeitcheck', self::storageKey($deviceLabel ?? $activityToken), $activityToken);
 	}
 
 	public function unregisterToken(string $uid, ?string $deviceLabel = null): void
 	{
 		foreach ($this->tokensFor($uid) as $key => $_) {
-			if ($deviceLabel === null || $key === self::TOKEN_PREFIX . hash('sha256', $deviceLabel)) {
+			if ($deviceLabel === null || $key === self::storageKey($deviceLabel)) {
 				$this->config->deleteUserValue($uid, 'arbeitszeitcheck', $key);
 			}
 		}
@@ -65,6 +64,15 @@ class LiveActivityPushService
 			}
 		}
 		return $out;
+	}
+
+	/**
+	 * oc_preferences.configkey is varchar(64): prefix (13) + a 192-bit hash
+	 * slice (48 hex) = 61 chars. A longer digest can never be written.
+	 */
+	private static function storageKey(string $deviceLabelOrToken): string
+	{
+		return self::TOKEN_PREFIX . substr(hash('sha256', $deviceLabelOrToken), 0, 48);
 	}
 
 	/**

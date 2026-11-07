@@ -146,9 +146,13 @@ class MapperSurfaceCoverageTest extends TestCase
 	private function newQbThrowingOnWrite(): IQueryBuilder
 	{
 		$qb = $this->newQb(false);
-		$ex = new \Doctrine\DBAL\Exception\UniqueConstraintViolationException(
-			$this->createMock(\Doctrine\DBAL\Driver\Exception::class),
-			null,
+		// NC wraps DBAL errors in DbalException — that wrapper (not the raw
+		// Doctrine subtype) is what actually reaches mapper catch blocks.
+		$ex = \OC\DB\Exceptions\DbalException::wrap(
+			new \Doctrine\DBAL\Exception\UniqueConstraintViolationException(
+				$this->createMock(\Doctrine\DBAL\Driver\Exception::class),
+				null,
+			),
 		);
 		$qb->method('executeStatement')->willThrowException($ex);
 		return $qb;

@@ -10,6 +10,7 @@ use OCA\ArbeitszeitCheck\Db\WorkLocationDefaultPolicyMapper;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDefinition;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper;
 use OCA\ArbeitszeitCheck\Service\WorkLocationCatalog;
+use OCP\DB\Exception as DbException;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 
@@ -65,8 +66,17 @@ final class SeedWorkLocationCatalog implements IRepairStep
 			$row->setVersion(1);
 			$row->setCreatedAt($now);
 			$row->setUpdatedAt($now);
-			$this->definitionMapper->insert($row);
-			$seeded++;
+			try {
+				$this->definitionMapper->insert($row);
+				$seeded++;
+			} catch (DbException $e) {
+				// A repair step racing a parallel upgrade (or a pre-check that
+				// lost the codeExists window) must not abort the whole run —
+				// the unique winner already stores the same seed row.
+				if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
+			}
 		}
 
 		$migrated = 0;
@@ -88,8 +98,14 @@ final class SeedWorkLocationCatalog implements IRepairStep
 			$policy->setCreatedBy('system:upgrade');
 			$policy->setCreatedAt(new \DateTime());
 			$policy->setUpdatedAt(new \DateTime());
-			$this->policyMapper->insert($policy);
-			$migrated++;
+			try {
+				$this->policyMapper->insert($policy);
+				$migrated++;
+			} catch (DbException $e) {
+				if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
+			}
 		}
 
 		$output->info(sprintf(

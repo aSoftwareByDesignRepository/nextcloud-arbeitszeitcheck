@@ -9,6 +9,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\WidgetToken;
 use OCA\ArbeitszeitCheck\Exception\WidgetTokenLimitException;
+use OCA\ArbeitszeitCheck\Service\LiveActivityPushService;
 use OCA\ArbeitszeitCheck\Service\MobileStampReplayService;
 use OCA\ArbeitszeitCheck\Service\WidgetTokenService;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -30,6 +31,8 @@ class WidgetTokenControllerTest extends TestCase
 	private $timeEntryMapper;
 	/** @var IUserSession&MockObject */
 	private $userSession;
+	/** @var LiveActivityPushService&MockObject */
+	private $livePush;
 
 	protected function setUp(): void
 	{
@@ -38,6 +41,7 @@ class WidgetTokenControllerTest extends TestCase
 		$this->stampReplay = $this->createMock(MobileStampReplayService::class);
 		$this->timeEntryMapper = $this->createMock(TimeEntryMapper::class);
 		$this->userSession = $this->createMock(IUserSession::class);
+		$this->livePush = $this->createMock(LiveActivityPushService::class);
 
 		$this->controller = new WidgetTokenController(
 			'arbeitszeitcheck',
@@ -46,6 +50,7 @@ class WidgetTokenControllerTest extends TestCase
 			$this->stampReplay,
 			$this->timeEntryMapper,
 			$this->userSession,
+			$this->livePush,
 		);
 	}
 

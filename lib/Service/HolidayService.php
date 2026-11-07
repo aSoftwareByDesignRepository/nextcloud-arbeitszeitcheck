@@ -26,6 +26,11 @@ use OCP\IConfig;
 use OCP\IL10N;
 use Psr\Log\LoggerInterface;
 
+// unique-conflict:ok — the only mapper-mediated write site the class gate
+// flags here is holidayMapper->update($existing) on a row re-read by id
+// (mutates kind/name/updated_at, never its unique key columns); at_holiday_
+// suppress writes are removeSuppression() deletes, at_settings access is
+// read-only, and the at_holidays insert carries a REASON_UNIQUE reason check.
 class HolidayService
 {
 	public function __construct(

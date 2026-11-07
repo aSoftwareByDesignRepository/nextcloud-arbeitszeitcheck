@@ -50,6 +50,10 @@ class KioskTerminalMapper extends QBMapper
 	/**
 	 * Atomically activate a pending terminal. Returns 1 on success, 0 if already
 	 * claimed, expired, or not pending (safe under concurrent pair requests).
+	 *
+	 * unique-conflict:ok — only SETs status/token_hash/label/pairing_* on a row
+	 * matched by terminal_id; terminal_id itself (the at_kiosk_term_tid_uq
+	 * column) is never SET, so the update cannot collide.
 	 */
 	public function claimPendingAsActive(
 		string $terminalId,

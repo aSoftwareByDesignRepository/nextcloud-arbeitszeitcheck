@@ -50,6 +50,10 @@ use OCP\IUserManager;
 use OCP\IURLGenerator;
 use OCP\IL10N;
 
+// unique-conflict:ok — the write-execution site the class gate flags in
+// this file is `$this->update(...)`, the controller's own absence-update
+// domain method (its DB writes go through AbsenceMapper on key-stable
+// entities); no direct UNIQUE-indexed table write exists here.
 /**
  * AbsenceController
  */

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -48,6 +48,8 @@ class UserOvertimeYearBalanceMapper extends QBMapper
 		$now = new \DateTime();
 		$normalized = max(-9999.0, min(9999.0, round($openingBalanceHours, 2)));
 
+		// unique-conflict:ok — update() mutates non-key columns only on a row
+		// re-read by (user_id, year); it cannot hit at_uotb_user_year_uq.
 		try {
 			$entity = $this->findByUserAndYear($userId, $year);
 			$entity->setOpeningBalanceHours($normalized);
@@ -62,7 +64,12 @@ class UserOvertimeYearBalanceMapper extends QBMapper
 			$entity->setUpdatedAt($now);
 			try {
 				return $this->insert($entity);
-			} catch (UniqueConstraintViolationException) {
+			} catch (DbException $e) {
+				// NC wraps DBAL errors in DbalException — reason check, not the
+				// Doctrine subtype (thrown as DbalException, never the original).
+				if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
 				$existing = $this->findByUserAndYear($userId, $year);
 				$existing->setOpeningBalanceHours($normalized);
 				$existing->setUpdatedAt($now);

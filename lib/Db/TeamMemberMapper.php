@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\Db;
 
 use OCA\ArbeitszeitCheck\Support\QueryInChunker;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -110,7 +111,21 @@ class TeamMemberMapper extends QBMapper
 		$entity = new TeamMember();
 		$entity->setTeamId($teamId);
 		$entity->setUserId($userId);
-		return $this->insert($entity);
+		try {
+			return $this->insert($entity);
+		} catch (DbException $e) {
+			// Lost the caller's existence pre-check race — the (team_id, user_id)
+			// link already exists; return the winner so the call is idempotent.
+			if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $e;
+			}
+			foreach ($this->findByTeamId($teamId) as $m) {
+				if ($m->getUserId() === $userId) {
+					return $m;
+				}
+			}
+			throw $e;
+		}
 	}
 
 	public function removeMember(int $teamId, string $userId): void

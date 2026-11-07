@@ -213,6 +213,14 @@ class OvertimePayoutMapper extends QBMapper
 		return $this->findEntities($qb);
 	}
 
+	// unique-conflict:ok — OvertimePayoutService::processForUser wraps
+	// insertPayout in an OCP\DB\Exception catch that re-checks
+	// existsForUserAndMonth() and degrades to 'skipped_already_paid'; this
+	// low-level writer delegates conflict handling to that service contract.
+	/**
+	 * @throws \OCP\DB\Exception on a unique (user_id, year, month) conflict —
+	 *         callers must convert it (see OvertimePayoutService).
+	 */
 	public function insertPayout(OvertimePayout $entity): OvertimePayout
 	{
 		$entity->setCreatedAt(new \DateTime());

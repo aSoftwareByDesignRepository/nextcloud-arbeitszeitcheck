@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -39,7 +41,27 @@ class VacationRolloverLogMapper extends QBMapper
 		// match VacationUnitService::clampCarryover — never truncate real hour amounts to 366.
 		$e->setAmount(max(0.0, min(4000.0, $amount)));
 		$e->setCreatedAt(new \DateTime());
-		return $this->insert($e);
+		try {
+			return $this->insert($e);
+		} catch (DbException $ex) {
+			// A rollover rerun or concurrent writer already logged this
+			// (user_id, from_year, to_year) row — return the winner so the
+			// ledger write stays idempotent instead of leaking a raw DB error.
+			if ($ex->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $ex;
+			}
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('*')
+				->from($this->getTableName())
+				->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+				->andWhere($qb->expr()->eq('from_year', $qb->createNamedParameter($fromYear, IQueryBuilder::PARAM_INT)))
+				->andWhere($qb->expr()->eq('to_year', $qb->createNamedParameter($toYear, IQueryBuilder::PARAM_INT)));
+			try {
+				return $this->findEntity($qb);
+			} catch (DoesNotExistException) {
+				throw $ex;
+			}
+		}
 	}
 
 	public function deleteByUserId(string $userId): void

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Db;
 
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\Exception as DbException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
@@ -116,6 +116,8 @@ class VacationYearBalanceMapper extends QBMapper
 				$entity->setCarryoverHours($normalizedHours);
 			}
 			$entity->setUpdatedAt($now);
+			// unique-conflict:ok — update() mutates non-key columns only on a
+			// row re-read by (user_id, year); it cannot hit at_vacb_user_year_uq.
 			$saved = $this->update($entity);
 		} catch (DoesNotExistException $e) {
 			$entity = new VacationYearBalance();
@@ -131,7 +133,12 @@ class VacationYearBalanceMapper extends QBMapper
 			$entity->setUpdatedAt($now);
 			try {
 				$saved = $this->insert($entity);
-			} catch (UniqueConstraintViolationException) {
+			} catch (DbException $e) {
+				// NC wraps DBAL errors in DbalException — reason check, not the
+				// Doctrine subtype (thrown as DbalException, never the original).
+				if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
 				$existing = $this->findByUserAndYear($userId, $year);
 				$existing->setCarryoverDays($normalized);
 				if ($clearCarryoverHours) {

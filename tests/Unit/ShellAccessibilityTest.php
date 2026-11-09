@@ -25,9 +25,12 @@ class ShellAccessibilityTest extends TestCase
 		$this->assertStringContainsString('aria-live="assertive"', $content);
 		$this->assertStringContainsString('id="azc-page-title"', $content);
 		$this->assertStringContainsString('azc-scope-strip', $content);
-		$this->assertStringContainsString('azc-breadcrumb__list', $content);
-		$this->assertStringContainsString('azc-breadcrumb__link', $content);
-		$this->assertStringContainsString('aria-current="page"', $content);
+		$this->assertStringContainsString("include __DIR__ . '/breadcrumb.php'", $content);
+
+		$crumb = (string)file_get_contents(__DIR__ . '/../../templates/common/breadcrumb.php');
+		$this->assertStringContainsString('azc-breadcrumb__list', $crumb);
+		$this->assertStringContainsString('azc-breadcrumb__link', $crumb);
+		$this->assertStringContainsString('aria-current="page"', $crumb);
 		$this->assertStringContainsString('<main id="azc-main-content"', $content);
 		$this->assertStringContainsString('id="azc-page-title"', $content);
 		$this->assertMatchesRegularExpression('/<h1[^>]*id="azc-page-title"/', $content);

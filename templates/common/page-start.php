@@ -18,8 +18,6 @@ $shellWidthClass = match ($shellWidth) {
 };
 $pageTitle = (string)($_['pageTitle'] ?? '');
 $pageHelp = (string)($_['pageHelp'] ?? '');
-$breadcrumbSection = (string)($_['breadcrumbSection'] ?? '');
-$breadcrumbParent = is_array($_['breadcrumbParent'] ?? null) ? $_['breadcrumbParent'] : null;
 $urls = $_['urls'] ?? [];
 $clientHints = $_['clientHints'] ?? ['locale' => 'en-US', 'htmlLang' => 'en-US', 'timezone' => 'UTC'];
 $azcHtmlLang = (string)($clientHints['htmlLang'] ?? $clientHints['locale'] ?? 'en-US');
@@ -96,29 +94,7 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 				</span>
 				<span class="azc-nav-toggle__label"><?php p($l->t('Menu')); ?></span>
 			</button>
-			<nav class="azc-breadcrumb" aria-label="<?php p($l->t('Breadcrumb')); ?>">
-				<ol class="azc-breadcrumb__list">
-					<li class="azc-breadcrumb__item">
-						<a class="azc-breadcrumb__link" href="<?php p((string)($urls['dashboard'] ?? '#')); ?>">
-							<?php p($l->t('ArbeitszeitCheck')); ?>
-						</a>
-					</li>
-					<?php if (is_array($breadcrumbParent) && ($breadcrumbParent['label'] ?? '') !== ''): ?>
-						<li class="azc-breadcrumb__item">
-							<a class="azc-breadcrumb__link" href="<?php p((string)($breadcrumbParent['url'] ?? '#')); ?>">
-								<?php p((string)$breadcrumbParent['label']); ?>
-							</a>
-						</li>
-					<?php elseif ($breadcrumbSection !== ''): ?>
-						<li class="azc-breadcrumb__item">
-							<span class="azc-breadcrumb__text"><?php p($breadcrumbSection); ?></span>
-						</li>
-					<?php endif; ?>
-					<li class="azc-breadcrumb__item azc-breadcrumb__item--current" aria-current="page">
-						<span class="azc-breadcrumb__current"><?php p($pageTitle); ?></span>
-					</li>
-				</ol>
-			</nav>
+			<?php include __DIR__ . '/breadcrumb.php'; ?>
 			<div class="azc-page-header__main">
 				<div class="azc-page-header__icon" aria-hidden="true">
 					<?php print_unescaped(IconCatalog::render($headerIconName, 'azc-page-header__icon-svg')); ?>

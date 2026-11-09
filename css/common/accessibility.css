@@ -288,13 +288,13 @@ header {
 
 /* Links: sufficient contrast, scoped to app so we don't override Nextcloud UI.
  * Button-styled anchors and stat tiles must keep their own chrome (not link underlines). */
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-stat-tile) {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile) {
   color: var(--arbeitszeitcheck-color-primary);
   text-decoration: underline;
 }
 
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-stat-tile):hover,
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-stat-tile):focus {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile):hover,
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile):focus {
   color: var(--arbeitszeitcheck-color-primary-hover);
   text-decoration: underline;
 }

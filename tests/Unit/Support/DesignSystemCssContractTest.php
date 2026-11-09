@@ -131,6 +131,28 @@ final class DesignSystemCssContractTest extends TestCase
 		self::assertStringContainsString('.azc-nc-admin-settings .azc-settings-nav', $globalCss);
 		self::assertStringContainsString('azc-settings-nav__group', $globalCss);
 		self::assertStringContainsString('azc-settings-nav__title', $globalCss);
+		// §3.12.1 level-1 group tabs: default §3.12 tab styling (no uppercase/muted variant).
+		self::assertStringContainsString('azc-settings-nav__tabs', $globalCss);
+		self::assertMatchesRegularExpression(
+			'/\.azc-settings-nav__tab[^{]*\{[^}]*border-bottom:\s*2px solid transparent/s',
+			$globalCss,
+			'Level-1 tab must use the §3.12 transparent-underline pattern',
+		);
+		self::assertMatchesRegularExpression(
+			'/\.azc-settings-nav__tab\.is-active[^{]*\{[^}]*border-bottom-color:\s*var\(--color-primary-element\)/s',
+			$globalCss,
+			'Active level-1 tab must carry the 2px primary underline',
+		);
+		self::assertDoesNotMatchRegularExpression(
+			'/\.azc-settings-nav__tab[^{]*\{[^}]*text-transform:\s*uppercase/s',
+			$globalCss,
+			'Level-1 tabs keep the default tab look — no uppercase variant',
+		);
+		self::assertDoesNotMatchRegularExpression(
+			'/\.azc-settings-nav__tab[^{]*\{[^}]*color:\s*var\(--azc-muted/s',
+			$globalCss,
+			'Level-1 tabs keep main-text ink — not the muted group-label style',
+		);
 		self::assertDoesNotMatchRegularExpression('/#[0-9a-fA-F]{3,8}\b/', $globalCss, 'Global settings CSS must use tokens (no raw hex)');
 		self::assertMatchesRegularExpression(
 			'/#app-content\.azc-app--admin-settings\s+\.azc-settings-nav__link[^{]*\{[^}]*min-height:\s*var\(--azc-touch/s',

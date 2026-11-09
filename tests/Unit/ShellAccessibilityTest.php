@@ -17,8 +17,10 @@ class ShellAccessibilityTest extends TestCase
 		$this->assertFileExists($path);
 		$content = (string)file_get_contents($path);
 
-		$this->assertStringContainsString('azc-skip-link', $content);
-		$this->assertStringContainsString('#azc-main-content', $content);
+		// Skip links are delegated to Nextcloud core's #skip-actions strip —
+		// the shell must not render its own duplicates.
+		$this->assertStringNotContainsString('azc-skip-link', $content);
+		$this->assertStringContainsString('id="azc-main-content"', $content);
 		$this->assertStringContainsString('id="azc-live-region"', $content);
 		$this->assertStringContainsString('aria-live="polite"', $content);
 		$this->assertStringContainsString('id="azc-alert-region"', $content);

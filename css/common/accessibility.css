@@ -103,30 +103,7 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* ===== SKIP LINKS ===== */
-
-/* Skip link is already styled in base.css, but ensure it's accessible */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 6px;
-  background: var(--arbeitszeitcheck-color-primary);
-  color: var(--arbeitszeitcheck-color-text-inverse);
-  padding: var(--space-2) var(--space-4);
-  text-decoration: none;
-  border-radius: var(--radius-base);
-  z-index: 10000;
-  font-weight: var(--arbeitszeitcheck-font-weight-medium);
-  transition: top 0.2s ease-in-out;
-  min-height: 44px; /* WCAG touch target size */
-  display: flex;
-  align-items: center;
-}
-
-.skip-link:focus {
-  top: 6px;
-  outline: 2px solid var(--arbeitszeitcheck-color-border-focus);
-  outline-offset: 2px;
-}
+/* Provided by Nextcloud core's #skip-actions strip — no app-side styles. */
 
 /* ===== HIGH CONTRAST MODE SUPPORT ===== */
 
@@ -183,11 +160,6 @@ textarea:focus:not(:focus-visible) {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  /* Keep essential transitions for usability */
-  .skip-link:focus {
-    transition: top 0.01ms !important;
   }
 }
 

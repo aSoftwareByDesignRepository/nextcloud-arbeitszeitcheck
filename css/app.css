@@ -6,14 +6,14 @@
 @import url('common/icons.css');
 @import url('common/colors.css');
 @import url('common/typography.css?v=20261031-tile');
-@import url('common/base.css?v=20261031-tile');
+@import url('common/base.css?v=20261109-skiplink');
 @import url('common/components.css');
 @import url('common/user-picker.css');
 @import url('common/layout.css');
 @import url('common/app-layout.css');
 @import url('common/page-patterns.css');
 @import url('common/table-pager.css');
-@import url('common/stat-tiles.css');
+@import url('common/stat-tiles.css?v=20261109-skiplink');
 @import url('common/manager-scope-filter.css');
 @import url('common/utilities.css');
 @import url('common/responsive.css');
@@ -28,25 +28,8 @@
 @import url('common/badges.css');
 @import url('common/notification-surfaces.css');
 
-/* ── Skip link / live regions ─────────────────────────────── */
-.azc-skip-link {
-	position: absolute;
-	left: -9999px;
-	top: var(--azc-space-2);
-	padding: var(--azc-space-2) var(--azc-space-4);
-	background: var(--color-primary-element);
-	color: var(--color-primary-element-text);
-	border-radius: var(--azc-radius-sm);
-	z-index: 1000;
-	font-weight: 600;
-	text-decoration: none;
-}
-.azc-skip-link:focus,
-.azc-skip-link:focus-visible {
-	left: var(--azc-space-3);
-	outline: 3px solid var(--color-primary-element-text);
-	outline-offset: 2px;
-}
+/* ── Live regions / visually-hidden ─────────────────────────
+   Skip links are provided by Nextcloud core's #skip-actions strip. */
 .azc-sr-only {
 	position: absolute !important;
 	width: 1px;

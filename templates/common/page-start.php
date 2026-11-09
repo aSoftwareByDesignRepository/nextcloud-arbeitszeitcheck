@@ -75,7 +75,7 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 	data-azc-page="<?php p($pageId); ?>"
 	data-azc-role="<?php p($roleSlug); ?>"
 	data-azc-urls="<?php print_unescaped($urlsJson); ?>">
-	<a class="azc-skip-link" href="#azc-main-content"><?php p($l->t('Skip to main content')); ?></a>
+	<?php /* Skip links are provided by Nextcloud core's #skip-actions strip. */ ?>
 	<div id="azc-live-region" class="azc-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 	<div id="azc-alert-region" class="azc-sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 	<div id="app-content-wrapper" class="azc-shell<?php p($shellWidthClass); ?>">

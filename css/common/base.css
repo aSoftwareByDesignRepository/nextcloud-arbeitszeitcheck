@@ -360,23 +360,7 @@ template {
   outline-offset: 2px;
 }
 
-/* Skip Links for Accessibility */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 6px;
-  background: var(--arbeitszeitcheck-color-primary);
-  color: var(--arbeitszeitcheck-color-text-inverse);
-  padding: 8px;
-  text-decoration: none;
-  border-radius: 4px;
-  z-index: 1000;
-  transition: top 0.3s;
-}
-
-.skip-link:focus {
-  top: 6px;
-}
+/* Skip links are provided by Nextcloud core's #skip-actions strip. */
 
 /* Selection Styles */
 ::selection {

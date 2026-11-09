@@ -161,11 +161,7 @@ $businessTripsEnabledNav = array_key_exists('businessTripsEnabled', $_)
 
 <!-- App layout wrapper: flex container for sidebar + content (desktop), stacked (mobile) -->
 <div id="arbeitszeitcheck-app" class="arbeitszeitcheck-app">
-    <a href="#app-navigation" class="skip-link azc-skip-link--nav" aria-describedby="azc-skiplinks-help"><?php p($l->t('Skip to app navigation')); ?></a>
-    <p id="azc-skiplinks-help" class="visually-hidden">
-        <?php p($l->t('Help: These skip links let you jump directly to the main content or to the app navigation.')); ?>
-    </p>
-
+    <?php /* Skip links are provided by Nextcloud core's #skip-actions strip. */ ?>
     <div id="app-navigation" class="azc-nav" role="navigation" aria-label="<?php p($l->t('Main navigation')); ?>">
         <!-- Sidebar Header -->
         <div class="sidebar-header">

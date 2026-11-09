@@ -28,6 +28,7 @@ use OCP\AppFramework\Http\Attribute\BruteForceProtection;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -53,6 +54,7 @@ class WidgetTokenController extends Controller
 
 	/** Issue a scoped token. Raw token returned ONCE — never stored. */
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 30, period: 300)]
 	public function issue(?string $scope = null, ?string $deviceLabel = null): JSONResponse
 	{
 		$uid = $this->uid();
@@ -80,6 +82,7 @@ class WidgetTokenController extends Controller
 
 	/** List the user's tokens (public-safe view — no hashes). */
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 30, period: 300)]
 	public function index(): JSONResponse
 	{
 		$uid = $this->uid();
@@ -91,6 +94,7 @@ class WidgetTokenController extends Controller
 
 	/** Revoke a token — owner-only. */
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 30, period: 300)]
 	public function revoke(int $id): JSONResponse
 	{
 		$uid = $this->uid();
@@ -127,6 +131,12 @@ class WidgetTokenController extends Controller
 		} catch (\Throwable) {
 			// Invalid/revoked/expired/wrong-scope → degrade to navigation (E.6).
 			return new JSONResponse(['action' => 'navigate'], Http::STATUS_UNAUTHORIZED);
+		}
+		// E.6-6 replay-safety: the idempotency key is MANDATORY — a replayed
+		// POST without it would re-execute the toggle (in→out→in). Both
+		// extension executors (Kotlin/Swift) always send a UUID.
+		if ($clientRequestId === null || $clientRequestId === '') {
+			return new JSONResponse(['action' => 'navigate'], Http::STATUS_BAD_REQUEST);
 		}
 		$uid = $token->getUserId();
 		try {

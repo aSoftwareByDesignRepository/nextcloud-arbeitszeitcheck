@@ -61,13 +61,13 @@ class DashboardWidgetController extends Controller {
 	#[NoCSRFRequired]
 	public function widgetSnapshot(): JSONResponse {
 		$userId = $this->getUserId();
-		$summary = $this->widgetDataService->getEmployeeStatusSummary($userId);
+		$summary = $this->widgetDataService->getWidgetSnapshotSummary($userId);
 		$res = new JSONResponse([
 			'success' => true,
 			'data' => [
 				'serverNow' => (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('c'),
 				'status' => $summary['status'] ?? 'unknown',
-				'stateSince' => $summary['sessionStart'] ?? null,
+				'stateSince' => $summary['sessionStartFormatted'] ?? null,
 				'workingTodayHours' => $summary['workingTodayHours'] ?? 0,
 				'weekHoursWorked' => $summary['weekHoursWorked'] ?? 0,
 				'weekHoursRequired' => $summary['weekHoursRequired'] ?? 0,

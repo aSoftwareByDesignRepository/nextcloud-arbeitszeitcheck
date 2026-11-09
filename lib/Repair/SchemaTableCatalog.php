@@ -78,6 +78,7 @@ final class SchemaTableCatalog
 		'azc_mobile_seat',
 		'azc_outlook_ical_tokens',
 		'azc_terminal_device',
+		'azc_widget_tokens',
 	];
 
 	/** @var list<string> tables dropped intentionally by later migrations */

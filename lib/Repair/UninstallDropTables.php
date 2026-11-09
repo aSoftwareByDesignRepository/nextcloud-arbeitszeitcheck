@@ -103,6 +103,7 @@ final class UninstallDropTables implements IRepairStep
 		'azc_mobile_seat',
 		'azc_outlook_ical_tokens',
 		'azc_terminal_device',
+		'azc_widget_tokens',
 	];
 
 	// The set of tables that must exist after current migrations —

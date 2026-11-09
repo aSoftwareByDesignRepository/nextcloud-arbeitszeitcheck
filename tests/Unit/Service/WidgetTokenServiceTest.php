@@ -46,7 +46,7 @@ class WidgetTokenServiceTest extends TestCase
 		[$entity, $raw] = $this->service->issue('u1', WidgetTokenService::SCOPE_CLOCK, 'Pixel 8');
 
 		$this->assertSame(7, $entity->getId());
-		$this->assertMatchesRegularExpression('/^[A-Za-z0-9\-_]{43}$/', $raw);
+		$this->assertMatchesRegularExpression('/^widget_[A-Za-z0-9\-_]{43}$/', $raw);
 		$this->assertSame(hash('sha256', $raw), $storedHash);
 	}
 
@@ -149,5 +149,45 @@ class WidgetTokenServiceTest extends TestCase
 		$this->assertArrayNotHasKey('tokenHash', $row);
 		$this->assertArrayNotHasKey('token_hash', $row);
 		$this->assertArrayNotHasKey('token', $row);
+	}
+
+	public function testIssueRevokesPriorTokenOnSameDeviceAndScope(): void
+	{
+		$prior = $this->tokenFixture();
+		$prior->setId(11);
+		$this->mapper->method('findActiveByDevice')->with('u1', 'Pixel 8')->willReturn([$prior]);
+		$this->mapper->expects($this->once())->method('revoke')->with(11, 'u1');
+		$this->mapper->method('countActiveByUser')->willReturn(0);
+		$inserted = new WidgetToken();
+		$inserted->setId(12);
+		$this->mapper->method('insert')->willReturn($inserted);
+
+		$this->service->issue('u1', WidgetTokenService::SCOPE_CLOCK, 'Pixel 8');
+	}
+
+	public function testIssueKeepsOtherScopeTokenOnSameDevice(): void
+	{
+		$prior = $this->tokenFixture();
+		$prior->setId(11);
+		$prior->setScope('azc-other-scope');
+		$this->mapper->method('findActiveByDevice')->with('u1', 'Pixel 8')->willReturn([$prior]);
+		$this->mapper->expects($this->never())->method('revoke');
+		$this->mapper->method('countActiveByUser')->willReturn(0);
+		$inserted = new WidgetToken();
+		$inserted->setId(12);
+		$this->mapper->method('insert')->willReturn($inserted);
+
+		$this->service->issue('u1', WidgetTokenService::SCOPE_CLOCK, 'Pixel 8');
+	}
+
+	public function testIssueWithoutDeviceLabelSkipsDeviceLookup(): void
+	{
+		$this->mapper->expects($this->never())->method('findActiveByDevice');
+		$this->mapper->method('countActiveByUser')->willReturn(0);
+		$inserted = new WidgetToken();
+		$inserted->setId(12);
+		$this->mapper->method('insert')->willReturn($inserted);
+
+		$this->service->issue('u1', WidgetTokenService::SCOPE_CLOCK, null);
 	}
 }

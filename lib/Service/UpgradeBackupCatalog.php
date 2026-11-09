@@ -94,6 +94,7 @@ final class UpgradeBackupCatalog
 		'azc_mobile_seat',
 		'azc_outlook_ical_tokens',
 		'azc_terminal_device',
+		'azc_widget_tokens',
 	];
 
 	/** @var list<string> */
@@ -156,6 +157,7 @@ final class UpgradeBackupCatalog
 		'azc_mobile_seat',
 		'azc_outlook_ical_tokens',
 		'azc_terminal_device',
+		'azc_widget_tokens',
 	];
 
 	public static function isBackupTable(string $table): bool

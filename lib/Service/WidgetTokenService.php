@@ -47,15 +47,29 @@ class WidgetTokenService
 		if (!\in_array($scope, self::ALLOWED_SCOPES, true)) {
 			throw new \InvalidArgumentException('Unknown token scope'); // deny-by-default
 		}
+		$label = $deviceLabel !== null ? mb_substr($deviceLabel, 0, 128) : null;
+		if ($label !== null && $label !== '') {
+			// E.6-2: one active token per (user, device, scope) — reissuing on
+			// a device revokes its prior token so a device can't stockpile
+			// credentials; the per-user cap still bounds label-less issues.
+			foreach ($this->mapper->findActiveByDevice($userId, $label) as $old) {
+				if ($old->getScope() === $scope) {
+					$this->mapper->revoke((int)$old->getId(), $userId);
+				}
+			}
+		}
 		if ($this->mapper->countActiveByUser($userId) >= self::MAX_ACTIVE_TOKENS_PER_USER) {
 			throw new WidgetTokenLimitException('Active widget-token limit reached');
 		}
-		$raw = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+		// E.6 token format `widget_<rnd>`: the stored SHA-256 hash covers the
+		// full prefixed token — verify() hashes the presented token the same
+		// way, so the stored-hash contract is unchanged.
+		$raw = 'widget_' . rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
 		$t = new WidgetToken();
 		$t->setUserId($userId);
 		$t->setTokenHash(hash('sha256', $raw));
 		$t->setScope($scope);
-		$t->setDeviceLabel($deviceLabel !== null ? mb_substr($deviceLabel, 0, 128) : null);
+		$t->setDeviceLabel($label);
 		$t->setCreatedAt(new \DateTime());
 		$t->setExpiresAt((new \DateTime())->modify('+' . self::TTL_DAYS . ' days'));
 		return [$this->mapper->insert($t), $raw];

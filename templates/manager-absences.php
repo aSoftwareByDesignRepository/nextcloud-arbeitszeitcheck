@@ -285,7 +285,7 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 </div>
 
 <?php include __DIR__ . '/common/manager-employee-list-l10n.php'; ?>
-<script>
+<script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
 window.ArbeitszeitCheck.vacationUnit = <?php echo json_encode((string)($_['vacationUnit'] ?? 'days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ArbeitszeitCheck.vacationHoursPerDay = <?php echo json_encode((float)($_['vacationHoursPerDay'] ?? 8), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

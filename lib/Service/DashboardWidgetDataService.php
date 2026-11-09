@@ -71,6 +71,27 @@ class DashboardWidgetDataService {
 	}
 
 	/**
+	 * azc-clock widget snapshot source (NH-P2): the lean status summary plus
+	 * the weekly contract/overtime row the widget's week-balance field needs.
+	 * Kept out of getEmployeeStatusSummary — that payload is polled every
+	 * 30 s by the NC desklet and must stay single-query lean; this method is
+	 * called only by the 60 s-cached widget-snapshot endpoint.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function getWidgetSnapshotSummary(string $userId): array {
+		$summary = $this->getEmployeeStatusSummary($userId);
+		try {
+			$weekly = $this->overtimeService->getWeeklyOvertime($userId);
+		} catch (\Throwable $e) {
+			$weekly = [];
+		}
+		$summary['weekHoursWorked'] = (float)($weekly['total_hours_worked'] ?? 0.0);
+		$summary['weekHoursRequired'] = (float)($weekly['required_hours'] ?? 0.0);
+		return $summary;
+	}
+
+	/**
 	 * Full employee home payload (mobile dashboard + native desklet).
 	 *
 	 * @param bool $vacationUnitAwareClient When false and org is in hours mode,

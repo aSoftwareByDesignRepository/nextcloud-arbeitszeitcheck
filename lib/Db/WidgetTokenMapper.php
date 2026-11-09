@@ -66,6 +66,27 @@ class WidgetTokenMapper extends QBMapper
 		return $this->findEntities($qb);
 	}
 
+	/**
+	 * E.6-2 per-device issuance: active tokens for (user, deviceLabel) — a
+	 * reissued device replaces its prior token instead of accumulating.
+	 *
+	 * @return WidgetToken[]
+	 */
+	public function findActiveByDevice(string $userId, string $deviceLabel): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->eq('device_label', $qb->createNamedParameter($deviceLabel)))
+			->andWhere($qb->expr()->isNull('revoked_at'))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->isNull('expires_at'),
+				$qb->expr()->gt('expires_at', $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s')))
+			));
+		return $this->findEntities($qb);
+	}
+
 	public function revoke(int $id, string $userId): bool
 	{
 		$qb = $this->db->getQueryBuilder();

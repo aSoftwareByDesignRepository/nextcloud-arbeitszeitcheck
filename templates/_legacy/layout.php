@@ -112,21 +112,21 @@ try {
     <!-- Nextcloud Core Scripts -->
     <?php if (isset($_['jsfiles'])): ?>
         <?php foreach ($_['jsfiles'] as $jsfile): ?>
-            <script src="<?php print_unescaped($jsfile); ?>"></script>
+            <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped($jsfile); ?>"></script>
         <?php endforeach; ?>
     <?php endif; ?>
 
     <!-- ArbeitszeitCheck Common Scripts -->
-    <script src="<?php print_unescaped(link_to($appName, 'js/common/utils.js')); ?>"></script>
-    <script src="<?php print_unescaped(link_to($appName, 'js/common/components.js')); ?>"></script>
-    <script src="<?php print_unescaped(link_to($appName, 'js/common/messaging.js')); ?>"></script>
-    <script src="<?php print_unescaped(link_to($appName, 'js/common/validation.js')); ?>"></script>
-    <script src="<?php print_unescaped(link_to($appName, 'js/common/navigation.js')); ?>"></script>
+    <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped(link_to($appName, 'js/common/utils.js')); ?>"></script>
+    <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped(link_to($appName, 'js/common/components.js')); ?>"></script>
+    <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped(link_to($appName, 'js/common/messaging.js')); ?>"></script>
+    <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped(link_to($appName, 'js/common/validation.js')); ?>"></script>
+    <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped(link_to($appName, 'js/common/navigation.js')); ?>"></script>
 
     <!-- Page Specific Scripts -->
     <?php if (isset($pageScripts)): ?>
         <?php foreach ($pageScripts as $script): ?>
-            <script src="<?php print_unescaped($script); ?>"></script>
+            <script nonce="<?php p($_['cspNonce'] ?? ''); ?>" src="<?php print_unescaped($script); ?>"></script>
         <?php endforeach; ?>
     <?php endif; ?>
 

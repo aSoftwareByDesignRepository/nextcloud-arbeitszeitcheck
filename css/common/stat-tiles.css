@@ -37,8 +37,8 @@
 	min-width: 0;
 	margin: 0;
 	padding: var(--azc-space-4, 1rem);
-	border: none;
-	border-left: 3px solid var(--azc-border, var(--color-border));
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-inline-start: 3px solid var(--azc-border-strong, var(--color-border-maxcontrast));
 	border-radius: var(--azc-radius-md, 10px);
 	background: var(--azc-bg-card, var(--color-main-background));
 	box-shadow: none;
@@ -47,23 +47,23 @@
 }
 
 #app-content.azc-app .azc-stat-tile--primary {
-	border-left-color: var(--color-primary-element);
+	border-inline-start-color: var(--color-primary-element);
 }
 
 #app-content.azc-app .azc-stat-tile--success {
-	border-left-color: var(--color-success-text, var(--color-success));
+	border-inline-start-color: var(--color-success-text, var(--color-success));
 }
 
 #app-content.azc-app .azc-stat-tile--warning {
-	border-left-color: var(--color-warning-text, var(--color-warning));
+	border-inline-start-color: var(--color-warning-text, var(--color-warning));
 }
 
 #app-content.azc-app .azc-stat-tile--danger {
-	border-left-color: var(--color-error-text, var(--color-error));
+	border-inline-start-color: var(--color-error-text, var(--color-error));
 }
 
 #app-content.azc-app .azc-stat-tile--neutral {
-	border-left-color: var(--azc-border, var(--color-border));
+	border-inline-start-color: var(--azc-border, var(--color-border));
 }
 
 #app-content.azc-app .azc-stat-tile__label {
@@ -131,7 +131,7 @@
 @media (forced-colors: active) {
 	#app-content.azc-app .azc-stat-tile {
 		border: 1px solid CanvasText;
-		border-left-width: 3px;
+		border-inline-start-width: 3px;
 	}
 
 	#app-content.azc-app button.azc-stat-tile:focus-visible,

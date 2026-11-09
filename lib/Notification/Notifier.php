@@ -148,6 +148,64 @@ class Notifier implements INotifier {
 					->setLink($this->urlGenerator->linkToRouteAbsolute('arbeitszeitcheck.page.absences'));
 				break;
 
+			case 'absence_manager_cancelled':
+				$typeCode = (string)($parameters['type'] ?? 'vacation');
+				$typeLabel = AbsenceTypeLabel::get($l, $typeCode);
+				$startDate = $parameters['start_date'] ?? null;
+				$endDate = $parameters['end_date'] ?? null;
+				$period = ($startDate && $endDate)
+					? $l->t('%1$s – %2$s', [$startDate, $endDate])
+					: ($startDate ?? $endDate ?? '?');
+				$reason = $parameters['reason'] ?? null;
+				$message = $l->t('Your %1$s (%2$s) was cancelled by your manager.', [$typeLabel, $period]);
+				if ($reason) {
+					$message .= ' ' . $l->t('Reason: %s', [$reason]);
+				}
+				$notification->setParsedSubject(
+					$l->t('Absence cancelled')
+				)->setParsedMessage($message)
+					->setLink($this->urlGenerator->linkToRouteAbsolute('arbeitszeitcheck.page.absences'));
+				break;
+
+			case 'absence_cancel_requested':
+				$typeCode = (string)($parameters['type'] ?? 'vacation');
+				$typeLabel = AbsenceTypeLabel::get($l, $typeCode);
+				$startDate = $parameters['start_date'] ?? null;
+				$endDate = $parameters['end_date'] ?? null;
+				$period = ($startDate && $endDate)
+					? $l->t('%1$s – %2$s', [$startDate, $endDate])
+					: ($startDate ?? $endDate ?? '?');
+				$employee = (string)($parameters['employee'] ?? '');
+				$reason = $parameters['reason'] ?? null;
+				$message = $l->t('%1$s asks to cancel their %2$s (%3$s).', [$employee !== '' ? $employee : $l->t('An employee'), $typeLabel, $period]);
+				if ($reason) {
+					$message .= ' ' . $l->t('Reason: %s', [$reason]);
+				}
+				$notification->setParsedSubject(
+					$l->t('Cancellation requested')
+				)->setParsedMessage($message)
+					->setLink($this->urlGenerator->linkToRouteAbsolute('arbeitszeitcheck.manager.employeeAbsencesPage'));
+				break;
+
+			case 'absence_cancel_request_declined':
+				$typeCode = (string)($parameters['type'] ?? 'vacation');
+				$typeLabel = AbsenceTypeLabel::get($l, $typeCode);
+				$startDate = $parameters['start_date'] ?? null;
+				$endDate = $parameters['end_date'] ?? null;
+				$period = ($startDate && $endDate)
+					? $l->t('%1$s – %2$s', [$startDate, $endDate])
+					: ($startDate ?? $endDate ?? '?');
+				$comment = $parameters['comment'] ?? null;
+				$message = $l->t('Your cancellation request for %1$s (%2$s) was declined.', [$typeLabel, $period]);
+				if ($comment) {
+					$message .= ' ' . $l->t('Comment: %s', [$comment]);
+				}
+				$notification->setParsedSubject(
+					$l->t('Cancellation request declined')
+				)->setParsedMessage($message)
+					->setLink($this->urlGenerator->linkToRouteAbsolute('arbeitszeitcheck.page.absences'));
+				break;
+
 			case 'reminder_clock_out':
 				$hoursWorked = $parameters['hours_worked'] ?? 0;
 				$notification->setParsedSubject(

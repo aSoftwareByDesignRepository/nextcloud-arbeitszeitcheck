@@ -504,7 +504,7 @@ class AbsenceController extends Controller
 
 			return new JSONResponse([
 				'success' => true,
-				'absence' => $absence->getSummary()
+				'absence' => $absence->getSummary() + $this->absenceService->ownerAbsenceActionFlags($absence)
 			]);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::apiShow failed: ' . $e->getMessage(), ['exception' => $e]);
@@ -726,6 +726,8 @@ class AbsenceController extends Controller
 				'overlap' => [Http::STATUS_CONFLICT, 'overlap', 'This period overlaps with an existing absence.'],
 				'range_outside' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'range_outside', 'The sick period must be inside the vacation period.'],
 				'fraction_boundary' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'fraction_boundary', 'This vacation contains half days and cannot be split there.'],
+				'type_not_convertible' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'type_not_convertible', 'This absence type cannot be converted to sick leave.'],
+				'entitlement_mid_split' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'entitlement_mid_split', 'This absence is bound to a special entitlement — the sick period must touch the start or the end of the absence.'],
 			];
 			if (isset($mapped[$code])) {
 				[$status, $errCode, $msg] = $mapped[$code];
@@ -742,6 +744,116 @@ class AbsenceController extends Controller
 				'error' => $msg
 			], $this->safeErrorStatus($e, $msg));
 		}
+	}
+
+	/**
+	 * POST /api/absences/{id}/cancel-request (FA-2c): owner files a
+	 * cancellation request for a running approved absence. The absence stays
+	 * approved (quota untouched) until a manager decides.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function requestCancel(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$data = [
+			'expectedUpdatedAt' => isset($params['expectedUpdatedAt']) ? trim((string)$params['expectedUpdatedAt']) : '',
+			'reason' => isset($params['reason']) ? trim((string)$params['reason']) : '',
+		];
+		if ($data['expectedUpdatedAt'] === '' || $data['reason'] === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('A reason and the current absence version are required.'),
+				'error_code' => 'reason_required',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$absence = $this->absenceService->requestAbsenceCancellation($id, $data, $this->getUserId());
+			return new JSONResponse([
+				'success' => true,
+				'absence' => $absence->getSummary() + $this->absenceService->ownerAbsenceActionFlags($absence),
+			]);
+		} catch (\Throwable $e) {
+			return $this->absenceMutationErrorResponse($e, 'requestCancel');
+		}
+	}
+
+	/**
+	 * POST /api/absences/{id}/cancel-request/withdraw (FA-2c): owner pulls
+	 * back their own open cancellation request. Flags only — CAS protected.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function withdrawCancelRequest(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$data = [
+			'expectedUpdatedAt' => isset($params['expectedUpdatedAt']) ? trim((string)$params['expectedUpdatedAt']) : '',
+		];
+		if ($data['expectedUpdatedAt'] === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('The current absence version is required.'),
+				'error_code' => 'revision_stale',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$absence = $this->absenceService->withdrawAbsenceCancelRequest($id, $data, $this->getUserId());
+			return new JSONResponse([
+				'success' => true,
+				'absence' => $absence->getSummary() + $this->absenceService->ownerAbsenceActionFlags($absence),
+			]);
+		} catch (\Throwable $e) {
+			return $this->absenceMutationErrorResponse($e, 'withdrawCancelRequest');
+		}
+	}
+
+	/**
+	 * Shared error mapper for the FA-2 mutation endpoints — mirrors the
+	 * convertToSick envelope so clients can reuse one error-code surface.
+	 */
+	private function absenceMutationErrorResponse(\Throwable $e, string $context): JSONResponse
+	{
+		if ($e instanceof MonthFinalizedException) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This calendar month is finalized. Contact an administrator if a correction must be made.'),
+				'error_code' => 'month_finalized',
+			], Http::STATUS_CONFLICT);
+		}
+		if ($e instanceof DoesNotExistException) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Absence not found'),
+			], Http::STATUS_NOT_FOUND);
+		}
+		if ($e instanceof AbsenceMutationBusyException) {
+			return new JSONResponse($e->toHttpPayload(), Http::STATUS_LOCKED);
+		}
+		$code = $e->getMessage();
+		$mapped = [
+			'revision_stale' => [Http::STATUS_CONFLICT, 'revision_stale', 'This absence was changed in the meantime. Please reload and try again.'],
+			'cancel_request_pending' => [Http::STATUS_CONFLICT, 'cancel_request_pending', 'A cancellation request is already open for this absence.'],
+			'no_cancel_request' => [Http::STATUS_CONFLICT, 'no_cancel_request', 'There is no open cancellation request for this absence.'],
+			'use_direct_cancel' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'use_direct_cancel', 'This absence has not started yet — you can cancel it directly.'],
+			'already_ended' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'already_ended', 'This absence has already ended.'],
+			'not_approved' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_approved', 'Only approved absences can be changed this way.'],
+			'reason_required' => [Http::STATUS_BAD_REQUEST, 'reason_required', 'Please provide a reason (max. 500 characters).'],
+		];
+		if (isset($mapped[$code])) {
+			[$status, $errCode, $msg] = $mapped[$code];
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t($msg),
+				'error_code' => $errCode,
+			], $status);
+		}
+		\OCP\Log\logger('arbeitszeitcheck')->error('AbsenceController::' . $context . ' failed: ' . $e->getMessage(), ['exception' => $e]);
+		$msg = $this->getSafeErrorMessage($e);
+		return new JSONResponse([
+			'success' => false,
+			'error' => $msg,
+		], $this->safeErrorStatus($e, $msg));
 	}
 
 	/**
@@ -901,7 +1013,7 @@ class AbsenceController extends Controller
 
 			foreach ($absences as $absence) {
 				try {
-					$summary = $absence->getSummary();
+					$summary = $absence->getSummary() + $this->absenceService->ownerAbsenceActionFlags($absence);
 					$absenceSummaries[] = $summary;
 					if (isset($summary['id'])) {
 						$seenIds[(int)$summary['id']] = true;
@@ -1108,6 +1220,7 @@ class AbsenceController extends Controller
 		// datepicker, validation) plus the shared conversion module.
 		$this->registerAbsenceFormAssets();
 		\OCP\Util::addScript('arbeitszeitcheck', 'common/absence-sick-conversion');
+		\OCP\Util::addScript('arbeitszeitcheck', 'common/absence-cancel-request');
 
 		try {
 			$userId = $this->getUserId();

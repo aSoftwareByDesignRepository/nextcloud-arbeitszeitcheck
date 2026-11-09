@@ -716,26 +716,63 @@ if ($mode === 'list') {
                 <?php endif; ?>
 
                 <?php
-                $canConvertToSick = $absence->getType() === 'vacation'
-                    && $absence->getStatus() === 'approved'
+                $isConvertible = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType());
+                $isRunningApproved = $absence->getStatus() === 'approved'
                     && $start <= $today
                     && $end >= $today;
+                $canConvertToSick = $isConvertible && $isRunningApproved;
+                $absenceTypeLabel = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::resolvedLabel((string)$absence->getType());
                 ?>
                 <?php if ($canConvertToSick): ?>
                 <div class="absence-detail-section absence-detail-sick-convert" role="region" aria-labelledby="sick-convert-heading">
-                    <h3 id="sick-convert-heading" class="absence-detail-section__title"><?php p($l->t('Sick during vacation')); ?></h3>
-                    <p class="absence-detail-sick-convert__desc"><?php p($l->t('Sick days during vacation do not count as vacation days. Select the days you were sick and the vacation is shortened and credited back.')); ?></p>
+                    <h3 id="sick-convert-heading" class="absence-detail-section__title"><?php p($l->t('Sick during this absence')); ?></h3>
+                    <p class="absence-detail-sick-convert__desc"><?php p($l->t('Sick days during an absence do not count against it. Select the days you were sick and the absence is shortened and credited back.')); ?></p>
                     <button type="button"
                             class="btn btn--primary"
                             data-sick-convert
                             data-sick-convert-flow="owner"
                             data-sick-convert-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.convertToSick', ['id' => $absence->getId()])); ?>"
+                            data-type-label="<?php p($absenceTypeLabel); ?>"
+                            data-source-type="<?php p((string)$absence->getType()); ?>"
                             data-vac-start="<?php p($start->format('Y-m-d')); ?>"
                             data-vac-end="<?php p($end->format('Y-m-d')); ?>"
                             data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
-                        <?php p($l->t('Convert vacation to sick leave')); ?>
+                        <?php p($l->t('Convert to sick leave')); ?>
                     </button>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($isRunningApproved && !$isPastAbsence): ?>
+                    <?php $cancelRequested = $absence->getCancelRequestedAt() !== null; ?>
+                    <div class="absence-detail-section absence-detail-cancel-request" role="region" aria-labelledby="cancel-request-heading">
+                        <?php if ($cancelRequested): ?>
+                            <h3 id="cancel-request-heading" class="absence-detail-section__title"><?php p($l->t('Cancellation requested')); ?></h3>
+                            <p class="absence-detail-cancel-request__desc">
+                                <span class="azc-status-chip" data-status="cancel_requested"><?php p($l->t('Cancellation requested')); ?></span>
+                                <?php p($l->t('Your manager has been notified. The absence stays approved until a decision is made.')); ?>
+                                <?php if ($absence->getCancelReason()): ?>
+                                    <em><?php p($l->t('Your reason:')); ?> <?php p($absence->getCancelReason()); ?></em>
+                                <?php endif; ?>
+                            </p>
+                            <button type="button"
+                                    class="btn btn--secondary"
+                                    data-cancel-request-withdraw
+                                    data-withdraw-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.withdrawCancelRequest', ['id' => $absence->getId()])); ?>"
+                                    data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
+                                <?php p($l->t('Withdraw request')); ?>
+                            </button>
+                        <?php else: ?>
+                            <h3 id="cancel-request-heading" class="absence-detail-section__title"><?php p($l->t('Withdraw from this absence')); ?></h3>
+                            <p class="absence-detail-cancel-request__desc"><?php p($l->t('Need to step back from this running absence? File a cancellation request — your manager decides. Until then the absence stays approved and counts fully.')); ?></p>
+                            <button type="button"
+                                    class="btn btn--secondary"
+                                    data-cancel-request
+                                    data-cancel-request-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.requestCancel', ['id' => $absence->getId()])); ?>"
+                                    data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
+                                <?php p($l->t('Request cancellation')); ?>
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 <?php endif; ?>
 
                 <!-- Dates & Duration -->
@@ -943,6 +980,9 @@ if ($mode === 'list') {
                                                 p($statusLabel);
                                                 ?>
                                             </span>
+                                            <?php if ($absence->getCancelRequestedAt() !== null): ?>
+                                                <span class="azc-status-chip" data-status="cancel_requested"><?php p($l->t('Cancellation requested')); ?></span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                             <div class="azc-table-actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
@@ -966,6 +1006,19 @@ if ($mode === 'list') {
                                                         title="<?php p($l->t('View Details')); ?>">
                                                     <?php print_unescaped(IconCatalog::render('info')); ?>
                                                 </button>
+                                                <?php
+                                                // U-2: approved, not-yet-started absences get the row-level
+                                                // cancel affordance too — one visible owner per action.
+                                                $rowStart = $absence->getStartDate();
+                                                if ($absence->getStatus() === 'approved' && $rowStart !== null && $rowStart > $today): ?>
+                                                <button type="button" class="btn btn--sm btn--danger azc-icon-btn btn-icon btn-icon--cancel"
+                                                        data-absence-id="<?php p($absence->getId()); ?>"
+                                                        data-cancel-approved="1"
+                                                        aria-label="<?php p($l->t('Cancel this absence')); ?>"
+                                                        title="<?php p($l->t('Cancel')); ?>">
+                                                    <?php print_unescaped(IconCatalog::render('trash')); ?>
+                                                </button>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                             </div>
                                         </td>
@@ -1256,7 +1309,8 @@ if ($mode === 'list') {
         show: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.show'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         edit: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.edit'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
         update: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.updatePost'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
-        delete: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.delete'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
+        delete: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.delete'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        cancel: <?php echo json_encode(\OCA\ArbeitszeitCheck\Support\RouteUrlTemplate::for($urlGenerator, 'arbeitszeitcheck.absence.cancel'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
     };
     
     // Handle form submission for create/edit

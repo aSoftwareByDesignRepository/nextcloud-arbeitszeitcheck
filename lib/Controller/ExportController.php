@@ -382,12 +382,25 @@ class ExportController extends Controller
 			};
 
 			// Convert to array format
+			// FA-3: carryover ("UV") attribution per vacation row — additive,
+			// null for non-vacation types.
+			$attributions = [];
+			try {
+				$attributions = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\VacationAllocationService::class)
+					->attributeVacationAbsences($absences);
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->info('absences export attribution skipped: ' . $e->getMessage());
+			}
+
 			$data = [];
 			foreach ($absences as $absence) {
 				try {
 					$startDateRow = $absence->getStartDate();
 					$endDateRow = $absence->getEndDate();
 					$createdAt = $absence->getCreatedAt();
+					$attr = $absence->getType() === \OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION
+						? ($attributions[(int)$absence->getId()] ?? null)
+						: null;
 					$row = [
 						'id' => $absence->getId(),
 						'type' => $absence->getType(),
@@ -398,7 +411,12 @@ class ExportController extends Controller
 						'status' => $absence->getStatus(),
 						'approver_comment' => $absence->getApproverComment() ?? '',
 						'approved_at' => $absence->getApprovedAt() ? $absence->getApprovedAt()->format('Y-m-d H:i:s') : '',
-						'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : ''
+						'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : '',
+						// FA-3: payroll "UV" — carryover funds the earliest
+						// working days of the absence (see uv_dates).
+						'carryover_amount' => $attr['carryover_amount'] ?? null,
+						'annual_amount' => $attr['annual_amount'] ?? null,
+						'uv_dates' => isset($attr['uv_dates']) ? implode(',', $attr['uv_dates']) : null,
 					];
 					if (!$isSelfExport) {
 						// Scoped exports carry the employee identity columns.

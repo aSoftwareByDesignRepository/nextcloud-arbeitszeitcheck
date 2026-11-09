@@ -1359,17 +1359,24 @@
                 });
             });
 
-            // Cancel buttons in table rows (for pending absences)
+            // Cancel buttons in table rows. Two distinct backends:
+            // - pending rows hard-delete via DELETE /api/absences/{id}
+            // - approved, not-yet-started rows (U-2) POST /api/absences/{id}/cancel
+            //   — deleteAbsence is pending-only and would 409 on these rows.
             const cancelButtons = document.querySelectorAll('table tbody .btn-icon--cancel[data-absence-id]');
             cancelButtons.forEach(button => {
                 button.addEventListener('click', (e) => {
                     e.preventDefault();
                     const absenceId = button.dataset.absenceId;
                     if (!absenceId) return;
-                    
-                    const confirmMsg = this.config.l10n?.confirmCancel ||
-                                     mainT('Are you sure you want to cancel this absence request?');
-                    
+                    const isApprovedCancel = button.dataset.cancelApproved === '1';
+
+                    const confirmMsg = isApprovedCancel
+                        ? (this.config.l10n?.confirmCancelApproved ||
+                           mainT('Do you really want to cancel this absence? This cannot be undone.'))
+                        : (this.config.l10n?.confirmCancel ||
+                           mainT('Are you sure you want to cancel this absence request?'));
+
                     const confirmTitle = this.config.l10n?.confirmCancelAbsenceTitle ||
                                      mainT('Cancel absence request');
                     const dialogOpts = (typeof OC !== 'undefined' && OC.dialogs)
@@ -1380,19 +1387,37 @@
                         if (!confirmed) {
                             return;
                         }
-                        let deleteUrl = this.config.apiUrl?.delete || '';
-                        if (deleteUrl && deleteUrl.includes('__ID__')) {
-                            deleteUrl = deleteUrl.replace('__ID__', absenceId);
-                        } else if (!deleteUrl) {
-                            deleteUrl = OC.generateUrl('/apps/arbeitszeitcheck/api/absences/' + absenceId);
+                        let endpoint = '';
+                        let method = 'DELETE';
+                        if (isApprovedCancel) {
+                            method = 'POST';
+                            endpoint = this.config.apiUrl?.cancel || '';
+                            if (endpoint && endpoint.includes('__ID__')) {
+                                endpoint = endpoint.replace('__ID__', absenceId);
+                            } else {
+                                endpoint = OC.generateUrl('/apps/arbeitszeitcheck/api/absences/' + absenceId + '/cancel');
+                            }
                         } else {
-                            deleteUrl = deleteUrl.replace(/\/$/, '') + '/' + absenceId;
+                            endpoint = this.config.apiUrl?.delete || '';
+                            if (endpoint && endpoint.includes('__ID__')) {
+                                endpoint = endpoint.replace('__ID__', absenceId);
+                            } else if (!endpoint) {
+                                endpoint = OC.generateUrl('/apps/arbeitszeitcheck/api/absences/' + absenceId);
+                            } else {
+                                endpoint = endpoint.replace(/\/$/, '') + '/' + absenceId;
+                            }
                         }
 
                         button.disabled = true;
                         button.setAttribute('aria-busy', 'true');
-                        this.callApi(deleteUrl, 'DELETE', null, false)
+                        this.callApi(endpoint, method, null, false)
                             .then(() => {
+                                if (isApprovedCancel) {
+                                    // The record stays as cancelled — reload so the
+                                    // status badge reflects it honestly.
+                                    window.location.reload();
+                                    return;
+                                }
                                 const row = button.closest('tr');
                                 if (row) {
                                     row.remove();

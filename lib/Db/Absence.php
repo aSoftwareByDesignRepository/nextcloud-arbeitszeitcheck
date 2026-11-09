@@ -49,6 +49,12 @@ use OCA\ArbeitszeitCheck\Service\HolidayService;
  * @method void setUpdatedAt(\DateTime $updatedAt)
  * @method string|null getSubstituteUserId()
  * @method void setSubstituteUserId(string|null $substituteUserId)
+ * @method \DateTime|null getCancelRequestedAt()
+ * @method void setCancelRequestedAt(\DateTime|null $cancelRequestedAt)
+ * @method string|null getCancelRequestedBy()
+ * @method void setCancelRequestedBy(string|null $cancelRequestedBy)
+ * @method string|null getCancelReason()
+ * @method void setCancelReason(string|null $cancelReason)
  */
 class Absence extends Entity
 {
@@ -117,6 +123,15 @@ class Absence extends Entity
 	/** @var string|null */
 	protected $substituteUserId;
 
+	/** @var \DateTime|null */
+	protected $cancelRequestedAt;
+
+	/** @var string|null */
+	protected $cancelRequestedBy;
+
+	/** @var string|null */
+	protected $cancelReason;
+
 	/**
 	 * Absence constructor
 	 */
@@ -137,6 +152,9 @@ class Absence extends Entity
 		$this->addType('createdAt', 'datetime');
 		$this->addType('updatedAt', 'datetime');
 		$this->addType('substituteUserId', 'string');
+		$this->addType('cancelRequestedAt', 'datetime');
+		$this->addType('cancelRequestedBy', 'string');
+		$this->addType('cancelReason', 'string');
 	}
 
 	/**
@@ -336,6 +354,10 @@ class Absence extends Entity
 			'isCurrent' => $isCurrent,
 			'isFuture' => $isFuture,
 			'isManagerRecorded' => $isManagerRecorded,
+			'cancelRequested' => $this->getCancelRequestedAt() !== null,
+			'cancelRequestedAt' => $this->getCancelRequestedAt()?->format('c'),
+			'cancelRequestedBy' => $this->getCancelRequestedBy(),
+			'cancelRequestReason' => $this->getCancelReason(),
 		];
 	}
 }

@@ -276,6 +276,30 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
+	 * Find approved absences with an open owner cancel-request for the
+	 * given users (team members) — the manager decision queue for FA-2c.
+	 *
+	 * @param array $userIds
+	 * @return Absence[]
+	 */
+	public function findCancelRequestedForUsers(array $userIds): array
+	{
+		if ($userIds === []) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('status', $qb->createNamedParameter(Absence::STATUS_APPROVED)))
+			->andWhere($qb->expr()->isNotNull('cancel_requested_at'))
+			->andWhere(QueryInChunker::in($qb, 'user_id', $userIds, IQueryBuilder::PARAM_STR_ARRAY))
+			->orderBy('cancel_requested_at', 'ASC');
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Per-user count of absences awaiting ANY approval — both
 	 * STATUS_PENDING and STATUS_SUBSTITUTE_PENDING, matching the
 	 * "pending" filter semantics of

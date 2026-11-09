@@ -170,7 +170,25 @@ class AbsenceService
 			$data['working_days'],
 			$data['workingDays'],
 			$data['Days'],
-			$data['WorkingDays']
+			$data['WorkingDays'],
+			// FA-2c/FA-3/ADR flags: server-computed only — a client must never
+			// be able to forge a cancel-request, an action flag or a payroll
+			// attribution on create/update (TH-04 mass-assignment guard).
+			$data['cancel_requested_at'],
+			$data['cancel_requested_by'],
+			$data['cancel_reason'],
+			$data['cancelRequestedAt'],
+			$data['cancelRequestedBy'],
+			$data['cancelReason'],
+			$data['cancelRequested'],
+			$data['cancelRequestReason'],
+			$data['canConvertToSick'],
+			$data['canManagerCancel'],
+			$data['canRequestCancel'],
+			$data['canDecideCancelRequest'],
+			$data['carryover_amount'],
+			$data['annual_amount'],
+			$data['uv_dates']
 		);
 		return $data;
 	}
@@ -2741,11 +2759,16 @@ class AbsenceService
 		if (!$managerFlow && $ownerUserId !== $actorUserId) {
 			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
-		if ($absence->getType() !== Absence::TYPE_VACATION) {
-			throw new \Exception($this->l10n->t('Only vacation absences can be converted to sick leave.'));
+		// FA-2a: fail-closed whitelist — sick-family types are the conversion
+		// *target*; parental leave is a status absence. Anything else rejects
+		// with a machine code instead of writing unverified side effects.
+		$sourceType = (string)$absence->getType();
+		if (!AbsenceTypeCatalog::isConvertibleToSick($sourceType)) {
+			throw new \Exception('type_not_convertible');
 		}
+		$isVacation = $sourceType === Absence::TYPE_VACATION;
 		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
-			throw new \Exception($this->l10n->t('Only approved vacations can be converted to sick leave.'));
+			throw new \Exception($this->l10n->t('Only approved absences can be converted to sick leave.'));
 		}
 
 		$vacStart = $absence->getStartDate();
@@ -2757,10 +2780,14 @@ class AbsenceService
 		$today = $this->todayDateInStorage();
 		if (!$managerFlow) {
 			if ($vacStart > $today) {
-				throw new \Exception($this->l10n->t('For a vacation that has not started yet, please cancel it and submit a sick leave request instead.'));
+				throw new \Exception($isVacation
+					? $this->l10n->t('For a vacation that has not started yet, please cancel it and submit a sick leave request instead.')
+					: $this->l10n->t('For an absence that has not started yet, please cancel it and submit a sick leave request instead.'));
 			}
 			if ($vacEnd < $today) {
-				throw new \Exception($this->l10n->t('This vacation has already ended. Please ask your manager or an administrator to record the sick days.'));
+				throw new \Exception($isVacation
+					? $this->l10n->t('This vacation has already ended. Please ask your manager or an administrator to record the sick days.')
+					: $this->l10n->t('This absence has already ended. Please ask your manager or an administrator to record the sick days.'));
 			}
 		}
 
@@ -2789,13 +2816,15 @@ class AbsenceService
 
 		// Half-day fractions make a clean day boundary impossible to cut —
 		// silently rounding a 0.5 debit up or down would corrupt the quota.
-		$daysStored = $absence->getDays() !== null ? (float)$absence->getDays() : null;
-		$calendarDays = $this->computeWorkingDaysForUser($ownerUserId, $vacStart, $vacEnd);
-		if ($daysStored !== null && abs($daysStored - $calendarDays) > 0.011 && ($sickStart != $vacStart || $sickEnd != $vacEnd)) {
-			throw new \Exception('fraction_boundary');
+		// Vacation-only: other types re-debit by plain working-day count.
+		if ($isVacation) {
+			$daysStored = $absence->getDays() !== null ? (float)$absence->getDays() : null;
+			$calendarDays = $this->computeWorkingDaysForUser($ownerUserId, $vacStart, $vacEnd);
+			if ($daysStored !== null && abs($daysStored - $calendarDays) > 0.011 && ($sickStart != $vacStart || $sickEnd != $vacEnd)) {
+				throw new \Exception('fraction_boundary');
+			}
+			$this->assertVacationUnitMigrationIdle();
 		}
-
-		$this->assertVacationUnitMigrationIdle();
 		$this->assertAbsenceMutable($absence);
 		$endOfSick = clone $sickEnd;
 		$endOfSick->setTime(23, 59, 59);
@@ -2809,6 +2838,13 @@ class AbsenceService
 		}
 
 		$plan = $this->planSickConversion($absence, $sickStart, $sickEnd, $ownerUserId, $managerFlow, $reason);
+		// Entitlement-backed source: a mid-split would spawn a tail row without
+		// a reservation of its own — a silent under-consumption. Edge cuts and
+		// full cancellation are fine; interior splits reject (BQ-2).
+		$entitlementConsumed = $this->specialEntitlementService?->hasLiveReservationForAbsence($absence) === true;
+		if ($plan['mode'] === 'split' && $entitlementConsumed) {
+			throw new \Exception('entitlement_mid_split');
+		}
 		if (!empty($data['dryRun']) && $data['dryRun'] !== '0' && $data['dryRun'] !== 'false') {
 			return $plan['dry'];
 		}
@@ -2826,6 +2862,10 @@ class AbsenceService
 					|| !$absence->getUpdatedAt()
 					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
 					throw new \Exception('revision_stale');
+				}
+				if ($plan['mode'] === 'split'
+					&& $this->specialEntitlementService?->hasLiveReservationForAbsence($absence) === true) {
+					throw new \Exception('entitlement_mid_split');
 				}
 				$overlapping = $this->absenceMapper->findOverlapping($ownerUserId, $sickStart, $sickEnd, $absenceId);
 				if (!empty($overlapping)) {
@@ -2845,7 +2885,9 @@ class AbsenceService
 					$sick->setStatus(Absence::STATUS_APPROVED);
 					$sick->setApprovedByUserId($actorUserId);
 					$sick->setApprovedAt($now);
-					$sick->setApproverComment($this->l10n->t('Converted from vacation by a manager or administrator.'));
+					$sick->setApproverComment($isVacation
+						? $this->l10n->t('Converted from vacation by a manager or administrator.')
+						: $this->l10n->t('Converted from an approved absence by a manager or administrator.'));
 				} else {
 					$sick->setStatus(Absence::STATUS_PENDING);
 				}
@@ -2855,6 +2897,12 @@ class AbsenceService
 				$tail = null;
 				if ($plan['mode'] === 'full') {
 					$absence->setStatus(Absence::STATUS_CANCELLED);
+					// A fully-converted row is cancelled — an open cancel
+					// request is moot and must not linger on the dead row
+					// (badge + dead decide buttons otherwise; QA finding).
+					$absence->setCancelRequestedAt(null);
+					$absence->setCancelRequestedBy(null);
+					$absence->setCancelReason(null);
 				} else {
 					if ($plan['mode'] === 'tail' || $plan['mode'] === 'split') {
 						$absence->setEndDate($plan['vacEnd']);
@@ -2862,18 +2910,24 @@ class AbsenceService
 					if ($plan['mode'] === 'head') {
 						$absence->setStartDate($plan['vacStart']);
 					}
-					$absence->setDays($this->resolveVacationDaysDebit($ownerUserId, $absence->getStartDate(), $absence->getEndDate(), [
-						'type' => Absence::TYPE_VACATION,
-						'start_date' => $absence->getStartDate()->format('Y-m-d'),
-						'end_date' => $absence->getEndDate()->format('Y-m-d'),
-					]));
-					if ($this->vacationUnitService?->isHoursMode()) {
-						$this->recomputeVacationHoursAfterShorten($absence, $vacEnd, $oldData, (float)$absence->getDays());
+					if ($isVacation) {
+						$absence->setDays($this->resolveVacationDaysDebit($ownerUserId, $absence->getStartDate(), $absence->getEndDate(), [
+							'type' => Absence::TYPE_VACATION,
+							'start_date' => $absence->getStartDate()->format('Y-m-d'),
+							'end_date' => $absence->getEndDate()->format('Y-m-d'),
+						]));
+						if ($this->vacationUnitService?->isHoursMode()) {
+							$this->recomputeVacationHoursAfterShorten($absence, $vacEnd, $oldData, (float)$absence->getDays());
+						}
+					} else {
+						$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $absence->getStartDate(), $absence->getEndDate()));
 					}
 					if ($plan['mode'] === 'split') {
 						$tail = new Absence();
 						$tail->setUserId($ownerUserId);
-						$tail->setType(Absence::TYPE_VACATION);
+						// The tail keeps the source type (NN-07) — a non-vacation
+						// tail must never debit the vacation quota.
+						$tail->setType($sourceType);
 						$tail->setStartDate($plan['tailStart']);
 						$tail->setEndDate($vacEnd);
 						$tail->setReason($absence->getReason());
@@ -2882,17 +2936,21 @@ class AbsenceService
 						$tail->setApprovedByUserId($absence->getApprovedByUserId());
 						$tail->setApprovedAt($absence->getApprovedAt());
 						$tail->setApproverComment($absence->getApproverComment());
-						$tail->setDays($this->resolveVacationDaysDebit($ownerUserId, $tail->getStartDate(), $tail->getEndDate(), [
-							'type' => Absence::TYPE_VACATION,
-							'start_date' => $tail->getStartDate()->format('Y-m-d'),
-							'end_date' => $tail->getEndDate()->format('Y-m-d'),
-						]));
-						if ($this->vacationUnitService?->isHoursMode()) {
-							$tail->setDurationHours(null);
-							$this->applyVacationDurationHours($tail, [
+						if ($isVacation) {
+							$tail->setDays($this->resolveVacationDaysDebit($ownerUserId, $tail->getStartDate(), $tail->getEndDate(), [
+								'type' => Absence::TYPE_VACATION,
 								'start_date' => $tail->getStartDate()->format('Y-m-d'),
 								'end_date' => $tail->getEndDate()->format('Y-m-d'),
-							], (float)$tail->getDays());
+							]));
+							if ($this->vacationUnitService?->isHoursMode()) {
+								$tail->setDurationHours(null);
+								$this->applyVacationDurationHours($tail, [
+									'start_date' => $tail->getStartDate()->format('Y-m-d'),
+									'end_date' => $tail->getEndDate()->format('Y-m-d'),
+								], (float)$tail->getDays());
+							}
+						} else {
+							$tail->setDays($this->computeWorkingDaysForUser($ownerUserId, $tail->getStartDate(), $tail->getEndDate()));
 						}
 						$tail->setCreatedAt($now);
 						$tail->setUpdatedAt($now);
@@ -2904,12 +2962,19 @@ class AbsenceService
 				$savedSick = $this->absenceMapper->insert($sick);
 				$savedTail = $tail !== null ? $this->absenceMapper->insert($tail) : null;
 
-				$this->specialEntitlementService?->adjustConsumedAbsence(
-					$updatedVacation,
-					['start_date' => $updatedVacation->getStartDate()->format('Y-m-d'), 'end_date' => $updatedVacation->getEndDate()->format('Y-m-d')],
-					$oldData,
-					$actorUserId
-				);
+				if ($plan['mode'] === 'full') {
+					// Full conversion cancels the row — release the entitlement
+					// reservation (compensating ledger) instead of repricing a
+					// zero-length window on a cancelled record (NN-08).
+					$this->specialEntitlementService?->releaseForAbsence($updatedVacation, $actorUserId);
+				} else {
+					$this->specialEntitlementService?->adjustConsumedAbsence(
+						$updatedVacation,
+						['start_date' => $updatedVacation->getStartDate()->format('Y-m-d'), 'end_date' => $updatedVacation->getEndDate()->format('Y-m-d')],
+						$oldData,
+						$actorUserId
+					);
+				}
 
 				$newSummary = $updatedVacation->getSummary();
 				$newSummary['converted_to_sick_absence_id'] = $savedSick->getId();
@@ -3047,6 +3112,466 @@ class AbsenceService
 					$this->absenceMapper->findOverlapping($ownerUserId, $sickStart, $sickEnd, $absence->getId())
 				),
 			],
+		];
+	}
+
+	/**
+	 * FA-2b/FA-2c shared write pipeline (ADR-02): the ONLY path that turns an
+	 * approved absence into a manager-driven cancellation. Both the direct
+	 * manager cancel (US-404) and the approve side of an owner cancel-request
+	 * (US-407) funnel through it, so the two surfaces cannot drift apart.
+	 *
+	 * Guards that ran pre-lock in the caller (approved + end ≥ today + CAS)
+	 * are re-asserted inside the user mutation lock — the token comparison is
+	 * the concurrency gate, the status/end re-read is defence in depth.
+	 *
+	 * @param array{requestedBy:?string,requestedAt:?string,reason:?string}|null $requestMeta
+	 *        Set when the cancel executes an owner cancel-request — the flags
+	 *        are cleared inside the same write and the audit names the requester.
+	 */
+	private function writeManagerCancellation(
+		Absence $absence,
+		string $actorUserId,
+		string $reason,
+		string $expectedRevision,
+		?array $requestMeta,
+	): Absence {
+		$ownerUserId = $absence->getUserId();
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
+				$absence = $this->absenceMapper->find($absence->getId());
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $expectedRevision) {
+					throw new \Exception('revision_stale');
+				}
+				$end = $absence->getEndDate();
+				if ($end === null || $end->format('Y-m-d') < $today) {
+					// The window closed while a request was open (FM-06) —
+					// refuse the decision; flags stay for audit until the
+					// owner withdraws.
+					throw new \Exception('already_ended');
+				}
+				if ($requestMeta !== null && $absence->getCancelRequestedAt() === null) {
+					throw new \Exception('no_cancel_request');
+				}
+				$oldData = $absence->getSummary();
+				$absence->setStatus(Absence::STATUS_CANCELLED);
+				$absence->setCancelRequestedAt(null);
+				$absence->setCancelRequestedBy(null);
+				$absence->setCancelReason(null);
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+
+				// Entitlement-backed types: release the consumed reservation
+				// inside the same transaction (compensating ledger, FM-03).
+				$this->specialEntitlementService?->releaseForAbsence($updated, $actorUserId);
+
+				$newSummary = $updated->getSummary();
+				$newSummary['cancel_reason'] = $reason;
+				if ($requestMeta !== null) {
+					$newSummary['cancel_requested_by'] = $requestMeta['requestedBy'] ?? null;
+					$newSummary['cancel_requested_at'] = $requestMeta['requestedAt'] ?? null;
+				}
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_manager_cancelled',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId
+				);
+				$this->invalidateVacationStatsAfterCommit($ownerUserId);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceCancelledByManager(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($updated),
+				$reason !== '' ? $reason : null
+			));
+		}
+		if ($this->absenceNotificationMailService) {
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification(
+				$updated,
+				'manager_cancelled',
+				$actorUserId
+			));
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * FA-2b (US-404): manager/HR cancels an approved absence that has not
+	 * ended yet, with a mandatory reason and CAS token.
+	 *
+	 * @return Absence|array{dry: array} Absence on write; dry plan on dryRun
+	 */
+	public function managerCancelApprovedAbsence(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception('not_approved');
+		}
+		$start = $absence->getStartDate();
+		$end = $absence->getEndDate();
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		if ($start === null || $end === null || $end->format('Y-m-d') < $today) {
+			throw new \Exception('already_ended');
+		}
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+		if ($absence->getType() === Absence::TYPE_VACATION) {
+			$this->assertVacationUnitMigrationIdle();
+		}
+		if (!empty($data['dryRun']) && $data['dryRun'] !== '0' && $data['dryRun'] !== 'false') {
+			return [
+				'dry' => [
+					'absence' => [
+						'id' => $absence->getId(),
+						'action' => 'cancel',
+						'status' => Absence::STATUS_CANCELLED,
+					],
+					'reason' => $reason,
+					'running' => $start->format('Y-m-d') <= $today,
+				],
+			];
+		}
+		return $this->writeManagerCancellation($absence, $actorUserId, $reason, $actualUpdatedAt, null);
+	}
+
+	/**
+	 * FA-2c (US-406): owner files a cancellation request for a RUNNING
+	 * approved absence. Status/quota stay untouched (NN-12) — only flags
+	 * rotate, protected by CAS like every other mutation.
+	 */
+	public function requestAbsenceCancellation(int $absenceId, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->getAbsence($absenceId, $actorUserId);
+		if ($absence === null) {
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception('not_approved');
+		}
+		$start = $absence->getStartDate();
+		$end = $absence->getEndDate();
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		if ($start === null || $end === null) {
+			throw new \Exception('not_approved');
+		}
+		if ($start->format('Y-m-d') > $today) {
+			// Not started yet — the direct cancel stays the single path (no
+			// double track, U-4).
+			throw new \Exception('use_direct_cancel');
+		}
+		if ($end->format('Y-m-d') < $today) {
+			throw new \Exception('already_ended');
+		}
+		if ($absence->getCancelRequestedAt() !== null) {
+			throw new \Exception('cancel_request_pending');
+		}
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $start, $end);
+				$absence = $this->absenceMapper->find($absenceId);
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() !== null) {
+					throw new \Exception('cancel_request_pending');
+				}
+				$oldData = $absence->getSummary();
+				$now = $this->nowInStorage();
+				$absence->setCancelRequestedAt($now);
+				$absence->setCancelRequestedBy($actorUserId);
+				$absence->setCancelReason($reason);
+				$absence->setUpdatedAt($now);
+				$updated = $this->absenceMapper->update($absence);
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_cancel_requested',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$updated->getSummary(),
+					$actorUserId
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		// Each manager of the owner gets a decision task — state-change-bound
+		// notification only (FM-07), no reminders.
+		if ($this->notificationService) {
+			$managers = array_unique($this->teamResolver->getManagerIdsForEmployee($ownerUserId));
+			$payload = $this->buildAbsenceNotificationData($updated);
+			foreach ($managers as $managerUid) {
+				$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceCancelRequested(
+					$managerUid,
+					$ownerUserId,
+					$payload,
+					$reason
+				));
+			}
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * FA-2c: owner withdraws their own open cancel-request — flags only, the
+	 * absence stays approved. CAS-protected like every transition.
+	 */
+	public function withdrawAbsenceCancelRequest(int $absenceId, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->getAbsence($absenceId, $actorUserId);
+		if ($absence === null) {
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getCancelRequestedAt() === null) {
+			throw new \Exception('no_cancel_request');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
+				$absence = $this->absenceMapper->find($absenceId);
+				if (!$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() === null) {
+					throw new \Exception('no_cancel_request');
+				}
+				$oldData = $absence->getSummary();
+				$absence->setCancelRequestedAt(null);
+				$absence->setCancelRequestedBy(null);
+				$absence->setCancelReason(null);
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_cancel_request_withdrawn',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$updated->getSummary(),
+					$actorUserId
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * FA-2c (US-407): manager approves an open cancel-request — runs through
+	 * the identical pipeline as the direct manager cancel (ADR-02, NG-05).
+	 */
+	public function approveAbsenceCancelRequest(int $absenceId, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		$requestMeta = $this->assertOpenCancelRequest($absence);
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception('not_approved');
+		}
+		$end = $absence->getEndDate();
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		if ($end === null || $end->format('Y-m-d') < $today) {
+			throw new \Exception('already_ended');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+		if ($absence->getType() === Absence::TYPE_VACATION) {
+			$this->assertVacationUnitMigrationIdle();
+		}
+		$reason = (string)($absence->getCancelReason() ?? '');
+		return $this->writeManagerCancellation($absence, $actorUserId, $reason, $actualUpdatedAt, $requestMeta);
+	}
+
+	/**
+	 * FA-2c (US-407): manager declines an open cancel-request — flags are
+	 * cleared, the absence stays approved, the owner is notified.
+	 */
+	public function declineAbsenceCancelRequest(int $absenceId, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		$this->assertOpenCancelRequest($absence);
+		$ownerUserId = $absence->getUserId();
+		$comment = trim((string)($data['comment'] ?? ''));
+		if (mb_strlen($comment) > 500) {
+			throw new \Exception('reason_too_long');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
+				$absence = $this->absenceMapper->find($absenceId);
+				if (!$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() === null) {
+					throw new \Exception('no_cancel_request');
+				}
+				$oldData = $absence->getSummary();
+				$absence->setCancelRequestedAt(null);
+				$absence->setCancelRequestedBy(null);
+				$absence->setCancelReason(null);
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$newSummary = $updated->getSummary();
+				if ($comment !== '') {
+					$newSummary['decline_comment'] = $comment;
+				}
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_cancel_request_declined',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceCancelDeclined(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($updated),
+				$comment !== '' ? $comment : null
+			));
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * @return array{requestedBy:?string,requestedAt:?string,reason:?string}
+	 */
+	private function assertOpenCancelRequest(Absence $absence): array
+	{
+		$requestedAt = $absence->getCancelRequestedAt();
+		if ($requestedAt === null) {
+			throw new \Exception('no_cancel_request');
+		}
+		return [
+			'requestedBy' => $absence->getCancelRequestedBy(),
+			'requestedAt' => $requestedAt->format('c'),
+			'reason' => $absence->getCancelReason(),
+		];
+	}
+
+	/**
+	 * Action flags for the OWNER's own absence payloads (ADR-04 — the server
+	 * is the single source of eligibility truth; clients render buttons
+	 * straight from these flags instead of re-deriving type logic).
+	 *
+	 * @return array{canConvertToSick: bool, canRequestCancel: bool}
+	 */
+	public function ownerAbsenceActionFlags(Absence $absence): array
+	{
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		$start = $absence->getStartDate()?->format('Y-m-d');
+		$end = $absence->getEndDate()?->format('Y-m-d');
+		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
+		$running = $approved && $start !== null && $end !== null && $start <= $today && $end >= $today;
+		return [
+			'canConvertToSick' => $running && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
+			'canRequestCancel' => $running && $absence->getCancelRequestedAt() === null,
+		];
+	}
+
+	/**
+	 * Action flags for MANAGER-scope absence payloads (ADR-04). Manager
+	 * conversions are allowed retroactively, so no running-gate here.
+	 *
+	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canDecideCancelRequest: bool}
+	 */
+	public function managerAbsenceActionFlags(Absence $absence): array
+	{
+		$today = $this->todayDateInStorage()->format('Y-m-d');
+		$end = $absence->getEndDate()?->format('Y-m-d');
+		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
+		return [
+			'canConvertToSick' => $approved && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
+			'canManagerCancel' => $approved && $end !== null && $end >= $today,
+			'canDecideCancelRequest' => $approved && $absence->getCancelRequestedAt() !== null,
 		];
 	}
 

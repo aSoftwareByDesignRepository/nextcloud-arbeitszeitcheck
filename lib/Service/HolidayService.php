@@ -213,6 +213,18 @@ class HolidayService
 	}
 
 	/**
+	 * Holiday weight map for a user over a range — date (Y-m-d) => weight
+	 * (1.0 full, 0.5 half). Public so allocation-facing code (FA-3 uv_dates)
+	 * can enumerate working days without per-day queries.
+	 *
+	 * @return array<string,float>
+	 */
+	public function getHolidayWeightMapForUser(string $userId, \DateTime $start, \DateTime $end): array
+	{
+		return $this->buildHolidayWeightMapForState($this->resolveStateForUser($userId), $start, $end);
+	}
+
+	/**
 	 * Holiday weight for Sollzeit: 0.0 none, 0.5 half-day, 1.0 full day.
 	 */
 	public function getHolidayWeightForUser(string $userId, \DateTime $date): float

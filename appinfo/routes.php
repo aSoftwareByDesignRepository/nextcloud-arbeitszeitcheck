@@ -129,6 +129,8 @@ return [
 		['name' => 'absence#cancel', 'url' => '/api/absences/{id}/cancel', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#shorten', 'url' => '/api/absences/{id}/shorten', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#convertToSick', 'url' => '/api/absences/{id}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#requestCancel', 'url' => '/api/absences/{id}/cancel-request', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#withdrawCancelRequest', 'url' => '/api/absences/{id}/cancel-request/withdraw', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
 		// Manager routes
 		['name' => 'manager#dashboard', 'url' => '/manager', 'verb' => 'GET'],
@@ -149,6 +151,9 @@ return [
 		['name' => 'manager#estimateEmployeeVacationHours', 'url' => '/api/manager/employee-absences/estimate-hours', 'verb' => 'GET'],
 		['name' => 'manager#createEmployeeAbsence', 'url' => '/api/manager/employee-absences', 'verb' => 'POST'],
 		['name' => 'manager#convertEmployeeAbsenceToSick', 'url' => '/api/manager/employee-absences/{absenceId}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#cancelEmployeeAbsence', 'url' => '/api/manager/employee-absences/{absenceId}/cancel', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#approveEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/approve', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#declineEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/decline', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
 		['name' => 'manager#getTeamCompliance', 'url' => '/api/manager/team-compliance', 'verb' => 'GET'],
 		['name' => 'manager#getTeamOvertimeAlerts', 'url' => '/api/manager/team-overtime-alerts', 'verb' => 'GET'],

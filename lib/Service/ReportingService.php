@@ -571,6 +571,15 @@ class ReportingService
 		$userAbsences = [];
 		$totalDays = 0;
 
+		// FA-3: per-absence carryover attribution for the payroll "UV" marker.
+		$attributions = [];
+		try {
+			$attributions = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\VacationAllocationService::class)
+				->attributeVacationAbsences($absences);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->info('absence report attribution skipped: ' . $e->getMessage());
+		}
+
 		foreach ($absences as $absence) {
 			$type = $absence->getType();
 			$status = $absence->getStatus();
@@ -609,13 +618,21 @@ class ReportingService
 				$days = 0.0;
 			}
 
+			$attr = $type === \OCA\ArbeitszeitCheck\Db\Absence::TYPE_VACATION
+				? ($attributions[(int)$absence->getId()] ?? null)
+				: null;
 			$userAbsences[$uid]['absences'][] = [
 				'id' => $absence->getId(),
 				'type' => $type,
 				'start_date' => $startDateRow ? $startDateRow->format('Y-m-d') : null,
 				'end_date' => $endDateRow ? $endDateRow->format('Y-m-d') : null,
 				'days' => $days,
-				'status' => $status
+				'status' => $status,
+				// FA-3 (additive): payroll "UV" attribution — carryover
+				// finances the earliest working days (see uv_dates).
+				'carryover_amount' => $attr['carryover_amount'] ?? null,
+				'annual_amount' => $attr['annual_amount'] ?? null,
+				'uv_dates' => $attr['uv_dates'] ?? null,
 			];
 
 			$userAbsences[$uid]['total_days'] += $days;

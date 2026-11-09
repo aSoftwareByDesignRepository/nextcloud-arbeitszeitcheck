@@ -284,6 +284,7 @@ final class Constants
 		'manager_rejected',
 		'employee_cancelled',
 		'employee_shortened',
+		'manager_cancelled',
 	];
 
 	/** @var list<string> Single enumeration lives in AbsenceTypeCatalog; kept for BC. */

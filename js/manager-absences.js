@@ -207,16 +207,64 @@
 				? Utils.responsiveTd(label, html, cls)
 				: `<td${cls ? ` class="${cls}"` : ''}>${html}</td>`;
 			const convertLabel = t('Convert to sick', 'Convert to sick');
-			const actionCell = (entry.type === 'vacation' && entry.status === 'approved')
-				? `<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-sick-convert
+			// "today" must be the org storage TZ (server compares end >= today
+			// the same way) — never UTC toISOString slices, which roll the
+			// calendar day for users west/east of UTC.
+			const azcTz = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.tz) || {};
+			const _now = new Date();
+			const todayStr = (window.ArbeitszeitCheckTime && window.ArbeitszeitCheckTime.todayYmd)
+				? window.ArbeitszeitCheckTime.todayYmd({ timeZone: azcTz.storage })
+				: _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0') + '-' + String(_now.getDate()).padStart(2, '0');
+			const base = Utils.buildAppUrl(`/apps/arbeitszeitcheck/api/manager/employee-absences/${encodeURIComponent(String(entry.id))}`);
+			// Server flags are the single eligibility source (ADR-04); the
+			// legacy vacation-only gate is the fallback for older servers.
+			const canConvert = entry.canConvertToSick !== undefined
+				? entry.canConvertToSick === true
+				: (entry.type === 'vacation' && entry.status === 'approved');
+			const canCancel = entry.canManagerCancel !== undefined
+				? entry.canManagerCancel === true
+				: false;
+			const cancelRequested = entry.cancelRequested === true;
+			const parts = [];
+			if (canConvert) {
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-sick-convert
 						data-sick-convert-flow="manager"
-						data-sick-convert-url="${escapeHtml(Utils.buildAppUrl(`/apps/arbeitszeitcheck/api/manager/employee-absences/${encodeURIComponent(String(entry.id))}/convert-to-sick`))}"
+						data-sick-convert-url="${escapeHtml(`${base}/convert-to-sick`)}"
+						data-type-label="${escapeHtml(entry.typeLabel || entry.type || '')}"
+						data-source-type="${escapeHtml(entry.type || '')}"
 						data-vac-start="${escapeHtml(entry.startDate || '')}"
 						data-vac-end="${escapeHtml(entry.endDate || '')}"
 						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
 						aria-label="${escapeHtml(convertLabel)}"
-						title="${escapeHtml(convertLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('activity') : ''}</button>`
-				: '<span class="text-muted">–</span>';
+						title="${escapeHtml(convertLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('activity') : ''}</button>`);
+			}
+			if (canCancel) {
+				const cancelLabel = t('Cancel absence', 'Cancel absence');
+				parts.push(`<button type="button" class="azc-btn azc-btn--danger azc-icon-btn" data-manager-cancel
+						data-cancel-url="${escapeHtml(`${base}/cancel`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-running="${(entry.startDate && entry.endDate && entry.startDate <= todayStr && entry.endDate >= todayStr) ? '1' : ''}"
+						aria-label="${escapeHtml(cancelLabel)}"
+						title="${escapeHtml(cancelLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : ''}</button>`);
+			}
+			if (cancelRequested) {
+				const approveLabel = t('Approve cancellation', 'Approve cancellation');
+				const declineLabel = t('Decline cancellation', 'Decline cancellation');
+				const requestReason = entry.cancelRequestReason || '';
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-cancel-decide="approve"
+						data-decide-url="${escapeHtml(`${base}/cancel-request/approve`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-cancel-reason="${escapeHtml(requestReason)}"
+						aria-label="${escapeHtml(approveLabel)}"
+						title="${escapeHtml(approveLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('check') : '✓'}</button>`);
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-cancel-decide="decline"
+						data-decide-url="${escapeHtml(`${base}/cancel-request/decline`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-cancel-reason="${escapeHtml(requestReason)}"
+						aria-label="${escapeHtml(declineLabel)}"
+						title="${escapeHtml(declineLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('x') : '✕'}</button>`);
+			}
+			const actionCell = parts.length ? parts.join('') : '<span class="text-muted">–</span>';
 			return [
 			'<tr>',
 			td(t('Name', 'Name'), escapeHtml(entry.displayName || entry.userId || '-')),
@@ -225,7 +273,7 @@
 			td(t('End date', 'End date'), escapeHtml(formatDate(entry.endDate))),
 			td(t('Duration', 'Duration'), escapeHtml(formatDuration(entry))),
 			td(t('Status', 'Status'), statusCell),
-			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')), 'reason-cell'),
+			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')) + (cancelRequested ? ` <span class="azc-status-chip" data-status="cancel_requested">${escapeHtml(t('Cancellation requested', 'Cancellation requested'))}</span>` : ''), 'reason-cell'),
 			td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${actionCell}</div>`, 'actions-cell'),
 			'</tr>',
 			].join('');
@@ -1255,6 +1303,131 @@
 		});
 	}
 
+	// FA-2b/2c: manager cancel + cancel-request decisions. One native
+	// <dialog> per action — no window.confirm (U-3).
+	function openManagerDecisionDialog(opts) {
+		const dlg = document.createElement('dialog');
+		dlg.className = 'azc-dialog';
+		dlg.innerHTML = `
+			<form method="dialog" novalidate>
+				<h2 class="azc-dialog__title"></h2>
+				<p class="form-help dlg-hint"></p>
+				<p class="form-help dlg-request-reason" hidden></p>
+				<div class="form-group" data-reason-wrap>
+					<label class="form-label dlg-reason-label" for="azc-mgr-decision-reason"></label>
+					<textarea class="form-input dlg-reason" id="azc-mgr-decision-reason" rows="3" maxlength="500"></textarea>
+					<p class="azc-field-error dlg-error" role="alert" hidden></p>
+				</div>
+				<div class="azc-dialog__actions">
+					<button type="submit" class="azc-btn azc-btn--primary dlg-submit"></button>
+					<button type="button" class="azc-btn azc-btn--secondary dlg-cancel">${t('Cancel', 'Cancel')}</button>
+				</div>
+			</form>`;
+		dlg.querySelector('.azc-dialog__title').textContent = opts.title;
+		dlg.querySelector('.dlg-hint').textContent = opts.hint || '';
+		// The employee's stated cancel-request reason is rendered read-only —
+		// the manager must see what they are deciding on (it is never editable
+		// here; the server uses the stored owner reason on approve).
+		const requestReasonEl = dlg.querySelector('.dlg-request-reason');
+		if (opts.requestReason) {
+			requestReasonEl.textContent = `${t('Reason (from employee)', 'Reason (from employee)')}: ${opts.requestReason}`;
+			requestReasonEl.hidden = false;
+		}
+		const reasonWrap = dlg.querySelector('[data-reason-wrap]');
+		if (opts.reasonLabel) {
+			dlg.querySelector('.dlg-reason-label').textContent = opts.reasonLabel;
+		} else {
+			reasonWrap.hidden = true;
+		}
+		dlg.querySelector('.dlg-submit').textContent = opts.submitLabel;
+		if (opts.dangerSubmit) dlg.querySelector('.dlg-submit').classList.replace('azc-btn--primary', 'azc-btn--danger');
+		document.body.appendChild(dlg);
+		const reasonEl = dlg.querySelector('.dlg-reason');
+		const errorEl = dlg.querySelector('.dlg-error');
+		const submitBtn = dlg.querySelector('.dlg-submit');
+		dlg.querySelector('.dlg-cancel').addEventListener('click', () => dlg.close());
+		dlg.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); dlg.close(); } });
+		dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 300));
+		dlg.querySelector('form').addEventListener('submit', async (ev) => {
+			ev.preventDefault();
+			const reason = reasonEl.value.trim();
+			if (opts.reasonRequired && reason === '') {
+				reasonEl.setAttribute('aria-invalid', 'true');
+				errorEl.textContent = t('Please provide a reason.', 'Please provide a reason.');
+				errorEl.hidden = false;
+				reasonEl.focus();
+				return;
+			}
+			submitBtn.disabled = true;
+			try {
+				const api = window.AzcApi;
+				const res = await api.fetch(opts.url, {
+					method: 'POST',
+					json: Object.assign({ expectedUpdatedAt: opts.updatedAt }, opts.body ? opts.body(reason) : {}),
+				});
+				if (!res.ok || !(res.data && res.data.success !== false)) {
+					throw Object.assign(new Error((res.data && res.data.error) || res.error || t('The request could not be completed.', 'The request could not be completed.')), { code: res.data && res.data.error_code });
+				}
+				window.location.reload();
+			} catch (e) {
+				errorEl.textContent = e.message;
+				errorEl.hidden = false;
+				submitBtn.disabled = false;
+				if (e.code === 'revision_stale' || e.code === 'no_cancel_request') {
+					setTimeout(() => window.location.reload(), 1600);
+				}
+			}
+		});
+		dlg.showModal();
+		if (opts.reasonLabel) {
+			reasonEl.focus();
+		} else {
+			submitBtn.focus();
+		}
+	}
+
+	function bindManagerAbsenceActions() {
+		document.addEventListener('click', (ev) => {
+			const cancelBtn = ev.target.closest && ev.target.closest('[data-manager-cancel]');
+			if (cancelBtn) {
+				ev.preventDefault();
+				const running = cancelBtn.dataset.running === '1';
+				openManagerDecisionDialog({
+					title: t('Cancel absence', 'Cancel absence'),
+					hint: running
+						? t('The whole period is cancelled; days already past count as worked.', 'The whole period is cancelled; days already past count as worked.')
+						: t('The approved absence is cancelled. The employee is notified.', 'The approved absence is cancelled. The employee is notified.'),
+					reasonLabel: t('Reason', 'Reason'),
+					reasonRequired: true,
+					submitLabel: t('Cancel absence', 'Cancel absence'),
+					dangerSubmit: true,
+					url: cancelBtn.dataset.cancelUrl,
+					updatedAt: cancelBtn.dataset.updatedAt || '',
+					body: (reason) => ({ reason }),
+				});
+				return;
+			}
+			const decideBtn = ev.target.closest && ev.target.closest('[data-cancel-decide]');
+			if (decideBtn) {
+				ev.preventDefault();
+				const approve = decideBtn.dataset.cancelDecide === 'approve';
+				openManagerDecisionDialog({
+					title: approve ? t('Approve cancellation', 'Approve cancellation') : t('Decline cancellation', 'Decline cancellation'),
+					hint: approve
+						? t('The whole period is cancelled; days already past count as worked.', 'The whole period is cancelled; days already past count as worked.')
+						: t('The absence stays approved. The employee is notified.', 'The absence stays approved. The employee is notified.'),
+					requestReason: decideBtn.dataset.cancelReason || '',
+					reasonLabel: approve ? null : t('Comment (optional)', 'Comment (optional)'),
+					reasonRequired: false,
+					submitLabel: approve ? t('Approve', 'Approve') : t('Decline', 'Decline'),
+					url: decideBtn.dataset.decideUrl,
+					updatedAt: decideBtn.dataset.updatedAt || '',
+					body: (text) => (approve ? {} : { comment: text }),
+				});
+			}
+		});
+	}
+
 	function init() {
 		initEmployeePickers();
 		setDefaultDateRange(false);
@@ -1264,6 +1437,7 @@
 		bindRecordHistoricalHint();
 		bindPagination();
 		updatePagination();
+		bindManagerAbsenceActions();
 	}
 
 	if (document.readyState === 'loading') {

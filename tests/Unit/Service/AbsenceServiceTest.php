@@ -2618,7 +2618,8 @@ class AbsenceServiceTest extends TestCase
 			$this->service->convertVacationToSick(43, $this->convertData($sick, '+1 days', '+3 days'), 'alice', false);
 			$this->fail('type check must fire');
 		} catch (\Exception $e) {
-			$this->assertStringContainsString('vacation', $e->getMessage());
+			// FA-2a whitelist: non-convertible types reject with a machine code.
+			$this->assertSame('type_not_convertible', $e->getMessage());
 		}
 
 		$pending = $this->runningVacation(44);
@@ -2835,5 +2836,458 @@ class AbsenceServiceTest extends TestCase
 
 		$this->expectException(\OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException::class);
 		$this->service->convertVacationToSick(42, $this->convertData($absence, '+2 days', '+9 days'), 'alice', false);
+	}
+
+	// ---------- FA-2a: whitelist conversion (absence-storno-conversion-bt-rules-2026-11) ----------
+
+	public function testConvertWhitelistConvertsPersonalLeaveAndKeepsTailType(): void
+	{
+		// Mid-split of an approved personal_leave: head shortens, tail keeps
+		// the SOURCE type (NN-07) — never vacation.
+		$absence = $this->makeAbsenceRow(42, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$inserted = [];
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willReturnCallback(function (Absence $a) use (&$inserted) {
+			$inserted[] = $a;
+			$a->setId(2000 + count($inserted));
+			return $a;
+		});
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+
+		$this->assertCount(2, $inserted);
+		$this->assertSame(Absence::TYPE_SICK_LEAVE, $inserted[0]->getType());
+		$this->assertSame(Absence::TYPE_PERSONAL_LEAVE, $inserted[1]->getType());
+		$this->assertNotNull($result['tail']);
+		$this->assertSame(Absence::STATUS_PENDING, $result['sick']['status']);
+	}
+
+	public function testConvertWhitelistRejectsSickFamilyAndParental(): void
+	{
+		// Spec AC-4: sick-family (conversion target family) and parental
+		// leave reject with the machine code.
+		foreach ([Absence::TYPE_SICK_LEAVE, Absence::TYPE_CHILD_SICK, Absence::TYPE_PARENTAL_LEAVE] as $type) {
+			$row = $this->makeAbsenceRow(43, 'alice', Absence::STATUS_APPROVED, $type, '-5 days', '+9 days');
+			$service = $this->rebuildService($this->mapperReturning($row));
+			try {
+				$service->convertVacationToSick(43, $this->convertData($row, '+1 days', '+3 days'), 'alice', false);
+				$this->fail("$type must not be convertible");
+			} catch (\Exception $e) {
+				$this->assertSame('type_not_convertible', $e->getMessage(), "type=$type");
+			}
+		}
+	}
+
+	// ---------- FA-2b: manager cancel (shared pipeline) ----------
+
+	public function testManagerCancelCancelsApprovedAndNotifies(): void
+	{
+		$absence = $this->makeAbsenceRow(50, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-2 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->db->expects($this->once())->method('commit');
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_manager_cancelled', 'absence', 50, $this->anything(), $this->anything(), 'manager-1');
+		$this->notificationService->expects($this->once())->method('notifyAbsenceCancelledByManager')
+			->with('alice', $this->anything(), 'medical emergency');
+
+		$out = $this->service->managerCancelApprovedAbsence(50, [
+			'reason' => 'medical emergency',
+			'expectedUpdatedAt' => $this->casToken($absence),
+		], 'manager-1');
+
+		$this->assertSame(Absence::STATUS_CANCELLED, $out->getStatus());
+	}
+
+	public function testManagerCancelRequiresReasonAndValidRevision(): void
+	{
+		$absence = $this->makeAbsenceRow(50, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '+1 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->managerCancelApprovedAbsence(50, ['reason' => '  ', 'expectedUpdatedAt' => $this->casToken($absence)], 'manager-1');
+			$this->fail('empty reason must fail');
+		} catch (\Exception $e) {
+			$this->assertSame('reason_required', $e->getMessage());
+		}
+		try {
+			$this->service->managerCancelApprovedAbsence(50, ['reason' => 'ok', 'expectedUpdatedAt' => '2001-01-01T00:00:00+00:00'], 'manager-1');
+			$this->fail('stale revision must fail');
+		} catch (\Exception $e) {
+			$this->assertSame('revision_stale', $e->getMessage());
+		}
+	}
+
+	public function testManagerCancelRejectsEndedAbsence(): void
+	{
+		$absence = $this->makeAbsenceRow(50, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-9 days', '-2 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->managerCancelApprovedAbsence(50, ['reason' => 'x', 'expectedUpdatedAt' => $this->casToken($absence)], 'manager-1');
+			$this->fail('ended absence must reject');
+		} catch (\Exception $e) {
+			$this->assertSame('already_ended', $e->getMessage());
+		}
+	}
+
+	// ---------- FA-2c: owner cancel-request / withdraw / manager decision ----------
+
+	private function requestData(Absence $a, array $extra = []): array
+	{
+		return array_merge(['expectedUpdatedAt' => $this->casToken($a)], $extra);
+	}
+
+	public function testRequestCancelSetsFlagsKeepsApprovedAndNotifiesManagers(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->teamResolver->method('getManagerIdsForEmployee')->with('alice')->willReturn(['manager-1']);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_cancel_requested', 'absence', 60);
+		$this->notificationService->expects($this->once())->method('notifyAbsenceCancelRequested')
+			->with('manager-1', 'alice', $this->anything(), 'family emergency');
+
+		$out = $this->service->requestAbsenceCancellation(60, $this->requestData($absence, ['reason' => 'family emergency']), 'alice');
+
+		$this->assertSame(Absence::STATUS_APPROVED, $out->getStatus());
+		$this->assertNotNull($out->getCancelRequestedAt());
+		$this->assertSame('alice', $out->getCancelRequestedBy());
+		$this->assertSame('family emergency', $out->getCancelReason());
+	}
+
+	public function testRequestCancelRejectsFutureDuplicateAndStale(): void
+	{
+		$future = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '+2 days', '+5 days');
+		$mapper = $this->mapperReturning($future);
+		$service = $this->rebuildService($mapper);
+		try {
+			$service->requestAbsenceCancellation(60, $this->requestData($future, ['reason' => 'x']), 'alice');
+			$this->fail('future absence must use direct cancel');
+		} catch (\Exception $e) {
+			$this->assertSame('use_direct_cancel', $e->getMessage());
+		}
+
+		$running = $this->makeAbsenceRow(61, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$running->setCancelRequestedAt(new \DateTime());
+		$running->setCancelRequestedBy('alice');
+		$mapper = $this->mapperReturning($running);
+		$service = $this->rebuildService($mapper);
+		try {
+			$service->requestAbsenceCancellation(61, $this->requestData($running, ['reason' => 'x']), 'alice');
+			$this->fail('duplicate request must fail');
+		} catch (\Exception $e) {
+			$this->assertSame('cancel_request_pending', $e->getMessage());
+		}
+
+		$running2 = $this->makeAbsenceRow(62, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$mapper = $this->mapperReturning($running2);
+		$service = $this->rebuildService($mapper);
+		try {
+			$service->requestAbsenceCancellation(62, ['expectedUpdatedAt' => '2001-01-01T00:00:00+00:00', 'reason' => 'x'], 'alice');
+			$this->fail('stale revision must fail');
+		} catch (\Exception $e) {
+			$this->assertSame('revision_stale', $e->getMessage());
+		}
+	}
+
+	public function testRequestCancelIsOwnerOnly(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'bob', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->expectException(DoesNotExistException::class);
+		$this->service->requestAbsenceCancellation(60, $this->requestData($absence, ['reason' => 'x']), 'alice');
+	}
+
+	public function testWithdrawClearsFlagsAndKeepsApproved(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$absence->setCancelRequestedAt(new \DateTime('-1 hour'));
+		$absence->setCancelRequestedBy('alice');
+		$absence->setCancelReason('family emergency');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_cancel_request_withdrawn', 'absence', 60);
+
+		$out = $this->service->withdrawAbsenceCancelRequest(60, $this->requestData($absence), 'alice');
+
+		$this->assertSame(Absence::STATUS_APPROVED, $out->getStatus());
+		$this->assertNull($out->getCancelRequestedAt());
+		$this->assertNull($out->getCancelRequestedBy());
+		$this->assertNull($out->getCancelReason());
+	}
+
+	public function testApproveCancelRequestRunsSharedCancelPipeline(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$absence->setCancelRequestedAt(new \DateTime('-1 hour'));
+		$absence->setCancelRequestedBy('alice');
+		$absence->setCancelReason('family emergency');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_manager_cancelled', 'absence', 60, $this->anything(), $this->anything(), 'manager-1');
+		$this->notificationService->expects($this->once())->method('notifyAbsenceCancelledByManager')
+			->with('alice', $this->anything(), 'family emergency');
+
+		$out = $this->service->approveAbsenceCancelRequest(60, $this->requestData($absence), 'manager-1');
+
+		$this->assertSame(Absence::STATUS_CANCELLED, $out->getStatus());
+		$this->assertNull($out->getCancelRequestedAt());
+	}
+
+	public function testDeclineCancelRequestClearsFlagsNotifiesOwner(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$absence->setCancelRequestedAt(new \DateTime('-1 hour'));
+		$absence->setCancelRequestedBy('alice');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->auditLogMapper->expects($this->once())->method('logAction')
+			->with('alice', 'absence_cancel_request_declined', 'absence', 60);
+		$this->notificationService->expects($this->once())->method('notifyAbsenceCancelDeclined')
+			->with('alice', $this->anything(), 'still needed');
+
+		$out = $this->service->declineAbsenceCancelRequest(60, $this->requestData($absence, ['comment' => 'still needed']), 'manager-1');
+
+		$this->assertSame(Absence::STATUS_APPROVED, $out->getStatus());
+		$this->assertNull($out->getCancelRequestedAt());
+	}
+
+	public function testDecisionWithoutOpenRequestRejects(): void
+	{
+		$absence = $this->makeAbsenceRow(60, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-2 days', '+5 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		try {
+			$this->service->approveAbsenceCancelRequest(60, $this->requestData($absence), 'manager-1');
+			$this->fail('no open request must fail');
+		} catch (\Exception $e) {
+			$this->assertSame('no_cancel_request', $e->getMessage());
+		}
+	}
+
+	// ---------- FA-2a: entitlement-backed sources (AC-S5 / AC-S6 / MH-04) ----------
+
+	private function serviceWithEntitlements(AbsenceMapper $mapper, SpecialEntitlementService $se): AbsenceService
+	{
+		return new AbsenceService(
+			$mapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$this->lockingProvider,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			$se
+		);
+	}
+
+	/**
+	 * SpecialEntitlementService is final — instantiate without the ctor and
+	 * bind only the collaborators the exercised path touches (same pattern as
+	 * testShortenAbsenceAdjustsConsumedSpecialEntitlement).
+	 */
+	private function entitlementServiceStub(array $props): SpecialEntitlementService
+	{
+		$se = (new \ReflectionClass(SpecialEntitlementService::class))->newInstanceWithoutConstructor();
+		foreach ($props as $name => $value) {
+			\Closure::bind(function () use ($name, $value): void {
+				$this->{$name} = $value;
+			}, $se, SpecialEntitlementService::class)();
+		}
+		return $se;
+	}
+
+	private function consumedReservation(int $id, int $revision, int $periodId): \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation
+	{
+		// Entity accessors are magic __call — a real row, not a mock.
+		$reservation = new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation();
+		$reservation->setId($id);
+		$reservation->setStatus(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation::STATUS_CONSUMED);
+		$reservation->setRevision($revision);
+		$reservation->setPeriodId($periodId);
+		return $reservation;
+	}
+
+	/**
+	 * AC-S5: an interior sick range on an entitlement-backed absence rejects
+	 * BEFORE any write — the tail row could never carry a reservation (BQ-2).
+	 */
+	public function testConvertEntitlementBackedMidSplitRejectsBeforeWrite(): void
+	{
+		$absence = $this->makeAbsenceRow(46, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SPECIAL_LEAVE, '-5 days', '+9 days');
+		$reservations = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class);
+		$reservations->method('findByAbsenceId')->with(46)->willReturn($this->consumedReservation(9, 3, 5));
+		$se = $this->entitlementServiceStub(['reservations' => $reservations]);
+		$service = $this->serviceWithEntitlements($this->mapperReturning($absence), $se);
+
+		try {
+			$service->convertVacationToSick(46, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('entitlement mid-split must reject');
+		} catch (\Exception $e) {
+			$this->assertSame('entitlement_mid_split', $e->getMessage());
+		}
+		// No write ever happened: status untouched, no sick row, no release.
+		$this->assertSame(Absence::STATUS_APPROVED, $absence->getStatus());
+		$reservations->expects($this->never())->method('transitionIfRevision');
+	}
+
+	/**
+	 * AC-S6 / NN-08: full conversion of an entitlement-backed absence must run
+	 * releaseForAbsence — the reservation transitions to RELEASED inside the
+	 * same transaction (compensating ledger), never adjust-on-cancelled.
+	 */
+	public function testConvertEntitlementBackedFullReleasesReservation(): void
+	{
+		$absence = $this->makeAbsenceRow(47, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SPECIAL_LEAVE, '-5 days', '+9 days');
+		$reservations = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class);
+		$reservations->method('findByAbsenceId')->with(47)->willReturn($this->consumedReservation(9, 3, 5));
+		$reservations->expects($this->once())->method('transitionIfRevision')
+			->with(9, 3, \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation::STATUS_RELEASED)
+			->willReturn(true);
+		$ledger = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class);
+		$ledger->method('findByEventKey')->willReturn(null);
+		$se = $this->entitlementServiceStub([
+			'reservations' => $reservations,
+			'ledger' => $ledger,
+			'audit' => $this->auditLogMapper,
+			'lockingProvider' => $this->lockingProvider,
+		]);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willReturnCallback(static function (Absence $a) {
+			$a->setId(3000);
+			return $a;
+		});
+		$service = $this->serviceWithEntitlements($this->absenceMapper, $se);
+
+		$result = $service->convertVacationToSick(47, $this->convertData($absence, '-5 days', '+9 days'), 'alice', false);
+
+		$this->assertSame(Absence::STATUS_CANCELLED, $absence->getStatus());
+		$this->assertSame(Absence::TYPE_SICK_LEAVE, $result['sick']['type']);
+	}
+
+	/**
+	 * MH-04: head/tail cuts keep the row alive — adjustConsumedAbsence runs
+	 * (re-pricing the remaining window), the reservation must NOT be released.
+	 */
+	public function testConvertEntitlementBackedHeadCutAdjustsNotReleases(): void
+	{
+		$absence = $this->makeAbsenceRow(48, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SPECIAL_LEAVE, '-5 days', '+9 days');
+		$reservations = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class);
+		$reservations->method('findByAbsenceId')->with(48)->willReturn($this->consumedReservation(9, 3, 5));
+		$reservations->expects($this->never())->method('transitionIfRevision');
+		// adjustConsumedAbsenceLocked early-returns when the type is unknown —
+		// reaching this call proves the adjust path ran instead of release.
+		$types = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class);
+		$types->expects($this->once())->method('findByAbsenceTypeCode')->with(Absence::TYPE_SPECIAL_LEAVE)->willReturn(null);
+		$ledger = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class);
+		$se = $this->entitlementServiceStub([
+			'reservations' => $reservations,
+			'types' => $types,
+			'ledger' => $ledger,
+			'lockingProvider' => $this->lockingProvider,
+		]);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+		$this->absenceMapper->method('insert')->willReturnCallback(static function (Absence $a) {
+			$a->setId(3001);
+			return $a;
+		});
+		$service = $this->serviceWithEntitlements($this->absenceMapper, $se);
+
+		$result = $service->convertVacationToSick(48, $this->convertData($absence, '-5 days', '-3 days'), 'alice', false);
+
+		// Head cut: start moved to the day after the sick window, still approved.
+		$this->assertSame(Absence::STATUS_APPROVED, $absence->getStatus());
+		$this->assertSame((new \DateTime('-2 days'))->format('Y-m-d'), $absence->getStartDate()->format('Y-m-d'));
+		$this->assertNull($result['tail']);
+	}
+
+	/**
+	 * QA finding (fail-closed guard): a LIVE reservation that is not yet
+	 * consumed (status active — e.g. a reservation attached post-approval by
+	 * any future path) must still block the mid-split. The guard checks
+	 * "not released", not only "consumed".
+	 */
+	public function testConvertEntitlementBackedActiveReservationMidSplitRejects(): void
+	{
+		$absence = $this->makeAbsenceRow(49, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_SPECIAL_LEAVE, '-5 days', '+9 days');
+		$reservation = new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation();
+		$reservation->setId(10);
+		$reservation->setStatus(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservation::STATUS_ACTIVE);
+		$reservation->setRevision(1);
+		$reservation->setPeriodId(5);
+		$reservations = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class);
+		$reservations->method('findByAbsenceId')->with(49)->willReturn($reservation);
+		$se = $this->entitlementServiceStub(['reservations' => $reservations]);
+		$service = $this->serviceWithEntitlements($this->mapperReturning($absence), $se);
+
+		try {
+			$service->convertVacationToSick(49, $this->convertData($absence, '+1 days', '+3 days'), 'alice', false);
+			$this->fail('mid-split must reject for ANY live reservation, not only consumed ones');
+		} catch (\Exception $e) {
+			$this->assertSame('entitlement_mid_split', $e->getMessage());
+		}
+		$this->assertSame(Absence::STATUS_APPROVED, $absence->getStatus());
+	}
+
+	/**
+	 * QA finding: a full conversion cancels the source row — an open cancel
+	 * request is moot and must be cleared in the same write, or the dead row
+	 * keeps a "Cancellation requested" badge + undecidable decide buttons.
+	 */
+	public function testConvertFullClearsOpenCancelRequestFlags(): void
+	{
+		$absence = $this->runningVacation();
+		$absence->setCancelRequestedAt(new \DateTime('now'));
+		$absence->setCancelRequestedBy('alice');
+		$absence->setCancelReason('family emergency');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+		$this->db->expects($this->once())->method('commit');
+
+		$this->service->convertVacationToSick(42, $this->convertData($absence, '-5 days', '+9 days'), 'alice', false);
+
+		$this->assertSame(Absence::STATUS_CANCELLED, $absence->getStatus());
+		$this->assertNull($absence->getCancelRequestedAt());
+		$this->assertNull($absence->getCancelRequestedBy());
+		$this->assertNull($absence->getCancelReason());
+	}
+
+	/**
+	 * QA finding: canDecideCancelRequest must express *decidability* —
+	 * a cancelled row with stale flags must not render decide buttons.
+	 */
+	public function testManagerFlagsHideDecisionOnCancelledRowWithStaleFlags(): void
+	{
+		$absence = $this->runningVacation();
+		$absence->setStatus(Absence::STATUS_CANCELLED);
+		$absence->setCancelRequestedAt(new \DateTime('now'));
+
+		$flags = $this->service->managerAbsenceActionFlags($absence);
+
+		$this->assertFalse($flags['canDecideCancelRequest']);
 	}
 }

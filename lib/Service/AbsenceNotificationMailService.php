@@ -402,6 +402,7 @@ class AbsenceNotificationMailService
 			'manager_rejected' => $this->l10n->t('Manager rejected'),
 			'employee_cancelled' => $this->l10n->t('Employee cancelled'),
 			'employee_shortened' => $this->l10n->t('Employee shortened'),
+			'manager_cancelled' => $this->l10n->t('Manager cancelled absence'),
 		];
 		return $map[$eventKey] ?? $eventKey;
 	}

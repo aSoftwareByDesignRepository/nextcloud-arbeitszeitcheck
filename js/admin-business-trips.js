@@ -139,11 +139,55 @@
 		return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
 	}
 
+	// Ultra-forgiving tier input parsing (spec FA-1): users paste values from
+	// collective agreements in German formats — normalise whitespace (incl.
+	// NBSP and zero-width space from PDF copy-paste), accept the documented
+	// format set, then validate. Ambiguous inputs ("8,5") fail instead of
+	// being guessed wrong — silent misparses are worse than a clear error.
 	function parseHm(value) {
-		const m = /^(\d{1,3}):([0-5]?\d)$/.exec(String(value || '').trim());
-		if (!m) return null;
-		const total = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-		return total <= 1440 ? total : null;
+		const raw = String(value || '').replace(/[\s\u200B]/g, '');
+		if (raw === '') return null;
+		const m = /^(\d{1,3}):([0-5]?\d)$/.exec(raw)
+			|| /^(\d{1,3})[.,hH]([0-5]\d)$/.exec(raw);
+		if (m) {
+			const total = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+			return total <= 1440 ? total : null;
+		}
+		if (/^\d{1,2}$/.test(raw)) {
+			const total = parseInt(raw, 10) * 60;
+			return total <= 1440 ? total : null;
+		}
+		if (/^\d{3,6}$/.test(raw)) {
+			const total = parseInt(raw, 10);
+			return total <= 1440 ? total : null;
+		}
+		return null;
+	}
+
+	function setTierFieldInvalid(input, invalid) {
+		if (invalid) {
+			input.setAttribute('aria-invalid', 'true');
+			input.setAttribute('aria-describedby', 'bta-threshold-formats bta-threshold-error');
+		} else {
+			input.removeAttribute('aria-invalid');
+			input.setAttribute('aria-describedby', 'bta-threshold-formats');
+		}
+	}
+
+	function hideThresholdError() {
+		if (!els.thresholdError) return;
+		els.thresholdError.hidden = true;
+		els.thresholdError.textContent = '';
+	}
+
+	function showThresholdError(badInputs) {
+		const rows = [...new Set(badInputs.map((b) => b.row))].join(', ');
+		const message = t('Check row %s: use a time like 8:00, 8.30, 8,30, 8h30, minutes (e.g. 480) or a bare hour (e.g. 8).').replace('%s', rows);
+		if (els.thresholdError) {
+			els.thresholdError.textContent = message;
+			els.thresholdError.hidden = false;
+		}
+		return message;
 	}
 
 	function showError(el, textEl, message) {
@@ -279,17 +323,19 @@
 		const inFrom = document.createElement('input');
 		inFrom.type = 'text';
 		inFrom.className = 'bta-hm';
-		inFrom.inputMode = 'numeric';
+		inFrom.inputMode = 'decimal';
 		inFrom.placeholder = '10:00';
 		inFrom.value = hm(from);
 		inFrom.setAttribute('aria-label', t('From (h:mm)'));
+		inFrom.setAttribute('aria-describedby', 'bta-threshold-formats');
 		const inTarget = document.createElement('input');
 		inTarget.type = 'text';
 		inTarget.className = 'bta-hm';
-		inTarget.inputMode = 'numeric';
+		inTarget.inputMode = 'decimal';
 		inTarget.placeholder = '9:00';
 		inTarget.value = hm(target);
 		inTarget.setAttribute('aria-label', t('Credits (h:mm)'));
+		inTarget.setAttribute('aria-describedby', 'bta-threshold-formats');
 		const del = document.createElement('button');
 		del.type = 'button';
 		del.className = 'azc-btn azc-btn--danger azc-icon-btn';
@@ -297,8 +343,21 @@
 		del.title = t('Remove');
 		del.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
 		del.addEventListener('click', () => { tr.remove(); runPreview(); });
-		inFrom.addEventListener('change', runPreview);
-		inTarget.addEventListener('change', runPreview);
+		[inFrom, inTarget].forEach((input) => {
+			input.addEventListener('input', () => {
+				// Clear this field's error eagerly; readConfig re-marks all
+				// remaining bad rows on the same debounce tick as the preview.
+				setTierFieldInvalid(input, false);
+				runPreview();
+			});
+			const formatOnCommit = () => {
+				const parsed = parseHm(input.value);
+				if (parsed !== null) input.value = hm(parsed);
+				runPreview();
+			};
+			input.addEventListener('change', formatOnCommit);
+			input.addEventListener('blur', formatOnCommit);
+		});
 		tdFrom.appendChild(inFrom);
 		tdTarget.appendChild(inTarget);
 		tdActions.appendChild(del);
@@ -307,31 +366,50 @@
 	}
 
 	function readConfig() {
-		const thresholds = [];
-		let error = null;
-		els.thresholdRows.querySelectorAll('tr').forEach((tr) => {
+		const parsed = [];
+		const badInputs = [];
+		els.thresholdRows.querySelectorAll('tr').forEach((tr, idx) => {
 			const [inFrom, inTarget] = tr.querySelectorAll('input.bta-hm');
+			if (!inFrom || !inTarget) return;
 			const f = parseHm(inFrom.value);
 			const g = parseHm(inTarget.value);
-			if (f === null || g === null) {
-				error = t('Every tier needs a “from” and a “credits” value as h:mm.');
-				return;
-			}
-			thresholds.push({ fromMinutes: f, targetMinutes: g });
+			if (f === null) badInputs.push({ input: inFrom, row: idx + 1 });
+			if (g === null) badInputs.push({ input: inTarget, row: idx + 1 });
+			setTierFieldInvalid(inFrom, f === null);
+			setTierFieldInvalid(inTarget, g === null);
+			if (f === null || g === null) return;
+			parsed.push({ input: inFrom, row: idx + 1, fromMinutes: f, targetMinutes: g });
 		});
-		if (error) return { error };
-		thresholds.sort((a, b) => a.fromMinutes - b.fromMinutes);
+		if (badInputs.length) {
+			return { error: showThresholdError(badInputs), firstInvalid: badInputs[0].input };
+		}
+		parsed.sort((a, b) => a.fromMinutes - b.fromMinutes);
+		const thresholds = parsed.map(({ fromMinutes, targetMinutes }) => ({ fromMinutes, targetMinutes }));
 		if (thresholds.length === 0) {
+			hideThresholdError();
 			return { error: t('Add at least one tier.') };
 		}
-		if (thresholds[0].fromMinutes !== 0) {
-			return { error: t('The first tier must start at 0:00.') };
+		if (parsed[0].fromMinutes !== 0) {
+			setTierFieldInvalid(parsed[0].input, true);
+			const error = t('The first tier must start at 0:00.');
+			if (els.thresholdError) {
+				els.thresholdError.textContent = t('Check row %s: the first tier must start at 0:00.').replace('%s', String(parsed[0].row));
+				els.thresholdError.hidden = false;
+			}
+			return { error, firstInvalid: parsed[0].input };
 		}
-		for (let i = 1; i < thresholds.length; i++) {
-			if (thresholds[i].fromMinutes <= thresholds[i - 1].fromMinutes) {
-				return { error: t('Tiers must be strictly increasing.') };
+		for (let i = 1; i < parsed.length; i++) {
+			if (parsed[i].fromMinutes <= parsed[i - 1].fromMinutes) {
+				setTierFieldInvalid(parsed[i].input, true);
+				const error = t('Tiers must be strictly increasing.');
+				if (els.thresholdError) {
+					els.thresholdError.textContent = t('Check row %s: tiers must be strictly increasing.').replace('%s', String(parsed[i].row));
+					els.thresholdError.hidden = false;
+				}
+				return { error, firstInvalid: parsed[i].input };
 			}
 		}
+		hideThresholdError();
 		const dayKinds = {};
 		[['first', els.kindFirst], ['middle', els.kindMiddle], ['last', els.kindLast], ['single', els.kindSingle]].forEach(([k, sel]) => {
 			if (sel.value) dayKinds[k] = sel.value;
@@ -430,14 +508,18 @@
 	els.builderClose.addEventListener('click', () => { els.builder.hidden = true; });
 	els.addThreshold.addEventListener('click', () => {
 		els.thresholdRows.appendChild(thresholdRow(0, 0));
+		runPreview();
 	});
 	els.operation.addEventListener('change', updateOperationHint);
 	els.previewBasis.addEventListener('change', runPreview);
 
 	let previewTimer = null;
+	let previewSeq = 0;
 	function runPreview() {
 		if (previewTimer) clearTimeout(previewTimer);
+		const seq = ++previewSeq;
 		previewTimer = setTimeout(async () => {
+			if (seq !== previewSeq) return;
 			els.previewRows.replaceChildren();
 			const basis = parseInt(els.previewBasis.value, 10);
 			const { config, error } = readConfig();
@@ -455,6 +537,7 @@
 					method: 'POST',
 					json: { configJson: JSON.stringify(config), basisMinutes: basis },
 				});
+				if (seq !== previewSeq) return; // stale response — a newer edit superseded this preview
 				els.previewRows.replaceChildren();
 				(body.rows || []).forEach((row) => {
 					const li = document.createElement('li');
@@ -466,6 +549,7 @@
 				});
 				els.previewStatus.textContent = '';
 			} catch (e) {
+				if (seq !== previewSeq) return;
 				els.previewStatus.textContent = e.message;
 			}
 		}, 350);
@@ -474,9 +558,10 @@
 	els.builderForm.addEventListener('submit', async (ev) => {
 		ev.preventDefault();
 		els.builderError.hidden = true;
-		const { config, error } = readConfig();
+		const { config, error, firstInvalid } = readConfig();
 		if (error) {
 			showError(els.builderError, els.builderErrorText, error);
+			if (firstInvalid) firstInvalid.focus();
 			return;
 		}
 		if (els.name.value.trim() === '') {
@@ -925,4 +1010,8 @@
 	loadScopeData();
 	loadPresets();
 	loadAll();
+
+	if (typeof window !== 'undefined') {
+		window.__ArbeitszeitCheckBtaTestables = { parseHm, hm, readConfig };
+	}
 })();

@@ -506,6 +506,11 @@ class VacationAllocationService
 		$usedTotal = 0.0;
 		$valid = true;
 		$shortfall = 0.0;
+		// FA-3: per-absence pool attribution for the payroll "UV" marker.
+		// FIFO means carryover always funds the chronologically earliest
+		// working days of an absence — carryover_amount=N deterministically
+		// says "the first N working days are prior-year leave".
+		$attributions = [];
 
 		foreach ($merged as $absence) {
 			$start = $absence->getStartDate();
@@ -561,6 +566,15 @@ class VacationAllocationService
 				$valid = false;
 				$shortfall += $need2;
 			}
+
+			if (!$isProspective && $absence->getId() !== null) {
+				$id = (int)$absence->getId();
+				if (!isset($attributions[$id])) {
+					$attributions[$id] = ['carryover_amount' => 0.0, 'annual_amount' => 0.0];
+				}
+				$attributions[$id]['carryover_amount'] += $fromC;
+				$attributions[$id]['annual_amount'] += $fromA + $fromA2;
+			}
 		}
 
 		$carryoverRem = max(0.0, $carryoverPool);
@@ -605,6 +619,16 @@ class VacationAllocationService
 			'vacation_year_start' => $rangeStart->format('Y-m-d'),
 			'vacation_year_end_inclusive' => $rangeEndInclusive->format('Y-m-d'),
 			'vacation_year_error' => $window->missingEmploymentStart ? Constants::VAC_YEAR_MISSING_START : null,
+			// FA-3 (additive): absenceId => {carryover_amount, annual_amount}
+			// in this window's unit (days or hours). uv_dates are derived
+			// on demand by attributeVacationAbsences().
+			'attributions' => array_map(
+				static fn (array $a) => [
+					'carryover_amount' => round($a['carryover_amount'], 4),
+					'annual_amount' => round($a['annual_amount'], 4),
+				],
+				$attributions
+			),
 		];
 
 		if ($persistEntitlementSnapshot) {
@@ -818,6 +842,114 @@ class VacationAllocationService
 	public function isAnniversaryMode(): bool
 	{
 		return $this->yearWindowResolver->isAnniversaryMode();
+	}
+
+	/**
+	 * FA-3: per-absence carryover/annual attribution for report & export.
+	 *
+	 * Runs the (already on-the-fly) FIFO allocation once per touched
+	 * (user, balance-year) and merges the per-absence pool shares. A
+	 * boundary-spanning absence can appear in two windows — amounts merge
+	 * additively and uv_dates are de-duplicated per date.
+	 *
+	 * `uv_dates` is the ISO list of working days funded by the carryover
+	 * pool: FIFO guarantees these are the chronologically earliest working
+	 * days of the absence (carryover can only fund the before-expiry
+	 * segment), so payroll can mark "UV" tag-exact without its own logic.
+	 *
+	 * @param Absence[] $absences
+	 * @return array<int, array{carryover_amount: float, annual_amount: float, uv_dates: list<string>}>
+	 */
+	public function attributeVacationAbsences(array $absences): array
+	{
+		$byUser = [];
+		foreach ($absences as $a) {
+			if ($a->getType() !== Absence::TYPE_VACATION
+				|| $a->getStatus() !== Absence::STATUS_APPROVED
+				|| $a->getId() === null
+				|| $a->getStartDate() === null
+				|| $a->getEndDate() === null) {
+				continue;
+			}
+			$byUser[$a->getUserId()][] = $a;
+		}
+
+		$out = [];
+		foreach ($byUser as $userId => $list) {
+			$minStart = null;
+			$maxEnd = null;
+			foreach ($list as $a) {
+				$s = $a->getStartDate();
+				$e = $a->getEndDate();
+				if ($minStart === null || $s < $minStart) {
+					$minStart = $s;
+				}
+				if ($maxEnd === null || $e > $maxEnd) {
+					$maxEnd = $e;
+				}
+			}
+			$windows = $this->yearWindowResolver->windowsOverlappingRange($userId, $minStart, $maxEnd);
+			$expiryByYear = [];
+			$weights = null;
+			foreach ($windows as $window) {
+				try {
+					$alloc = $this->computeYearAllocation($userId, $window->balanceYearKey, null, null, null, null, null, false);
+				} catch (\Throwable) {
+					continue;
+				}
+				$expiryByYear[$window->balanceYearKey] = $alloc['carryover_expires_on'] ?? null;
+				foreach (($alloc['attributions'] ?? []) as $id => $amounts) {
+					$id = (int)$id;
+					if (!isset($out[$id])) {
+						$out[$id] = ['carryover_amount' => 0.0, 'annual_amount' => 0.0, 'uv_dates' => []];
+					}
+					$out[$id]['carryover_amount'] += (float)$amounts['carryover_amount'];
+					$out[$id]['annual_amount'] += (float)$amounts['annual_amount'];
+				}
+			}
+			foreach ($list as $a) {
+				$id = (int)$a->getId();
+				$carry = $out[$id]['carryover_amount'] ?? 0.0;
+				if ($carry <= 0.0001) {
+					continue;
+				}
+				if ($weights === null) {
+					$weights = $this->holidayCalendarService->getHolidayWeightMapForUser($userId, $minStart, $maxEnd);
+				}
+				// Earliest expiry among windows that funded this absence —
+				// carryover can only cover days on/before that deadline.
+				$expiry = null;
+				foreach ($windows as $window) {
+					$exp = $expiryByYear[$window->balanceYearKey] ?? null;
+					if ($exp !== null && ($expiry === null || $exp > $expiry)) {
+						$expiry = $exp;
+					}
+				}
+				$cursor = \DateTime::createFromInterface($a->getStartDate())->setTime(0, 0, 0);
+				$stop = \DateTime::createFromInterface($a->getEndDate())->setTime(0, 0, 0);
+				if ($expiry !== null && $expiry < $stop->format('Y-m-d')) {
+					$stop = new \DateTime($expiry);
+				}
+				$acc = 0.0;
+				while ($cursor <= $stop && $acc < $carry - 0.0001) {
+					if ((int)$cursor->format('N') < 6) {
+						$key = $cursor->format('Y-m-d');
+						$w = 1.0 - (float)($weights[$key] ?? 0.0);
+						if ($w > 0.0001) {
+							$out[$id]['uv_dates'][] = $key;
+							$acc += min($w, 1.0);
+						}
+					}
+					$cursor->modify('+1 day');
+				}
+			}
+		}
+		foreach ($out as $id => &$entry) {
+			$entry['carryover_amount'] = round($entry['carryover_amount'], 4);
+			$entry['annual_amount'] = round($entry['annual_amount'], 4);
+			$entry['uv_dates'] = array_values(array_unique($entry['uv_dates']));
+		}
+		return $out;
 	}
 
 	private function resolveWindowForAllocation(

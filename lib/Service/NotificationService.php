@@ -263,6 +263,83 @@ class NotificationService
 	}
 
 	/**
+	 * FA-2b/2c: notify the owner that a manager cancelled their absence.
+	 */
+	public function notifyAbsenceCancelledByManager(string $userId, array $absenceData, ?string $reason = null): void
+	{
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($userId)
+			->setDateTime(new \DateTime())
+			->setObject('absence', (string)($absenceData['id'] ?? ''))
+			->setSubject('absence_manager_cancelled', [
+				'absence_id' => $absenceData['id'] ?? null,
+				'type' => $absenceData['type'] ?? 'vacation',
+				'start_date' => $absenceData['start_date'] ?? null,
+				'end_date' => $absenceData['end_date'] ?? null,
+				'reason' => $reason,
+			])
+			->setMessage('absence_manager_cancelled', [
+				'type' => $absenceData['type'] ?? 'vacation',
+				'reason' => $reason ?? $this->l10n->t('No reason provided'),
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
+	 * FA-2c: notify a manager that an employee filed a cancellation request
+	 * for a running absence — a decision task, not a reminder.
+	 */
+	public function notifyAbsenceCancelRequested(string $managerUserId, string $employeeUserId, array $absenceData, ?string $reason = null): void
+	{
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($managerUserId)
+			->setDateTime(new \DateTime())
+			->setObject('absence', (string)($absenceData['id'] ?? ''))
+			->setSubject('absence_cancel_requested', [
+				'absence_id' => $absenceData['id'] ?? null,
+				'employee' => $employeeUserId,
+				'type' => $absenceData['type'] ?? 'vacation',
+				'start_date' => $absenceData['start_date'] ?? null,
+				'end_date' => $absenceData['end_date'] ?? null,
+				'reason' => $reason,
+			])
+			->setMessage('absence_cancel_requested', [
+				'employee' => $employeeUserId,
+				'type' => $absenceData['type'] ?? 'vacation',
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
+	 * FA-2c: notify the owner that their cancellation request was declined.
+	 */
+	public function notifyAbsenceCancelDeclined(string $userId, array $absenceData, ?string $comment = null): void
+	{
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($userId)
+			->setDateTime(new \DateTime())
+			->setObject('absence', (string)($absenceData['id'] ?? ''))
+			->setSubject('absence_cancel_request_declined', [
+				'absence_id' => $absenceData['id'] ?? null,
+				'type' => $absenceData['type'] ?? 'vacation',
+				'start_date' => $absenceData['start_date'] ?? null,
+				'end_date' => $absenceData['end_date'] ?? null,
+				'comment' => $comment,
+			])
+			->setMessage('absence_cancel_request_declined', [
+				'type' => $absenceData['type'] ?? 'vacation',
+				'comment' => $comment ?? '',
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
 	 * Send a reminder to clock out
 	 *
 	 * @param string $userId User ID to notify

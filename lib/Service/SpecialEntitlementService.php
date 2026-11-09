@@ -381,6 +381,21 @@ final class SpecialEntitlementService
 		}
 	}
 
+	/**
+	 * Read-only check: does this absence carry a LIVE entitlement
+	 * reservation (active or consumed — anything not released)? Drives the
+	 * FA-2a convert gate: a mid-split spawns a tail row no reservation can
+	 * cover, so the guard must be fail-closed on every live state, not only
+	 * on consumed — an active reservation is still a reservation the tail
+	 * cannot inherit.
+	 */
+	public function hasLiveReservationForAbsence(Absence $absence): bool
+	{
+		$reservation = $this->reservations->findByAbsenceId((int)$absence->getId());
+		return $reservation !== null
+			&& $reservation->getStatus() !== SpecialEntitlementReservation::STATUS_RELEASED;
+	}
+
 	/** Called when an already-approved absence is shortened before a boundary. */
 	public function adjustConsumedAbsence(Absence $absence, array $data, array $oldSummary, string $actorUid): void
 	{

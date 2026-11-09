@@ -686,4 +686,111 @@ class VacationAllocationServiceTest extends TestCase
 		$this->assertSame(VacationYearWindow::MODE_ANNIVERSARY, $w2->mode);
 		$this->assertSame(2023, $w2->balanceYearKey);
 	}
+
+	public function testAttributeVacationAbsencesFifoSplitsCarryoverAndAnnual(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+
+		// A: Jan 5-9 (Mon-Fri, 5 wd) fully carryover; B: Feb 2-11 (8 wd) →
+		// pool has 5 left → carryover 5 + annual 3. FIFO across the year.
+		$mk = function (int $id, string $s, string $e): Absence {
+			$a = new Absence();
+			$a->setId($id);
+			$a->setUserId('u1');
+			$a->setType(Absence::TYPE_VACATION);
+			$a->setStatus(Absence::STATUS_APPROVED);
+			$a->setStartDate(new \DateTime($s));
+			$a->setEndDate(new \DateTime($e));
+			return $a;
+		};
+		$a = $mk(1, '2026-01-05', '2026-01-09');
+		$b = $mk(2, '2026-02-02', '2026-02-11');
+
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$absenceMapper->method('findVacationApprovedOverlappingYear')->willReturn([$a, $b]);
+
+		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$userWtm->method('findCurrentByUser')->willReturn(null);
+		$settings = $this->createMock(UserSettingsMapper::class);
+		$settings->method('getIntegerSetting')->willReturn(25);
+
+		$balance = $this->createMock(VacationYearBalanceMapper::class);
+		$balance->method('getCarryoverDays')->willReturn(10.0);
+
+		$holiday = $this->createMock(HolidayService::class);
+		$holiday->method('computeWorkingDaysForUser')->willReturnCallback(
+			static function (string $uid, \DateTime $start, \DateTime $end): float {
+				$n = 0;
+				$c = \DateTime::createFromInterface($start);
+				while ($c <= $end) {
+					if ((int)$c->format('N') < 6) {
+						$n++;
+					}
+					$c->modify('+1 day');
+				}
+				return (float)$n;
+			}
+		);
+		$holiday->method('getHolidayWeightMapForUser')->willReturn([]);
+
+		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
+		$attr = $s->attributeVacationAbsences([$a, $b]);
+
+		$this->assertEqualsWithDelta(5.0, $attr[1]['carryover_amount'], 0.001);
+		$this->assertEqualsWithDelta(0.0, $attr[1]['annual_amount'], 0.001);
+		$this->assertEqualsWithDelta(5.0, $attr[2]['carryover_amount'], 0.001);
+		$this->assertEqualsWithDelta(3.0, $attr[2]['annual_amount'], 0.001);
+
+		// uv_dates = chronologically earliest working days funded by
+		// carryover (A: all 5; B: first 5 of its 8 weekdays).
+		$this->assertSame(
+			['2026-01-05', '2026-01-06', '2026-01-07', '2026-01-08', '2026-01-09'],
+			$attr[1]['uv_dates']
+		);
+		$this->assertSame(
+			['2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05', '2026-02-06'],
+			$attr[2]['uv_dates']
+		);
+	}
+
+	public function testAttributeVacationAbsencesSkipsNonVacationAndNonApproved(): void
+	{
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnMap([
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH, '3', '3'],
+			['arbeitszeitcheck', Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY, '31', '31'],
+		]);
+
+		$mk = function (int $id, string $type, string $status): Absence {
+			$a = new Absence();
+			$a->setId($id);
+			$a->setUserId('u1');
+			$a->setType($type);
+			$a->setStatus($status);
+			$a->setStartDate(new \DateTime('2026-01-05'));
+			$a->setEndDate(new \DateTime('2026-01-09'));
+			return $a;
+		};
+
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		// FIFO pool only sees approved vacations (mapper contract).
+		$absenceMapper->method('findVacationApprovedOverlappingYear')->willReturn([]);
+		$userWtm = $this->createMock(UserWorkingTimeModelMapper::class);
+		$settings = $this->createMock(UserSettingsMapper::class);
+		$balance = $this->createMock(VacationYearBalanceMapper::class);
+		$holiday = $this->createMock(HolidayService::class);
+
+		$s = $this->makeService($config, $absenceMapper, $userWtm, $settings, $balance, $holiday);
+		$attr = $s->attributeVacationAbsences([
+			$mk(1, Absence::TYPE_HOME_OFFICE, Absence::STATUS_APPROVED),
+			$mk(2, Absence::TYPE_VACATION, Absence::STATUS_CANCELLED),
+			$mk(3, Absence::TYPE_VACATION, Absence::STATUS_PENDING),
+		]);
+
+		$this->assertSame([], $attr);
+	}
 }

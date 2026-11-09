@@ -188,6 +188,7 @@ $enabled = !empty($_['businessTripsEnabled']);
 							</thead>
 							<tbody id="bta-threshold-rows"></tbody>
 						</table>
+						<p class="form-help" id="bta-threshold-formats"><?php p($l->t('Accepted formats: 8:00, 8.30, 8,30, 8h30, minutes like 480, or a bare hour like 8.')); ?></p>
 						<p id="bta-threshold-error" class="azc-field-error" role="alert" hidden></p>
 						<button type="button" class="azc-btn azc-btn--secondary" id="bta-add-threshold"><?php p($l->t('Add tier')); ?></button>
 					</fieldset>

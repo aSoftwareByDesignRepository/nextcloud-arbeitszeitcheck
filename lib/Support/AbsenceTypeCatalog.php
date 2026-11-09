@@ -197,6 +197,35 @@ final class AbsenceTypeCatalog
 	}
 
 	/**
+	 * Fail-closed whitelist of absence types that may be converted into a
+	 * sick-leave record (FA-2a). Built-ins only — custom types piggyback on
+	 * {@see isConvertibleToSick()}. Sick-family types are the conversion
+	 * *target* family and parental leave is a status absence, so neither is
+	 * a convertible source.
+	 *
+	 * @var list<string>
+	 */
+	public const CONVERTIBLE_TO_SICK_TYPES = [
+		Absence::TYPE_VACATION,
+		Absence::TYPE_HOME_OFFICE,
+		Absence::TYPE_BUSINESS_TRIP,
+		Absence::TYPE_PERSONAL_LEAVE,
+		Absence::TYPE_SPECIAL_LEAVE,
+		Absence::TYPE_UNPAID_LEAVE,
+		Absence::TYPE_OVERTIME_COMP,
+	];
+
+	/**
+	 * Whitelist (not blacklist): a type is convertible to sick leave only
+	 * when explicitly listed or a custom type — unknown future types reject
+	 * instead of inheriting unverified side effects.
+	 */
+	public static function isConvertibleToSick(string $type): bool
+	{
+		return in_array($type, self::CONVERTIBLE_TO_SICK_TYPES, true) || self::isCustom($type);
+	}
+
+	/**
 	 * Localized display label (canonical Title-Case variant used by selects,
 	 * badges, mails, iCal and PDFs).
 	 */

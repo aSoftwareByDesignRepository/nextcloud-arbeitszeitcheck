@@ -45,21 +45,38 @@
 		return res.data;
 	}
 
-	function describePreview(data) {
+	function describePreview(data, ctx) {
 		const v = data.vacation || {};
 		const s = data.sick || {};
+		// Type-neutral copy: the dry-run payload carries no type, so the
+		// source type + its label come from the invoking button (FA-2a §7.2).
+		// Vacation keeps the original wording byte-for-byte (AC-S1).
+		const typeLabel = (ctx && ctx.typeLabel) || t('absence');
+		const isVacation = !ctx || ctx.sourceType === 'vacation';
 		const parts = [];
 		if (v.action === 'cancel') {
-			parts.push(t('The vacation is cancelled completely.'));
+			parts.push(isVacation
+				? t('The vacation is cancelled completely.')
+				: t('The %1$s is cancelled completely.').replace('%1$s', typeLabel));
 		} else if (v.action === 'shorten') {
-			parts.push(t('The vacation ends on %s.').replace('%s', fmt(v.newEnd)));
+			parts.push(isVacation
+				? t('The vacation ends on %s.').replace('%s', fmt(v.newEnd))
+				: t('The %1$s ends on %2$s.').replace('%1$s', typeLabel).replace('%2$s', fmt(v.newEnd)));
 		} else if (v.action === 'move_start') {
-			parts.push(t('The vacation starts on %s instead.').replace('%s', fmt(v.newStart)));
+			parts.push(isVacation
+				? t('The vacation starts on %s instead.').replace('%s', fmt(v.newStart))
+				: t('The %1$s starts on %2$s instead.').replace('%1$s', typeLabel).replace('%2$s', fmt(v.newStart)));
 		} else if (v.action === 'shorten_and_split') {
-			parts.push(t('The vacation is shortened to %s and continues again from %s to %s.')
-				.replace('%s', fmt(v.newEnd))
-				.replace('%s', fmt(data.tail ? data.tail.start : ''))
-				.replace('%s', fmt(data.tail ? data.tail.end : '')));
+			parts.push(isVacation
+				? t('The vacation is shortened to %s and continues again from %s to %s.')
+					.replace('%s', fmt(v.newEnd))
+					.replace('%s', fmt(data.tail ? data.tail.start : ''))
+					.replace('%s', fmt(data.tail ? data.tail.end : ''))
+				: t('The %1$s is shortened to %2$s and continues again from %3$s to %4$s.')
+					.replace('%1$s', typeLabel)
+					.replace('%2$s', fmt(v.newEnd))
+					.replace('%3$s', fmt(data.tail ? data.tail.start : ''))
+					.replace('%4$s', fmt(data.tail ? data.tail.end : '')));
 		}
 		const statusLabel = s.status === 'approved' ? t('approved') : t('pending approval');
 		parts.push(t('Sick leave from %s to %s (%s working days) is recorded as %s.')
@@ -149,7 +166,7 @@
 					reason: reasonEl.value.trim(),
 					dryRun: '1',
 				});
-				previewEl.textContent = describePreview(data);
+				previewEl.textContent = describePreview(data, ctx);
 			} catch (e) {
 				previewEl.textContent = '';
 			}
@@ -198,6 +215,11 @@
 					setTimeout(() => window.location.reload(), 1600);
 					return;
 				}
+				if (err.code === 'entitlement_mid_split') {
+					showError(t('This absence is bound to a special entitlement — the sick period must touch the start or the end of the absence.'));
+					submitBtn.disabled = false;
+					return;
+				}
 				showError(err.message);
 				submitBtn.disabled = false;
 			}
@@ -216,16 +238,19 @@
 		e.preventDefault();
 		const d = btn.dataset;
 		const isManager = d.sickConvertFlow === 'manager';
+		const typeLabel = d.typeLabel || t('absence');
 		open({
 			url: d.sickConvertUrl,
 			vacStart: d.vacStart,
 			vacEnd: d.vacEnd,
 			updatedAt: d.updatedAt,
 			showReason: isManager,
-			title: t('Convert vacation to sick leave'),
+			sourceType: d.sourceType || 'vacation',
+			typeLabel,
+			title: t('Convert %s to sick leave').replace('%s', typeLabel),
 			subtitle: isManager
-				? t('Converts the approved vacation into sick leave. The employee is notified; vacation days are credited back.')
-				: t('Were you sick during your vacation? Select the sick days. The vacation is shortened and the days are credited back.'),
+				? t('Converts the approved absence into sick leave. The employee is notified; the days are credited back.')
+				: t('Were you sick during this absence? Select the sick days. The absence is shortened and the days are credited back.'),
 		});
 	});
 })();

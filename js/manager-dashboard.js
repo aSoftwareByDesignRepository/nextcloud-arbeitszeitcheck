@@ -389,22 +389,25 @@
         itemsEl.setAttribute('aria-hidden', 'true');
         emptyEl.classList.add('visually-hidden');
 
-        Utils.ajax('/apps/arbeitszeitcheck/api/manager/pending-approvals?type=absence', {
+        Utils.ajax('/apps/arbeitszeitcheck/api/manager/pending-approvals', {
             method: 'GET',
             onSuccess: function(data) {
                 loadingEl.classList.add('visually-hidden');
                 loadingEl.setAttribute('aria-hidden', 'true');
                 const list = (data && data.pendingApprovals) ? data.pendingApprovals : [];
                 const absences = list.filter(function(item) { return item.type === 'absence'; });
-                if (absences.length === 0) {
+                const cancelRequests = list.filter(function(item) { return item.type === 'absence_cancel_request'; });
+                if (absences.length === 0 && cancelRequests.length === 0) {
                     emptyEl.classList.remove('visually-hidden');
                     emptyEl.textContent = t('No pending absence requests.', 'No pending absence requests.');
                     itemsEl.innerHTML = '';
                 } else {
                     emptyEl.classList.add('visually-hidden');
                     itemsEl.setAttribute('aria-hidden', 'false');
-                    itemsEl.innerHTML = absences.map(function(item) { return renderAbsenceCard(item); }).join('');
+                    itemsEl.innerHTML = absences.map(function(item) { return renderAbsenceCard(item); }).join('')
+                        + cancelRequests.map(function(item) { return renderCancelRequestCard(item); }).join('');
                     bindAbsenceButtons();
+                    bindCancelRequestButtons();
                     bindBulkCheckboxes(itemsEl);
                     pruneBulkSelection();
                 }
@@ -549,6 +552,120 @@
     function removeAbsenceCard(absenceId) {
         const card = document.querySelector('.pending-approval-card[data-absence-id="' + absenceId + '"]');
         if (card) card.remove();
+    }
+
+    // ===== PENDING CANCEL REQUESTS (FA-2c) =====
+    function renderCancelRequestCard(item) {
+        const s = parseSummary(item.summary);
+        const start = formatDateForDisplay(s.start_date || s.startDate || '');
+        const end = formatDateForDisplay(s.end_date || s.endDate || '');
+        const days = s.days != null ? s.days : '';
+        const id = item.id;
+        const displayName = escapeHtml(item.displayName || item.userId || '');
+        const typeDisplay = escapeHtml(s.typeLabel || s.type || t('Absence', 'Absence'));
+        const reason = escapeHtml(s.cancelRequestReason || '');
+        const updatedAt = escapeHtml(s.updatedAt || '');
+        return (
+            '<div class="pending-approval-card pending-approval-card--absence" data-absence-id="' + escapeHtml(String(id)) + '" role="article">' +
+            '  <div class="pending-approval-card__body">' +
+            '    <p class="pending-approval-card__title"><strong>' + displayName + '</strong> – ' + typeDisplay +
+            '      <span class="azc-status-chip" data-status="cancel_requested">' + escapeHtml(t('Cancellation requested', 'Cancellation requested')) + '</span></p>' +
+            '    <p class="pending-approval-card__meta">' + escapeHtml(start) + ' – ' + escapeHtml(end) + (days !== '' ? ' (' + escapeHtml(String(days)) + ' ' + t('days', 'days') + ')' : '') + '</p>' +
+            (reason !== '' ? '    <p class="pending-approval-card__meta">' + escapeHtml(t('Reason (from employee)', 'Reason (from employee)')) + ': ' + reason + '</p>' : '') +
+            '    <div class="pending-approval-card__actions">' +
+            '      <button type="button" class="azc-btn azc-btn--primary btn-approve-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" aria-label="' + t('Approve cancellation', 'Approve cancellation') + ' ' + displayName + '">' + t('Approve cancellation', 'Approve cancellation') + '</button>' +
+            '      <button type="button" class="azc-btn azc-btn--secondary btn-decline-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" aria-label="' + t('Decline cancellation', 'Decline cancellation') + ' ' + displayName + '">' + t('Decline', 'Decline') + '</button>' +
+            '    </div>' +
+            '  </div>' +
+            '</div>'
+        );
+    }
+
+    function bindCancelRequestButtons() {
+        document.querySelectorAll('.btn-approve-cancel-request').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                decideCancelRequest(this, 'approve', null);
+            });
+        });
+        document.querySelectorAll('.btn-decline-cancel-request').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                showDeclineCancelRequestModal(this);
+            });
+        });
+    }
+
+    function showDeclineCancelRequestModal(btn) {
+        const absenceId = parseInt(btn.getAttribute('data-absence-id'), 10);
+        const modalId = 'decline-cancel-request-modal-' + absenceId;
+        if (document.getElementById(modalId)) {
+            Components.openModal(modalId);
+            return;
+        }
+        const textareaId = 'decline-cancel-request-reason-' + absenceId;
+        const content = [
+            '<p class="reject-modal-desc" id="decline-cancel-request-desc-' + absenceId + '">' + escapeHtml(t('The absence stays approved. The employee is notified.', 'The absence stays approved. The employee is notified.')) + '</p>',
+            '<label for="' + textareaId + '" class="visually-hidden">' + escapeHtml(t('Comment (optional)', 'Comment (optional)')) + '</label>',
+            '<textarea id="' + textareaId + '" rows="3" class="reject-modal-textarea" placeholder="' + escapeHtml(t('Comment (optional)', 'Comment (optional)')) + '" maxlength="500" aria-describedby="decline-cancel-request-desc-' + absenceId + '"></textarea>',
+            '<div class="reject-modal-actions">',
+            '  <button type="button" class="azc-btn azc-btn--secondary btn-reject-modal-cancel">' + t('Cancel', 'Cancel') + '</button>',
+            '  <button type="button" class="azc-btn azc-btn--primary btn-reject-modal-confirm">' + t('Decline', 'Decline') + '</button>',
+            '</div>'
+        ].join('');
+        const modal = Components.createModal({
+            id: modalId,
+            title: t('Decline cancellation', 'Decline cancellation'),
+            content: content,
+            size: 'md'
+        });
+        const textarea = modal.querySelector('#' + textareaId);
+        modal.querySelector('.btn-reject-modal-cancel').addEventListener('click', function() { Components.closeModal(modal); });
+        modal.querySelector('.btn-reject-modal-confirm').addEventListener('click', function() {
+            const comment = textarea ? textarea.value.trim() : '';
+            Components.closeModal(modal);
+            decideCancelRequest(btn, 'decline', comment || null);
+        });
+        Components.openModal(modalId);
+        if (textarea) setTimeout(function() { textarea.focus(); }, 100);
+    }
+
+    function decideCancelRequest(btn, decision, comment) {
+        const absenceId = parseInt(btn.getAttribute('data-absence-id'), 10);
+        const updatedAt = btn.getAttribute('data-updated-at') || '';
+        btn.disabled = true;
+        const payload = { expectedUpdatedAt: updatedAt };
+        if (decision === 'decline' && comment) {
+            payload.comment = comment;
+        }
+        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/employee-absences/' + absenceId + '/cancel-request/' + decision), {
+            method: 'POST',
+            data: payload,
+            onSuccess: function(data) {
+                if (data.success) {
+                    Messaging.showSuccess(decision === 'approve'
+                        ? t('Absence cancelled.', 'Absence cancelled.')
+                        : t('Cancellation request declined.', 'Cancellation request declined.'));
+                    removeAbsenceCard(absenceId);
+                    loadPendingApprovals();
+                } else {
+                    btn.disabled = false;
+                    if (data.error_code === 'revision_stale' || data.error_code === 'no_cancel_request') {
+                        Messaging.showError(t('The request changed in the meantime. The list was reloaded.', 'The request changed in the meantime. The list was reloaded.'));
+                        loadPendingApprovals();
+                    } else {
+                        Messaging.showError(data.error || t('Failed to decide the request.', 'Failed to decide the request.'));
+                    }
+                }
+            },
+            onError: function(xhr) {
+                btn.disabled = false;
+                if (xhr && xhr.status === 409) {
+                    Messaging.showError(t('The request changed in the meantime. The list was reloaded.', 'The request changed in the meantime. The list was reloaded.'));
+                    loadPendingApprovals();
+                } else {
+                    Messaging.showError(t('Failed to decide the request.', 'Failed to decide the request.'));
+                }
+            }
+        });
     }
 
     // ===== PENDING TIME ENTRY CORRECTIONS =====

@@ -301,10 +301,10 @@ $holidaysUiStrings = [
 
 				<aside class="azc-callout azc-callout--info admin-holidays__legend" aria-label="<?php p($l->t('Column explanations')); ?>">
 					<p class="azc-callout__text">
-						<?php p($l->t('"Type" determines whether a day is treated as a full-day holiday (not counted as a working day) or as a half-day holiday (e.g., 0.5 vacation day).')); ?>
+						<?php p($l->t('"Full-day holiday" or "Half-day holiday" determines how the day is counted: a full-day holiday is not a working day, a half-day holiday counts as half a day (e.g. 0.5 vacation day).')); ?>
 					</p>
 					<p class="azc-callout__text">
-						<?php p($l->t('"Scope" distinguishes between statutory holidays, organization-wide company holidays, and custom entries. Statutory holidays are usually full-day; in Switzerland some statutory days (e.g. Sechseläuten) are half-day and count as 0.5.')); ?>
+						<?php p($l->t('"Statutory", "Company holiday" or "custom" determines where the entry comes from and whom it applies to: statutory holidays come from the official calendar of the region, company holidays apply organisation-wide, custom entries are your own individual days. Statutory holidays are usually full-day; in Switzerland some statutory days (e.g. Sechseläuten) are half-day and count as 0.5.')); ?>
 					</p>
 				</aside>
 

@@ -942,7 +942,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	 */
 	private const LEGIT_PL_NEAR_DONOR_TOKENS = [
 		'absolutne', 'administratora', 'administratorem', 'androida', 'centralne', 'duplikaty', 'dyrektor',
-		'elementem', 'elementu', 'elementy', 'formatu', 'formularz', 'globalne', 'hierarchii', 'historia',
+		'elementem', 'elementu', 'elementy', 'formatu', 'formaty', 'formularz', 'globalne', 'hierarchii', 'historia',
 		'historii', 'historią', 'historię', 'importu', 'importy', 'kantonu', 'katalogu', 'kategoria',
 		'kategorii', 'kategorię', 'kohorty', 'komputer', 'kontrole', 'laptopa', 'leopolda', 'minimalne',
 		'mobilne', 'momentu', 'normalne', 'outlooku', 'problemu', 'problemy', 'procent', 'profilu',

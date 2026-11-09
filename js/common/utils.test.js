@@ -62,6 +62,19 @@ describe('ArbeitszeitCheckUtils', () => {
     expect(el.innerHTML).toBe('&lt;b&gt;hi&lt;/b&gt;')
   })
 
+  it('createElement binds on* props as listeners, never as attributes', () => {
+    const u = window.ArbeitszeitCheckUtils
+    const onClick = vi.fn()
+    const el = u.createElement('button', { onClick })
+    expect(el.hasAttribute('onclick')).toBe(false)
+    el.dispatchEvent(new Event('click'))
+    expect(onClick).toHaveBeenCalledTimes(1)
+    // a string on* value still falls through to setAttribute unchanged
+    // (pre-delta behavior — no implicit eval surface added)
+    const el2 = u.createElement('button', { onmouseover: 'x' })
+    expect(el2.getAttribute('onmouseover')).toBe('x')
+  })
+
   it('formatTime returns 24h time and handles invalid dates', () => {
     const u = window.ArbeitszeitCheckUtils
     expect(u.formatTime('invalid')).toBe('00:00')

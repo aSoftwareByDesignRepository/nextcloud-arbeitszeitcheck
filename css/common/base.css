@@ -196,7 +196,7 @@
 }
 
 /* Link Reset — exclude button anchors and stat tiles so they keep their own chrome */
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-stat-tile) {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile) {
   color: inherit;
   text-decoration: inherit;
   background-color: transparent;
@@ -360,23 +360,7 @@ template {
   outline-offset: 2px;
 }
 
-/* Skip Links for Accessibility */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 6px;
-  background: var(--arbeitszeitcheck-color-primary);
-  color: var(--arbeitszeitcheck-color-text-inverse);
-  padding: 8px;
-  text-decoration: none;
-  border-radius: 4px;
-  z-index: 1000;
-  transition: top 0.3s;
-}
-
-.skip-link:focus {
-  top: 6px;
-}
+/* Skip links are provided by Nextcloud core's #skip-actions strip. */
 
 /* Selection Styles */
 ::selection {
@@ -607,19 +591,19 @@ button:disabled {
 }
 
 /* Link Base Styles — exclude button anchors, badge chips, settings chip bar, stat tiles */
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile) {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile) {
   color: var(--azc-text, var(--color-main-text));
   text-decoration: underline;
   text-underline-offset: 0.12em;
   transition: color 0.15s ease-in-out, text-decoration-color 0.15s ease-in-out;
 }
 
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile):hover {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile):hover {
   color: var(--azc-text, var(--color-main-text));
   text-decoration: underline;
 }
 
-#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-stat-tile):focus {
+#app-content-wrapper a:not(.btn):not(.azc-btn):not(.azc-badge):not(.azc-scope-strip__chip):not(.azc-settings-nav__link):not(.azc-settings-nav__tab):not(.azc-stat-tile):focus {
   outline: 3px solid var(--arbeitszeitcheck-color-border-focus, var(--color-primary-element));
   outline-offset: 2px;
 }

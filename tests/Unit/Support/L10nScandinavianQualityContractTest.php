@@ -868,7 +868,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'problemet', 'procent', 'produktion', 'profil', 'projekt', 'projektet', 'projektteam',
 		'projektteamet', 'punkt', 'rapport', 'rapporten', 'rapportens', 'rapporter', 'rapportering',
 		'rapportperioden', 'realtid', 'receptions', 'redigering', 'reduktionen', 'reformationsdagen', 'regel',
-		'regelresultatet', 'regionen', 'register', 'registrering', 'registreringen',
+		'regelresultatet', 'regionen', 'regionens', 'register', 'registrering', 'registreringen',
 		'registreringsdetaljer', 'regler', 'rekordtid', 'resultat', 'resultatet', 'resumé', 'revisionslog',
 		'revisionsregister', 'rotation', 'ruperts', 'rådgivning', 'satser', 'schweiz', 'schweizisk',
 		'sekunder', 'separat', 'serverproblem', 'sessionen', 'sessioner', 'signatur', 'simulering',

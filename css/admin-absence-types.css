@@ -25,12 +25,6 @@
 	margin-top: 0.125rem;
 	word-break: break-all;
 }
-
-.cat-empty {
-	padding: 2rem 1rem;
-	color: var(--color-text-maxcontrast);
-}
-
 /* Admin-chosen calendar color preview — small, non-interactive dot. */
 .cat-swatch {
 	display: inline-block;

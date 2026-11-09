@@ -1,71 +1,15 @@
 /* Business trips — employee, manager, and admin surfaces. */
 
-.bt-trip-list {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	margin: 0;
-	padding: 0;
-	list-style: none;
+/* Trip list table: slightly taller rows than the shared td base
+   (space-3 = 12px → 14px = +4px row height). */
+#app-content.azc-app #bt-trip-table tbody td {
+	padding-block: calc(var(--azc-space-3, var(--space-3, 12px)) + 2px);
 }
 
-.bt-trip-item {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	padding: 10px 14px;
-}
-
-.bt-trip-item__link,
-.bt-trip-item__button {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	flex: 1 1 auto;
-	min-width: 0;
-	text-align: start;
-	background: none;
-	border: none;
-	padding: 0;
-	font: inherit;
-	color: inherit;
-	cursor: pointer;
+/* The row's primary link reads as row title, not inline text — the global
+   link recipe (1 ID + 5 class :not()s) needs a 2-ID selector to override. */
+#app-content-wrapper #bt-trip-table tbody td:first-child a {
 	text-decoration: none;
-}
-
-.bt-trip-item__button {
-	cursor: pointer;
-}
-
-.bt-trip-item__link:hover .bt-trip-item__title,
-.bt-trip-item__button:hover .bt-trip-item__title,
-.bt-trip-item__link:focus-visible .bt-trip-item__title,
-.bt-trip-item__button:focus-visible .bt-trip-item__title {
-	text-decoration: underline;
-}
-
-.bt-trip-item__title {
-	font-weight: 600;
-	color: var(--color-main-text, #222);
-}
-
-.bt-trip-item__sub {
-	font-size: 0.85em;
-	/* muted-on-tinted-row failed axe 4.5:1 (maxcontrast ≈ 4.08 on the
-	 * primary-light item fill) — size carries the hierarchy instead. */
-	color: var(--color-main-text);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.bt-trip-item__main {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	flex: 1 1 auto;
-	min-width: 0;
 }
 
 .bt-step {
@@ -129,19 +73,27 @@
 }
 
 .bt-summary__item {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-1, 4px);
 	padding: 12px 14px;
 	border: 1px solid var(--color-border, #e5e5e5);
 	border-radius: var(--border-radius-large, 8px);
 	background: var(--color-background-hover, #f7f7f7);
 }
 
+/* Title row and value row are explicit stacked rows — dd base styles
+   (margin-left) must not leak in, and long German labels wrap cleanly. */
 .bt-summary__item dt {
+	flex: 0 0 auto;
 	font-size: 0.82em;
 	color: var(--color-text-maxcontrast, #767676);
-	margin: 0 0 4px;
+	margin: 0;
+	overflow-wrap: anywhere;
 }
 
 .bt-summary__item dd {
+	flex: 0 0 auto;
 	margin: 0;
 	font-size: 1.25em;
 	font-weight: 600;
@@ -178,6 +130,32 @@
 .mbt-reject-group {
 	margin-block-start: 12px;
 	max-width: 560px;
+}
+
+/* Create-trip form: two columns, optional purpose spans both. */
+.bt-create-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: var(--azc-space-4, 16px);
+	margin-bottom: var(--azc-space-4, 16px);
+}
+
+.bt-create-grid .form-group {
+	margin-bottom: 0;
+}
+
+.bt-create-grid__span {
+	grid-column: 1 / -1;
+}
+
+@media (max-width: 639.98px) {
+	.bt-create-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.bt-create-grid__span {
+		grid-column: auto;
+	}
 }
 
 .bta-threshold-table {
@@ -309,10 +287,6 @@
 	.mbt-cards {
 		grid-template-columns: 1fr;
 	}
-
-	.bt-trip-item {
-		flex-wrap: wrap;
-	}
 }
 
 /* Admin rollout card (Phase 6) */
@@ -322,10 +296,100 @@
 	gap: 8px;
 }
 
-.bta-rollout-check {
+.bta-rollout-group {
+	margin-block-start: var(--azc-space-4, 16px);
+}
+
+.bta-rollout-group__title {
+	margin: 0 0 var(--azc-space-2, 8px);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 600;
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+.bta-steps {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-2, 8px);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bta-step {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--azc-space-3, 12px);
+	padding: 10px 14px;
+	border: 1px solid var(--color-border, #e5e5e5);
+	border-radius: var(--azc-radius-md, 12px);
+}
+
+.bta-step__icon {
+	flex: 0 0 auto;
+	display: inline-flex;
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+.bta-step__icon .azc-icon {
+	width: 20px;
+	height: 20px;
+}
+
+.bta-step__text {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bta-step__note {
+	font-size: var(--azc-fs-sm, 0.875rem);
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+.bta-step__action {
+	flex: 0 0 auto;
+}
+
+.bta-step--done {
+	border-color: color-mix(in srgb, var(--color-success, #2d8a4e) 35%, var(--color-border, #e5e5e5));
+}
+
+.bta-step--done .bta-step__icon {
+	color: var(--color-success, #2d8a4e);
+}
+
+.bta-step--blocked {
+	border-style: dashed;
+}
+
+.bta-step--blocked .bta-step__text {
+	color: var(--color-text-maxcontrast, #767676);
+}
+
+.bta-step--info {
+	border-color: transparent;
+	padding-block: 4px;
+}
+
+.bta-step--info .bta-step__icon {
+	color: var(--color-primary-element, var(--arbeitszeitcheck-color-primary, #0082c9));
+}
+
+@media (max-width: 639.98px) {
+	.bta-step {
+		flex-wrap: wrap;
+	}
+
+	.bta-step__action {
+		flex: 1 1 100%;
+	}
+
+	.bta-step__action .azc-btn {
+		width: 100%;
+	}
 }
 
 .azc-card__header-actions {

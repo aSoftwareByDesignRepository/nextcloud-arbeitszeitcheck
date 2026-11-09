@@ -149,7 +149,7 @@
         const tbody = Utils.$('#violations-tbody');
         if (tbody) {
             const loadingMsg = cvT('Loading...');
-            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center">' + Utils.escapeHtml(loadingMsg) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + Utils.escapeHtml(loadingMsg) + '</h3></div></td></tr>';
             syncViolationPager(true);
         }
 
@@ -160,7 +160,7 @@
                     renderViolations(data.violations);
                 } else {
                     const errorMsg = (data && data.error) ? data.error : cvT('Error loading violations');
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + Utils.escapeHtml(errorMsg) + '</h3></div></td></tr>';
                     syncViolationPager(true);
                 }
             },
@@ -171,7 +171,7 @@
                     clearButtonSelector: '#violations-employee-filter-clear',
                 });
                 const errorMsg = (error && error.error) ? error.error : cvT('Error loading violations');
-                if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + Utils.escapeHtml(errorMsg) + '</td></tr>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + Utils.escapeHtml(errorMsg) + '</h3></div></td></tr>';
                 syncViolationPager(true);
                 if (Messaging && Messaging.showError) {
                     const failMsg = (error && error.error) ? error.error : cvT('Failed to load violations. Please try again.');
@@ -189,7 +189,7 @@
         if (!tbody) return;
 
         if (violations.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center empty-state">' + cvT('No violations found') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + cvT('No violations found') + '</h3></div></td></tr>';
             syncViolationPager(true);
             return;
         }

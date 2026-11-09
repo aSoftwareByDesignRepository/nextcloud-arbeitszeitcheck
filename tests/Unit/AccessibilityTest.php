@@ -109,9 +109,10 @@ class AccessibilityTest extends TestCase {
 		$this->assertStringContainsString(':focus-visible', $content,
 			'CSS should support focus-visible');
 
-		// Check for skip links
-		$this->assertStringContainsString('.skip-link', $content,
-			'CSS should contain skip link styles');
+		// Skip links are delegated to Nextcloud core's #skip-actions strip —
+		// the app must not ship its own .skip-link styles.
+		$this->assertStringNotContainsString('.skip-link', $content,
+			'CSS must not define app-side skip link styles');
 	}
 
 	/**

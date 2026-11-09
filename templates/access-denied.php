@@ -17,7 +17,7 @@ $homeUrl = (string)($_['homeUrl'] ?? '/');
 ?>
 <div id="app-content" class="azc-app azc-app--access-denied">
 	<div id="app-content-wrapper" class="azc-shell azc-shell--minimal">
-	<a class="azc-skip-link" href="#azc-denied-main"><?php p($l->t('Skip to main content')); ?></a>
+	<?php /* Skip links are provided by Nextcloud core's #skip-actions strip. */ ?>
 	<div class="azc-denied">
 		<section id="azc-denied-main" class="azc-card azc-denied__card" role="alert" aria-labelledby="azc-denied-title" tabindex="-1">
 			<div class="azc-page-header__icon azc-denied__icon" aria-hidden="true">

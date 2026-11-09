@@ -10,9 +10,8 @@
 	if (!root) return;
 	const t = (text) => (typeof window.t === 'function' ? window.t('arbeitszeitcheck', text) : text);
 	const token = document.querySelector('head')?.dataset.requesttoken || window.OC?.requestToken || '';
-	const list = document.getElementById('se-accounts-list');
+	const grid = document.getElementById('se-accounts-grid');
 	const status = document.getElementById('se-accounts-status');
-	const history = document.getElementById('se-account-history');
 
 	async function request(url) {
 		const response = await fetch(url, {
@@ -32,38 +31,13 @@
 	function fmt(v, unit) {
 		const n = Number(v);
 		if (!Number.isFinite(n)) return '—';
-		return `${n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)} ${unit === 'hours' ? t('hours') : t('days')}`;
+		return `${fmtNum(v)} ${unit === 'hours' ? t('hours') : t('days')}`;
 	}
 
-	async function loadHistory(typeCode, titleEl, listEl) {
-		listEl.replaceChildren();
-		try {
-			const url = root.dataset.historyTemplate.replace('__ID__', encodeURIComponent(typeCode));
-			const body = await request(url);
-			const periods = body.periods || [];
-			periods.forEach((p) => {
-				(p.entries || []).forEach((e) => {
-					const li = document.createElement('li');
-					li.className = 'azc-list__item';
-					const text = document.createElement('span');
-					const kind = { debit: t('Debited'), credit: t('Credited'), correction: t('Correction') }[e.kind] || e.kind;
-					text.textContent = `${kind} ${fmt(e.amount, body.unit)} · ${p.periodStart} – ${p.periodEnd}`;
-					li.append(text);
-					listEl.append(li);
-				});
-			});
-			if (listEl.childElementCount === 0) {
-				const li = document.createElement('li');
-				li.className = 'azc-list__item';
-				li.textContent = t('No ledger entries.');
-				listEl.append(li);
-			}
-		} catch (e) {
-			const li = document.createElement('li');
-			li.className = 'azc-list__item';
-			li.textContent = e.message;
-			listEl.append(li);
-		}
+	function fmtNum(v) {
+		const n = Number(v);
+		if (!Number.isFinite(n)) return '—';
+		return n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2);
 	}
 
 	async function load() {
@@ -76,40 +50,35 @@
 				return; // keep the whole card hidden — spec: no misleading empty state for employees
 			}
 			root.hidden = false;
-			list.replaceChildren();
-			visible.forEach((item) => {
-				const li = document.createElement('li');
-				li.className = 'azc-list__item se-account-card';
-				const main = document.createElement('div');
-				const title = document.createElement('strong');
+			grid.replaceChildren();
+			visible.forEach((item, index) => {
+				const card = document.createElement('div');
+				card.className = 'stat-card stat-card--se-account';
+				const labelId = `se-stat-${index}-label`;
+				const title = document.createElement('span');
+				title.className = 'stat-label';
+				title.id = labelId;
 				title.textContent = item.label;
-				const meta = document.createElement('p');
-				meta.className = 'form-help';
-				meta.textContent = [
-					`${t('Available')}: ${fmt(item.available, item.unit)}`,
+				const value = document.createElement('span');
+				value.className = 'stat-value stat-value--secondary';
+				value.setAttribute('aria-labelledby', labelId);
+				value.textContent = fmtNum(item.available);
+				const sublabel = document.createElement('span');
+				sublabel.className = 'stat-sublabel';
+				sublabel.textContent = item.unit === 'hours' ? t('hours') : t('days');
+				const facts = document.createElement('ul');
+				facts.className = 'stat-card__facts';
+				[
 					`${t('Total')}: ${fmt(item.total, item.unit)}`,
 					`${t('Reserved')}: ${fmt(item.reserved, item.unit)}`,
-					`${t('Used')}: ${fmt(item.used, item.unit)}`,
 					item.periodEnd ? `${t('until')} ${item.periodEnd}` : '',
-				].filter(Boolean).join(' · ');
-				main.append(title, meta);
-				li.append(main);
-				const actions = document.createElement('span');
-				actions.className = 'azc-list__actions';
-				const btn = document.createElement('button');
-				btn.type = 'button';
-				btn.className = 'azc-btn azc-btn--secondary';
-				btn.textContent = t('History');
-				btn.setAttribute('aria-label', `${t('History for')} ${item.label}`);
-				btn.addEventListener('click', async () => {
-					history.hidden = false;
-					document.getElementById('se-account-history-title').textContent = `${item.label}`;
-					await loadHistory(item.typeCode, null, document.getElementById('se-account-history-list'));
-					history.scrollIntoView({ block: 'nearest' });
+				].filter(Boolean).forEach((text) => {
+					const li = document.createElement('li');
+					li.textContent = text;
+					facts.append(li);
 				});
-				actions.append(btn);
-				li.append(actions);
-				list.append(li);
+				card.append(title, value, sublabel, facts);
+				grid.append(card);
 			});
 			status.textContent = '';
 		} catch (e) {
@@ -118,10 +87,6 @@
 			root.hidden = false;
 		}
 	}
-
-	document.getElementById('se-account-history-close').addEventListener('click', () => {
-		history.hidden = true;
-	});
 
 	load();
 })();

@@ -155,30 +155,6 @@
   line-height: 1.3;
 }
 
-/* Core sets table { white-space: nowrap }. The empty sentence is longer than
-   the 32rem description cap, so it starts at the left of that box and spills
-   right. Let it wrap across the full cell and center each line. */
-#app-content.azc-app #violations-table td.empty-state,
-#app-content.azc-app #violations-table td.text-center {
-  text-align: center;
-  vertical-align: middle;
-  white-space: normal;
-}
-
-#app-content.azc-app #violations-table td.empty-state .empty-state__title,
-#app-content.azc-app #violations-table td.empty-state .empty-state__description {
-  display: block;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  text-align: center;
-  white-space: normal;
-}
-
-#app-content.azc-app #violations-table td.empty-state .empty-state__title {
-  margin-bottom: 0.25rem;
-}
-
 .compliance-status__breakdown {
   display: flex;
   flex-direction: column;

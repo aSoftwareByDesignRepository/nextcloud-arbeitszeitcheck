@@ -137,6 +137,10 @@ final class AdminPolicyPagesCatalogContractTest extends TestCase
 		$nav = self::read('templates/common/azc-policy-pages-nav.php');
 		self::assertStringContainsString('azc-settings-nav', $nav);
 		self::assertStringContainsString('azc-settings-nav__link', $nav);
+		// Two-level tabs (§3.12.1) + grouped index fallback.
+		self::assertStringContainsString('azc-settings-nav__tabs', $nav);
+		self::assertStringContainsString('azc-settings-nav__tab', $nav);
+		self::assertStringContainsString('aria-current="location"', $nav);
 		self::assertStringContainsString('azc-settings-nav__group', $nav);
 		self::assertStringContainsString('azc-settings-nav__title', $nav);
 		self::assertStringContainsString('Choose a topic', $nav);

@@ -138,7 +138,7 @@ echo json_encode([
 								</tr>
 							</thead>
 							<tbody id="l0-history-rows">
-								<tr><td colspan="6" class="layer-card__placeholder"><?php p($l->t('Loading…')); ?></td></tr>
+								<tr><td colspan="6" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Loading…')); ?></h3></div></td></tr>
 							</tbody>
 						</table>
 					</div>
@@ -181,7 +181,7 @@ echo json_encode([
 							</tr>
 						</thead>
 						<tbody id="l1-rows">
-							<tr><td colspan="7" class="layer-card__placeholder"><?php p($l->t('Loading…')); ?></td></tr>
+							<tr><td colspan="7" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Loading…')); ?></h3></div></td></tr>
 						</tbody>
 					</table>
 				</div>
@@ -223,7 +223,7 @@ echo json_encode([
 							</tr>
 						</thead>
 						<tbody id="l2-rows">
-							<tr><td colspan="7" class="layer-card__placeholder"><?php p($l->t('Loading…')); ?></td></tr>
+							<tr><td colspan="7" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Loading…')); ?></h3></div></td></tr>
 						</tbody>
 					</table>
 				</div>

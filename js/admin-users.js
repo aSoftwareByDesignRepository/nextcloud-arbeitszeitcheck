@@ -408,9 +408,9 @@
 
         const requestId = ++loadRequestId;
         setTableBusy(true);
-        tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-loading-cell">'
+        tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
             + '<span class="admin-users-loading-label">' + Utils.escapeHtml(auMsg('loadingEllipsis', 'Loading…')) + '</span>'
-            + '</td></tr>';
+            + '</h3></div></td></tr>';
 
         const params = new URLSearchParams({
             limit: String(USERS_PAGE_SIZE),
@@ -472,8 +472,8 @@
                     updateBanners();
                     renderUsers(data.users, listTotal);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-                        + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</p>'
+                    tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
+                        + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</h3>'
                         + '<div class="admin-users-empty-actions">'
                         + '<button type="button" class="azc-btn azc-btn--secondary" data-action="clear-employee-search">'
                         + Utils.escapeHtml(auMsg('tryAgainReset', 'Reset and try again'))
@@ -486,8 +486,8 @@
                     return;
                 }
                 setTableBusy(false);
-                tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-                    + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</p>'
+                tbody.innerHTML = '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
+                    + Utils.escapeHtml(auMsg('errorLoadingUsers', 'Error loading users')) + '</h3>'
                     + '<div class="admin-users-empty-actions">'
                     + '<button type="button" class="azc-btn azc-btn--secondary" data-action="clear-employee-search">'
                     + Utils.escapeHtml(auMsg('tryAgainReset', 'Reset and try again'))
@@ -571,8 +571,8 @@
      */
     function buildEmptyStateHtml() {
         if (listSearch.trim() !== '' || listModel !== '' || listStatus !== '') {
-            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-                + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'
+            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
+                + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</h3>'
                 + '<div class="admin-users-empty-actions">'
                 + '<button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">'
                 + Utils.escapeHtml(auMsg('clearSearch', 'Clear search'))
@@ -586,17 +586,17 @@
             const cta = auMsg('openAccessControl', 'Open access control');
             const showAll = auMsg('showAllAccounts', 'Show all accounts');
             const settingsUrl = Utils.escapeHtml(accessSettingsUrl);
-            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-                + '<p class="admin-users-empty-message">' + Utils.escapeHtml(message) + '</p>'
+            return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
+                + Utils.escapeHtml(message) + '</h3>'
                 + '<div class="admin-users-empty-actions">'
                 + '<a class="azc-btn azc-btn--primary" href="' + settingsUrl + '">' + Utils.escapeHtml(cta) + '</a>'
                 + '<button type="button" class="azc-btn azc-btn--secondary" data-action="show-all-accounts">'
                 + Utils.escapeHtml(showAll) + '</button>'
                 + '</div></td></tr>';
         }
-        return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="text-center admin-users-empty-cell">'
-            + '<p class="admin-users-empty-message">' + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</p>'
-            + '</td></tr>';
+        return '<tr><td colspan="' + USERS_TABLE_COLS + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">'
+            + Utils.escapeHtml(auMsg('noUsersFound', 'No users found')) + '</h3>'
+            + '</h3></div></td></tr>';
     }
 
     function renderUsers(users, total) {

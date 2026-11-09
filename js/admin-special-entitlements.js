@@ -2,6 +2,11 @@
  * Admin page: Sonderfreistellungen (special leave entitlements).
  * One page, four decisions (name, amount, recipients, from-date) plus a
  * server-side impact preview that gates the primary CTA (spec §7.2).
+ *
+ * Layout mirrors admin-absence-types: hidden editor + detail panels render
+ * above the list card, the list itself is a design-system table
+ * (.table.table--hover.azc-table--responsive with data-label cells and a
+ * fade-in .azc-table-actions column).
  */
 (function () {
 	'use strict';
@@ -12,9 +17,8 @@
 	const token = document.querySelector('head')?.dataset.requesttoken || window.OC?.requestToken || '';
 
 	const enabled = root.dataset.enabled === '1';
-	const listEl = document.getElementById('se-type-list');
+	const listEl = document.getElementById('se-type-tbody');
 	const listStatus = document.getElementById('se-list-status');
-	const emptyEl = document.getElementById('se-empty');
 	const searchEl = document.getElementById('se-search');
 	const filterEl = document.getElementById('se-filter-active');
 	const editor = document.getElementById('se-editor');
@@ -25,6 +29,11 @@
 	const activateBtn = document.getElementById('se-activate');
 	const opGroup = document.getElementById('se-operation-group');
 	const conflictBox = document.getElementById('se-conflict');
+	const newTypeBtn = document.getElementById('se-new-type');
+	const detailAddPolicyBtn = document.getElementById('se-detail-add-policy');
+	const formErrorBox = document.getElementById('se-form-error');
+
+	const TYPE_TABLE_COLUMNS = 7;
 
 	let types = [];
 	let policies = [];
@@ -32,6 +41,18 @@
 	let currentType = null;
 	let previewToken = 0;
 	let previewOk = false;
+	// Sequence guards: only the latest async loader may write its result. Two
+	// admins (or a fast scope switch) otherwise let a stale response overwrite
+	// the newer state ("model" options landing in a "team" select).
+	let typesToken = 0;
+	let policiesToken = 0;
+	let cohortsToken = 0;
+	let targetsToken = 0;
+	// 'create' = new entitlement type, 'policy' = extra rule for currentType.
+	let editorMode = null;
+	// WCAG 2.4.3 — panels hide their trigger; remember it so focus returns.
+	let editorReturnFocus = null;
+	let detailReturnFocus = null;
 
 	async function request(url, options = {}) {
 		const response = await fetch(url, {
@@ -65,28 +86,94 @@
 		listStatus.textContent = text;
 	}
 
+	function prefersReducedMotion() {
+		return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
+
+	function scrollToPanel(el) {
+		if (!el || typeof el.scrollIntoView !== 'function') return;
+		el.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+	}
+
+	function restoreFocus(el) {
+		if (el && typeof el.focus === 'function' && el.isConnected) {
+			el.focus();
+		}
+	}
+
 	function clearFieldErrors(scope) {
 		scope.querySelectorAll('[aria-invalid="true"]').forEach((f) => f.removeAttribute('aria-invalid'));
 		scope.querySelectorAll('.azc-field-error').forEach((e) => { e.hidden = true; e.textContent = ''; });
 	}
 
-	function showFieldErrors(fields) {
+	// Server field names are the request names (publicLabel, scopeType, …); the
+	// error <p> ids follow the input id. Anything unlisted falls back to the
+	// `se-{name}-error` / `se-cohort-{name}-error` convention inside the scope.
+	const FIELD_ERROR_IDS = {
+		publicLabel: 'se-label-error',
+	};
+
+	function showFieldErrors(scopeEl, fields) {
 		let first = null;
+		let shown = false;
+		// Matched against element properties, not selector strings — server
+		// field names are data, never trusted as selector syntax.
+		const errorEls = Array.from(scopeEl.querySelectorAll('.azc-field-error'));
+		const named = Array.from(scopeEl.querySelectorAll('[name]'));
 		Object.entries(fields || {}).forEach(([name, message]) => {
-			const err = document.getElementById(`se-${name}-error`) || document.getElementById(`se-cohort-${name}-error`);
-			const field = form.elements.namedItem(name) || document.querySelector(`[name="${name}"]`);
+			const errId = FIELD_ERROR_IDS[name] || `se-${name}-error`;
+			const err = errorEls.find((el) => el.id === errId || el.id === `se-cohort-${name}-error`);
+			const field = named.find((el) => el.name === name);
 			if (err) {
 				err.textContent = String(message);
 				err.hidden = false;
+				shown = true;
 				if (field) field.setAttribute('aria-invalid', 'true');
 				if (!first) first = field || err;
 			}
 		});
 		if (first && typeof first.focus === 'function') first.focus();
-		return Object.keys(fields || {}).length > 0;
+		return shown;
 	}
 
 	function escapeText(v) { return String(v ?? ''); }
+
+	function chip(text, variant) {
+		const c = document.createElement('span');
+		c.className = `badge badge--${variant}`;
+		c.textContent = text;
+		return c;
+	}
+
+	function operationChip(operation) {
+		return {
+			add: { label: t('Additionally'), variant: 'success' },
+			replace: { label: t('Replaces'), variant: 'warning' },
+			disable: { label: t('Disabled'), variant: 'error' },
+			inherit: { label: t('Inherits'), variant: 'neutral' },
+		}[operation] || { label: operation, variant: 'neutral' };
+	}
+
+	function glyph(name) {
+		return (window.AzcCatalog && typeof window.AzcCatalog.render === 'function')
+			? window.AzcCatalog.render(name)
+			: '';
+	}
+
+	function iconBtn(icon, label) {
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'azc-btn azc-btn--secondary azc-icon-btn';
+		btn.setAttribute('aria-label', label);
+		btn.title = label;
+		const svg = glyph(icon);
+		if (svg) {
+			btn.innerHTML = svg;
+		} else {
+			btn.textContent = label;
+		}
+		return btn;
+	}
 
 	function fmtAmount(v, unit) {
 		const n = Number(v);
@@ -94,7 +181,15 @@
 		return `${n.toFixed(2).replace(/\.00$/, '')} ${unit === 'hours' ? t('hours') : t('days')}`;
 	}
 
-	/* ---------- type list ---------- */
+	function periodLabel(periodType) {
+		return {
+			calendar_year: t('per calendar year'),
+			service_year: t('per employment year'),
+			one_time: t('one-time'),
+		}[periodType] || periodType;
+	}
+
+	/* ---------- type table ---------- */
 
 	function scopeHuman(scopeType) {
 		return {
@@ -104,6 +199,59 @@
 			team: t('Team'),
 			user: t('Single person'),
 		}[scopeType] || scopeType;
+	}
+
+	function cell(label, className) {
+		const td = document.createElement('td');
+		td.setAttribute('data-label', label);
+		if (className) td.className = className;
+		return td;
+	}
+
+	function emptyRow(title) {
+		const tr = document.createElement('tr');
+		const td = document.createElement('td');
+		td.colSpan = TYPE_TABLE_COLUMNS;
+		td.className = 'azc-table-empty';
+		const state = document.createElement('div');
+		state.className = 'azc-empty-state';
+		const h = document.createElement('h3');
+		h.className = 'azc-empty-state__title';
+		h.textContent = title;
+		state.append(h);
+		td.append(state);
+		tr.append(td);
+		return tr;
+	}
+
+	function loadingRow() {
+		const tr = document.createElement('tr');
+		const td = document.createElement('td');
+		td.colSpan = TYPE_TABLE_COLUMNS;
+		td.className = 'azc-table-loading';
+		const state = document.createElement('div');
+		state.className = 'azc-loading';
+		state.setAttribute('aria-busy', 'true');
+		state.setAttribute('aria-live', 'polite');
+		state.textContent = t('Loading…');
+		td.append(state);
+		tr.append(td);
+		return tr;
+	}
+
+	async function toggleTypeActive(item, btn) {
+		setBusy(btn, true);
+		try {
+			await request(tpl('typeActiveTemplate', item.id), {
+				method: 'POST',
+				body: JSON.stringify({ active: item.active ? '0' : '1', version: item.version }),
+			});
+			await loadTypes();
+		} catch (e) {
+			announce(e.message);
+		} finally {
+			setBusy(btn, false);
+		}
 	}
 
 	function renderTypes() {
@@ -116,61 +264,104 @@
 			return true;
 		});
 		listEl.replaceChildren();
+		if (visible.length === 0) {
+			listEl.append(emptyRow(types.length === 0
+				? t('No additional leave accounts exist.')
+				: t('No entitlements match the current filters.')));
+		}
 		visible.forEach((item) => {
-			const li = document.createElement('li');
-			li.className = 'azc-list__item se-type-card';
-			const btn = document.createElement('button');
-			btn.type = 'button';
-			btn.className = 'se-type-card__btn';
-			const title = document.createElement('strong');
-			title.textContent = item.publicLabel;
-			const meta = document.createElement('span');
-			meta.className = 'form-help';
-			const parts = [
-				item.unit === 'hours' ? t('Hours') : t('Days'),
-				{ calendar_year: t('per calendar year'), service_year: t('per employment year'), one_time: t('one-time') }[item.periodType] || item.periodType,
-				item.active ? t('Active') : t('Inactive'),
-			];
-			if (item.confidentialLabel) parts.push(`${t('Confidential:')} ${item.confidentialLabel}`);
-			meta.textContent = parts.join(' · ');
-			btn.append(title, meta);
-			btn.addEventListener('click', () => openDetail(item));
-			li.append(btn);
-			const actions = document.createElement('span');
-			actions.className = 'azc-list__actions';
-			const toggle = document.createElement('button');
-			toggle.type = 'button';
-			toggle.className = 'azc-btn azc-btn--secondary';
-			toggle.textContent = item.active ? t('Deactivate') : t('Activate');
-			toggle.addEventListener('click', async () => {
-				setBusy(toggle, true);
-				try {
-					await request(tpl('typeActiveTemplate', item.id), {
-						method: 'POST',
-						body: JSON.stringify({ active: item.active ? '0' : '1', version: item.version }),
-					});
-					await loadTypes();
-				} catch (e) { announce(e.message); }
-				finally { setBusy(toggle, false); }
+			const tr = document.createElement('tr');
+			tr.dataset.typeId = String(item.id);
+
+			const nameTd = cell(t('Name'));
+			const name = document.createElement('span');
+			name.className = 'se-type-name';
+			name.textContent = item.publicLabel;
+			const code = document.createElement('span');
+			code.className = 'se-type-code';
+			code.textContent = item.code;
+			code.title = t('Technical identifier');
+			nameTd.append(name, code);
+			if (item.confidentialLabel) {
+				const conf = document.createElement('p');
+				conf.className = 'form-help se-type-confidential';
+				conf.textContent = `${t('Confidential:')} ${item.confidentialLabel}`;
+				nameTd.append(conf);
+			}
+
+			// "Betrag" + "Für wen" come from the type's active rules — one
+			// line per rule so multi-rule types stay readable.
+			const rules = Array.isArray(item.policies) ? item.policies : [];
+			const amountTd = cell(t('Amount'));
+			const scopeTd = cell(t('For whom?'));
+			if (rules.length === 0) {
+				amountTd.textContent = '—';
+				scopeTd.textContent = '—';
+			}
+			rules.forEach((p) => {
+				const amt = document.createElement('span');
+				amt.className = 'se-type-rule';
+				amt.textContent = p.operation === 'disable'
+					? t('Disabled')
+					: fmtAmount(p.amount, item.unit);
+				amountTd.append(amt);
+
+				const scp = document.createElement('span');
+				scp.className = 'se-type-rule';
+				scp.textContent = p.scopeType === 'org'
+					? scopeHuman('org')
+					: `${scopeHuman(p.scopeType)}: ${p.scopeLabel || `#${escapeText(p.scopeId)}`}`;
+				scopeTd.append(scp);
 			});
-			actions.append(toggle);
-			li.append(actions);
-			listEl.append(li);
+
+			const unitTd = cell(t('Unit'));
+			unitTd.textContent = item.unit === 'hours' ? t('Hours') : t('Days');
+
+			const periodTd = cell(t('Period'));
+			periodTd.textContent = periodLabel(item.periodType);
+
+			const statusTd = cell(t('Status'));
+			const badge = document.createElement('span');
+			badge.className = `badge ${item.active ? 'badge--success' : 'badge--neutral'}`;
+			badge.textContent = item.active ? t('Active') : t('Inactive');
+			statusTd.append(badge);
+
+			const actTd = cell(t('Actions'), 'actions-cell');
+			const group = document.createElement('div');
+			group.className = 'azc-table-actions';
+			group.setAttribute('role', 'group');
+			group.setAttribute('aria-label', `${t('Actions')}: ${item.publicLabel}`);
+			const manageBtn = iconBtn('edit', `${t('Manage rules')}: ${item.publicLabel}`);
+			manageBtn.addEventListener('click', () => openDetail(item, manageBtn));
+			const toggleBtn = iconBtn(item.active ? 'pause' : 'check',
+				`${item.active ? t('Deactivate') : t('Activate')}: ${item.publicLabel}`);
+			toggleBtn.addEventListener('click', () => toggleTypeActive(item, toggleBtn));
+			group.append(manageBtn, toggleBtn);
+			actTd.append(group);
+
+			tr.append(nameTd, amountTd, scopeTd, unitTd, periodTd, statusTd, actTd);
+			listEl.append(tr);
 		});
-		emptyEl.hidden = visible.length > 0;
 		announce(visible.length === 0 ? '' : (typeof window.n === 'function'
 			? window.n('arbeitszeitcheck', '1 entitlement', '%n entitlements', visible.length)
 			: `${visible.length} ${visible.length === 1 ? t('entitlement') : t('entitlements')}`));
 	}
 
 	async function loadTypes() {
+		const my = ++typesToken;
 		listStatus.textContent = t('Loading…');
+		if (types.length === 0 && listEl.children.length === 0) {
+			listEl.append(loadingRow());
+		}
 		try {
 			const body = await request(root.dataset.typesUrl);
+			if (my !== typesToken) return;
 			types = body.items || [];
 			renderTypes();
 		} catch (e) {
+			if (my !== typesToken) return;
 			listStatus.textContent = e.message;
+			listEl.replaceChildren(emptyRow(e.message));
 		}
 	}
 
@@ -183,7 +374,25 @@
 	const userWrap = document.getElementById('se-user-wrap');
 	const userHidden = document.getElementById('se-user-id');
 
-	const userPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
+	// The "Explain calculation" surface is commented out in the template;
+	// keep the wiring guarded so re-enabling needs no JS change.
+	const _traceUserPicker = document.getElementById('se-trace-user-wrap')
+		? window.ArbeitszeitCheck?.initAdminUserPicker({
+		wrapSelector: '#se-trace-user-wrap',
+		hiddenSelector: '#se-trace-uid',
+		searchSelector: '#se-trace-user-search',
+		listSelector: '#se-trace-user-list',
+		statusSelector: '#se-trace-user-status',
+		searchUrl: root.dataset.usersUrl,
+		l10n: {
+			typeToSearch: t('Type to search for people'),
+			noResults: t('No results'),
+			loading: t('Loading…'),
+		},
+	})
+		: null;
+
+	const _userPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
 		wrapSelector: '#se-user-wrap',
 		hiddenSelector: '#se-user-id',
 		searchSelector: '#se-user-search',
@@ -199,6 +408,7 @@
 	});
 
 	async function loadTargets() {
+		const my = ++targetsToken;
 		const kind = scopeSel.value;
 		const needsTarget = kind !== 'org';
 		targetGroup.hidden = !needsTarget;
@@ -220,6 +430,7 @@
 			} else {
 				const url = kind === 'model' ? root.dataset.modelsUrl : root.dataset.teamsUrl;
 				const body = await request(url);
+				if (my !== targetsToken) return;
 				rows = (kind === 'model' ? body.models : body.teams) || [];
 			}
 			rows.forEach((node) => {
@@ -234,9 +445,11 @@
 					: t('No targets are set up yet.');
 			}
 		} catch (e) {
-			targetEmpty.textContent = e.message;
+			if (my === targetsToken) {
+				targetEmpty.textContent = e.message;
+			}
 		}
-		schedulePreview();
+		if (my === targetsToken) schedulePreview();
 	}
 
 	function selectedScopeId() {
@@ -340,7 +553,69 @@
 			: t('Save and activate');
 	}
 
-	/* ---------- create ---------- */
+	/* ---------- create / add-rule editor ---------- */
+
+	const DEFINITION_FIELD_IDS = ['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type'];
+
+	function setDefinitionFieldsEnabled(on) {
+		DEFINITION_FIELD_IDS.forEach((id) => {
+			const el = document.getElementById(id);
+			if (el) el.disabled = !on;
+		});
+	}
+
+	function tomorrowYmd() {
+		const tomorrow = new Date(Date.now() + 86400000);
+		return window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.ymd(tomorrow) : tomorrow.toLocaleDateString('sv-SE');
+	}
+
+	function openCreateEditor(invoker) {
+		currentType = null;
+		editorMode = 'create';
+		editorReturnFocus = invoker || newTypeBtn;
+		form.reset();
+		setDefinitionFieldsEnabled(true);
+		document.getElementById('se-type-version').value = '';
+		document.getElementById('se-editor-title').textContent = t('New special leave entitlement');
+		document.getElementById('se-from').value = tomorrowYmd();
+		formErrorBox.hidden = true;
+		conflictBox.hidden = true;
+		editor.hidden = false;
+		detail.hidden = true;
+		cohortEditor.hidden = true;
+		loadTargets();
+		scrollToPanel(editor);
+		document.getElementById('se-label').focus();
+	}
+
+	function openPolicyEditor(invoker) {
+		if (!currentType) return;
+		editorMode = 'policy';
+		editorReturnFocus = invoker || detailAddPolicyBtn;
+		document.getElementById('se-editor-title').textContent = `${t('New rule for')} ${currentType.publicLabel}`;
+		form.reset();
+		document.getElementById('se-from').value = tomorrowYmd();
+		// Definition fields are read-only for an existing type.
+		setDefinitionFieldsEnabled(false);
+		document.getElementById('se-label').value = currentType.publicLabel;
+		document.getElementById('se-unit').value = currentType.unit;
+		document.getElementById('se-period').value = currentType.periodType;
+		formErrorBox.hidden = true;
+		editor.hidden = false;
+		cohortEditor.hidden = true;
+		loadTargets();
+		schedulePreview();
+		scrollToPanel(editor);
+		document.getElementById('se-amount').focus();
+	}
+
+	function closeEditor() {
+		editor.hidden = true;
+		editorMode = null;
+		// Keep currentType: the detail panel may still be open underneath.
+		restoreFocus(editorReturnFocus);
+		editorReturnFocus = null;
+	}
 
 	form.addEventListener('input', (ev) => {
 		if (ev.target?.name) {
@@ -352,28 +627,16 @@
 	targetSel.addEventListener('change', schedulePreview);
 	form.querySelectorAll('[name="operation"]').forEach((r) => r.addEventListener('change', schedulePreview));
 
-	document.getElementById('se-new-type').addEventListener('click', () => {
-		currentType = null;
-		form.reset();
-		document.getElementById('se-type-version').value = '';
-		document.getElementById('se-editor-title').textContent = t('New special leave entitlement');
-		const tomorrow = new Date(Date.now() + 86400000);
-		document.getElementById('se-from').value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.ymd(tomorrow) : tomorrow.toLocaleDateString('sv-SE'));
-		editor.hidden = false;
-		detail.hidden = true;
-		loadTargets();
-		document.getElementById('se-label').focus();
-	});
+	newTypeBtn.addEventListener('click', () => openCreateEditor(newTypeBtn));
 
-	document.getElementById('se-cancel').addEventListener('click', () => {
-		editor.hidden = true;
-		currentType = null;
-	});
+	document.getElementById('se-cancel').addEventListener('click', closeEditor);
 
 	form.addEventListener('submit', async (ev) => {
 		ev.preventDefault();
-		clearFieldErrors(document.getElementById('se-editor'));
+		clearFieldErrors(editor);
+		formErrorBox.hidden = true;
 		if (!form.reportValidity()) return;
+		const savedMode = editorMode;
 		setBusy(activateBtn, true);
 		try {
 			let typeId = currentType?.id;
@@ -408,16 +671,35 @@
 			await request(root.dataset.policyCreateUrl, { method: 'POST', body: JSON.stringify(pol) });
 			editor.hidden = true;
 			conflictBox.hidden = true;
-			announce(t('Special leave entitlement saved.'));
 			await loadTypes();
+			announce(t('Special leave entitlement saved.'));
+			if (savedMode === 'policy' && currentType) {
+				// The detail panel stays open — refresh its rules so the new
+				// row is visible without a manual reopen.
+				await loadPolicies(currentType.id);
+				restoreFocus(detailAddPolicyBtn);
+			} else {
+				currentType = null;
+				const row = Array.from(listEl.querySelectorAll('tr'))
+					.find((tr) => tr.dataset.typeId === String(typeId));
+				restoreFocus(row?.querySelector('.azc-table-actions .azc-icon-btn') || newTypeBtn);
+			}
+			editorMode = null;
+			editorReturnFocus = null;
 		} catch (e) {
-			if (!showFieldErrors(e.fields)) {
+			if (!showFieldErrors(editor, e.fields)) {
 				if (e.status === 409) {
 					conflictBox.hidden = false;
 					document.getElementById('se-conflict-text').textContent = e.message;
+					// The conflict callout lives in the (possibly hidden) detail
+					// panel; surface it in the editor as well.
+					if (detail.hidden) {
+						document.getElementById('se-form-error-text').textContent = e.message;
+						formErrorBox.hidden = false;
+					}
 				} else {
 					document.getElementById('se-form-error-text').textContent = e.message;
-					document.getElementById('se-form-error').hidden = false;
+					formErrorBox.hidden = false;
 				}
 			}
 		} finally {
@@ -433,13 +715,56 @@
 
 	/* ---------- detail: policies + trace ---------- */
 
-	async function openDetail(item) {
+	async function openDetail(item, invoker) {
 		currentType = item;
+		detailReturnFocus = invoker || null;
+		// Single-flight: the editor and the detail panel never coexist.
+		editor.hidden = true;
+		editorMode = null;
+		conflictBox.hidden = true;
+		cohortEditor.hidden = true;
 		detail.hidden = false;
 		document.getElementById('se-detail-title').textContent = item.publicLabel;
-		document.getElementById('se-detail-meta').textContent = `${item.code} · ${item.unit} · ${item.periodType} · ${item.active ? t('Active') : t('Inactive')}`;
+		const addRuleBtn = document.getElementById('se-add-rule');
+		if (addRuleBtn) {
+			addRuleBtn.textContent = t('Add rule to %1$s').replace('%1$s', item.publicLabel);
+		}
+		
 		await loadPolicies(item.id);
-		detail.scrollIntoView({ block: 'start' });
+		scrollToPanel(detail);
+	}
+
+	function untilChip(p) {
+		const c = chip(p.effectiveTo ? `${t('Valid until')} ${p.effectiveTo}` : t('open-ended'), 'neutral');
+		if (!p.effectiveTo) return c;
+		c.classList.add('se-policy-chip--removable');
+		const x = document.createElement('button');
+		x.type = 'button';
+		x.className = 'se-policy-chip__remove';
+		x.setAttribute('aria-label', `${t('Remove end date')}: ${scopeHuman(p.scopeType)}${p.scopeType !== 'org' ? ` ${p.scopeLabel || `#${escapeText(p.scopeId)}`}` : ''}`);
+		x.textContent = '×';
+		x.addEventListener('click', () => { void updatePolicyEnd(p, null, x); });
+		c.append(x);
+		return c;
+	}
+
+	async function updatePolicyEnd(p, effectiveTo, busyEl) {
+		setBusy(busyEl, true);
+		try {
+			await request(tpl('policyUpdateTemplate', p.id), {
+				method: 'PUT',
+				body: JSON.stringify({ revision: p.version, effectiveTo }),
+			});
+			await loadPolicies(currentType.id);
+			await loadTypes();
+		} catch (e) {
+			if (e.status === 409) {
+				conflictBox.hidden = false;
+				document.getElementById('se-conflict-text').textContent = e.message;
+			} else {
+				document.getElementById('se-policy-status').textContent = e.message;
+			}
+		} finally { setBusy(busyEl, false); }
 	}
 
 	function renderPolicies() {
@@ -462,43 +787,54 @@
 			ul.className = 'azc-list';
 			g.rows.forEach((p) => {
 				const li = document.createElement('li');
-				li.className = 'azc-list__item';
+				li.className = 'azc-list__item se-policy-item';
 				const text = document.createElement('div');
+				text.className = 'se-policy-text';
 				const title = document.createElement('strong');
-				title.textContent = `${scopeHuman(p.scopeType)} ${p.scopeId !== 'org' ? `#${escapeText(p.scopeId)}` : ''} → ${fmtAmount(p.amount, currentType?.unit)}`;
-				const meta = document.createElement('p');
-				meta.className = 'form-help';
-				meta.textContent = `${p.operation} · ${p.effectiveFrom} – ${p.effectiveTo || t('open')} · ${t('Priority')} ${p.priority}`;
-				text.append(title, meta);
-				const actions = document.createElement('span');
-				actions.className = 'azc-list__actions';
-				const endInput = document.createElement('input');
-				endInput.type = 'date';
-				endInput.setAttribute('aria-label', t('Last valid date'));
-				const endBtn = document.createElement('button');
-				endBtn.type = 'button';
-				endBtn.className = 'azc-btn azc-btn--secondary';
-				endBtn.textContent = t('End rule');
-				endBtn.addEventListener('click', async () => {
-					if (!endInput.reportValidity() || endInput.value === '') { endInput.focus(); return; }
-					setBusy(endBtn, true);
-					try {
-						await request(tpl('policyUpdateTemplate', p.id), {
-							method: 'PUT',
-							body: JSON.stringify({ revision: p.version, effectiveTo: endInput.value }),
-						});
-						await loadPolicies(currentType.id);
-					} catch (e) {
-						if (e.status === 409) {
-							conflictBox.hidden = false;
-							document.getElementById('se-conflict-text').textContent = e.message;
-						} else {
-							document.getElementById('se-policy-status').textContent = e.message;
-						}
-					} finally { setBusy(endBtn, false); }
-				});
-				actions.append(endInput, endBtn);
-				li.append(text, actions);
+				title.textContent = `${scopeHuman(p.scopeType)}${p.scopeType !== 'org' ? ` ${p.scopeLabel || `#${escapeText(p.scopeId)}`}` : ''} → ${fmtAmount(p.amount, currentType?.unit)}`;
+				const chips = document.createElement('span');
+				chips.className = 'se-policy-chips';
+				const op = operationChip(p.operation);
+				chips.append(
+					chip(op.label, op.variant),
+					chip(`${t('From')} ${p.effectiveFrom}`, 'neutral'),
+					untilChip(p),
+				);
+				if (Number(p.priority) !== 0) {
+					chips.append(chip(`${t('Priority')} ${p.priority}`, 'neutral'));
+				}
+				text.append(title, chips);
+				if (p.reason) {
+					const reason = document.createElement('p');
+					reason.className = 'form-help';
+					reason.textContent = p.reason;
+					text.append(reason);
+				}
+				li.append(text);
+				// The end-date control only appears while the rule is
+				// open-ended; once an end date exists, the removable
+				// "Valid until" chip takes over that role.
+				if (!p.effectiveTo) {
+					const actions = document.createElement('span');
+					actions.className = 'azc-list__actions se-policy-end';
+					const endLabel = document.createElement('span');
+					endLabel.className = 'se-policy-end-label';
+					endLabel.textContent = `${t('End on')}:`;
+					const endInput = document.createElement('input');
+					endInput.type = 'date';
+					endInput.className = 'form-input se-policy-end-date';
+					endInput.setAttribute('aria-label', `${t('End on')}: ${title.textContent}`);
+					const endBtn = document.createElement('button');
+					endBtn.type = 'button';
+					endBtn.className = 'azc-btn azc-btn--secondary';
+					endBtn.textContent = t('Set end date');
+					endBtn.addEventListener('click', async () => {
+						if (!endInput.reportValidity() || endInput.value === '') { endInput.focus(); return; }
+						await updatePolicyEnd(p, endInput.value, endBtn);
+					});
+					actions.append(endLabel, endInput, endBtn);
+					li.append(actions);
+				}
 				ul.append(li);
 			});
 			wrap.append(h, ul);
@@ -507,55 +843,36 @@
 	}
 
 	async function loadPolicies(typeId) {
+		const my = ++policiesToken;
 		try {
 			const body = await request(tpl('policiesTemplate', typeId));
+			if (my !== policiesToken) return;
 			policies = body.items || [];
 			renderPolicies();
 		} catch (e) {
-			document.getElementById('se-policy-status').textContent = e.message;
+			if (my === policiesToken) {
+				document.getElementById('se-policy-status').textContent = e.message;
+			}
 		}
 	}
 
 	document.getElementById('se-detail-close').addEventListener('click', () => {
 		detail.hidden = true;
 		currentType = null;
+		conflictBox.hidden = true;
+		restoreFocus(detailReturnFocus);
+		detailReturnFocus = null;
 	});
 
-	document.getElementById('se-detail-add-policy').addEventListener('click', () => {
-		if (!currentType) return;
-		document.getElementById('se-editor-title').textContent = `${t('New rule for')} ${currentType.publicLabel}`;
-		form.reset();
-		const tomorrow = new Date(Date.now() + 86400000);
-		document.getElementById('se-from').value = (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.ymd(tomorrow) : tomorrow.toLocaleDateString('sv-SE'));
-		// Definition fields are read-only for an existing type.
-		['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type'].forEach((id) => {
-			const el = document.getElementById(id);
-			if (!el) return;
-			el.disabled = true;
-		});
-		document.getElementById('se-label').value = currentType.publicLabel;
-		document.getElementById('se-unit').value = currentType.unit;
-		document.getElementById('se-period').value = currentType.periodType;
-		editor.hidden = false;
-		loadTargets();
-		schedulePreview();
-		document.getElementById('se-amount').focus();
-	});
+	detailAddPolicyBtn.addEventListener('click', () => openPolicyEditor(detailAddPolicyBtn));
 
-	// Re-enable definition fields when creating a new type.
-	document.getElementById('se-new-type').addEventListener('click', () => {
-		['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type'].forEach((id) => {
-			const el = document.getElementById(id);
-			if (el) el.disabled = false;
-		});
-	});
-
-	document.getElementById('se-trace-run').addEventListener('click', async () => {
+	const traceRunEl = document.getElementById('se-trace-run');
+	if (traceRunEl) traceRunEl.addEventListener('click', async () => {
 		if (!currentType) return;
 		const out = document.getElementById('se-trace-out');
-		const uid = document.getElementById('se-trace-user').value.trim();
+		const uid = document.getElementById('se-trace-uid').value.trim();
 		const date = document.getElementById('se-trace-date').value || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE'));
-		if (!uid) { out.textContent = t('Enter a user id.'); return; }
+		if (!uid) { out.textContent = t('Choose a person first.'); return; }
 		out.textContent = t('Resolving…');
 		try {
 			const q = new URLSearchParams({ userId: uid, asOf: date });
@@ -568,49 +885,155 @@
 
 	/* ---------- cohorts ---------- */
 
+	const COHORT_TABLE_COLUMNS = 5;
 	const cohortList = document.getElementById('se-cohort-list');
 	const cohortStatus = document.getElementById('se-cohort-status');
-
+	const cohortEditor = document.getElementById('se-cohort-editor');
+	const selectedCohortMembers = [];
+	const cohortChipsEl = document.getElementById('se-cohort-member-chips');
 	let openCohortId = null;
 	let memberPicker = null;
+	let cohortReturnFocus = null;
+
+	function renderCohortMemberChips() {
+		if (!cohortChipsEl) return;
+		cohortChipsEl.replaceChildren();
+		selectedCohortMembers.forEach((m, idx) => {
+			const c = document.createElement('span');
+			c.className = 'badge badge--neutral se-member-chip';
+			c.textContent = m.displayName || m.userId;
+			const x = document.createElement('button');
+			x.type = 'button';
+			x.className = 'se-policy-chip__remove';
+			x.setAttribute('aria-label', t('Remove %s', 'Remove %s').replace('%s', m.displayName || m.userId));
+			x.textContent = '×';
+			x.addEventListener('click', () => { selectedCohortMembers.splice(idx, 1); renderCohortMemberChips(); });
+			c.append(x);
+			cohortChipsEl.append(c);
+		});
+	}
+
+	const _cohortCreatePicker = document.getElementById('se-cohort-members-wrap')
+		? window.ArbeitszeitCheck?.initAdminUserPicker({
+			wrapSelector: '#se-cohort-members-wrap',
+			hiddenSelector: '#se-cohort-member-uid',
+			searchSelector: '#se-cohort-member-search',
+			listSelector: '#se-cohort-member-list',
+			statusSelector: '#se-cohort-member-status',
+			searchUrl: root.dataset.usersUrl,
+			l10n: {
+				typeToSearch: t('Type to search for people'),
+				noResults: t('No results'),
+				loading: t('Loading…'),
+			},
+			onChange: (id, meta) => {
+				if (!id) return;
+				if (!selectedCohortMembers.some((m) => m.userId === id)) {
+					selectedCohortMembers.push({ userId: id, displayName: meta.displayName || meta.label || id });
+					renderCohortMemberChips();
+				}
+				// Free the picker for the next person — the chip list owns the selection.
+				_cohortCreatePicker?.clear();
+			},
+		})
+		: null;
+
+	function openCohortEditor() {
+		editor.hidden = true;
+		editorMode = null;
+		detail.hidden = true;
+		conflictBox.hidden = true;
+		cohortReturnFocus = document.activeElement;
+		cohortEditor.hidden = false;
+		scrollToPanel(cohortEditor);
+		document.getElementById('se-cohort-label').focus();
+	}
+
+	function hideCohortEditor() {
+		cohortEditor.hidden = true;
+		cohortReturnFocus?.focus?.();
+		cohortReturnFocus = null;
+	}
+
+	document.getElementById('se-new-cohort')?.addEventListener('click', () => {
+		if (cohortEditor.hidden) { openCohortEditor(); } else { hideCohortEditor(); }
+	});
+	cohortEditor?.querySelector('[data-close-panel]')?.addEventListener('click', hideCohortEditor);
 
 	function renderCohorts() {
 		cohortList.replaceChildren();
 		cohorts.forEach((c) => {
-			const li = document.createElement('li');
-			li.className = 'azc-list__item se-cohort-item';
-			const text = document.createElement('div');
-			const title = document.createElement('strong');
-			title.textContent = c.publicLabel;
-			const meta = document.createElement('p');
-			meta.className = 'form-help';
+			const tr = document.createElement('tr');
+			const nameTd = cell(t('Name'));
+			const nameEl = document.createElement('span');
+			nameEl.className = 'se-type-name';
+			nameEl.textContent = c.publicLabel;
+			const code = document.createElement('span');
+			code.className = 'se-type-code';
+			code.title = t('Technical identifier');
+			code.textContent = c.code;
+			nameTd.append(nameEl, code);
+			const confTd = cell(t('Confidential label'));
+			confTd.textContent = c.confidentialLabel || '—';
 			const memberText = typeof window.n === 'function'
 				? window.n('arbeitszeitcheck', '1 member', '%n members', c.memberCount)
 				: `${c.memberCount} ${c.memberCount === 1 ? t('member') : t('members')}`;
-			meta.textContent = `${c.code} · ${memberText} · ${c.active ? t('Active') : t('Inactive')}`;
-			text.append(title, meta);
-			const actions = document.createElement('span');
-			actions.className = 'azc-list__actions';
+			const membersTd = cell(t('Members'));
+			membersTd.textContent = memberText;
+			const statusTd = cell(t('Status'));
+			const badge = document.createElement('span');
+			badge.className = `badge badge--${c.active ? 'success' : 'neutral'}`;
+			badge.textContent = c.active ? t('Active') : t('Inactive');
+			statusTd.append(badge);
+			const actTd = cell(t('Actions'));
+			actTd.className = 'actions-cell';
+			const group = document.createElement('span');
+			group.className = 'azc-table-actions';
+			group.setAttribute('role', 'group');
+			group.setAttribute('aria-label', `${t('Actions')}: ${c.publicLabel}`);
 			const manageBtn = document.createElement('button');
 			manageBtn.type = 'button';
 			manageBtn.className = 'azc-btn azc-btn--secondary';
+			manageBtn.dataset.cohortId = String(c.id);
 			manageBtn.textContent = t('Manage members');
 			manageBtn.setAttribute('aria-expanded', openCohortId === c.id ? 'true' : 'false');
 			manageBtn.addEventListener('click', () => {
 				openCohortId = openCohortId === c.id ? null : c.id;
 				renderCohorts();
 			});
-			actions.append(manageBtn);
-			li.append(text, actions);
-			cohortList.append(li);
+			const toggleBtn = iconBtn(c.active ? 'pause' : 'check',
+				`${c.active ? t('Deactivate') : t('Activate')}: ${c.publicLabel}`);
+			toggleBtn.addEventListener('click', async () => {
+				setBusy(toggleBtn, true);
+				try {
+					await request(tpl('cohortUpdateTemplate', c.id), {
+						method: 'PUT',
+						body: JSON.stringify({ active: c.active ? '0' : '1', revision: c.revision }),
+					});
+					cohortStatus.textContent = '';
+				} catch (e) {
+					cohortStatus.textContent = e.message;
+				}
+				await loadCohorts();
+			});
+			group.append(manageBtn, toggleBtn);
+			actTd.append(group);
+			tr.append(nameTd, confTd, membersTd, statusTd, actTd);
+			cohortList.append(tr);
 			if (openCohortId === c.id) {
-				const panelLi = document.createElement('li');
-				panelLi.className = 'azc-list__item se-cohort-panel-wrap';
-				panelLi.append(buildCohortPanel(c));
-				cohortList.append(panelLi);
+				const pr = document.createElement('tr');
+				pr.className = 'se-cohort-panel';
+				const td = document.createElement('td');
+				td.colSpan = COHORT_TABLE_COLUMNS;
+				td.append(buildCohortPanel(c));
+				pr.append(td);
+				cohortList.append(pr);
 			}
 		});
-		cohortStatus.textContent = cohorts.length === 0 ? t('No protected groups yet.') : '';
+		if (cohorts.length === 0) {
+			cohortList.append(emptyRow(COHORT_TABLE_COLUMNS, t('No protected groups yet.')));
+		}
+		cohortStatus.textContent = '';
 	}
 
 	function buildCohortPanel(cohort) {
@@ -619,6 +1042,19 @@
 		const panel = document.createElement('div');
 		panel.className = 'se-cohort-panel';
 		const prefix = `se-member-${cohort.id}`;
+
+		const header = document.createElement('div');
+		header.className = 'se-cohort-panel__header';
+		const headerTitle = document.createElement('strong');
+		headerTitle.textContent = `${t('Members')}: ${cohort.publicLabel}`;
+		const closeBtn = iconBtn('x', `${t('Close')}: ${cohort.publicLabel}`);
+		closeBtn.addEventListener('click', () => {
+			openCohortId = null;
+			renderCohorts();
+			cohortList.querySelector(`[data-cohort-id="${cohort.id}"]`)?.focus();
+		});
+		header.append(headerTitle, closeBtn);
+		panel.append(header);
 
 		const membersList = document.createElement('ul');
 		membersList.className = 'azc-list';
@@ -692,18 +1128,24 @@
 
 		panel.append(membersList, memberStatus, addForm);
 
-		memberPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
-			wrapSelector: `#${prefix}-wrap`,
-			hiddenSelector: `#${prefix}-uid`,
-			searchSelector: `#${prefix}-search`,
-			listSelector: `#${prefix}-list`,
-			statusSelector: `#${prefix}-status`,
-			searchUrl: root.dataset.usersUrl,
-			l10n: {
-				typeToSearch: t('Type at least 2 characters to search.'),
-				noResults: t('No matching people.'),
-				loading: t('Searching…'),
-			},
+		// initAdminUserPicker resolves its elements via document.querySelector —
+		// the panel is still detached at this point, so defer the init until the
+		// row has been connected to the DOM (after renderCohorts finishes).
+		queueMicrotask(() => {
+			if (!panel.isConnected) return;
+			memberPicker = window.ArbeitszeitCheck?.initAdminUserPicker({
+				wrapSelector: `#${prefix}-wrap`,
+				hiddenSelector: `#${prefix}-uid`,
+				searchSelector: `#${prefix}-search`,
+				listSelector: `#${prefix}-list`,
+				statusSelector: `#${prefix}-status`,
+				searchUrl: root.dataset.usersUrl,
+				l10n: {
+					typeToSearch: t('Type at least 2 characters to search.'),
+					noResults: t('No matching people.'),
+					loading: t('Searching…'),
+				},
+			});
 		});
 
 		async function loadMembers() {
@@ -789,12 +1231,16 @@
 
 	async function loadCohorts() {
 		if (!enabled) return;
+		const my = ++cohortsToken;
 		try {
 			const body = await request(root.dataset.cohortsUrl);
+			if (my !== cohortsToken) return;
 			cohorts = body.items || [];
 			renderCohorts();
 		} catch (e) {
-			cohortStatus.textContent = e.message;
+			if (my === cohortsToken) {
+				cohortStatus.textContent = e.message;
+			}
 		}
 	}
 
@@ -806,16 +1252,21 @@
 		const submit = formEl.querySelector('[type="submit"]');
 		setBusy(submit, true);
 		try {
+			const payload = Object.fromEntries(new FormData(formEl));
+			payload.members = selectedCohortMembers.map((m) => m.userId);
 			await request(root.dataset.cohortCreateUrl, {
 				method: 'POST',
-				body: JSON.stringify(Object.fromEntries(new FormData(formEl))),
+				body: JSON.stringify(payload),
 			});
 			formEl.reset();
+			selectedCohortMembers.length = 0;
+			renderCohortMemberChips();
 			cohortStatus.textContent = t('Protected group created.');
+			hideCohortEditor();
 			await loadCohorts();
 			await loadTargets();
 		} catch (e) {
-			if (!showFieldErrors(e.fields)) cohortStatus.textContent = e.message;
+			if (!showFieldErrors(formEl, e.fields)) cohortStatus.textContent = e.message;
 		} finally {
 			setBusy(submit, false);
 		}
@@ -859,4 +1310,25 @@
 	if (enabled) {
 		Promise.all([loadTypes(), loadCohorts()]).then(loadTargets);
 	}
+
+	// Test hooks (vitest stages the production DOM). Read-only surface —
+	// mutations in tests go through the same DOM events users trigger.
+	window.__ArbeitszeitCheckSeAdminTestables = {
+		renderTypes,
+		renderCohorts,
+		loadTypes,
+		loadTargets,
+		loadCohorts,
+		openDetail,
+		openCreateEditor,
+		openPolicyEditor,
+		closeEditor,
+		showFieldErrors,
+		emptyRow,
+		loadingRow,
+		get types() { return types; },
+		set types(v) { types = Array.isArray(v) ? v : []; },
+		get currentType() { return currentType; },
+		get editorMode() { return editorMode; },
+	};
 })();

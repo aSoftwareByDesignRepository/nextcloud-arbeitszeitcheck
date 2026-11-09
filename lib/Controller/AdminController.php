@@ -1212,14 +1212,17 @@ class AdminController extends Controller
 			$catalog->label($this->l10n, $section),
 			$catalog->help($this->l10n, $section),
 		);
-		// SETTINGS-PAGES-STANDARD §7: App → Global settings (link) → section
-		$shell['breadcrumbSection'] = '';
-		$shell['breadcrumbParent'] = [
-			'label' => $this->l10n->t('Global settings'),
-			'url' => $catalog->url(
-				$this->urlGenerator,
-				\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::DEFAULT_SECTION
-			),
+		// Admin IA (sidebar hierarchy): App → Administration (plain text, same as
+		// every admin page) → Global settings (link to the section index) → section.
+		$shell['breadcrumbParents'] = [
+			['label' => $this->l10n->t('Administration')],
+			[
+				'label' => $this->l10n->t('Global settings'),
+				'url' => $catalog->url(
+					$this->urlGenerator,
+					\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::DEFAULT_SECTION
+				),
+			],
 		];
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-settings', array_merge(

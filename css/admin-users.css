@@ -92,11 +92,6 @@
 .admin-users-empty-actions .azc-btn {
   min-height: 2.75rem;
 }
-
-.admin-users-loading-cell {
-  padding: var(--space-6, 1.5rem) var(--space-4, 1rem);
-}
-
 .admin-users-loading-label {
   display: inline-block;
   font-weight: 600;
@@ -139,35 +134,6 @@
   gap: var(--space-2, 0.5rem);
   align-items: center;
 }
-
-#app-content.azc-app--admin-users td.admin-users-empty-cell {
-  padding: var(--space-6, 1.5rem) var(--space-4, 1rem);
-  text-align: center;
-}
-
-#app-content.azc-app--admin-users .admin-users-empty-message {
-  display: inline-block;
-  max-width: 42ch;
-  margin: 0 0 var(--space-3, 0.75rem);
-  text-align: center;
-  line-height: 1.5;
-  color: var(--color-main-text);
-}
-
-@media (max-width: 768.98px) {
-  #app-content.azc-app--admin-users .table.azc-table--responsive tbody td.admin-users-empty-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
-
-  #app-content.azc-app--admin-users .table.azc-table--responsive tbody td.admin-users-empty-cell::before {
-    content: none;
-  }
-}
-
 @media (max-width: 479.98px) {
   #app-content.azc-app--admin-users .azc-page-stack,
   #app-content.azc-app--admin-users #azc-main-content {

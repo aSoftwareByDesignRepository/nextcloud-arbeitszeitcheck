@@ -892,6 +892,98 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
+/* §3.12.1 level-1 group tabs — identical to the §3.12 default tab row
+   (My settings reference: css/settings.css). */
+#app-content.azc-app--admin-notifications .azc-settings-nav__tabs,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tabs,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tabs,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tabs,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tabs,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tabs {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	overflow-x: auto;
+	gap: var(--azc-space-4);
+	width: 100%;
+	min-width: 0;
+}
+
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab,
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab:focus,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab:focus,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab:focus,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab:focus,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab:focus,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab:focus {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	min-height: var(--azc-touch, 44px);
+	min-width: var(--azc-touch, 44px);
+	padding: var(--azc-space-2) var(--azc-space-1);
+	border: 0;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--azc-text, var(--color-main-text));
+	font-size: var(--azc-fs-sm);
+	font-weight: 600;
+	line-height: 1.2;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab:hover,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab:hover {
+	color: var(--color-primary-element);
+	border-bottom-color: transparent;
+}
+
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab:focus-visible,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab:focus-visible,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab:focus-visible,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab:focus-visible,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab:focus-visible,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
+	outline-offset: 2px;
+}
+
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-notifications .azc-settings-nav__tab[aria-current="location"],
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-overtime-settings .azc-settings-nav__tab[aria-current="location"],
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-vacation-rules .azc-settings-nav__tab[aria-current="location"],
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-vacation-layers .azc-settings-nav__tab[aria-current="location"],
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-overtime-payouts .azc-settings-nav__tab[aria-current="location"],
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab.is-active,
+#app-content.azc-app--admin-overtime-payout-audit .azc-settings-nav__tab[aria-current="location"] {
+	border-bottom-color: var(--color-primary-element);
+	background: transparent;
+	color: var(--azc-text, var(--color-main-text));
+}
+
 #app-content.azc-app--admin-notifications .azc-settings-nav__chips,
 #app-content.azc-app--admin-overtime-settings .azc-settings-nav__chips,
 #app-content.azc-app--admin-vacation-rules .azc-settings-nav__chips,

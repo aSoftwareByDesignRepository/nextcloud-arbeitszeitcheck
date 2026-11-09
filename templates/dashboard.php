@@ -1188,7 +1188,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="7">
+                                <td colspan="7" class="azc-table-empty">
                                     <div class="azc-empty-state azc-dashboard-recent__empty">
                                         <p class="azc-empty-state__title"><?php p($l->t('No recent entries found')); ?></p>
                                         <p class="azc-empty-state__lead">

@@ -199,6 +199,25 @@ final class BusinessTripControllerTest extends TestCase
 		$this->assertSame('invalid', $r->getData()['fields']['startsAtUtc'] ?? null);
 	}
 
+	public function testCreateAcceptsIso8601FractionalSeconds(): void
+	{
+		// JS toISOString() always emits ".000Z" — ISO 8601 clients must not be
+		// rejected for the sub-second tail.
+		$this->tripMapper->method('findByRequestKey')->willReturn(null);
+		$this->tripMapper->method('findOverlapping')->willReturn([]);
+		$this->tripMapper->method('insert')->willReturnArgument(0);
+		$r = $this->controller([
+			'startsAtUtc' => '2026-03-10T06:00:00.000Z',
+			'endsAtUtc' => '2026-03-10T18:00:00.123Z',
+			'originTimezone' => 'UTC',
+			'destinationTimezone' => 'UTC',
+			'evaluationTimezone' => 'UTC',
+			'requestKey' => 'req-test-0001',
+		])->create();
+		$this->assertSame(Http::STATUS_CREATED, $r->getStatus());
+		$this->assertTrue($r->getData()['success']);
+	}
+
 	public function testShowOwnTripMergesDetail(): void
 	{
 		$this->tripMapper->method('find')->willReturn($this->ownTrip());

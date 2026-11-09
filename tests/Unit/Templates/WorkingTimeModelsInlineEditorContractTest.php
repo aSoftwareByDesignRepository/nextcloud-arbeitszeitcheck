@@ -36,7 +36,11 @@ class WorkingTimeModelsInlineEditorContractTest extends TestCase
 		$this->assertStringContainsString('function openEditorPanel', $js);
 		$this->assertStringContainsString('function closeEditorPanel', $js);
 		$this->assertStringContainsString('wtm-editor-panel', $js);
-		$this->assertStringContainsString('wtm-editor-desc', $js);
+		$this->assertStringContainsString('wtm-field-grid', $js);
+		$this->assertStringContainsString('wtm-model-description', $js);
+		// Description is a plain labelled field, not a click-to-open disclosure.
+		$this->assertStringNotContainsString('wtm-editor-desc', $js);
+		$this->assertStringNotContainsString('<summary', $js);
 		$this->assertStringContainsString("selectedType || 'full_time'", $js);
 		$this->assertStringContainsString('editorSaveInflight', $js);
 		$this->assertStringContainsString('Please wait until the current save finishes', $js);
@@ -55,7 +59,8 @@ class WorkingTimeModelsInlineEditorContractTest extends TestCase
 		$css = file_get_contents(dirname(__DIR__, 3) . '/css/working-time-models.css');
 		$this->assertNotFalse($css);
 		$this->assertStringContainsString('wtm-editor-panel', $css);
-		$this->assertStringContainsString('wtm-editor-desc__summary', $css);
+		$this->assertStringContainsString('wtm-field-grid', $css);
+		$this->assertStringContainsString('grid-template-columns', $css);
 		$this->assertStringContainsString('--azc-touch, 44px', $css);
 		$this->assertStringNotContainsString('#0082c9', $css);
 	}

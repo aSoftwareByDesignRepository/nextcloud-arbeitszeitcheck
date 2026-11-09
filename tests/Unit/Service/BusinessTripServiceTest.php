@@ -463,6 +463,20 @@ final class BusinessTripServiceTest extends TestCase
 		$this->assertEqualsCanonicalizing($this->acquiredKeys, $this->releasedKeys);
 	}
 
+	public function testUpdateAcceptsFractionalSecondsTimestamp(): void
+	{
+		$fresh = $this->draftTrip(7, 'alice', 3);
+		$this->trips->method('find')->willReturn($fresh);
+		$this->trips->method('findOverlapping')->willReturn([]);
+		$this->segments->method('findForTrip')->willReturn([]);
+		$this->links->method('findTimeEntryIdsForTrip')->willReturn([]);
+		$this->trips->method('updateContentIfRevision')->willReturn(true);
+		$result = $this->service->updateDraft($this->draftTrip(7, 'alice', 3), 3, [
+			'startsAtUtc' => '2026-03-10T07:00:00.123+00:00',
+		], 'alice');
+		$this->assertSame('07:00', $result->getStartsAtUtc()->format('H:i'));
+	}
+
 	public function testUpdateCasWriteFailureRejected(): void
 	{
 		$fresh = $this->draftTrip(7, 'alice', 3);

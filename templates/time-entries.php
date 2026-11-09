@@ -1147,7 +1147,7 @@ if ($mode === 'list') {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="10">
+                                    <td colspan="10" class="azc-table-empty">
                                         <div class="azc-empty-state">
                                             <?php if ($azcListFiltered): ?>
                                                 <h3 class="azc-empty-state__title"><?php p($l->t('No entries match this filter')); ?></h3>

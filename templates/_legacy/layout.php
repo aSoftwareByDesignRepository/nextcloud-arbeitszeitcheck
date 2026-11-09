@@ -161,8 +161,7 @@ try {
 </head>
 
 <body id="<?php p($_['bodyid'] ?? 'body-arbeitszeitcheck'); ?>" class="<?php p($_['bodyclass'] ?? ''); ?>">
-    <!-- Skip Link for Accessibility -->
-    <a href="#main-content" class="skip-link"><?php p($l->t('Skip to main content')); ?></a>
+    <?php /* Skip links are provided by Nextcloud core's #skip-actions strip. */ ?>
 
     <!-- Page Layout Container -->
     <div class="page-layout">

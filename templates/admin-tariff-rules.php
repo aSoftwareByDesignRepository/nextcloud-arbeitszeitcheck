@@ -172,7 +172,7 @@ $tariffL10n = [
                             </thead>
                             <tbody id="tariff-rules-tbody">
                                 <tr>
-                                    <td colspan="8" class="admin-tariff-rules__empty"><?php p($l->t('Loading…')); ?></td>
+                                    <td colspan="8" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Loading…')); ?></h3></div></td>
                                 </tr>
                             </tbody>
                         </table>

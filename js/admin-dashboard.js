@@ -226,7 +226,7 @@
 					|| (row.userId || '').toLowerCase().includes(q);
 			});
 			if (!filtered.length) {
-				tbody.innerHTML = '<tr><td colspan="4">' + escapeHtml(t('No employees found.', 'No employees found.')) + '</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="4" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + escapeHtml(t('No employees found.', 'No employees found.')) + '</h3></div></td></tr>';
 			} else {
 				const nameHdr = t('Name', 'Name');
 				const userIdHdr = t('User ID', 'User ID');

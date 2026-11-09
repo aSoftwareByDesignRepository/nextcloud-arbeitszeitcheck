@@ -297,7 +297,11 @@ final class BusinessTripController extends Controller
 	private function requiredTime(mixed $value, string $field): \DateTime
 	{
 		if (is_string($value)) {
-			$parsed = \DateTime::createFromFormat(\DateTime::ATOM, $value);
+			// ISO 8601 clients (JS toISOString, RFC 3339 serializers) may append
+			// fractional seconds — sub-minute precision is meaningless here,
+			// so normalize it away before the strict ATOM check.
+			$normalized = preg_replace('/\.\d{1,6}(?=Z$|[+-]\d{2}:\d{2}$)/', '', $value);
+			$parsed = \DateTime::createFromFormat(\DateTime::ATOM, $normalized ?? $value);
 			if ($parsed !== false) {
 				return $parsed;
 			}

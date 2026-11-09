@@ -255,13 +255,6 @@
 #app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__actions .azc-btn + .azc-btn {
 	margin-inline-start: var(--azc-space-2);
 }
-
-#app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__empty {
-	text-align: center;
-	color: var(--azc-muted);
-	padding: var(--azc-space-5) var(--azc-space-4);
-}
-
 #app-content.azc-app--admin-overtime-payout-audit .admin-ot-audit__muted {
 	color: var(--azc-muted);
 	font-size: var(--azc-fs-sm);

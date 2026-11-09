@@ -90,13 +90,25 @@
 		pUser: $('bta-p-user'),
 		pMinutes: $('bta-p-minutes'),
 		pFrom: $('bta-p-from'),
+		rolloutCard: $('bta-rollout'),
 		rolloutStatus: $('bta-rollout-status'),
-		rolloutChecks: $('bta-rollout-checks'),
+		rolloutTodoGroup: $('bta-rollout-todo-group'),
+		rolloutTodo: $('bta-rollout-todo'),
+		rolloutDoneGroup: $('bta-rollout-done-group'),
+		rolloutDone: $('bta-rollout-done'),
+		rolloutInfoGroup: $('bta-rollout-info-group'),
+		rolloutInfo: $('bta-rollout-info'),
+		cutover: $('bta-cutover'),
+		cutoverHelp: $('bta-cutover-help'),
 		enable: $('bta-enable'),
 		enableCredit: $('bta-enable-credit'),
 		disableLegacy: $('bta-disable-legacy'),
 		presets: $('bta-presets'),
 	};
+
+	// Merged flag state — the cutover response only echoes changed flags.
+	// Declared above initRollout(): it runs before the early return below.
+	let rolloutFlags = {};
 
 	// The rollout card renders even while the feature is off — readiness is
 	// exactly what an admin needs before enabling or cutting over.
@@ -247,6 +259,24 @@
 				review.dataset.status = set.reviewedAt ? 'approved' : 'pending';
 				review.textContent = set.reviewedAt ? t('Reviewed') : t('Review pending');
 				actions.appendChild(review);
+				if (set.reviewedAt) {
+					const activate = document.createElement('button');
+					activate.type = 'button';
+					activate.className = 'azc-btn azc-btn--primary';
+					activate.textContent = t('Activate');
+					activate.addEventListener('click', async () => {
+						activate.disabled = true;
+						try {
+							await call(tpl('ruleSetActivateTemplate', set.id), { method: 'POST' });
+							await loadSets();
+							await loadRollout();
+						} catch (e) {
+							els.setsStatus.textContent = e.message;
+							activate.disabled = false;
+						}
+					});
+					actions.appendChild(activate);
+				}
 				if (!set.reviewedAt) {
 					const mark = document.createElement('button');
 					mark.type = 'button';
@@ -270,6 +300,7 @@
 								json: { configHash: set.configHash || '' },
 							});
 							await loadSets();
+							await loadRollout();
 						} catch (e) {
 							els.setsStatus.textContent = e.message;
 							mark.disabled = false;
@@ -593,6 +624,7 @@
 			}
 			els.builder.hidden = true;
 			await loadSets();
+			await loadRollout();
 		} catch (e) {
 			showError(els.builderError, els.builderErrorText, e.message);
 		}
@@ -605,6 +637,7 @@
 			await call(tpl('ruleSetActivateTemplate', editingSet.id), { method: 'POST' });
 			els.builder.hidden = true;
 			await loadSets();
+			await loadRollout();
 		} catch (e) {
 			showError(els.builderError, els.builderErrorText, e.message);
 		} finally {
@@ -654,6 +687,7 @@
 							json: { revision: a.revision, effectiveTo: (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')) },
 						});
 						await loadAll();
+						await loadRollout();
 					} catch (e) {
 						showError(els.assignError, els.assignErrorText, e.message);
 						end.disabled = false;
@@ -740,6 +774,7 @@
 			});
 			els.assignmentForm.hidden = true;
 			await loadAll();
+			await loadRollout();
 		} catch (e) {
 			showError(els.assignError, els.assignErrorText, e.message);
 		}
@@ -835,57 +870,163 @@
 
 	// ---------- rollout (Phase 6) ----------
 
-	function rolloutCheck(label, ok) {
+	function icon(name) {
+		return (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(name) : '';
+	}
+
+	function stepLink(href, label) {
+		const a = document.createElement('a');
+		a.className = 'azc-btn azc-btn--secondary';
+		a.href = href;
+		a.textContent = label;
+		return a;
+	}
+
+	function stepLi(state, label, action, note) {
 		const li = document.createElement('li');
-		li.className = 'azc-list__item bta-rollout-check';
-		const chip = document.createElement('span');
-		chip.className = 'azc-status-chip';
-		chip.dataset.status = ok ? 'approved' : 'pending';
-		chip.textContent = ok ? t('OK') : t('Open');
+		li.className = 'bta-step bta-step--' + state;
+		const iconEl = document.createElement('span');
+		iconEl.className = 'bta-step__icon';
+		iconEl.setAttribute('aria-hidden', 'true');
+		iconEl.innerHTML = icon({ open: 'circle', done: 'circle-check', blocked: 'lock', info: 'info' }[state] || 'circle');
 		const text = document.createElement('span');
+		text.className = 'bta-step__text';
 		text.textContent = label;
-		li.append(chip, text);
+		if (note) {
+			const sub = document.createElement('span');
+			sub.className = 'bta-step__note';
+			sub.textContent = note;
+			text.appendChild(sub);
+		}
+		li.append(iconEl, text);
+		if (action) {
+			const slot = document.createElement('span');
+			slot.className = 'bta-step__action';
+			slot.appendChild(action);
+			li.appendChild(slot);
+		}
 		return li;
 	}
 
-	function rolloutInfo(label) {
-		const li = document.createElement('li');
-		li.className = 'azc-list__item bta-rollout-check';
-		const chip = document.createElement('span');
-		chip.className = 'azc-status-chip';
-		chip.dataset.status = 'draft';
-		chip.textContent = t('Info');
-		const text = document.createElement('span');
-		text.textContent = label;
-		li.append(chip, text);
-		return li;
+	function renderStepGroup(groupEl, listEl, items) {
+		listEl.replaceChildren();
+		items.forEach((li) => listEl.appendChild(li));
+		if (groupEl) {
+			groupEl.hidden = items.length === 0;
+		}
 	}
 
 	function renderRollout(body) {
+		if (!els.rolloutTodo || !els.rolloutDone || !els.rolloutInfo) {
+			return;
+		}
 		const p = body.preflight || {};
-		const flags = body.flags || {};
-		els.rolloutChecks.replaceChildren();
-		els.rolloutChecks.append(
-			rolloutCheck(t('No pending legacy business-trip requests'), p.pendingLegacyTripAbsences === 0),
-			rolloutCheck(t('A legally reviewed rule set is active'), (p.activeRuleSets || 0) > 0),
-			rolloutCheck(t('At least one rule assignment is in effect'), (p.effectiveAssignments || 0) > 0),
-			rolloutCheck(t('Business trips feature is on'), flags.business_trips_enabled === true),
-			rolloutCheck(t('Time-account credit postings are on'), flags.business_trip_credit_enabled === true),
-			rolloutInfo(t('Submitted trips awaiting a decision: %s').replace('%s', String(p.submittedTripsUndecided || 0))),
-			rolloutInfo(t('Organisation-wide assignment: %s').replace('%s', p.orgScopeCoverage === true ? t('yes') : t('no'))),
-		);
-		if (els.enable) {
-			els.enable.hidden = flags.business_trips_enabled === true;
+		rolloutFlags = Object.assign(rolloutFlags, body.flags || {});
+		const flags = rolloutFlags;
+		const featureOn = flags.business_trips_enabled === true;
+		const creditOn = flags.business_trip_credit_enabled === true;
+		const cutoverDone = flags.legacy_trip_absence_create_enabled === false;
+		// Rollout finished — the card's job is done, remove it entirely.
+		if (els.rolloutCard) {
+			els.rolloutCard.hidden = cutoverDone;
 		}
-		if (els.enableCredit) {
-			els.enableCredit.hidden = !(flags.business_trips_enabled === true && flags.business_trip_credit_enabled !== true);
+		if (cutoverDone) {
+			return;
 		}
-		const canCut = p.ready === true && flags.business_trips_enabled === true
-			&& flags.legacy_trip_absence_create_enabled === true;
-		els.disableLegacy.disabled = !canCut;
-		els.rolloutStatus.textContent = flags.legacy_trip_absence_create_enabled === false
-			? t('Legacy business-trip requests are closed for new submissions.')
-			: (p.ready === true ? t('All checks passed — the cutover is safe.') : t('Some checks are still open.'));
+		const pending = p.pendingLegacyTripAbsences || 0;
+		const ruleSetReady = (p.activeRuleSets || 0) > 0;
+		const assigned = (p.effectiveAssignments || 0) > 0;
+		const undecided = p.submittedTripsUndecided || 0;
+
+		const todo = [];
+		const done = [];
+		const info = [];
+
+		if (pending > 0) {
+			const label = t('Decide pending legacy business-trip requests (%s)').replace('%s', String(pending));
+			const link = root.dataset.managerAbsencesUrl ? stepLink(root.dataset.managerAbsencesUrl, t('Open requests')) : null;
+			if (cutoverDone) {
+				info.push(stepLi('info', label, link));
+			} else {
+				todo.push(stepLi('open', label, link));
+			}
+		} else {
+			done.push(stepLi('done', t('No pending legacy business-trip requests')));
+		}
+
+		if (featureOn) {
+			done.push(stepLi('done', t('Business trips feature is on')));
+		} else {
+			if (els.enable) {
+				els.enable.hidden = false;
+			}
+			todo.push(stepLi('open', t('Turn on the business-trip feature'), els.enable || null));
+		}
+
+		if (ruleSetReady) {
+			done.push(stepLi('done', t('A legally reviewed rule set is active')));
+		} else if (featureOn) {
+			todo.push(stepLi('open', t('Create, review and activate a rule set'), stepLink('#bta-sets', t('Open rule sets'))));
+		} else {
+			todo.push(stepLi('blocked', t('Create, review and activate a rule set'), null, t('Enable business trips first.')));
+		}
+
+		if (assigned) {
+			done.push(stepLi('done', t('At least one rule assignment is in effect')));
+		} else if (featureOn && ruleSetReady) {
+			todo.push(stepLi('open', t('Assign a rule set'), stepLink('#bta-assignments', t('Open assignments'))));
+		} else {
+			todo.push(stepLi('blocked', t('Assign a rule set'), null, featureOn ? t('Activate a rule set first.') : t('Enable business trips first.')));
+		}
+
+		if (creditOn) {
+			done.push(stepLi('done', t('Time-account credit postings are on')));
+		} else if (featureOn) {
+			if (els.enableCredit) {
+				els.enableCredit.hidden = false;
+			}
+			todo.push(stepLi('open', t('Turn on time-account credit postings'), els.enableCredit || null));
+		} else {
+			todo.push(stepLi('blocked', t('Turn on time-account credit postings'), null, t('Enable business trips first.')));
+		}
+
+		if (cutoverDone) {
+			done.push(stepLi('done', t('New legacy business-trip requests are closed')));
+		}
+
+		info.push(stepLi('info',
+			t('Submitted trips awaiting a decision: %s').replace('%s', String(undecided)),
+			undecided > 0 && root.dataset.managerTripsUrl ? stepLink(root.dataset.managerTripsUrl, t('Review trips')) : null));
+		info.push(stepLi('info',
+			t('Organisation-wide assignment: %s').replace('%s', p.orgScopeCoverage === true ? t('yes') : t('no')),
+			null,
+			p.orgScopeCoverage === true ? null : t('Team, model or person assignments also count.')));
+
+		renderStepGroup(els.rolloutTodoGroup, els.rolloutTodo, todo);
+		renderStepGroup(els.rolloutDoneGroup, els.rolloutDone, done);
+		renderStepGroup(els.rolloutInfoGroup, els.rolloutInfo, info);
+
+		const canCut = p.ready === true && featureOn && !cutoverDone;
+		if (els.cutover) {
+			els.cutover.hidden = cutoverDone;
+		}
+		if (!cutoverDone && els.disableLegacy) {
+			els.disableLegacy.disabled = !canCut;
+			if (els.cutoverHelp) {
+				els.cutoverHelp.textContent = canCut
+					? t('Existing legacy requests stay readable and editable forever — this only stops creating new ones.')
+					: t('Finish the open steps above — then you can stop new legacy requests.');
+			}
+		}
+
+		const doneCount = [pending === 0, featureOn, ruleSetReady, assigned, creditOn].filter(Boolean).length;
+		if (cutoverDone) {
+			els.rolloutStatus.textContent = t('Rollout complete — new requests use the business-trip workflow.');
+		} else if (canCut) {
+			els.rolloutStatus.textContent = t('All required steps are done — you can now stop new legacy requests.');
+		} else {
+			els.rolloutStatus.textContent = t('%d of %d steps done.').replace('%d', String(doneCount)).replace('%d', '5');
+		}
 	}
 
 	async function loadRollout() {
@@ -977,31 +1118,33 @@
 				}
 			});
 		}
-		els.disableLegacy.addEventListener('click', async () => {
-			const cutoverOk = await confirmStep({
-				title: t('Close the legacy trip absence type?'),
-				message: t('This closes the legacy "business trip" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration.'),
-				confirmLabel: t('Close legacy type'),
-				cancelLabel: t('Cancel'),
-				variant: 'destructive',
-				requireCheckbox: true,
-				checkboxLabel: t('I understand the effect and the rollback path.'),
-			});
-			if (!cutoverOk) {
-				return;
-			}
-			els.disableLegacy.disabled = true;
-			try {
-				const body = await call(root.dataset.disableLegacyUrl, { method: 'POST' });
-				renderRollout({ preflight: body.preflight, flags: { legacy_trip_absence_create_enabled: body.legacy_trip_absence_create_enabled, business_trips_enabled: true } });
-			} catch (e) {
-				if (e.data && e.data.preflight) {
-					renderRollout({ preflight: e.data.preflight, flags: { legacy_trip_absence_create_enabled: true, business_trips_enabled: true } });
+		if (els.disableLegacy) {
+			els.disableLegacy.addEventListener('click', async () => {
+				const cutoverOk = await confirmStep({
+					title: t('Close the legacy trip absence type?'),
+					message: t('This closes the legacy "business trip" absence type for new requests. Existing requests stay readable and decidable; new trips use the business-trip workflow. Rollback: re-enable the legacy create flag in the app configuration.'),
+					confirmLabel: t('Close legacy type'),
+					cancelLabel: t('Cancel'),
+					variant: 'destructive',
+					requireCheckbox: true,
+					checkboxLabel: t('I understand the effect and the rollback path.'),
+				});
+				if (!cutoverOk) {
+					return;
 				}
-				els.rolloutStatus.textContent = e.message;
-				els.disableLegacy.disabled = false;
-			}
-		});
+				els.disableLegacy.disabled = true;
+				try {
+					const body = await call(root.dataset.disableLegacyUrl, { method: 'POST' });
+					renderRollout({ preflight: body.preflight, flags: { legacy_trip_absence_create_enabled: body.legacy_trip_absence_create_enabled, business_trips_enabled: true } });
+				} catch (e) {
+					if (e.data && e.data.preflight) {
+						renderRollout({ preflight: e.data.preflight, flags: { legacy_trip_absence_create_enabled: true, business_trips_enabled: true } });
+					}
+					els.rolloutStatus.textContent = e.message;
+					els.disableLegacy.disabled = false;
+				}
+			});
+		}
 		loadRollout();
 	}
 

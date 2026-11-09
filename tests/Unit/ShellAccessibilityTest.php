@@ -17,17 +17,22 @@ class ShellAccessibilityTest extends TestCase
 		$this->assertFileExists($path);
 		$content = (string)file_get_contents($path);
 
-		$this->assertStringContainsString('azc-skip-link', $content);
-		$this->assertStringContainsString('#azc-main-content', $content);
+		// Skip links are delegated to Nextcloud core's #skip-actions strip —
+		// the shell must not render its own duplicates.
+		$this->assertStringNotContainsString('azc-skip-link', $content);
+		$this->assertStringContainsString('id="azc-main-content"', $content);
 		$this->assertStringContainsString('id="azc-live-region"', $content);
 		$this->assertStringContainsString('aria-live="polite"', $content);
 		$this->assertStringContainsString('id="azc-alert-region"', $content);
 		$this->assertStringContainsString('aria-live="assertive"', $content);
 		$this->assertStringContainsString('id="azc-page-title"', $content);
 		$this->assertStringContainsString('azc-scope-strip', $content);
-		$this->assertStringContainsString('azc-breadcrumb__list', $content);
-		$this->assertStringContainsString('azc-breadcrumb__link', $content);
-		$this->assertStringContainsString('aria-current="page"', $content);
+		$this->assertStringContainsString("include __DIR__ . '/breadcrumb.php'", $content);
+
+		$crumb = (string)file_get_contents(__DIR__ . '/../../templates/common/breadcrumb.php');
+		$this->assertStringContainsString('azc-breadcrumb__list', $crumb);
+		$this->assertStringContainsString('azc-breadcrumb__link', $crumb);
+		$this->assertStringContainsString('aria-current="page"', $crumb);
 		$this->assertStringContainsString('<main id="azc-main-content"', $content);
 		$this->assertStringContainsString('id="azc-page-title"', $content);
 		$this->assertMatchesRegularExpression('/<h1[^>]*id="azc-page-title"/', $content);
@@ -106,8 +111,11 @@ class ShellAccessibilityTest extends TestCase
 	public function testNavigationHasOnlyNavSkipLink(): void
 	{
 		$content = (string)file_get_contents(__DIR__ . '/../../templates/common/navigation.php');
+		// Skip links are delegated to Nextcloud core's #skip-actions strip —
+		// the app must not render its own duplicates.
 		$this->assertStringNotContainsString('href="#app-content"', $content);
-		$this->assertStringContainsString('href="#app-navigation"', $content);
+		$this->assertStringNotContainsString('href="#app-navigation"', $content);
+		$this->assertStringNotContainsString('skip-link', $content);
 	}
 
 	/**

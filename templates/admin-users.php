@@ -226,9 +226,10 @@ $pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
                         <tbody id="users-tbody">
                             <?php if (empty($users)): ?>
                                 <tr id="users-empty-row">
-                                    <td colspan="9" class="text-center admin-users-empty-cell">
+                                    <td colspan="9" class="azc-table-empty">
+                                        <div class="azc-empty-state">
                                         <?php if ($isAccessRestricted && $accessFilter === AdminEmployeeDirectoryService::FILTER_APP_ACCESS): ?>
-                                            <p class="admin-users-empty-message"><?php p($l->t('No one with app access yet. Add people under Access control, or show all Nextcloud accounts.')); ?></p>
+                                            <h3 class="azc-empty-state__title"><?php p($l->t('No one with app access yet. Add people under Access control, or show all Nextcloud accounts.')); ?></h3>
                                             <div class="admin-users-empty-actions">
                                                 <a class="azc-btn azc-btn--primary" href="<?php p($accessSettingsUrl); ?>">
                                                     <?php p($l->t('Open access control')); ?>
@@ -238,7 +239,7 @@ $pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
                                                 </button>
                                             </div>
                                         <?php else: ?>
-                                            <p class="admin-users-empty-message"><?php p($l->t('No users found')); ?></p>
+                                            <h3 class="azc-empty-state__title"><?php p($l->t('No users found')); ?></h3>
                                             <?php if ($searchValue !== '' || $modelFilter !== '' || $statusFilter !== ''): ?>
                                             <div class="admin-users-empty-actions">
                                                 <button type="button" class="azc-btn azc-btn--primary" data-action="clear-employee-search">
@@ -247,6 +248,7 @@ $pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
                                             </div>
                                             <?php endif; ?>
                                         <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php else: ?>

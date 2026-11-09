@@ -869,8 +869,12 @@ final class BusinessTripService
 			return new \DateTime($value->format('Y-m-d H:i:s'), new \DateTimeZone('UTC'));
 		}
 		if (is_string($value)) {
-			$parsed = \DateTime::createFromFormat(\DateTime::ATOM, $value)
-				?: \DateTime::createFromFormat('Y-m-d\TH:i:s', $value, new \DateTimeZone('UTC'));
+			// Same normalization as the controller boundary: JS toISOString and
+			// RFC 3339 serializers append fractional seconds that the strict
+			// ATOM format rejects — sub-minute precision is meaningless here.
+			$normalized = preg_replace('/\.\d{1,6}(?=Z$|[+-]\d{2}:\d{2}$)/', '', $value) ?? $value;
+			$parsed = \DateTime::createFromFormat(\DateTime::ATOM, $normalized)
+				?: \DateTime::createFromFormat('Y-m-d\TH:i:s', $normalized, new \DateTimeZone('UTC'));
 			if ($parsed !== false) {
 				return $parsed;
 			}

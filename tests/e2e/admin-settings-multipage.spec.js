@@ -37,9 +37,11 @@ test.describe('Admin global settings multipage', () => {
 		).toBeVisible()
 
 		const topics = page.locator('#azc-admin-settings-pages')
-		await expect(topics.locator('.azc-settings-nav__title')).toBeVisible()
-		await expect(topics.locator('.azc-settings-nav__group')).toHaveCount(4)
-		await expect(topics.locator('.azc-settings-nav__link')).toHaveCount(SECTIONS.length)
+		// Two-level tabs (DS §3.12.1): 4 group tabs on top, active group's chips below.
+		await expect(topics.locator('.azc-settings-nav__tab')).toHaveCount(4)
+		await expect(topics.locator('.azc-settings-nav__tab.is-active')).toHaveAttribute('aria-current', 'location')
+		// Access group owns exactly one topic — no foreign group's chips rendered.
+		await expect(topics.locator('.azc-settings-nav__link')).toHaveCount(1)
 		await expect(topics.locator('.azc-settings-nav__link.is-active')).toHaveAttribute('aria-current', 'page')
 
 		const chipBox = await topics.boundingBox()
@@ -49,8 +51,14 @@ test.describe('Admin global settings multipage', () => {
 		await expect(page.locator('#section-access-heading')).toBeAttached()
 		await expect(page.locator('#section-compliance-heading')).toHaveCount(0)
 
+		// Breadcrumb: App → Administration (plain text) → Global settings (link) → section.
 		const crumb = page.locator('.azc-breadcrumb')
-		await expect(crumb.locator('a.azc-breadcrumb__link[href*="/admin/settings/access"]')).toBeVisible()
+		await expect(crumb.locator('.azc-breadcrumb__item')).toHaveCount(4)
+		await expect(crumb.locator('.azc-breadcrumb__text')).toHaveText(/Administration/)
+		await expect(crumb.locator('a.azc-breadcrumb__link[href*="/admin/settings/access"]')).toHaveText(
+			/Global settings|Globale Einstellungen/i,
+		)
+		await expect(crumb.locator('.azc-breadcrumb__current')).toHaveText(/Access control|Zugriffskontrolle/i)
 
 		await page.locator('#azc-admin-settings-pages a[href*="/admin/settings/compliance"]').click()
 		await page.waitForURL(/\/admin\/settings\/compliance/)

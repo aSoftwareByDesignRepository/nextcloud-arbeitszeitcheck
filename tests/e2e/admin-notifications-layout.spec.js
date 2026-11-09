@@ -39,7 +39,7 @@ test.describe('Admin policy settings IA', () => {
 			)
 			const overtimeChip = !!document.querySelector('#azc-policy-pages a[href*="/admin/overtime-settings"]')
 			const vacationChip = !!document.querySelector('#azc-policy-pages a[href*="/admin/vacation-rules"]')
-			const entitlementChip = !!document.querySelector('#azc-policy-pages a[href*="/admin/vacation-layers"]')
+			const alertsChip = !!document.querySelector('#azc-policy-pages a[href*="/admin/notifications"]')
 			return {
 				bodyId: body.id,
 				guestCss,
@@ -61,7 +61,7 @@ test.describe('Admin policy settings IA', () => {
 		expect(metrics.policySidebar).toBe(true)
 		expect(metrics.overtimeChip).toBe(true)
 		expect(metrics.vacationChip).toBe(true)
-		expect(metrics.entitlementChip).toBe(true)
+		expect(metrics.alertsChip).toBe(true)
 	})
 
 	test('overtime settings hosts bank and premiums', async ({ page }) => {
@@ -191,9 +191,11 @@ test.describe('Admin policy settings IA', () => {
 		await expect(page.locator('#app-navigation a').filter({ hasText: /^Notifications$|^Benachrichtigungen$/i })).toHaveCount(0)
 
 		const topics = page.locator('#azc-policy-pages')
-		await expect(topics.locator('.azc-settings-nav__title')).toBeVisible()
-		await expect(topics.locator('.azc-settings-nav__group')).toHaveCount(3)
-		await expect(topics.locator('.azc-settings-nav__link')).toHaveCount(6)
+		// Two-level tabs (DS §3.12.1): 3 group tabs on top, active group's chips below.
+		await expect(topics.locator('.azc-settings-nav__tab')).toHaveCount(3)
+		await expect(topics.locator('.azc-settings-nav__tab.is-active')).toHaveAttribute('aria-current', 'location')
+		// Alerts group owns exactly one topic — foreign groups' chips stay hidden.
+		await expect(topics.locator('.azc-settings-nav__link')).toHaveCount(1)
 		await expect(topics.locator('.azc-settings-nav__link[aria-current="page"]')).toHaveCount(1)
 
 		const crumb = page.locator('.azc-breadcrumb')
@@ -213,7 +215,7 @@ test.describe('Admin policy settings IA', () => {
 		await assertArbeitszeitcheckLoaded(page)
 
 		const chips = page.locator('#azc-policy-pages .azc-settings-nav__link')
-		await expect(chips).toHaveCount(6)
+		await expect(chips).toHaveCount(1)
 		const active = page.locator('#azc-policy-pages .azc-settings-nav__link[aria-current="page"]')
 		await expect(active).toHaveCount(1)
 		await expect(active).toBeVisible()

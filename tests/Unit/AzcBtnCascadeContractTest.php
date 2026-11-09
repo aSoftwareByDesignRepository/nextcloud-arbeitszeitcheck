@@ -172,7 +172,7 @@ final class AzcBtnCascadeContractTest extends TestCase {
 		);
 		self::assertStringContainsString("a.azc-btn {\n    text-decoration: none !important;", $base);
 		self::assertMatchesRegularExpression(
-			'/@media print[\s\S]*a:not\(\.btn\):not\(\.azc-btn\) \{\s*\n\s*color:[^;]+!important;\s*\n\s*text-decoration:\s*underline !important;/',
+			'/@media print[\s\S]*a:not\(\.btn\):not\(\.azc-btn\)(?::not\([^)]+\))*\s*\{\s*\n\s*color:[^;]+!important;\s*\n\s*text-decoration:\s*underline !important;/',
 			$typo,
 			'Print must not underline button anchors (typography.css)'
 		);

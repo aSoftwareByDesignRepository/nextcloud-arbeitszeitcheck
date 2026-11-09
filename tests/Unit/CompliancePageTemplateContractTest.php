@@ -47,13 +47,16 @@ final class CompliancePageTemplateContractTest extends TestCase {
 
 	public function testReportFiguresHaveNoSecondFrameAndStackOnANarrowScreen(): void {
 		$css = (string)file_get_contents(dirname(__DIR__, 2) . '/css/compliance-violations.css');
+		$tpl = (string)file_get_contents(dirname(__DIR__, 2) . '/templates/compliance-violations.php');
+		$patterns = (string)file_get_contents(dirname(__DIR__, 2) . '/css/common/page-patterns.css');
 		self::assertStringContainsString('.compliance-status__figures', $css);
 		self::assertStringContainsString('order: -1;', $css);
-		self::assertStringContainsString('#violations-table td.empty-state', $css);
-		self::assertStringContainsString('#violations-table td.empty-state .empty-state__description', $css);
+		// Empty table rows render the shared empty-state recipe (td.azc-table-empty + .azc-empty-state).
+		self::assertStringContainsString('class="azc-table-empty"', $tpl);
+		self::assertStringContainsString('azc-empty-state', $tpl);
+		self::assertStringContainsString('td.azc-table-empty > .azc-empty-state', $patterns);
 		self::assertStringContainsString('white-space: normal;', $css);
-		self::assertStringContainsString('max-width: none;', $css);
-		self::assertStringContainsString('text-align: center;', $css);
+		self::assertStringContainsString('text-align: center;', $patterns);
 		self::assertStringContainsString('grid-template-columns: 1fr;', $css);
 		self::assertStringContainsString('.compliance-dashboard__violations .compliance-violations__filters', $css);
 		self::assertStringContainsString('border: 0;', $css);

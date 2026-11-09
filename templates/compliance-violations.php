@@ -106,10 +106,10 @@ $colCount = $canSeeScope ? 6 : 5;
                     <tbody id="violations-tbody">
                         <?php if (empty($violations)): ?>
                             <tr>
-                                <td colspan="<?php p($colCount); ?>" class="empty-state">
-                                    <div class="empty-state">
-                                        <h3 class="empty-state__title"><?php p($l->t('No problems found')); ?></h3>
-                                        <p class="empty-state__description">
+                                <td colspan="<?php p($colCount); ?>" class="azc-table-empty">
+                                    <div class="azc-empty-state">
+                                        <h3 class="azc-empty-state__title"><?php p($l->t('No problems found')); ?></h3>
+                                        <p class="azc-empty-state__text">
                                             <?php p($l->t('Great! No working time rule violations were found for the selected time period.')); ?>
                                         </p>
                                     </div>

@@ -170,7 +170,7 @@ $monthLabels = is_array($_['monthLabels'] ?? null) ? $_['monthLabels'] : [];
                                 </tr>
                             </thead>
                             <tbody id="ot-audit-tbody">
-                                <tr><td colspan="5"><?php p($l->t('Loading…')); ?></td></tr>
+                                <tr><td colspan="5" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title"><?php p($l->t('Loading…')); ?></h3></div></td></tr>
                             </tbody>
                         </table>
                     </div>

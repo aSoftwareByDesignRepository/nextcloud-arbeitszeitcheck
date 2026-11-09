@@ -497,6 +497,7 @@ halvdags
 halvdagsferie
 halvdagshelligdag
 halvdelen
+halve
 halvfemsindstyvende
 halvfjerdsende
 halvtredsindstyvende
@@ -1086,6 +1087,7 @@ regelresultatet
 regeltildeling
 regionale
 regionen
+regionens
 regionsliste
 register
 registrer

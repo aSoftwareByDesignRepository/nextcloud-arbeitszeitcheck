@@ -59,6 +59,12 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('Open global administration settings', $nav);
 		$chipNav = file_get_contents(dirname(__DIR__, 3) . '/templates/common/azc-admin-settings-nav.php');
 		$this->assertNotFalse($chipNav);
+		// Two-level tabs (§3.12.1): group tab row + active group's chips only.
+		$this->assertStringContainsString('azc-settings-nav__tabs', $chipNav);
+		$this->assertStringContainsString('azc-settings-nav__tab', $chipNav);
+		$this->assertStringContainsString('aria-current="location"', $chipNav);
+		$this->assertStringContainsString('$activeGroupSections', $chipNav);
+		// Index-mode fallback (NC mega-form): grouped labels + all chips.
 		$this->assertStringContainsString('azc-settings-nav__group', $chipNav);
 		$this->assertStringContainsString('Choose a topic', $chipNav);
 	}
@@ -156,7 +162,10 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('function settingsSection(string $section)', $src);
 		$this->assertStringContainsString('admin-settings-legacy-redirect', $src);
 		$this->assertStringNotContainsString("'common/settings-jump-nav', 'common/admin-user-picker', 'admin-settings-legacy-redirect'", $src);
-		$this->assertStringContainsString('breadcrumbParent', $src);
+		// Breadcrumb contract: App → Administration (plain text) → Global settings (link) → section.
+		$this->assertStringContainsString('breadcrumbParents', $src);
+		$this->assertStringContainsString("\$this->l10n->t('Administration')", $src);
+		$this->assertStringContainsString("\$this->l10n->t('Global settings')", $src);
 		$this->assertStringContainsString('allowedParamKeys($scope)', $src);
 		$this->assertStringContainsString('$accessScopeOk', $src);
 	}

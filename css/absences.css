@@ -562,6 +562,10 @@
 	color: var(--arbeitszeitcheck-color-text-maxcontrast);
 }
 
+.section--stats .se-accounts {
+	margin-top: var(--space-4, 1rem);
+}
+
 .stats-section-title {
 	font-size: 1.125rem;
 	font-weight: 600;

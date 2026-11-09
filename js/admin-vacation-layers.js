@@ -418,7 +418,7 @@
     const tbody = document.getElementById('l0-history-rows');
     if (!tbody) return;
     if (state.org.history.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="layer-card__placeholder">${escape(t('No entries yet.', 'No entries yet.'))}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">${escape(t('No entries yet.', 'No entries yet.'))}</h3></div></td></tr>`;
       return;
     }
     tbody.innerHTML = state.org.history.map((row) => `
@@ -443,7 +443,7 @@
     const tbody = document.getElementById('l1-rows');
     if (!tbody) return;
     if (state.model.defaults.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="layer-card__placeholder">${escape(t('No model defaults yet — employees fall through to L0.', 'No model defaults yet — employees fall through to L0.'))}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">${escape(t('No model defaults yet — employees fall through to L0.', 'No model defaults yet — employees fall through to L0.'))}</h3></div></td></tr>`;
       return;
     }
     tbody.innerHTML = state.model.defaults.map((row) => `
@@ -469,7 +469,7 @@
     const tbody = document.getElementById('l2-rows');
     if (!tbody) return;
     if (state.team.policies.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="layer-card__placeholder">${escape(t('No team policies yet — teams inherit from L1 or L0.', 'No team policies yet — teams inherit from L1 or L0.'))}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">${escape(t('No team policies yet — teams inherit from L1 or L0.', 'No team policies yet — teams inherit from L1 or L0.'))}</h3></div></td></tr>`;
       return;
     }
     tbody.innerHTML = state.team.policies.map((row) => `

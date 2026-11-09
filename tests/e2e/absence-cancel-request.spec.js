@@ -62,19 +62,20 @@ async function runningVacation(mgr, userId) {
 		`${APP}/api/manager/employee-absences?employeeId=${userId}&startDate=${shift(today, -150)}&endDate=${shift(today, 150)}&limit=300`)
 	const rows = list.json?.entries ?? []
 	const reuse = rows.find(
-		(a) => a.type === 'vacation' && a.status === 'approved' && !a.cancelRequested
+		(a) => a.status === 'approved' && !a.cancelRequested
 			&& a.startDate <= today && a.endDate >= today,
 	)
 	if (reuse) {
 		return reuse
 	}
 	// Seed fallback: only possible when today itself is free (any approved
-	// row covering today blocks the whole range). Probe the end forward.
-	for (let span = 5; span <= 90; span += 5) {
+	// row covering today blocks the whole range). unpaid_leave carries no
+	// quota — residue-saturated vacation entitlements can't starve the seed.
+	for (let span = 0; span <= 60; span += 2) {
 		const res = await apiAllowFailure(mgr, 'POST', `${APP}/api/manager/employee-absences`, {
 			data: {
 				userId,
-				type: 'vacation',
+				type: 'unpaid_leave',
 				startDate: shift(today, -1),
 				endDate: shift(today, span),
 				reason: 'e2e cancel-request seed',
@@ -94,7 +95,7 @@ async function seedEndedVacation(page, userId) {
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/manager/employee-absences`, {
 			data: {
 				userId,
-				type: 'vacation',
+				type: 'unpaid_leave',
 				startDate: shift(today, -20 - back),
 				endDate: shift(today, -15 - back),
 				reason: 'e2e manager-cancel seed',

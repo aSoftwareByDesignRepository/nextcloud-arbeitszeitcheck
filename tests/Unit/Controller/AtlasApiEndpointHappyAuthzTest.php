@@ -424,6 +424,25 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'sickEnd' => '2026-09-11',
 			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
 		],
+		// FA-2b/2c: CAS token + mandatory reason for the new mutation surface.
+		'AbsenceController::requestCancel' => [
+			'reason' => 'Family emergency',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'AbsenceController::withdrawCancelRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::cancelEmployeeAbsence' => [
+			'reason' => 'Documented operational reason',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::approveEmployeeAbsenceCancelRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::declineEmployeeAbsenceCancelRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+			'comment' => 'Still needed on site',
+		],
 	];
 
 	/**

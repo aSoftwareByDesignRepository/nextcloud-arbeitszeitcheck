@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
 
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
@@ -49,9 +50,9 @@ $rangeEnd = min($total, $offset + $shownCount);
 						id="audit-log-filter-form"
 						class="audit-log-page__filter-form"
 						novalidate
-						aria-describedby="audit-log-filter-help audit-log-filter-footnote audit-log-filter-error"
+						aria-describedby="audit-log-filter-help audit-log-filter-error"
 					>
-						<?php /* Dates first (required), then optional filters. IDs must stay stable for audit-log-viewer.js. */ ?>
+						<?php /* Dates first (required), then optional filters, actions below. IDs must stay stable for audit-log-viewer.js. */ ?>
 						<div class="audit-log-page__filter-grid" role="group" aria-label="<?php p($l->t('Filter options')); ?>">
 							<div class="audit-log-filter__field audit-log-filter__field--from">
 								<label for="start-date" class="audit-log-filter__label"><?php p($l->t('From')); ?></label>
@@ -68,7 +69,7 @@ $rangeEnd = min($total, $offset + $shownCount);
 										autocomplete="off"
 										aria-required="true"
 										value="<?php p($startDate); ?>"
-										aria-describedby="audit-log-filter-footnote"
+										aria-describedby="audit-log-date-hint"
 									/>
 								</div>
 							</div>
@@ -88,25 +89,14 @@ $rangeEnd = min($total, $offset + $shownCount);
 										autocomplete="off"
 										aria-required="true"
 										value="<?php p($endDate); ?>"
-										aria-describedby="audit-log-filter-footnote"
+										aria-describedby="audit-log-date-hint"
 									/>
 								</div>
 							</div>
 
-							<div class="audit-log-filter__field audit-log-filter__field--actions">
-								<span class="audit-log-filter__label audit-log-filter__label--spacer" aria-hidden="true">&nbsp;</span>
-								<div class="audit-log-filter__control audit-log-filter__actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
-									<button type="submit" id="apply-filters" class="azc-btn azc-btn--primary">
-										<?php p($l->t('Show')); ?>
-									</button>
-									<button type="button" id="reset-filters" class="azc-btn azc-btn--secondary">
-										<?php p($l->t('Reset')); ?>
-									</button>
-									<button type="button" id="export-logs" class="azc-btn azc-btn--secondary">
-										<?php p($l->t('Export CSV')); ?>
-									</button>
-								</div>
-							</div>
+							<p id="audit-log-date-hint" class="audit-log-filter__hint audit-log-filter__hint--dates">
+								<?php p($l->t('Maximum date range: %d days. Times use your personal timezone.', [$maxDateRangeDays])); ?>
+							</p>
 
 							<div class="audit-log-filter__field audit-log-filter__field--user">
 								<label for="audit-user-search" class="audit-log-filter__label"><?php p($l->t('User account')); ?></label>
@@ -126,7 +116,7 @@ $rangeEnd = min($total, $offset + $shownCount);
 												aria-autocomplete="list"
 												aria-expanded="false"
 												aria-controls="audit-user-listbox"
-												aria-describedby="audit-log-filter-footnote audit-user-status"
+												aria-describedby="audit-log-user-hint audit-user-status"
 											/>
 											<button type="button"
 												class="user-picker__clear"
@@ -145,6 +135,10 @@ $rangeEnd = min($total, $offset + $shownCount);
 									</div>
 								</div>
 							</div>
+
+							<p id="audit-log-user-hint" class="audit-log-filter__hint audit-log-filter__hint--user">
+								<?php p($l->t('Search by name — no need to enter a raw user ID.')); ?>
+							</p>
 
 							<div class="audit-log-filter__field audit-log-filter__field--action">
 								<label for="action-category-filter" class="audit-log-filter__label"><?php p($l->t('Action')); ?></label>
@@ -181,13 +175,25 @@ $rangeEnd = min($total, $offset + $shownCount);
 							</div>
 						</div>
 
+						<div class="audit-log-filter__actions" role="group" aria-label="<?php p($l->t('Actions')); ?>">
+							<button type="submit" id="apply-filters" class="azc-btn azc-btn--primary">
+								<?php p($l->t('Show')); ?>
+							</button>
+							<button type="button" id="export-logs" class="azc-btn azc-btn--secondary">
+								<?php p($l->t('Export CSV')); ?>
+							</button>
+							<button type="button" id="reset-filters"
+								class="azc-btn azc-btn--secondary audit-log-filter-reset"
+								title="<?php p($l->t('Reset')); ?>"
+								aria-label="<?php p($l->t('Reset')); ?>">
+								<?php print_unescaped(IconCatalog::render('rotate', 'azc-btn__icon')); ?>
+							</button>
+						</div>
+
 						<div id="audit-log-filter-error" class="azc-callout azc-callout--danger audit-log-page__toolbar-feedback" role="alert" hidden>
 							<span class="azc-callout__text"></span>
 						</div>
 					</form>
-					<p id="audit-log-filter-footnote" class="audit-log-page__toolbar-footnote" role="note">
-						<?php p($l->t('Optional: search and pick a user account. Never type a raw user id. Maximum date range: %d days. Times use your personal timezone.', [$maxDateRangeDays])); ?>
-					</p>
 				</div>
 			</div>
 		</section>

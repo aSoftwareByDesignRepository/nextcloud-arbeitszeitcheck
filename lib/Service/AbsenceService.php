@@ -2867,6 +2867,12 @@ class AbsenceService
 					&& $this->specialEntitlementService?->hasLiveReservationForAbsence($absence) === true) {
 					throw new \Exception('entitlement_mid_split');
 				}
+				// Re-assert inside the transaction — month-finalize runs on a
+				// different lock, so the pre-lock check alone is a TOCTOU.
+				$this->assertAbsenceMutable($absence);
+				if ($this->monthClosureService !== null) {
+					$this->monthClosureService->assertDateRangeMutable($ownerUserId, $sickStart, $endOfSick);
+				}
 				$overlapping = $this->absenceMapper->findOverlapping($ownerUserId, $sickStart, $sickEnd, $absenceId);
 				if (!empty($overlapping)) {
 					throw new \Exception('overlap');
@@ -3159,6 +3165,10 @@ class AbsenceService
 				if ($requestMeta !== null && $absence->getCancelRequestedAt() === null) {
 					throw new \Exception('no_cancel_request');
 				}
+				// Month-finalize runs on a different lock — the mutable guard
+				// must be re-asserted inside the transaction or a write could
+				// slip into a month sealed after the caller's pre-check.
+				$this->assertAbsenceMutable($absence);
 				$oldData = $absence->getSummary();
 				$absence->setStatus(Absence::STATUS_CANCELLED);
 				$absence->setCancelRequestedAt(null);
@@ -3318,6 +3328,8 @@ class AbsenceService
 				if ($absence->getCancelRequestedAt() !== null) {
 					throw new \Exception('cancel_request_pending');
 				}
+				// Re-assert inside the transaction — see writeManagerCancellation.
+				$this->assertAbsenceMutable($absence);
 				$oldData = $absence->getSummary();
 				$now = $this->nowInStorage();
 				$absence->setCancelRequestedAt($now);

@@ -1680,7 +1680,7 @@
 		"Describe how you travelled. Add a block for each part — for example outbound drive, flight, return trip." : "Décrivez comment vous avez voyagé. Ajoutez un segment pour chaque partie — par exemple trajet aller en voiture, vol, retour.",
 		"Describe what was wrong and why the times should change." : "Décrivez ce qui était incorrect et pourquoi les heures doivent changer.",
 		"Description" : "Descriptif",
-		"Description (optional)" : "Description (facultative)",
+		"Description (optional)" : "Descriptif (facultatif)",
 		"Description cannot exceed 1000 characters" : "La description ne peut pas dépasser 1000 caractères",
 		"Description is required" : "La description est requise",
 		"Destination time zone" : "Fuseau horaire de destination",

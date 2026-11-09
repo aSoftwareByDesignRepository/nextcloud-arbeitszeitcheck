@@ -148,8 +148,9 @@ test.describe('Admin global settings multipage', () => {
 			}
 
 			// Active chip matches this section; foreign section markers stay absent when possible.
+			// Scoped to the level-2 chip — the group tab may share the same href.
 			await expect(
-				page.locator(`#azc-admin-settings-pages a[href*="/admin/settings/${section.id}"]`),
+				page.locator(`#azc-admin-settings-pages a.azc-settings-nav__link[href*="/admin/settings/${section.id}"]`),
 			).toHaveAttribute('aria-current', 'page')
 
 			let saveBody = ''

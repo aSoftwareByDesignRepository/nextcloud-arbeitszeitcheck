@@ -61,6 +61,34 @@ class ComplianceViolation extends Entity
 	 */
 	public const TYPE_MISSING_PRESENCE = 'missing_presence';
 
+	/**
+	 * Every violation type the checks can produce. Single source of truth —
+	 * used by validation, filter selects, and label maps.
+	 *
+	 * @var list<string>
+	 */
+	public const TYPES = [
+		self::TYPE_MISSING_BREAK,
+		self::TYPE_EXCESSIVE_WORKING_HOURS,
+		self::TYPE_INSUFFICIENT_REST_PERIOD,
+		self::TYPE_DAILY_HOURS_LIMIT_EXCEEDED,
+		self::TYPE_WEEKLY_HOURS_LIMIT_EXCEEDED,
+		self::TYPE_WEEKLY_ABSOLUTE_HOURS_EXCEEDED,
+		self::TYPE_NIGHT_WORK,
+		self::TYPE_SUNDAY_WORK,
+		self::TYPE_HOLIDAY_WORK,
+		self::TYPE_MISSING_PRESENCE,
+	];
+
+	/**
+	 * @var list<string>
+	 */
+	public const SEVERITIES = [
+		self::SEVERITY_ERROR,
+		self::SEVERITY_WARNING,
+		self::SEVERITY_INFO,
+	];
+
 	/** @var string */
 	protected $userId;
 
@@ -123,19 +151,7 @@ class ComplianceViolation extends Entity
 		}
 
 		// Validate violation type
-		$validTypes = [
-			self::TYPE_INSUFFICIENT_REST_PERIOD,
-			self::TYPE_DAILY_HOURS_LIMIT_EXCEEDED,
-			self::TYPE_WEEKLY_HOURS_LIMIT_EXCEEDED,
-			self::TYPE_WEEKLY_ABSOLUTE_HOURS_EXCEEDED,
-			self::TYPE_MISSING_BREAK,
-			self::TYPE_EXCESSIVE_WORKING_HOURS,
-			self::TYPE_NIGHT_WORK,
-			self::TYPE_SUNDAY_WORK,
-			self::TYPE_HOLIDAY_WORK,
-			self::TYPE_MISSING_PRESENCE,
-		];
-		if (!in_array($this->violationType, $validTypes)) {
+		if (!in_array($this->violationType, self::TYPES, true)) {
 			$errors['violationType'] = 'Invalid violation type';
 		}
 
@@ -150,12 +166,7 @@ class ComplianceViolation extends Entity
 		}
 
 		// Validate severity
-		$validSeverities = [
-			self::SEVERITY_INFO,
-			self::SEVERITY_WARNING,
-			self::SEVERITY_ERROR
-		];
-		if (!in_array($this->severity, $validSeverities)) {
+		if (!in_array($this->severity, self::SEVERITIES, true)) {
 			$errors['severity'] = 'Invalid severity level';
 		}
 

@@ -1245,11 +1245,6 @@ dialog .azc-icon-btn,
 	max-width: 65ch;
 }
 
-#app-content.azc-app .compliance-dashboard__score {
-	margin: 0;
-	font-size: var(--azc-fs-md);
-	line-height: var(--azc-line-base);
-}
 #app-content.azc-app .compliance-dashboard__score-hint {
 	display: block;
 	margin-top: var(--azc-space-2);

@@ -15,12 +15,13 @@
   border-radius: var(--border-radius-large, 10px);
 }
 
-/* Grid: explicit columns, wrap on narrow screens */
+/* Flex row: fields share space, wrap only when genuinely needed.
+   Date inputs get a compact basis — dd.mm.yyyy needs ~8.5em, not a full column. */
 .compliance-violations__filters-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(140px, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-4, 1rem) var(--space-5, 1.25rem);
-  align-items: end;
+  align-items: flex-end;
 }
 
 /* Each field: vertical stack, no overflow */
@@ -28,7 +29,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
+  flex: 1 1 140px;
   min-width: 0;
+}
+
+/* Dates: compact fixed basis; selects/pickers share the rest. */
+.compliance-violations__filter-field:has(#start-date),
+.compliance-violations__filter-field:has(#end-date) {
+  flex: 0 1 9.5rem;
+}
+
+/* The employee combobox needs more room than a plain select. */
+.compliance-violations__filter-field:has(#violations-employee-filter-search) {
+  flex-basis: 15rem;
 }
 
 .compliance-violations__filter-label {
@@ -52,7 +65,7 @@
   min-width: 0 !important;
 }
 
-/* Actions: button, no shrink */
+/* Actions: button keeps its natural width, stays in the row while space lasts */
 .compliance-violations__filter-actions {
   display: flex;
   align-items: flex-end;
@@ -62,21 +75,17 @@
   white-space: nowrap;
 }
 
-/* Tablet: 2 columns */
-@media (max-width: 899.98px) {
-  .compliance-violations__filters-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+/* Mobile: fields stack full-width */
+@media (max-width: 599.98px) {
+  .compliance-violations__filter-field,
+  .compliance-violations__filter-field:has(#start-date),
+  .compliance-violations__filter-field:has(#end-date),
+  .compliance-violations__filter-field:has(#violations-employee-filter-search) {
+    flex: 1 1 100%;
   }
 
   .compliance-violations__filter-actions {
-    grid-column: 1 / -1;
-  }
-}
-
-/* Mobile: single column */
-@media (max-width: 479.98px) {
-  .compliance-violations__filters-grid {
-    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .compliance-violations__filter-actions .btn {
@@ -84,50 +93,32 @@
   }
 }
 
-/* Report totals sit in the status card. No second frame. */
-.compliance-status__reports {
-  display: flex;
-  flex-direction: column;
-  gap: var(--azc-space-4, 1rem);
-  margin-top: var(--azc-space-5, 1.25rem);
-}
-
-.compliance-status__reports h3,
-.compliance-status__reports h4 {
-  margin: 0;
-  color: var(--color-main-text);
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.compliance-status__reports h3 {
-  font-size: 1.125rem;
-}
-
-.compliance-status__reports h4 {
-  font-size: 1rem;
-}
-
-.compliance-status__figures {
+/* Status summary tiles — glanceable numbers, not tables. */
+.compliance-status__tiles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--azc-space-4, 1rem);
-  margin: 0;
+  margin: var(--azc-space-4, 1rem) 0 0;
 }
 
-/* Core server.css draws dt/dd inline (130px, end-aligned). That collides
-   the longer label with the number. Stack the number, then the label. */
-#app-content.azc-app .compliance-status__figure {
+.compliance-status__tile {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.25rem;
-  margin: 0;
   min-width: 0;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: var(--azc-space-4, 1rem);
+  border: 1px solid var(--azc-border, var(--color-border));
+  border-radius: var(--azc-radius-md, 8px);
+  background: var(--azc-bg-soft, var(--color-background-hover));
 }
 
-#app-content.azc-app .compliance-status__figure dt,
-#app-content.azc-app .compliance-status__figure dd {
+/* Core server.css draws dt/dd inline (130px, end-aligned). That collides
+   the label with the number. Stack number over label inside each tile. */
+#app-content.azc-app .compliance-status__tile dt,
+#app-content.azc-app .compliance-status__tile dd {
   display: block;
   width: auto;
   max-width: 100%;
@@ -138,16 +129,7 @@
   white-space: normal;
 }
 
-#app-content.azc-app .compliance-status__figure dd {
-  order: -1;
-  color: var(--color-main-text);
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
-#app-content.azc-app .compliance-status__figure dt {
+#app-content.azc-app .compliance-status__tile dt {
   order: 0;
   color: var(--color-text-maxcontrast);
   font-size: 0.875rem;
@@ -155,11 +137,24 @@
   line-height: 1.3;
 }
 
-.compliance-status__breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--azc-space-2, 0.5rem);
-  min-width: 0;
+#app-content.azc-app .compliance-status__tile dd {
+  order: -1;
+  color: var(--color-main-text);
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+#app-content.azc-app .compliance-status__tile-value--alert {
+  color: var(--color-error-text, var(--color-error));
+}
+
+/* Text values (e.g. a violation type name) read smaller than the numbers. */
+#app-content.azc-app .compliance-status__tile-value--text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .compliance-dashboard__violations .compliance-violations__filters {
@@ -174,8 +169,14 @@
   margin: 0 0 var(--azc-space-3, 0.75rem);
 }
 
+@media (max-width: 899.98px) {
+  .compliance-status__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 599.98px) {
-  .compliance-status__figures {
+  .compliance-status__tiles {
     grid-template-columns: 1fr;
   }
 }

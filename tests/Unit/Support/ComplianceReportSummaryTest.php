@@ -43,4 +43,34 @@ final class ComplianceReportSummaryTest extends TestCase {
 			'warning' => 2,
 		], $report['by_severity']);
 	}
+
+	public function testTopTypesSortsByCountAndKeepsAlphabeticalTies(): void {
+		// by_type arrives ksort'ed, so equal counts must stay alphabetical —
+		// deterministic for both rendering and tests.
+		self::assertSame(
+			['missing_break' => 3, 'night_work' => 1, 'sunday_work' => 1],
+			ComplianceReportSummary::topTypes([
+				'missing_break' => 3,
+				'night_work' => 1,
+				'sunday_work' => 1,
+			])
+		);
+		self::assertSame(
+			['sunday_work' => 5, 'missing_break' => 3, 'night_work' => 1],
+			ComplianceReportSummary::topTypes([
+				'missing_break' => 3,
+				'night_work' => 1,
+				'sunday_work' => 5,
+			])
+		);
+	}
+
+	public function testTopTypesHonoursTheLimitAndEdgeCases(): void {
+		$byType = ['a' => 3, 'b' => 2, 'c' => 1, 'd' => 1];
+		self::assertSame(['a' => 3, 'b' => 2], ComplianceReportSummary::topTypes($byType, 2));
+		self::assertSame([], ComplianceReportSummary::topTypes($byType, 0));
+		self::assertSame([], ComplianceReportSummary::topTypes([], 3));
+		// A limit beyond the map size returns the whole sorted map.
+		self::assertCount(4, ComplianceReportSummary::topTypes($byType, 99));
+	}
 }

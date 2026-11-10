@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use OCA\ArbeitszeitCheck\Service\IconCatalog;
+use OCA\ArbeitszeitCheck\Support\ViolationLabels;
 
 /**
  * Compliance page: status, personal report, and violations.
@@ -30,35 +31,24 @@ if (is_string($_['filterUserId'] ?? null) && $_['filterUserId'] !== '') {
 }
 
 $complianceTypeLabel = static function (string $typeKey) use ($l): string {
-	return match ($typeKey) {
-		'missing_break' => $l->t('Missing break'),
-		'excessive_working_hours' => $l->t('Excessive working hours'),
-		'insufficient_rest_period' => $l->t('Insufficient rest period'),
-		'daily_hours_limit_exceeded' => $l->t('Daily hours limit exceeded'),
-		'weekly_hours_limit_exceeded' => $l->t('Weekly hours limit exceeded'),
-		'weekly_absolute_hours_exceeded' => $l->t('Absolute weekly hours maximum exceeded'),
-		'night_work' => $l->t('Night work'),
-		'sunday_work' => $l->t('Sunday work'),
-		'holiday_work' => $l->t('Holiday work'),
-		'missing_presence' => $l->t('Required presence not covered'),
-		default => $typeKey,
-	};
+	return ViolationLabels::type($l, $typeKey);
 };
 $complianceSeverityLabel = static function (string $severityKey) use ($l): string {
-	return match ($severityKey) {
-		'error' => $l->t('High'),
-		'warning' => $l->t('Medium'),
-		'info' => $l->t('Low'),
-		default => $severityKey,
-	};
+	return ViolationLabels::severity($l, $severityKey);
 };
 $complianceSeverityBadge = static function (string $severityKey): string {
-	return match ($severityKey) {
-		'error' => 'error',
-		'warning' => 'warning',
-		default => 'primary',
-	};
+	return ViolationLabels::severityBadge($severityKey);
 };
+$complianceOpenCount = (int)($reportData['unresolved'] ?? 0);
+$complianceFixedCount = max(0, (int)($reportData['total_violations'] ?? 0) - $complianceOpenCount);
+$complianceTopTypes = (array)($_['topTypes'] ?? []);
+$complianceTopTypeText = '—';
+$complianceTopTypeCount = 0;
+if ($complianceTopTypes !== []) {
+	$complianceTopTypeKey = (string)array_key_first($complianceTopTypes);
+	$complianceTopTypeText = $complianceTypeLabel($complianceTopTypeKey);
+	$complianceTopTypeCount = (int)$complianceTopTypes[$complianceTopTypeKey];
+}
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -166,144 +156,29 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                     ?>
                 <?php endif; ?>
                 <?php if (!$loadError): ?>
-                    <p class="compliance-dashboard__score">
-                        <strong><?php p($filtered ? $l->t('How well the rules are followed:') : $l->t('How well you follow the rules:')); ?></strong>
-                        <?php if ($hasData): ?>
-                            <?php p((string)($complianceStatus['score'] ?? 0)); ?>%
-                        <?php else: ?>
-                            — <?php p($l->t('(no data yet)')); ?>
-                        <?php endif; ?>
-                        <span class="form-help compliance-dashboard__score-hint">
-                            <?php p($filtered
-                                ? $l->t('This shows how well this working time follows the configured labour law. 100%% means everything is perfect.')
-                                : $l->t('This shows how well your working time follows the configured labour law. 100%% means everything is perfect.')); ?>
-                        </span>
+                    <dl class="compliance-status__tiles">
+                        <div class="compliance-status__tile">
+                            <dt><?php p($l->t('Compliance score')); ?></dt>
+                            <dd class="compliance-status__tile-value"><?php if ($hasData): ?><?php p((string)($complianceStatus['score'] ?? 0)); ?>%<?php else: ?>—<?php endif; ?></dd>
+                        </div>
+                        <div class="compliance-status__tile">
+                            <dt><?php p($l->t('Open problems')); ?></dt>
+                            <dd id="azc-compliance-open-count" class="compliance-status__tile-value<?php echo $complianceOpenCount > 0 ? ' compliance-status__tile-value--alert' : ''; ?>"><?php p((string)$complianceOpenCount); ?></dd>
+                        </div>
+                        <div class="compliance-status__tile">
+                            <dt><?php p($l->t('Problems fixed')); ?></dt>
+                            <dd id="azc-compliance-fixed-count" class="compliance-status__tile-value"><?php p((string)$complianceFixedCount); ?></dd>
+                        </div>
+                        <div class="compliance-status__tile">
+                            <dt><?php p($l->t('Most common problem')); ?><?php if ($complianceTopTypeCount > 0): ?> (<?php p((string)$complianceTopTypeCount); ?>)<?php endif; ?></dt>
+                            <dd class="compliance-status__tile-value compliance-status__tile-value--text"><?php p($complianceTopTypeText); ?></dd>
+                        </div>
+                    </dl>
+                    <p class="form-help compliance-dashboard__score-hint">
+                        <?php p($filtered
+                            ? $l->t('This shows how well this working time follows the configured labour law. 100%% means everything is perfect.')
+                            : $l->t('This shows how well your working time follows the configured labour law. 100%% means everything is perfect.')); ?>
                     </p>
-                    <div class="compliance-status__reports">
-                        <h3 id="compliance-reports-heading"><?php p($l->t('Reports')); ?></h3>
-                        <dl class="compliance-status__figures">
-                            <div class="compliance-status__figure">
-                                <dt><?php p($l->t('Total Problems')); ?></dt>
-                                <dd><?php p((string)($reportData['total_violations'] ?? 0)); ?></dd>
-                            </div>
-                            <div class="compliance-status__figure">
-                                <dt><?php p($l->t('Need to Fix')); ?></dt>
-                                <dd><?php p((string)($reportData['unresolved'] ?? 0)); ?></dd>
-                            </div>
-                        </dl>
-                        <?php if (!empty($reportData['by_type'])): ?>
-                            <div class="compliance-status__breakdown">
-                                <h4 id="compliance-by-type"><?php p($l->t('Problems by Type')); ?></h4>
-                                <p class="form-help"><?php p($l->t('See what kinds of working time problems occurred')); ?></p>
-                                <?php
-                                $typePager = is_array($_['typePager'] ?? null) ? $_['typePager'] : \OCA\ArbeitszeitCheck\Support\TablePager::state(count($reportData['by_type']), null, null);
-                                $typePagerTotal = (int)($typePager['total'] ?? 0);
-                                $typePagerPerPage = (int)($typePager['perPage'] ?? \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE);
-                                $typePagerOffset = (int)($typePager['offset'] ?? 0);
-                                $typeRowIndex = 0;
-                                ?>
-                                <div class="table-container" role="region" aria-labelledby="compliance-by-type">
-                                    <div class="azc-table-scroll" tabindex="0">
-                                    <table class="table table--hover azc-table--responsive" id="compliance-by-type-table">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col"><?php p($l->t('Type')); ?></th>
-                                                <th scope="col"><?php p($l->t('Count')); ?></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($reportData['by_type'] as $typeKey => $count): ?>
-                                                <?php
-                                                $hideTypeRow = $typePagerTotal > $typePagerPerPage
-                                                	&& ($typeRowIndex < $typePagerOffset || $typeRowIndex >= $typePagerOffset + $typePagerPerPage);
-                                                $typeRowIndex++;
-                                                ?>
-                                                <tr data-azc-row<?php echo $hideTypeRow ? ' hidden' : ''; ?>>
-                                                    <td data-label="<?php p($l->t('Type')); ?>"><?php p($complianceTypeLabel((string)$typeKey)); ?></td>
-                                                    <td data-label="<?php p($l->t('Count')); ?>"><?php p((string)$count); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                    </div>
-                                    <?php
-                                    $azcTablePager = [
-                                    	'id' => 'compliance-by-type-pager',
-                                    	'tableId' => 'compliance-by-type-table',
-                                    	'label' => $l->t('Problems by type pagination'),
-                                    	'base' => $urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard'),
-                                    	'filters' => $compliancePagerFilters,
-                                    	'allow' => ['userId'],
-                                    	'state' => $typePager,
-                                    	'pageParam' => 't_page',
-                                    	'sizeParam' => 't_per_page',
-                                    	'mode' => 'client',
-                                    	'hash' => 'compliance-status',
-                                    ];
-                                    include __DIR__ . '/partials/table-pager.php';
-                                    ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($reportData['by_severity'])): ?>
-                            <div class="compliance-status__breakdown">
-                                <h4 id="compliance-by-severity"><?php p($l->t('Problems by How Serious')); ?></h4>
-                                <p class="form-help"><?php p($l->t('See how serious the problems were')); ?></p>
-                                <?php
-                                $severityPager = is_array($_['severityPager'] ?? null) ? $_['severityPager'] : \OCA\ArbeitszeitCheck\Support\TablePager::state(count($reportData['by_severity']), null, null);
-                                $severityPagerTotal = (int)($severityPager['total'] ?? 0);
-                                $severityPagerPerPage = (int)($severityPager['perPage'] ?? \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE);
-                                $severityPagerOffset = (int)($severityPager['offset'] ?? 0);
-                                $severityRowIndex = 0;
-                                ?>
-                                <div class="table-container" role="region" aria-labelledby="compliance-by-severity">
-                                    <div class="azc-table-scroll" tabindex="0">
-                                    <table class="table table--hover azc-table--responsive" id="compliance-by-severity-table">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col"><?php p($l->t('How Serious')); ?></th>
-                                                <th scope="col"><?php p($l->t('Count')); ?></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($reportData['by_severity'] as $severityKey => $count): ?>
-                                                <?php
-                                                $hideSeverityRow = $severityPagerTotal > $severityPagerPerPage
-                                                	&& ($severityRowIndex < $severityPagerOffset || $severityRowIndex >= $severityPagerOffset + $severityPagerPerPage);
-                                                $severityRowIndex++;
-                                                ?>
-                                                <tr data-azc-row<?php echo $hideSeverityRow ? ' hidden' : ''; ?>>
-                                                    <td data-label="<?php p($l->t('How Serious')); ?>">
-                                                        <span class="badge badge--<?php p($complianceSeverityBadge((string)$severityKey)); ?>">
-                                                            <?php p($complianceSeverityLabel((string)$severityKey)); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td data-label="<?php p($l->t('Count')); ?>"><?php p((string)$count); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                    </div>
-                                    <?php
-                                    $azcTablePager = [
-                                    	'id' => 'compliance-by-severity-pager',
-                                    	'tableId' => 'compliance-by-severity-table',
-                                    	'label' => $l->t('Problems by how serious pagination'),
-                                    	'base' => $urlGenerator->linkToRoute('arbeitszeitcheck.compliance.dashboard'),
-                                    	'filters' => $compliancePagerFilters,
-                                    	'allow' => ['userId'],
-                                    	'state' => $severityPager,
-                                    	'pageParam' => 's_page',
-                                    	'sizeParam' => 's_per_page',
-                                    	'mode' => 'client',
-                                    	'hash' => 'compliance-status',
-                                    ];
-                                    include __DIR__ . '/partials/table-pager.php';
-                                    ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                    </div>
                 <?php endif; ?>
             </div>
         </section>
@@ -311,7 +186,7 @@ $complianceSeverityBadge = static function (string $severityKey): string {
         <section class="azc-card compliance-dashboard__violations" id="compliance-violations" aria-labelledby="compliance-violations-heading">
             <header class="azc-card__header">
                 <div class="azc-card__header-text">
-                    <h2 id="compliance-violations-heading" class="azc-card__title"><?php p($l->t('Violations')); ?></h2>
+                    <h2 id="compliance-violations-heading" class="azc-card__title" tabindex="-1"><?php p($l->t('Violations')); ?></h2>
                 </div>
             </header>
             <div class="azc-card__body">
@@ -324,6 +199,15 @@ $complianceSeverityBadge = static function (string $severityKey): string {
                         <div class="compliance-violations__filter-field">
                             <label for="end-date" class="compliance-violations__filter-label"><?php p($l->t('End Date')); ?></label>
                             <input type="text" id="end-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" aria-label="<?php p($l->t('End date for filter')); ?>">
+                        </div>
+                        <div class="compliance-violations__filter-field">
+                            <label for="type-filter" class="compliance-violations__filter-label"><?php p($l->t('Problem Type')); ?></label>
+                            <select id="type-filter" class="form-select" aria-label="<?php p($l->t('Filter by problem type')); ?>">
+                                <option value=""><?php p($l->t('All Types')); ?></option>
+                                <?php foreach ((array)($_['violationTypeOptions'] ?? []) as $typeOptionKey => $typeOptionLabel): ?>
+                                    <option value="<?php p((string)$typeOptionKey); ?>"><?php p($typeOptionLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="compliance-violations__filter-field">
                             <label for="severity-filter" class="compliance-violations__filter-label"><?php p($l->t('Severity')); ?></label>
@@ -441,6 +325,7 @@ $complianceViolationsL10n = [
 	'Error loading violations' => $l->t('Error loading violations'),
 	'Failed to load violations. Please try again.' => $l->t('Failed to load violations. Please try again.'),
 	'No violations found' => $l->t('No violations found'),
+	'Violations list updated' => $l->t('Violations list updated'),
 	'Resolved' => $l->t('Resolved'),
 	'Unresolved' => $l->t('Unresolved'),
 	'Missing break' => $l->t('Missing break'),

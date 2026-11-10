@@ -210,6 +210,7 @@ class AbsenceService
 		}
 		$lockKey = $this->acquireUserMutationLock($userId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
@@ -272,9 +273,20 @@ class AbsenceService
 			$savedAbsence = null;
 			$autoApproved = false;
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit or a seal
+			// could land between the controller's pre-check and this insert
+			// (state_transition_toctou). Acquired pre-tx: oc_file_locks
+			// writes inside a transaction are invisible to peers.
+			$monthClosureKeys = $this->monthClosureLockKeys($userId, $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($userId, $absence->getStartDate(), $absence->getEndDate());
+				// Re-assert under the month-closure locks — the controller's
+				// pre-check is outside this lock domain.
+				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), null);
 				if (!empty($overlappingInTx)) {
 					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -360,6 +372,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 			$this->specialEntitlementService?->releaseReservationContext($specialContext);
@@ -390,6 +403,7 @@ class AbsenceService
 		}
 		$lockKey = $this->acquireUserMutationLock($targetUserId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
@@ -435,9 +449,17 @@ class AbsenceService
 			}
 
 			$savedAbsence = null;
+
+			// Same month-closure contract as createAbsence — a manager-recorded
+			// historical entry must not land in a month being sealed either.
+			$monthClosureKeys = $this->monthClosureLockKeys($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+				// Re-assert under the month-closure locks (see createAbsence).
+				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($targetUserId, $absence->getStartDate(), $absence->getEndDate(), null);
 				if (!empty($overlappingInTx)) {
 					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -498,6 +520,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 			$this->specialEntitlementService?->releaseReservationContext($specialContext);
@@ -543,6 +566,7 @@ class AbsenceService
 		$data = $this->scrubClientAuthoredDebitFields($data);
 		$lockKey = $this->acquireUserMutationLock($userId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			$absence = $this->getAbsence($id, $userId);
@@ -558,6 +582,12 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Only pending absences can be updated'));
 		}
 		$this->assertAbsenceMutable($absence);
+
+		// Keep the stored range: the window set below may differ, and moving
+		// coverage OUT of a sealed month falsifies the snapshot as much as
+		// writing into one — the in-tx guard must cover both.
+		$originalStart = $absence->getStartDate() !== null ? clone $absence->getStartDate() : null;
+		$originalEnd = $absence->getEndDate() !== null ? clone $absence->getEndDate() : null;
 
 		$oldData = $absence->getSummary();
 
@@ -649,9 +679,30 @@ class AbsenceService
 
 		$updatedAbsence = null;
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (both the stored
+		// and the new window; see createAbsence).
+		$monthClosureKeys = array_values(array_unique(array_merge(
+			$this->monthClosureLockKeys($userId, $originalStart, $originalEnd),
+			$this->monthClosureLockKeys($userId, $absence->getStartDate(), $absence->getEndDate())
+		)));
+		sort($monthClosureKeys);
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$this->db->beginTransaction();
 		try {
 			$this->absenceMapper->lockUserAbsenceWindow($userId, $absence->getStartDate(), $absence->getEndDate());
+			// Re-assert under the month-closure locks (see createAbsence):
+			// the new window via the entity, the stored window explicitly
+			// when the range moved.
+			$this->assertAbsenceMutable($absence);
+			if ($this->monthClosureService !== null
+				&& $originalStart !== null
+				&& $originalEnd !== null
+				&& ($originalStart->format('Y-m-d') !== $absence->getStartDate()->format('Y-m-d')
+					|| $originalEnd->format('Y-m-d') !== $absence->getEndDate()->format('Y-m-d'))) {
+				$this->monthClosureService->assertDateRangeMutable($userId, $originalStart, $originalEnd);
+			}
 			$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), $id);
 			if (!empty($overlappingInTx)) {
 				throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -700,6 +751,7 @@ class AbsenceService
 
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 		}
@@ -720,6 +772,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			// Re-read under lock so concurrent approve cannot race a delete.
 			$absence = $this->absenceMapper->find($id);
@@ -732,8 +785,15 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit (see createAbsence).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks.
+				$this->assertAbsenceMutable($absence);
 				$this->specialEntitlementService?->releaseForAbsence($absence, $userId);
 				$this->absenceMapper->delete($absence);
 
@@ -754,6 +814,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -784,6 +845,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			$absence = $this->absenceMapper->find($id);
@@ -810,6 +872,11 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit (see createAbsence).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$oldData = $absence->getSummary();
 
 			$absence->setStatus(Absence::STATUS_CANCELLED);
@@ -817,6 +884,8 @@ class AbsenceService
 
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks.
+				$this->assertAbsenceMutable($absence);
 				$updatedAbsence = $this->absenceMapper->update($absence);
 				$this->specialEntitlementService?->releaseForAbsence($updatedAbsence, $userId);
 
@@ -837,6 +906,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -874,6 +944,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			$absence = $this->absenceMapper->find($id);
@@ -938,8 +1009,19 @@ class AbsenceService
 			}
 			$absence->setUpdatedAt($this->nowInStorage());
 
+			// Month-finalize runs on a disjoint lock domain — the stored
+			// range covers the shortened window (newEnd ⊆ [start, origEnd]).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $startDate, $originalEndDate);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks: the new window
+				// via the entity, the stored window explicitly.
+				$this->assertAbsenceMutable($absence);
+				if ($this->monthClosureService !== null) {
+					$this->monthClosureService->assertDateRangeMutable($userId, $startDate, $originalEndDate);
+				}
 				$updatedAbsence = $this->absenceMapper->update($absence);
 				$this->specialEntitlementService?->adjustConsumedAbsence(
 					$updatedAbsence,
@@ -967,6 +1049,7 @@ class AbsenceService
 
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -990,11 +1073,19 @@ class AbsenceService
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
 		}
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
+			// Re-read under the mutation lock — the pre-lock find may be
+			// stale — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($id);
+			$monthClosureKeys = $this->monthClosureLockKeys($lockFresh->getUserId(), $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1005,6 +1096,7 @@ class AbsenceService
 					$this->l10n->t('This absence was already decided by another manager.')
 				);
 			}
+			// Re-assert under the month-closure locks.
 			$this->assertAbsenceMutable($absence);
 
 			if ($absence->getType() === Absence::TYPE_VACATION) {
@@ -1059,6 +1151,7 @@ class AbsenceService
 			$this->db->rollBack();
 			throw $e;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -1099,11 +1192,19 @@ class AbsenceService
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
 		}
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
+			// Re-read under the mutation lock — the pre-lock find may be
+			// stale — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($id);
+			$monthClosureKeys = $this->monthClosureLockKeys($lockFresh->getUserId(), $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1114,6 +1215,7 @@ class AbsenceService
 					$this->l10n->t('This absence was already decided by another manager.')
 				);
 			}
+			// Re-assert under the month-closure locks.
 			$this->assertAbsenceMutable($absence);
 
 			$oldData = $absence->getSummary();
@@ -1144,6 +1246,7 @@ class AbsenceService
 			$this->db->rollBack();
 			throw $e;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -1237,6 +1340,7 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1257,6 +1361,11 @@ class AbsenceService
 		}
 		$this->assertAbsenceMutable($absence);
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (see createAbsence).
+		$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_PENDING);
 		$absence->setUpdatedAt(new \DateTime());
@@ -1266,6 +1375,8 @@ class AbsenceService
 
 		$this->db->beginTransaction();
 		try {
+			// Re-assert under the month-closure locks.
+			$this->assertAbsenceMutable($absence);
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -1338,6 +1449,7 @@ class AbsenceService
 		}
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -1359,6 +1471,7 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1379,6 +1492,11 @@ class AbsenceService
 		}
 		$this->assertAbsenceMutable($absence);
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (see createAbsence).
+		$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_SUBSTITUTE_DECLINED);
 		$absence->setApproverComment($comment);
@@ -1388,6 +1506,8 @@ class AbsenceService
 
 		$this->db->beginTransaction();
 		try {
+			// Re-assert under the month-closure locks.
+			$this->assertAbsenceMutable($absence);
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -1430,6 +1550,7 @@ class AbsenceService
 		}
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -1445,6 +1566,100 @@ class AbsenceService
 			);
 		}
 		return $key;
+	}
+
+	/**
+	 * Month-closure lock keys (month_closure tier — always LAST in
+	 * {@see DbLockKeys::ORDER}) for every calendar month a [start..end]
+	 * window touches. Absence writers hold them LOCK_EXCLUSIVE for the
+	 * whole check→commit window so finalizeMonth/reopenMonth — which take
+	 * the same keys exclusive — can never interleave between the mutable
+	 * assert and the write commit. Same contract as
+	 * {@see BusinessTripService::closureLockKeys()}; exclusive rather than
+	 * shared because a mutation and a seal are never compatible anyway.
+	 *
+	 * @return list<string>
+	 */
+	private function monthClosureLockKeys(string $userId, ?\DateTimeInterface $start, ?\DateTimeInterface $end): array
+	{
+		if ($this->monthClosureService === null || $start === null || $end === null) {
+			return [];
+		}
+		$startDay = new \DateTime($start->format('Y-m-d'));
+		$endDay = new \DateTime($end->format('Y-m-d'));
+		$endDay->setTime(23, 59, 59);
+		$keys = [];
+		foreach ($this->monthClosureService->monthsOverlappingRange($startDay, $endDay) as [$y, $m]) {
+			$keys[] = DbLockKeys::monthClosure($userId, $y, $m);
+		}
+		// Deterministic acquisition order across callers (sorted, deduped).
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		return $keys;
+	}
+
+	/**
+	 * Acquire exclusive month-closure locks in sorted order; a partial
+	 * acquisition failure releases what was taken instead of leaking locks
+	 * until TTL (BusinessTripService::acquireAllExclusive shape).
+	 *
+	 * MUST be called before beginTransaction(): the DB locking provider
+	 * writes oc_file_locks on the same connection, so a lock acquired
+	 * inside an open transaction is invisible to a concurrent finalize
+	 * until commit — exactly the window this serializes. A LockedException
+	 * means a finalize/reopen for one of these months is in flight; it
+	 * surfaces as a retryable busy error (wire code LOCKED), never a
+	 * masked generic error.
+	 *
+	 * @param list<string> $keys
+	 */
+	private function acquireMonthClosureLocks(array $keys): void
+	{
+		$held = [];
+		try {
+			foreach ($keys as $key) {
+				$this->lockingProvider->acquireLock(
+					$key,
+					ILockingProvider::LOCK_EXCLUSIVE,
+					'Absence write against month-closure window'
+				);
+				$held[] = $key;
+			}
+		} catch (\Throwable $e) {
+			foreach (array_reverse($held) as $key) {
+				try {
+					$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+				} catch (\Throwable) {
+					// Best effort — the lock TTL is the final safety net.
+				}
+			}
+			if ($e instanceof \OCP\Lock\LockedException) {
+				throw new AbsenceMutationBusyException(
+					$this->l10n->t('This calendar month is currently being finalized. Please wait a moment and try again.')
+				);
+			}
+			throw $e;
+		}
+	}
+
+	/**
+	 * Release exclusive month-closure locks in reverse acquisition order.
+	 * Best effort — release failures must never mask a primary exception.
+	 *
+	 * @param list<string> $keys
+	 */
+	private function releaseMonthClosureLocks(array $keys): void
+	{
+		foreach (array_reverse($keys) as $key) {
+			try {
+				$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'Failed to release month closure lock: ' . $e->getMessage(),
+					['exception' => $e]
+				);
+			}
+		}
 	}
 
 	/**
@@ -2467,17 +2682,30 @@ class AbsenceService
 	private function autoApproveForNoManager(Absence $absence): Absence
 	{
 		$updatedAbsence = null;
-
-		$this->db->beginTransaction();
+		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
-			$updatedAbsence = $this->doAutoApproveDbWork($absence);
-			$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
-			$this->invalidateVacationStatsAfterCommit($absence->getUserId());
+			// Re-read under the mutation lock — the entity handed in is a
+			// pre-lock read and may be stale — then hold the month-closure
+			// keys exclusive across check→commit (see createAbsence).
+			$absence = $this->absenceMapper->find($absence->getId());
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
 
-			$this->db->commit();
-		} catch (\Throwable $e) {
-			$this->db->rollBack();
-			throw $e;
+			$this->db->beginTransaction();
+			try {
+				$updatedAbsence = $this->doAutoApproveDbWork($absence);
+				$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
+				$this->invalidateVacationStatsAfterCommit($absence->getUserId());
+
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
+			$this->releaseUserMutationLock($lockKey);
 		}
 
 		if ($this->notificationService) {
@@ -2850,8 +3078,20 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		$result = null;
 		try {
+			// Re-read under the mutation lock — the CAS check above is
+			// pre-lock — then hold the month-closure keys exclusive across
+			// check→commit over BOTH the vacation and the sick window.
+			$lockFresh = $this->absenceMapper->find($absenceId);
+			$monthClosureKeys = array_values(array_unique(array_merge(
+				$this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate()),
+				$this->monthClosureLockKeys($ownerUserId, $sickStart, $endOfSick)
+			)));
+			sort($monthClosureKeys);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $vacStart, $vacEnd);
@@ -3032,6 +3272,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -3145,7 +3386,15 @@ class AbsenceService
 		$ownerUserId = $absence->getUserId();
 		$today = $this->todayDateInStorage()->format('Y-m-d');
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		try {
+			// Re-read under the mutation lock — the entity handed in is a
+			// pre-lock read — then hold the month-closure keys exclusive
+			// across check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($absence->getId());
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
@@ -3203,6 +3452,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -3315,7 +3565,15 @@ class AbsenceService
 		$this->assertAbsenceMutable($absence);
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		try {
+			// Re-read under the mutation lock — the pre-checks above are
+			// pre-lock — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($absenceId);
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $start, $end);
@@ -3352,6 +3610,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 

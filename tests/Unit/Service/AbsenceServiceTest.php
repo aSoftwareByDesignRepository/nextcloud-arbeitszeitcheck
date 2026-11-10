@@ -1201,7 +1201,7 @@ class AbsenceServiceTest extends TestCase
 		$absence->setEndDate($end);
 		$absence->setDays(5.0);
 
-		$this->absenceMapper->expects($this->exactly(2))
+		$this->absenceMapper->expects($this->exactly(3))
 			->method('find')
 			->with($absenceId)
 			->willReturn($absence);
@@ -1240,7 +1240,7 @@ class AbsenceServiceTest extends TestCase
 		$absence->setUserId('employee');
 		$absence->setStatus(Absence::STATUS_APPROVED);
 
-		$this->absenceMapper->expects($this->exactly(2))
+		$this->absenceMapper->expects($this->exactly(3))
 			->method('find')
 			->with($absenceId)
 			->willReturn($absence);
@@ -1309,7 +1309,7 @@ class AbsenceServiceTest extends TestCase
 		$absence->setStartDate(clone $start);
 		$absence->setEndDate(clone $end);
 
-		$this->absenceMapper->expects($this->exactly(2))
+		$this->absenceMapper->expects($this->exactly(3))
 			->method('find')
 			->with($absenceId)
 			->willReturn($absence);
@@ -1352,7 +1352,7 @@ class AbsenceServiceTest extends TestCase
 		$absence->setEndDate($end);
 		$absence->setDays(5.0);
 
-		$this->absenceMapper->expects($this->exactly(2))
+		$this->absenceMapper->expects($this->exactly(3))
 			->method('find')
 			->with($absenceId)
 			->willReturn($absence);
@@ -2779,7 +2779,7 @@ class AbsenceServiceTest extends TestCase
 		$before = $this->runningVacation();
 		$drifted = $this->runningVacation();
 		$drifted->setUpdatedAt(new \DateTime('-1 day'));
-		$this->absenceMapper->method('find')->willReturnOnConsecutiveCalls($before, $drifted);
+		$this->absenceMapper->method('find')->willReturnOnConsecutiveCalls($before, $before, $drifted);
 		$this->absenceMapper->expects($this->never())->method('insert');
 		$this->db->expects($this->once())->method('rollBack');
 		$this->db->expects($this->never())->method('commit');
@@ -3290,4 +3290,248 @@ class AbsenceServiceTest extends TestCase
 
 		$this->assertFalse($flags['canDecideCancelRequest']);
 	}
+	/**
+	 * state_transition_toctou (r43 MF-1): every absence write path must hold
+	 * the month-closure advisory locks (azc/mc/, LOCK_EXCLUSIVE) across the
+	 * guard→commit window, acquired BEFORE beginTransaction (the DB locking
+	 * provider writes oc_file_locks on the same connection — an in-tx
+	 * acquire would be invisible to a concurrent finalize until commit).
+	 *
+	 * For each named write path we drive the method into its transaction and
+	 * assert: at least one azc/mc/ key was acquired EXCLUSIVE strictly before
+	 * the tx began, and every acquired mc key is released on exit.
+	 *
+	 * @dataProvider monthClosureLockWritePaths
+	 */
+	public function testAbsenceWritePathsHoldMonthClosureLocksAcrossTx(string $method): void
+	{
+		$events = [];
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$events): void {
+				$events[] = ['acq', $key, $type];
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function (string $key, int $type) use (&$events): void {
+				$events[] = ['rel', $key, $type];
+			}
+		);
+		$db = $this->createMock(\OCP\IDBConnection::class);
+		$db->method('beginTransaction')->willReturnCallback(static function () use (&$events): void {
+			$events[] = ['tx', null, null];
+		});
+		$db->method('commit');
+		$db->method('rollBack');
+
+		$mc = $this->createMock(MonthClosureService::class);
+		$mc->method('monthsOverlappingRange')->willReturn([[2026, 6]]);
+		$mc->method('assertDateRangeMutable');
+
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$db,
+			$lp,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$mc
+		);
+
+		$this->fixtureMonthClosureLockPath($method);
+
+		try {
+			$this->invokeMonthClosureLockPath($service, $method);
+		} catch (\Throwable $e) {
+			// A post-lock failure still must satisfy the lock protocol.
+		}
+
+		$acquiredMc = [];
+		$releasedMc = [];
+		$txIndex = null;
+		foreach ($events as $i => [$kind, $key, $type]) {
+			if ($kind === 'tx' && $txIndex === null) {
+				$txIndex = $i;
+			}
+			if (is_string($key) && str_starts_with($key, 'azc/mc/')) {
+				if ($kind === 'acq') {
+					$acquiredMc[] = [$i, $type];
+				} elseif ($kind === 'rel') {
+					$releasedMc[] = [$i, $type];
+				}
+			}
+		}
+
+		$this->assertNotEmpty($acquiredMc, $method . ' must acquire azc/mc/ month-closure locks');
+		foreach ($acquiredMc as [$i, $type]) {
+			$this->assertSame(ILockingProvider::LOCK_EXCLUSIVE, $type, $method . ': mc lock must be EXCLUSIVE');
+			$this->assertNotNull($txIndex, $method . ': no transaction started');
+			$this->assertLessThan($txIndex, $i, $method . ': mc locks must be acquired BEFORE beginTransaction (oc_file_locks writes are tx-scoped)');
+		}
+		$this->assertCount(count($acquiredMc), $releasedMc, $method . ': every mc lock must be released');
+		foreach ($releasedMc as [$i, $type]) {
+			$this->assertSame(ILockingProvider::LOCK_EXCLUSIVE, $type);
+		}
+	}
+
+	/** @return array<string, array{0:string}> */
+	public function monthClosureLockWritePaths(): array
+	{
+		return [
+			'updateAbsence' => ['updateAbsence'],
+			'deleteAbsence' => ['deleteAbsence'],
+			'cancelAbsence' => ['cancelAbsence'],
+			'shortenAbsence' => ['shortenAbsence'],
+			'approveBySubstitute' => ['approveBySubstitute'],
+			'declineBySubstitute' => ['declineBySubstitute'],
+		];
+	}
+
+	private function mkLockAbsence(string $status, string $type = Absence::TYPE_SICK_LEAVE): Absence
+	{
+		$a = new Absence();
+		$a->setId(123);
+		$a->setUserId('testuser');
+		$a->setType($type);
+		$a->setStatus($status);
+		$a->setStartDate(new \DateTime('2026-06-10'));
+		$a->setEndDate(new \DateTime('2026-06-12'));
+		$a->setDays(3.0);
+		return $a;
+	}
+
+	private function fixtureMonthClosureLockPath(string $method): void
+	{
+		switch ($method) {
+			case 'updateAbsence':
+				$this->absenceMapper->method('find')->willReturn($this->mkLockAbsence(Absence::STATUS_PENDING));
+				$this->absenceMapper->method('findOverlapping')->willReturn([]);
+				$this->absenceMapper->method('update')->willReturnArgument(0);
+				$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+				break;
+			case 'deleteAbsence':
+				$this->absenceMapper->method('find')->willReturn($this->mkLockAbsence(Absence::STATUS_PENDING));
+				$this->absenceMapper->method('delete');
+				break;
+			case 'cancelAbsence':
+				$a = $this->mkLockAbsence(Absence::STATUS_PENDING);
+				$a->setStartDate((new \DateTime())->modify('+7 days'));
+				$a->setEndDate((new \DateTime())->modify('+9 days'));
+				$this->absenceMapper->method('find')->willReturn($a);
+				$this->absenceMapper->method('update')->willReturnArgument(0);
+				break;
+			case 'shortenAbsence':
+				$a = $this->mkLockAbsence(Absence::STATUS_APPROVED);
+				$a->setStartDate((new \DateTime())->modify('-3 days'));
+				$a->setEndDate((new \DateTime())->modify('+3 days'));
+				$this->absenceMapper->method('find')->willReturn($a);
+				$this->absenceMapper->method('update')->willReturnArgument(0);
+				break;
+			case 'approveBySubstitute':
+				$a = $this->mkLockAbsence(Absence::STATUS_SUBSTITUTE_PENDING);
+				$a->setSubstituteUserId('sub1');
+				$this->absenceMapper->method('find')->willReturn($a);
+				$this->absenceMapper->method('update')->willReturnArgument(0);
+				$this->teamResolver->method('hasAssignableManagerForEmployee')->willReturn(true);
+				break;
+			case 'declineBySubstitute':
+				$a = $this->mkLockAbsence(Absence::STATUS_SUBSTITUTE_PENDING);
+				$a->setSubstituteUserId('sub1');
+				$this->absenceMapper->method('find')->willReturn($a);
+				$this->absenceMapper->method('update')->willReturnArgument(0);
+				break;
+			default:
+				$this->fail('unknown path ' . $method);
+		}
+	}
+
+	private function invokeMonthClosureLockPath(AbsenceService $service, string $method): void
+	{
+		switch ($method) {
+			case 'updateAbsence':
+				$service->updateAbsence(123, ['reason' => 'changed'], 'testuser');
+				break;
+			case 'deleteAbsence':
+				$service->deleteAbsence(123, 'testuser');
+				break;
+			case 'cancelAbsence':
+				$service->cancelAbsence(123, 'testuser');
+				break;
+			case 'shortenAbsence':
+				$service->shortenAbsence(123, 'testuser', (new \DateTime())->format('Y-m-d'));
+				break;
+			case 'approveBySubstitute':
+				$service->approveBySubstitute(123, 'sub1');
+				break;
+			case 'declineBySubstitute':
+				$service->declineBySubstitute(123, 'sub1', 'no coverage needed');
+				break;
+		}
+	}
+
+	/**
+	 * A finalize in flight on one of the window's months must surface as a
+	 * retryable busy error (AbsenceMutationBusyException / LOCKED) — never
+	 * a write into the sealing month.
+	 */
+	public function testDeleteAbsenceMapsMonthClosureLockContentionToBusy(): void
+	{
+		$absence = new Absence();
+		$absence->setId(7);
+		$absence->setUserId('testuser');
+		$absence->setType(Absence::TYPE_SICK_LEAVE);
+		$absence->setStatus(Absence::STATUS_PENDING);
+		$absence->setStartDate(new \DateTime('2026-06-10'));
+		$absence->setEndDate(new \DateTime('2026-06-12'));
+
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->expects($this->never())->method('delete');
+
+		$this->monthClosureService->method('monthsOverlappingRange')->willReturn([[2026, 6]]);
+		$this->monthClosureService->method('assertDateRangeMutable');
+
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function (string $key, int $type): void {
+				if (str_starts_with($key, 'azc/mc/')) {
+					throw new \OCP\Lock\LockedException($key);
+				}
+			}
+		);
+		$lp->method('releaseLock');
+
+		$service = new AbsenceService(
+			$this->absenceMapper,
+			$this->auditLogMapper,
+			$this->userSettingsMapper,
+			$this->teamResolver,
+			$this->userWorkingTimeModelMapper,
+			$this->config,
+			$this->db,
+			$lp,
+			$this->userManager,
+			$this->l10n,
+			$this->notificationService,
+			null,
+			$this->holidayCalendarService,
+			$this->vacationYearBalanceMapper,
+			$this->vacationAllocationService,
+			null,
+			$this->monthClosureService
+		);
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\AbsenceMutationBusyException::class);
+		$service->deleteAbsence(7, 'testuser');
+	}
+
 }

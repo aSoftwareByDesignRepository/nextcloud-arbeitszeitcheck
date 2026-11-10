@@ -4920,7 +4920,7 @@
 		"This badge is already assigned to another employee. Remove it there first, or use a different badge." : "Ten identyfikator jest już przypisany innemu pracownikowi. Najpierw usuń go tam albo użyj innego identyfikatora.",
 		"This badge is already assigned." : "Ten identyfikator jest już przypisany.",
 		"This block overlaps another travel block." : "Ten etap nakłada się na inny etap podróży.",
-		"This calendar month is currently being finalized. Please wait a moment and try again." : "This calendar month is currently being finalized. Please wait a moment and try again.",
+		"This calendar month is currently being finalized. Please wait a moment and try again." : "Ten miesiąc kalendarzowy jest właśnie finalizowany. Poczekaj chwilę i spróbuj ponownie.",
 		"This calendar month is finalized. Contact an administrator if a correction must be made." : "Ten miesiąc kalendarzowy został zamknięty. Skontaktuj się z administratorem, jeśli konieczna jest korekta.",
 		"This cannot be undone." : "Tego nie można cofnąć.",
 		"This clocked time entry will be permanently removed. The deletion is recorded in the audit log." : "Ten odbity wpis czasu zostanie trwale usunięty. Usunięcie zostanie zapisane w dzienniku audytu.",

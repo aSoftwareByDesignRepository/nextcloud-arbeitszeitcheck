@@ -4920,7 +4920,7 @@
 		"This badge is already assigned to another employee. Remove it there first, or use a different badge." : "Denna bricka är redan tilldelad en annan medarbetare. Ta bort den där först, eller använd en annan bricka.",
 		"This badge is already assigned." : "Denna bricka är redan tilldelad.",
 		"This block overlaps another travel block." : "Den här etappen överlappar en annan reseetapp.",
-		"This calendar month is currently being finalized. Please wait a moment and try again." : "This calendar month is currently being finalized. Please wait a moment and try again.",
+		"This calendar month is currently being finalized. Please wait a moment and try again." : "Den här kalendermånaden avslutas just nu. Vänta ett ögonblick och försök igen.",
 		"This calendar month is finalized. Contact an administrator if a correction must be made." : "Denna kalendermånad är slutförd. Kontakta en administratör om en korrigering måste göras.",
 		"This cannot be undone." : "Detta kan inte ångras.",
 		"This clocked time entry will be permanently removed. The deletion is recorded in the audit log." : "Den här instämplade tidsregistreringen tas bort permanent. Raderingen registreras i granskningsloggen.",

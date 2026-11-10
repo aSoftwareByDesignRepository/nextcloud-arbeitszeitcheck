@@ -153,41 +153,64 @@ class ExternalStampService
 	{
 		$lock = 'azc_ext_stamp_decide_' . $id;
 		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
+		$monthClosureKeys = [];
 		try {
-			$this->db->beginTransaction();
+			// Month-closure tier BEFORE the tx (last in DbLockKeys::ORDER):
+			// the decide lock is stamp-scoped, but a confirm writes
+			// month-scoped time-entry rows via promote(). The stamp's
+			// start/end are immutable, so a plain pre-read sizes the set;
+			// an open-ended stamp promote overlaps through "now".
+			$preStamp = $this->stamps->findForUser($id, $uid);
+			if ($preStamp !== null) {
+				$mcTz = AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config);
+				$mcStart = (new \DateTimeImmutable('@' . $preStamp->getStartTs()))->setTimezone($mcTz);
+				$mcEnd = $preStamp->getEndTs() !== null
+					? (new \DateTimeImmutable('@' . $preStamp->getEndTs()))->setTimezone($mcTz)
+					: new \DateTimeImmutable();
+				$monthClosureKeys = $this->monthClosureGuard->acquireMutableRangeLocks(
+					$uid,
+					\DateTime::createFromImmutable($mcStart),
+					\DateTime::createFromImmutable($mcEnd)
+				);
+			}
 			try {
-				$stamp = $this->stamps->findForUserLocked($id, $uid);
-				if ($stamp === null) {
-					throw new BusinessRuleException('Not found.', 'not_found');
-				}
-				if ($stamp->getStatus() !== ExternalStamp::STATUS_PENDING) {
-					$same = $stamp->getStatus() === ($confirm ? ExternalStamp::STATUS_CONFIRMED : ExternalStamp::STATUS_DISMISSED);
-					$entryId = $stamp->getPromotedEntryId();
-					$this->db->commit();
-					if ($same) {
-						return ['timeEntryId' => $entryId];
+				$this->db->beginTransaction();
+				try {
+					$stamp = $this->stamps->findForUserLocked($id, $uid);
+					if ($stamp === null) {
+						throw new BusinessRuleException('Not found.', 'not_found');
 					}
-					throw new BusinessRuleException(
-						$this->l10n->t('This suggestion was already decided.'),
-						'already_decided',
-					);
-				}
+					if ($stamp->getStatus() !== ExternalStamp::STATUS_PENDING) {
+						$same = $stamp->getStatus() === ($confirm ? ExternalStamp::STATUS_CONFIRMED : ExternalStamp::STATUS_DISMISSED);
+						$entryId = $stamp->getPromotedEntryId();
+						$this->db->commit();
+						if ($same) {
+							return ['timeEntryId' => $entryId];
+						}
+						throw new BusinessRuleException(
+							$this->l10n->t('This suggestion was already decided.'),
+							'already_decided',
+						);
+					}
 
-				$entryId = null;
-				if ($confirm) {
-					$entryId = $this->promote($stamp);
-					$stamp->setPromotedEntryId($entryId);
+					$entryId = null;
+					if ($confirm) {
+						$entryId = $this->promote($stamp);
+						$stamp->setPromotedEntryId($entryId);
+					}
+					$stamp->setStatus($confirm ? ExternalStamp::STATUS_CONFIRMED : ExternalStamp::STATUS_DISMISSED);
+					$stamp->setDecidedBy($uid);
+					$stamp->setDecidedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
+					$this->stamps->update($stamp);
+					$this->db->commit();
+				} catch (\Throwable $e) {
+					if ($this->db->inTransaction()) {
+						$this->db->rollBack();
+					}
+					throw $e;
 				}
-				$stamp->setStatus($confirm ? ExternalStamp::STATUS_CONFIRMED : ExternalStamp::STATUS_DISMISSED);
-				$stamp->setDecidedBy($uid);
-				$stamp->setDecidedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
-				$this->stamps->update($stamp);
-				$this->db->commit();
-			} catch (\Throwable $e) {
-				if ($this->db->inTransaction()) {
-					$this->db->rollBack();
-				}
-				throw $e;
+			} finally {
+				$this->monthClosureGuard->releaseMutableRangeLocks($monthClosureKeys);
 			}
 		} finally {
 			$this->lockingProvider->releaseLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
@@ -235,7 +258,7 @@ class ExternalStampService
 		$storageTz = AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config);
 		$start = (new \DateTimeImmutable('@' . $startTs))->setTimezone($storageTz);
 		$end = (new \DateTimeImmutable('@' . $endTs))->setTimezone($storageTz);
-		$this->monthClosureGuard->assertUserDayMutable($uid, \DateTime::createFromImmutable($start));
+		$this->monthClosureGuard->assertRangeMutable($uid, \DateTime::createFromImmutable($start), \DateTime::createFromImmutable($end));
 
 		$entryId = 0;
 		$this->timeTrackingService->withUserMutationLock($uid, function () use ($uid, $start, $end, $stamp, &$entryId) {

@@ -37,6 +37,57 @@ class TimeEntryCorrectionService
 	) {
 	}
 
+	/**
+	 * Exclusive month-closure lock keys (month_closure tier — last in
+	 * {@see DbLockKeys::ORDER}) for a persisted entry write: the entry's
+	 * CURRENT post-mutation range unioned with the range it had before
+	 * ($otherStart/$otherEnd) — an update that shifts a row between months
+	 * must lock both sides or a seal of either can interleave with the
+	 * write (the disjoint-lock TOCTOU the month-closure protocol closes).
+	 *
+	 * @return list<string>
+	 */
+	private function entryWriteMonthClosureKeys(TimeEntry $entry, ?\DateTimeInterface $otherStart, ?\DateTimeInterface $otherEnd): array
+	{
+		$keys = $this->monthClosureGuard->timeEntryMutableLockKeys($entry);
+		if ($otherStart !== null) {
+			$keys = array_merge(
+				$keys,
+				$this->monthClosureGuard->mutableRangeLockKeys(
+					$entry->getUserId(),
+					$otherStart,
+					$otherEnd ?? $otherStart
+				)
+			);
+		}
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		return $keys;
+	}
+
+	/**
+	 * Run $fn holding the exclusive month-closure locks — the durable
+	 * assert inside re-checks BOTH the post-mutation entry range and the
+	 * pre-mutation one, so a month sealed on either side of a move blocks
+	 * the write, and an in-flight seal serializes on the held keys.
+	 *
+	 * @param list<string> $keys
+	 * @param callable():TimeEntry $fn
+	 */
+	private function writeEntryUnderMonthClosureLocks(TimeEntry $entry, ?\DateTimeInterface $otherStart, ?\DateTimeInterface $otherEnd, array $keys, callable $fn): TimeEntry
+	{
+		$this->monthClosureGuard->acquireMutableRangeLockKeys($keys);
+		try {
+			$this->monthClosureGuard->assertTimeEntryMutable($entry);
+			if ($otherStart !== null) {
+				$this->monthClosureGuard->assertRangeMutable($entry->getUserId(), $otherStart, $otherEnd ?? $otherStart);
+			}
+			return $fn();
+		} finally {
+			$this->monthClosureGuard->releaseMutableRangeLocks($keys);
+		}
+	}
+
 	private function userWorkLocationService(): UserWorkLocationService
 	{
 		return $this->userWorkLocationService ?? \OCP\Server::get(UserWorkLocationService::class);
@@ -337,6 +388,9 @@ class TimeEntryCorrectionService
 			$justificationData = [];
 		}
 
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
+
 		$error = $this->validateProposal($entry, $adjustedProposal, $managerId);
 		if ($error !== null) {
 			throw new \InvalidArgumentException($error);
@@ -365,12 +419,16 @@ class TimeEntryCorrectionService
 		}
 		$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 
-		$updated = $this->persistPendingDecision($entry);
-		$updated = $this->recomputePaidBreaks($updated);
-		$this->runComplianceIfEnabled($updated);
-		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
+		// The proposal may shift the row across a month boundary — lock both sides.
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry, $managerId): TimeEntry {
+			$updated = $this->persistPendingDecision($entry);
+			$updated = $this->recomputePaidBreaks($updated);
+			$this->runComplianceIfEnabled($updated);
+			$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
-		return $updated;
+			return $updated;
+		});
 	}
 
 	public function approve(TimeEntry $entry, string $managerId, ?string $comment = null): TimeEntry
@@ -379,6 +437,9 @@ class TimeEntryCorrectionService
 		if (!is_array($justificationData)) {
 			$justificationData = [];
 		}
+
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
 
 		$proposal = $justificationData['proposed'] ?? null;
 		if (is_array($proposal) && $proposal !== []) {
@@ -405,17 +466,23 @@ class TimeEntryCorrectionService
 		$encoded = json_encode($justificationData, JSON_THROW_ON_ERROR);
 		$entry->setJustification($encoded);
 
-		$updated = $this->persistPendingDecision($entry);
-		$updated = $this->recomputePaidBreaks($updated);
-		$this->runComplianceIfEnabled($updated);
-		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry, $managerId): TimeEntry {
+			$updated = $this->persistPendingDecision($entry);
+			$updated = $this->recomputePaidBreaks($updated);
+			$this->runComplianceIfEnabled($updated);
+			$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
-		return $updated;
+			return $updated;
+		});
 	}
 
 	public function autoApprove(TimeEntry $entry): TimeEntry
 	{
 		$justificationData = json_decode($entry->getJustification() ?? '{}', true);
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
+
 		if (is_array($justificationData)) {
 			$proposal = $justificationData['proposed'] ?? null;
 			if (is_array($proposal) && $proposal !== []) {
@@ -447,9 +514,13 @@ class TimeEntryCorrectionService
 			$entry->setJustification($encoded);
 		}
 
-		$updated = $this->persistPendingDecision($entry);
-		$updated = $this->recomputePaidBreaks($updated);
-		$this->runComplianceIfEnabled($updated);
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		$updated = $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry): TimeEntry {
+			$updated = $this->persistPendingDecision($entry);
+			$updated = $this->recomputePaidBreaks($updated);
+			$this->runComplianceIfEnabled($updated);
+			return $updated;
+		});
 
 		// B1-MH-05: audit row mirrors absence auto-approval — reason + which
 		// approvers the predicate counted (method_exists: upgrade repair paths
@@ -506,6 +577,9 @@ class TimeEntryCorrectionService
 			$justificationData = [];
 		}
 
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
+
 		// Four-eyes reject of a *new* manual entry: there is no original snapshot to
 		// restore. restoreOriginalSnapshot([]) would keep the proposed clocks and set
 		// status=completed — i.e. "Reject" would silently approve hours. That is forbidden.
@@ -521,10 +595,12 @@ class TimeEntryCorrectionService
 			}
 			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 
-			$rejected = $this->persistPendingDecision($entry);
-			// Status flipped to REJECTED — its breaks leave the day pool.
-			$rejected = $this->recomputePaidBreaks($rejected);
-			return $rejected;
+			$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+			return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry): TimeEntry {
+				$rejected = $this->persistPendingDecision($entry);
+				// Status flipped to REJECTED — its breaks leave the day pool.
+				return $this->recomputePaidBreaks($rejected);
+			});
 		}
 
 		$originalData = is_array($justificationData['original'] ?? null) ? $justificationData['original'] : [];
@@ -540,10 +616,12 @@ class TimeEntryCorrectionService
 			$entry->setJustification(json_encode($justificationData, JSON_THROW_ON_ERROR));
 		}
 
-		$rejected = $this->persistPendingDecision($entry);
-		// Restored snapshot changed the recorded breaks — rebalance the pool.
-		$rejected = $this->recomputePaidBreaks($rejected);
-		return $rejected;
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry): TimeEntry {
+			$rejected = $this->persistPendingDecision($entry);
+			// Restored snapshot changed the recorded breaks — rebalance the pool.
+			return $this->recomputePaidBreaks($rejected);
+		});
 	}
 
 	/**
@@ -560,6 +638,9 @@ class TimeEntryCorrectionService
 			return null;
 		}
 
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
+
 		$originalData = is_array($justificationData['original'] ?? null) ? $justificationData['original'] : [];
 		$this->restoreOriginalSnapshot($entry, $originalData);
 		$entry->setApprovedByUserId(null);
@@ -567,10 +648,12 @@ class TimeEntryCorrectionService
 		$entry->setJustification(null);
 		$entry->setUpdatedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
 
-		$restored = $this->persistPendingDecision($entry);
-		// Restored snapshot changed the recorded breaks — rebalance the pool.
-		$restored = $this->recomputePaidBreaks($restored);
-		return $restored;
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry): TimeEntry {
+			$restored = $this->persistPendingDecision($entry);
+			// Restored snapshot changed the recorded breaks — rebalance the pool.
+			return $this->recomputePaidBreaks($restored);
+		});
 	}
 
 	/**
@@ -621,6 +704,9 @@ class TimeEntryCorrectionService
 
 	public function applyManagerCorrection(TimeEntry $entry, array $proposal, string $managerId, string $reason): TimeEntry
 	{
+		$beforeStart = $entry->getStartTime();
+		$beforeEnd = $entry->getEndTime();
+
 		$error = $this->validateProposal($entry, $proposal, $managerId);
 		if ($error !== null) {
 			throw new \InvalidArgumentException($error);
@@ -680,12 +766,15 @@ class TimeEntryCorrectionService
 		}
 		$entry->setJustification(json_encode($justification, JSON_THROW_ON_ERROR));
 
-		$updated = $this->timeEntryMapper->update($entry);
-		$updated = $this->recomputePaidBreaks($updated);
-		$this->runComplianceIfEnabled($updated);
-		$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, $beforeStart, $beforeEnd);
+		return $this->writeEntryUnderMonthClosureLocks($entry, $beforeStart, $beforeEnd, $mcKeys, function () use ($entry, $managerId): TimeEntry {
+			$updated = $this->timeEntryMapper->update($entry);
+			$updated = $this->recomputePaidBreaks($updated);
+			$this->runComplianceIfEnabled($updated);
+			$updated->setBillingSyncWarning($this->syncProjectCheckBilling($updated, $managerId));
 
-		return $updated;
+			return $updated;
+		});
 	}
 
 	/**
@@ -722,12 +811,16 @@ class TimeEntryCorrectionService
 		$entry->setApprovedAt(clone $nowAt);
 		$entry->setUpdatedAt(clone $nowAt);
 
-		$inserted = $this->timeEntryMapper->insert($entry);
-		$inserted = $this->recomputePaidBreaks($inserted);
-		$this->runComplianceIfEnabled($inserted);
-		$inserted->setBillingSyncWarning($this->syncProjectCheckBilling($inserted, $managerId));
+		// New row — its own [start, end] months are the full write set.
+		$mcKeys = $this->entryWriteMonthClosureKeys($entry, null, null);
+		return $this->writeEntryUnderMonthClosureLocks($entry, null, null, $mcKeys, function () use ($entry, $managerId): TimeEntry {
+			$inserted = $this->timeEntryMapper->insert($entry);
+			$inserted = $this->recomputePaidBreaks($inserted);
+			$this->runComplianceIfEnabled($inserted);
+			$inserted->setBillingSyncWarning($this->syncProjectCheckBilling($inserted, $managerId));
 
-		return $inserted;
+			return $inserted;
+		});
 	}
 
 	/**

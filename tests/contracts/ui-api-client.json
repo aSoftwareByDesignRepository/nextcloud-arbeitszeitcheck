@@ -274,6 +274,134 @@
             ],
             "mobile": null,
             "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec §7.3/§7.4."
+        },
+        {
+            "id": "manager-absence-shorten-reason",
+            "param": "end_date/reason/expectedUpdatedAt",
+            "description": "FA-MSHORTEN (US-407): manager end-early on a running approved absence requires end_date + mandatory reason + CAS token; web manager dialog collects all three. Companion: EmployeeAbsenceDetailScreen renders the action only when canManagerShorten === true and updatedAt is present (NN-08/NN-09).",
+            "errorCodes": [
+                "reason_required",
+                "not_started",
+                "already_ended",
+                "end_before_start",
+                "end_not_earlier",
+                "revision_stale"
+            ],
+            "server": [
+                {
+                    "file": "lib/Controller/ManagerController.php",
+                    "needles": [
+                        "shortenEmployeeAbsence",
+                        "'end_date' => $this->requestParamString($payload, 'end_date')",
+                        "reason_required"
+                    ]
+                },
+                {
+                    "file": "lib/Service/AbsenceService.php",
+                    "needles": [
+                        "managerShortenAbsence",
+                        "'reason_required'",
+                        "'revision_stale'"
+                    ]
+                },
+                {
+                    "file": "appinfo/routes.php",
+                    "needles": [
+                        "employee-absences/{absenceId}/shorten"
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "js/manager-absences.js",
+                    "needles": [
+                        "data-manager-shorten",
+                        "dlg-reason",
+                        "expectedUpdatedAt",
+                        "end_date"
+                    ]
+                }
+            ],
+            "mobile": [
+                {
+                    "file": "src/screens/EmployeeAbsenceDetailScreen.tsx",
+                    "needles": [
+                        "canManagerShorten === true",
+                        "expectedUpdatedAt: absence.updatedAt",
+                        "useManagerShortenEmployeeAbsenceMutation"
+                    ]
+                },
+                {
+                    "file": "src/api/client.ts",
+                    "needles": [
+                        "managerShortenEmployeeAbsence",
+                        "/shorten",
+                        "expectedUpdatedAt"
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "absence-estimate-days",
+            "param": "start/end (self) — userId/startDate/endDate (manager)",
+            "description": "FA-PREVIEW/DC-02+DC-06b: server-side schedule-aware day estimate; web and mobile previews display only, never count client-side (NN-03).",
+            "errorCodes": [],
+            "server": [
+                {
+                    "file": "lib/Controller/AbsenceController.php",
+                    "needles": [
+                        "estimateDays",
+                        "/^\\d{4}-\\d{2}-\\d{2}$/"
+                    ]
+                },
+                {
+                    "file": "lib/Controller/ManagerController.php",
+                    "needles": [
+                        "estimateEmployeeAbsenceDays",
+                        "canManageEmployee"
+                    ]
+                },
+                {
+                    "file": "appinfo/routes.php",
+                    "needles": [
+                        "absences/estimate-days",
+                        "employee-absences/estimate-days"
+                    ]
+                }
+            ],
+            "web": [
+                {
+                    "file": "templates/absences.php",
+                    "needles": [
+                        "absence-days-consumption",
+                        "estimateDays"
+                    ]
+                }
+            ],
+            "mobile": [
+                {
+                    "file": "src/api/client.ts",
+                    "needles": [
+                        "fetchAbsenceDaysEstimate",
+                        "fetchEmployeeAbsenceDaysEstimate",
+                        "estimate-days"
+                    ]
+                },
+                {
+                    "file": "src/screens/CreateAbsenceScreen.tsx",
+                    "needles": [
+                        "fetchAbsenceDaysEstimate",
+                        "consumptionDays"
+                    ]
+                },
+                {
+                    "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
+                    "needles": [
+                        "fetchEmployeeAbsenceDaysEstimate",
+                        "consumptionDays"
+                    ]
+                }
+            ]
         }
     ]
 }

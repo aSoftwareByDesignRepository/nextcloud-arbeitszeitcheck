@@ -175,6 +175,9 @@ class DashboardWidgetDataService {
 			'displayBalance'         => $this->overtimeDisplayService->getYearToDateBalanceForTrafficLight($userId),
 			// Additive GH #40 — YTD planned-hours credit when Entgeltausfall opt-in is on.
 			'absenceCreditHoursYtd'  => (float)($hoursGlanceBundle['absence_credit_hours_ytd'] ?? 0.0),
+			// Additive DC-06d — "today" in org storage TZ so companions can
+			// default record/shorten dates to the same day the web uses.
+			'serverToday'            => $this->timeZoneService->nowImmutableInStorage()->format('Y-m-d'),
 			// Additive GH #37 — old companions ignore; keys are stable for client l10n.
 			'hoursGlance'            => $hoursGlanceBundle['periods'],
 			'overtimeBankEnabled'    => $this->overtimeBankService->isEnabled(),
@@ -198,6 +201,9 @@ class DashboardWidgetDataService {
 			'vacationHoursPerDay'    => (float)($vacationStats['vacation_hours_per_day'] ?? \OCA\ArbeitszeitCheck\Constants::DEFAULT_VACATION_HOURS_PER_DAY),
 			'vacationCarryover'      => (float)($vacationStats['carryover_days'] ?? 0.0),
 			'vacationCarryoverUsable'=> (float)($vacationStats['carryover_usable'] ?? 0.0),
+			// Additive DC-07 — companions render "(expired)" only when the
+			// deadline passed; absent on old payloads → no guessing.
+			'vacationCarryoverLocked' => (bool)($vacationStats['carryover_unused_locked_after_deadline'] ?? false),
 			// Additive — old companions ignore; Q2 anniversary expiry is per-user date.
 			'vacationCarryoverExpiresOn' => $vacationStats['carryover_expires_on'] ?? null,
 			// Additive Phase B fields — old companions ignore safely (§16).
@@ -621,13 +627,18 @@ class DashboardWidgetDataService {
 		};
 
 		$pack = static function (string $key, array $row) use ($formatPeriod): array {
-			$worked = round((float)($row['total_hours_worked'] ?? 0), 2);
+			// FA-GLANCE (DC-06c): worked includes the paid-absence credit —
+			// matches Saldo math and the web tile; total_hours_worked itself
+			// stays clocked-only for reports.
+			$credit = round((float)($row['absence_credit_hours'] ?? 0), 2);
+			$worked = round((float)($row['total_hours_worked'] ?? 0) + $credit, 2);
 			$target = round((float)($row['required_hours'] ?? 0), 2);
 			return [
 				'key' => $key,
 				'worked' => $worked,
 				'target' => $target,
 				'delta' => round($worked - $target, 2),
+				'credit' => $credit,
 				'period' => $formatPeriod($row),
 			];
 		};

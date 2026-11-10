@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
 use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks;
+use OCA\ArbeitszeitCheck\Repair\RecomputeAbsenceDaysSchedule;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
 use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
@@ -673,6 +674,17 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(RecomputeAbsenceDaysSchedule::class, function ($c): RecomputeAbsenceDaysSchedule {
+			return new RecomputeAbsenceDaysSchedule(
+				$c->query(IDBConnection::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
+			);
+		});
+
 		$context->registerService(ReleaseStuckPendingAbsences::class, function ($c): ReleaseStuckPendingAbsences {
 			return new ReleaseStuckPendingAbsences(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
@@ -879,6 +891,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue::class),
 				$c->query(\OCP\ICacheFactory::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 
@@ -1003,6 +1016,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationYearWindowResolver::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 

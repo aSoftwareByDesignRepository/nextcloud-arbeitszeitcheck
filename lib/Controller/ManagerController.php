@@ -2192,6 +2192,74 @@ class ManagerController extends Controller
 	}
 
 	/**
+	 * GET /api/manager/employee-absences/estimate-days (DC-06b): schedule-aware
+	 * day estimate for a managed employee — mirror of estimate-hours, scoped
+	 * via canManageEmployee + ghost-uid check. Powers the mobile record-form
+	 * consumption preview without a self-scope userId leak.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function estimateEmployeeAbsenceDays(): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'estimate_employee_absence_days');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+
+			$targetUserId = trim((string)$this->request->getParam('userId', ''));
+			$startDate = trim((string)$this->request->getParam('startDate', ''));
+			$endDate = trim((string)$this->request->getParam('endDate', $startDate));
+			if ($targetUserId === '' || $startDate === '' || $endDate === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('userId, startDate, and endDate are required.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if (!$this->permissionService->canManageEmployee($actorUserId, $targetUserId)) {
+				$this->permissionService->logPermissionDenied($actorUserId, 'estimate_employee_absence_days', 'user', $targetUserId);
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Access denied. You can only record absences for employees you manage.'),
+				], Http::STATUS_FORBIDDEN);
+			}
+			if ($this->userManager->get($targetUserId) === null) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The selected user does not exist or is disabled.'),
+				], Http::STATUS_NOT_FOUND);
+			}
+			if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Dates must be in YYYY-MM-DD format.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$start = \DateTime::createFromFormat('!Y-m-d', $startDate);
+			$end = \DateTime::createFromFormat('!Y-m-d', $endDate);
+			if ($start === false || $end === false) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Dates must be in YYYY-MM-DD format.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			return new JSONResponse([
+				'success' => true,
+			] + $this->absenceService->estimateAbsenceDays($targetUserId, $start, $end));
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Error in ManagerController::estimateEmployeeAbsenceDays',
+				['exception' => $e]
+			);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
 	 * Create an absence for a team member and store it as already approved (migration / HR corrections).
 	 * JSON body: { "userId": "…", "type": "vacation", "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "reason": "…" (optional) }
 	 */
@@ -2541,6 +2609,9 @@ class ManagerController extends Controller
 			'month_finalized' => [Http::STATUS_CONFLICT, 'month_finalized', 'This calendar month is finalized. Contact an administrator if a correction must be made.'],
 			'not_approved' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_approved', 'Only approved absences can be changed this way.'],
 			'already_ended' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'already_ended', 'This absence has already ended.'],
+			'not_started' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_started', 'This absence has not started yet.'],
+			'end_before_start' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'end_before_start', 'The new end date cannot be before the start date.'],
+			'end_not_earlier' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'end_not_earlier', 'The new end date must be before the current end date.'],
 			'reason_required' => [Http::STATUS_BAD_REQUEST, 'reason_required', 'Please provide a reason (max. 500 characters).'],
 			'reason_too_long' => [Http::STATUS_BAD_REQUEST, 'reason_too_long', 'The comment is too long (max. 500 characters).'],
 		];
@@ -2598,6 +2669,50 @@ class ManagerController extends Controller
 			return new JSONResponse(['success' => true] + $result);
 		} catch (\Throwable $e) {
 			return $this->managerAbsenceMutationError($e, 'cancelEmployeeAbsence');
+		}
+	}
+
+	/**
+	 * POST /api/manager/employee-absences/{id}/shorten (FA-MSHORTEN, US-407):
+	 * manager/HR ends a running approved absence early — mandatory reason + CAS.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function shortenEmployeeAbsence(int $absenceId): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'shorten_employee_absence');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			[$absence, $guardError] = $this->managerAbsenceWriteGuards($absenceId, $actorUserId, 'shorten_employee_absence');
+			if ($guardError !== null) {
+				return $guardError;
+			}
+			$payload = $this->request->getParams();
+			$data = [
+				'end_date' => $this->requestParamString($payload, 'end_date'),
+				'expectedUpdatedAt' => $this->requestParamString($payload, 'expectedUpdatedAt'),
+				'reason' => $this->requestParamString($payload, 'reason'),
+			];
+			if ($data['end_date'] === '' || $data['expectedUpdatedAt'] === '' || $data['reason'] === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('An end date, a reason and the current absence version are required.'),
+					'error_code' => 'reason_required',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['end_date'])) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Dates must be in YYYY-MM-DD format.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$result = $this->absenceService->managerShortenAbsence($absenceId, $data, $actorUserId);
+			return new JSONResponse(['success' => true, 'absence' => $result->getSummary()]);
+		} catch (\Throwable $e) {
+			return $this->managerAbsenceMutationError($e, 'shortenEmployeeAbsence');
 		}
 	}
 

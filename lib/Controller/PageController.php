@@ -1641,7 +1641,9 @@ class PageController extends Controller
 		};
 
 		$pack = static function (string $key, string $label, array $row) use ($formatPeriod): array {
-			$worked = round((float)($row['total_hours_worked'] ?? 0), 2);
+			// FA-GLANCE: Ist = clocked + paid-absence credit (matches Saldo math;
+			// total_hours_worked itself stays clocked-only for reports).
+			$worked = round((float)($row['total_hours_worked'] ?? 0) + (float)($row['absence_credit_hours'] ?? 0), 2);
 			$target = round((float)($row['required_hours'] ?? 0), 2);
 			return [
 				'key' => $key,
@@ -1650,6 +1652,7 @@ class PageController extends Controller
 				'worked' => $worked,
 				'target' => $target,
 				'delta' => round($worked - $target, 2),
+				'credit' => round((float)($row['absence_credit_hours'] ?? 0), 2),
 			];
 		};
 

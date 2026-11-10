@@ -281,6 +281,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::updateAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::cancelAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::shortenAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
+			'OCA\ArbeitszeitCheck\Service\AbsenceService::managerShortenAbsence' => $this->entityMock(\OCA\ArbeitszeitCheck\Db\Absence::class),
+			'OCA\ArbeitszeitCheck\Service\AbsenceService::estimateAbsenceDays' => [
+				'days' => 4.0, 'basis' => 'weekdays_mon_fri', 'single_day' => false,
+			],
 			'OCA\ArbeitszeitCheck\Service\AbsenceService::convertVacationToSick' => [
 				'vacation' => ['id' => 1, 'status' => 'approved'],
 				'sick' => ['id' => 2, 'status' => 'pending'],
@@ -435,6 +439,15 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'ManagerController::cancelEmployeeAbsence' => [
 			'reason' => 'Documented operational reason',
 			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::shortenEmployeeAbsence' => [
+			'end_date' => '2026-09-10',
+			'reason' => 'Employee returned early',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'AbsenceController::estimateDays' => [
+			'start' => '2026-09-14',
+			'end' => '2026-09-18',
 		],
 		'ManagerController::approveEmployeeAbsenceCancelRequest' => [
 			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',

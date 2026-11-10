@@ -148,6 +148,7 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.name = <?php echo json_encode($l->t('Name'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.description = <?php echo json_encode($l->t('Description'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.descriptionOptional = <?php echo json_encode($l->t('Description (optional)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.weekdayScheduleAbsenceHint = <?php echo json_encode($l->t('Filled weekday times also drive absence day counting: without them, absences count Mon–Fri — a part-time model without weekday times debits 5 days for a calendar week off.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.editorLead = <?php echo json_encode($l->t('Name the schedule, set hours, and optionally fill weekday times. Cancel returns to the list.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.type = <?php echo json_encode($l->t('Type'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.weeklyHours = <?php echo json_encode($l->t('Weekly Hours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

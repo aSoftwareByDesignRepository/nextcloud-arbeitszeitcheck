@@ -628,6 +628,39 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * API: estimate vacation/absence working days for a range (FA-PREVIEW).
+	 * Owner-self only — resolves the caller's own schedule, no userId param.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function estimateDays(): JSONResponse
+	{
+		$start = trim((string)$this->request->getParam('start', ''));
+		$end = trim((string)$this->request->getParam('end', $start));
+		if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Dates must be in YYYY-MM-DD format.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$ds = new \DateTime($start);
+			$de = new \DateTime($end);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid date range.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($de < $ds) {
+			[$ds, $de] = [$de, $ds];
+		}
+		return new JSONResponse([
+			'success' => true,
+		] + $this->absenceService->estimateAbsenceDays($this->getUserId(), $ds, $de));
+	}
+
+	/**
 	 * API: Shorten absence (early return). Accepts JSON or form-encoded end_date.
 	 *
 	 * @param int $id Absence ID

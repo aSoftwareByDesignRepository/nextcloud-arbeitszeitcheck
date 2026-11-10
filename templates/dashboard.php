@@ -628,6 +628,9 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <span class="azc-dashboard-metric__unit"><?php p($l->t('h')); ?></span>
                         </span>
                         <span class="azc-dashboard-metric__delta <?php p($deltaClass); ?>"><?php p($deltaLabel); ?></span>
+                        <?php $gCredit = (float)($glanceRow['credit'] ?? 0); if ($gCredit >= 0.01): ?>
+                        <span class="azc-dashboard-metric__credit"><?php p($l->t('incl. %s h absence credit', [$arbeitszeitCheckFormatHours($gCredit)])); ?></span>
+                        <?php endif; ?>
                     </div>
                     <?php
                 };
@@ -924,8 +927,8 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                                 <dd><?php p((string)round((float)($dashStats['vacation_annual_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
                             </div>
                             <div class="dashboard-stat-card__breakdown-row">
-                                <dt><?php p($l->t('Carryover pool left')); ?></dt>
-                                <dd><?php p((string)round((float)($dashStats['vacation_carryover_remaining'] ?? 0), 1) . ' ' . $dashUnitWord); ?></dd>
+                                <dt><?php p($l->t('Prior-year carryover left')); ?></dt>
+                                <dd><?php p((string)round((float)($dashStats['vacation_carryover_remaining'] ?? 0), 1) . ' ' . $dashUnitWord . (!empty($dashStats['vacation_carryover_locked_after_deadline']) ? ' ' . $l->t('(expired)') : '')); ?></dd>
                             </div>
                             <?php if (isset($dashStats['vacation_carryover_max_cap']) && $dashStats['vacation_carryover_max_cap'] !== null && $dashStats['vacation_carryover_max_cap'] !== '') { ?>
                             <div class="dashboard-stat-card__breakdown-row">

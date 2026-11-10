@@ -234,6 +234,12 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								<input id="manager-absence-record-end" name="record_end_date" type="text" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" required autocomplete="off" aria-label="<?php p($l->t('To')); ?>" />
 							</div>
 						</div>
+						<div class="azc-filter-field">
+							<span class="azc-filter-field__label" aria-hidden="true">&nbsp;</span>
+							<div class="azc-filter-field__control">
+								<button type="button" id="manager-absence-record-copy-filter" class="azc-btn azc-btn--secondary" title="<?php p($l->t('Copy the list filter range into the record dates')); ?>"><?php p($l->t('Copy filter range')); ?></button>
+							</div>
+						</div>
 						<div class="azc-filter-field" id="manager-absence-record-day-fraction-field" hidden>
 							<fieldset class="absence-day-fraction__fieldset">
 								<legend id="manager-absence-day-fraction-legend" class="azc-filter-field__label"><?php p($l->t('Day length')); ?></legend>

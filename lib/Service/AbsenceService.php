@@ -42,6 +42,7 @@ class AbsenceService
 	private UserSettingsMapper $userSettingsMapper;
 	private TeamResolverService $teamResolver;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
+	private ?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null;
 	private IConfig $config;
 	private IDBConnection $db;
 	private ILockingProvider $lockingProvider;
@@ -95,6 +96,7 @@ class AbsenceService
 		?SpecialEntitlementService $specialEntitlementService = null,
 		?PostCommitEffectQueue $postCommitEffectQueue = null,
 		?\OCP\ICacheFactory $cacheFactory = null,
+		?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -125,6 +127,7 @@ class AbsenceService
 		$this->timeEntryMapper = $timeEntryMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
 		$this->postCommitEffectQueue = $postCommitEffectQueue;
 		$this->cacheFactory = $cacheFactory;
+		$this->scheduledWorkdayCounter = $scheduledWorkdayCounter ?? $this->scheduledWorkdayCounter;
 	}
 
 	/**
@@ -965,11 +968,15 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
-			$today = $this->todayDateInStorage();
-			if ($startDate > $today) {
+			// Calendar-date comparison (Y-m-d), matching the flag semantics in
+			// ownerAbsenceActionFlags/managerAbsenceActionFlags — instant
+			// comparison against the storage-TZ midnight would skew by up to a
+			// day on hosts whose PHP default TZ differs from the org TZ.
+			$todayYmd = $this->todayDateInStorage()->format('Y-m-d');
+			if ($startDate->format('Y-m-d') > $todayYmd) {
 				throw new \Exception($this->l10n->t('You can only shorten absences that have already started.'));
 			}
-			if ($originalEndDate <= $today) {
+			if ($originalEndDate->format('Y-m-d') <= $todayYmd) {
 				throw new \Exception($this->l10n->t('This absence has already ended. It cannot be shortened.'));
 			}
 
@@ -2922,6 +2929,9 @@ class AbsenceService
 	 */
 	private function computeWorkingDaysPerYear(\DateTime $start, \DateTime $end, string $userId): array
 	{
+		if ($this->scheduledWorkdayCounter !== null) {
+			return $this->scheduledWorkdayCounter->daysPerYearForUser($userId, $start, $end);
+		}
 		return $this->holidayCalendarService->computeWorkingDaysPerYearForUser($userId, $start, $end);
 	}
 
@@ -2931,6 +2941,11 @@ class AbsenceService
 	 */
 	private function computeWorkingDaysForUser(string $userId, \DateTime $start, \DateTime $end): float
 	{
+		// ADR-01 (absence-day-accuracy-pack-2026-11): weekday_schedule wins;
+		// Mon–Fri stays the documented fallback inside the counter.
+		if ($this->scheduledWorkdayCounter !== null) {
+			return $this->scheduledWorkdayCounter->daysForUser($userId, $start, $end);
+		}
 		return $this->holidayCalendarService->computeWorkingDaysForUser($userId, $start, $end);
 	}
 
@@ -3809,11 +3824,136 @@ class AbsenceService
 	}
 
 	/**
+	 * FA-MSHORTEN (US-407): manager/HR shortens a running approved absence
+	 * (early return). Same business rules as the owner shorten, but the
+	 * actor is the manager — scope was verified by the controller; a
+	 * mandatory reason + CAS token is required for auditability.
+	 *
+	 * @param array<string,mixed> $data end_date, expectedUpdatedAt, reason
+	 */
+	public function managerShortenAbsence(int $id, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->absenceMapper->find($id);
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception('not_approved');
+		}
+		$startDate = $absence->getStartDate();
+		$originalEndDate = $absence->getEndDate();
+		if (!$startDate || !$originalEndDate) {
+			throw new \Exception('not_approved');
+		}
+		// Calendar-date comparison — see shortenAbsence() for why instants skew.
+		$todayYmd = $this->todayDateInStorage()->format('Y-m-d');
+		if ($startDate->format('Y-m-d') > $todayYmd) {
+			throw new \Exception('not_started');
+		}
+		if ($originalEndDate->format('Y-m-d') <= $todayYmd) {
+			throw new \Exception('already_ended');
+		}
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$newEnd = $this->parseDate((string)($data['end_date'] ?? ''));
+		$newEnd->setTime(0, 0, 0);
+		if ($newEnd < (clone $startDate)->setTime(0, 0, 0)) {
+			throw new \Exception('end_before_start');
+		}
+		if ($newEnd >= (clone $originalEndDate)->setTime(0, 0, 0)) {
+			throw new \Exception('end_not_earlier');
+		}
+		$ownerUserId = $absence->getUserId();
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
+		try {
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $startDate, $originalEndDate);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $startDate, $originalEndDate);
+				$absence = $this->absenceMapper->find($id);
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				// FM-05: an open owner cancellation request wins — the manager
+				// must decide it, not shorten around it.
+				if ($absence->getCancelRequestedAt() !== null) {
+					throw new \Exception('cancel_request_pending');
+				}
+				$this->assertAbsenceMutable($absence);
+				if ($absence->getType() === Absence::TYPE_VACATION) {
+					$this->assertVacationUnitMigrationIdle();
+				}
+				$oldData = $absence->getSummary();
+				$absence->setEndDate($newEnd);
+				$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $startDate, $newEnd));
+				if ($absence->getType() === Absence::TYPE_VACATION) {
+					// DC-04: hours-mode duration_hours follows the shortened
+					// range, same rule as the owner shorten path.
+					$this->recomputeVacationHoursAfterShorten(
+						$absence, $originalEndDate, $oldData, (float)$absence->getDays()
+					);
+				}
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$this->specialEntitlementService?->adjustConsumedAbsence(
+					$updated,
+					['end_date' => $newEnd->format('Y-m-d')],
+					$oldData,
+					$actorUserId
+				);
+				$newSummary = $updated->getSummary();
+				$newSummary['shorten_reason'] = $reason;
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_manager_shortened',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId
+				);
+				$this->invalidateVacationStatsAfterCommit($ownerUserId);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceShortenedByManager(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($updated),
+				$reason
+			));
+		}
+		if ($this->absenceNotificationMailService) {
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification(
+				$updated, 'manager_shortened', $actorUserId
+			));
+		}
+
+		return $updated;
+	}
+
+	/**
 	 * Action flags for the OWNER's own absence payloads (ADR-04 — the server
 	 * is the single source of eligibility truth; clients render buttons
 	 * straight from these flags instead of re-deriving type logic).
 	 *
-	 * @return array{canConvertToSick: bool, canRequestCancel: bool}
+	 * @return array{canConvertToSick: bool, canRequestCancel: bool, canShorten: bool}
 	 */
 	public function ownerAbsenceActionFlags(Absence $absence): array
 	{
@@ -3825,6 +3965,8 @@ class AbsenceService
 		return [
 			'canConvertToSick' => $running && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canRequestCancel' => $running && $absence->getCancelRequestedAt() === null,
+			// NH-05: mirrors shortenAbsence() eligibility (approved && started && end > today).
+			'canShorten' => $running && $end > $today,
 		];
 	}
 
@@ -3832,17 +3974,37 @@ class AbsenceService
 	 * Action flags for MANAGER-scope absence payloads (ADR-04). Manager
 	 * conversions are allowed retroactively, so no running-gate here.
 	 *
-	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canDecideCancelRequest: bool}
+	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canManagerShorten: bool, canDecideCancelRequest: bool}
 	 */
 	public function managerAbsenceActionFlags(Absence $absence): array
 	{
 		$today = $this->todayDateInStorage()->format('Y-m-d');
+		$start = $absence->getStartDate()?->format('Y-m-d');
 		$end = $absence->getEndDate()?->format('Y-m-d');
 		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
 		return [
 			'canConvertToSick' => $approved && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canManagerCancel' => $approved && $end !== null && $end >= $today,
+			'canManagerShorten' => $approved && $start !== null && $end !== null
+				&& $start <= $today && $end > $today,
 			'canDecideCancelRequest' => $approved && $absence->getCancelRequestedAt() !== null,
+		];
+	}
+
+	/**
+	 * FA-PREVIEW: server-side day estimate for the absence form.
+	 * Never trusts client math — single authority via DC-01.
+	 * @return array{days: float, basis: string, single_day: bool}
+	 */
+	public function estimateAbsenceDays(string $userId, \DateTime $start, \DateTime $end): array
+	{
+		$days = $this->computeWorkingDaysForUser($userId, $start, $end);
+		return [
+			'days' => round($days, 2),
+			'basis' => $this->scheduledWorkdayCounter !== null
+				? $this->scheduledWorkdayCounter->basisForUser($userId)
+				: 'weekdays_mon_fri',
+			'single_day' => $start->format('Y-m-d') === $end->format('Y-m-d'),
 		];
 	}
 
@@ -3856,7 +4018,7 @@ class AbsenceService
 		if (!$start || !$end) {
 			return 0.0;
 		}
-		return $this->holidayCalendarService->computeWorkingDaysForUser(
+		return $this->computeWorkingDaysForUser(
 			$absence->getUserId(),
 			$start,
 			$end

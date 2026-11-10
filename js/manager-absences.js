@@ -224,6 +224,7 @@
 			const canCancel = entry.canManagerCancel !== undefined
 				? entry.canManagerCancel === true
 				: false;
+			const canShorten = entry.canManagerShorten === true;
 			const cancelRequested = entry.cancelRequested === true;
 			const parts = [];
 			if (canConvert) {
@@ -246,6 +247,16 @@
 						data-running="${(entry.startDate && entry.endDate && entry.startDate <= todayStr && entry.endDate >= todayStr) ? '1' : ''}"
 						aria-label="${escapeHtml(cancelLabel)}"
 						title="${escapeHtml(cancelLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : ''}</button>`);
+			}
+			if (canShorten) {
+				const shortenLabel = t('End absence early', 'End absence early');
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-manager-shorten
+						data-shorten-url="${escapeHtml(`${base}/shorten`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-orig-start="${escapeHtml(entry.startDate || '')}"
+						data-orig-end="${escapeHtml(entry.endDate || '')}"
+						aria-label="${escapeHtml(shortenLabel)}"
+						title="${escapeHtml(shortenLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('clock') : '⏱'}</button>`);
 			}
 			if (cancelRequested) {
 				const approveLabel = t('Approve cancellation', 'Approve cancellation');
@@ -560,7 +571,7 @@
 					updateCount();
 					state.countBeforeLoad = document.getElementById('employee-absences-count')?.textContent || '';
 					updatePagination();
-					syncRecordDatesFromFilter();
+					setRecordDatesToToday();
 				} catch (err) {
 					state.total = 0;
 					const message = err?.message || t('Could not load employee absences.', 'Could not load employee absences.');
@@ -591,7 +602,9 @@
 		}
 	}
 
-	function syncRecordDatesFromFilter() {
+	// NH-01: explicit opt-in — copy the list filter range into the record
+	// dates on click (retro-recording workflow), never implicitly.
+	function copyFilterRangeToRecord() {
 		const fs = document.getElementById('employee-absences-start-date-filter');
 		const fe = document.getElementById('employee-absences-end-date-filter');
 		const rs = document.getElementById('manager-absence-record-start');
@@ -602,6 +615,25 @@
 		if (fe && re && fe.value) {
 			re.value = fe.value;
 		}
+	}
+
+	// FA-RECDATE: default record dates to TODAY (dominant use-case is
+	// sickness entered from today onward) — never silently inherit the
+	// list filter range; an empty field is the only trigger.
+	function setRecordDatesToToday() {
+		const rs = document.getElementById('manager-absence-record-start');
+		const re = document.getElementById('manager-absence-record-end');
+		if (!rs || !re || rs.value || re.value) {
+			return;
+		}
+		const api = window.ArbeitszeitCheckTime;
+		const todayYmd = api ? api.todayYmd() : '';
+		const d = (todayYmd && api.parseYmd) ? api.parseYmd(todayYmd) : new Date();
+		const fmt = Utils.formatDate
+			? Utils.formatDate(d, 'DD.MM.YYYY')
+			: toEuropeanDateString(d);
+		rs.value = fmt;
+		re.value = fmt;
 	}
 
 	/* Past-date awareness for the manager record form.
@@ -1278,7 +1310,7 @@
 				countEl.textContent = '';
 			}
 			updatePagination();
-			syncRecordDatesFromFilter();
+			setRecordDatesToToday();
 			if (employeeFilterPicker) {
 				employeeFilterPicker.clear();
 			}
@@ -1297,10 +1329,71 @@
 			if (input) {
 				input.addEventListener('change', () => {
 					clearFilterFieldErrors();
-					syncRecordDatesFromFilter();
+					setRecordDatesToToday();
 				});
 			}
 		});
+	}
+
+	// FA-MSHORTEN: end a running absence early — date (dd.mm.yyyy) + reason.
+	function openManagerShortenDialog(btn) {
+		const dlg = document.createElement('dialog');
+		dlg.className = 'azc-dialog';
+		dlg.innerHTML = `
+			<form method="dialog" novalidate>
+				<h2 class="azc-dialog__title">${t('End absence early', 'End absence early')}</h2>
+				<p class="form-help">${t('Days up to and including the new end date stay recorded. The rest is removed.', 'Days up to and including the new end date stay recorded. The rest is removed.')}</p>
+				<div class="form-group">
+					<label class="form-label" for="azc-mgr-shorten-end">${t('New end date', 'New end date')}</label>
+					<input class="form-input dlg-end" id="azc-mgr-shorten-end" placeholder="dd.mm.yyyy" maxlength="10" required>
+					<p class="azc-field-error dlg-error" role="alert" hidden></p>
+				</div>
+				<div class="form-group">
+					<label class="form-label" for="azc-mgr-shorten-reason">${t('Reason', 'Reason')}</label>
+					<textarea class="form-input dlg-reason" id="azc-mgr-shorten-reason" rows="3" maxlength="500" required></textarea>
+				</div>
+				<div class="azc-dialog__actions">
+					<button type="submit" class="azc-btn azc-btn--primary">${t('Update end date', 'Update end date')}</button>
+					<button type="button" class="azc-btn azc-btn--secondary dlg-cancel">${t('Cancel', 'Cancel')}</button>
+				</div>
+			</form>`;
+		document.body.appendChild(dlg);
+		const endEl = dlg.querySelector('.dlg-end');
+		const reasonEl = dlg.querySelector('.dlg-reason');
+		const errEl = dlg.querySelector('.dlg-error');
+		const _t = new Date();
+		endEl.value = String(_t.getDate()).padStart(2,'0') + '.' + String(_t.getMonth()+1).padStart(2,'0') + '.' + _t.getFullYear();
+		dlg.querySelector('.dlg-cancel').addEventListener('click', () => dlg.close());
+		dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 300));
+		dlg.querySelector('form').addEventListener('submit', async (e2) => {
+			e2.preventDefault();
+			const toISO = (v) => {
+				const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(v.trim());
+				return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+			};
+			const endISO = toISO(endEl.value);
+			const reason = reasonEl.value.trim();
+			if (!endISO || !reason) {
+				errEl.textContent = !endISO ? t('Invalid date format. Please use dd.mm.yyyy.', 'Invalid date format. Please use dd.mm.yyyy.') : t('Please provide a reason.', 'Please provide a reason.');
+				errEl.hidden = false;
+				return;
+			}
+			try {
+				const api = window.AzcApi;
+				const res = await api.fetch(btn.dataset.shortenUrl, {
+					method: 'POST',
+					json: { end_date: endISO, expectedUpdatedAt: btn.dataset.updatedAt || '', reason },
+				});
+				if (!res.ok || !(res.data && res.data.success !== false)) {
+					throw new Error((res.data && res.data.error) || t('The request could not be completed.', 'The request could not be completed.'));
+				}
+				window.location.reload();
+			} catch (err) {
+				errEl.textContent = err.message;
+				errEl.hidden = false;
+			}
+		});
+		dlg.showModal();
 	}
 
 	// FA-2b/2c: manager cancel + cancel-request decisions. One native
@@ -1407,6 +1500,12 @@
 				});
 				return;
 			}
+			const shortenBtn = ev.target.closest && ev.target.closest('[data-manager-shorten]');
+			if (shortenBtn) {
+				ev.preventDefault();
+				openManagerShortenDialog(shortenBtn);
+				return;
+			}
 			const decideBtn = ev.target.closest && ev.target.closest('[data-cancel-decide]');
 			if (decideBtn) {
 				ev.preventDefault();
@@ -1431,7 +1530,9 @@
 	function init() {
 		initEmployeePickers();
 		setDefaultDateRange(false);
-		syncRecordDatesFromFilter();
+		setRecordDatesToToday();
+		document.getElementById('manager-absence-record-copy-filter')
+			?.addEventListener('click', copyFilterRangeToRecord);
 		bindForm();
 		bindRecordForm();
 		bindRecordHistoricalHint();

@@ -3281,4 +3281,278 @@ class ManagerControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_LOCKED, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
+
+	/* ------------------------------------------------------------------
+	 * DC-06b (US-408 AC-5): GET /api/manager/employee-absences/estimate-days
+	 * — manager-scoped day estimate, same shape as the self endpoint.
+	 * ----------------------------------------------------------------- */
+
+	private function stubEstimateParams(array $params): void
+	{
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => $params[$k] ?? $d
+		);
+	}
+
+	public function testEstimateEmployeeAbsenceDaysReturnsEstimate(): void
+	{
+		$this->stubManagerActor();
+		$this->stubEstimateParams([
+			'userId' => 'bob', 'startDate' => '2026-11-16', 'endDate' => '2026-11-20',
+		]);
+		$this->permissionService->method('canManageEmployee')->with('manager1', 'bob')->willReturn(true);
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with('bob', $this->isInstanceOf(\DateTime::class), $this->isInstanceOf(\DateTime::class))
+			->willReturn(['days' => 4.0, 'basis' => 'weekday_schedule', 'single_day' => false]);
+
+		$response = $this->controller->estimateEmployeeAbsenceDays();
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertSame(4.0, $data['days']);
+		$this->assertSame('weekday_schedule', $data['basis']);
+	}
+
+	public function testEstimateEmployeeAbsenceDaysResolvesTargetNotActor(): void
+	{
+		// TH-09: the estimate must run against the *employee's* schedule —
+		// never the manager's, never a self-scope fallback.
+		$this->stubManagerActor();
+		$this->stubEstimateParams([
+			'userId' => 'bob', 'startDate' => '2026-11-16', 'endDate' => '2026-11-16',
+		]);
+		$this->permissionService->method('canManageEmployee')->with('manager1', 'bob')->willReturn(true);
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with('bob', $this->anything(), $this->anything())
+			->willReturn(['days' => 1.0, 'basis' => 'weekdays_mon_fri', 'single_day' => true]);
+
+		$data = $this->controller->estimateEmployeeAbsenceDays()->getData();
+		$this->assertTrue($data['success']);
+	}
+
+	public function testEstimateEmployeeAbsenceDaysForbiddenOutOfScope(): void
+	{
+		$this->stubManagerActor();
+		$this->stubEstimateParams([
+			'userId' => 'stranger', 'startDate' => '2026-11-16', 'endDate' => '2026-11-20',
+		]);
+		$this->permissionService->method('canManageEmployee')->willReturn(false);
+		$this->permissionService->expects($this->once())->method('logPermissionDenied');
+		$this->absenceService->expects($this->never())->method('estimateAbsenceDays');
+
+		$response = $this->controller->estimateEmployeeAbsenceDays();
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testEstimateEmployeeAbsenceDaysMissingParams(): void
+	{
+		$this->stubManagerActor();
+		$this->stubEstimateParams(['userId' => 'bob']);
+		$this->absenceService->expects($this->never())->method('estimateAbsenceDays');
+
+		$response = $this->controller->estimateEmployeeAbsenceDays();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	public function testEstimateEmployeeAbsenceDaysBadDateFormat(): void
+	{
+		$this->stubManagerActor();
+		$this->stubEstimateParams([
+			'userId' => 'bob', 'startDate' => '16.11.2026', 'endDate' => '2026-11-20',
+		]);
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->absenceService->expects($this->never())->method('estimateAbsenceDays');
+
+		$response = $this->controller->estimateEmployeeAbsenceDays();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	public function testEstimateEmployeeAbsenceDaysGhostUid(): void
+	{
+		// api-security-patterns §2: scope check alone is not enough — a uid
+		// that no longer exists must 404, not silently estimate.
+		$this->stubManagerActor();
+		$this->missingUsers['ghost'] = true;
+		$this->stubEstimateParams([
+			'userId' => 'ghost', 'startDate' => '2026-11-16', 'endDate' => '2026-11-20',
+		]);
+		$this->permissionService->method('canManageEmployee')->willReturn(true);
+		$this->absenceService->expects($this->never())->method('estimateAbsenceDays');
+
+		$response = $this->controller->estimateEmployeeAbsenceDays();
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+	}
+
+	/* ------------------------------------------------------------------
+	 * FA-MSHORTEN (US-407, DC-04): POST …/employee-absences/{id}/shorten
+	 * ----------------------------------------------------------------- */
+
+	private function managerShortenParams(array $overrides = []): array
+	{
+		return array_merge([
+			'end_date' => (new \DateTime())->format('Y-m-d'),
+			'expectedUpdatedAt' => '2026-10-28T12:00:00+02:00',
+			'reason' => 'Employee returned early',
+		], $overrides);
+	}
+
+	public function testShortenEmployeeAbsenceSuccess(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->with('manager1', 'bob')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->expects($this->once())
+			->method('managerShortenAbsence')
+			->with(77, $this->callback(fn ($d) => $d['reason'] === 'Employee returned early'), 'manager1')
+			->willReturn($this->managedVacation());
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('absence', $data);
+	}
+
+	public function testShortenEmployeeAbsenceUniform404OutOfScope(): void
+	{
+		// NN-05: out-of-scope collapses into the same 404 envelope as a
+		// missing row — no existence oracle.
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(false);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->expects($this->never())->method('managerShortenAbsence');
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function testShortenEmployeeAbsenceNotFound(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willThrowException(new DoesNotExistException('x'));
+
+		$response = $this->controller->shortenEmployeeAbsence(999);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
+	}
+
+	public function testShortenEmployeeAbsenceSelfTargetForbiddenForNonAdmin(): void
+	{
+		// Four-eyes: a regular manager must never mutate their own record
+		// through the manager path (the admin exception is covered by the
+		// entry-approval precedent).
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation(77, 'manager1'));
+		$this->isAdminAccess = false;
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->expects($this->never())->method('managerShortenAbsence');
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+	}
+
+	public function testShortenEmployeeAbsenceSelfTargetAllowedForAdmin(): void
+	{
+		$this->stubManagerActor();
+		$this->isAdminAccess = true;
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation(77, 'manager1'));
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->expects($this->once())
+			->method('managerShortenAbsence')
+			->willReturn($this->managedVacation(77, 'manager1'));
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+	}
+
+	public function testShortenEmployeeAbsenceMissingRequiredFields(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams(['reason' => '']));
+		$this->absenceService->expects($this->never())->method('managerShortenAbsence');
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('reason_required', $response->getData()['error_code']);
+	}
+
+	public function testShortenEmployeeAbsenceBadDateFormat(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn(
+			$this->managerShortenParams(['end_date' => '12.11.2026'])
+		);
+		$this->absenceService->expects($this->never())->method('managerShortenAbsence');
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+	}
+
+	public function testShortenEmployeeAbsenceRevisionStaleReturns409(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->method('managerShortenAbsence')
+			->willThrowException(new \Exception('revision_stale'));
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('revision_stale', $response->getData()['error_code']);
+	}
+
+	public function testShortenEmployeeAbsenceMonthFinalizedReturns409(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->method('managerShortenAbsence')
+			->willThrowException(new \OCA\ArbeitszeitCheck\Exception\MonthFinalizedException('sealed'));
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('month_finalized', $response->getData()['error_code']);
+	}
+
+	public function testShortenEmployeeAbsenceCancelRequestPendingReturns409(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->method('managerShortenAbsence')
+			->willThrowException(new \Exception('cancel_request_pending'));
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('cancel_request_pending', $response->getData()['error_code']);
+	}
+
+	public function testShortenEmployeeAbsenceEligibilityErrorsReturn422(): void
+	{
+		$this->stubManagerActor();
+		$this->absenceMapper->method('find')->willReturn($this->managedVacation());
+		$this->permissionService->method('canDecideEntryApproval')->willReturn(true);
+		$this->request->method('getParams')->willReturn($this->managerShortenParams());
+		$this->absenceService->method('managerShortenAbsence')
+			->willThrowException(new \Exception('already_ended'));
+
+		$response = $this->controller->shortenEmployeeAbsence(77);
+		$this->assertSame(Http::STATUS_UNPROCESSABLE_ENTITY, $response->getStatus());
+		$this->assertSame('already_ended', $response->getData()['error_code']);
+	}
 }

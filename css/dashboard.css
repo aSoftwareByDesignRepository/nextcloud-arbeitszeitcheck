@@ -646,6 +646,13 @@
     color: var(--azc-text, var(--color-main-text));
 }
 
+#app-content.azc-app--dashboard .azc-dashboard-metric__credit {
+	display: block;
+	font-size: 0.78rem;
+	color: var(--color-text-maxcontrast);
+	margin-top: 2px;
+}
+
 #app-content.azc-app--dashboard .azc-dashboard-metric__value--positive,
 #app-content.azc-app--dashboard .azc-dashboard-metric__value--negative {
     color: var(--azc-text, var(--color-main-text));

@@ -186,7 +186,13 @@ final class ComplianceControllerDashboardTest extends TestCase {
 		self::assertSame(2, $params['violationTotal']);
 		self::assertSame(2, $params['violationPager']['total']);
 		self::assertSame(25, $params['violationPager']['perPage']);
-		self::assertSame(2, $params['typePager']['total']);
+		self::assertArrayNotHasKey('typePager', $params);
+		self::assertArrayNotHasKey('severityPager', $params);
+		self::assertSame(['missing_break' => 1, 'sunday_work' => 1], $params['topTypes']);
+		self::assertSame(
+			array_fill_keys(\OCA\ArbeitszeitCheck\Db\ComplianceViolation::TYPES, true),
+			array_fill_keys(array_keys($params['violationTypeOptions']), true)
+		);
 		self::assertFalse($params['violations'][0]['can_resolve']);
 		self::assertSame('21.10.2026', $params['violations'][0]['date']);
 		self::assertSame('Missing break', $params['violations'][0]['description']);

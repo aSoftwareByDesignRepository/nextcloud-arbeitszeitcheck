@@ -54,4 +54,18 @@ final class ComplianceReportSummary {
 
 		return $report;
 	}
+
+	/**
+	 * Most frequent violation types, highest count first. Ties keep the
+	 * key order of the input map (by_type is ksort'ed, so ties are
+	 * alphabetical — deterministic for tests and rendering).
+	 *
+	 * @param array<string, int> $byType
+	 * @return array<string, int>
+	 */
+	public static function topTypes(array $byType, int $limit = 3): array {
+		$sorted = $byType;
+		arsort($sorted); // stable sort as of PHP 8.0 — ties keep input order
+		return array_slice($sorted, 0, max(0, $limit), true);
+	}
 }

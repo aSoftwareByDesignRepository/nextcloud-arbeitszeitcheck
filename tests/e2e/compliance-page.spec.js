@@ -10,7 +10,7 @@ test.describe('Compliance page is one screen', () => {
 		await page.goto('/apps/arbeitszeitcheck/compliance')
 		await assertArbeitszeitcheckLoaded(page)
 		await expect(page.locator('#compliance-status-heading')).toBeVisible()
-		await expect(page.locator('#compliance-reports-heading')).toBeVisible()
+		await expect(page.locator('.compliance-status__tiles')).toBeVisible()
 		await expect(page.locator('#violations-table')).toBeVisible()
 		await expect(page.locator('.compliance-tabs')).toHaveCount(0)
 		await expect(page.locator('.azc-help-more')).toHaveCount(0)
@@ -35,7 +35,7 @@ test.describe('Compliance page is one screen', () => {
 
 		await page.goto('/apps/arbeitszeitcheck/compliance/reports')
 		await expect(page).toHaveURL(/\/apps\/arbeitszeitcheck\/compliance#compliance-status$/)
-		await expect(page.locator('#compliance-reports-heading')).toBeVisible()
+		await expect(page.locator('.compliance-status__tiles')).toBeVisible()
 	})
 
 	test('the report figures stack on a narrow screen without sideways scrolling', async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe('Compliance page is one screen', () => {
 		await loginAs(page, 'EMPLOYEE')
 		await page.goto('/apps/arbeitszeitcheck/compliance')
 		await assertArbeitszeitcheckLoaded(page)
-		await expect(page.locator('.compliance-status__figure').first()).toBeVisible()
+		await expect(page.locator('.compliance-status__tile').first()).toBeVisible()
 		const overflow = await page.evaluate(() => {
 			const content = document.getElementById('app-content')
 			if (!content) {

@@ -23,6 +23,7 @@ use OCA\ArbeitszeitCheck\Support\CompliancePageScope;
 use OCA\ArbeitszeitCheck\Support\ExceptionHttpStatus;
 use OCA\ArbeitszeitCheck\Support\TablePager;
 use OCA\ArbeitszeitCheck\Support\ComplianceReportSummary;
+use OCA\ArbeitszeitCheck\Support\ViolationLabels;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
@@ -291,16 +292,6 @@ class ComplianceController extends Controller
 				$this->request->getParam('v_page'),
 				$this->request->getParam('v_per_page'),
 			);
-			$typePager = TablePager::state(
-				count(is_array($reportData['by_type'] ?? null) ? $reportData['by_type'] : []),
-				$this->request->getParam('t_page'),
-				$this->request->getParam('t_per_page'),
-			);
-			$severityPager = TablePager::state(
-				count(is_array($reportData['by_severity'] ?? null) ? $reportData['by_severity'] : []),
-				$this->request->getParam('s_page'),
-				$this->request->getParam('s_per_page'),
-			);
 
 			$navFlags = $this->getNavigationFlags($userId);
 			$response = new TemplateResponse('arbeitszeitcheck', 'compliance-dashboard', $this->buildShellParams(
@@ -314,9 +305,11 @@ class ComplianceController extends Controller
 				'violations' => $shownViolations,
 				'violationTotal' => count($rows),
 				'violationPager' => $violationPager,
-				'typePager' => $typePager,
-				'severityPager' => $severityPager,
 				'reportData' => $reportData,
+				'topTypes' => ComplianceReportSummary::topTypes(
+					is_array($reportData['by_type'] ?? null) ? $reportData['by_type'] : []
+				),
+				'violationTypeOptions' => ViolationLabels::typeMap($this->l10n),
 				'filterUserId' => $scope['filterUserId'],
 				'filterDisplayName' => $scope['filterDisplayName'],
 				'showComplianceRunCheck' => $this->permissionService->isAdmin($userId),
@@ -349,6 +342,8 @@ class ComplianceController extends Controller
 				'violations' => [],
 				'violationTotal' => 0,
 				'reportData' => ComplianceReportSummary::fromRows([]),
+				'topTypes' => [],
+				'violationTypeOptions' => ViolationLabels::typeMap($this->l10n),
 				'filterUserId' => null,
 				'filterDisplayName' => null,
 				'showComplianceRunCheck' => false,
@@ -434,6 +429,7 @@ class ComplianceController extends Controller
 			) + [
 				'violations' => $violationsData,
 				'total' => count($violations),
+				'violationTypeOptions' => ViolationLabels::typeMap($this->l10n),
 				'filterUserId' => $filterUserId !== '' && $filterUserId !== $currentUserId ? $filterUserId : null,
 				'filterDisplayName' => $filterDisplayName,
 				'canSeeScope' => $canSeeScope,
@@ -452,6 +448,7 @@ class ComplianceController extends Controller
 			) + [
 				'violations' => [],
 				'total' => 0,
+				'violationTypeOptions' => ViolationLabels::typeMap($this->l10n),
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			]);
 			return $this->configureCSP($response);

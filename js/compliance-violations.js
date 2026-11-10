@@ -11,6 +11,10 @@
     const Utils = window.ArbeitszeitCheckUtils || {};
     const Messaging = window.ArbeitszeitCheckMessaging || {};
     let employeePicker = null;
+    // Monotonic request counter — overlapping loads (Apply, scope select,
+    // employee picker, post-resolve refresh) race; only the newest response
+    // may touch the table.
+    let loadSeq = 0;
 
     function cvT(msg) {
         const map = window.ArbeitszeitCheck && window.ArbeitszeitCheck.complianceViolationsL10n;
@@ -64,6 +68,23 @@
         // server-rendered rows already match the default (scope or self).
         if (getFilterUserId()) {
             loadViolations();
+        }
+    }
+
+    /**
+     * Keep the status-card counters honest after a row is marked fixed:
+     * open −delta, fixed +delta. No-op on pages without the tiles.
+     */
+    function adjustComplianceTiles(resolvedDelta) {
+        const openEl = document.getElementById('azc-compliance-open-count');
+        const fixedEl = document.getElementById('azc-compliance-fixed-count');
+        if (openEl) {
+            const next = Math.max(0, (parseInt(openEl.textContent, 10) || 0) - resolvedDelta);
+            openEl.textContent = String(next);
+            openEl.classList.toggle('compliance-status__tile-value--alert', next > 0);
+        }
+        if (fixedEl) {
+            fixedEl.textContent = String(Math.max(0, (parseInt(fixedEl.textContent, 10) || 0) + resolvedDelta));
         }
     }
 
@@ -121,6 +142,25 @@
     }
 
     /**
+     * Build the API query string for GET /api/compliance/violations.
+     * Parameter names must match the controller signature exactly —
+     * Nextcloud binds request params by literal name, so camelCase here.
+     */
+    function buildViolationParams(fields) {
+        const params = new URLSearchParams();
+        if (fields.startDate) params.append('startDate', fields.startDate);
+        if (fields.endDate) params.append('endDate', fields.endDate);
+        if (fields.severity) params.append('severity', fields.severity);
+        if (fields.violationType) params.append('violationType', fields.violationType);
+        if (fields.userId) {
+            params.append('userId', fields.userId);
+        } else if (fields.scope) {
+            params.append('scope', fields.scope);
+        }
+        return params;
+    }
+
+    /**
      * Load violations with filters
      */
     function loadViolations() {
@@ -129,22 +169,25 @@
         const startDate = toISO(Utils.$('#start-date')?.value || '');
         const endDate = toISO(Utils.$('#end-date')?.value || '');
         const severity = Utils.$('#severity-filter')?.value || '';
-
-        const params = new URLSearchParams();
-        if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
-        if (severity) params.append('severity', severity);
+        const violationType = Utils.$('#type-filter')?.value || '';
 
         // Selector precedence: a picked employee wins; otherwise the scope
         // select decides between the whole oversight scope and own-only.
         const pickedUserId = selectedEmployeeId() || getFilterUserId();
         const scopeSelect = Utils.$('#scope-filter');
         const scopeChoice = scopeSelect ? scopeSelect.value : '';
-        if (pickedUserId) {
-            params.append('userId', pickedUserId);
-        } else if (canSeeScope() && scopeChoice === 'scope') {
-            params.append('scope', String(scopeCfg().scopeValue || 'managed'));
-        }
+        const params = buildViolationParams({
+            startDate: startDate,
+            endDate: endDate,
+            severity: severity,
+            violationType: violationType,
+            userId: pickedUserId,
+            scope: !pickedUserId && canSeeScope() && scopeChoice === 'scope'
+                ? String(scopeCfg().scopeValue || 'managed')
+                : '',
+        });
+
+        const seq = ++loadSeq;
 
         const tbody = Utils.$('#violations-tbody');
         if (tbody) {
@@ -156,8 +199,14 @@
         Utils.ajax('/apps/arbeitszeitcheck/api/compliance/violations?' + params.toString(), {
             method: 'GET',
             onSuccess: function (data) {
+                if (seq !== loadSeq) {
+                    return; // a newer request superseded this one
+                }
                 if (data.success && data.violations) {
                     renderViolations(data.violations);
+                    if (typeof Messaging.announcePolite === 'function') {
+                        Messaging.announcePolite(cvT('Violations list updated'));
+                    }
                 } else {
                     const errorMsg = (data && data.error) ? data.error : cvT('Error loading violations');
                     if (tbody) tbody.innerHTML = '<tr><td colspan="' + colCount() + '" class="azc-table-empty"><div class="azc-empty-state"><h3 class="azc-empty-state__title">' + Utils.escapeHtml(errorMsg) + '</h3></div></td></tr>';
@@ -165,6 +214,9 @@
                 }
             },
             onError: function (error) {
+                if (seq !== loadSeq) {
+                    return; // stale request — the newer one owns the table
+                }
                 window.ArbeitszeitCheck?.handleManagerListApiError?.(error, {
                     picker: employeePicker,
                     searchSelector: '#violations-employee-filter-search',
@@ -266,8 +318,23 @@
         }
     }
 
+    // Resolve requests in flight — a double-click must not double-count
+    // the tile decrement or send a second POST for the same row.
+    const resolvingIds = new Set();
+
     async function resolveViolation(id) {
-        if (!id) return;
+        if (!id || resolvingIds.has(id)) {
+            return;
+        }
+        resolvingIds.add(id);
+        try {
+            await doResolveViolation(id);
+        } finally {
+            resolvingIds.delete(id);
+        }
+    }
+
+    async function doResolveViolation(id) {
         const confirmed = await Utils.confirmDestructiveAction({
             title: cvT('Mark as fixed'),
             message: cvT('Confirm that this violation has been reviewed and corrected.'),
@@ -284,6 +351,7 @@
                 if (data.success) {
                     Messaging.showSuccess?.(cvT('Violation marked as fixed.'));
                     Messaging.announcePolite?.(cvT('Violation marked as fixed.'));
+                    adjustComplianceTiles(1);
                     loadViolations();
                 } else {
                     Messaging.showError?.(data.error || cvT('Could not update violation.'));
@@ -304,6 +372,9 @@
             resolveViolation: resolveViolation,
             formatViolationDate: formatViolationDate,
             getFilterUserId: getFilterUserId,
+            buildViolationParams: buildViolationParams,
+            adjustComplianceTiles: adjustComplianceTiles,
+            loadViolations: loadViolations,
         };
     }
 

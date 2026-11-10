@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use OCA\ArbeitszeitCheck\Service\IconCatalog;
+use OCA\ArbeitszeitCheck\Support\ViolationLabels;
 
 /**
  * Compliance violations template for arbeitszeitcheck app
@@ -74,6 +75,15 @@ $colCount = $canSeeScope ? 6 : 5;
                         <input type="text" id="end-date" class="form-input datepicker-input" placeholder="<?php p($l->t('dd.mm.yyyy')); ?>" pattern="\d{2}\.\d{2}\.\d{4}" maxlength="10" aria-label="<?php p($l->t('End date for filter')); ?>">
                     </div>
                     <div class="compliance-violations__filter-field">
+                        <label for="type-filter" class="compliance-violations__filter-label"><?php p($l->t('Problem Type')); ?></label>
+                        <select id="type-filter" class="form-select" aria-label="<?php p($l->t('Filter by problem type')); ?>">
+                            <option value=""><?php p($l->t('All Types')); ?></option>
+                            <?php foreach ((array)($_['violationTypeOptions'] ?? []) as $typeOptionKey => $typeOptionLabel): ?>
+                                <option value="<?php p((string)$typeOptionKey); ?>"><?php p($typeOptionLabel); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="compliance-violations__filter-field">
                         <label for="severity-filter" class="compliance-violations__filter-label"><?php p($l->t('Severity')); ?></label>
                         <select id="severity-filter" class="form-select" aria-label="<?php p($l->t('Filter by severity')); ?>">
                             <option value=""><?php p($l->t('All Severities')); ?></option>
@@ -119,31 +129,10 @@ $colCount = $canSeeScope ? 6 : 5;
                             <?php foreach (($violations ?? []) as $violation): ?>
                                 <?php
                                 $typeKey = $violation['type'] ?? '';
-                                $typeLabel = match ($typeKey) {
-                                    'missing_break' => $l->t('Missing break'),
-                                    'excessive_working_hours' => $l->t('Excessive working hours'),
-                                    'insufficient_rest_period' => $l->t('Insufficient rest period'),
-                                    'daily_hours_limit_exceeded' => $l->t('Daily hours limit exceeded'),
-                                    'weekly_hours_limit_exceeded' => $l->t('Weekly hours limit exceeded'),
-                                    'weekly_absolute_hours_exceeded' => $l->t('Absolute weekly hours maximum exceeded'),
-                                    'night_work' => $l->t('Night work'),
-                                    'sunday_work' => $l->t('Sunday work'),
-                                    'holiday_work' => $l->t('Holiday work'),
-                                    'missing_presence' => $l->t('Required presence not covered'),
-                                    default => $typeKey,
-                                };
+                                $typeLabel = ViolationLabels::type($l, (string)$typeKey);
                                 $severityKey = $violation['severity'] ?? '';
-                                $severityLabel = match ($severityKey) {
-                                    'error' => $l->t('High'),
-                                    'warning' => $l->t('Medium'),
-                                    'info' => $l->t('Low'),
-                                    default => $severityKey,
-                                };
-                                $severityBadge = match ($severityKey) {
-                                    'error' => 'error',
-                                    'warning' => 'warning',
-                                    default => 'primary',
-                                };
+                                $severityLabel = ViolationLabels::severity($l, (string)$severityKey);
+                                $severityBadge = ViolationLabels::severityBadge((string)$severityKey);
                                 ?>
                                 <tr>
                                     <?php if ($canSeeScope): ?>
@@ -186,6 +175,7 @@ $complianceViolationsL10n = [
 	'Error loading violations' => $l->t('Error loading violations'),
 	'Failed to load violations. Please try again.' => $l->t('Failed to load violations. Please try again.'),
 	'No violations found' => $l->t('No violations found'),
+	'Violations list updated' => $l->t('Violations list updated'),
 	'Employee' => $l->t('Employee'),
 	'Type at least 2 characters to search.' => $l->t('Type at least 2 characters to search.'),
 	'Employee search failed.' => $l->t('Employee search failed.'),

@@ -6359,8 +6359,8 @@
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "”Placering” lägger automatiska raster inom fönstret. ”Obligatorisk” betyder att rasten måste överlappa fönstret med angivna minuter.",
 	"…" : "…",
 	"Transfer configuration" : "Överför konfiguration",
-	"Transfer" : "Överföring",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportera alla inställningar och data som en krypterad fil — läs sedan in den på din produktionsinstans. Granska förhandsvisningen innan du bekräftar."
+	"Transfer" : "Överför",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportera alla inställningar och data som en krypterad fil och importera den till din produktionsmiljö. Granska förhandsvisningen innan du bekräftar."
 	}
 );
 }});})();

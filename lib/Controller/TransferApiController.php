@@ -31,6 +31,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\BackgroundJob\IJobList;
@@ -56,7 +57,10 @@ class TransferApiController extends Controller
 		parent::__construct($appName, $request);
 	}
 
+	// Read-only job/receipt state polled by the settings page — a session GET
+	// without requesttoken must not bounce on CSRF (api_get_missing_nocsrf).
 	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function status(): DataResponse
 	{
 		return $this->guard(function (): array {
@@ -135,6 +139,10 @@ class TransferApiController extends Controller
 				}
 				$replaceConfirmed = true;
 			}
+			// Refuse before queueing: a job killed by an env gate dies before
+			// the first job-state/receipt write and would leave the status
+			// surface showing a stale previous run. applyPayload re-checks.
+			$this->transfer->assertModeRunnable($mode);
 			$this->jobList->add(TransferApplyJob::class, [
 				'pendingId' => $pendingId,
 				'actor' => $user,

@@ -6359,8 +6359,8 @@
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "„Plaatsing” plaatst automatische pauzes binnen het venster. „Vereist” betekent dat de pauze het venster met het aangegeven aantal minuten moet overlappen.",
 	"…" : "…",
 	"Transfer configuration" : "Configuratie overdragen",
-	"Transfer" : "Overdracht",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporteer alle instellingen en gegevens als één versleuteld bestand — en importeer het op uw productie-instantie. Controleer het voorbeeld voordat u bevestigt."
+	"Transfer" : "Overdragen",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporteer alle instellingen en gegevens als één versleuteld bestand en importeer het op uw productie-instantie. Controleer het voorbeeld voordat u bevestigt."
 	}
 );
 }});})();

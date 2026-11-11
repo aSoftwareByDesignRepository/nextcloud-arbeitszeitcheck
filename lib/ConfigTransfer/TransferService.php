@@ -314,9 +314,7 @@ final class TransferService
 			if (!$replaceConfirmed) {
 				throw new TransferException('TRANSFER_CONFIRM_REQUIRED');
 			}
-			if (!$this->config->getSystemValueBool('maintenance')) {
-				throw new TransferException('TRANSFER_MAINTENANCE_REQUIRED');
-			}
+			$this->assertModeRunnable($mode);
 		}
 
 		// ── exclusive mutex — one transfer at a time, whoever runs it ──
@@ -1471,6 +1469,21 @@ final class TransferService
 		$mode = (string)($record['mode'] ?? self::MODE_MERGE);
 		$this->assertMode($mode);
 		return $mode;
+	}
+
+	/**
+	 * Environment gate for a mode — currently: replace requires maintenance
+	 * mode. Checked at queue time (controller) AND re-checked inside
+	 * applyPayload (the job runs later — the flag may have flipped between
+	 * the two). Failing early at queue time keeps the refusal honest: a job
+	 * refused here dies before any job-state/receipt write, which would
+	 * otherwise leave the status surface showing a stale previous run.
+	 */
+	public function assertModeRunnable(string $mode): void
+	{
+		if ($mode === self::MODE_REPLACE && !$this->config->getSystemValueBool('maintenance')) {
+			throw new TransferException('TRANSFER_MAINTENANCE_REQUIRED');
+		}
 	}
 
 	/**

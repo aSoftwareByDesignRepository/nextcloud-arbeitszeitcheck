@@ -1876,7 +1876,7 @@
 	"Enable time-account credit postings?" : "Aktivér kreditbogføringer på tidskontoen?",
 	"Enable work-location catalog" : "Aktivér arbejdsstedskatalog",
 	"Enabled" : "Aktiveret",
-	"Encryption passphrase" : "Encryption adgangssætning",
+	"Encryption passphrase" : "Krypteringsadgangssætning",
 	"End" : "Slut",
 	"End Break" : "Afslut pause",
 	"End Break or Clock Out" : "Afslut pause eller Stem ud",
@@ -3264,7 +3264,7 @@
 	"Number of working time rule violations that need attention" : "Antal overtrædelser af arbejdstidsreglerne, der kræver opmærksomhed",
 	"Number of years to keep time tracking data before automatic deletion (typically at least 2 years)." : "Antal år til at holde tid til at spore data før automatisk sletning (typisk mindst 2 år).",
 	"OK" : "OK",
-	"OK — a longer passphrase is safer." : "OK — a longer adgangssætning is safer.",
+	"OK — a longer passphrase is safer." : "OK — en længere adgangssætning er sikrere.",
 	"Oberösterreich" : "Kanton Oberösterreich",
 	"Obwalden" : "Kanton Obwalden",
 	"Occurred: %s" : "Registreret: %s",
@@ -3593,7 +3593,7 @@
 	"Passenger time" : "Passagertid",
 	"Passenger time is legally free" : "Passagertid er juridisk fri",
 	"Passphrase generated and copied." : "Adgangssætning genereret og kopieret.",
-	"Passphrase generated — copy it now." : "Adgangssætning generated — copy it now.",
+	"Passphrase generated — copy it now." : "Adgangssætning genereret — kopiér den nu.",
 	"Passwords, tokens and salts stay on this instance — the file is encrypted and still does not carry them. It does contain user and group names: handle it like personal data." : "Adgangskoder, tokens og salts bliver på denne instans — filen er krypteret og indeholder dem alligevel ikke. Den indeholder bruger- og gruppenavne: håndtér den som persondata.",
 	"Past Only" : "Kun tidligere",
 	"Past absences are allowed" : "Tidligere fravær er tilladt",
@@ -6359,8 +6359,8 @@
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "»Placering« placerer automatiske pauser inde i vinduet. »Påkrævet« betyder, at pausen skal overlappe vinduet med det angivne antal minutter.",
 	"…" : "…",
 	"Transfer configuration" : "Overfør konfiguration",
-	"Transfer" : "Overførsel",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksportér alle indstillinger og data som én krypteret fil — og importér den på din produktionsinstans. Gennemse forhåndsvisningen, før du bekræfter."
+	"Transfer" : "Overfør",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksportér alle indstillinger og data som én krypteret fil, og importér den på din produktionsinstans. Gennemse forhåndsvisningen, før du bekræfter."
 	}
 );
 }});})();

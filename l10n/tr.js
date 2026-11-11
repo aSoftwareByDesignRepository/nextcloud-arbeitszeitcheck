@@ -6358,9 +6358,9 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "“Akış URL'si oluştur” bir kapsam için ilk bağlantıyı oluşturur. “İptal et ve döndür” mevcut bir bağlantıyı değiştirir — eski URL hemen çalışmayı durdurur.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "“Yerleşim” otomatik molaları pencere içine yerleştirir. “Zorunlu”, molanın verilen dakikalar boyunca pencereyle çakışması gerektiği anlamına gelir.",
 	"…" : "…",
-	"Transfer configuration" : "Yapılandırmayı aktar",
-	"Transfer" : "Aktarma",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Tüm ayarları ve verileri tek şifreli dosya olarak dışa aktarın — ardından üretim ortamınıza içe aktarın. Onaylamadan önce önizlemeyi inceleyin."
+	"Transfer configuration" : "Yapılandırma aktarımı",
+	"Transfer" : "Aktar",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Tüm ayarları ve verileri tek bir şifreli dosya olarak dışa aktarın ve üretim ortamınıza içe aktarın. Onaylamadan önce önizlemeyi gözden geçirin."
 	}
 );
 }});})();

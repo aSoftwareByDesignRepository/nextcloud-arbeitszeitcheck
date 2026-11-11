@@ -6358,9 +6358,9 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generer feed-URL» oppretter den første lenken for et omfang. «Tilbakekall og roter» erstatter en eksisterende lenke — den gamle URL-en slutter å fungere umiddelbart.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "«Plassering» legger automatiske pauser inne i vinduet. «Påkrevd» betyr at pausen må overlappe vinduet med det angitte antallet minutter.",
 	"…" : "…",
-	"Transfer configuration" : "Overfør konfigurasjon",
+	"Transfer configuration" : "Overføring av konfigurasjon",
 	"Transfer" : "Overføring",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksporter alle innstillinger og data som én kryptert fil — les den deretter inn på produksjonsinstansen. Se gjennom forhåndsvisningen før du bekrefter."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksporter alle innstillinger og data som én kryptert fil, og importer den på produksjonsinstansen din. Se gjennom forhåndsvisningen før du bekrefter."
 	}
 );
 }});})();

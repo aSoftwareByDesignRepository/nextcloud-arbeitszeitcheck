@@ -31,6 +31,7 @@
 		const fallback = t('Something went wrong. Please try again.');
 		const map = {
 			TRANSFER_CANNOT_READ_FILE: t('Cannot read this file — wrong passphrase, wrong app, or a damaged file.'),
+			TRANSFER_FILE_INVALID: t('Cannot read this file — wrong passphrase, wrong app, or a damaged file.'),
 			TRANSFER_NEWER_VERSION: t('This file was exported from a newer app version. Update this app first.'),
 			TRANSFER_IN_PROGRESS: t('A transfer started by %s is already running.', [(e.context && e.context.actor) || '?']),
 			TRANSFER_MAINTENANCE_REQUIRED: t('Replace needs maintenance mode: occ maintenance:mode --on'),
@@ -43,11 +44,12 @@
 			RATE_LIMITED: t('Too many attempts — wait a minute and try again.'),
 			TRANSFER_THROTTLED: t('Too many attempts — wait a minute and try again.'),
 			NOT_FOUND: t('You do not have the rights for this action.'),
-			TRANSFER_CANNOT_READ_FILE: t('Cannot read this file — wrong passphrase, wrong app, or a damaged file.'),
 			NETWORK_ERROR: t('Network problem — check your connection and try again.'),
 			SERVER_ERROR: fallback,
 		};
-		return map[code] || (code === 'SERVER_ERROR' ? fallback : code);
+		// Unmapped codes still get the translated fallback — never render a
+		// raw UPPER_SNAKE code to the user.
+		return map[code] || fallback;
 	}
 
 	// ── export ──────────────────────────────────────────────────────────
@@ -180,6 +182,16 @@
 		return det;
 	}
 
+	function armEscape(dlg) {
+		// NC notification handlers can preventDefault the global Escape
+		// keydown, suppressing the native <dialog> cancel event — a dialog
+		// opened via showModal() would then ignore Escape entirely. Bind a
+		// dialog-level close ourselves (host_app_escape_preventdefault).
+		if (dlg) dlg.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dlg.close(); }
+		});
+	}
+
 	function showReport(r) {
 		const dlg = $('transfer-report');
 		const verdict = $('transfer-report-verdict');
@@ -195,6 +207,12 @@
 			verdict.className = P + '-transfer-report__verdict';
 		}
 		file.textContent = t('Exported from %1$s at %2$s', [(r.file && r.file.source_instance) || '?', (r.file && r.file.exported_at) || '?']);
+		if ((c.rowsSkipped || 0) > 0 || (c.refsUnresolved || 0) > 0) {
+			const skipped = document.createElement('p');
+			skipped.className = P + '-callout ' + P + '-callout--warning';
+			skipped.textContent = t('%d row(s) skipped and %d reference(s) unresolved — see the groups below.', [c.rowsSkipped || 0, c.refsUnresolved || 0]);
+			groups.appendChild(skipped);
+		}
 
 		(r.warnings || []).forEach((w) => {
 			const p = document.createElement('p');
@@ -212,7 +230,12 @@
 		if ((r.envBound || []).length) groups.appendChild(group(t('Instance-bound columns left empty'), r.envBound, (e) => e.table + '.' + e.column + ' — ' + t('%d row(s) need a value on this instance', [e.rows || 0])));
 		const tableRows = Object.keys(r.tables || {}).map((k) => [k, r.tables[k]]);
 		if (tableRows.length) groups.appendChild(group(t('Data changes'), tableRows, ([k, v]) =>
-			k + ': +' + (v.insert || 0) + ' ~' + (v.update || 0) + ' −' + (v.delete || 0) + ' ✕' + (v.skip || 0) + (v.filtered ? ' ' + t('(%d filtered)', [v.filtered]) : '') + (v.skipped ? ' (' + (v.skipReason || '') + ')' : '')));
+			k + ': +' + (v.insert || 0) + ' ~' + (v.update || 0) + ' −' + (v.delete || 0) + ' ✕' + (v.skip || 0)
+				+ (v.filtered ? ' ' + t('(%d filtered)', [v.filtered]) : '')
+				+ (v.unresolved ? ' ' + t('(%d unresolved ref)', [v.unresolved]) : '')
+				+ (v.envDropped ? ' ' + t('(%d env-bound value(s) emptied)', [v.envDropped]) : '')
+				+ (v.secretsRedacted ? ' ' + t('(%d secret(s) redacted)', [v.secretsRedacted]) : '')
+				+ (v.skipped ? ' (' + (v.skipReason || '') + ')' : '')));
 		if ((r.tablesUnknown || []).length) groups.appendChild(group(t('Unknown tables skipped'), r.tablesUnknown, (x) => x));
 		const cc = r.config || {};
 		const cfgItems = []
@@ -283,7 +306,7 @@
 				const job = s.job || {};
 				bar.value = job.percent || 0;
 				const phase = PHASES[job.phase] || job.phase || '';
-				text.textContent = phase ? t('Phase: %s', [phase]) : t('Waiting for the job…');
+				text.textContent = phase ? t('Phase: %s', [t(phase)]) : t('Waiting for the job…');
 				if (job.status === 'done' || job.status === 'failed') {
 					clearInterval(pollTimer); pollTimer = null;
 					dlg.close();
@@ -307,5 +330,7 @@
 		if (!$('transfer-export-card')) return;
 		initExport();
 		initImport();
+		armEscape($('transfer-report'));
+		armEscape($('transfer-progress'));
 	});
 })();

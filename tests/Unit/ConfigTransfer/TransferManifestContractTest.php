@@ -19,7 +19,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\ConfigTransfer;
 
 use OCA\ArbeitszeitCheck\ConfigTransfer\AbstractTransferManifest;
 use OCA\ArbeitszeitCheck\ConfigTransfer\TransferManifest;
-use Test\TestCase;
+use PHPUnit\Framework\TestCase;
 
 final class TransferManifestContractTest extends TestCase
 {

@@ -10,7 +10,7 @@
 .azc-form-row input[type="password"],
 .azc-form-row input[type="text"] {
 	padding: 8px 12px;
-	border: 1px solid var(--color-border, #c8c8c8);
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast, #767676));
 	border-radius: var(--azc-radius-md, 8px);
 	background: var(--color-main-background, #fff);
 	color: var(--color-main-text, #222);
@@ -44,7 +44,7 @@
 .azc-file-input {
 	min-height: 44px;
 	padding: var(--azc-space-2, 8px);
-	border: 1px dashed var(--color-border, #c8c8c8);
+	border: 1px dashed var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border, #c8c8c8)));
 	border-radius: var(--azc-radius-md, 8px);
 	width: 100%;
 	box-sizing: border-box;

@@ -6361,7 +6361,6 @@
 	"Transfer configuration" : "Transfer configuration",
 	"Transfer" : "Transfer",
 	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming."
-
 	}
 );
 }});})();

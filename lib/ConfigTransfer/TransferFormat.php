@@ -90,7 +90,14 @@ final class TransferFormat
 		if ($bytes === '' || strlen($bytes) > self::MAX_FILE_BYTES) {
 			throw new TransferException('TRANSFER_FILE_TOO_LARGE');
 		}
-		$envelope = json_decode($bytes, true, 8, JSON_THROW_ON_ERROR);
+		try {
+			$envelope = json_decode($bytes, true, 8, JSON_THROW_ON_ERROR);
+		} catch (\JsonException $e) {
+			// Non-JSON bytes are just another unreadable file — they must
+			// collapse into the same file-error class as a wrong passphrase
+			// (uniform pre-decrypt wording, no parseability oracle).
+			throw new TransferException('TRANSFER_FILE_INVALID', [], $e);
+		}
 		if (!is_array($envelope) || array_is_list($envelope)) {
 			throw new TransferException('TRANSFER_FILE_INVALID');
 		}

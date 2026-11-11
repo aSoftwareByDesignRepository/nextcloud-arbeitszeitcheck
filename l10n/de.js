@@ -6359,8 +6359,8 @@
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "„Platzierung“ legt automatische Pausen ins Fenster. „Erforderlich“ heißt: Die Pause muss das Fenster um die angegebenen Minuten überlappen.",
 	"…" : "…",
 	"Transfer configuration" : "Konfiguration übertragen",
-	"Transfer" : "Transfer",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportieren Sie alle Einstellungen und Daten als eine verschlüsselte Datei und importieren Sie sie auf Ihrer Produktivinstanz. Prüfen Sie die Vorschau, bevor Sie bestätigen."
+	"Transfer" : "Übertragen",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Alle Einstellungen und Daten als eine verschlüsselte Datei exportieren und auf Ihrer Produktiv-Instanz importieren. Prüfen Sie die Vorschau vor der Bestätigung."
 	}
 );
 }});})();

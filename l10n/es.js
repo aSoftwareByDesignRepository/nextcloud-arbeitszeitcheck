@@ -6358,9 +6358,9 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generar URL del feed» crea el primer enlace de un ámbito. «Revocar y renovar» sustituye un enlace existente — la URL antigua deja de funcionar al instante.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "«Ubicación» coloca las pausas automáticas dentro de la franja. «Obligatorio» significa que la pausa debe solaparse con la franja en los minutos indicados.",
 	"…" : "…",
-	"Transfer configuration" : "Transferir configuración",
+	"Transfer configuration" : "Transferencia de configuración",
 	"Transfer" : "Transferencia",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporte todos los ajustes y datos en un único archivo cifrado e impórtelo en su instancia de producción. Revise la vista previa antes de confirmar."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporte todos los ajustes y datos como un solo archivo cifrado e impórtelo en su instancia de producción. Revise la vista previa antes de confirmar."
 	}
 );
 }});})();

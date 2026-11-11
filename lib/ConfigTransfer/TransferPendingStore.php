@@ -22,6 +22,7 @@ use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IConfig;
+use Psr\Log\LoggerInterface;
 
 final class TransferPendingStore
 {
@@ -33,6 +34,7 @@ final class TransferPendingStore
 		private IRootFolder $rootFolder,
 		private IConfig $config,
 		private string $appId,
+		private readonly ?LoggerInterface $logger = null,
 	) {
 	}
 
@@ -90,8 +92,12 @@ final class TransferPendingStore
 		try {
 			$this->assertId($id);
 			$this->pendingRoot()->get($id)->delete();
-		} catch (\Throwable) {
-			// best-effort cleanup — an absent/expired blob is the goal state.
+		} catch (\Throwable $e) {
+			// best-effort cleanup — an absent/expired blob is the goal state,
+			// but a real storage failure must not vanish silently.
+			$this->logger?->warning('config transfer pending blob delete failed', [
+				'app' => $this->appId, 'exception' => $e,
+			]);
 		}
 	}
 
@@ -104,7 +110,10 @@ final class TransferPendingStore
 		$removed = 0;
 		try {
 			$root = $this->pendingRoot();
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
+			$this->logger?->warning('config transfer pending sweep cannot open store', [
+				'app' => $this->appId, 'exception' => $e,
+			]);
 			return 0;
 		}
 		foreach ($root->getDirectoryListing() as $node) {
@@ -119,8 +128,12 @@ final class TransferPendingStore
 				try {
 					$node->delete();
 					$removed++;
-				} catch (\Throwable) {
-					// continue sweeping others
+				} catch (\Throwable $e) {
+					// cleanup only, non-fatal — a stranded expired blob is
+					// retried by the next sweep; log so it stays observable.
+					$this->logger?->warning('config transfer pending sweep delete failed', [
+						'app' => $this->appId, 'exception' => $e,
+					]);
 				}
 			}
 		}

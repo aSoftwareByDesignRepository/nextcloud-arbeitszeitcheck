@@ -496,6 +496,7 @@ gyldige
 halvdags
 halvdagsferie
 halvdagshelligdag
+halvdagsregistreringer
 halvdelen
 halve
 halvfemsindstyvende

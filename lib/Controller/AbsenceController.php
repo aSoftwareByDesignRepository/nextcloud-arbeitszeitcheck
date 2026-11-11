@@ -265,6 +265,11 @@ class AbsenceController extends Controller
 		if (\in_array($mode, ['create', 'edit'], true)) {
 			$pageData['dismissedHints'] = $this->dismissedHintIds($userId);
 		}
+		if (!isset($pageData['halfDayEnabledTypes'])) {
+			$enabled = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+			$pageData['halfDayEnabledTypes'] = $enabled;
+			$pageData['halfDayCreditTypes'] = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($enabled);
+		}
 
 		return \array_merge($this->buildAbsencesShellParams($mode, $navFlags), $pageData);
 	}

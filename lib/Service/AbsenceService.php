@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IDBConnection;
@@ -259,7 +260,13 @@ class AbsenceService
 				$absence->setDays($workingDays);
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
 			} else {
-				$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
+				$workingDays = $this->resolveNonVacationDaysDebit(
+					$userId,
+					$data['type'],
+					$absence->getStartDate(),
+					$absence->getEndDate(),
+					$data
+				);
 				$absence->setDays($workingDays);
 			}
 			$specialAmount = null;
@@ -438,7 +445,13 @@ class AbsenceService
 					$absence->getEndDate(),
 					$data
 				)
-				: $this->computeWorkingDaysForUser($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+				: $this->resolveNonVacationDaysDebit(
+					$targetUserId,
+					$absence->getType(),
+					$absence->getStartDate(),
+					$absence->getEndDate(),
+					$data
+				);
 			$absence->setDays($workingDays);
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
@@ -631,6 +644,11 @@ class AbsenceService
 		} elseif ($absence->getDurationHours() !== null) {
 			$validateData['duration_hours'] = $absence->getDurationHours();
 		}
+		// $fractionTrusted marks a server-REderived day_fraction (stored debit
+		// preservation): it bypasses the org opt-in gate — the flag gates new
+		// entry UI, not historical truth — but keeps normalize/range/integrity
+		// checks. An explicit client day_fraction is never trusted.
+		$fractionTrusted = false;
 		if (array_key_exists('day_fraction', $data)) {
 			$validateData['day_fraction'] = $data['day_fraction'];
 		} elseif (
@@ -656,17 +674,52 @@ class AbsenceService
 				&& abs($storedDays - 0.5) <= 0.011
 			) {
 				$validateData['day_fraction'] = '0.5';
+				$fractionTrusted = true;
+			}
+		} elseif (
+			$absence->getType() !== Absence::TYPE_VACATION
+			&& $absence->getDays() !== null
+			&& $originalStart !== null
+			&& $originalEnd !== null
+			&& $originalStart->format('Y-m-d') === $originalEnd->format('Y-m-d')
+			&& $startDate->format('Y-m-d') === $endDate->format('Y-m-d')
+		) {
+			// Non-vacation trusted preservation (AZC-HALF-DAY-NON-VACATION):
+			// derive the stored fraction relative to the ORIGINAL single-day
+			// weight — never a literal days≈0.5 test, which would both miss
+			// 0.25-stored halves (weight-0.5 days) and misread a full-day
+			// 0.5-weight debit as a half. A fraction only exists on
+			// single-day rows; widening to a multi-day range intentionally
+			// recomputes to full schedule weight.
+			$storedDays = (float)$absence->getDays();
+			$oldWeight = $this->computeWorkingDaysForUser($userId, $originalStart, $originalStart);
+			if ($oldWeight > 0.011) {
+				$storedFraction = $storedDays / $oldWeight;
+				if (abs($storedFraction - 0.5) <= 0.011) {
+					$validateData['day_fraction'] = '0.5';
+					$fractionTrusted = true;
+				}
 			}
 		}
-		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), ['existing_type' => $absence->getType()]);
+		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), [
+			'existing_type' => $absence->getType(),
+			'trusted_day_fraction' => $fractionTrusted,
+		]);
 
 		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
 		if ($absence->getType() === Absence::TYPE_VACATION) {
-			$workingDays = $this->resolveVacationDaysDebit($userId, $absence->getStartDate(), $absence->getEndDate(), $validateData);
+			$workingDays = $this->resolveVacationDaysDebit($userId, $absence->getStartDate(), $absence->getEndDate(), $validateData, $fractionTrusted);
 			$absence->setDays($workingDays);
 			$this->applyVacationDurationHours($absence, $validateData, $workingDays);
 		} else {
-			$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
+			$workingDays = $this->resolveNonVacationDaysDebit(
+				$userId,
+				$absence->getType(),
+				$absence->getStartDate(),
+				$absence->getEndDate(),
+				$validateData,
+				$fractionTrusted
+			);
 			$absence->setDays($workingDays);
 		}
 		$absence->setUpdatedAt(new \DateTime());
@@ -2474,7 +2527,13 @@ class AbsenceService
 				);
 			} else {
 				// Days mode: resolve half/full debit before allocation gate (ADR-05).
-				$prospectiveDays = $this->resolveVacationDaysDebit($userId, $startDate, $endDate, $data);
+				$prospectiveDays = $this->resolveVacationDaysDebit(
+					$userId,
+					$startDate,
+					$endDate,
+					$data,
+					($options['trusted_day_fraction'] ?? false) === true
+				);
 			}
 			// Hours mode: schedule-/holiday-aware debit is authoritative (Sat work models
 			// can have net hours while Mon–Fri “working days” is 0).
@@ -2816,7 +2875,7 @@ class AbsenceService
 	 * @param mixed $raw
 	 * @throws BusinessRuleException
 	 */
-	private function normalizeDayFraction(mixed $raw): float
+	private function normalizeDayFraction(mixed $raw, string $invalidCode = Constants::VAC_HALF_DAY_INVALID): float
 	{
 		if ($raw === null || $raw === '' || (is_array($raw) && $raw === [])) {
 			return 1.0;
@@ -2827,7 +2886,7 @@ class AbsenceService
 		if (is_bool($raw) || is_object($raw)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		$s = trim((string)$raw);
@@ -2838,14 +2897,14 @@ class AbsenceService
 		if (!preg_match('/^\d+(\.\d+)?$/', $s)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		$v = (float)$s;
 		if (!is_finite($v)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		// Strict membership on the parsed float (rejects 0.5000001 / 0.25).
@@ -2857,8 +2916,106 @@ class AbsenceService
 		}
 		throw new BusinessRuleException(
 			$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-			Constants::VAC_HALF_DAY_INVALID
+			$invalidCode
 		);
+	}
+
+	/**
+	 * Conversion day carry (AZC-HALF-DAY-NON-VACATION / US-005): when the
+	 * source row stores a fraction debit on a single day — e.g. a 0.5
+	 * vacation — the converted sick row keeps `weight × storedFraction`
+	 * regardless of whether sick leave is currently half-day enabled. The
+	 * opt-in flag gates new entry UI, never historical truth. Multi-day or
+	 * full-weight sources carry nothing.
+	 */
+	private function daysWithCarriedFraction(
+		Absence $source,
+		string $userId,
+		\DateTime $targetStart,
+		\DateTime $targetEnd,
+	): float {
+		$targetWeight = $this->computeWorkingDaysForUser($userId, $targetStart, $targetEnd);
+		$srcDays = $source->getDays();
+		$srcStart = $source->getStartDate();
+		$srcEnd = $source->getEndDate();
+		if ($srcDays === null
+			|| $srcStart === null
+			|| $srcEnd === null
+			|| $srcStart->format('Y-m-d') !== $srcEnd->format('Y-m-d')) {
+			return $targetWeight;
+		}
+		$srcWeight = $this->computeWorkingDaysForUser($userId, $srcStart, $srcStart);
+		if (!is_finite($srcWeight) || $srcWeight <= 0.011) {
+			return $targetWeight;
+		}
+		$fraction = min(1.0, (float)$srcDays / $srcWeight);
+		if ($fraction >= 1.0 - 0.011) {
+			return $targetWeight;
+		}
+		return round($targetWeight * $fraction, 4);
+	}
+
+	/**
+	 * Org allowlist for opt-in half-day types (AZC-HALF-DAY-NON-VACATION).
+	 * Fail-closed parse — see {@see HalfDayTypePolicy::enabledTypesFromRaw()}.
+	 *
+	 * @return list<string>
+	 */
+	private function halfDayEnabledTypes(): array
+	{
+		return HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+	}
+
+	/**
+	 * EC-14: a days-unit entitlement binding owns its fraction contract via
+	 * the entitlement ledger ({0.25,0.5,0.75,1}); the generic opt-in gate
+	 * must never run for such a type, and `days` stays full schedule weight.
+	 */
+	private function isEntitlementDaysBoundType(string $type): bool
+	{
+		return $this->specialEntitlementService?->hasActiveDaysUnitBindingForAbsenceType($type) === true;
+	}
+
+	/**
+	 * Days debit for every non-vacation type (AZC-HALF-DAY-NON-VACATION).
+	 *
+	 * Pipeline: scrub happened upstream → entitlement-bound types return
+	 * full weight → normalize day_fraction (1.0|0.5 only) → enabled gate →
+	 * single-day guard → days = schedule/workday weight × fraction.
+	 *
+	 * @param array<string, mixed> $data
+	 * @throws BusinessRuleException|\Exception
+	 */
+	private function resolveNonVacationDaysDebit(
+		string $userId,
+		string $type,
+		\DateTime $start,
+		\DateTime $end,
+		array $data,
+		bool $fractionTrusted = false,
+	): float {
+		$w = $this->computeWorkingDaysForUser($userId, $start, $end);
+		if ($this->isEntitlementDaysBoundType($type)) {
+			return $w;
+		}
+		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null, Constants::HALF_DAY_INVALID);
+		if (abs($fraction - 0.5) < 1e-9) {
+			if (!$fractionTrusted
+				&& !HalfDayTypePolicy::isEnabledForType($type, $this->halfDayEnabledTypes())) {
+				throw new BusinessRuleException(
+					$this->l10n->t('Half-day entries are not enabled for this absence type.'),
+					Constants::HALF_DAY_TYPE_NOT_ENABLED
+				);
+			}
+			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
+				throw new BusinessRuleException(
+					$this->l10n->t('A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
+					Constants::HALF_DAY_RANGE_FORBIDDEN
+				);
+			}
+			return $w * 0.5;
+		}
+		return $w;
 	}
 
 	/**
@@ -2874,6 +3031,7 @@ class AbsenceService
 		\DateTime $start,
 		\DateTime $end,
 		array $data,
+		bool $fractionTrusted = false,
 	): float {
 		$w = $this->computeWorkingDaysForUser($userId, $start, $end);
 
@@ -2883,6 +3041,16 @@ class AbsenceService
 		}
 
 		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null);
+
+		if (abs($fraction - 0.5) < 1e-9
+			&& !$fractionTrusted
+			&& !$this->isEntitlementDaysBoundType(Absence::TYPE_VACATION)
+			&& !HalfDayTypePolicy::isEnabledForType(Absence::TYPE_VACATION, $this->halfDayEnabledTypes())) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Half-day entries are not enabled for this absence type.'),
+				Constants::HALF_DAY_TYPE_NOT_ENABLED
+			);
+		}
 
 		if (abs($fraction - 0.5) < 1e-9) {
 			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
@@ -3140,7 +3308,7 @@ class AbsenceService
 				$sick->setStartDate($sickStart);
 				$sick->setEndDate($sickEnd);
 				$sick->setReason($reason !== '' ? $reason : null);
-				$sick->setDays($this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd));
+				$sick->setDays($this->daysWithCarriedFraction($absence, $ownerUserId, $sickStart, $sickEnd));
 				$now = $this->nowInStorage();
 				if ($managerFlow) {
 					$sick->setStatus(Absence::STATUS_APPROVED);
@@ -3355,7 +3523,7 @@ class AbsenceService
 					'start' => $sickStart->format('Y-m-d'),
 					'end' => $sickEnd->format('Y-m-d'),
 					'status' => $managerFlow ? 'approved' : 'pending',
-					'days' => $this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd),
+					'days' => $this->daysWithCarriedFraction($absence, $ownerUserId, $sickStart, $sickEnd),
 				],
 				'tail' => $tailStart !== null ? [
 					'start' => $tailStart->format('Y-m-d'),

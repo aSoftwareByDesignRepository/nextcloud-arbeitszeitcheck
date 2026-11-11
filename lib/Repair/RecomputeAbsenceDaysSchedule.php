@@ -97,11 +97,6 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 		if ($start === null || $end === null) {
 			return false;
 		}
-		// Half-day fraction debits are fixed by day_fraction, not by the
-		// calendar weight — never re-evaluate them (FM-02).
-		if ($stored !== null && abs((float)$stored - 0.5) < 0.011) {
-			return false;
-		}
 		$userId = $absence->getUserId();
 		try {
 			$this->monthClosureService->assertDateRangeMutable($userId, $start, $end);
@@ -117,8 +112,27 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 		if ($computed <= 0.0001) {
 			return false;
 		}
-		if ($stored !== null && abs($computed - (float)$stored) < 0.011) {
-			return false;
+		if ($stored !== null) {
+			// Fraction debits (day_fraction) are request input, not calendar
+			// weight — never re-inflate them (FM-02, generalized: ratio, not
+			// a literal days≈0.5 test which missed every non-unit weight).
+			// Fractions only exist on single-day rows and only ever carry a
+			// ratio in the write-path contract {0.25, 0.5, 0.75} (generic
+			// half-day + entitlement-bound quarters) — any OTHER under-stored
+			// ratio is corruption the repair must still fix, and a multi-day
+			// under-stored row is legit schedule expansion, not a fraction.
+			$singleDay = $start->format('Y-m-d') === $end->format('Y-m-d');
+			if ($singleDay && (float)$stored < $computed - 0.011) {
+				$ratio = (float)$stored / $computed;
+				foreach ([0.25, 0.5, 0.75] as $knownFraction) {
+					if (abs($ratio - $knownFraction) < 0.02) {
+						return false;
+					}
+				}
+			}
+			if (abs($computed - (float)$stored) < 0.011) {
+				return false;
+			}
 		}
 
 		// FM-04: user-mutation lock + CAS-light re-read — a live mutation

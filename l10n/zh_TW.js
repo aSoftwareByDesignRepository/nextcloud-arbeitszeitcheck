@@ -6360,7 +6360,16 @@
 	"…" : "…",
 	"Transfer configuration" : "傳輸配置",
 	"Transfer" : "傳輸",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "將所有設定和資料匯出為一個加密檔案——然後在生產執行個體上匯入。確認前請檢查預覽。"
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "將所有設定和資料匯出為一個加密檔案——然後在生產執行個體上匯入。確認前請檢查預覽。",
+	"Absences: Half-day entries" : "請假：半天記錄",
+	"For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed." : "對於所選的請假類型，員工和管理員還可以記錄半天（儲存的天數值為當天權重乘以 0.5）。補休、育兒假以及繫結特別額度的類型保留各自規則，不在列表中顯示。",
+	"This request uses 0.5 day." : "此申請使用 0.5 天。",
+	"This request uses 1 day." : "此申請使用 1 天。",
+	"This request uses 0.5 day and credits half of the planned working time for that day." : "此申請使用 0.5 天，並按當日計畫工作時間的一半計入。",
+	"This request uses 1 day and credits the planned working time for that day." : "此申請使用 1 天，並按當日計畫工作時間計入。",
+	"Half-day absence request submitted successfully" : "半天請假申請已成功提交",
+	"Half-day entries are not enabled for this absence type." : "此請假類型未啟用半天記錄。",
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "僅當開始和結束為同一天時才允許半天。若需混合半天與全天，請分別提交申請。"
 	}
 );
 }});})();

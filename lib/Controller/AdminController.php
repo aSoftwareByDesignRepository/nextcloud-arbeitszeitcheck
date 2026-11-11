@@ -1160,7 +1160,7 @@ class AdminController extends Controller
 		if (!is_array($requireSubstituteTypes)) {
 			$requireSubstituteTypes = [];
 		}
-		$settings = [
+		$settings = $this->halfDaySettingsPayload() + [
 			'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
@@ -2658,7 +2658,7 @@ class AdminController extends Controller
 			if (!is_array($requireSubstituteTypes)) {
 				$requireSubstituteTypes = [];
 			}
-			$settings = [
+			$settings = $this->halfDaySettingsPayload() + [
 				'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 				'enableViolationNotifications' => $this->appConfig->getAppValueString('enable_violation_notifications', '1') === '1',
 				'breakAutoFallbackEnabled' => $this->appConfig->getAppValueString('break_auto_fallback_enabled', '1') === '1',
@@ -2808,6 +2808,7 @@ class AdminController extends Controller
 				'monthClosureEnabled' => Constants::CONFIG_MONTH_CLOSURE_ENABLED,
 				'monthClosureGraceDaysAfterEom' => Constants::CONFIG_MONTH_CLOSURE_GRACE_DAYS_AFTER_EOM,
 				'requireSubstituteTypes' => 'require_substitute_types',
+				'halfDayEnabledTypes' => Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
 				'sendIcalToManagers' => 'send_ical_to_managers',
@@ -2979,6 +2980,11 @@ class AdminController extends Controller
 							return in_array((string)$t, $validTypes, true);
 						})));
 						$value = json_encode($arr);
+					} elseif ($paramKey === 'halfDayEnabledTypes') {
+						// Regex-validated ids; unknown/deactivated ids are kept
+						// (reactivation must not lose the flag) — the eligible
+						// gate is applied at read time, not on save.
+						$value = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::normalizeSaveValue($value);
 					} else {
 						$value = (string)$value;
 					}
@@ -4337,6 +4343,31 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Half-day opt-in settings (AZC-HALF-DAY-NON-VACATION): the stored
+	 * allowlist plus the eligible multiselect options. Shared by every
+	 * settings surface so NC-admin form, in-app admin page and the JSON
+	 * API can never drift apart (a missing key on one surface silently
+	 * resets the flag on save — parity contract).
+	 *
+	 * @return array{halfDayEnabledTypes: list<string>, halfDayEligibleTypes: array{builtin: list<array{id: string, label: string}>, custom: list<array{id: string, label: string}>}}
+	 */
+	private function halfDaySettingsPayload(): array
+	{
+		return [
+			'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromRaw(
+				$this->appConfig->getAppValueString(
+					Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
+					Constants::CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT
+				)
+			),
+			'halfDayEligibleTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::adminOptions(
+				$this->l10n,
+				\OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::entitlementBoundDaysTypeCodes()
+			),
+		];
+	}
+
+	/**
 	 * @return array<string, mixed>
 	 */
 	private function buildNotificationSettingsPayload(): array
@@ -4362,7 +4393,7 @@ class AdminController extends Controller
 			$this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_NOTIFICATION_RECIPIENTS, '')
 		);
 
-		return [
+		return $this->halfDaySettingsPayload() + [
 			'enabled' => $enabled,
 			'recipients' => implode(', ', $recipients),
 			'matrix' => $this->normalizeNotificationMatrix($decoded),

@@ -43,6 +43,7 @@
 		<select id="absence-type" name="type">
 			<option value="vacation" selected>Vacation</option>
 			<option value="sick_leave">Sick leave</option>
+			<option value="personal_leave">Personal leave</option>
 		</select>
 		<label for="absence-start-date">Start</label>
 		<input id="absence-start-date" name="start_date" value="12.08.2026">
@@ -51,7 +52,7 @@
 		<p id="absence-multi-day-half-tip" class="form-help absence-multi-day-half-tip" hidden data-days-mode="1">
 			Need a half day plus full days? Submit the half day as its own request, then the remaining days.
 		</p>
-		<div id="absence-day-fraction-group" class="form-group absence-day-fraction" data-days-mode="1">
+		<div id="absence-day-fraction-group" class="form-group absence-day-fraction" data-days-mode="1" data-enabled-types="[&quot;vacation&quot;]">
 			<fieldset class="absence-day-fraction__fieldset">
 				<legend id="absence-day-fraction-legend">Day length</legend>
 				<div class="absence-day-fraction__segments" role="radiogroup" aria-labelledby="absence-day-fraction-legend" aria-describedby="absence-day-fraction-help absence-day-fraction-preview">
@@ -85,13 +86,23 @@
 	const endEl = document.getElementById('absence-end-date');
 	const sickToday = document.getElementById('btn-report-sick-today');
 
+	function enabledTypes() {
+		try {
+			const list = JSON.parse(group.getAttribute('data-enabled-types') || '[]');
+			return Array.isArray(list) ? list : ['vacation'];
+		} catch (e) {
+			return ['vacation'];
+		}
+	}
+
 	function sync() {
 		const single = startEl.value === endEl.value;
 		const multi = startEl.value && endEl.value && startEl.value !== endEl.value;
-		const show = typeEl.value === 'vacation' && single;
+		const eligible = enabledTypes().indexOf(typeEl.value) !== -1;
+		const show = eligible && single;
 		const was = !group.hidden;
 		group.hidden = !show;
-		if (multiTip) multiTip.hidden = !(typeEl.value === 'vacation' && multi);
+		if (multiTip) multiTip.hidden = !(eligible && multi);
 		if (!show) {
 			full.checked = true;
 			half.checked = false;

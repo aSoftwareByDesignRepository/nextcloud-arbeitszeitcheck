@@ -140,6 +140,7 @@ final class AdminSettingsSectionCatalog
 			'breakAutoFallbackFlexWindowStart',
 			'breakAutoFallbackFlexWindowEnd',
 			'requireSubstituteTypes',
+			'halfDayEnabledTypes',
 			'breakPolicyEnforced',
 			'breakPolicyMinBreakMinutes',
 			'breakPolicyTiers',

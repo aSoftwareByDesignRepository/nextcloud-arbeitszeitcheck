@@ -675,6 +675,10 @@ class ManagerController extends Controller
 					'monthClosureEnabled' => $this->monthClosureEnabledParam(),
 					'vacationUnit' => $vacationUnitService->getUnit(),
 					'vacationHoursPerDay' => $vacationUnitService->getHoursPerDay(),
+					'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config),
+					'halfDayCreditTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes(
+						\OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config)
+					),
 				]
 			));
 			return $this->configureCSP($response);

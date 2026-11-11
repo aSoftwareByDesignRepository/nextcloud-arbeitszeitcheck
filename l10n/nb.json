@@ -6386,7 +6386,16 @@
         "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Eksporter alle innstillinger og data som én kryptert fil — les den deretter inn på produksjonsinstansen. Se gjennom forhåndsvisningen før du bekrefter.",
         "Transfer configuration": "Overføring av konfigurasjon",
         "Transfer": "Overføring",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Eksporter alle innstillinger og data som én kryptert fil, og importer den på produksjonsinstansen din. Se gjennom forhåndsvisningen før du bekrefter."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Eksporter alle innstillinger og data som én kryptert fil, og importer den på produksjonsinstansen din. Se gjennom forhåndsvisningen før du bekrefter.",
+        "Absences: Half-day entries": "Fravær: Halvdagsregistreringer",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "For de valgte fraværstypene kan ansatte og ledere også registrere en halv dag (den lagrede dagsverdien er dagsvekten ganger 0,5). Avspasering, foreldrepermisjon og typer knyttet til en spesiell rettighet beholder sine egne regler og vises ikke.",
+        "This request uses 0.5 day.": "Denne forespørselen bruker 0,5 dag.",
+        "This request uses 1 day.": "Denne forespørselen bruker 1 dag.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Denne forespørselen bruker 0,5 dag og godskriver halvparten av den planlagte arbeidstiden for den dagen.",
+        "This request uses 1 day and credits the planned working time for that day.": "Denne forespørselen bruker 1 dag og godskriver den planlagte arbeidstiden for den dagen.",
+        "Half-day absence request submitted successfully": "Forespørsel om halv fraværsdag er sendt inn",
+        "Half-day entries are not enabled for this absence type.": "Halvdagsregistreringer er ikke aktivert for denne fraværstypen.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "En halv dag er bare tillatt når start og slutt er samme dag. For blandede halve og hele dager må du sende inn separate forespørsler."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

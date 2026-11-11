@@ -6383,7 +6383,16 @@
         "…": "…",
         "Transfer configuration": "Konfiguration übertragen",
         "Transfer": "Übertragen",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Alle Einstellungen und Daten als eine verschlüsselte Datei exportieren und auf Ihrer Produktiv-Instanz importieren. Prüfen Sie die Vorschau vor der Bestätigung."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Alle Einstellungen und Daten als eine verschlüsselte Datei exportieren und auf Ihrer Produktiv-Instanz importieren. Prüfen Sie die Vorschau vor der Bestätigung.",
+        "Absences: Half-day entries": "Abwesenheiten: Halbtägige Einträge",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "Für die ausgewählten Abwesenheitsarten können Beschäftigte und Vorgesetzte auch einen halben Tag erfassen (der gespeicherte Tagewert ist das Tagesgewicht mal 0,5). Überstundenabbau, Elternzeit und Arten mit Sonderanspruch behalten ihre eigenen Regeln und werden nicht aufgeführt.",
+        "This request uses 0.5 day.": "Dieser Antrag verbraucht 0,5 Tag.",
+        "This request uses 1 day.": "Dieser Antrag verbraucht 1 Tag.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Dieser Antrag verbraucht 0,5 Tag und rechnet die Hälfte der geplanten Arbeitszeit dieses Tages an.",
+        "This request uses 1 day and credits the planned working time for that day.": "Dieser Antrag verbraucht 1 Tag und rechnet die geplante Arbeitszeit dieses Tages an.",
+        "Half-day absence request submitted successfully": "Halbtags-Antrag erfolgreich eingereicht",
+        "Half-day entries are not enabled for this absence type.": "Halbtägige Einträge sind für diese Abwesenheitsart nicht aktiviert.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Ein halber Tag ist nur erlaubt, wenn Start und Ende am selben Tag liegen. Für gemischte halbe und ganze Tage bitte getrennte Anträge stellen."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

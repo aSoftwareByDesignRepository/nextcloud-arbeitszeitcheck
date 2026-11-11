@@ -6394,7 +6394,16 @@
         "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Wyeksportuj wszystkie ustawienia i dane jako jeden zaszyfrowany plik — następnie wczytaj go na instancji produkcyjnej. Sprawdź podgląd przed potwierdzeniem.",
         "Transfer configuration": "Przenoszenie konfiguracji",
         "Transfer": "Przenoszenie",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Wyeksportuj wszystkie ustawienia i dane jako jeden zaszyfrowany plik, a następnie zaimportuj go na instancji produkcyjnej. Sprawdź podgląd przed potwierdzeniem."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Wyeksportuj wszystkie ustawienia i dane jako jeden zaszyfrowany plik, a następnie zaimportuj go na instancji produkcyjnej. Sprawdź podgląd przed potwierdzeniem.",
+        "Absences: Half-day entries": "Nieobecności: wpisy półdniowe",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "Dla wybranych rodzajów nieobecności pracownicy i przełożeni mogą również rejestrować pół dnia (zapisywana wartość dnia to waga dnia razy 0,5). Odbiór nadgodzin, urlop rodzicielski oraz typy powiązane ze specjalnym uprawnieniem zachowują własne zasady i nie są wyświetlane.",
+        "This request uses 0.5 day.": "Ten wniosek zużywa 0,5 dnia.",
+        "This request uses 1 day.": "Ten wniosek zużywa 1 dzień.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Ten wniosek zużywa 0,5 dnia i zalicza połowę planowanego czasu pracy tego dnia.",
+        "This request uses 1 day and credits the planned working time for that day.": "Ten wniosek zużywa 1 dzień i zalicza planowany czas pracy tego dnia.",
+        "Half-day absence request submitted successfully": "Wniosek o nieobecność półdniową został złożony",
+        "Half-day entries are not enabled for this absence type.": "Wpisy półdniowe nie są włączone dla tego rodzaju nieobecności.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Pół dnia jest dozwolone tylko wtedy, gdy początek i koniec przypadają na ten sam dzień. W przypadku mieszanych półdni i pełnych dni złóż osobne wnioski."
     },
     "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

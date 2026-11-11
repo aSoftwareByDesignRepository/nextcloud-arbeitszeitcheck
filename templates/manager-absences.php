@@ -295,6 +295,8 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};
 window.ArbeitszeitCheck.vacationUnit = <?php echo json_encode((string)($_['vacationUnit'] ?? 'days'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.ArbeitszeitCheck.vacationHoursPerDay = <?php echo json_encode((float)($_['vacationHoursPerDay'] ?? 8), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.halfDayEnabledTypes = <?php echo json_encode(array_values(is_array($_['halfDayEnabledTypes'] ?? null) ? $_['halfDayEnabledTypes'] : []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'; ?>;
+window.ArbeitszeitCheck.halfDayCreditTypes = <?php echo json_encode(array_values(is_array($_['halfDayCreditTypes'] ?? null) ? $_['halfDayCreditTypes'] : []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'; ?>;
 window.ArbeitszeitCheck.estimateEmployeeVacationHoursUrl = <?php echo json_encode(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.manager.estimateEmployeeVacationHours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 

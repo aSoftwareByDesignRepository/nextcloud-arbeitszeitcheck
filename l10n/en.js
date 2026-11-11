@@ -6360,7 +6360,16 @@
 	"…" : "…",
 	"Transfer configuration" : "Transfer configuration",
 	"Transfer" : "Transfer",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.",
+	"Absences: Half-day entries" : "Absences: Half-day entries",
+	"For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed." : "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.",
+	"This request uses 0.5 day." : "This request uses 0.5 day.",
+	"This request uses 1 day." : "This request uses 1 day.",
+	"This request uses 0.5 day and credits half of the planned working time for that day." : "This request uses 0.5 day and credits half of the planned working time for that day.",
+	"This request uses 1 day and credits the planned working time for that day." : "This request uses 1 day and credits the planned working time for that day.",
+	"Half-day absence request submitted successfully" : "Half-day absence request submitted successfully",
+	"Half-day entries are not enabled for this absence type." : "Half-day entries are not enabled for this absence type.",
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests."
 	}
 );
 }});})();

@@ -6386,7 +6386,16 @@
         "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Tüm ayarları ve verileri tek şifreli dosya olarak dışa aktarın — ardından üretim ortamınıza içe aktarın. Onaylamadan önce önizlemeyi inceleyin.",
         "Transfer configuration": "Yapılandırma aktarımı",
         "Transfer": "Aktar",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Tüm ayarları ve verileri tek bir şifreli dosya olarak dışa aktarın ve üretim ortamınıza içe aktarın. Onaylamadan önce önizlemeyi gözden geçirin."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Tüm ayarları ve verileri tek bir şifreli dosya olarak dışa aktarın ve üretim ortamınıza içe aktarın. Onaylamadan önce önizlemeyi gözden geçirin.",
+        "Absences: Half-day entries": "Devamsızlıklar: Yarım gün kayıtları",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "Seçilen devamsızlık türleri için çalışanlar ve yöneticiler yarım gün de kaydedebilir (kayıtlı gün değeri, gün ağırlığının 0,5 katıdır). Denkleştirme izni, ebeveyn izni ve özel bir hakka bağlı türler kendi kurallarını korur ve listelenmez.",
+        "This request uses 0.5 day.": "Bu talep 0,5 gün kullanır.",
+        "This request uses 1 day.": "Bu talep 1 gün kullanır.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Bu talep 0,5 gün kullanır ve o gün için planlanan çalışma süresinin yarısını hak ediş olarak yazar.",
+        "This request uses 1 day and credits the planned working time for that day.": "Bu talep 1 gün kullanır ve o gün için planlanan çalışma süresini hak ediş olarak yazar.",
+        "Half-day absence request submitted successfully": "Yarım günlük devamsızlık talebi başarıyla gönderildi",
+        "Half-day entries are not enabled for this absence type.": "Yarım gün kayıtları bu devamsızlık türü için etkin değil.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Yarım gün yalnızca başlangıç ve bitiş aynı gün olduğunda izin verilir. Karışık yarım ve tam günler için ayrı talepler gönderin."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

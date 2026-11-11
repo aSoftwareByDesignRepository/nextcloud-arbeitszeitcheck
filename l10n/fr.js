@@ -6360,7 +6360,16 @@
 	"…" : "…",
 	"Transfer configuration" : "Transfert de configuration",
 	"Transfer" : "Transfert",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportez tous les paramètres et données dans un seul fichier chiffré, puis importez-le sur votre instance de production. Vérifiez l’aperçu avant de confirmer."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportez tous les paramètres et données dans un seul fichier chiffré, puis importez-le sur votre instance de production. Vérifiez l’aperçu avant de confirmer.",
+	"Absences: Half-day entries" : "Absences : saisies en demi-journée",
+	"For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed." : "Pour les types d’absence sélectionnés, les employés et les responsables peuvent également saisir une demi-journée (la valeur de jour enregistrée est le poids du jour multiplié par 0,5). La récupération, le congé parental et les types liés à un droit spécial conservent leurs propres règles et ne sont pas listés.",
+	"This request uses 0.5 day." : "Cette demande utilise 0,5 jour.",
+	"This request uses 1 day." : "Cette demande utilise 1 jour.",
+	"This request uses 0.5 day and credits half of the planned working time for that day." : "Cette demande utilise 0,5 jour et crédite la moitié du temps de travail prévu pour ce jour.",
+	"This request uses 1 day and credits the planned working time for that day." : "Cette demande utilise 1 jour et crédite le temps de travail prévu pour ce jour.",
+	"Half-day absence request submitted successfully" : "Demande d’absence en demi-journée envoyée avec succès",
+	"Half-day entries are not enabled for this absence type." : "Les saisies en demi-journée ne sont pas activées pour ce type d’absence.",
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Une demi-journée n’est autorisée que lorsque le début et la fin sont le même jour. Pour combiner demi-journées et journées complètes, envoyez des demandes séparées."
 	}
 );
 }});})();

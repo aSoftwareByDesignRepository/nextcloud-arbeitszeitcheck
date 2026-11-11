@@ -6386,7 +6386,16 @@
         "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Esporta tutte le impostazioni e i dati in un unico file cifrato — poi importalo sull’istanza di produzione. Controlla l’anteprima prima di confermare.",
         "Transfer configuration": "Trasferimento configurazione",
         "Transfer": "Trasferimento",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Esporta tutte le impostazioni e i dati in un unico file crittografato, quindi importalo sulla tua istanza di produzione. Controlla l’anteprima prima di confermare."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Esporta tutte le impostazioni e i dati in un unico file crittografato, quindi importalo sulla tua istanza di produzione. Controlla l’anteprima prima di confermare.",
+        "Absences: Half-day entries": "Assenze: registrazioni a mezza giornata",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "Per i tipi di assenza selezionati, dipendenti e responsabili possono registrare anche una mezza giornata (il valore di giorno salvato è il peso del giorno moltiplicato per 0,5). Riposo compensativo, congedo parentale e tipi vincolati a un diritto speciale mantengono le proprie regole e non sono elencati.",
+        "This request uses 0.5 day.": "Questa richiesta usa 0,5 giorno.",
+        "This request uses 1 day.": "Questa richiesta usa 1 giorno.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Questa richiesta usa 0,5 giorno e accredita la metà dell’orario di lavoro pianificato per quel giorno.",
+        "This request uses 1 day and credits the planned working time for that day.": "Questa richiesta usa 1 giorno e accredita l’orario di lavoro pianificato per quel giorno.",
+        "Half-day absence request submitted successfully": "Richiesta di assenza a mezza giornata inviata correttamente",
+        "Half-day entries are not enabled for this absence type.": "Le registrazioni a mezza giornata non sono abilitate per questo tipo di assenza.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Una mezza giornata è consentita solo quando inizio e fine coincidono nello stesso giorno. Per combinare mezze giornate e giornate intere, invia richieste separate."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

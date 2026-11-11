@@ -6360,7 +6360,16 @@
 	"…" : "…",
 	"Transfer configuration" : "Transferência de configuração",
 	"Transfer" : "Transferência",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporte todas as definições e dados como um único ficheiro encriptado e importe-o na sua instância de produção. Reveja a pré-visualização antes de confirmar."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporte todas as definições e dados como um único ficheiro encriptado e importe-o na sua instância de produção. Reveja a pré-visualização antes de confirmar.",
+	"Absences: Half-day entries" : "Ausências: registos de meio dia",
+	"For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed." : "Para os tipos de ausência selecionados, os colaboradores e os gestores também podem registar meio dia (o valor de dia guardado é o peso do dia vezes 0,5). A compensação de horas, a licença parental e os tipos vinculados a um direito especial mantêm as suas próprias regras e não são listados.",
+	"This request uses 0.5 day." : "Este pedido usa 0,5 dia.",
+	"This request uses 1 day." : "Este pedido usa 1 dia.",
+	"This request uses 0.5 day and credits half of the planned working time for that day." : "Este pedido usa 0,5 dia e credita metade do tempo de trabalho planeado para esse dia.",
+	"This request uses 1 day and credits the planned working time for that day." : "Este pedido usa 1 dia e credita o tempo de trabalho planeado para esse dia.",
+	"Half-day absence request submitted successfully" : "Pedido de ausência de meio dia submetido com sucesso",
+	"Half-day entries are not enabled for this absence type." : "Os registos de meio dia não estão ativados para este tipo de ausência.",
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Um meio dia só é permitido quando o início e o fim são no mesmo dia. Para misturar meios dias e dias inteiros, submeta pedidos separados."
 	}
 );
 }});})();

@@ -850,6 +850,12 @@ class PageController extends Controller
 		$requireSubstituteTypes = json_decode($requireSubstituteJson, true);
 		$requireSubstituteTypes = is_array($requireSubstituteTypes) ? $requireSubstituteTypes : [];
 
+		// Opt-in half-day types (AZC-HALF-DAY-NON-VACATION) — the day-length
+		// control renders only for these; credit-effect types get the
+		// "planned time credited at half" preview copy, others the neutral one.
+		$halfDayEnabledTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+		$halfDayCreditTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($halfDayEnabledTypes);
+
 		$navFlags = $this->getNavigationFlags($userId);
 
 		$employeeHasAssignableManager = $this->teamResolver->hasAssignableManagerForEmployee($userId);
@@ -901,6 +907,8 @@ class PageController extends Controller
 			'computedWorkingDays' => $computedWorkingDays,
 			'hasColleagues' => $hasColleagues,
 			'requireSubstituteTypes' => $requireSubstituteTypes,
+			'halfDayEnabledTypes' => $halfDayEnabledTypes,
+			'halfDayCreditTypes' => $halfDayCreditTypes,
 			'filterStartDate' => $filterStartDate,
 			'filterEndDate' => $filterEndDate,
 			'filterStatus' => $statusParam ?? '',

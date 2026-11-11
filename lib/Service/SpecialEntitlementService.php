@@ -58,6 +58,45 @@ final class SpecialEntitlementService
 	}
 
 	/**
+	 * Absence-type codes with an ACTIVE days-unit entitlement binding
+	 * (AZC-HALF-DAY-NON-VACATION, EC-14). These types own their own fraction
+	 * contract ({0.25,0.5,0.75,1} via {@see requestAmount()}) and bypass the
+	 * generic half-day opt-in gate. Returns [] while the suite flags are off —
+	 * a dormant binding behaves like a normal custom type.
+	 *
+	 * @return list<string>
+	 */
+	public function daysUnitBoundAbsenceTypeCodes(): array
+	{
+		if (!$this->isEnabled()) {
+			return [];
+		}
+		$codes = [];
+		foreach ($this->types->findAll(true) as $type) {
+			if ($type->getUnit() === SpecialEntitlementType::UNIT_DAYS) {
+				$codes[] = (string)$type->getAbsenceTypeCode();
+			}
+		}
+		return $codes;
+	}
+
+	/**
+	 * Whether `$absenceTypeCode` currently has an active days-unit entitlement
+	 * binding (same predicate as {@see daysUnitBoundAbsenceTypeCodes()} for a
+	 * single type, without the full list query).
+	 */
+	public function hasActiveDaysUnitBindingForAbsenceType(string $absenceTypeCode): bool
+	{
+		if ($absenceTypeCode === '' || !$this->isEnabled()) {
+			return false;
+		}
+		$type = $this->types->findByAbsenceTypeCode($absenceTypeCode);
+		return $type !== null
+			&& (bool)$type->getActive()
+			&& $type->getUnit() === SpecialEntitlementType::UNIT_DAYS;
+	}
+
+	/**
 	 * Acquire definition/policy/period locks before the generic absence-user
 	 * lock. The returned context must be passed to completeReservation() in the
 	 * absence transaction and to releaseReservationContext() in finally.

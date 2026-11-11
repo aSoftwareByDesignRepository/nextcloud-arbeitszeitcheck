@@ -1149,6 +1149,9 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
 				$c->query(HolidayService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class),
+				// Schedule-aware weight authority for the fraction heuristic —
+				// same SoT as the absence write path (AZC-HALF-DAY-NON-VACATION).
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 

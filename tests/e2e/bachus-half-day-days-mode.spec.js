@@ -55,6 +55,40 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 	});
 
+	test('non-vacation half-day: enabled type shows Length, disabled type hides it', async ({ page }) => {
+		await page.goto(fixtureUrl);
+		const group = page.locator('#absence-day-fraction-group');
+		const type = page.locator('#absence-type');
+
+		// Org enablelist: vacation + sick_leave.
+		await group.evaluate((node) => node.setAttribute('data-enabled-types', '["vacation","sick_leave"]'));
+
+		// sick_leave enabled → Length visible on a single-day request.
+		await type.selectOption('sick_leave');
+		await type.dispatchEvent('change');
+		await expect(group).toBeVisible();
+		await expect(page.locator('#absence-day-fraction-half + .absence-day-fraction__face')).toBeVisible();
+
+		// Switching to a non-enabled type hides the control and resets to full day.
+		await type.selectOption('personal_leave');
+		await type.dispatchEvent('change');
+		await expect(group).toBeHidden();
+		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
+
+		// Enabled again → control returns; half selectable for sick.
+		await type.selectOption('sick_leave');
+		await type.dispatchEvent('change');
+		await expect(group).toBeVisible();
+		await page.locator('#absence-day-fraction-half + .absence-day-fraction__face').click();
+		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
+
+		// Multi-day range still hides the control for non-vacation types.
+		await page.locator('#absence-end-date').fill('14.08.2026');
+		await page.locator('#absence-end-date').dispatchEvent('change');
+		await expect(group).toBeHidden();
+		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
+	});
+
 	test('responsive stacking adapts without overflow', async ({ page }) => {
 		await page.setViewportSize({ width: 320, height: 812 });
 		await page.goto(fixtureUrl);

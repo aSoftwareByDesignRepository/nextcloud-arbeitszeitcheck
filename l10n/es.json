@@ -6386,7 +6386,16 @@
         "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Exporte todos los ajustes y datos en un único archivo cifrado e impórtelo en su instancia de producción. Revise la vista previa antes de confirmar.",
         "Transfer configuration": "Transferencia de configuración",
         "Transfer": "Transferencia",
-        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Exporte todos los ajustes y datos como un solo archivo cifrado e impórtelo en su instancia de producción. Revise la vista previa antes de confirmar."
+        "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.": "Exporte todos los ajustes y datos como un solo archivo cifrado e impórtelo en su instancia de producción. Revise la vista previa antes de confirmar.",
+        "Absences: Half-day entries": "Ausencias: entradas de medio día",
+        "For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.": "Para los tipos de ausencia seleccionados, los empleados y los responsables también pueden registrar medio día (el valor de día guardado es el peso del día multiplicado por 0,5). El tiempo compensatorio, el permiso parental y los tipos vinculados a un derecho especial conservan sus propias reglas y no aparecen en la lista.",
+        "This request uses 0.5 day.": "Esta solicitud usa 0,5 día.",
+        "This request uses 1 day.": "Esta solicitud usa 1 día.",
+        "This request uses 0.5 day and credits half of the planned working time for that day.": "Esta solicitud usa 0,5 día y acredita la mitad del tiempo de trabajo planificado para ese día.",
+        "This request uses 1 day and credits the planned working time for that day.": "Esta solicitud usa 1 día y acredita el tiempo de trabajo planificado para ese día.",
+        "Half-day absence request submitted successfully": "Solicitud de ausencia de medio día enviada correctamente",
+        "Half-day entries are not enabled for this absence type.": "Las entradas de medio día no están habilitadas para este tipo de ausencia.",
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Un medio día solo se permite cuando el inicio y el fin son el mismo día. Para combinar medios días y días completos, envíe solicitudes separadas."
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

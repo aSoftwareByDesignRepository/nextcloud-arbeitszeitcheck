@@ -148,12 +148,61 @@ final class RecomputeAbsenceDaysScheduleTest extends TestCase
 
 	public function testHalfDayFractionRowIsNeverTouched(): void
 	{
+		// Single-day row stored at half the schedule weight — a day_fraction
+		// debit is request input, not calendar weight (FM-02).
 		$a = $this->absence(7, 'alice', 0.5);
+		$a->setEndDate(new \DateTime('2026-11-16'));
 		$mapper = $this->createMock(AbsenceMapper::class);
 		$mapper->method('find')->willReturn($a);
 		$mapper->expects($this->never())->method('update');
 
+		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(1.0),
+			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
+	public function testQuarterFractionOnHalfWeightDayIsNeverTouched(): void
+	{
+		// 0.25 stored on a 0.5-weight day = a half-day — the old literal
+		// days≈0.5 test would have re-inflated it to the full weight.
+		$a = $this->absence(7, 'alice', 0.25);
+		$a->setEndDate(new \DateTime('2026-11-16'));
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->never())->method('update');
+
+		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(0.5),
+			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
+	public function testMultiDayUnderStoredRowIsRecomputed(): void
+	{
+		// A multi-day row stored below schedule weight is corruption/schedule
+		// expansion, never a fraction — repair must still fix it.
+		$a = $this->absence(7, 'alice', 0.5);
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->once())->method('update')
+			->with($this->callback(static fn (Absence $x) => abs((float)$x->getDays() - 4.0) < 0.001));
+
 		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(4.0),
+			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
+	public function testSingleDayNonFractionUnderStoreIsRepaired(): void
+	{
+		// 0.3 stored on a 1.0-weight single day is no valid fraction ratio
+		// ({0.25,0.5,0.75} only) — corruption the repair must fix, not keep.
+		$a = $this->absence(7, 'alice', 0.3);
+		$a->setEndDate(new \DateTime('2026-11-16'));
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->once())->method('update')
+			->with($this->callback(static fn (Absence $x) => abs((float)$x->getDays() - 1.0) < 0.001));
+
+		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(1.0),
 			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
 			->run($this->createMock(IOutput::class));
 	}

@@ -62,12 +62,19 @@ if ($mode === 'list') {
 		'type' => Absence::TYPE_SICK_LEAVE,
 	]);
 }
-// No type in the query: create still opens on Vacation (first option).
-// A prefill such as sick leave must not also reveal the vacation half-day control.
-$typeIsVacation = ($absence && $absence->getType() === 'vacation')
-	|| ($mode === 'create' && !$absence && ($prefillType === '' || $prefillType === Absence::TYPE_VACATION));
+// Day-length control (AZC-HALF-DAY-NON-VACATION): shows for every type the
+// org enabled for half days, not only vacation. The server allowlist is the
+// authority; these template flags only decide first paint + preselect.
+$halfDayEnabledTypes = is_array($halfDayEnabledTypes ?? null) ? $halfDayEnabledTypes : [];
+$halfDayCreditTypes = is_array($halfDayCreditTypes ?? null) ? $halfDayCreditTypes : [];
+$absenceFormType = ($absence && $absence->getType() !== null && $absence->getType() !== '')
+	? (string)$absence->getType()
+	: (($mode === 'create' && is_string($prefillType) && $prefillType !== '')
+		? $prefillType
+		: Absence::TYPE_VACATION);
+$typeSupportsHalfDay = in_array($absenceFormType, $halfDayEnabledTypes, true);
 $editIsHalf = $absence
-	&& $absence->getType() === 'vacation'
+	&& in_array((string)$absence->getType(), $halfDayEnabledTypes, true)
 	&& !$isVacationHours
 	&& $absence->getDays() !== null
 	&& abs((float)$absence->getDays() - 0.5) < 0.011
@@ -78,11 +85,11 @@ $halfSelected = $editIsHalf || (
 	$mode === 'create'
 	&& $prefillHalf
 	&& !$isVacationHours
-	&& ($prefillType === '' || $prefillType === Absence::TYPE_VACATION)
+	&& $typeSupportsHalfDay
 );
 $showDayFractionInitially = !$isVacationHours
 	&& in_array($mode, ['create', 'edit'], true)
-	&& $typeIsVacation
+	&& $typeSupportsHalfDay
 	&& $absenceFormStartDisplay !== ''
 	&& $absenceFormStartDisplay === $absenceFormEndDisplay;
 $unitWord = $isVacationHours ? $l->t('hours') : $l->t('days');
@@ -370,6 +377,8 @@ if ($mode === 'list') {
                     <div id="absence-day-fraction-group"
                          class="form-group absence-day-fraction"
                          data-days-mode="<?php echo $isVacationHours ? '0' : '1'; ?>"
+                         data-enabled-types="<?php p(json_encode(array_values($halfDayEnabledTypes), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'); ?>"
+                         data-credit-types="<?php p(json_encode(array_values($halfDayCreditTypes), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'); ?>"
                          <?php echo $showDayFractionInitially ? '' : 'hidden'; ?>>
                         <fieldset class="absence-day-fraction__fieldset">
                             <legend id="absence-day-fraction-legend" class="form-label absence-day-fraction__legend"><?php p($l->t('Day length')); ?></legend>
@@ -1442,8 +1451,16 @@ if ($mode === 'list') {
             const endEl = document.getElementById('absence-end-date');
             const typeEl = document.getElementById('absence-type');
             const rangeAnnounce = <?php echo json_encode($l->t('Half day is only for a single day. This request will use full working days.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-            const previewHalf = <?php echo json_encode($l->t('This request uses 0.5 vacation day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-            const previewFull = <?php echo json_encode($l->t('This request uses 1 vacation day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewHalfVacation = <?php echo json_encode($l->t('This request uses 0.5 vacation day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewFullVacation = <?php echo json_encode($l->t('This request uses 1 vacation day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewHalfGeneric = <?php echo json_encode($l->t('This request uses 0.5 day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewFullGeneric = <?php echo json_encode($l->t('This request uses 1 day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewHalfCredit = <?php echo json_encode($l->t('This request uses 0.5 day and credits half of the planned working time for that day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            const previewFullCredit = <?php echo json_encode($l->t('This request uses 1 day and credits the planned working time for that day.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            let enabledTypes = [];
+            let creditTypes = [];
+            try { enabledTypes = JSON.parse(group.getAttribute('data-enabled-types') || '[]') || []; } catch (e) { enabledTypes = []; }
+            try { creditTypes = JSON.parse(group.getAttribute('data-credit-types') || '[]') || []; } catch (e) { creditTypes = []; }
             let lastAnnounced = '';
 
             function parseDDMMYYYY(s) {
@@ -1466,8 +1483,13 @@ if ($mode === 'list') {
                 return !!(a && b && a !== b);
             }
 
-            function isVacation() {
-                return typeEl && String(typeEl.value || '') === 'vacation';
+            function currentType() {
+                return typeEl ? String(typeEl.value || '') : '';
+            }
+
+            function isEligibleType() {
+                const t = currentType();
+                return t !== '' && enabledTypes.indexOf(t) !== -1;
             }
 
             function selectedFraction() {
@@ -1480,18 +1502,26 @@ if ($mode === 'list') {
                     if (previewEl) previewEl.textContent = '';
                     return;
                 }
-                previewEl.textContent = selectedFraction() === '0.5' ? previewHalf : previewFull;
+                const isHalf = selectedFraction() === '0.5';
+                const t = currentType();
+                if (t === 'vacation') {
+                    previewEl.textContent = isHalf ? previewHalfVacation : previewFullVacation;
+                } else if (creditTypes.indexOf(t) !== -1) {
+                    previewEl.textContent = isHalf ? previewHalfCredit : previewFullCredit;
+                } else {
+                    previewEl.textContent = isHalf ? previewHalfGeneric : previewFullGeneric;
+                }
             }
 
             function syncMultiTip() {
                 if (!multiTip || multiTip.getAttribute('data-days-mode') !== '1') {
                     return;
                 }
-                multiTip.hidden = !(isVacation() && isMultiDayRange());
+                multiTip.hidden = !(isEligibleType() && isMultiDayRange());
             }
 
             function syncVisibility() {
-                const show = isVacation() && isSingleDay();
+                const show = isEligibleType() && isSingleDay();
                 const wasVisible = !group.hidden;
                 group.hidden = !show;
                 if (!show) {
@@ -2104,9 +2134,12 @@ if ($mode === 'list') {
                     .then(function(response) {
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalText; }
                         if (response.redirected || response.ok) {
+                            const submittedType = String(formData.get('type') || '');
                             const successMsg = isCreate
                                 ? (submittedDayFraction === '0.5'
-                                    ? ((window.t && window.t('arbeitszeitcheck', 'Half-day vacation request submitted successfully')) || 'Half-day vacation request submitted successfully')
+                                    ? (submittedType === 'vacation'
+                                        ? ((window.t && window.t('arbeitszeitcheck', 'Half-day vacation request submitted successfully')) || 'Half-day vacation request submitted successfully')
+                                        : ((window.t && window.t('arbeitszeitcheck', 'Half-day absence request submitted successfully')) || 'Half-day absence request submitted successfully'))
                                     : ((window.t && window.t('arbeitszeitcheck', 'Absence request submitted successfully')) || 'Absence request submitted successfully'))
                                 : ((window.t && window.t('arbeitszeitcheck', 'Absence request updated')) || 'Absence request updated');
                             if (window.AzcMessaging && typeof window.AzcMessaging.showSuccess === 'function') {
@@ -2128,8 +2161,15 @@ if ($mode === 'list') {
                                 if (j && typeof j.error === 'string' && j.error) errMsg = j.error;
                                 if (j && (j.code || j.error_code)) errCode = String(j.code || j.error_code);
                             } catch (e) { /* ignore */ }
-                            if (errCode.indexOf('VAC_HALF_DAY_') === 0 && window.ArbeitszeitCheck && typeof window.ArbeitszeitCheck.showDayFractionError === 'function') {
+                            if ((errCode.indexOf('VAC_HALF_DAY_') === 0 || errCode.indexOf('HALF_DAY_') === 0) && window.ArbeitszeitCheck && typeof window.ArbeitszeitCheck.showDayFractionError === 'function') {
                                 window.ArbeitszeitCheck.showDayFractionError(errMsg);
+                                if (errCode === 'HALF_DAY_TYPE_NOT_ENABLED') {
+                                    const typeField = document.getElementById('absence-type');
+                                    if (typeField) {
+                                        typeField.setAttribute('aria-invalid', 'true');
+                                        typeField.focus();
+                                    }
+                                }
                             }
                             showFormError(errMsg);
                             if (window.AzcMessaging && typeof window.AzcMessaging.showError === 'function') {

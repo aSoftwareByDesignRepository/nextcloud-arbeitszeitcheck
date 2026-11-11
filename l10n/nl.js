@@ -6360,7 +6360,16 @@
 	"…" : "…",
 	"Transfer configuration" : "Configuratie overdragen",
 	"Transfer" : "Overdragen",
-	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporteer alle instellingen en gegevens als één versleuteld bestand en importeer het op uw productie-instantie. Controleer het voorbeeld voordat u bevestigt."
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exporteer alle instellingen en gegevens als één versleuteld bestand en importeer het op uw productie-instantie. Controleer het voorbeeld voordat u bevestigt.",
+	"Absences: Half-day entries" : "Afwezigheden: halve-dagregistraties",
+	"For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed." : "Voor de geselecteerde afwezigheidstypen kunnen medewerkers en leidinggevenden ook een halve dag registreren (de opgeslagen dagwaarde is het daggewicht maal 0,5). Compensatiedag, ouderschapsverlof en typen gekoppeld aan een bijzonder recht behouden hun eigen regels en worden niet weergegeven.",
+	"This request uses 0.5 day." : "Dit verzoek gebruikt 0,5 dag.",
+	"This request uses 1 day." : "Dit verzoek gebruikt 1 dag.",
+	"This request uses 0.5 day and credits half of the planned working time for that day." : "Dit verzoek gebruikt 0,5 dag en schrijft de helft van de geplande werktijd voor die dag bij.",
+	"This request uses 1 day and credits the planned working time for that day." : "Dit verzoek gebruikt 1 dag en schrijft de geplande werktijd voor die dag bij.",
+	"Half-day absence request submitted successfully" : "Verzoek voor een halve afwezigheidsdag succesvol ingediend",
+	"Half-day entries are not enabled for this absence type." : "Halve-dagregistraties zijn niet ingeschakeld voor dit afwezigheidstype.",
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Een halve dag is alleen toegestaan wanneer start en einde op dezelfde dag vallen. Dien voor gemengde halve en hele dagen afzonderlijke verzoeken in."
 	}
 );
 }});})();

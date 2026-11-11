@@ -45,6 +45,7 @@ class PaidAbsencePlannedHoursCreditService
 		private readonly WorkingTimeModelMapper $workingTimeModelMapper,
 		private readonly HolidayService $holidayService,
 		private readonly ?DutyRotationSollProvider $dutyRotationSollProvider = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $workdayCounter = null,
 	) {
 	}
 
@@ -342,7 +343,7 @@ class PaidAbsencePlannedHoursCreditService
 			return $targets;
 		}
 
-		$fraction = $this->dayFraction($absence);
+		$fraction = $this->dayFraction($userId, $absence);
 		$targets = [];
 		foreach ($plannedByDay as $key => $planned) {
 			$targets[$key] = [$planned * $fraction, $planned];
@@ -429,9 +430,18 @@ class PaidAbsencePlannedHoursCreditService
 	}
 
 	/**
-	 * Half-day absences (single calendar day, days ≈ 0.5) credit half the planned target.
+	 * Fraction of the planned target a single-day absence covers
+	 * (AZC-HALF-DAY-NON-VACATION). Derived as `days / singleDayWeight` — the
+	 * same weight authority the write path used — never a literal
+	 * `days ≈ 0.5` test. That literal test double-halved on fraction-weighted
+	 * days (a 0.25-stored half on a 0.5-weight holiday read as "full") and
+	 * missed halves at weight 1.0.
+	 *
+	 * Guards: non-single-day and zero/near-zero weight stay 1.0 — a free day
+	 * credits nothing anyway because planned net is 0. A stored debit above
+	 * the recomputed weight (retro schedule change, EC-18) clamps to 1.0.
 	 */
-	private function dayFraction(Absence $absence): float
+	private function dayFraction(string $userId, Absence $absence): float
 	{
 		$start = $absence->getStartDate();
 		$end = $absence->getEndDate();
@@ -441,12 +451,24 @@ class PaidAbsencePlannedHoursCreditService
 		if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
 			return 1.0;
 		}
-		$days = $absence->getDays();
-		if ($days !== null && abs((float)$days - 0.5) < 0.011) {
-			return 0.5;
+		$rawDays = $absence->getDays();
+		if ($rawDays === null || !is_finite((float)$rawDays)) {
+			return 1.0;
 		}
-
-		return 1.0;
+		$weight = $this->workdayCounter !== null
+			? $this->workdayCounter->daysForUser($userId, $start, $start)
+			: $this->holidayService->computeWorkingDaysForUser($userId, $start, $start);
+		if (!is_finite($weight) || $weight <= 0.011) {
+			// Weight uncomputable (schedule source unavailable) — fall back
+			// to the legacy literal check rather than losing the fraction;
+			// a free day credits nothing anyway because planned net is 0.
+			return abs((float)$rawDays - 0.5) < 0.011 ? 0.5 : 1.0;
+		}
+		$fraction = (float)$rawDays / $weight;
+		if (!is_finite($fraction) || $fraction >= 1.0 - 0.011) {
+			return 1.0;
+		}
+		return max(0.0, $fraction);
 	}
 
 	/**

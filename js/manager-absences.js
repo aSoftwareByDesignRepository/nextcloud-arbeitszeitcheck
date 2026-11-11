@@ -790,6 +790,31 @@
 		const daysMode = !hoursMode;
 		const previewHalfMsg = t('This request uses 0.5 vacation day.', 'This request uses 0.5 vacation day.');
 		const previewFullMsg = t('This request uses 1 vacation day.', 'This request uses 1 vacation day.');
+		const previewHalfGenericMsg = t('This request uses 0.5 day.', 'This request uses 0.5 day.');
+		const previewFullGenericMsg = t('This request uses 1 day.', 'This request uses 1 day.');
+		const previewHalfCreditMsg = t(
+			'This request uses 0.5 day and credits half of the planned working time for that day.',
+			'This request uses 0.5 day and credits half of the planned working time for that day.'
+		);
+		const previewFullCreditMsg = t(
+			'This request uses 1 day and credits the planned working time for that day.',
+			'This request uses 1 day and credits the planned working time for that day.'
+		);
+		const halfDayEnabledTypes = Array.isArray(window.ArbeitszeitCheck && window.ArbeitszeitCheck.halfDayEnabledTypes)
+			? window.ArbeitszeitCheck.halfDayEnabledTypes
+			: [];
+		const halfDayCreditTypes = Array.isArray(window.ArbeitszeitCheck && window.ArbeitszeitCheck.halfDayCreditTypes)
+			? window.ArbeitszeitCheck.halfDayCreditTypes
+			: [];
+		function halfDayPreviewMsg(isHalf, type) {
+			if (type === 'vacation') {
+				return isHalf ? previewHalfMsg : previewFullMsg;
+			}
+			if (halfDayCreditTypes.indexOf(type) !== -1) {
+				return isHalf ? previewHalfCreditMsg : previewFullCreditMsg;
+			}
+			return isHalf ? previewHalfGenericMsg : previewFullGenericMsg;
+		}
 		const rangeAnnounceMsg = t(
 			'Half day is only for a single day. This request will use full working days.',
 			'Half day is only for a single day. This request will use full working days.'
@@ -970,7 +995,7 @@
 			const start = parseDDMMYYYY(startEl && startEl.value);
 			const end = parseDDMMYYYY(endEl && endEl.value);
 			const singleDay = !!(start && end && toYmd(start) === toYmd(end));
-			const show = daysMode && typeSel.value === 'vacation' && singleDay;
+			const show = daysMode && halfDayEnabledTypes.indexOf(typeSel.value) !== -1 && singleDay;
 			const wasVisible = !dayFractionField.hidden;
 			dayFractionField.hidden = !show;
 			if (!show) {
@@ -993,9 +1018,10 @@
 					dayFractionLive.textContent = '';
 				}
 				if (dayFractionPreview) {
-					dayFractionPreview.textContent = (dayFractionHalf && dayFractionHalf.checked)
-						? previewHalfMsg
-						: previewFullMsg;
+					dayFractionPreview.textContent = halfDayPreviewMsg(
+						!!(dayFractionHalf && dayFractionHalf.checked),
+						typeSel.value
+					);
 				}
 			}
 		}
@@ -1031,9 +1057,10 @@
 			}
 			el.addEventListener('change', () => {
 				if (dayFractionPreview) {
-					dayFractionPreview.textContent = (dayFractionHalf && dayFractionHalf.checked)
-						? previewHalfMsg
-						: previewFullMsg;
+					dayFractionPreview.textContent = halfDayPreviewMsg(
+						!!(dayFractionHalf && dayFractionHalf.checked),
+						typeSel ? typeSel.value : ''
+					);
 				}
 			});
 		});
@@ -1139,7 +1166,7 @@
 				payload.requireDurationHours = true;
 				payload.serverMayFillHours = true;
 			}
-			if (daysMode && type === 'vacation' && dayFractionField && !dayFractionField.hidden) {
+			if (daysMode && halfDayEnabledTypes.indexOf(type) !== -1 && dayFractionField && !dayFractionField.hidden) {
 				payload.dayFraction = (dayFractionHalf && dayFractionHalf.checked) ? '0.5' : '1';
 			}
 			form.querySelector('.azc-self-target-notice')?.remove();
@@ -1177,6 +1204,21 @@
 					let message = err?.error || t('Could not save absence.', 'Could not save absence.');
 					if (code === 'ABSENCE_HOURS_CLIENT_REQUIRED') {
 						message = t('Please enter vacation hours.', 'Please enter vacation hours.');
+					}
+					if (code.startsWith('HALF_DAY_') || code.startsWith('VAC_HALF_DAY_')) {
+						// Bind near the field: announce in the live region and
+						// focus the offending control (type select when the org
+						// flag rejects it, otherwise the day-length group).
+						const focusTarget = (code === 'HALF_DAY_TYPE_NOT_ENABLED')
+							? typeSel
+							: (dayFractionHalf || dayFractionFull || typeSel);
+						if (dayFractionLive) {
+							dayFractionLive.textContent = message;
+						}
+						if (focusTarget) {
+							focusTarget.setAttribute('aria-invalid', 'true');
+							focusTarget.focus();
+						}
 					}
 					Messaging?.showError?.(message);
 				},

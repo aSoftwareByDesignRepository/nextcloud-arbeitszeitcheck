@@ -1091,6 +1091,19 @@ dialog .azc-icon-btn,
 	height: var(--azc-icon-md, 1.125rem);
 }
 
+/* Decorative svg glyphs inside icon-only buttons are aria-hidden and must
+   never win a hit test — the button owns the click and the hover. */
+#app-content.azc-app .azc-icon-btn > svg,
+#app-content-wrapper .azc-icon-btn > svg,
+.azc-nc-admin-settings .azc-icon-btn > svg,
+.azc-nc-settings-panel .azc-icon-btn > svg,
+.azc-app .btn.azc-icon-btn > svg,
+.azc-dialog .azc-icon-btn > svg,
+dialog .azc-icon-btn > svg,
+[role="dialog"] .azc-icon-btn > svg {
+	pointer-events: none;
+}
+
 #app-content.azc-app .azc-btn[aria-busy="true"],
 #app-content-wrapper .azc-btn[aria-busy="true"],
 .azc-nc-admin-settings .azc-btn[aria-busy="true"],

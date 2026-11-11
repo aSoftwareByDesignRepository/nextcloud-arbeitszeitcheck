@@ -69,14 +69,17 @@ async function runningVacation(mgr, userId) {
 		return reuse
 	}
 	// Seed fallback: only possible when today itself is free (any approved
-	// row covering today blocks the whole range). unpaid_leave carries no
-	// quota — residue-saturated vacation entitlements can't starve the seed.
+	// row covering today blocks the whole range — but that row would already
+	// have been reused above). Start AT today, not yesterday: yesterday may
+	// hold approved residue a today-only seed never collides with.
+	// unpaid_leave carries no quota — residue-saturated vacation
+	// entitlements can't starve the seed.
 	for (let span = 0; span <= 60; span += 2) {
 		const res = await apiAllowFailure(mgr, 'POST', `${APP}/api/manager/employee-absences`, {
 			data: {
 				userId,
 				type: 'unpaid_leave',
-				startDate: shift(today, -1),
+				startDate: today,
 				endDate: shift(today, span),
 				reason: 'e2e cancel-request seed',
 			},

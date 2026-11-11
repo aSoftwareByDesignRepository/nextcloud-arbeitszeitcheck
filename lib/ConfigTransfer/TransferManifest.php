@@ -46,6 +46,7 @@ final class TransferManifest extends AbstractTransferManifest
 			'break_auto_fallback_flex_window_start' => ['class' => 'plain', 'section' => 'compliance'],
 			'break_auto_fallback_flex_window_end' => ['class' => 'plain', 'section' => 'compliance'],
 			'require_substitute_types' => ['class' => 'plain', 'section' => 'compliance'],
+			'half_day_enabled_types' => ['class' => 'plain', 'section' => 'compliance'],
 			'break_policy_json' => ['class' => 'plain', 'section' => 'compliance'],
 			'break_policy_version' => ['class' => 'plain', 'section' => 'compliance'],
 			'missing_clock_in_reminders_enabled' => ['class' => 'plain', 'section' => 'compliance'],
@@ -187,6 +188,13 @@ final class TransferManifest extends AbstractTransferManifest
 			// '180' => 'internal',
 			// '2000' => 'internal',
 			'immediate' => 'internal',
+			// '["vacation"]' (CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT) is the
+			// same class of artifact — the JSON literal is read as the
+			// getAppValue default — but it cannot be expressed as an entry
+			// (gate key names are word-char only) and PHP would accept it
+			// as a misleading real key. It stays out of the swept surface:
+			// lib call sites rely on HalfDayTypePolicy::enabledTypesFromRaw
+			// null/empty handling instead of the *_DEFAULT constant.
 			// Dynamic/prefix key families — prefixes, not keys; members are
 			// dynamic and never transferred by definition:
 			//   'upgrade_backup_*'   snapshot-restore rewrites restored keys

@@ -91,10 +91,11 @@ final class HalfDayTypePolicy
 	/** @return list<string> */
 	public static function enabledTypesFromConfig(IConfig $config): array
 	{
+		// No explicit default: enabledTypesFromRaw(null) already resolves the
+		// documented ['vacation'] fallback — single authority for the default.
 		return self::enabledTypesFromRaw($config->getAppValue(
 			'arbeitszeitcheck',
-			Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-			Constants::CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT
+			Constants::CONFIG_HALF_DAY_ENABLED_TYPES
 		));
 	}
 

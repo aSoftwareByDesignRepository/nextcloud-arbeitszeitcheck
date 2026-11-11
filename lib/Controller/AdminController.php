@@ -4356,8 +4356,7 @@ class AdminController extends Controller
 		return [
 			'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromRaw(
 				$this->appConfig->getAppValueString(
-					Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-					Constants::CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT
+					Constants::CONFIG_HALF_DAY_ENABLED_TYPES
 				)
 			),
 			'halfDayEligibleTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::adminOptions(

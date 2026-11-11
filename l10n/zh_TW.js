@@ -4572,7 +4572,7 @@
 	"Start typing the user name or login — suggestions will appear. Use the arrow keys to navigate, Enter to select." : "開始輸入使用者名稱或登入名——將出現建議。用方向鍵導航，回車選擇。",
 	"Start typing their name or login, then pick them from the list." : "開始輸入姓名或登入名，然後從列表中選擇。",
 	"Start typing, then select from the list." : "開始輸入，然後從列表中選擇。",
-	"Start with Check Partner when you want ongoing, invoiceable care. Use the other options for a one-off workshop, a scoped feature, or official mobile licenses." : "需要持續、可開票的運維時選擇 Check Partner。其他選項用於一次性工作坊、定製功能或官方移動授權。",
+	"Start with Check Partner when you want ongoing, invoiceable care. Use the other options for a one-off workshop, a scoped feature, or official mobile licenses." : "需要持續、可開票的運維時選擇 Check 合作夥伴。其他選項用於一次性工作坊、定製功能或官方移動授權。",
 	"Start your break now" : "現在開始休息",
 	"Start your break time" : "開始您的休息時間",
 	"Started at" : "開始於",

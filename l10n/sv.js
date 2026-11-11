@@ -1708,7 +1708,7 @@
 	"Download CSV" : "Ladda ner CSV",
 	"Download PDF" : "Ladda ner PDF",
 	"Download a DATEV text file for the same start and end dates as above. Hour premiums appear as extra Lohnart lines only when mapped in Global settings." : "Ladda ner en DATEV-textfil för samma start- och slutdatum som ovan. Timtillägg visas som extra Lohnart-rader endast när de är mappade i Globala inställningar.",
-	"Download all settings, catalogues and business data as one encrypted file — then import it on your production instance." : "Hämta alla inställningar, förteckningar och affärsdata som en krypterad fil — läs sedan in den på din produktionsinstans.",
+	"Download all settings, catalogues and business data as one encrypted file — then import it on your production instance." : "Hämta alla inställningar, förteckningar och affärsdata som en krypterad fil — läs sedan in den på din produktionsmiljö.",
 	"Download balance PDF" : "Ladda ner saldo-PDF",
 	"Download encrypted transfer file" : "Hämta krypterad överföringsfil",
 	"Download for each person" : "Ladda ner för varje person",
@@ -6357,7 +6357,10 @@
 	"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "”Minst X timmars frånvaro krediterar minst Y timmar.” Rader kontrolleras i ordning — den sista matchande raden vinner.",
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generera flödes-URL» skapar den första länken för ett omfattning. «Återkalla och rotera» ersätter en befintlig länk — den gamla URL:en slutar fungera direkt.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "”Placering” lägger automatiska raster inom fönstret. ”Obligatorisk” betyder att rasten måste överlappa fönstret med angivna minuter.",
-	"…" : "…"
+	"…" : "…",
+	"Transfer configuration" : "Överför konfiguration",
+	"Transfer" : "Överföring",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Exportera alla inställningar och data som en krypterad fil — läs sedan in den på din produktionsinstans. Granska förhandsvisningen innan du bekräftar."
 	}
 );
 }});})();

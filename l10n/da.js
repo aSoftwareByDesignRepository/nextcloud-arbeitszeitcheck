@@ -6357,7 +6357,10 @@
 	"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "»Mindst X timers fravær krediterer mindst Y timer.« Rækker kontrolleres i rækkefølge — den sidste matchende række vinder.",
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generer feed-URL» opretter det første link for et omfang. «Tilbagekald og roter» erstatter et eksisterende link — den gamle URL virker ikke længere med det samme.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "»Placering« placerer automatiske pauser inde i vinduet. »Påkrævet« betyder, at pausen skal overlappe vinduet med det angivne antal minutter.",
-	"…" : "…"
+	"…" : "…",
+	"Transfer configuration" : "Overfør konfiguration",
+	"Transfer" : "Overførsel",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksportér alle indstillinger og data som én krypteret fil — og importér den på din produktionsinstans. Gennemse forhåndsvisningen, før du bekræfter."
 	}
 );
 }});})();

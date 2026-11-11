@@ -6357,7 +6357,11 @@
 	"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.",
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.",
-	"…" : "…"
+	"…" : "…",
+	"Transfer configuration" : "Transfer configuration",
+	"Transfer" : "Transfer",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming."
+
 	}
 );
 }});})();

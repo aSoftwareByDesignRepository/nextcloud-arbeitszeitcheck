@@ -255,7 +255,7 @@
   font-weight: 700;
 }
 
-@media (max-width: 479.98px) {
+@media (max-width: 480px) {
   #app-content.azc-app--admin-settings .azc-admin-settings-form__actions--sticky .azc-btn--primary,
   #app-content.azc-app--admin-settings .azc-admin-settings-form__actions--sticky .azc-btn--touch {
     width: 100%;

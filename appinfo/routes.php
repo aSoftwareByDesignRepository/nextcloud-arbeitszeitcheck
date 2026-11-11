@@ -360,6 +360,12 @@ return [
 		['name' => 'admin#updateAdminSettings', 'url' => '/api/admin/settings', 'verb' => 'POST'],
 		['name' => 'admin#getNotificationSettings', 'url' => '/api/admin/notifications/settings', 'verb' => 'GET'],
 		['name' => 'admin#updateNotificationSettings', 'url' => '/api/admin/notifications/settings', 'verb' => 'POST'],
+		// ── Config & data transfer (test → production) ──────────────────
+		['name' => 'transfer_api#status', 'url' => '/api/admin/transfer/status', 'verb' => 'GET'],
+		['name' => 'transfer_api#export', 'url' => '/api/admin/transfer/export', 'verb' => 'POST'],
+		['name' => 'transfer_api#preview', 'url' => '/api/admin/transfer/preview', 'verb' => 'POST'],
+		['name' => 'transfer_api#apply', 'url' => '/api/admin/transfer/apply', 'verb' => 'POST'],
+		['name' => 'transfer_api#reconcile', 'url' => '/api/admin/transfer/reconcile', 'verb' => 'POST'],
 		['name' => 'admin#migrateVacationUnit', 'url' => '/api/admin/vacation-unit/migrate', 'verb' => 'POST'],
 		// Legacy company_holidays JSON (kept for backward compatibility; new code should use state-holidays endpoints)
 		['name' => 'admin#getCompanyHolidays', 'url' => '/api/admin/holidays', 'verb' => 'GET'],

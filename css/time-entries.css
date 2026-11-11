@@ -1405,7 +1405,7 @@
 
 /* Auto-break + break-requirement contrast: common/semantic-surfaces.css */
 
-@media (max-width: 479.98px) {
+@media (max-width: 480px) {
 	#app-content.azc-app--time-entries .auto-break-panel__control {
 		flex-direction: column;
 		align-items: stretch;

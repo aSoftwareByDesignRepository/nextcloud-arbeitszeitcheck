@@ -211,6 +211,7 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null,
 		?\OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService = null,
+		?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -258,7 +259,22 @@ class AdminController extends Controller
 		$this->breakPolicyResolver = $breakPolicyResolver;
 		$this->breakPolicyStore = $breakPolicyStore;
 		$this->timeZoneService = $timeZoneService;
+		$this->transferReceiptStore = $transferReceiptStore;
 		$this->setCspService($cspService);
+	}
+
+	private ?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null;
+
+	private function transferReceiptStore(): ?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore
+	{
+		if ($this->transferReceiptStore === null) {
+			try {
+				$this->transferReceiptStore = \OCP\Server::get(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore::class);
+			} catch (\Throwable) {
+				// Container without the transfer pack registered — page still renders.
+			}
+		}
+		return $this->transferReceiptStore;
 	}
 
 	private function timeZoneService(): \OCA\ArbeitszeitCheck\Service\TimeZoneService
@@ -1122,11 +1138,21 @@ class AdminController extends Controller
 			return new NotFoundResponse();
 		}
 
+		// The transfer section is engine-owned: it renders the synced partial
+		// (templates/parts/settings/transfer.php) with its own script bundle,
+		// outside the admin-settings form (nested <form> is invalid HTML).
+		$isTransferSection = $section === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_TRANSFER;
 		$this->registerFrontEndAssets(
 			'admin-settings',
 			'admin-settings',
-			['common/projectcheck', 'common/country-region'],
-			['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription', 'admin-work-locations']
+			array_merge(
+				['common/projectcheck', 'common/country-region'],
+				$isTransferSection ? ['common/transfer'] : [],
+			),
+			array_merge(
+				['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription', 'admin-work-locations'],
+				$isTransferSection ? ['transfer-bridge', 'transfer'] : [],
+			)
 		);
 
 		$requireSubstituteJson = $this->appConfig->getAppValueString('require_substitute_types', '[]');
@@ -1246,6 +1272,13 @@ class AdminController extends Controller
 				'projectCheckAppsUrl' => $this->projectCheckAppsSettingsUrl(),
 				'requesttoken' => Util::callRegister(),
 				'useAppTeams' => $this->appConfig->getAppValueString('use_app_teams', '0') === '1',
+				// Synced transfer partial contract (parts/settings/transfer.php).
+				'isSystemAdmin' => $this->groupManager->isAdmin(
+					(string)($this->userSession->getUser()?->getUID() ?? '')
+				),
+				'transferLastReceipt' => $isTransferSection
+					? $this->transferReceiptStore()?->lastReceipt()
+					: null,
 			],
 			$extraTemplateData,
 		));
@@ -3064,12 +3097,14 @@ class AdminController extends Controller
 					$users = $this->normalizeAppAdminUserIds($userIds);
 				}
 
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, $restrictionEnabled ? '1' : '0');
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, json_encode($groups));
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_ALLOWED_USER_IDS, json_encode($users));
-				// Open ⇒ clear NC app restriction so the menu shows for everyone.
-				// Restricted ⇒ sync group allowlist into NC restriction (users enforced in-app).
-				$this->applyAppRestrictionGroups($restrictionEnabled ? $groups : []);
+				// One atomic door-policy write through the central permission
+				// writer (NN-02 / azc #46): appconfig keys + NC platform
+				// app-restriction mirror move together — never raw setAppValue.
+				$this->permissionService->saveAccessDoorPolicy([
+					'restrictionEnabled' => $restrictionEnabled,
+					'allowedUserIds' => $users,
+					'allowedGroupIds' => $groups,
+				]);
 
 				$updatedSettings['accessRestrictionEnabled'] = $restrictionEnabled;
 				$updatedSettings['accessAllowedGroups'] = $groups;
@@ -3101,7 +3136,9 @@ class AdminController extends Controller
 						], Http::STATUS_BAD_REQUEST);
 					}
 				}
-				$this->appConfig->setAppValueString(Constants::CONFIG_APP_ADMIN_USER_IDS, json_encode($normalizedAdminUserIds));
+				$this->permissionService->saveAccessDoorPolicy([
+					'appAdminUserIds' => $normalizedAdminUserIds,
+				]);
 				$updatedSettings['appAdminUserIds'] = $normalizedAdminUserIds;
 			}
 
@@ -4522,25 +4559,6 @@ class AdminController extends Controller
 		}
 
 		return array_keys($unique);
-	}
-
-	/**
-	 * @param list<string> $groupIds
-	 */
-	private function applyAppRestrictionGroups(array $groupIds): void
-	{
-		if ($groupIds === []) {
-			$this->appManager->enableApp('arbeitszeitcheck');
-			return;
-		}
-		$groups = [];
-		foreach ($groupIds as $groupId) {
-			$group = $this->groupManager->get($groupId);
-			if ($group !== null) {
-				$groups[] = $group;
-			}
-		}
-		$this->appManager->enableAppForGroups('arbeitszeitcheck', $groups);
 	}
 
 	/**

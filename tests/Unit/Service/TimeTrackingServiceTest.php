@@ -784,9 +784,10 @@ class TimeTrackingServiceTest extends TestCase {
 		$entry->setCreatedAt(clone $start);
 		$entry->setUpdatedAt($pausedAt);
 
-		// find() runs once to load the paused entry and once more to refresh
-		// the persisted paid-break snapshot after recompute.
-		$this->timeEntryMapper->expects($this->exactly(2))
+		// find() runs once to size the month-closure lock set (TOCTOU
+		// pre-read), once more inside the tx to re-check under the held
+		// locks, and once to refresh the persisted paid-break snapshot.
+		$this->timeEntryMapper->expects($this->exactly(3))
 			->method('find')
 			->with(77)
 			->willReturn($entry);

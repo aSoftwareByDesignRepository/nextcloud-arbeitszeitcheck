@@ -30,6 +30,7 @@ final class AdminSettingsSectionCatalog
 	public const SECTION_RETENTION = 'retention';
 	public const SECTION_WORK_LOCATIONS = 'work-locations';
 	public const SECTION_PROJECTCHECK = 'projectcheck';
+	public const SECTION_TRANSFER = 'transfer';
 
 	/** Sentinel for Nextcloud Administration mega-form (full write parity). */
 	public const SECTION_ALL = 'all';
@@ -52,6 +53,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_RETENTION,
 		self::SECTION_WORK_LOCATIONS,
 		self::SECTION_PROJECTCHECK,
+		self::SECTION_TRANSFER,
 	];
 
 	/**
@@ -74,6 +76,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_MONTH_CLOSURE,
 			self::SECTION_RETENTION,
 			self::SECTION_WORK_LOCATIONS,
+			self::SECTION_TRANSFER,
 		],
 		'connections' => [self::SECTION_PROJECTCHECK],
 	];
@@ -97,6 +100,7 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_RETENTION => 'retention.php',
 		self::SECTION_WORK_LOCATIONS => 'work-locations.php',
 		self::SECTION_PROJECTCHECK => 'projectcheck', // special: shared partial
+		self::SECTION_TRANSFER => 'transfer.php', // wrapper partial includes the synced pack template
 	];
 
 	/**
@@ -183,6 +187,8 @@ final class AdminSettingsSectionCatalog
 		self::SECTION_PROJECTCHECK => [
 			'projectCheckIntegrationEnabled',
 		],
+		// Transfer is engine-owned — no fields write through updateAdminSettings.
+		self::SECTION_TRANSFER => [],
 	];
 
 	public function isSection(string $section): bool
@@ -215,6 +221,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_RETENTION => $l->t('Data retention'),
 			self::SECTION_WORK_LOCATIONS => $l->t('Work locations'),
 			self::SECTION_PROJECTCHECK => $l->t('ProjectCheck connection'),
+			self::SECTION_TRANSFER => $l->t('Transfer configuration'),
 			default => $l->t('Global settings'),
 		};
 	}
@@ -234,6 +241,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_RETENTION => $l->t('Retention'),
 			self::SECTION_WORK_LOCATIONS => $l->t('Locations'),
 			self::SECTION_PROJECTCHECK => $l->t('ProjectCheck'),
+			self::SECTION_TRANSFER => $l->t('Transfer'),
 			default => $l->t('Settings'),
 		};
 	}
@@ -253,6 +261,7 @@ final class AdminSettingsSectionCatalog
 			self::SECTION_RETENTION => $l->t('How long time records are kept before cleanup.'),
 			self::SECTION_WORK_LOCATIONS => $l->t('Manage selectable work locations, effective defaults, and the home-office migration.'),
 			self::SECTION_PROJECTCHECK => $l->t('Optional link from time entries to ProjectCheck projects.'),
+			self::SECTION_TRANSFER => $l->t('Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming.'),
 			default => '',
 		};
 	}

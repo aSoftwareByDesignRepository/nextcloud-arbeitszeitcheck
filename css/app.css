@@ -1708,7 +1708,7 @@ dialog .azc-icon-btn,
 	margin: 0 auto var(--azc-space-4);
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
-@media (max-width: 479.98px) {
+@media (max-width: 480px) {
 	.azc-denied {
 		min-height: auto;
 		padding: var(--azc-space-4);

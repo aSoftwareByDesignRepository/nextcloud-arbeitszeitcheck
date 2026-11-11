@@ -264,7 +264,7 @@
 }
 
 /* Compact breakpoint: from 481px upward the manager half-day choices can share the row safely. */
-@media (min-width: 480px) {
+@media (min-width: 480.02px) {
 	#app-content.azc-app--manager-absences .absence-day-fraction__segment {
 		flex: 1 1 10rem;
 		min-width: 8rem;

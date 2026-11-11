@@ -6357,7 +6357,10 @@
 	"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "«Almeno X ore di assenza accreditano almeno Y ore.» Le righe sono controllate in ordine — vince l'ultima riga corrispondente.",
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Genera URL feed» crea il primo link per un ambito. «Revoca e ruota» sostituisce un link esistente — il vecchio URL smette subito di funzionare.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "«Posizionamento» colloca le pause automatiche nella fascia. «Obbligatorio» significa che la pausa deve sovrapporsi alla fascia per i minuti indicati.",
-	"…" : "…"
+	"…" : "…",
+	"Transfer configuration" : "Trasferisci configurazione",
+	"Transfer" : "Trasferimento",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Esporta tutte le impostazioni e i dati in un unico file cifrato — poi importalo sull’istanza di produzione. Controlla l’anteprima prima di confermare."
 	}
 );
 }});})();

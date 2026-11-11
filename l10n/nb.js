@@ -1708,7 +1708,7 @@
 	"Download CSV" : "Last ned CSV",
 	"Download PDF" : "Last ned PDF",
 	"Download a DATEV text file for the same start and end dates as above. Hour premiums appear as extra Lohnart lines only when mapped in Global settings." : "Last ned en DATEV-tekstfil for samme start- og sluttdato som ovenfor. Timetillegg vises som ekstra Lohnart-linjer bare når de er kartlagt i Globale innstillinger.",
-	"Download all settings, catalogues and business data as one encrypted file — then import it on your production instance." : "Last ned alle innstillinger, katalogdata og forretningsdata som én kryptert fil — les den deretter inn på produksjonsinstansen.",
+	"Download all settings, catalogues and business data as one encrypted file — then import it on your production instance." : "Last ned alle innstillinger, katalogdata og virksomhetsdata som én kryptert fil — les den deretter inn på produksjonsinstansen.",
 	"Download balance PDF" : "Last ned saldo-PDF",
 	"Download encrypted transfer file" : "Last ned kryptert overføringsfil",
 	"Download for each person" : "Last ned for hver person",
@@ -2502,7 +2502,7 @@
 	"Install and enable the ProjectCheck app on this server before you can connect ArbeitszeitCheck to it." : "Installer og aktiver ProjectCheck-appen på denne serveren før du kan koble ArbeitszeitCheck til den.",
 	"Installed app version on this Nextcloud." : "Installert appversjon på denne Nextcloud.",
 	"Instance default (currently: %s)" : "Instansstandard (gjeldende: %s)",
-	"Instance-bound columns left empty" : "Instansbundne kolonner står tomme",
+	"Instance-bound columns left empty" : "Instansbaserte kolonner står tomme",
 	"Insufficient Break Time" : "Utilstrekkelig pausetid",
 	"Insufficient rest period" : "Utilstrekkelig hvileperiode",
 	"Internal error" : "Intern feil",
@@ -6357,7 +6357,10 @@
 	"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins." : "«Minst X timer fravær krediterer minst Y timer.» Rader sjekkes i rekkefølge — den siste matchende raden vinner.",
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generer feed-URL» oppretter den første lenken for et omfang. «Tilbakekall og roter» erstatter en eksisterende lenke — den gamle URL-en slutter å fungere umiddelbart.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "«Plassering» legger automatiske pauser inne i vinduet. «Påkrevd» betyr at pausen må overlappe vinduet med det angitte antallet minutter.",
-	"…" : "…"
+	"…" : "…",
+	"Transfer configuration" : "Overfør konfigurasjon",
+	"Transfer" : "Overføring",
+	"Export all settings and data as one encrypted file, then import it on your production instance. Review the preview before confirming." : "Eksporter alle innstillinger og data som én kryptert fil — les den deretter inn på produksjonsinstansen. Se gjennom forhåndsvisningen før du bekrefter."
 	}
 );
 }});})();

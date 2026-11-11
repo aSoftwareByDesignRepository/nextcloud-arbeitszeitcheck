@@ -46,9 +46,15 @@ $sectionFiles = [
 	'regional' => 'regional.php',
 	'retention' => 'retention.php',
 	'work-locations' => 'work-locations.php',
+	'transfer' => 'transfer.php',
 ];
-
 $renderAll = $isNcAdminShell || $settingsSection === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL;
+// 'transfer' is intentionally absent from $sectionFiles: the synced pack
+// partial carries its own <form> elements, so it renders OUTSIDE
+// #admin-settings-form (nested <form> is invalid) and never joins the NC
+// mega-form (no fields write through updateAdminSettings).
+$isTransferSection = !$renderAll
+	&& $settingsSection === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_TRANSFER;
 $formScope = $renderAll
 	? \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL
 	: $settingsSection;
@@ -60,10 +66,10 @@ $projectCheckEnabledForCurrentUser = !empty($_['projectCheckEnabledForCurrentUse
 $projectCheckAppsUrl = (string)($_['projectCheckAppsUrl'] ?? '');
 $useAppTeams = !empty($_['useAppTeams']);
 // Outlook subscription uses dedicated API actions — hide misleading sticky Save on that page only.
-$showSettingsSaveFooter = $renderAll || !in_array($settingsSection, [
+$showSettingsSaveFooter = !$isTransferSection && ($renderAll || !in_array($settingsSection, [
 	\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_OUTLOOK_SUBSCRIPTION,
 	\OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_WORK_LOCATIONS,
-], true);
+], true));
 ?>
 
 <?php if (!$isNcAdminShell): ?>
@@ -112,6 +118,13 @@ $showSettingsSaveFooter = $renderAll || !in_array($settingsSection, [
 					<?php include __DIR__ . '/common/azc-admin-settings-nav.php'; ?>
 				<?php endif; ?>
             <div class="azc-settings-layout__main">
+			<?php if ($isTransferSection): ?>
+				<?php
+				// Synced pack page (apps/_shared/config-transfer) — own forms,
+				// no sticky Save bar, same chip-bar chrome as every section.
+				include __DIR__ . '/parts/settings/transfer.php';
+				?>
+			<?php else: ?>
             <form id="admin-settings-form" class="form admin-settings-form" method="post" action="#" novalidate
                   data-settings-section="<?php p($formScope); ?>"
                   data-initial-country="<?php p($settings['country'] ?? \OCA\ArbeitszeitCheck\Support\RegionRegistry::COUNTRY_DE); ?>">
@@ -147,6 +160,7 @@ $showSettingsSaveFooter = $renderAll || !in_array($settingsSection, [
 
 				if ($renderAll) {
 					foreach (array_keys($sectionFiles) as $slug) {
+						if ($slug === 'transfer') { continue; } // own forms — never inside the mega-form
 						$includeSection($slug);
 					}
 					$includeSection('projectcheck');
@@ -182,6 +196,7 @@ $showSettingsSaveFooter = $renderAll || !in_array($settingsSection, [
                 </div>
 				<?php endif; ?>
             </form>
+			<?php endif; ?>
             </div><!-- /.azc-settings-layout__main -->
             </div><!-- /.azc-settings-layout -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">

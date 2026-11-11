@@ -1506,7 +1506,7 @@ body[data-theme-dark-highcontrast] #app-content.azc-app--dashboard .dashboard-st
 }
 
 /* Compact breakpoint: from 480px upward the dashboard metric tiles can share two columns safely. */
-@media (min-width: 480px) and (max-width: 768.98px) {
+@media (min-width: 480.02px) and (max-width: 768.98px) {
     #app-content.azc-app--dashboard .azc-dashboard-metrics {
         grid-template-columns: 1fr 1fr;
     }

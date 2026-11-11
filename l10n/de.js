@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Dieser Antrag verbraucht 1 Tag und rechnet die geplante Arbeitszeit dieses Tages an.",
 	"Half-day absence request submitted successfully" : "Halbtags-Antrag erfolgreich eingereicht",
 	"Half-day entries are not enabled for this absence type." : "Halbtägige Einträge sind für diese Abwesenheitsart nicht aktiviert.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Ein halber Tag ist nur erlaubt, wenn Start und Ende am selben Tag liegen. Für gemischte halbe und ganze Tage bitte getrennte Anträge stellen."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Ein halber Tag ist nur erlaubt, wenn Start und Ende am selben Tag liegen. Für gemischte halbe und ganze Tage bitte getrennte Anträge stellen.",
+	"%d row(s) need a value on this instance" : "%d Zeile(n) benötigen einen Wert auf dieser Instanz",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d Zeile(n) übersprungen und %d Verweis(e) unaufgelöst — siehe die Gruppen unten.",
+	"(%d env-bound value(s) emptied)" : "(%d instanzgebundene Werte geleert)",
+	"(%d filtered)" : "(%d gefiltert)",
+	"(%d secret(s) redacted)" : "(%d Geheimnis(se) geschwärzt)",
+	"(%d unresolved ref)" : "(%d unaufgelöste Verweise)",
+	"A transfer started by %s is already running." : "Ein von %s gestarteter Transfer läuft bereits.",
+	"Exported from %1$s at %2$s" : "Exportiert von %1$s um %2$s",
+	"Import applied. %d settings and %d rows written." : "Import angewendet. %d Einstellungen und %d Zeilen geschrieben.",
+	"Phase: %s" : "Phase: %s",
+	"Pre-flight checks" : "Vorabprüfungen",
+	"Queued" : "In Warteschlange",
+	"Safety snapshot" : "Sicherheitssnapshot",
+	"This will update %d settings and %d rows — nothing is deleted." : "Dies aktualisiert %d Einstellungen und %d Zeilen — nichts wird gelöscht.",
+	"Validating" : "Wird geprüft",
+	"Value \"%s\" still points at the source server URL." : "Wert „%s“ zeigt weiterhin auf die URL des Quellservers.",
+	"Verifying references" : "Verweise werden geprüft",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Warnung: %d Zeile(n) werden endgültig gelöscht, danach werden die Dateidaten geladen.",
+	"Writing data" : "Daten werden geschrieben",
+	"Writing settings" : "Einstellungen werden geschrieben"
 	}
 );
 }});})();

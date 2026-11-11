@@ -6403,7 +6403,27 @@
         "This request uses 1 day and credits the planned working time for that day.": "Ten wniosek zużywa 1 dzień i zalicza planowany czas pracy tego dnia.",
         "Half-day absence request submitted successfully": "Wniosek o nieobecność półdniową został złożony",
         "Half-day entries are not enabled for this absence type.": "Wpisy półdniowe nie są włączone dla tego rodzaju nieobecności.",
-        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Pół dnia jest dozwolone tylko wtedy, gdy początek i koniec przypadają na ten sam dzień. W przypadku mieszanych półdni i pełnych dni złóż osobne wnioski."
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Pół dnia jest dozwolone tylko wtedy, gdy początek i koniec przypadają na ten sam dzień. W przypadku mieszanych półdni i pełnych dni złóż osobne wnioski.",
+        "%d row(s) need a value on this instance": "%d wierszy wymaga wartości na tej instancji",
+        "%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "Pominięto %d wierszy i nierozwiązano %d odwołań — zobacz grupy poniżej.",
+        "(%d env-bound value(s) emptied)": "(%d opróżnione wartości związane z instancją)",
+        "(%d filtered)": "(%d odfiltrowane)",
+        "(%d secret(s) redacted)": "(%d ukryte sekrety)",
+        "(%d unresolved ref)": "(%d nierozwiązane odwołania)",
+        "A transfer started by %s is already running.": "Transfer uruchomiony przez %s jest już w toku.",
+        "Exported from %1$s at %2$s": "Wyeksportowano z %1$s o %2$s",
+        "Import applied. %d settings and %d rows written.": "Import zastosowany. Zapisano %d ustawień i %d wierszy.",
+        "Phase: %s": "Faza: %s",
+        "Pre-flight checks": "Kontrole wstępne",
+        "Queued": "W kolejce",
+        "Safety snapshot": "Migawka bezpieczeństwa",
+        "This will update %d settings and %d rows — nothing is deleted.": "Spowoduje to aktualizację %d ustawień i %d wierszy — nic nie zostanie usunięte.",
+        "Validating": "Sprawdzanie",
+        "Value \"%s\" still points at the source server URL.": "Wartość „%s” nadal wskazuje na adres URL serwera źródłowego.",
+        "Verifying references": "Weryfikowanie odwołań",
+        "Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Ostrzeżenie: %d wierszy zostanie trwale usuniętych, a następnie dane z pliku zostaną wczytane.",
+        "Writing data": "Zapisywanie danych",
+        "Writing settings": "Zapisywanie ustawień"
     },
     "pluralForm": "nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 }

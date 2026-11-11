@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Questa richiesta usa 1 giorno e accredita l’orario di lavoro pianificato per quel giorno.",
 	"Half-day absence request submitted successfully" : "Richiesta di assenza a mezza giornata inviata correttamente",
 	"Half-day entries are not enabled for this absence type." : "Le registrazioni a mezza giornata non sono abilitate per questo tipo di assenza.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Una mezza giornata è consentita solo quando inizio e fine coincidono nello stesso giorno. Per combinare mezze giornate e giornate intere, invia richieste separate."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Una mezza giornata è consentita solo quando inizio e fine coincidono nello stesso giorno. Per combinare mezze giornate e giornate intere, invia richieste separate.",
+	"%d row(s) need a value on this instance" : "%d riga\/e richiedono un valore su questa istanza",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d riga\/e saltata\/e e %d riferimento\/i non risolto\/i — vedi i gruppi sotto.",
+	"(%d env-bound value(s) emptied)" : "(%d valori legati all’istanza svuotati)",
+	"(%d filtered)" : "(%d filtrate)",
+	"(%d secret(s) redacted)" : "(%d segreti oscurati)",
+	"(%d unresolved ref)" : "(%d riferimenti non risolti)",
+	"A transfer started by %s is already running." : "Un trasferimento avviato da %s è già in esecuzione.",
+	"Exported from %1$s at %2$s" : "Esportato da %1$s il %2$s",
+	"Import applied. %d settings and %d rows written." : "Importazione applicata. %d impostazioni e %d righe scritte.",
+	"Phase: %s" : "Fase: %s",
+	"Pre-flight checks" : "Controlli preliminari",
+	"Queued" : "In coda",
+	"Safety snapshot" : "Snapshot di sicurezza",
+	"This will update %d settings and %d rows — nothing is deleted." : "Verranno aggiornate %d impostazioni e %d righe — non verrà eliminato nulla.",
+	"Validating" : "Convalida in corso",
+	"Value \"%s\" still points at the source server URL." : "Il valore \"%s\" punta ancora all’URL del server di origine.",
+	"Verifying references" : "Verifica dei riferimenti",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Attenzione: %d riga\/e verranno eliminate definitivamente, quindi verranno caricati i dati del file.",
+	"Writing data" : "Scrittura dei dati",
+	"Writing settings" : "Scrittura delle impostazioni"
 	}
 );
 }});})();

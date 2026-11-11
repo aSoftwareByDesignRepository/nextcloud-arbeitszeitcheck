@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Dit verzoek gebruikt 1 dag en schrijft de geplande werktijd voor die dag bij.",
 	"Half-day absence request submitted successfully" : "Verzoek voor een halve afwezigheidsdag succesvol ingediend",
 	"Half-day entries are not enabled for this absence type." : "Halve-dagregistraties zijn niet ingeschakeld voor dit afwezigheidstype.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Een halve dag is alleen toegestaan wanneer start en einde op dezelfde dag vallen. Dien voor gemengde halve en hele dagen afzonderlijke verzoeken in."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Een halve dag is alleen toegestaan wanneer start en einde op dezelfde dag vallen. Dien voor gemengde halve en hele dagen afzonderlijke verzoeken in.",
+	"%d row(s) need a value on this instance" : "%d rij(en) hebben een waarde nodig op deze installatie",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d rij(en) overgeslagen en %d verwijzing(en) onopgelost — zie de groepen hieronder.",
+	"(%d env-bound value(s) emptied)" : "(%d installatiegebonden waarden geleegd)",
+	"(%d filtered)" : "(%d gefilterd)",
+	"(%d secret(s) redacted)" : "(%d geheimen gemaskeerd)",
+	"(%d unresolved ref)" : "(%d onopgeloste verwijzingen)",
+	"A transfer started by %s is already running." : "Er loopt al een door %s gestarte overdracht.",
+	"Exported from %1$s at %2$s" : "Geëxporteerd van %1$s om %2$s",
+	"Import applied. %d settings and %d rows written." : "Import toegepast. %d instellingen en %d rijen geschreven.",
+	"Phase: %s" : "Fase: %s",
+	"Pre-flight checks" : "Controles vooraf",
+	"Queued" : "In wachtrij",
+	"Safety snapshot" : "Veiligheidsmomentopname",
+	"This will update %d settings and %d rows — nothing is deleted." : "Dit werkt %d instellingen en %d rijen bij — er wordt niets verwijderd.",
+	"Validating" : "Bezig met valideren",
+	"Value \"%s\" still points at the source server URL." : "Waarde \"%s\" verwijst nog steeds naar de URL van de bronserver.",
+	"Verifying references" : "Verwijzingen worden gecontroleerd",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Waarschuwing: %d rij(en) worden definitief verwijderd, daarna worden de bestandsgegevens geladen.",
+	"Writing data" : "Gegevens worden geschreven",
+	"Writing settings" : "Instellingen worden geschreven"
 	}
 );
 }});})();

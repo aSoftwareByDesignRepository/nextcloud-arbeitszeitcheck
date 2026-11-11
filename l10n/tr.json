@@ -6395,7 +6395,27 @@
         "This request uses 1 day and credits the planned working time for that day.": "Bu talep 1 gün kullanır ve o gün için planlanan çalışma süresini hak ediş olarak yazar.",
         "Half-day absence request submitted successfully": "Yarım günlük devamsızlık talebi başarıyla gönderildi",
         "Half-day entries are not enabled for this absence type.": "Yarım gün kayıtları bu devamsızlık türü için etkin değil.",
-        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Yarım gün yalnızca başlangıç ve bitiş aynı gün olduğunda izin verilir. Karışık yarım ve tam günler için ayrı talepler gönderin."
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Yarım gün yalnızca başlangıç ve bitiş aynı gün olduğunda izin verilir. Karışık yarım ve tam günler için ayrı talepler gönderin.",
+        "%d row(s) need a value on this instance": "%d satırın bu örnekte bir değere ihtiyacı var",
+        "%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d satır atlandı ve %d başvuru çözümlenemedi — aşağıdaki gruplara bakın.",
+        "(%d env-bound value(s) emptied)": "(%d örneğe bağlı değer boşaltıldı)",
+        "(%d filtered)": "(%d filtrelendi)",
+        "(%d secret(s) redacted)": "(%d sır gizlendi)",
+        "(%d unresolved ref)": "(%d çözümlenemeyen başvuru)",
+        "A transfer started by %s is already running.": "%s tarafından başlatılan bir aktarım zaten çalışıyor.",
+        "Exported from %1$s at %2$s": "%1$s konumundan %2$s tarihinde dışa aktarıldı",
+        "Import applied. %d settings and %d rows written.": "İçe aktarma uygulandı. %d ayar ve %d satır yazıldı.",
+        "Phase: %s": "Aşama: %s",
+        "Pre-flight checks": "Ön denetimler",
+        "Queued": "Kuyrukta",
+        "Safety snapshot": "Güvenlik anlık görüntüsü",
+        "This will update %d settings and %d rows — nothing is deleted.": "Bu işlem %d ayarı ve %d satırı güncelleyecek — hiçbir şey silinmeyecek.",
+        "Validating": "Doğrulanıyor",
+        "Value \"%s\" still points at the source server URL.": "\"%s\" değeri hâlâ kaynak sunucunun URL adresine işaret ediyor.",
+        "Verifying references": "Başvurular doğrulanıyor",
+        "Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Uyarı: %d satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek.",
+        "Writing data": "Veriler yazılıyor",
+        "Writing settings": "Ayarlar yazılıyor"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

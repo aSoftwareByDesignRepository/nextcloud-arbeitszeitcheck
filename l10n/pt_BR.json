@@ -6392,7 +6392,27 @@
         "This request uses 1 day and credits the planned working time for that day.": "Esta solicitação usa 1 dia e credita o tempo de trabalho planejado para esse dia.",
         "Half-day absence request submitted successfully": "Solicitação de ausência de meio dia enviada com sucesso",
         "Half-day entries are not enabled for this absence type.": "Os registros de meio dia não estão ativados para este tipo de ausência.",
-        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Um meio dia só é permitido quando o início e o fim são no mesmo dia. Para misturar meios dias e dias inteiros, envie solicitações separadas."
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "Um meio dia só é permitido quando o início e o fim são no mesmo dia. Para misturar meios dias e dias inteiros, envie solicitações separadas.",
+        "%d row(s) need a value on this instance": "%d linha(s) precisam de um valor nesta instância",
+        "%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d linha(s) ignorada(s) e %d referência(s) não resolvida(s) — veja os grupos abaixo.",
+        "(%d env-bound value(s) emptied)": "(%d valor(es) vinculados à instância esvaziados)",
+        "(%d filtered)": "(%d filtrada(s))",
+        "(%d secret(s) redacted)": "(%d segredo(s) ocultado(s))",
+        "(%d unresolved ref)": "(%d referência(s) não resolvida(s))",
+        "A transfer started by %s is already running.": "Já há uma transferência iniciada por %s em execução.",
+        "Exported from %1$s at %2$s": "Exportado de %1$s em %2$s",
+        "Import applied. %d settings and %d rows written.": "Importação aplicada. %d configurações e %d linhas gravadas.",
+        "Phase: %s": "Fase: %s",
+        "Pre-flight checks": "Verificações prévias",
+        "Queued": "Na fila",
+        "Safety snapshot": "Snapshot de segurança",
+        "This will update %d settings and %d rows — nothing is deleted.": "Isso atualizará %d configurações e %d linhas — nada será excluído.",
+        "Validating": "Validando",
+        "Value \"%s\" still points at the source server URL.": "O valor \"%s\" ainda aponta para a URL do servidor de origem.",
+        "Verifying references": "Verificando referências",
+        "Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Aviso: %d linha(s) serão excluídas permanentemente e, em seguida, os dados do arquivo serão carregados.",
+        "Writing data": "Gravando dados",
+        "Writing settings": "Gravando configurações"
     },
     "pluralForm": "nplurals=2; plural=(n > 1);"
 }

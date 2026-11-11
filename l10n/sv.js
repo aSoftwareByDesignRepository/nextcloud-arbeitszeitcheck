@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Denna begäran använder 1 dag och krediterar den planerade arbetstiden för den dagen.",
 	"Half-day absence request submitted successfully" : "Begäran om halv frånvarodag har skickats",
 	"Half-day entries are not enabled for this absence type." : "Halvdagsregistreringar är inte aktiverade för denna frånvarotyp.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "En halv dag är endast tillåten när start och slut är samma dag. För blandade halva och hela dagar, skicka separata begäranden."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "En halv dag är endast tillåten när start och slut är samma dag. För blandade halva och hela dagar, skicka separata begäranden.",
+	"%d row(s) need a value on this instance" : "%d rad(er) behöver ett värde på den här instansen",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d rad(er) hoppades över och %d referens(er) är olösta — se grupperna nedan.",
+	"(%d env-bound value(s) emptied)" : "(%d instansbundna värden tömda)",
+	"(%d filtered)" : "(%d filtrerade)",
+	"(%d secret(s) redacted)" : "(%d hemligheter maskerade)",
+	"(%d unresolved ref)" : "(%d olösta referenser)",
+	"A transfer started by %s is already running." : "En överföring som startades av %s körs redan.",
+	"Exported from %1$s at %2$s" : "Exporterad från %1$s kl. %2$s",
+	"Import applied. %d settings and %d rows written." : "Importen har tillämpats. %d inställningar och %d rader skrivna.",
+	"Phase: %s" : "Fas: %s",
+	"Pre-flight checks" : "Förkontroller",
+	"Queued" : "I kö",
+	"Safety snapshot" : "Säkerhetsögonblicksbild",
+	"This will update %d settings and %d rows — nothing is deleted." : "Detta uppdaterar %d inställningar och %d rader — inget raderas.",
+	"Validating" : "Validerar",
+	"Value \"%s\" still points at the source server URL." : "Värdet \"%s\" pekar fortfarande på källserverns URL.",
+	"Verifying references" : "Verifierar referenser",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Varning: %d rad(er) raderas permanent, sedan läses filens data in.",
+	"Writing data" : "Skriver data",
+	"Writing settings" : "Skriver inställningar"
 	}
 );
 }});})();

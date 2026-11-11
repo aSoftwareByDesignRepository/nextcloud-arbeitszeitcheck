@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Denne anmodning bruger 1 dag og godskriver den planlagte arbejdstid for den dag.",
 	"Half-day absence request submitted successfully" : "Anmodning om halv fraværsdag er indsendt",
 	"Half-day entries are not enabled for this absence type." : "Halvdagsregistreringer er ikke aktiveret for denne fraværstype.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "En halv dag er kun tilladt, når start og slut er samme dag. Ved blandede halve og hele dage skal der indsendes separate anmodninger."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "En halv dag er kun tilladt, når start og slut er samme dag. Ved blandede halve og hele dage skal der indsendes separate anmodninger.",
+	"%d row(s) need a value on this instance" : "%d række(r) kræver en værdi på denne instans",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d række(r) sprunget over og %d reference(r) uopløst — se grupperne nedenfor.",
+	"(%d env-bound value(s) emptied)" : "(%d instansbundne værdier tømt)",
+	"(%d filtered)" : "(%d filtreret)",
+	"(%d secret(s) redacted)" : "(%d hemmelighed(er) sløret)",
+	"(%d unresolved ref)" : "(%d uopløst reference)",
+	"A transfer started by %s is already running." : "En overførsel startet af %s kører allerede.",
+	"Exported from %1$s at %2$s" : "Eksporteret fra %1$s kl. %2$s",
+	"Import applied. %d settings and %d rows written." : "Import anvendt. %d indstillinger og %d rækker skrevet.",
+	"Phase: %s" : "Fase: %s",
+	"Pre-flight checks" : "Forhåndskontroller",
+	"Queued" : "I kø",
+	"Safety snapshot" : "Sikkerhedssnapshot",
+	"This will update %d settings and %d rows — nothing is deleted." : "Dette opdaterer %d indstillinger og %d rækker — intet slettes.",
+	"Validating" : "Validerer",
+	"Value \"%s\" still points at the source server URL." : "Værdien \"%s\" peger stadig på kildeserverens URL.",
+	"Verifying references" : "Verificerer referencer",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Advarsel: %d række(r) slettes permanent, derefter indlæses fildataene.",
+	"Writing data" : "Skriver data",
+	"Writing settings" : "Skriver indstillinger"
 	}
 );
 }});})();

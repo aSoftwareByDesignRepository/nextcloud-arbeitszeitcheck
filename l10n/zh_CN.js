@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "此申请使用 1 天，并按当日计划工作时间计入。",
 	"Half-day absence request submitted successfully" : "半天请假申请已成功提交",
 	"Half-day entries are not enabled for this absence type." : "此请假类型未启用半天记录。",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "仅当开始和结束为同一天时才允许半天。若需混合半天与全天，请分别提交申请。"
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "仅当开始和结束为同一天时才允许半天。若需混合半天与全天，请分别提交申请。",
+	"%d row(s) need a value on this instance" : "%d 行需要在此实例上填写值",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "已跳过 %d 行，%d 个引用未能解析——请查看下方分组。",
+	"(%d env-bound value(s) emptied)" : "（已清空 %d 个实例绑定值）",
+	"(%d filtered)" : "（已过滤 %d 项）",
+	"(%d secret(s) redacted)" : "（已遮蔽 %d 个机密）",
+	"(%d unresolved ref)" : "（%d 个引用未解析）",
+	"A transfer started by %s is already running." : "由 %s 发起的传输已在运行中。",
+	"Exported from %1$s at %2$s" : "导出自 %1$s，时间 %2$s",
+	"Import applied. %d settings and %d rows written." : "导入已应用。已写入 %d 项设置和 %d 行。",
+	"Phase: %s" : "阶段：%s",
+	"Pre-flight checks" : "预检",
+	"Queued" : "排队中",
+	"Safety snapshot" : "安全快照",
+	"This will update %d settings and %d rows — nothing is deleted." : "这将更新 %d 项设置和 %d 行数据——不会删除任何内容。",
+	"Validating" : "正在校验",
+	"Value \"%s\" still points at the source server URL." : "值“%s”仍指向源服务器 URL。",
+	"Verifying references" : "正在验证引用",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "警告：%d 行将被永久删除，然后加载文件数据。",
+	"Writing data" : "正在写入数据",
+	"Writing settings" : "正在写入设置"
 	}
 );
 }});})();

@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "This request uses 1 day and credits the planned working time for that day.",
 	"Half-day absence request submitted successfully" : "Half-day absence request submitted successfully",
 	"Half-day entries are not enabled for this absence type." : "Half-day entries are not enabled for this absence type.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.",
+	"%d row(s) need a value on this instance" : "%d row(s) need a value on this instance",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d row(s) skipped and %d reference(s) unresolved — see the groups below.",
+	"(%d env-bound value(s) emptied)" : "(%d env-bound value(s) emptied)",
+	"(%d filtered)" : "(%d filtered)",
+	"(%d secret(s) redacted)" : "(%d secret(s) redacted)",
+	"(%d unresolved ref)" : "(%d unresolved ref)",
+	"A transfer started by %s is already running." : "A transfer started by %s is already running.",
+	"Exported from %1$s at %2$s" : "Exported from %1$s at %2$s",
+	"Import applied. %d settings and %d rows written." : "Import applied. %d settings and %d rows written.",
+	"Phase: %s" : "Phase: %s",
+	"Pre-flight checks" : "Pre-flight checks",
+	"Queued" : "Queued",
+	"Safety snapshot" : "Safety snapshot",
+	"This will update %d settings and %d rows — nothing is deleted." : "This will update %d settings and %d rows — nothing is deleted.",
+	"Validating" : "Validating",
+	"Value \"%s\" still points at the source server URL." : "Value \"%s\" still points at the source server URL.",
+	"Verifying references" : "Verifying references",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Warning: %d row(s) will be permanently deleted, then the file data is loaded.",
+	"Writing data" : "Writing data",
+	"Writing settings" : "Writing settings"
 	}
 );
 }});})();

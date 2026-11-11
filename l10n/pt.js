@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "Este pedido usa 1 dia e credita o tempo de trabalho planeado para esse dia.",
 	"Half-day absence request submitted successfully" : "Pedido de ausência de meio dia submetido com sucesso",
 	"Half-day entries are not enabled for this absence type." : "Os registos de meio dia não estão ativados para este tipo de ausência.",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Um meio dia só é permitido quando o início e o fim são no mesmo dia. Para misturar meios dias e dias inteiros, submeta pedidos separados."
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "Um meio dia só é permitido quando o início e o fim são no mesmo dia. Para misturar meios dias e dias inteiros, submeta pedidos separados.",
+	"%d row(s) need a value on this instance" : "%d linha(s) precisam de um valor nesta instância",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "%d linha(s) ignorada(s) e %d referência(s) por resolver — vê os grupos abaixo.",
+	"(%d env-bound value(s) emptied)" : "(%d valor(es) ligados à instância esvaziados)",
+	"(%d filtered)" : "(%d filtrada(s))",
+	"(%d secret(s) redacted)" : "(%d segredo(s) ocultado(s))",
+	"(%d unresolved ref)" : "(%d referência(s) por resolver)",
+	"A transfer started by %s is already running." : "Já está em execução uma transferência iniciada por %s.",
+	"Exported from %1$s at %2$s" : "Exportado de %1$s em %2$s",
+	"Import applied. %d settings and %d rows written." : "Importação aplicada. %d definições e %d linhas escritas.",
+	"Phase: %s" : "Fase: %s",
+	"Pre-flight checks" : "Verificações prévias",
+	"Queued" : "Em fila",
+	"Safety snapshot" : "Snapshot de segurança",
+	"This will update %d settings and %d rows — nothing is deleted." : "Isto irá atualizar %d definições e %d linhas — nada será eliminado.",
+	"Validating" : "A validar",
+	"Value \"%s\" still points at the source server URL." : "O valor \"%s\" ainda aponta para o URL do servidor de origem.",
+	"Verifying references" : "A verificar referências",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "Aviso: %d linha(s) serão eliminadas permanentemente e, depois, os dados do ficheiro serão carregados.",
+	"Writing data" : "A escrever dados",
+	"Writing settings" : "A escrever definições"
 	}
 );
 }});})();

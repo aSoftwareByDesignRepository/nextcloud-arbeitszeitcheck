@@ -6395,7 +6395,27 @@
         "This request uses 1 day and credits the planned working time for that day.": "Denne forespørselen bruker 1 dag og godskriver den planlagte arbeidstiden for den dagen.",
         "Half-day absence request submitted successfully": "Forespørsel om halv fraværsdag er sendt inn",
         "Half-day entries are not enabled for this absence type.": "Halvdagsregistreringer er ikke aktivert for denne fraværstypen.",
-        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "En halv dag er bare tillatt når start og slutt er samme dag. For blandede halve og hele dager må du sende inn separate forespørsler."
+        "A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.": "En halv dag er bare tillatt når start og slutt er samme dag. For blandede halve og hele dager må du sende inn separate forespørsler.",
+        "%d row(s) need a value on this instance": "%d rad(er) trenger en verdi på denne instansen",
+        "%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d rad(er) hoppet over og %d referanse(r) uløst — se gruppene nedenfor.",
+        "(%d env-bound value(s) emptied)": "(%d instansbundne verdier tømt)",
+        "(%d filtered)": "(%d filtrert)",
+        "(%d secret(s) redacted)": "(%d hemmeligheter sladdet)",
+        "(%d unresolved ref)": "(%d uløste referanser)",
+        "A transfer started by %s is already running.": "En overføring startet av %s kjører allerede.",
+        "Exported from %1$s at %2$s": "Eksportert fra %1$s kl. %2$s",
+        "Import applied. %d settings and %d rows written.": "Importert. %d innstillinger og %d rader skrevet.",
+        "Phase: %s": "Fase: %s",
+        "Pre-flight checks": "Forhåndskontroller",
+        "Queued": "I kø",
+        "Safety snapshot": "Sikkerhetsøyeblikksbilde",
+        "This will update %d settings and %d rows — nothing is deleted.": "Dette oppdaterer %d innstillinger og %d rader — ingenting slettes.",
+        "Validating": "Validerer",
+        "Value \"%s\" still points at the source server URL.": "Verdien «%s» peker fortsatt på kildeserverens URL.",
+        "Verifying references": "Verifiserer referanser",
+        "Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Advarsel: %d rad(er) slettes permanent, deretter lastes fildataene inn.",
+        "Writing data": "Skriver data",
+        "Writing settings": "Skriver innstillinger"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

@@ -342,7 +342,12 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'Projekt #%s', 'På Google Play', 'Rapporter', 'Region (område)', 'Registreringsdetaljer',
 		'Regler', 'Resultat', 'Ruperts dag', 'Saldo: %1$s t', 'Sats', 'Schweiz',
 		'Session (aktiv)',
-		'Session: %1$s (aktiv)', 'Slut', 'Slutminut', 'Sluttid',
+		'Session: %1$s (aktiv)',
+		// 2026-11-11: 'Skriver data' — genuine Swedish present-tense label
+		// (config-transfer 'Writing data' phase), identical spelling in da
+		// is shared vocabulary, not bleed.
+		'Skriver data',
+		'Slut', 'Slutminut', 'Sluttid',
 		'Starttid', 'Station', 'Statistik', 'Status: %1$s - I dag: %2$s t',
 		'Status: %1$s, i dag: %2$s t', 'Statusfilter', 'Struktur',
 		'System (modul)', 'Teammedlem', 'Terminal-app på Google Play',
@@ -843,6 +848,15 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'grund', 'grupper', 'guiden', 'halvdags', 'heldags', 'helst', 'heltal', 'hierarki', 'historik',
 		'historisk', 'hypotetisk', 'idéer', 'importer', 'inaktiv', 'ingen', 'inklusive', 'installationer',
 		'instans', 'instansens', 'instansstandard', 'integrationer', 'intern', 'intervallet', 'juridisk',
+		// 2026-11-11: 'instansen' — definite singular of 'instans' (same
+		// lemma family as 'instans'/'instansens' above); genuine Swedish,
+		// identical spelling in da is shared vocabulary, not bleed
+		// (config-transfer donor catalog, msgid '%d row(s) need a value
+		// on this instance'). 'filens' — genitive of 'filen' ('filens
+		// data', replace-warning msgid), same shared-vocabulary class.
+		// 'importen' — definite singular of 'import' ('Importen har
+		// tillämpats.', apply-result msgid), genuine Swedish noun.
+		'instansen', 'filens', 'importen',
 		'justering', 'justeringen', 'kalenderappen', 'kalenderdag', 'kalenderformat', 'kalenderikon',
 		'kalenderinvitationer', 'kalenderkonto', 'kalendersynkronisering', 'kalenderår', 'kalenderåret',
 		'kalenderårs', 'kanton', 'kategori', 'kategorier', 'kioskadministration', 'kioskadministrationen',

@@ -6369,7 +6369,27 @@
 	"This request uses 1 day and credits the planned working time for that day." : "此申請使用 1 天，並按當日計畫工作時間計入。",
 	"Half-day absence request submitted successfully" : "半天請假申請已成功提交",
 	"Half-day entries are not enabled for this absence type." : "此請假類型未啟用半天記錄。",
-	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "僅當開始和結束為同一天時才允許半天。若需混合半天與全天，請分別提交申請。"
+	"A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests." : "僅當開始和結束為同一天時才允許半天。若需混合半天與全天，請分別提交申請。",
+	"%d row(s) need a value on this instance" : "%d 列需要在此實例上填寫值",
+	"%d row(s) skipped and %d reference(s) unresolved — see the groups below." : "已略過 %d 列，%d 個參照未能解析——請查看下方群組。",
+	"(%d env-bound value(s) emptied)" : "（已清空 %d 個實例綁定值）",
+	"(%d filtered)" : "（已篩選 %d 項）",
+	"(%d secret(s) redacted)" : "（已遮蔽 %d 個密鑰）",
+	"(%d unresolved ref)" : "（%d 個參照未解析）",
+	"A transfer started by %s is already running." : "由 %s 啟動的傳輸已在執行中。",
+	"Exported from %1$s at %2$s" : "匯出自 %1$s，時間 %2$s",
+	"Import applied. %d settings and %d rows written." : "匯入已套用。已寫入 %d 項設定與 %d 列。",
+	"Phase: %s" : "階段：%s",
+	"Pre-flight checks" : "預先檢查",
+	"Queued" : "佇列中",
+	"Safety snapshot" : "安全快照",
+	"This will update %d settings and %d rows — nothing is deleted." : "這將更新 %d 項設定與 %d 列資料——不會刪除任何內容。",
+	"Validating" : "正在驗證",
+	"Value \"%s\" still points at the source server URL." : "值「%s」仍指向來源伺服器 URL。",
+	"Verifying references" : "正在驗證參照",
+	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "警告：%d 列將被永久刪除，然後載入檔案資料。",
+	"Writing data" : "正在寫入資料",
+	"Writing settings" : "正在寫入設定"
 	}
 );
 }});})();

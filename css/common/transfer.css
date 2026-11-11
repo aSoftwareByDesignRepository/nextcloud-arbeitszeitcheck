@@ -20,6 +20,14 @@
 	outline: 2px solid var(--color-primary-element, #0082c9);
 	outline-offset: 1px;
 }
+/* Replace-confirm token: bare text input in the dialog footer — NC core
+   pins input[type=text] to 130px, dwarfing it inside the ~40rem dialog.
+   Give it a real measure (cramped_form_controls r44). */
+.azc-form-row #azc-transfer-replace-token {
+	width: 100%;
+	max-width: 20rem;
+	min-height: 44px;
+}
 .azc-form-row__hint { color: var(--color-text-maxcontrast, #6b6b6b); font-size: .92em; margin: var(--azc-space-1, 4px) 0 0; }
 .azc-actions { margin-top: var(--azc-space-3, 12px); }
 

@@ -98,7 +98,11 @@
 	function sync() {
 		const single = startEl.value === endEl.value;
 		const multi = startEl.value && endEl.value && startEl.value !== endEl.value;
-		const eligible = enabledTypes().indexOf(typeEl.value) !== -1;
+		// Mirrors templates/absences.php: in a hours-unit org only vacation
+		// loses the control — enabled non-vacation types keep it (AC-G11).
+		const daysMode = group.getAttribute('data-days-mode') === '1';
+		const eligible = enabledTypes().indexOf(typeEl.value) !== -1
+			&& (typeEl.value !== 'vacation' || daysMode);
 		const show = eligible && single;
 		const was = !group.hidden;
 		group.hidden = !show;

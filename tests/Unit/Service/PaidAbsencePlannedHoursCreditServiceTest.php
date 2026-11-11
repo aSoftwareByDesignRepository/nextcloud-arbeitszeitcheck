@@ -266,6 +266,37 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 		$this->assertEqualsWithDelta(4.0, $result['hours'], 0.001);
 	}
 
+	public function testHalfDayOnHalfWeightDayCreditsHalfPlanned(): void
+	{
+		// AZC-HALF-DAY-NON-VACATION: fraction must come from the weight
+		// authority, not a literal days≈0.5 check. A 0.25-stored debit on a
+		// 0.5-weight day is a half-day absence → credits half of the planned
+		// net (8h × 0.5 = 4h); the legacy literal check would read 0.25 as
+		// "full" and credit 8h.
+		$this->config->method('getAppValue')->willReturn('1');
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+		$this->holidayService = $this->createMock(HolidayService::class);
+		$this->holidayService->method('getHolidayWeightForUser')->willReturn(0.0);
+		$this->holidayService->method('computeWorkingDaysForUser')->willReturn(0.5);
+
+		$absence = new Absence();
+		$absence->setType(Absence::TYPE_SICK_LEAVE);
+		$absence->setStatus(Absence::STATUS_APPROVED);
+		$absence->setStartDate(new \DateTime('2026-09-09'));
+		$absence->setEndDate(new \DateTime('2026-09-09'));
+		$absence->setDays(0.25);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([$absence]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(4.0, $result['hours'], 0.001);
+	}
+
 	public function testChildSickCreditsLikeSickLeave(): void
 	{
 		$this->config->method('getAppValue')->willReturn('1');

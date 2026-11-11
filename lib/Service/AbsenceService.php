@@ -3089,6 +3089,31 @@ class AbsenceService
 	}
 
 	/**
+	 * Stored day fraction for the edit form ('0.5' or '1').
+	 *
+	 * Weight-aware mirror of the update path's trusted-preserve derivation:
+	 * a stored half on a half-weight working day persists days = weight × 0.5
+	 * (e.g. 0.25), so a literal days≈0.5 check would mislabel it "Full day"
+	 * and inflate the debit on the next save. Returns '1' for multi-day rows,
+	 * null days, and non-working days (weight 0).
+	 */
+	public function storedDayFraction(Absence $absence): string
+	{
+		$days = $absence->getDays();
+		$start = $absence->getStartDate();
+		$end = $absence->getEndDate();
+		if ($days === null || !$start || !$end
+			|| $start->format('Y-m-d') !== $end->format('Y-m-d')) {
+			return '1';
+		}
+		$weight = $this->computeWorkingDaysForUser($absence->getUserId(), $start, $start);
+		if ($weight <= 0.011) {
+			return '1';
+		}
+		return abs(((float)$days / $weight) - 0.5) <= 0.011 ? '0.5' : '1';
+	}
+
+	/**
 	 * Compute working days per year for a date range (excludes weekends and German public holidays)
 	 *
 	 * @param \DateTime $start

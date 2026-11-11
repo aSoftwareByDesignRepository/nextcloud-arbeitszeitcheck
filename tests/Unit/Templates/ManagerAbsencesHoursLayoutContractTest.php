@@ -28,4 +28,16 @@ class ManagerAbsencesHoursLayoutContractTest extends TestCase
 		$this->assertStringContainsString('j.hours < 0', $js);
 		$this->assertStringNotContainsString('j.hours <= 0', $js);
 	}
+
+	public function testManagerAbsencesJsKeepsHalfDayControlForNonVacationInHoursMode(): void
+	{
+		$js = file_get_contents(dirname(__DIR__, 2) . '/../js/manager-absences.js');
+		$this->assertNotFalse($js);
+		// AC-G11: in a vacation_unit=hours org only *vacation* loses the
+		// day-length control — enabled non-vacation types keep it.
+		$this->assertStringContainsString(
+			"const typeFractionCapable = daysMode || typeSel.value !== 'vacation';",
+			$js
+		);
+	}
 }

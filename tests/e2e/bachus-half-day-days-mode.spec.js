@@ -89,6 +89,37 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
 	});
 
+	test('AC-G11 hours-mode: vacation loses Length, enabled non-vacation type keeps it', async ({ page }) => {
+		await page.goto(fixtureUrl);
+		const group = page.locator('#absence-day-fraction-group');
+		const type = page.locator('#absence-type');
+
+		// Org runs vacation_unit=hours (days-mode off) with vacation+sick enabled.
+		await group.evaluate((node) => {
+			node.setAttribute('data-days-mode', '0');
+			node.setAttribute('data-enabled-types', '["vacation","sick_leave"]');
+		});
+
+		// Vacation in hours mode → hours presets own it, no Length control.
+		await type.selectOption('vacation');
+		await type.dispatchEvent('change');
+		await expect(group).toBeHidden();
+
+		// Enabled non-vacation type keeps the control even in hours mode.
+		await type.selectOption('sick_leave');
+		await type.dispatchEvent('change');
+		await expect(group).toBeVisible();
+		await page.locator('#absence-day-fraction-half + .absence-day-fraction__face').click();
+		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
+
+		// Multi-day still hides it; hidden state resets to full day.
+		await page.locator('#absence-end-date').fill('14.08.2026');
+		await page.locator('#absence-end-date').dispatchEvent('change');
+		await expect(group).toBeHidden();
+		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
+		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
+	});
+
 	test('responsive stacking adapts without overflow', async ({ page }) => {
 		await page.setViewportSize({ width: 320, height: 812 });
 		await page.goto(fixtureUrl);

@@ -270,6 +270,10 @@ class AbsenceController extends Controller
 			$pageData['halfDayEnabledTypes'] = $enabled;
 			$pageData['halfDayCreditTypes'] = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($enabled);
 		}
+		if (!isset($pageData['absenceDayFraction'])
+			&& ($pageData['absence'] ?? null) instanceof Absence) {
+			$pageData['absenceDayFraction'] = $this->absenceService->storedDayFraction($pageData['absence']);
+		}
 
 		return \array_merge($this->buildAbsencesShellParams($mode, $navFlags), $pageData);
 	}

@@ -2521,6 +2521,25 @@ class AbsenceServiceTest extends TestCase
 		$this->assertContains('absence_created', $audited);
 	}
 
+	public function testConvertVacationToSickCarriesStoredHalfDayFraction(): void
+	{
+		// Single-day vacation storing a 0.5 debit. The weight mock returns
+		// 2.0 for every range → stored fraction 0.25, carried sick days
+		// 2.0 × 0.25 = 0.5. A conversion that dropped the carry would write
+		// the full weight (2.0).
+		$absence = $this->makeAbsenceRow(42, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_VACATION, '-5 days', '-5 days');
+		$absence->getStartDate()->setTime(0, 0, 0);
+		$absence->getEndDate()->setTime(0, 0, 0);
+		$absence->setDays(0.5);
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('findOverlapping')->willReturn([]);
+		$this->expectUpdateInsertUpdate();
+
+		$result = $this->service->convertVacationToSick(42, $this->convertData($absence, '-5 days', '-5 days'), 'manager', true);
+
+		$this->assertEqualsWithDelta(0.5, (float)$result['sick']['days'], 0.001);
+	}
+
 	public function testConvertVacationToSickFullCancelsVacation(): void
 	{
 		$absence = $this->runningVacation();

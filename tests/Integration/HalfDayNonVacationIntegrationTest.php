@@ -24,6 +24,8 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 	private string $uid = '';
 	private string $managerUid = '';
 	private ?string $prevEnabled = null;
+	/** @var list<int> */
+	private array $createdAbsenceIds = [];
 
 	protected function setUp(): void
 	{
@@ -73,6 +75,15 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			} catch (\Throwable) {
 			}
 		}
+		foreach ($this->createdAbsenceIds as $absenceId) {
+			try {
+				\OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class)->delete(
+					\OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class)->find($absenceId)
+				);
+			} catch (\Throwable) {
+			}
+		}
+		$this->createdAbsenceIds = [];
 		if ($this->prevEnabled !== null) {
 			try {
 				\OCP\Server::get(IConfig::class)->setAppValue(
@@ -166,6 +177,18 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			]);
 		$this->assertSame(Absence::STATUS_APPROVED, $row->getStatus());
 		$this->assertEqualsWithDelta(0.5, (float)$row->getDays(), 0.011);
+
+		// AC-G2: the manager-recorded audit row must carry the half debit.
+		$audit = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class)
+			->findByEntity('absence', (int)$row->getId(), 20, 0);
+		$recorded = array_values(array_filter(
+			$audit,
+			static fn ($a) => $a->getAction() === 'absence_manager_recorded'
+		));
+		$this->assertNotEmpty($recorded, 'absence_manager_recorded audit row missing');
+		$newValues = json_decode((string)$recorded[0]->getNewValues(), true);
+		$this->assertIsArray($newValues);
+		$this->assertEqualsWithDelta(0.5, (float)($newValues['days'] ?? -1), 0.011);
 	}
 
 	public function testOverlapBlocksSecondHalfSameDay(): void
@@ -229,5 +252,46 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			} catch (\Throwable) {
 			}
 		}
+	}
+
+	public function testVacationHalfDayConvertsToSickHalfDay(): void
+	{
+		// Past weekday so the manager conversion path accepts the range.
+		$day = new \DateTimeImmutable('-7 days');
+		while ((int)$day->format('N') > 5) {
+			$day = $day->modify('-1 day');
+		}
+		$ymd = $day->format('Y-m-d');
+
+		$mapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class);
+		$vacation = new Absence();
+		$vacation->setUserId($this->uid);
+		$vacation->setType(Absence::TYPE_VACATION);
+		$vacation->setStatus(Absence::STATUS_APPROVED);
+		$vacation->setStartDate(new \DateTime($ymd));
+		$vacation->setEndDate(new \DateTime($ymd));
+		$vacation->setDays(0.5);
+		$vacation->setCreatedAt(new \DateTime());
+		$vacation->setUpdatedAt(new \DateTime());
+		$vacation = $mapper->insert($vacation);
+		$this->createdAbsenceIds[] = (int)$vacation->getId();
+
+		$result = \OCP\Server::get(AbsenceService::class)->convertVacationToSick(
+			(int)$vacation->getId(),
+			[
+				'sickStart' => $ymd,
+				'sickEnd' => $ymd,
+				'expectedUpdatedAt' => $vacation->getUpdatedAt()->format('c'),
+				'reason' => 'got sick on vacation',
+			],
+			$this->managerUid,
+			true
+		);
+		$this->createdAbsenceIds[] = (int)$result['sick']['id'];
+
+		$storedSick = $mapper->find((int)$result['sick']['id']);
+		$this->assertSame(Absence::TYPE_SICK_LEAVE, $storedSick->getType());
+		// The stored fraction carries: 0.5 vacation must not become a full sick day.
+		$this->assertEqualsWithDelta(0.5, (float)$storedSick->getDays(), 0.011);
 	}
 }

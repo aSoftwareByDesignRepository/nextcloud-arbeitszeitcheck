@@ -267,6 +267,21 @@ class AbsenceHalfDayNonVacationTest extends TestCase
 		$this->assertEqualsWithDelta(0.5, (float)$absence->getDays(), 0.001);
 	}
 
+	public function testCreateSickHalfDayOnFreeDayStoresZero(): void
+	{
+		// AC-G8/EC-04: a half on a non-working day (weight 0) is allowed —
+		// it stores 0 (no information loss, nothing to halve) instead of
+		// borrowing the vacation "at least one working day" rejection.
+		$this->calendarWeight = 0.0;
+		$absence = $this->service->createAbsence([
+			'type' => Absence::TYPE_SICK_LEAVE,
+			'start_date' => '2026-08-12',
+			'end_date' => '2026-08-12',
+			'day_fraction' => '0.5',
+		], 'alice');
+		$this->assertEqualsWithDelta(0.0, (float)$absence->getDays(), 0.001);
+	}
+
 	public function testCreateSickHalfDayWhenDisabledThrows(): void
 	{
 		$this->enabledTypesJson = '["vacation"]';
@@ -478,5 +493,42 @@ class AbsenceHalfDayNonVacationTest extends TestCase
 		// Bound types store full schedule weight — the fraction lives in the
 		// entitlement ledger, not in absences.days.
 		$this->assertEqualsWithDelta(1.0, (float)$updated->getDays(), 0.001);
+	}
+
+	public function testStoredDayFractionDetectsLiteralHalf(): void
+	{
+		$this->calendarWeight = 1.0;
+		$a = $this->storedAbsence(Absence::TYPE_SICK_LEAVE, 0.5, '2026-08-12', '2026-08-12');
+		$this->assertSame('0.5', $this->service->storedDayFraction($a));
+	}
+
+	public function testStoredDayFractionDetectsQuarterOnHalfWeightDay(): void
+	{
+		// Edit-form correctness (EC half-weight): a half on a 0.5-weight day
+		// stores 0.25 — a literal days≈0.5 check would label it "Full day"
+		// and inflate the debit on the next save.
+		$this->calendarWeight = 0.5;
+		$a = $this->storedAbsence(Absence::TYPE_SICK_LEAVE, 0.25, '2026-08-12', '2026-08-12');
+		$this->assertSame('0.5', $this->service->storedDayFraction($a));
+	}
+
+	public function testStoredDayFractionFullOnHalfWeightDayIsNotHalf(): void
+	{
+		// A *full* day on a half-weight day also stores 0.5 — the literal
+		// check would mislabel it half; the ratio must not.
+		$this->calendarWeight = 0.5;
+		$a = $this->storedAbsence(Absence::TYPE_SICK_LEAVE, 0.5, '2026-08-12', '2026-08-12');
+		$this->assertSame('1', $this->service->storedDayFraction($a));
+	}
+
+	public function testStoredDayFractionDefaultsToFull(): void
+	{
+		$this->calendarWeight = 1.0;
+		$multi = $this->storedAbsence(Absence::TYPE_SICK_LEAVE, 1.0, '2026-08-12', '2026-08-13');
+		$this->assertSame('1', $this->service->storedDayFraction($multi));
+
+		$this->calendarWeight = 0.0;
+		$nonWorking = $this->storedAbsence(Absence::TYPE_SICK_LEAVE, 0.0, '2026-08-12', '2026-08-12');
+		$this->assertSame('1', $this->service->storedDayFraction($nonWorking));
 	}
 }

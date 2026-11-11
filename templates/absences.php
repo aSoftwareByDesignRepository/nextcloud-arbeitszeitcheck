@@ -67,28 +67,30 @@ if ($mode === 'list') {
 // authority; these template flags only decide first paint + preselect.
 $halfDayEnabledTypes = is_array($halfDayEnabledTypes ?? null) ? $halfDayEnabledTypes : [];
 $halfDayCreditTypes = is_array($halfDayCreditTypes ?? null) ? $halfDayCreditTypes : [];
+// Server-derived stored fraction for edit mode ('0.5'|'1'); '1' when absent.
+$absenceDayFraction = ($absenceDayFraction ?? '1') === '0.5' ? '0.5' : '1';
 $absenceFormType = ($absence && $absence->getType() !== null && $absence->getType() !== '')
 	? (string)$absence->getType()
 	: (($mode === 'create' && is_string($prefillType) && $prefillType !== '')
 		? $prefillType
 		: Absence::TYPE_VACATION);
-$typeSupportsHalfDay = in_array($absenceFormType, $halfDayEnabledTypes, true);
+// AC-G11: in a vacation_unit=hours org only *vacation* loses the control
+// (hours presets own vacation); enabled non-vacation types stay offerable.
+$typeSupportsHalfDay = in_array($absenceFormType, $halfDayEnabledTypes, true)
+	&& ($absenceFormType !== Absence::TYPE_VACATION || !$isVacationHours);
+// Weight-aware: the controller derives the stored fraction as days ÷
+// single-day schedule weight, so a half on a half-weight day (0.25 stored)
+// still preselects "Half day" instead of inflating on save.
 $editIsHalf = $absence
 	&& in_array((string)$absence->getType(), $halfDayEnabledTypes, true)
-	&& !$isVacationHours
-	&& $absence->getDays() !== null
-	&& abs((float)$absence->getDays() - 0.5) < 0.011
-	&& $absence->getStartDate()
-	&& $absence->getEndDate()
-	&& $absence->getStartDate()->format('Y-m-d') === $absence->getEndDate()->format('Y-m-d');
+	&& ($absence->getType() !== Absence::TYPE_VACATION || !$isVacationHours)
+	&& $absenceDayFraction === '0.5';
 $halfSelected = $editIsHalf || (
 	$mode === 'create'
 	&& $prefillHalf
-	&& !$isVacationHours
 	&& $typeSupportsHalfDay
 );
-$showDayFractionInitially = !$isVacationHours
-	&& in_array($mode, ['create', 'edit'], true)
+$showDayFractionInitially = in_array($mode, ['create', 'edit'], true)
 	&& $typeSupportsHalfDay
 	&& $absenceFormStartDisplay !== ''
 	&& $absenceFormStartDisplay === $absenceFormEndDisplay;
@@ -1438,9 +1440,12 @@ if ($mode === 'list') {
 
         (function initDayFractionField() {
             const group = document.getElementById('absence-day-fraction-group');
-            if (!group || group.getAttribute('data-days-mode') !== '1') {
+            if (!group) {
                 return;
             }
+            // AC-G11: in a hours-unit org only vacation loses the control —
+            // enabled non-vacation types keep it (hours presets are vacation-only).
+            const daysMode = group.getAttribute('data-days-mode') === '1';
             const fullRadio = document.getElementById('absence-day-fraction-full');
             const halfRadio = document.getElementById('absence-day-fraction-half');
             const previewEl = document.getElementById('absence-day-fraction-preview');
@@ -1489,7 +1494,10 @@ if ($mode === 'list') {
 
             function isEligibleType() {
                 const t = currentType();
-                return t !== '' && enabledTypes.indexOf(t) !== -1;
+                if (t === '' || enabledTypes.indexOf(t) === -1) {
+                    return false;
+                }
+                return t !== 'vacation' || daysMode;
             }
 
             function selectedFraction() {
@@ -1514,7 +1522,7 @@ if ($mode === 'list') {
             }
 
             function syncMultiTip() {
-                if (!multiTip || multiTip.getAttribute('data-days-mode') !== '1') {
+                if (!multiTip) {
                     return;
                 }
                 multiTip.hidden = !(isEligibleType() && isMultiDayRange());

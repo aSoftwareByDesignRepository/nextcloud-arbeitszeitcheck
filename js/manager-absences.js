@@ -995,7 +995,10 @@
 			const start = parseDDMMYYYY(startEl && startEl.value);
 			const end = parseDDMMYYYY(endEl && endEl.value);
 			const singleDay = !!(start && end && toYmd(start) === toYmd(end));
-			const show = daysMode && halfDayEnabledTypes.indexOf(typeSel.value) !== -1 && singleDay;
+			// AC-G11: in a hours-unit org only vacation loses the control —
+			// enabled non-vacation types keep it.
+			const typeFractionCapable = daysMode || typeSel.value !== 'vacation';
+			const show = typeFractionCapable && halfDayEnabledTypes.indexOf(typeSel.value) !== -1 && singleDay;
 			const wasVisible = !dayFractionField.hidden;
 			dayFractionField.hidden = !show;
 			if (!show) {
@@ -1166,7 +1169,9 @@
 				payload.requireDurationHours = true;
 				payload.serverMayFillHours = true;
 			}
-			if (daysMode && halfDayEnabledTypes.indexOf(type) !== -1 && dayFractionField && !dayFractionField.hidden) {
+			// Visibility already encodes eligibility incl. the hours-mode
+			// vacation exclusion (AC-G11) — hidden controls never submit.
+			if (halfDayEnabledTypes.indexOf(type) !== -1 && dayFractionField && !dayFractionField.hidden) {
 				payload.dayFraction = (dayFractionHalf && dayFractionHalf.checked) ? '0.5' : '1';
 			}
 			form.querySelector('.azc-self-target-notice')?.remove();

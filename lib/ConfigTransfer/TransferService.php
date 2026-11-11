@@ -1472,6 +1472,22 @@ final class TransferService
 	}
 
 	/**
+	 * Seed the job-state surface at queue time. Without this the status
+	 * endpoint keeps returning the PREVIOUS run's terminal state between
+	 * queue and first job heartbeat — a poller that opens on 'done'
+	 * (settings page progress dialog) would instantly self-close on a stale
+	 * receipt. Called only after the job is actually enqueued.
+	 */
+	public function markQueued(string $pendingId, string $actor): void
+	{
+		$this->receiptStore->setJobState('queued', 'queued', 0, [
+			'actor' => $actor,
+			'pendingId' => $pendingId,
+			'queuedAt' => time(),
+		]);
+	}
+
+	/**
 	 * Environment gate for a mode — currently: replace requires maintenance
 	 * mode. Checked at queue time (controller) AND re-checked inside
 	 * applyPayload (the job runs later — the flag may have flipped between

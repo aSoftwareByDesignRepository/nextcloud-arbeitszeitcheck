@@ -59,6 +59,13 @@
 	background: var(--color-main-background, #fff);
 	color: var(--color-main-text, #222);
 }
+/* NC core ships an HTML5 shim (server.css: article, aside, dialog, …
+   { display:block }) — an author rule that beats the UA closed-dialog
+   rule, so a static <dialog> renders inline in the page flow until
+   showModal(). Re-hide the closed state here. */
+dialog.azc-dialog:not([open]) {
+	display: none !important;
+}
 .azc-dialog::backdrop { background: color-mix(in srgb, var(--color-main-text, #222) 45%, transparent); }
 .azc-dialog__body { padding: var(--azc-space-5, 20px); max-height: 65vh; overflow: auto; }
 .azc-dialog__footer {

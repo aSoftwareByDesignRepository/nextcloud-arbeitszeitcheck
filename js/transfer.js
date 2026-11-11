@@ -6,7 +6,22 @@
 	'use strict';
 	const API = window.ArbeitszeitCheckApi;
 	const M = window.ArbeitszeitCheckMessaging;
-	const t = (key, params) => (window.t ? window.t('arbeitszeitcheck', key, params || {}) : key);
+	// window.t expands {name} tokens from a vars object only — positional
+	// vsprintf placeholders (%d, %s, %1$s) come back literally. Catalog
+	// strings keep their vsprintf form for the PHP side, so positional
+	// params arrays are interpolated here after translation. Non-array
+	// params keep the named-vars path untouched.
+	const t = (key, params) => {
+		const s = window.t ? window.t('arbeitszeitcheck', key, (params && !Array.isArray(params)) ? params : {}) : key;
+		if (!Array.isArray(params) || !params.length) return s;
+		let i = 0;
+		return s.replace(/%%|%(?:\d+\$)?[sd]/g, (m) => {
+			if (m === '%%') return '%';
+			const idx = /^%(\d+)\$/.exec(m);
+			const v = idx ? params[+idx[1] - 1] : params[i++];
+			return (v === undefined || v === null) ? '' : String(v);
+		});
+	};
 	const P = 'azc';
 	const $ = (id) => document.getElementById(P + '-' + id);
 

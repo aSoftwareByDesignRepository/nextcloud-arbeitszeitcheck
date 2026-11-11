@@ -148,6 +148,10 @@ class TransferApiController extends Controller
 				'actor' => $user,
 				'replaceConfirmed' => $replaceConfirmed,
 			]);
+			// Seed the queued state — until the job's first heartbeat the
+			// status endpoint would otherwise still serve the PREVIOUS
+			// run's terminal state and the progress dialog self-closes.
+			$this->transfer->markQueued($pendingId, $user);
 			return ['queued' => true, 'pendingId' => $pendingId];
 		});
 	}

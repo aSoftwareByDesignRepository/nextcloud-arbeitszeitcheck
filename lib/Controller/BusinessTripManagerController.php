@@ -159,6 +159,13 @@ final class BusinessTripManagerController extends Controller
 			$this->permissions->logPermissionDenied($this->uid(), $action, 'business_trip', (string)$id);
 			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
 		}
+		// Drafts are the employee's private pre-submission workspace: the
+		// manager surface must not disclose them. Same uniform 404 — never
+		// a state oracle. Decided trips (approved/rejected/cancelled) stay
+		// viewable; their facts were already disclosed at decision time.
+		if ($trip->getStatus() === BusinessTrip::STATUS_DRAFT) {
+			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
+		}
 		return $trip;
 	}
 

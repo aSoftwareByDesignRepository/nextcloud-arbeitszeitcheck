@@ -68,6 +68,13 @@ $mutants = [
 		'replacement' => 'if (false) {',
 		'runs' => $testFile,
 	],
+	[
+		'file' => 'lib/Controller/BusinessTripManagerController.php',
+		'name' => 'draft trips leak through manager detail/approve — no state gate',
+		'needle' => "if (\$trip->getStatus() === BusinessTrip::STATUS_DRAFT) {",
+		'replacement' => 'if (false) {',
+		'runs' => $testFile,
+	],
 ];
 
 function runSuite(string $phpunit, string $testFile, string $root, string $filter): int

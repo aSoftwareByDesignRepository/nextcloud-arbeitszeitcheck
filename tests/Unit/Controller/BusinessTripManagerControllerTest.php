@@ -300,6 +300,31 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$this->assertArrayHasKey('snapshotToken', $p);
 	}
 
+	public function testShowDraftTripIsUniform404(): void
+	{
+		// Drafts are pre-submission private data: in-scope or not, the
+		// decision surface answers the same uniform 404 as a missing id.
+		$draft = $this->submittedTrip(7, 'alice');
+		$draft->setStatus(BusinessTrip::STATUS_DRAFT);
+		$this->tripMapper->method('find')->willReturn($draft);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'alice')->willReturn(true);
+		$r = $this->controller()->show(7);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
+		$this->assertSame('NOT_FOUND', $this->payload($r)['error']);
+	}
+
+	public function testApproveDraftTripIsUniform404(): void
+	{
+		$draft = $this->submittedTrip(7, 'alice');
+		$draft->setStatus(BusinessTrip::STATUS_DRAFT);
+		$this->tripMapper->method('find')->willReturn($draft);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'alice')->willReturn(true);
+		$r = $this->controller(['snapshotToken' => 'tok', 'revision' => '4'])->approve(7);
+		// 404 — the controller rejects before the service (which would
+		// answer TRIP_STATE_INVALID 409 for a draft -> approved jump).
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
+	}
+
 	public function testShowNonAdminSelfTripIsUniform404(): void
 	{
 		// Four-eyes regression: a non-admin manager must NOT read their own

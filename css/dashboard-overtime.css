@@ -207,7 +207,7 @@
 	font-size: 0.9rem;
 }
 
-@media (max-width: 479.98px) {
+@media (max-width: 480px) {
 	.dashboard-overtime-card__balance-value {
 		font-size: 1.5rem;
 	}

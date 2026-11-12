@@ -283,6 +283,44 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                         </div>
                     <?php endforeach; ?>
                 </fieldset>
+                <fieldset class="form-fieldset" aria-labelledby="half-day-enabled-legend">
+                    <legend id="half-day-enabled-legend" class="form-legend"><?php p($l->t('Absences: Half-day entries')); ?></legend>
+                    <p class="form-help form-help--block">
+                        <?php p($l->t('For the selected absence types, employees and managers may also record half a day (the stored day value is the day weight times 0.5). Compensatory time off, parental leave, and types bound to a special entitlement keep their own rules and are not listed.')); ?>
+                    </p>
+                    <?php
+                    $halfDayTypes = $settings['halfDayEnabledTypes'] ?? [];
+                    $halfDayOptions = $settings['halfDayEligibleTypes'] ?? ['builtin' => [], 'custom' => []];
+                    foreach (($halfDayOptions['builtin'] ?? []) as $opt):
+                        $checked = in_array($opt['id'], $halfDayTypes, true);
+                    ?>
+                        <div class="form-group form-group--inline">
+                            <div class="form-checkbox">
+                                <input type="checkbox" id="halfDayEnabled_<?php p($opt['id']); ?>" name="halfDayEnabledTypes[]" value="<?php p($opt['id']); ?>"
+                                    <?php echo $checked ? 'checked' : ''; ?>
+                                    aria-describedby="half-day-enabled-legend">
+                                <label for="halfDayEnabled_<?php p($opt['id']); ?>" class="form-label"><?php p($opt['label']); ?></label>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php if (!empty($halfDayOptions['custom'])): ?>
+                        <p class="form-help form-help--block" style="margin-top: var(--azc-space-sm, 0.5rem);">
+                            <?php p($l->t('Custom absence types')); ?>
+                        </p>
+                        <?php foreach ($halfDayOptions['custom'] as $opt):
+                            $checked = in_array($opt['id'], $halfDayTypes, true);
+                        ?>
+                            <div class="form-group form-group--inline">
+                                <div class="form-checkbox">
+                                    <input type="checkbox" id="halfDayEnabled_<?php p($opt['id']); ?>" name="halfDayEnabledTypes[]" value="<?php p($opt['id']); ?>"
+                                        <?php echo $checked ? 'checked' : ''; ?>
+                                        aria-describedby="half-day-enabled-legend">
+                                    <label for="halfDayEnabled_<?php p($opt['id']); ?>" class="form-label"><?php p($opt['label']); ?></label>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </fieldset>
                 <h3 class="admin-settings-subsection__title"><?php p($l->t('Break fallback behavior')); ?></h3>
                 <p class="form-help form-help--block">
                     <?php p($l->t('Use these settings to prevent users from staying in an open break state for many hours by accident.')); ?>

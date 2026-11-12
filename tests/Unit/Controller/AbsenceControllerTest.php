@@ -1469,4 +1469,129 @@ class AbsenceControllerTest extends TestCase
 		$this->assertSame(Http::STATUS_LOCKED, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
+
+	/* --------------------------------------------------------------
+	 * FA-PREVIEW (US-406, DC-02): GET /api/absences/estimate-days —
+	 * owner-self only, read-only, server-authoritative count.
+	 * ------------------------------------------------------------- */
+
+	private function stubSessionUser(string $uid): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($uid);
+		$this->userSession->method('getUser')->willReturn($user);
+	}
+
+	public function testEstimateDaysReturnsServerEstimate(): void
+	{
+		$this->stubSessionUser('alice');
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => ['start' => '2026-11-16', 'end' => '2026-11-20'][$k] ?? $d
+		);
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with(
+				'alice',
+				$this->callback(fn (\DateTime $s) => $s->format('Y-m-d') === '2026-11-16'),
+				$this->callback(fn (\DateTime $e) => $e->format('Y-m-d') === '2026-11-20')
+			)
+			->willReturn(['days' => 4.0, 'basis' => 'weekday_schedule', 'single_day' => false]);
+
+		$response = $this->controller->estimateDays();
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertSame(4.0, $data['days']);
+		$this->assertSame('weekday_schedule', $data['basis']);
+		$this->assertFalse($data['single_day']);
+	}
+
+	public function testEstimateDaysDefaultsEndToStart(): void
+	{
+		$this->stubSessionUser('alice');
+		// end param absent → defaults to start (single-day estimate).
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => $k === 'start' ? '2026-11-16' : $d
+		);
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with(
+				'alice',
+				$this->callback(fn (\DateTime $s) => $s->format('Y-m-d') === '2026-11-16'),
+				$this->callback(fn (\DateTime $e) => $e->format('Y-m-d') === '2026-11-16')
+			)
+			->willReturn(['days' => 1.0, 'basis' => 'weekdays_mon_fri', 'single_day' => true]);
+
+		$data = $this->controller->estimateDays()->getData();
+		$this->assertTrue($data['success']);
+		$this->assertTrue($data['single_day']);
+	}
+
+	public function testEstimateDaysSwapsReversedRange(): void
+	{
+		$this->stubSessionUser('alice');
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => ['start' => '2026-11-20', 'end' => '2026-11-16'][$k] ?? $d
+		);
+		// The service must receive a normalized [min, max] range.
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with(
+				'alice',
+				$this->callback(fn (\DateTime $s) => $s->format('Y-m-d') === '2026-11-16'),
+				$this->callback(fn (\DateTime $e) => $e->format('Y-m-d') === '2026-11-20')
+			)
+			->willReturn(['days' => 5.0, 'basis' => 'weekdays_mon_fri', 'single_day' => false]);
+
+		$data = $this->controller->estimateDays()->getData();
+		$this->assertTrue($data['success']);
+	}
+
+	/** @dataProvider badEstimateDateParams */
+	public function testEstimateDaysRejectsMalformedDates(array $params): void
+	{
+		$this->stubSessionUser('alice');
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => $params[$k] ?? $d
+		);
+		$this->absenceService->expects($this->never())->method('estimateAbsenceDays');
+
+		$response = $this->controller->estimateDays();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
+	public function badEstimateDateParams(): array
+	{
+		return [
+			'garbage start' => [['start' => 'next week', 'end' => '2026-11-20']],
+			'missing start' => [['end' => '2026-11-20']],
+			'bad end format' => [['start' => '2026-11-16', 'end' => '20.11.2026']],
+			'empty start' => [['start' => '', 'end' => '']],
+		];
+	}
+
+	/**
+	 * TH-07: the self-scope endpoint must resolve only the session uid —
+	 * a foreign userId param is never forwarded to the service.
+	 */
+	public function testEstimateDaysIgnoresForeignUserIdParam(): void
+	{
+		$this->stubSessionUser('alice');
+		$this->request->method('getParam')->willReturnCallback(
+			static fn (string $k, $d = null) => [
+				'start' => '2026-11-16',
+				'end' => '2026-11-20',
+				'userId' => 'victim',
+			][$k] ?? $d
+		);
+		$this->absenceService->expects($this->once())
+			->method('estimateAbsenceDays')
+			->with('alice', $this->anything(), $this->anything())
+			->willReturn(['days' => 5.0, 'basis' => 'weekdays_mon_fri', 'single_day' => false]);
+
+		$data = $this->controller->estimateDays()->getData();
+		$this->assertTrue($data['success']);
+	}
 }

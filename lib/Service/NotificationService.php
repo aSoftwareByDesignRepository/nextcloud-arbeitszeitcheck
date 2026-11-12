@@ -288,6 +288,32 @@ class NotificationService
 	}
 
 	/**
+	 * FA-MSHORTEN (US-407): notify the owner that a manager ended their
+	 * running absence early — elapsed days stay recorded.
+	 */
+	public function notifyAbsenceShortenedByManager(string $userId, array $absenceData, ?string $reason = null): void
+	{
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($userId)
+			->setDateTime(new \DateTime())
+			->setObject('absence', (string)($absenceData['id'] ?? ''))
+			->setSubject('absence_manager_shortened', [
+				'absence_id' => $absenceData['id'] ?? null,
+				'type' => $absenceData['type'] ?? 'vacation',
+				'start_date' => $absenceData['start_date'] ?? null,
+				'end_date' => $absenceData['end_date'] ?? null,
+				'reason' => $reason,
+			])
+			->setMessage('absence_manager_shortened', [
+				'type' => $absenceData['type'] ?? 'vacation',
+				'reason' => $reason ?? $this->l10n->t('No reason provided'),
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
 	 * FA-2c: notify a manager that an employee filed a cancellation request
 	 * for a running absence — a decision task, not a reminder.
 	 */

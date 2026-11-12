@@ -130,6 +130,7 @@ return [
 		['name' => 'absence#shorten', 'url' => '/api/absences/{id}/shorten', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#convertToSick', 'url' => '/api/absences/{id}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#requestCancel', 'url' => '/api/absences/{id}/cancel-request', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#estimateDays', 'url' => '/api/absences/estimate-days', 'verb' => 'GET'],
 		['name' => 'absence#withdrawCancelRequest', 'url' => '/api/absences/{id}/cancel-request/withdraw', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
 		// Manager routes
@@ -149,9 +150,11 @@ return [
 		['name' => 'manager#getManagerAssignableProjectcheckProjects', 'url' => '/api/manager/employees/{employeeUid}/projectcheck-assignable-projects', 'verb' => 'GET'],
 		['name' => 'manager#getEmployeeAbsences', 'url' => '/api/manager/employee-absences', 'verb' => 'GET'],
 		['name' => 'manager#estimateEmployeeVacationHours', 'url' => '/api/manager/employee-absences/estimate-hours', 'verb' => 'GET'],
+		['name' => 'manager#estimateEmployeeAbsenceDays', 'url' => '/api/manager/employee-absences/estimate-days', 'verb' => 'GET'],
 		['name' => 'manager#createEmployeeAbsence', 'url' => '/api/manager/employee-absences', 'verb' => 'POST'],
 		['name' => 'manager#convertEmployeeAbsenceToSick', 'url' => '/api/manager/employee-absences/{absenceId}/convert-to-sick', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#cancelEmployeeAbsence', 'url' => '/api/manager/employee-absences/{absenceId}/cancel', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#shortenEmployeeAbsence', 'url' => '/api/manager/employee-absences/{absenceId}/shorten', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#approveEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/approve', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#declineEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/decline', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
@@ -357,6 +360,12 @@ return [
 		['name' => 'admin#updateAdminSettings', 'url' => '/api/admin/settings', 'verb' => 'POST'],
 		['name' => 'admin#getNotificationSettings', 'url' => '/api/admin/notifications/settings', 'verb' => 'GET'],
 		['name' => 'admin#updateNotificationSettings', 'url' => '/api/admin/notifications/settings', 'verb' => 'POST'],
+		// ── Config & data transfer (test → production) ──────────────────
+		['name' => 'transfer_api#status', 'url' => '/api/admin/transfer/status', 'verb' => 'GET'],
+		['name' => 'transfer_api#export', 'url' => '/api/admin/transfer/export', 'verb' => 'POST'],
+		['name' => 'transfer_api#preview', 'url' => '/api/admin/transfer/preview', 'verb' => 'POST'],
+		['name' => 'transfer_api#apply', 'url' => '/api/admin/transfer/apply', 'verb' => 'POST'],
+		['name' => 'transfer_api#reconcile', 'url' => '/api/admin/transfer/reconcile', 'verb' => 'POST'],
 		['name' => 'admin#migrateVacationUnit', 'url' => '/api/admin/vacation-unit/migrate', 'verb' => 'POST'],
 		// Legacy company_holidays JSON (kept for backward compatibility; new code should use state-holidays endpoints)
 		['name' => 'admin#getCompanyHolidays', 'url' => '/api/admin/holidays', 'verb' => 'GET'],

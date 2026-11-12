@@ -26,7 +26,7 @@ class AdminSettingsSectionCatalogContractTest extends TestCase
 		$this->assertStringContainsString('/admin/settings/{section}', $routes);
 		$this->assertStringContainsString('AdminSettingsSectionCatalog::routeRequirement()', $routes);
 		$this->assertSame(
-			'access|compliance|time-recording|time-approvals|exports|outlook-subscription|month-closure|hours|regional|retention|work-locations|projectcheck',
+			'access|compliance|time-recording|time-approvals|exports|outlook-subscription|month-closure|hours|regional|retention|work-locations|projectcheck|transfer',
 			$req,
 			'routeRequirement must stay the stable allowlist'
 		);

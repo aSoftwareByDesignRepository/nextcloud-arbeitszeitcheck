@@ -41,6 +41,7 @@ class VacationAllocationService
 		private VacationYearWindowResolver $yearWindowResolver,
 		private ?VacationUnitService $vacationUnitService = null,
 		private ?VacationHoursDebitService $vacationHoursDebitService = null,
+		private ?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null,
 	) {
 	}
 
@@ -346,7 +347,9 @@ class VacationAllocationService
 		$beforeEnd = $segEnd <= $expiry ? clone $segEnd : clone $expiry;
 		$before = 0.0;
 		if ($segStart <= $beforeEnd) {
-			$before = $this->holidayCalendarService->computeWorkingDaysForUser($userId, $segStart, $beforeEnd);
+			$before = isset($this->scheduledWorkdayCounter)
+				? $this->scheduledWorkdayCounter->daysForUser($userId, $segStart, $beforeEnd)
+				: $this->holidayCalendarService->computeWorkingDaysForUser($userId, $segStart, $beforeEnd);
 		}
 
 		$afterStart = (clone $expiry)->modify('+1 day');
@@ -355,7 +358,9 @@ class VacationAllocationService
 		}
 		$after = 0.0;
 		if ($afterStart <= $segEnd) {
-			$after = $this->holidayCalendarService->computeWorkingDaysForUser($userId, $afterStart, $segEnd);
+			$after = isset($this->scheduledWorkdayCounter)
+				? $this->scheduledWorkdayCounter->daysForUser($userId, $afterStart, $segEnd)
+				: $this->holidayCalendarService->computeWorkingDaysForUser($userId, $afterStart, $segEnd);
 		}
 
 		return ['before' => $before, 'after' => $after];

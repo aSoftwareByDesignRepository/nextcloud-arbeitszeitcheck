@@ -151,7 +151,7 @@ $currentYear = (int)(new \DateTime())->format('Y');
 							<tr>
 								<th scope="col"><?php p($l->t('Employee')); ?></th>
 								<th scope="col"><?php p($l->t('Vacation remaining')); ?></th>
-								<th scope="col"><?php p($l->t('Approved upcoming')); ?></th>
+								<th scope="col" title="<?php p($l->t('Approved vacation days from tomorrow, counted as work days per the employee working-time model')); ?>"><?php p($l->t('Approved upcoming')); ?></th>
 								<th scope="col"><?php p($l->t('Overtime')); ?></th>
 								<th scope="col"><?php p($l->t('Open issues')); ?></th>
 								<th scope="col"><?php p($l->t('Pending requests')); ?></th>

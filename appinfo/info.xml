@@ -371,6 +371,9 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<command>OCA\ArbeitszeitCheck\Command\VerifyHolidaysCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\VerifyAbsenceSollCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\RecomputePaidBreaksCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\ConfigExportCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\ConfigImportCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\ConfigReconcileCommand</command>
 	</commands>
 
 	<!-- No <navigation> here: the menu entry is registered conditionally via
@@ -432,6 +435,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 			<step>OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries</step>
 			<step>OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks</step>
 			<step>OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs</step>
+			<step>OCA\ArbeitszeitCheck\Repair\RecomputeAbsenceDaysSchedule</step>
 		</post-migration>
 		<uninstall>
 			<step>OCA\ArbeitszeitCheck\Repair\UninstallDropTables</step>
@@ -439,7 +443,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<pre-migration>
 			<step>OCA\ArbeitszeitCheck\Repair\BackupBeforeUpdate</step>
 		</pre-migration>
-</repair-steps>
+	</repair-steps>
 	<background-jobs>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\DailyComplianceCheckJob</job>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\ClockOutReminderJob</job>

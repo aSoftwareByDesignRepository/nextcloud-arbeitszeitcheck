@@ -407,7 +407,7 @@
 	}
 }
 
-@media (min-width: 480px) {
+@media (min-width: 480.02px) {
 	.azc-get-app__stores,
 	.azc-get-app__features {
 		grid-template-columns: 1fr 1fr;

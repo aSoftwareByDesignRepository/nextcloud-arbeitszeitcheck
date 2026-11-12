@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite;
 use OCP\App\IAppManager;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -38,7 +39,7 @@ class PermissionService
 	 * Nextcloud's native app restriction ("Limit to groups") is authoritative:
 	 * every app-side settings save mirrors
 	 * {@see Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS} into it via
-	 * {@see \OCA\ArbeitszeitCheck\Controller\AdminController::applyAppRestrictionGroups()},
+	 * {@see self::saveAccessDoorPolicy()},
 	 * so a divergence between the stored config and the NC restriction always
 	 * means the admin changed the restriction out-of-band (Apps page or
 	 * `occ app:enable -g`). That newer signal must win — reading the stored
@@ -220,6 +221,152 @@ class PermissionService
 				continue;
 			}
 			$unique[$userId] = true;
+		}
+
+		return array_keys($unique);
+	}
+
+	/**
+	 * Atomic access-door policy write — the ONLY write path for the four door
+	 * appconfig keys plus the NC platform app-restriction mirror (azc #46 /
+	 * NN-02: {@see Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS} is mirrored
+	 * into `enableAppForGroups`, so a split write would let the door and the
+	 * platform restriction diverge). AdminController::updateAdminSettings
+	 * and the config-transfer engine both delegate here.
+	 *
+	 * Every field is an overlay: keys absent from $policy keep the current
+	 * value, so a partial payload never blanks sibling fields.
+	 *
+	 * @param array{
+	 *   restrictionEnabled?: bool,
+	 *   allowedUserIds?: array<mixed>,
+	 *   allowedGroupIds?: array<mixed>,
+	 *   appAdminUserIds?: array<mixed>,
+	 * } $policy
+	 * @return array{restrictionEnabled:bool,allowedUserIds:list<string>,allowedGroupIds:list<string>,appAdminUserIds:list<string>}
+	 *   the normalised policy actually persisted
+	 */
+	public function saveAccessDoorPolicy(array $policy): array
+	{
+		$restricted = array_key_exists('restrictionEnabled', $policy)
+			? (bool)$policy['restrictionEnabled']
+			: $this->isAccessRestrictionEnabled();
+		$users = array_key_exists('allowedUserIds', $policy)
+			? $this->normalizeExistingUidList((array)$policy['allowedUserIds'])
+			: $this->getAllowedAccessUserIds();
+		$groups = array_key_exists('allowedGroupIds', $policy)
+			? $this->normalizeExistingGidList((array)$policy['allowedGroupIds'])
+			: $this->getAllowedAccessGroups();
+		$admins = array_key_exists('appAdminUserIds', $policy)
+			? $this->normalizeExistingUidList((array)$policy['appAdminUserIds'])
+			: $this->getConfiguredAppAdminUserIds();
+
+		// Typed writes — all four keys exist as VALUE_STRING (NC >= 34
+		// AppConfigTypeConflictException on untyped writes, see purgeUser).
+		TypedAppConfigWrite::setString(
+			$this->config, Application::APP_ID, Constants::CONFIG_ACCESS_RESTRICTION_ENABLED,
+			$restricted ? '1' : '0',
+		);
+		TypedAppConfigWrite::setString(
+			$this->config, Application::APP_ID, Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS,
+			json_encode($groups, JSON_THROW_ON_ERROR),
+		);
+		TypedAppConfigWrite::setString(
+			$this->config, Application::APP_ID, Constants::CONFIG_ACCESS_ALLOWED_USER_IDS,
+			json_encode($users, JSON_THROW_ON_ERROR),
+		);
+		TypedAppConfigWrite::setString(
+			$this->config, Application::APP_ID, Constants::CONFIG_APP_ADMIN_USER_IDS,
+			json_encode($admins, JSON_THROW_ON_ERROR),
+		);
+
+		// Mirror into the NC platform restriction in the same call: Open ⇒
+		// clear it; Restricted ⇒ the group allowlist is the platform side
+		// (users are enforced in-app — identical to the former
+		// AdminController::applyAppRestrictionGroups semantics).
+		$restrictionGroups = $restricted ? $groups : [];
+		if ($restrictionGroups === []) {
+			$this->appManager->enableApp(Application::APP_ID);
+		} else {
+			$resolved = [];
+			foreach ($restrictionGroups as $gid) {
+				$group = $this->groupManager->get($gid);
+				if ($group !== null) {
+					$resolved[] = $group;
+				}
+			}
+			$this->appManager->enableAppForGroups(Application::APP_ID, $resolved);
+		}
+
+		return [
+			'restrictionEnabled' => $restricted,
+			'allowedUserIds' => $users,
+			'allowedGroupIds' => $groups,
+			'appAdminUserIds' => $admins,
+		];
+	}
+
+	/**
+	 * Snapshot of the effective door policy for overlay merges (transfer
+	 * decodePolicy) — same shape saveAccessDoorPolicy returns.
+	 *
+	 * @return array{restrictionEnabled:bool,allowedUserIds:list<string>,allowedGroupIds:list<string>,appAdminUserIds:list<string>}
+	 */
+	public function accessDoorPolicy(): array
+	{
+		return [
+			'restrictionEnabled' => $this->isAccessRestrictionEnabled(),
+			'allowedUserIds' => $this->getAllowedAccessUserIds(),
+			'allowedGroupIds' => $this->getAllowedAccessGroups(),
+			'appAdminUserIds' => $this->getConfiguredAppAdminUserIds(),
+		];
+	}
+
+	/**
+	 * Filter to existing + enabled UIDs — identical semantics to
+	 * AdminController::normalizeAppAdminUserIds (allowlist/app-admin writers
+	 * silently drop stale ids, ≤64 chars, deduped).
+	 *
+	 * @param array<mixed> $userIds
+	 * @return list<string>
+	 */
+	private function normalizeExistingUidList(array $userIds): array
+	{
+		$unique = [];
+		foreach ($userIds as $userId) {
+			$candidate = trim((string)$userId);
+			if ($candidate === '' || isset($unique[$candidate]) || strlen($candidate) > 64) {
+				continue;
+			}
+			$user = $this->userManager->get($candidate);
+			if ($user === null || !$user->isEnabled()) {
+				continue;
+			}
+			$unique[$candidate] = true;
+		}
+
+		return array_keys($unique);
+	}
+
+	/**
+	 * Filter to existing GIDs — identical semantics to
+	 * AdminController::normalizeExistingGroupIds.
+	 *
+	 * @param array<mixed> $groupIds
+	 * @return list<string>
+	 */
+	private function normalizeExistingGidList(array $groupIds): array
+	{
+		$unique = [];
+		foreach ($groupIds as $groupId) {
+			$candidate = trim((string)$groupId);
+			if ($candidate === '' || isset($unique[$candidate])) {
+				continue;
+			}
+			if ($this->groupManager->get($candidate) === null) {
+				continue;
+			}
+			$unique[$candidate] = true;
 		}
 
 		return array_keys($unique);

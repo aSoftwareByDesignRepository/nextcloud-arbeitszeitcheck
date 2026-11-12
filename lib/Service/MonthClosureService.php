@@ -473,6 +473,91 @@ class MonthClosureService
 	}
 
 	/**
+	 * Month-closure lock keys (month_closure tier — always LAST in
+	 * {@see DbLockKeys::ORDER}) for every calendar month a [start..end]
+	 * window touches. These are the exact keys
+	 * {@see acquireFinalizeLock()} takes exclusive, so a writer holding
+	 * them can never interleave with a finalize/reopen of an overlapping
+	 * month.
+	 *
+	 * @return list<string> sorted, deduplicated
+	 */
+	public function mutableRangeLockKeys(string $userId, \DateTimeInterface $rangeStart, \DateTimeInterface $rangeEnd): array
+	{
+		$startDay = new \DateTime($rangeStart->format('Y-m-d'));
+		$endDay = new \DateTime($rangeEnd->format('Y-m-d'));
+		if ($endDay < $startDay) {
+			$endDay = clone $startDay;
+		}
+		$endDay->setTime(23, 59, 59);
+		$keys = [];
+		foreach ($this->monthsOverlappingRange($startDay, $endDay) as [$y, $m]) {
+			$keys[] = DbLockKeys::monthClosure($userId, $y, $m);
+		}
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		return $keys;
+	}
+
+	/**
+	 * Acquire exclusive month-closure locks in sorted order; a partial
+	 * acquisition failure releases what was taken instead of leaking locks
+	 * until TTL (same contract as AbsenceService::acquireMonthClosureLocks /
+	 * BusinessTripService::acquireAllExclusive).
+	 *
+	 * MUST be called before beginTransaction(): the DB locking provider
+	 * writes oc_file_locks on the same connection, so a lock acquired
+	 * inside an open transaction is invisible to a concurrent finalize
+	 * until commit — exactly the window this serializes. A
+	 * {@see \OCP\Lock\LockedException} means a finalize/reopen for one of
+	 * these months is in flight; it propagates so callers can surface it
+	 * as a retryable busy error (wire LOCKED), never a masked generic
+	 * error.
+	 *
+	 * @param list<string> $keys
+	 */
+	public function acquireMonthClosureTierLocks(array $keys): void
+	{
+		$held = [];
+		try {
+			foreach ($keys as $key) {
+				$this->lockingProvider->acquireLock(
+					$key,
+					ILockingProvider::LOCK_EXCLUSIVE,
+					'Month-closure window write'
+				);
+				$held[] = $key;
+			}
+		} catch (\Throwable $e) {
+			foreach (array_reverse($held) as $key) {
+				try {
+					$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+				} catch (\Throwable) {
+					// Best effort — the lock TTL is the final safety net.
+				}
+			}
+			throw $e;
+		}
+	}
+
+	/**
+	 * Release exclusive month-closure locks in reverse acquisition order.
+	 * Best effort — release failures must never mask a primary exception.
+	 *
+	 * @param list<string> $keys
+	 */
+	public function releaseMonthClosureTierLocks(array $keys): void
+	{
+		foreach (array_reverse($keys) as $key) {
+			try {
+				$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+			} catch (\Throwable $e) {
+				$this->logger->warning('Failed to release month closure lock: ' . $e->getMessage(), ['exception' => $e]);
+			}
+		}
+	}
+
+	/**
 	 * @return array{0: int, 1: int}[]
 	 */
 	public function monthsOverlappingRange(\DateTime $rangeStart, \DateTime $rangeEnd): array

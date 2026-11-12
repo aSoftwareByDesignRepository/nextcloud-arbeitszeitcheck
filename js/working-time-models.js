@@ -842,6 +842,7 @@
                     <textarea id="wtm-model-description" name="description" class="form-textarea" rows="3">${descVal}</textarea>
                 </div>
                 ${weekdayScheduleSectionHtml(schedulePrefix, existingSchedule)}
+                <p class="form-help wtm-weekday-absence-hint">${Utils.escapeHtml(window.ArbeitszeitCheck?.l10n?.weekdayScheduleAbsenceHint || '')}</p>
                 ${ueHelperSectionHtml(schedulePrefix, existingUeLabel)}
                 ${presenceWindowsSectionHtml(schedulePrefix, existingPresence)}
                 <div class="form-actions wtm-editor-actions" role="group" aria-label="${Utils.escapeHtml(submitLabel)}">

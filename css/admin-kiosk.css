@@ -375,7 +375,7 @@
 	max-width: 48rem;
 }
 
-@media (max-width: 29.99875rem) {
+@media (max-width: 30rem) {
 	#app-content.azc-app .azc-kiosk-flow__hint,
 	#app-content.azc-app .azc-kiosk-flow__block > .azc-kiosk-search,
 	#app-content.azc-app .azc-kiosk-flow__block > .azc-kiosk-person,

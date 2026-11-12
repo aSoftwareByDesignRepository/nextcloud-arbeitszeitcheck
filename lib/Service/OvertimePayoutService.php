@@ -240,7 +240,7 @@ class OvertimePayoutService
 			];
 		}
 
-		$outcome = $this->withOvertimeBalanceLock($userId, function () use ($userId, $year, $month, $actorUserId): array {
+		$work = function () use ($userId, $year, $month, $actorUserId): array {
 			// Re-check under the lock: an adjustment or payout may have landed
 			// between the unlocked snapshot read above and now.
 			if ($this->payoutMapper->existsForUserAndMonth($userId, $year, $month)) {
@@ -301,6 +301,20 @@ class OvertimePayoutService
 				'user_id' => $userId,
 				'payout' => $payoutArray,
 			];
+		};
+		$outcome = $this->withOvertimeBalanceLock($userId, function () use ($userId, $year, $month, $work) {
+			// Month-closure tier (last in DbLockKeys::ORDER — after the
+			// balance lock): the payout row IS month-scoped payload data, so
+			// its check→insert window serializes against a finalize of the
+			// same month. Post-seal payout stays allowed — the lock only
+			// orders the write, never blocks it.
+			$mcKey = DbLockKeys::monthClosure($userId, $year, $month);
+			$this->lockingProvider->acquireLock($mcKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime payout against month-closure window');
+			try {
+				return $work();
+			} finally {
+				$this->lockingProvider->releaseLock($mcKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE);
+			}
 		});
 
 		// Employee notification deliberately outside the lock.

@@ -12,7 +12,7 @@
 		{ "id": "absences", "path": "/absences", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "calendar", "path": "/calendar", "role": "EMPLOYEE", "states": ["current"], "dark": true },
 		{ "id": "timeline", "path": "/timeline", "role": "EMPLOYEE", "states": ["current"] },
-		{ "id": "reports", "path": "/reports", "role": "EMPLOYEE", "states": ["current"] },
+		{ "id": "reports", "path": "/reports", "role": "MANAGER", "states": ["current"] },
 		{ "id": "compliance", "path": "/compliance", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "business-trips", "path": "/business-trips", "role": "EMPLOYEE", "states": ["current"] },
 		{ "id": "settings", "path": "/settings", "role": "EMPLOYEE", "states": ["current"] },

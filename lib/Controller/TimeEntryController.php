@@ -208,6 +208,36 @@ class TimeEntryController extends Controller
 	}
 
 	/**
+	 * Month-closure tier (always LAST in DbLockKeys::ORDER — acquired after
+	 * the per-user mutation lock, before the write tx): run $fn holding
+	 * the exclusive month-closure locks for the months the entry occupies
+	 * plus an optional second range when an update moves the row across a
+	 * month boundary. finalizeMonth/reopenMonth hold the same keys, so the
+	 * check→write window can never interleave with a seal.
+	 *
+	 * @param callable():mixed $fn
+	 * @return mixed
+	 */
+	private function withEntryMonthClosureLocks(TimeEntry $entry, callable $fn, ?\DateTimeInterface $extraStart = null, ?\DateTimeInterface $extraEnd = null)
+	{
+		$keys = $this->monthClosureGuard->timeEntryMutableLockKeys($entry);
+		if ($extraStart !== null) {
+			$keys = array_merge(
+				$keys,
+				$this->monthClosureGuard->mutableRangeLockKeys($entry->getUserId(), $extraStart, $extraEnd ?? $extraStart)
+			);
+		}
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		$this->monthClosureGuard->acquireMutableRangeLockKeys($keys);
+		try {
+			return $fn();
+		} finally {
+			$this->monthClosureGuard->releaseMutableRangeLocks($keys);
+		}
+	}
+
+	/**
 	 * Get current user ID from session
 	 *
 	 * @return string Current user's UID
@@ -1353,7 +1383,7 @@ class TimeEntryController extends Controller
 			// Check rest period / overlap / insert under the same exclusive lock as clock mutations
 			// so two parallel saves cannot both pass findOverlapping.
 			try {
-				return $this->timeTrackingService->withUserMutationLock($userId, function () use (
+				$mcWrite = function () use (
 					$userId,
 					$timeEntry,
 					$manualRequiresApproval,
@@ -1498,6 +1528,9 @@ class TimeEntryController extends Controller
 						'break_warning' => $this->breakWarningPayload($savedEntry),
 						'billing_warning' => $savedEntry->getBillingSyncWarning(),
 					], Http::STATUS_CREATED);
+				};
+				return $this->timeTrackingService->withUserMutationLock($userId, function () use ($timeEntry, $mcWrite) {
+					return $this->withEntryMonthClosureLocks($timeEntry, $mcWrite);
 				});
 			} catch (LockedException $e) {
 				return new JSONResponse([
@@ -1887,7 +1920,7 @@ class TimeEntryController extends Controller
 
 			// Check rest / overlap / update under the same exclusive lock as clock mutations.
 			try {
-				return $this->timeTrackingService->withUserMutationLock($userId, function () use ($userId, $entry, $id) {
+				$mcWrite = function () use ($userId, $entry, $id, $previousEntryStart, $previousEntryEnd) {
 					// Check rest period compliance before saving (ArbZG §5)
 					if ($entry->getStartTime()) {
 						$restPeriodCheck = $this->complianceService->checkRestPeriodForStartTime($userId, $entry->getStartTime(), $id);
@@ -2005,7 +2038,10 @@ class TimeEntryController extends Controller
 								'billing_warning' => $updatedEntry->getBillingSyncWarning(),
 							]);
 						}, $this->db);
-					});
+					};
+				return $this->timeTrackingService->withUserMutationLock($userId, function () use ($entry, $previousEntryStart, $previousEntryEnd, $mcWrite) {
+					return $this->withEntryMonthClosureLocks($entry, $mcWrite, $previousEntryStart, $previousEntryEnd);
+				});
 			} catch (LockedException $e) {
 				return new JSONResponse([
 					'success' => false,
@@ -2397,7 +2433,9 @@ class TimeEntryController extends Controller
 			$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
 			$entry->setUpdatedAt(AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config));
 
-			$updatedEntry = $this->timeEntryMapper->update($entry);
+			$updatedEntry = $this->withEntryMonthClosureLocks($entry, function () use ($entry) {
+				return $this->timeEntryMapper->update($entry);
+			});
 
 			// Create audit log
 			$this->auditLogMapper->logAction(
@@ -2504,8 +2542,10 @@ class TimeEntryController extends Controller
 				// Delete + pool recompute under the user mutation lock so the
 				// vanished breaks cannot race a concurrent mutation (MF-03).
 				$this->timeTrackingService->withUserMutationLock($userId, function () use ($userId, $entry): void {
-					$this->timeEntryMapper->delete($entry);
-					$this->recomputePaidBreaksForEntry($userId, $entry);
+					$this->withEntryMonthClosureLocks($entry, function () use ($userId, $entry): void {
+						$this->timeEntryMapper->delete($entry);
+						$this->recomputePaidBreaksForEntry($userId, $entry);
+					});
 				});
 				$this->auditLogMapper->logAction($userId, 'time_entry_correction_cancelled', 'time_entry', $id, $oldSummary, ['cascade_delete' => true]);
 				return new JSONResponse(['success' => true, 'deleted' => true]);
@@ -2622,7 +2662,9 @@ class TimeEntryController extends Controller
 					'recorded_by' => $userId,
 					'recorded_at' => date('c'),
 				], JSON_THROW_ON_ERROR));
-				$updatedEntry = $this->timeEntryMapper->update($updatedEntry);
+				$updatedEntry = $this->withEntryMonthClosureLocks($updatedEntry, function () use ($updatedEntry) {
+					return $this->timeEntryMapper->update($updatedEntry);
+				});
 			}
 			$this->auditLogMapper->logAction(
 				$userId,
@@ -2709,8 +2751,10 @@ class TimeEntryController extends Controller
 			$entryId = $entry->getId();
 			$this->projectCheckLaborSync->onTimeEntryDeleted($deletedSummary ?? [], $userId);
 			$this->timeTrackingService->withUserMutationLock($userId, function () use ($userId, $entry): void {
-				$this->timeEntryMapper->delete($entry);
-				$this->recomputePaidBreaksForEntry($userId, $entry);
+				$this->withEntryMonthClosureLocks($entry, function () use ($userId, $entry): void {
+					$this->timeEntryMapper->delete($entry);
+					$this->recomputePaidBreaksForEntry($userId, $entry);
+				});
 			});
 
 			// Log the action
@@ -3343,7 +3387,7 @@ class TimeEntryController extends Controller
 					return $complianceBlock;
 				}
 
-				return $this->timeTrackingService->withUserMutationLock($userId, function () use (
+				$mcWrite = function () use (
 					$userId,
 					$timeEntry,
 					$manualRequiresApproval,
@@ -3427,6 +3471,9 @@ class TimeEntryController extends Controller
 							'billing_warning' => $savedEntry->getBillingSyncWarning(),
 						], Http::STATUS_CREATED);
 					}, $this->db);
+				};
+				return $this->timeTrackingService->withUserMutationLock($userId, function () use ($timeEntry, $mcWrite) {
+					return $this->withEntryMonthClosureLocks($timeEntry, $mcWrite);
 				});
 			} catch (LockedException $e) {
 				return new JSONResponse([

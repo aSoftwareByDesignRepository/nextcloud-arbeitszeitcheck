@@ -424,6 +424,28 @@ final class Constants
 
 	public const VAC_HALF_DAY_INTEGRITY = 'VAC_HALF_DAY_INTEGRITY';
 
+	/**
+	 * Opt-in half-day absences for non-vacation types
+	 * (AZC-HALF-DAY-NON-VACATION). JSON list of absence-type codes for which
+	 * the day_fraction control is offered and honored. Default `["vacation"]`
+	 * preserves legacy behavior bit-for-bit; the list is the single source of
+	 * truth — vacation may be removed. Malformed/empty config fails closed to
+	 * the default ({@see \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy}).
+	 */
+	public const CONFIG_HALF_DAY_ENABLED_TYPES = 'half_day_enabled_types';
+
+	/** Default for {@see self::CONFIG_HALF_DAY_ENABLED_TYPES}. */
+	public const CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT = '["vacation"]';
+
+	/** day_fraction=0.5 sent for a type the org did not opt in (400). */
+	public const HALF_DAY_TYPE_NOT_ENABLED = 'HALF_DAY_TYPE_NOT_ENABLED';
+
+	/** day_fraction=0.5 spanning more than one calendar day (400). */
+	public const HALF_DAY_RANGE_FORBIDDEN = 'HALF_DAY_RANGE_FORBIDDEN';
+
+	/** day_fraction outside {1, 0.5} for a non-vacation type (400). */
+	public const HALF_DAY_INVALID = 'HALF_DAY_INVALID';
+
 	/** Calendar→anniversary while users lack employment_start without ack. */
 	public const VAC_YEAR_MISSING_HIRE_ACK_REQUIRED = 'VAC_YEAR_MISSING_HIRE_ACK_REQUIRED';
 

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- manager/HR can end a running approved employee absence early (end-early
+  with mandatory reason + CAS, audit `absence_manager_shortened`, owner +
+  HR-office notification); elapsed days stay recorded — complements manager
+  cancel which removes the whole period
+- absence form shows the actual vacation-day consumption for multi-day
+  requests ("This request uses N vacation days."), computed server-side
+  per the employee's working-time model
+- dashboard hours-at-a-glance tiles include the approved-absence credit in
+  the actual hours, with a "incl. X h absence credit" footnote, matching
+  the overtime balance math
+- prior-year carryover row renamed to "Prior-year carryover left"
+  (de: "Resturlaub Vorjahr") and shows "(expired)" once the transfer
+  deadline has passed
+- people overview "Approved upcoming" column documents that it sums
+  approved vacation days per the employee's working-time model
+- companion app: employee-absences manager surface (employee picker → list
+  → flag-gated shorten/cancel with CAS + mandatory reason), server-side
+  day-consumption preview in create and manager record forms, absence
+  credit in hours glance, "Prior-year carryover left" label + "(expired)"
+  marker, record form defaults to server "today"
+- absence payload carries additive `canShorten` flag for owners
+  (server-computed eligibility; older servers fall back to the
+  isCurrent+approved derivation)
+
+### Fixed
+
+- absence `days` now counts the employee's `weekday_schedule` work days
+  instead of hardcoded Mon–Fri — part-time employees (e.g. 4-day model)
+  were debited one day too many for every Mon–Fri vacation week; a repair
+  step recomputes open absences (non-finalized months only, audit-logged,
+  half-day safe); models without a weekday schedule keep Mon–Fri counting
+- manager absence recording form defaults From/To to today instead of
+  inheriting the one-month list-filter range
+- shorten eligibility (owner + manager paths) now compares calendar dates
+  instead of instants — on hosts whose PHP default timezone differs from
+  the organisation timezone the started/ended guards could skew by up to
+  a day, letting the action flags and the write guard disagree
+- mobile: manager absence record no longer applies the server "today"
+  only partially — a ref-guard was read after it was already overwritten,
+  so the end-date default could stay on the device date
+
 ## 1.9.11 - 2026-11-05
 
 ### Added

@@ -265,6 +265,15 @@ class AbsenceController extends Controller
 		if (\in_array($mode, ['create', 'edit'], true)) {
 			$pageData['dismissedHints'] = $this->dismissedHintIds($userId);
 		}
+		if (!isset($pageData['halfDayEnabledTypes'])) {
+			$enabled = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+			$pageData['halfDayEnabledTypes'] = $enabled;
+			$pageData['halfDayCreditTypes'] = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($enabled);
+		}
+		if (!isset($pageData['absenceDayFraction'])
+			&& ($pageData['absence'] ?? null) instanceof Absence) {
+			$pageData['absenceDayFraction'] = $this->absenceService->storedDayFraction($pageData['absence']);
+		}
 
 		return \array_merge($this->buildAbsencesShellParams($mode, $navFlags), $pageData);
 	}
@@ -625,6 +634,39 @@ class AbsenceController extends Controller
 				'error' => $msg
 			], $this->safeErrorStatus($e, $msg));
 		}
+	}
+
+	/**
+	 * API: estimate vacation/absence working days for a range (FA-PREVIEW).
+	 * Owner-self only — resolves the caller's own schedule, no userId param.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function estimateDays(): JSONResponse
+	{
+		$start = trim((string)$this->request->getParam('start', ''));
+		$end = trim((string)$this->request->getParam('end', $start));
+		if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Dates must be in YYYY-MM-DD format.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$ds = new \DateTime($start);
+			$de = new \DateTime($end);
+		} catch (\Throwable $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid date range.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($de < $ds) {
+			[$ds, $de] = [$de, $ds];
+		}
+		return new JSONResponse([
+			'success' => true,
+		] + $this->absenceService->estimateAbsenceDays($this->getUserId(), $ds, $de));
 	}
 
 	/**

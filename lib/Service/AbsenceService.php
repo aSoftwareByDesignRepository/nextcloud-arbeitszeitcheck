@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IDBConnection;
@@ -42,6 +43,7 @@ class AbsenceService
 	private UserSettingsMapper $userSettingsMapper;
 	private TeamResolverService $teamResolver;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
+	private ?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null;
 	private IConfig $config;
 	private IDBConnection $db;
 	private ILockingProvider $lockingProvider;
@@ -95,6 +97,7 @@ class AbsenceService
 		?SpecialEntitlementService $specialEntitlementService = null,
 		?PostCommitEffectQueue $postCommitEffectQueue = null,
 		?\OCP\ICacheFactory $cacheFactory = null,
+		?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -125,6 +128,7 @@ class AbsenceService
 		$this->timeEntryMapper = $timeEntryMapper ?? \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\TimeEntryMapper::class);
 		$this->postCommitEffectQueue = $postCommitEffectQueue;
 		$this->cacheFactory = $cacheFactory;
+		$this->scheduledWorkdayCounter = $scheduledWorkdayCounter ?? $this->scheduledWorkdayCounter;
 	}
 
 	/**
@@ -210,6 +214,7 @@ class AbsenceService
 		}
 		$lockKey = $this->acquireUserMutationLock($userId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
@@ -255,7 +260,13 @@ class AbsenceService
 				$absence->setDays($workingDays);
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
 			} else {
-				$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
+				$workingDays = $this->resolveNonVacationDaysDebit(
+					$userId,
+					$data['type'],
+					$absence->getStartDate(),
+					$absence->getEndDate(),
+					$data
+				);
 				$absence->setDays($workingDays);
 			}
 			$specialAmount = null;
@@ -272,9 +283,20 @@ class AbsenceService
 			$savedAbsence = null;
 			$autoApproved = false;
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit or a seal
+			// could land between the controller's pre-check and this insert
+			// (state_transition_toctou). Acquired pre-tx: oc_file_locks
+			// writes inside a transaction are invisible to peers.
+			$monthClosureKeys = $this->monthClosureLockKeys($userId, $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($userId, $absence->getStartDate(), $absence->getEndDate());
+				// Re-assert under the month-closure locks — the controller's
+				// pre-check is outside this lock domain.
+				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), null);
 				if (!empty($overlappingInTx)) {
 					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -360,6 +382,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 			$this->specialEntitlementService?->releaseReservationContext($specialContext);
@@ -390,6 +413,7 @@ class AbsenceService
 		}
 		$lockKey = $this->acquireUserMutationLock($targetUserId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			if (($data['type'] ?? '') === Absence::TYPE_VACATION) {
@@ -421,7 +445,13 @@ class AbsenceService
 					$absence->getEndDate(),
 					$data
 				)
-				: $this->computeWorkingDaysForUser($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+				: $this->resolveNonVacationDaysDebit(
+					$targetUserId,
+					$absence->getType(),
+					$absence->getStartDate(),
+					$absence->getEndDate(),
+					$data
+				);
 			$absence->setDays($workingDays);
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
@@ -435,9 +465,17 @@ class AbsenceService
 			}
 
 			$savedAbsence = null;
+
+			// Same month-closure contract as createAbsence — a manager-recorded
+			// historical entry must not land in a month being sealed either.
+			$monthClosureKeys = $this->monthClosureLockKeys($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($targetUserId, $absence->getStartDate(), $absence->getEndDate());
+				// Re-assert under the month-closure locks (see createAbsence).
+				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($targetUserId, $absence->getStartDate(), $absence->getEndDate(), null);
 				if (!empty($overlappingInTx)) {
 					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -498,6 +536,7 @@ class AbsenceService
 
 			return $savedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 			$this->specialEntitlementService?->releaseReservationContext($specialContext);
@@ -543,6 +582,7 @@ class AbsenceService
 		$data = $this->scrubClientAuthoredDebitFields($data);
 		$lockKey = $this->acquireUserMutationLock($userId);
 		$catalogLockHeld = false;
+		$monthClosureKeys = [];
 		try {
 			$catalogLockHeld = $this->acquireSharedCustomTypeCatalogLock($data);
 			$absence = $this->getAbsence($id, $userId);
@@ -558,6 +598,12 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Only pending absences can be updated'));
 		}
 		$this->assertAbsenceMutable($absence);
+
+		// Keep the stored range: the window set below may differ, and moving
+		// coverage OUT of a sealed month falsifies the snapshot as much as
+		// writing into one — the in-tx guard must cover both.
+		$originalStart = $absence->getStartDate() !== null ? clone $absence->getStartDate() : null;
+		$originalEnd = $absence->getEndDate() !== null ? clone $absence->getEndDate() : null;
 
 		$oldData = $absence->getSummary();
 
@@ -598,6 +644,11 @@ class AbsenceService
 		} elseif ($absence->getDurationHours() !== null) {
 			$validateData['duration_hours'] = $absence->getDurationHours();
 		}
+		// $fractionTrusted marks a server-REderived day_fraction (stored debit
+		// preservation): it bypasses the org opt-in gate — the flag gates new
+		// entry UI, not historical truth — but keeps normalize/range/integrity
+		// checks. An explicit client day_fraction is never trusted.
+		$fractionTrusted = false;
 		if (array_key_exists('day_fraction', $data)) {
 			$validateData['day_fraction'] = $data['day_fraction'];
 		} elseif (
@@ -623,17 +674,52 @@ class AbsenceService
 				&& abs($storedDays - 0.5) <= 0.011
 			) {
 				$validateData['day_fraction'] = '0.5';
+				$fractionTrusted = true;
+			}
+		} elseif (
+			$absence->getType() !== Absence::TYPE_VACATION
+			&& $absence->getDays() !== null
+			&& $originalStart !== null
+			&& $originalEnd !== null
+			&& $originalStart->format('Y-m-d') === $originalEnd->format('Y-m-d')
+			&& $startDate->format('Y-m-d') === $endDate->format('Y-m-d')
+		) {
+			// Non-vacation trusted preservation (AZC-HALF-DAY-NON-VACATION):
+			// derive the stored fraction relative to the ORIGINAL single-day
+			// weight — never a literal days≈0.5 test, which would both miss
+			// 0.25-stored halves (weight-0.5 days) and misread a full-day
+			// 0.5-weight debit as a half. A fraction only exists on
+			// single-day rows; widening to a multi-day range intentionally
+			// recomputes to full schedule weight.
+			$storedDays = (float)$absence->getDays();
+			$oldWeight = $this->computeWorkingDaysForUser($userId, $originalStart, $originalStart);
+			if ($oldWeight > 0.011) {
+				$storedFraction = $storedDays / $oldWeight;
+				if (abs($storedFraction - 0.5) <= 0.011) {
+					$validateData['day_fraction'] = '0.5';
+					$fractionTrusted = true;
+				}
 			}
 		}
-		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), ['existing_type' => $absence->getType()]);
+		$this->validateAbsenceData($validateData, $userId, $id, $absence->getCreatedAt(), [
+			'existing_type' => $absence->getType(),
+			'trusted_day_fraction' => $fractionTrusted,
+		]);
 
 		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
 		if ($absence->getType() === Absence::TYPE_VACATION) {
-			$workingDays = $this->resolveVacationDaysDebit($userId, $absence->getStartDate(), $absence->getEndDate(), $validateData);
+			$workingDays = $this->resolveVacationDaysDebit($userId, $absence->getStartDate(), $absence->getEndDate(), $validateData, $fractionTrusted);
 			$absence->setDays($workingDays);
 			$this->applyVacationDurationHours($absence, $validateData, $workingDays);
 		} else {
-			$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $absence->getEndDate());
+			$workingDays = $this->resolveNonVacationDaysDebit(
+				$userId,
+				$absence->getType(),
+				$absence->getStartDate(),
+				$absence->getEndDate(),
+				$validateData,
+				$fractionTrusted
+			);
 			$absence->setDays($workingDays);
 		}
 		$absence->setUpdatedAt(new \DateTime());
@@ -649,9 +735,30 @@ class AbsenceService
 
 		$updatedAbsence = null;
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (both the stored
+		// and the new window; see createAbsence).
+		$monthClosureKeys = array_values(array_unique(array_merge(
+			$this->monthClosureLockKeys($userId, $originalStart, $originalEnd),
+			$this->monthClosureLockKeys($userId, $absence->getStartDate(), $absence->getEndDate())
+		)));
+		sort($monthClosureKeys);
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$this->db->beginTransaction();
 		try {
 			$this->absenceMapper->lockUserAbsenceWindow($userId, $absence->getStartDate(), $absence->getEndDate());
+			// Re-assert under the month-closure locks (see createAbsence):
+			// the new window via the entity, the stored window explicitly
+			// when the range moved.
+			$this->assertAbsenceMutable($absence);
+			if ($this->monthClosureService !== null
+				&& $originalStart !== null
+				&& $originalEnd !== null
+				&& ($originalStart->format('Y-m-d') !== $absence->getStartDate()->format('Y-m-d')
+					|| $originalEnd->format('Y-m-d') !== $absence->getEndDate()->format('Y-m-d'))) {
+				$this->monthClosureService->assertDateRangeMutable($userId, $originalStart, $originalEnd);
+			}
 			$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), $id);
 			if (!empty($overlappingInTx)) {
 				throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
@@ -700,6 +807,7 @@ class AbsenceService
 
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseSharedCustomTypeCatalogLock($catalogLockHeld);
 			$this->releaseUserMutationLock($lockKey);
 		}
@@ -720,6 +828,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			// Re-read under lock so concurrent approve cannot race a delete.
 			$absence = $this->absenceMapper->find($id);
@@ -732,8 +841,15 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit (see createAbsence).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks.
+				$this->assertAbsenceMutable($absence);
 				$this->specialEntitlementService?->releaseForAbsence($absence, $userId);
 				$this->absenceMapper->delete($absence);
 
@@ -754,6 +870,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -784,6 +901,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			$absence = $this->absenceMapper->find($id);
@@ -810,6 +928,11 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
+			// Month-finalize runs on a disjoint lock domain — hold the
+			// month-closure keys exclusive across check→commit (see createAbsence).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$oldData = $absence->getSummary();
 
 			$absence->setStatus(Absence::STATUS_CANCELLED);
@@ -817,6 +940,8 @@ class AbsenceService
 
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks.
+				$this->assertAbsenceMutable($absence);
 				$updatedAbsence = $this->absenceMapper->update($absence);
 				$this->specialEntitlementService?->releaseForAbsence($updatedAbsence, $userId);
 
@@ -837,6 +962,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -874,6 +1000,7 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			$absence = $this->absenceMapper->find($id);
@@ -894,11 +1021,15 @@ class AbsenceService
 			}
 			$this->assertAbsenceMutable($absence);
 
-			$today = $this->todayDateInStorage();
-			if ($startDate > $today) {
+			// Calendar-date comparison (Y-m-d), matching the flag semantics in
+			// ownerAbsenceActionFlags/managerAbsenceActionFlags — instant
+			// comparison against the storage-TZ midnight would skew by up to a
+			// day on hosts whose PHP default TZ differs from the org TZ.
+			$todayYmd = $this->todayDateInStorage()->format('Y-m-d');
+			if ($startDate->format('Y-m-d') > $todayYmd) {
 				throw new \Exception($this->l10n->t('You can only shorten absences that have already started.'));
 			}
-			if ($originalEndDate <= $today) {
+			if ($originalEndDate->format('Y-m-d') <= $todayYmd) {
 				throw new \Exception($this->l10n->t('This absence has already ended. It cannot be shortened.'));
 			}
 
@@ -938,8 +1069,19 @@ class AbsenceService
 			}
 			$absence->setUpdatedAt($this->nowInStorage());
 
+			// Month-finalize runs on a disjoint lock domain — the stored
+			// range covers the shortened window (newEnd ⊆ [start, origEnd]).
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $startDate, $originalEndDate);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
+				// Re-assert under the month-closure locks: the new window
+				// via the entity, the stored window explicitly.
+				$this->assertAbsenceMutable($absence);
+				if ($this->monthClosureService !== null) {
+					$this->monthClosureService->assertDateRangeMutable($userId, $startDate, $originalEndDate);
+				}
 				$updatedAbsence = $this->absenceMapper->update($absence);
 				$this->specialEntitlementService?->adjustConsumedAbsence(
 					$updatedAbsence,
@@ -967,6 +1109,7 @@ class AbsenceService
 
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -990,11 +1133,19 @@ class AbsenceService
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
 		}
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
+			// Re-read under the mutation lock — the pre-lock find may be
+			// stale — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($id);
+			$monthClosureKeys = $this->monthClosureLockKeys($lockFresh->getUserId(), $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1005,6 +1156,7 @@ class AbsenceService
 					$this->l10n->t('This absence was already decided by another manager.')
 				);
 			}
+			// Re-assert under the month-closure locks.
 			$this->assertAbsenceMutable($absence);
 
 			if ($absence->getType() === Absence::TYPE_VACATION) {
@@ -1059,6 +1211,7 @@ class AbsenceService
 			$this->db->rollBack();
 			throw $e;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -1099,11 +1252,19 @@ class AbsenceService
 				$this->l10n->t('This absence was already decided by another manager.')
 			);
 		}
+		$monthClosureKeys = [];
 		$updatedAbsence = null;
 		try {
 			if ($lockAbsence->getType() === Absence::TYPE_VACATION) {
 				$this->assertVacationUnitMigrationIdle();
 			}
+			// Re-read under the mutation lock — the pre-lock find may be
+			// stale — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($id);
+			$monthClosureKeys = $this->monthClosureLockKeys($lockFresh->getUserId(), $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1114,6 +1275,7 @@ class AbsenceService
 					$this->l10n->t('This absence was already decided by another manager.')
 				);
 			}
+			// Re-assert under the month-closure locks.
 			$this->assertAbsenceMutable($absence);
 
 			$oldData = $absence->getSummary();
@@ -1144,6 +1306,7 @@ class AbsenceService
 			$this->db->rollBack();
 			throw $e;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -1237,6 +1400,7 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1257,6 +1421,11 @@ class AbsenceService
 		}
 		$this->assertAbsenceMutable($absence);
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (see createAbsence).
+		$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_PENDING);
 		$absence->setUpdatedAt(new \DateTime());
@@ -1266,6 +1435,8 @@ class AbsenceService
 
 		$this->db->beginTransaction();
 		try {
+			// Re-assert under the month-closure locks.
+			$this->assertAbsenceMutable($absence);
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -1338,6 +1509,7 @@ class AbsenceService
 		}
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -1359,6 +1531,7 @@ class AbsenceService
 			throw new \Exception($this->l10n->t('Absence not found'));
 		}
 		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
 			$absence = $this->absenceMapper->find($id);
 			if (!$absence) {
@@ -1379,6 +1552,11 @@ class AbsenceService
 		}
 		$this->assertAbsenceMutable($absence);
 
+		// Month-finalize runs on a disjoint lock domain — hold the
+		// month-closure keys exclusive across check→commit (see createAbsence).
+		$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+		$this->acquireMonthClosureLocks($monthClosureKeys);
+
 		$oldData = $absence->getSummary();
 		$absence->setStatus(Absence::STATUS_SUBSTITUTE_DECLINED);
 		$absence->setApproverComment($comment);
@@ -1388,6 +1566,8 @@ class AbsenceService
 
 		$this->db->beginTransaction();
 		try {
+			// Re-assert under the month-closure locks.
+			$this->assertAbsenceMutable($absence);
 			$updatedAbsence = $this->absenceMapper->update($absence);
 
 			$this->auditLogMapper->logAction(
@@ -1430,6 +1610,7 @@ class AbsenceService
 		}
 			return $updatedAbsence;
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 	}
@@ -1445,6 +1626,100 @@ class AbsenceService
 			);
 		}
 		return $key;
+	}
+
+	/**
+	 * Month-closure lock keys (month_closure tier — always LAST in
+	 * {@see DbLockKeys::ORDER}) for every calendar month a [start..end]
+	 * window touches. Absence writers hold them LOCK_EXCLUSIVE for the
+	 * whole check→commit window so finalizeMonth/reopenMonth — which take
+	 * the same keys exclusive — can never interleave between the mutable
+	 * assert and the write commit. Same contract as
+	 * {@see BusinessTripService::closureLockKeys()}; exclusive rather than
+	 * shared because a mutation and a seal are never compatible anyway.
+	 *
+	 * @return list<string>
+	 */
+	private function monthClosureLockKeys(string $userId, ?\DateTimeInterface $start, ?\DateTimeInterface $end): array
+	{
+		if ($this->monthClosureService === null || $start === null || $end === null) {
+			return [];
+		}
+		$startDay = new \DateTime($start->format('Y-m-d'));
+		$endDay = new \DateTime($end->format('Y-m-d'));
+		$endDay->setTime(23, 59, 59);
+		$keys = [];
+		foreach ($this->monthClosureService->monthsOverlappingRange($startDay, $endDay) as [$y, $m]) {
+			$keys[] = DbLockKeys::monthClosure($userId, $y, $m);
+		}
+		// Deterministic acquisition order across callers (sorted, deduped).
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		return $keys;
+	}
+
+	/**
+	 * Acquire exclusive month-closure locks in sorted order; a partial
+	 * acquisition failure releases what was taken instead of leaking locks
+	 * until TTL (BusinessTripService::acquireAllExclusive shape).
+	 *
+	 * MUST be called before beginTransaction(): the DB locking provider
+	 * writes oc_file_locks on the same connection, so a lock acquired
+	 * inside an open transaction is invisible to a concurrent finalize
+	 * until commit — exactly the window this serializes. A LockedException
+	 * means a finalize/reopen for one of these months is in flight; it
+	 * surfaces as a retryable busy error (wire code LOCKED), never a
+	 * masked generic error.
+	 *
+	 * @param list<string> $keys
+	 */
+	private function acquireMonthClosureLocks(array $keys): void
+	{
+		$held = [];
+		try {
+			foreach ($keys as $key) {
+				$this->lockingProvider->acquireLock(
+					$key,
+					ILockingProvider::LOCK_EXCLUSIVE,
+					'Absence write against month-closure window'
+				);
+				$held[] = $key;
+			}
+		} catch (\Throwable $e) {
+			foreach (array_reverse($held) as $key) {
+				try {
+					$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+				} catch (\Throwable) {
+					// Best effort — the lock TTL is the final safety net.
+				}
+			}
+			if ($e instanceof \OCP\Lock\LockedException) {
+				throw new AbsenceMutationBusyException(
+					$this->l10n->t('This calendar month is currently being finalized. Please wait a moment and try again.')
+				);
+			}
+			throw $e;
+		}
+	}
+
+	/**
+	 * Release exclusive month-closure locks in reverse acquisition order.
+	 * Best effort — release failures must never mask a primary exception.
+	 *
+	 * @param list<string> $keys
+	 */
+	private function releaseMonthClosureLocks(array $keys): void
+	{
+		foreach (array_reverse($keys) as $key) {
+			try {
+				$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'Failed to release month closure lock: ' . $e->getMessage(),
+					['exception' => $e]
+				);
+			}
+		}
 	}
 
 	/**
@@ -2252,7 +2527,13 @@ class AbsenceService
 				);
 			} else {
 				// Days mode: resolve half/full debit before allocation gate (ADR-05).
-				$prospectiveDays = $this->resolveVacationDaysDebit($userId, $startDate, $endDate, $data);
+				$prospectiveDays = $this->resolveVacationDaysDebit(
+					$userId,
+					$startDate,
+					$endDate,
+					$data,
+					($options['trusted_day_fraction'] ?? false) === true
+				);
 			}
 			// Hours mode: schedule-/holiday-aware debit is authoritative (Sat work models
 			// can have net hours while Mon–Fri “working days” is 0).
@@ -2467,17 +2748,30 @@ class AbsenceService
 	private function autoApproveForNoManager(Absence $absence): Absence
 	{
 		$updatedAbsence = null;
-
-		$this->db->beginTransaction();
+		$lockKey = $this->acquireUserMutationLock($absence->getUserId());
+		$monthClosureKeys = [];
 		try {
-			$updatedAbsence = $this->doAutoApproveDbWork($absence);
-			$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
-			$this->invalidateVacationStatsAfterCommit($absence->getUserId());
+			// Re-read under the mutation lock — the entity handed in is a
+			// pre-lock read and may be stale — then hold the month-closure
+			// keys exclusive across check→commit (see createAbsence).
+			$absence = $this->absenceMapper->find($absence->getId());
+			$monthClosureKeys = $this->monthClosureLockKeys($absence->getUserId(), $absence->getStartDate(), $absence->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
 
-			$this->db->commit();
-		} catch (\Throwable $e) {
-			$this->db->rollBack();
-			throw $e;
+			$this->db->beginTransaction();
+			try {
+				$updatedAbsence = $this->doAutoApproveDbWork($absence);
+				$this->specialEntitlementService?->consumeForAbsence($updatedAbsence, 'system');
+				$this->invalidateVacationStatsAfterCommit($absence->getUserId());
+
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
+			$this->releaseUserMutationLock($lockKey);
 		}
 
 		if ($this->notificationService) {
@@ -2581,7 +2875,7 @@ class AbsenceService
 	 * @param mixed $raw
 	 * @throws BusinessRuleException
 	 */
-	private function normalizeDayFraction(mixed $raw): float
+	private function normalizeDayFraction(mixed $raw, string $invalidCode = Constants::VAC_HALF_DAY_INVALID): float
 	{
 		if ($raw === null || $raw === '' || (is_array($raw) && $raw === [])) {
 			return 1.0;
@@ -2592,7 +2886,7 @@ class AbsenceService
 		if (is_bool($raw) || is_object($raw)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		$s = trim((string)$raw);
@@ -2603,14 +2897,14 @@ class AbsenceService
 		if (!preg_match('/^\d+(\.\d+)?$/', $s)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		$v = (float)$s;
 		if (!is_finite($v)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				Constants::VAC_HALF_DAY_INVALID
+				$invalidCode
 			);
 		}
 		// Strict membership on the parsed float (rejects 0.5000001 / 0.25).
@@ -2622,8 +2916,106 @@ class AbsenceService
 		}
 		throw new BusinessRuleException(
 			$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-			Constants::VAC_HALF_DAY_INVALID
+			$invalidCode
 		);
+	}
+
+	/**
+	 * Conversion day carry (AZC-HALF-DAY-NON-VACATION / US-005): when the
+	 * source row stores a fraction debit on a single day — e.g. a 0.5
+	 * vacation — the converted sick row keeps `weight × storedFraction`
+	 * regardless of whether sick leave is currently half-day enabled. The
+	 * opt-in flag gates new entry UI, never historical truth. Multi-day or
+	 * full-weight sources carry nothing.
+	 */
+	private function daysWithCarriedFraction(
+		Absence $source,
+		string $userId,
+		\DateTime $targetStart,
+		\DateTime $targetEnd,
+	): float {
+		$targetWeight = $this->computeWorkingDaysForUser($userId, $targetStart, $targetEnd);
+		$srcDays = $source->getDays();
+		$srcStart = $source->getStartDate();
+		$srcEnd = $source->getEndDate();
+		if ($srcDays === null
+			|| $srcStart === null
+			|| $srcEnd === null
+			|| $srcStart->format('Y-m-d') !== $srcEnd->format('Y-m-d')) {
+			return $targetWeight;
+		}
+		$srcWeight = $this->computeWorkingDaysForUser($userId, $srcStart, $srcStart);
+		if (!is_finite($srcWeight) || $srcWeight <= 0.011) {
+			return $targetWeight;
+		}
+		$fraction = min(1.0, (float)$srcDays / $srcWeight);
+		if ($fraction >= 1.0 - 0.011) {
+			return $targetWeight;
+		}
+		return round($targetWeight * $fraction, 4);
+	}
+
+	/**
+	 * Org allowlist for opt-in half-day types (AZC-HALF-DAY-NON-VACATION).
+	 * Fail-closed parse — see {@see HalfDayTypePolicy::enabledTypesFromRaw()}.
+	 *
+	 * @return list<string>
+	 */
+	private function halfDayEnabledTypes(): array
+	{
+		return HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+	}
+
+	/**
+	 * EC-14: a days-unit entitlement binding owns its fraction contract via
+	 * the entitlement ledger ({0.25,0.5,0.75,1}); the generic opt-in gate
+	 * must never run for such a type, and `days` stays full schedule weight.
+	 */
+	private function isEntitlementDaysBoundType(string $type): bool
+	{
+		return $this->specialEntitlementService?->hasActiveDaysUnitBindingForAbsenceType($type) === true;
+	}
+
+	/**
+	 * Days debit for every non-vacation type (AZC-HALF-DAY-NON-VACATION).
+	 *
+	 * Pipeline: scrub happened upstream → entitlement-bound types return
+	 * full weight → normalize day_fraction (1.0|0.5 only) → enabled gate →
+	 * single-day guard → days = schedule/workday weight × fraction.
+	 *
+	 * @param array<string, mixed> $data
+	 * @throws BusinessRuleException|\Exception
+	 */
+	private function resolveNonVacationDaysDebit(
+		string $userId,
+		string $type,
+		\DateTime $start,
+		\DateTime $end,
+		array $data,
+		bool $fractionTrusted = false,
+	): float {
+		$w = $this->computeWorkingDaysForUser($userId, $start, $end);
+		if ($this->isEntitlementDaysBoundType($type)) {
+			return $w;
+		}
+		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null, Constants::HALF_DAY_INVALID);
+		if (abs($fraction - 0.5) < 1e-9) {
+			if (!$fractionTrusted
+				&& !HalfDayTypePolicy::isEnabledForType($type, $this->halfDayEnabledTypes())) {
+				throw new BusinessRuleException(
+					$this->l10n->t('Half-day entries are not enabled for this absence type.'),
+					Constants::HALF_DAY_TYPE_NOT_ENABLED
+				);
+			}
+			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
+				throw new BusinessRuleException(
+					$this->l10n->t('A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
+					Constants::HALF_DAY_RANGE_FORBIDDEN
+				);
+			}
+			return $w * 0.5;
+		}
+		return $w;
 	}
 
 	/**
@@ -2639,6 +3031,7 @@ class AbsenceService
 		\DateTime $start,
 		\DateTime $end,
 		array $data,
+		bool $fractionTrusted = false,
 	): float {
 		$w = $this->computeWorkingDaysForUser($userId, $start, $end);
 
@@ -2648,6 +3041,16 @@ class AbsenceService
 		}
 
 		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null);
+
+		if (abs($fraction - 0.5) < 1e-9
+			&& !$fractionTrusted
+			&& !$this->isEntitlementDaysBoundType(Absence::TYPE_VACATION)
+			&& !HalfDayTypePolicy::isEnabledForType(Absence::TYPE_VACATION, $this->halfDayEnabledTypes())) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Half-day entries are not enabled for this absence type.'),
+				Constants::HALF_DAY_TYPE_NOT_ENABLED
+			);
+		}
 
 		if (abs($fraction - 0.5) < 1e-9) {
 			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
@@ -2686,6 +3089,31 @@ class AbsenceService
 	}
 
 	/**
+	 * Stored day fraction for the edit form ('0.5' or '1').
+	 *
+	 * Weight-aware mirror of the update path's trusted-preserve derivation:
+	 * a stored half on a half-weight working day persists days = weight × 0.5
+	 * (e.g. 0.25), so a literal days≈0.5 check would mislabel it "Full day"
+	 * and inflate the debit on the next save. Returns '1' for multi-day rows,
+	 * null days, and non-working days (weight 0).
+	 */
+	public function storedDayFraction(Absence $absence): string
+	{
+		$days = $absence->getDays();
+		$start = $absence->getStartDate();
+		$end = $absence->getEndDate();
+		if ($days === null || !$start || !$end
+			|| $start->format('Y-m-d') !== $end->format('Y-m-d')) {
+			return '1';
+		}
+		$weight = $this->computeWorkingDaysForUser($absence->getUserId(), $start, $start);
+		if ($weight <= 0.011) {
+			return '1';
+		}
+		return abs(((float)$days / $weight) - 0.5) <= 0.011 ? '0.5' : '1';
+	}
+
+	/**
 	 * Compute working days per year for a date range (excludes weekends and German public holidays)
 	 *
 	 * @param \DateTime $start
@@ -2694,6 +3122,9 @@ class AbsenceService
 	 */
 	private function computeWorkingDaysPerYear(\DateTime $start, \DateTime $end, string $userId): array
 	{
+		if ($this->scheduledWorkdayCounter !== null) {
+			return $this->scheduledWorkdayCounter->daysPerYearForUser($userId, $start, $end);
+		}
 		return $this->holidayCalendarService->computeWorkingDaysPerYearForUser($userId, $start, $end);
 	}
 
@@ -2703,6 +3134,11 @@ class AbsenceService
 	 */
 	private function computeWorkingDaysForUser(string $userId, \DateTime $start, \DateTime $end): float
 	{
+		// ADR-01 (absence-day-accuracy-pack-2026-11): weekday_schedule wins;
+		// Mon–Fri stays the documented fallback inside the counter.
+		if ($this->scheduledWorkdayCounter !== null) {
+			return $this->scheduledWorkdayCounter->daysForUser($userId, $start, $end);
+		}
 		return $this->holidayCalendarService->computeWorkingDaysForUser($userId, $start, $end);
 	}
 
@@ -2850,8 +3286,20 @@ class AbsenceService
 		}
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		$result = null;
 		try {
+			// Re-read under the mutation lock — the CAS check above is
+			// pre-lock — then hold the month-closure keys exclusive across
+			// check→commit over BOTH the vacation and the sick window.
+			$lockFresh = $this->absenceMapper->find($absenceId);
+			$monthClosureKeys = array_values(array_unique(array_merge(
+				$this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate()),
+				$this->monthClosureLockKeys($ownerUserId, $sickStart, $endOfSick)
+			)));
+			sort($monthClosureKeys);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $vacStart, $vacEnd);
@@ -2885,7 +3333,7 @@ class AbsenceService
 				$sick->setStartDate($sickStart);
 				$sick->setEndDate($sickEnd);
 				$sick->setReason($reason !== '' ? $reason : null);
-				$sick->setDays($this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd));
+				$sick->setDays($this->daysWithCarriedFraction($absence, $ownerUserId, $sickStart, $sickEnd));
 				$now = $this->nowInStorage();
 				if ($managerFlow) {
 					$sick->setStatus(Absence::STATUS_APPROVED);
@@ -3032,6 +3480,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -3099,7 +3548,7 @@ class AbsenceService
 					'start' => $sickStart->format('Y-m-d'),
 					'end' => $sickEnd->format('Y-m-d'),
 					'status' => $managerFlow ? 'approved' : 'pending',
-					'days' => $this->computeWorkingDaysForUser($ownerUserId, $sickStart, $sickEnd),
+					'days' => $this->daysWithCarriedFraction($absence, $ownerUserId, $sickStart, $sickEnd),
 				],
 				'tail' => $tailStart !== null ? [
 					'start' => $tailStart->format('Y-m-d'),
@@ -3145,7 +3594,15 @@ class AbsenceService
 		$ownerUserId = $absence->getUserId();
 		$today = $this->todayDateInStorage()->format('Y-m-d');
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		try {
+			// Re-read under the mutation lock — the entity handed in is a
+			// pre-lock read — then hold the month-closure keys exclusive
+			// across check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($absence->getId());
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
@@ -3203,6 +3660,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -3315,7 +3773,15 @@ class AbsenceService
 		$this->assertAbsenceMutable($absence);
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
 		try {
+			// Re-read under the mutation lock — the pre-checks above are
+			// pre-lock — then hold the month-closure keys exclusive across
+			// check→commit (see createAbsence).
+			$lockFresh = $this->absenceMapper->find($absenceId);
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
 			$this->db->beginTransaction();
 			try {
 				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $start, $end);
@@ -3352,6 +3818,7 @@ class AbsenceService
 				throw $e;
 			}
 		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
 
@@ -3550,11 +4017,136 @@ class AbsenceService
 	}
 
 	/**
+	 * FA-MSHORTEN (US-407): manager/HR shortens a running approved absence
+	 * (early return). Same business rules as the owner shorten, but the
+	 * actor is the manager — scope was verified by the controller; a
+	 * mandatory reason + CAS token is required for auditability.
+	 *
+	 * @param array<string,mixed> $data end_date, expectedUpdatedAt, reason
+	 */
+	public function managerShortenAbsence(int $id, array $data, string $actorUserId): Absence
+	{
+		$absence = $this->absenceMapper->find($id);
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+			throw new \Exception('not_approved');
+		}
+		$startDate = $absence->getStartDate();
+		$originalEndDate = $absence->getEndDate();
+		if (!$startDate || !$originalEndDate) {
+			throw new \Exception('not_approved');
+		}
+		// Calendar-date comparison — see shortenAbsence() for why instants skew.
+		$todayYmd = $this->todayDateInStorage()->format('Y-m-d');
+		if ($startDate->format('Y-m-d') > $todayYmd) {
+			throw new \Exception('not_started');
+		}
+		if ($originalEndDate->format('Y-m-d') <= $todayYmd) {
+			throw new \Exception('already_ended');
+		}
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$newEnd = $this->parseDate((string)($data['end_date'] ?? ''));
+		$newEnd->setTime(0, 0, 0);
+		if ($newEnd < (clone $startDate)->setTime(0, 0, 0)) {
+			throw new \Exception('end_before_start');
+		}
+		if ($newEnd >= (clone $originalEndDate)->setTime(0, 0, 0)) {
+			throw new \Exception('end_not_earlier');
+		}
+		$ownerUserId = $absence->getUserId();
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
+		try {
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $startDate, $originalEndDate);
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $startDate, $originalEndDate);
+				$absence = $this->absenceMapper->find($id);
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				// FM-05: an open owner cancellation request wins — the manager
+				// must decide it, not shorten around it.
+				if ($absence->getCancelRequestedAt() !== null) {
+					throw new \Exception('cancel_request_pending');
+				}
+				$this->assertAbsenceMutable($absence);
+				if ($absence->getType() === Absence::TYPE_VACATION) {
+					$this->assertVacationUnitMigrationIdle();
+				}
+				$oldData = $absence->getSummary();
+				$absence->setEndDate($newEnd);
+				$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $startDate, $newEnd));
+				if ($absence->getType() === Absence::TYPE_VACATION) {
+					// DC-04: hours-mode duration_hours follows the shortened
+					// range, same rule as the owner shorten path.
+					$this->recomputeVacationHoursAfterShorten(
+						$absence, $originalEndDate, $oldData, (float)$absence->getDays()
+					);
+				}
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$this->specialEntitlementService?->adjustConsumedAbsence(
+					$updated,
+					['end_date' => $newEnd->format('Y-m-d')],
+					$oldData,
+					$actorUserId
+				);
+				$newSummary = $updated->getSummary();
+				$newSummary['shorten_reason'] = $reason;
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_manager_shortened',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId
+				);
+				$this->invalidateVacationStatsAfterCommit($ownerUserId);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceShortenedByManager(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($updated),
+				$reason
+			));
+		}
+		if ($this->absenceNotificationMailService) {
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification(
+				$updated, 'manager_shortened', $actorUserId
+			));
+		}
+
+		return $updated;
+	}
+
+	/**
 	 * Action flags for the OWNER's own absence payloads (ADR-04 — the server
 	 * is the single source of eligibility truth; clients render buttons
 	 * straight from these flags instead of re-deriving type logic).
 	 *
-	 * @return array{canConvertToSick: bool, canRequestCancel: bool}
+	 * @return array{canConvertToSick: bool, canRequestCancel: bool, canShorten: bool}
 	 */
 	public function ownerAbsenceActionFlags(Absence $absence): array
 	{
@@ -3566,6 +4158,8 @@ class AbsenceService
 		return [
 			'canConvertToSick' => $running && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canRequestCancel' => $running && $absence->getCancelRequestedAt() === null,
+			// NH-05: mirrors shortenAbsence() eligibility (approved && started && end > today).
+			'canShorten' => $running && $end > $today,
 		];
 	}
 
@@ -3573,17 +4167,37 @@ class AbsenceService
 	 * Action flags for MANAGER-scope absence payloads (ADR-04). Manager
 	 * conversions are allowed retroactively, so no running-gate here.
 	 *
-	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canDecideCancelRequest: bool}
+	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canManagerShorten: bool, canDecideCancelRequest: bool}
 	 */
 	public function managerAbsenceActionFlags(Absence $absence): array
 	{
 		$today = $this->todayDateInStorage()->format('Y-m-d');
+		$start = $absence->getStartDate()?->format('Y-m-d');
 		$end = $absence->getEndDate()?->format('Y-m-d');
 		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
 		return [
 			'canConvertToSick' => $approved && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canManagerCancel' => $approved && $end !== null && $end >= $today,
+			'canManagerShorten' => $approved && $start !== null && $end !== null
+				&& $start <= $today && $end > $today,
 			'canDecideCancelRequest' => $approved && $absence->getCancelRequestedAt() !== null,
+		];
+	}
+
+	/**
+	 * FA-PREVIEW: server-side day estimate for the absence form.
+	 * Never trusts client math — single authority via DC-01.
+	 * @return array{days: float, basis: string, single_day: bool}
+	 */
+	public function estimateAbsenceDays(string $userId, \DateTime $start, \DateTime $end): array
+	{
+		$days = $this->computeWorkingDaysForUser($userId, $start, $end);
+		return [
+			'days' => round($days, 2),
+			'basis' => $this->scheduledWorkdayCounter !== null
+				? $this->scheduledWorkdayCounter->basisForUser($userId)
+				: 'weekdays_mon_fri',
+			'single_day' => $start->format('Y-m-d') === $end->format('Y-m-d'),
 		];
 	}
 
@@ -3597,7 +4211,7 @@ class AbsenceService
 		if (!$start || !$end) {
 			return 0.0;
 		}
-		return $this->holidayCalendarService->computeWorkingDaysForUser(
+		return $this->computeWorkingDaysForUser(
 			$absence->getUserId(),
 			$start,
 			$end

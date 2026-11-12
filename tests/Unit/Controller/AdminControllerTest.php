@@ -1131,9 +1131,12 @@ class AdminControllerTest extends TestCase
 			$group->method('getGID')->willReturn($gid);
 			return $group;
 		});
-		$this->appManager->expects($this->once())->method('enableAppForGroups')
-			->with('arbeitszeitcheck', $this->callback(static fn (array $groups): bool => count($groups) === 2));
-		$this->appConfig->expects($this->atLeastOnce())->method('setAppValueString');
+		$this->permissionService->expects($this->once())->method('saveAccessDoorPolicy')
+			->with($this->callback(static fn (array $policy): bool =>
+				($policy['restrictionEnabled'] ?? null) === true
+				&& ($policy['allowedGroupIds'] ?? null) === ['group_a', 'group_b']
+				&& ($policy['allowedUserIds'] ?? null) === []
+			));
 
 		$response = $this->controller->updateAdminSettings();
 		$data = $response->getData();
@@ -1160,8 +1163,12 @@ class AdminControllerTest extends TestCase
 		$alice->method('isEnabled')->willReturn(true);
 		$this->userManager->method('get')->with('alice')->willReturn($alice);
 
-		$this->appManager->expects($this->once())->method('enableApp')->with('arbeitszeitcheck');
-		$this->appManager->expects($this->never())->method('enableAppForGroups');
+		$this->permissionService->expects($this->once())->method('saveAccessDoorPolicy')
+			->with($this->callback(static fn (array $policy): bool =>
+				($policy['restrictionEnabled'] ?? null) === false
+				&& ($policy['allowedGroupIds'] ?? null) === ['group_a']
+				&& ($policy['allowedUserIds'] ?? null) === ['alice']
+			));
 
 		$response = $this->controller->updateAdminSettings();
 		$data = $response->getData();
@@ -1370,12 +1377,16 @@ class AdminControllerTest extends TestCase
 			return $user;
 		});
 
+		$this->permissionService->expects($this->once())->method('saveAccessDoorPolicy')
+			->with($this->callback(static fn (array $policy): bool =>
+				($policy['appAdminUserIds'] ?? null) === ['hr_admin', 'colleague', 'security_admin']
+			));
+
 		$response = $this->controller->updateAdminSettings();
 		$data = $response->getData();
 
 		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
 		$this->assertSame(['hr_admin', 'colleague', 'security_admin'], $data['settings']['appAdminUserIds']);
-		$this->assertSame('["hr_admin","colleague","security_admin"]', $store[Constants::CONFIG_APP_ADMIN_USER_IDS]);
 	}
 
 	/**

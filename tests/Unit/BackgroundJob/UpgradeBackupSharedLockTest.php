@@ -26,6 +26,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\MonthClosureAutoFinalizeJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\OvertimeTrafficLightJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\StampIdempotencyCleanupJob;
+use OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\VacationRolloverJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\WorkLogPullJob;
 use OCA\ArbeitszeitCheck\Db\KioskStampIdempotencyMapper;
@@ -54,6 +55,7 @@ class UpgradeBackupSharedLockTest extends TestCase
 		OvertimeTrafficLightJob::class,
 		PaidBreakRecomputeJob::class,
 		StampIdempotencyCleanupJob::class,
+		TransferApplyJob::class,
 		VacationRolloverJob::class,
 		WorkLogPullJob::class,
 	];

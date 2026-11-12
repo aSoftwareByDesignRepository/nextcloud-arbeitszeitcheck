@@ -211,6 +211,7 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null,
 		?\OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService = null,
+		?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -258,7 +259,22 @@ class AdminController extends Controller
 		$this->breakPolicyResolver = $breakPolicyResolver;
 		$this->breakPolicyStore = $breakPolicyStore;
 		$this->timeZoneService = $timeZoneService;
+		$this->transferReceiptStore = $transferReceiptStore;
 		$this->setCspService($cspService);
+	}
+
+	private ?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null;
+
+	private function transferReceiptStore(): ?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore
+	{
+		if ($this->transferReceiptStore === null) {
+			try {
+				$this->transferReceiptStore = \OCP\Server::get(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore::class);
+			} catch (\Throwable) {
+				// Container without the transfer pack registered — page still renders.
+			}
+		}
+		return $this->transferReceiptStore;
 	}
 
 	private function timeZoneService(): \OCA\ArbeitszeitCheck\Service\TimeZoneService
@@ -1122,11 +1138,21 @@ class AdminController extends Controller
 			return new NotFoundResponse();
 		}
 
+		// The transfer section is engine-owned: it renders the synced partial
+		// (templates/parts/settings/transfer.php) with its own script bundle,
+		// outside the admin-settings form (nested <form> is invalid HTML).
+		$isTransferSection = $section === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_TRANSFER;
 		$this->registerFrontEndAssets(
 			'admin-settings',
 			'admin-settings',
-			['common/projectcheck', 'common/country-region'],
-			['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription', 'admin-work-locations']
+			array_merge(
+				['common/projectcheck', 'common/country-region'],
+				$isTransferSection ? ['common/transfer'] : [],
+			),
+			array_merge(
+				['common/admin-user-picker', 'admin-settings-legacy-redirect', 'admin-outlook-ical-subscription', 'admin-work-locations'],
+				$isTransferSection ? ['transfer-bridge', 'transfer'] : [],
+			)
 		);
 
 		$requireSubstituteJson = $this->appConfig->getAppValueString('require_substitute_types', '[]');
@@ -1134,7 +1160,7 @@ class AdminController extends Controller
 		if (!is_array($requireSubstituteTypes)) {
 			$requireSubstituteTypes = [];
 		}
-		$settings = [
+		$settings = $this->halfDaySettingsPayload() + [
 			'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
@@ -1246,6 +1272,13 @@ class AdminController extends Controller
 				'projectCheckAppsUrl' => $this->projectCheckAppsSettingsUrl(),
 				'requesttoken' => Util::callRegister(),
 				'useAppTeams' => $this->appConfig->getAppValueString('use_app_teams', '0') === '1',
+				// Synced transfer partial contract (parts/settings/transfer.php).
+				'isSystemAdmin' => $this->groupManager->isAdmin(
+					(string)($this->userSession->getUser()?->getUID() ?? '')
+				),
+				'transferLastReceipt' => $isTransferSection
+					? $this->transferReceiptStore()?->lastReceipt()
+					: null,
 			],
 			$extraTemplateData,
 		));
@@ -2625,7 +2658,7 @@ class AdminController extends Controller
 			if (!is_array($requireSubstituteTypes)) {
 				$requireSubstituteTypes = [];
 			}
-			$settings = [
+			$settings = $this->halfDaySettingsPayload() + [
 				'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 				'enableViolationNotifications' => $this->appConfig->getAppValueString('enable_violation_notifications', '1') === '1',
 				'breakAutoFallbackEnabled' => $this->appConfig->getAppValueString('break_auto_fallback_enabled', '1') === '1',
@@ -2775,6 +2808,7 @@ class AdminController extends Controller
 				'monthClosureEnabled' => Constants::CONFIG_MONTH_CLOSURE_ENABLED,
 				'monthClosureGraceDaysAfterEom' => Constants::CONFIG_MONTH_CLOSURE_GRACE_DAYS_AFTER_EOM,
 				'requireSubstituteTypes' => 'require_substitute_types',
+				'halfDayEnabledTypes' => Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
 				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
 				'sendIcalToSubstitute' => 'send_ical_to_substitute',
 				'sendIcalToManagers' => 'send_ical_to_managers',
@@ -2946,6 +2980,11 @@ class AdminController extends Controller
 							return in_array((string)$t, $validTypes, true);
 						})));
 						$value = json_encode($arr);
+					} elseif ($paramKey === 'halfDayEnabledTypes') {
+						// Regex-validated ids; unknown/deactivated ids are kept
+						// (reactivation must not lose the flag) — the eligible
+						// gate is applied at read time, not on save.
+						$value = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::normalizeSaveValue($value);
 					} else {
 						$value = (string)$value;
 					}
@@ -3064,12 +3103,14 @@ class AdminController extends Controller
 					$users = $this->normalizeAppAdminUserIds($userIds);
 				}
 
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, $restrictionEnabled ? '1' : '0');
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, json_encode($groups));
-				$this->appConfig->setAppValueString(Constants::CONFIG_ACCESS_ALLOWED_USER_IDS, json_encode($users));
-				// Open ⇒ clear NC app restriction so the menu shows for everyone.
-				// Restricted ⇒ sync group allowlist into NC restriction (users enforced in-app).
-				$this->applyAppRestrictionGroups($restrictionEnabled ? $groups : []);
+				// One atomic door-policy write through the central permission
+				// writer (NN-02 / azc #46): appconfig keys + NC platform
+				// app-restriction mirror move together — never raw setAppValue.
+				$this->permissionService->saveAccessDoorPolicy([
+					'restrictionEnabled' => $restrictionEnabled,
+					'allowedUserIds' => $users,
+					'allowedGroupIds' => $groups,
+				]);
 
 				$updatedSettings['accessRestrictionEnabled'] = $restrictionEnabled;
 				$updatedSettings['accessAllowedGroups'] = $groups;
@@ -3101,7 +3142,9 @@ class AdminController extends Controller
 						], Http::STATUS_BAD_REQUEST);
 					}
 				}
-				$this->appConfig->setAppValueString(Constants::CONFIG_APP_ADMIN_USER_IDS, json_encode($normalizedAdminUserIds));
+				$this->permissionService->saveAccessDoorPolicy([
+					'appAdminUserIds' => $normalizedAdminUserIds,
+				]);
 				$updatedSettings['appAdminUserIds'] = $normalizedAdminUserIds;
 			}
 
@@ -4300,6 +4343,30 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Half-day opt-in settings (AZC-HALF-DAY-NON-VACATION): the stored
+	 * allowlist plus the eligible multiselect options. Shared by every
+	 * settings surface so NC-admin form, in-app admin page and the JSON
+	 * API can never drift apart (a missing key on one surface silently
+	 * resets the flag on save — parity contract).
+	 *
+	 * @return array{halfDayEnabledTypes: list<string>, halfDayEligibleTypes: array{builtin: list<array{id: string, label: string}>, custom: list<array{id: string, label: string}>}}
+	 */
+	private function halfDaySettingsPayload(): array
+	{
+		return [
+			'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromRaw(
+				$this->appConfig->getAppValueString(
+					Constants::CONFIG_HALF_DAY_ENABLED_TYPES
+				)
+			),
+			'halfDayEligibleTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::adminOptions(
+				$this->l10n,
+				\OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::entitlementBoundDaysTypeCodes()
+			),
+		];
+	}
+
+	/**
 	 * @return array<string, mixed>
 	 */
 	private function buildNotificationSettingsPayload(): array
@@ -4325,7 +4392,7 @@ class AdminController extends Controller
 			$this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_NOTIFICATION_RECIPIENTS, '')
 		);
 
-		return [
+		return $this->halfDaySettingsPayload() + [
 			'enabled' => $enabled,
 			'recipients' => implode(', ', $recipients),
 			'matrix' => $this->normalizeNotificationMatrix($decoded),
@@ -4522,25 +4589,6 @@ class AdminController extends Controller
 		}
 
 		return array_keys($unique);
-	}
-
-	/**
-	 * @param list<string> $groupIds
-	 */
-	private function applyAppRestrictionGroups(array $groupIds): void
-	{
-		if ($groupIds === []) {
-			$this->appManager->enableApp('arbeitszeitcheck');
-			return;
-		}
-		$groups = [];
-		foreach ($groupIds as $groupId) {
-			$group = $this->groupManager->get($groupId);
-			if ($group !== null) {
-				$groups[] = $group;
-			}
-		}
-		$this->appManager->enableAppForGroups('arbeitszeitcheck', $groups);
 	}
 
 	/**

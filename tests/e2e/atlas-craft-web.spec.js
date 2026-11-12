@@ -76,7 +76,6 @@ const EMPLOYEE_VIEWS = [
 	['time-entries-create', '/apps/arbeitszeitcheck/time-entries/create', '#time-entry-form, #azc-main-content'],
 	['absences', '/apps/arbeitszeitcheck/absences', '#azc-main-content'],
 	['absences-create', '/apps/arbeitszeitcheck/absences/create', '#azc-main-content'],
-	['reports', '/apps/arbeitszeitcheck/reports', '#azc-main-content'],
 	['calendar', '/apps/arbeitszeitcheck/calendar', '#calendar-container, #azc-main-content'],
 	['timeline', '/apps/arbeitszeitcheck/timeline', '#timeline-container, #azc-main-content'],
 	['business-trips', '/apps/arbeitszeitcheck/business-trips', '#bt-trip-list .bt-trip-item, #bt-empty:not([hidden]), #bt-root'],
@@ -94,6 +93,10 @@ const EMPLOYEE_VIEWS = [
 
 const MANAGER_VIEWS = [
 	['manager', '/apps/arbeitszeitcheck/manager', '#azc-main-content'],
+	// /reports hard-gates to admins + manager-capable users
+	// (PageController::reports 302s everyone else to the dashboard) — it must
+	// be captured under the manager role, never as an employee view.
+	['reports', '/apps/arbeitszeitcheck/reports', '#report-scope-form, #azc-main-content'],
 	['manager-time-entries', '/apps/arbeitszeitcheck/manager/time-entries', '#azc-main-content'],
 	['manager-absences', '/apps/arbeitszeitcheck/manager/absences', '#azc-main-content'],
 	['manager-month-closures', '/apps/arbeitszeitcheck/manager/month-closures', '#azc-main-content'],
@@ -172,6 +175,18 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 			await dismissToasts(page);
 			await shot(page, `azc-${id}.png`, { waitFor: ready, settleMs: 600 });
 		}
+
+		/* --- /reports hard gate: employees 302 to the dashboard index.
+		   Honest URL assert only — never a screenshot (the post-redirect
+		   landing is the dashboard, which already has its own craft). */
+		const resp = await page.goto('/apps/arbeitszeitcheck/reports', { waitUntil: 'domcontentloaded' });
+		expect(resp, 'reports must answer (redirect or render)').toBeTruthy();
+		await page.waitForLoadState('domcontentloaded');
+		expect(
+			page.url(),
+			`employee /reports must 302 to the dashboard index, got ${page.url()}`,
+		).toMatch(/\/apps\/arbeitszeitcheck\/?(\?.*)?$/);
+		expect(page.url(), 'employee must not stay on /reports').not.toContain('/reports');
 	});
 
 	test('craft employee dialogs, forms and error states', async ({ page }) => {

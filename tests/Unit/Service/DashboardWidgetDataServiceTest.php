@@ -689,4 +689,145 @@ class DashboardWidgetDataServiceTest extends TestCase {
 		$this->assertTrue($data['summaryTruncated']);
 		$this->assertSame(Constants::MAX_LIST_LIMIT, $data['summary']['total']);
 	}
+
+	/**
+	 * DC-06c/US-409: hoursGlance rows carry the additive `credit` field and
+	 * `worked` includes the paid-absence credit — identical math to the web
+	 * tile (FA-GLANCE), never inventing worked hours in reports.
+	 */
+	public function testEmployeeWidgetDataHoursGlanceCarriesCredit(): void {
+		$timeTrackingService = $this->createMock(TimeTrackingService::class);
+		$timeTrackingService->method('lawProfile')->willReturn(
+			\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE')
+		);
+		$timeTrackingService->method('getStatus')->willReturn([
+			'status' => 'clocked_out',
+			'working_today_hours' => 0.0,
+			'current_session_duration' => 0,
+			'current_entry' => null,
+		]);
+		$timeTrackingService->method('getBreakStatus')->willReturn([]);
+		$timeTrackingService->method('isAutoBreakCalculationEnabled')->willReturn(true);
+
+		$overtime = $this->createMock(OvertimeService::class);
+		// 9 h clocked + 40 h approved-absence credit in the month → worked 49.
+		$overtime->method('getWeeklyOvertime')->willReturn([
+			'total_hours_worked' => 10.0,
+			'required_hours' => 40.0,
+			'weekly_hours' => 40.0,
+			'implied_daily_hours' => 8.0,
+			'cumulative_balance' => 0.0,
+			'absence_credit_hours' => 0.0,
+		]);
+		$overtime->method('getDailyOvertime')->willReturn([
+			'total_hours_worked' => 0.0,
+			'required_hours' => 8.0,
+			'absence_credit_hours' => 0.0,
+		]);
+		$overtime->method('calculateMonthlyOvertime')->willReturn([
+			'total_hours_worked' => 9.0,
+			'required_hours' => 56.0,
+			'absence_credit_hours' => 40.0,
+			'period_start' => '2026-11-01',
+			'period_end' => '2026-11-30',
+		]);
+		$overtime->method('calculateYearlyOvertime')->willReturn([
+			'total_hours_worked' => 100.0,
+			'required_hours' => 400.0,
+			'absence_credit_hours' => 40.0,
+		]);
+
+		$absence = $this->createMock(AbsenceService::class);
+		$absence->method('getVacationStats')->willReturn([
+			'year' => 2026,
+			'carryover_days' => 8.0,
+			'carryover_usable' => 0.0,
+			'carryover_unused_locked_after_deadline' => true,
+			'carryover_expires_on' => '2026-03-31',
+		]);
+
+		$display = $this->createMock(OvertimeDisplayService::class);
+		$display->method('getYearToDateBalanceForTrafficLight')->willReturn(0.0);
+		$display->method('buildTrafficLightViewModel')->willReturn(['state' => 'green']);
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('isEnabled')->willReturn(false);
+
+		$service = new DashboardWidgetDataService(
+			$timeTrackingService,
+			$overtime,
+			$display,
+			$bank,
+			$absence,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(TeamResolverService::class),
+			$this->createMock(PermissionService::class),
+			$this->createMock(IUserManager::class),
+			$this->createTimeZoneService(),
+			$this->createTimeCaptureMethodService(),
+			$this->createMock(ProjectCheckIntegrationService::class),
+			$this->createVacationHoursDebitService(),
+			$this->createMock(TimeEntryMapper::class),
+		);
+
+		$data = $service->getEmployeeWidgetData('u1', true);
+
+		$byKey = array_column($data['hoursGlance'], null, 'key');
+		// Month: worked = clocked 9 + credit 40 = 49, delta = 49 - 56 = -7.
+		$this->assertSame(49.0, $byKey['month']['worked']);
+		$this->assertSame(56.0, $byKey['month']['target']);
+		$this->assertSame(-7.0, $byKey['month']['delta']);
+		$this->assertSame(40.0, $byKey['month']['credit']);
+		// Zero-credit periods still carry the additive key (stable contract).
+		$this->assertSame(0.0, $byKey['today']['credit']);
+		$this->assertSame(0.0, $byKey['today']['worked']);
+
+		// DC-06d: org-storage "today" for record/shorten defaults.
+		$this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $data['serverToday']);
+		// DC-07/US-410: carryover lock flag mirrored from vacationStats.
+		$this->assertTrue($data['vacationCarryoverLocked']);
+		$this->assertSame(8.0, $data['vacationCarryover']);
+	}
+
+	/**
+	 * DC-07/US-410 AC-3: a payload where the source flag is absent stays
+	 * false — fail-closed on the text level, never a guessed "(expired)".
+	 */
+	public function testEmployeeWidgetDataCarryoverLockedDefaultsFalse(): void {
+		$timeTrackingService = $this->createMock(TimeTrackingService::class);
+		$timeTrackingService->method('lawProfile')->willReturn(
+			\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::profileForCountry('DE')
+		);
+		$timeTrackingService->method('getStatus')->willReturn([
+			'status' => 'clocked_out',
+			'working_today_hours' => 0.0,
+		]);
+		$timeTrackingService->method('getBreakStatus')->willReturn([]);
+		$timeTrackingService->method('isAutoBreakCalculationEnabled')->willReturn(true);
+
+		$overtime = $this->createMock(OvertimeService::class);
+		$overtime->method('getWeeklyOvertime')->willReturn([]);
+
+		$absence = $this->createMock(AbsenceService::class);
+		$absence->method('getVacationStats')->willReturn(['year' => 2026]);
+
+		$service = new DashboardWidgetDataService(
+			$timeTrackingService,
+			$overtime,
+			$this->createMock(OvertimeDisplayService::class),
+			$this->createMock(OvertimeBankService::class),
+			$absence,
+			$this->createMock(AbsenceMapper::class),
+			$this->createMock(TeamResolverService::class),
+			$this->createMock(PermissionService::class),
+			$this->createMock(IUserManager::class),
+			$this->createTimeZoneService(),
+			$this->createTimeCaptureMethodService(),
+			$this->createMock(ProjectCheckIntegrationService::class),
+			$this->createVacationHoursDebitService(),
+			$this->createMock(TimeEntryMapper::class),
+		);
+
+		$data = $service->getEmployeeWidgetData('u1', true);
+		$this->assertFalse($data['vacationCarryoverLocked']);
+	}
 }

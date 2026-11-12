@@ -334,6 +334,7 @@ ferietimer
 ferieår
 ferieåret
 ferieårsmodus
+fildataene
 filen
 filer
 filformat
@@ -381,6 +382,7 @@ fordi
 forenklet
 foreslå
 forhold
+forhåndskontroller
 forhåndsvisning
 forhåndsvisningen
 forklar
@@ -496,6 +498,7 @@ gyldige
 halvdags
 halvdagsferie
 halvdagshelligdag
+halvdagsregistreringer
 halvdelen
 halve
 halvfemsindstyvende
@@ -589,6 +592,7 @@ inkluderes
 inklusive
 installer
 instans
+instansbundne
 instansen
 instansens
 instansstandard
@@ -636,6 +640,7 @@ kategori
 kategorien
 kategorier
 kildekode
+kildeserverens
 kioskbadges
 kiosken
 kioskstatus

@@ -422,8 +422,7 @@ final class VacationUnitMigrationService
 				$this->rescaleManualAmountColumn('at_model_vacation_defaults', 'manual_days', $scaleFactor, $toHours);
 				$this->rescaleManualAmountColumn('at_team_vacation_policies', 'manual_days', $scaleFactor, $toHours);
 				$this->rescaleManualAmountColumn('at_user_vacation_policies', 'manual_days', $scaleFactor, $toHours);
-				$this->rescaleManualAmountColumn('at_user_working_time_models', 'vacation_days_per_year', $scaleFactor, $toHours);
-				$this->rescaleManualAmountColumn('at_working_time_models', 'vacation_days_per_year', $scaleFactor, $toHours);
+				$this->rescaleManualAmountColumn('at_user_models', 'vacation_days_per_year', $scaleFactor, $toHours);
 				$this->rescaleUserSettingsVacationDays($scaleFactor, $toHours);
 				$this->rescaleTariffRuleModuleDayAmounts($scaleFactor, $toHours);
 
@@ -635,8 +634,7 @@ final class VacationUnitMigrationService
 			'at_model_vacation_defaults' => 'manual_days',
 			'at_team_vacation_policies' => 'manual_days',
 			'at_user_vacation_policies' => 'manual_days',
-			'at_user_working_time_models' => 'vacation_days_per_year',
-			'at_working_time_models' => 'vacation_days_per_year',
+			'at_user_models' => 'vacation_days_per_year',
 		];
 		if (!isset($allowed[$table]) || $allowed[$table] !== $column) {
 			return;

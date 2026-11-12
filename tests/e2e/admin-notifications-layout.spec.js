@@ -49,7 +49,7 @@ test.describe('Admin policy settings IA', () => {
 				policySidebar,
 				overtimeChip,
 				vacationChip,
-				entitlementChip,
+				alertsChip,
 			}
 		})
 

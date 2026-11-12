@@ -36,8 +36,34 @@ class ReportSickTodayContractTest extends TestCase
 			'$prefillType !== \'\' && $prefillType === $typeKey',
 			$template
 		);
+		// AZC-HALF-DAY-NON-VACATION: the day-length control is gated by the org
+		// allowlist (typeSupportsHalfDay), not a hard-coded vacation check — a
+		// sick-today deep link only reveals it when sick_leave is enabled AND
+		// prefillHalf (half=1) is set, never from the type param alone.
+		// AC-G11: in a vacation_unit=hours org only *vacation* loses the
+		// control — enabled non-vacation types stay offerable.
 		self::assertStringContainsString(
-			'$prefillType === \'\' || $prefillType === Absence::TYPE_VACATION',
+			'$typeSupportsHalfDay = in_array($absenceFormType, $halfDayEnabledTypes, true)',
+			$template
+		);
+		self::assertStringContainsString(
+			'($absenceFormType !== Absence::TYPE_VACATION || !$isVacationHours)',
+			$template
+		);
+		self::assertStringContainsString(
+			'&& $typeSupportsHalfDay',
+			$template
+		);
+		// AC-G11 (JS side): the runtime gate must mirror the PHP head — the
+		// control initializes regardless of vacation unit and only vacation
+		// is withheld in hours mode. A blanket data-days-mode early return
+		// would strand enabled non-vacation types in hours-mode orgs.
+		self::assertStringContainsString(
+			"return t !== 'vacation' || daysMode;",
+			$template
+		);
+		self::assertStringNotContainsString(
+			"group.getAttribute('data-days-mode') !== '1') {\n                return;",
 			$template
 		);
 

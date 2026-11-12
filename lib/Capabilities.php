@@ -144,6 +144,11 @@ class Capabilities implements ICapability {
 					// manager "record absence" surface on this flag so older
 					// servers fail closed instead of 404ing on submit.
 					'managerAbsenceRecording' => true,
+					// AZC-HALF-DAY-NON-VACATION: org allowlist for the day-length
+					// control. Old servers without this key already accepted
+					// dayFraction for vacation — clients fall back to ['vacation'],
+					// matching the stored default here.
+					'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config),
 					'projectCheck' => [
 						'available' => $projectCheckAvailable,
 						'linkingEnabled' => $projectCheckAvailable

@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
 use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks;
+use OCA\ArbeitszeitCheck\Repair\RecomputeAbsenceDaysSchedule;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
 use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
@@ -673,6 +674,17 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(RecomputeAbsenceDaysSchedule::class, function ($c): RecomputeAbsenceDaysSchedule {
+			return new RecomputeAbsenceDaysSchedule(
+				$c->query(IDBConnection::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
+			);
+		});
+
 		$context->registerService(ReleaseStuckPendingAbsences::class, function ($c): ReleaseStuckPendingAbsences {
 			return new ReleaseStuckPendingAbsences(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
@@ -879,6 +891,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\PostCommitEffectQueue::class),
 				$c->query(\OCP\ICacheFactory::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 
@@ -1003,6 +1016,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationYearWindowResolver::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationHoursDebitService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 
@@ -1135,6 +1149,9 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
 				$c->query(HolidayService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class),
+				// Schedule-aware weight authority for the fraction heuristic —
+				// same SoT as the absence write path (AZC-HALF-DAY-NON-VACATION).
+				$c->query(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class),
 			);
 		});
 
@@ -1403,6 +1420,71 @@ class Application extends App implements IBootstrap {
 			return new \OCA\ArbeitszeitCheck\Public\ExternalStampDraftFacade(
 				$c->query(\OCA\ArbeitszeitCheck\Service\ExternalStampService::class),
 				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+
+		// ── Config & data transfer (test → production) ──────────────────
+		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferManifest::class, fn () => new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferManifest());
+		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferHooks::class, function ($c): \OCA\ArbeitszeitCheck\ConfigTransfer\TransferHooks {
+			$breakPolicyResolver = null;
+			try {
+				$breakPolicyResolver = $c->query(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			} catch (\Throwable) {
+				// Resolver not autowirable in this container — the hooks fall
+				// back to JSON-shape validation for break_policy_json.
+			}
+			return new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferHooks(
+				$c->query(PermissionService::class),
+				$c->query(UpgradeBackupService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferManifest::class),
+				$breakPolicyResolver,
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\IGroupManager::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferPendingStore::class, fn ($c) => new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferPendingStore($c->query(IRootFolder::class), $c->query(\OCP\IConfig::class), 'arbeitszeitcheck'));
+		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore::class, fn ($c) => new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore($c->query(\OCP\IConfig::class), 'arbeitszeitcheck'));
+		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferService::class, function ($c): \OCA\ArbeitszeitCheck\ConfigTransfer\TransferService {
+			return new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferService(
+				$c->query(IDBConnection::class),
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCP\IGroupManager::class),
+				$c->query(IRootFolder::class),
+				$c->query(IAppManager::class),
+				$c->query(ILockingProvider::class),
+				$c->query(\OCP\IURLGenerator::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferManifest::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferHooks::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferPendingStore::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore::class),
+				'arbeitszeitcheck',
+				$c->query(\OCP\IAppConfig::class),
+			);
+		});
+		$context->registerService(\OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob::class, function ($c): \OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob {
+			return new \OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob(
+				$c->query(\OCP\AppFramework\Utility\ITimeFactory::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferService::class),
+				$c->query(ILockingProvider::class),
+				$c->query(\OCP\BackgroundJob\IJobList::class),
+				$c->query(\Psr\Log\LoggerInterface::class),
+			);
+		});
+		$context->registerService(\OCA\ArbeitszeitCheck\Controller\TransferApiController::class, function ($c): \OCA\ArbeitszeitCheck\Controller\TransferApiController {
+			return new \OCA\ArbeitszeitCheck\Controller\TransferApiController(
+				'arbeitszeitcheck',
+				$c->query(\OCP\IRequest::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferHooks::class),
+				$c->query(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferService::class),
+				$c->query(\OCP\BackgroundJob\IJobList::class),
+				$c->query(\OCP\Security\Bruteforce\IThrottler::class),
+				$c->query(\OCP\IGroupManager::class),
+				$c->query(\OCP\IUserSession::class),
 			);
 		});
 

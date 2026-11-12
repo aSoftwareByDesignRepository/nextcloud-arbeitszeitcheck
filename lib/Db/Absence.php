@@ -181,10 +181,17 @@ class Absence extends Entity
 			return 0.0;
 		}
 		try {
-			$service = \OCP\Server::get(HolidayService::class);
-			return $service->computeWorkingDaysForUser($userId, $start, $end);
+			// ADR-01: the schedule-aware counter is the single authority;
+			// HolidayService remains the fallback when it cannot be resolved.
+			$counter = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class);
+			return $counter->daysForUser($userId, $start, $end);
 		} catch (\Throwable) {
-			return 0.0;
+			try {
+				$service = \OCP\Server::get(HolidayService::class);
+				return $service->computeWorkingDaysForUser($userId, $start, $end);
+			} catch (\Throwable) {
+				return 0.0;
+			}
 		}
 	}
 

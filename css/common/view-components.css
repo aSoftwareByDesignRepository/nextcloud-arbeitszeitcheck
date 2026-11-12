@@ -243,7 +243,7 @@ button.azc-stat-tile:hover, button.azc-stat-tile:focus-visible {
 	margin: var(--azc-space-4, 16px) 0 0;
 }
 .azc-pagination__info { font-variant-numeric: var(--azc-tab-num, tabular-nums); color: var(--azc-muted, var(--color-text-maxcontrast)); }
-@media (max-width: 479.98px) {
+@media (max-width: 480px) {
 	.azc-pagination { flex-wrap: wrap; }
 	.azc-pagination > * { flex: 1 1 auto; }
 	.azc-pagination__info { text-align: center; order: -1; flex-basis: 100%; }

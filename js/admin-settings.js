@@ -1020,6 +1020,16 @@
             delete formData['requireSubstituteTypes[]'];
             delete formData.requireSubstituteTypes;
         }
+        if (hasField('halfDayEnabledTypes[]') || hasField('halfDayEnabledTypes')) {
+            const halfDayRaw = formData['halfDayEnabledTypes[]'];
+            formData.halfDayEnabledTypes = halfDayRaw === undefined
+                ? []
+                : (Array.isArray(halfDayRaw) ? halfDayRaw : [halfDayRaw]);
+            delete formData['halfDayEnabledTypes[]'];
+        } else {
+            delete formData['halfDayEnabledTypes[]'];
+            delete formData.halfDayEnabledTypes;
+        }
 
         // Convert localized decimal numbers (use defaults on invalid/empty) — only if present.
         const parseLocalizedNumber = (v) => {

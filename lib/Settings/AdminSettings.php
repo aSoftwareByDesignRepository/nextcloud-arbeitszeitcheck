@@ -82,6 +82,15 @@ class AdminSettings implements ISettings
 		if (!is_array($requireSubstituteTypes)) {
 			$requireSubstituteTypes = [];
 		}
+		$halfDayEnabledTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromRaw(
+			$this->appConfig->getAppValueString(
+				Constants::CONFIG_HALF_DAY_ENABLED_TYPES
+			)
+		);
+		$halfDayEligibleTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::adminOptions(
+			$this->l10n,
+			\OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::entitlementBoundDaysTypeCodes()
+		);
 
 		$country = $this->readConfiguredCountry();
 		$settings = [
@@ -101,6 +110,8 @@ class AdminSettings implements ISettings
 			'monthClosureEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_MONTH_CLOSURE_ENABLED, '0') === '1',
 			'monthClosureGraceDaysAfterEom' => max(0, min(90, (int)$this->appConfig->getAppValueString(Constants::CONFIG_MONTH_CLOSURE_GRACE_DAYS_AFTER_EOM, '0'))),
 			'requireSubstituteTypes' => $requireSubstituteTypes,
+			'halfDayEnabledTypes' => $halfDayEnabledTypes,
+			'halfDayEligibleTypes' => $halfDayEligibleTypes,
 			'sendIcalApprovedAbsences' => $this->appConfig->getAppValueString('send_ical_approved_absences', '1') === '1',
 			'sendIcalToSubstitute' => $this->appConfig->getAppValueString('send_ical_to_substitute', '0') === '1',
 			'sendIcalToManagers' => $this->appConfig->getAppValueString('send_ical_to_managers', '0') === '1',

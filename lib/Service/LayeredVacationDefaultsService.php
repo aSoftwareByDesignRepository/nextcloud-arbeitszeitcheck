@@ -504,7 +504,7 @@ class LayeredVacationDefaultsService
 		try {
 			$qb = $this->db->getQueryBuilder();
 			$qb->select($qb->createFunction('COUNT(DISTINCT user_id) AS cnt'))
-				->from('at_user_working_time_models');
+				->from('at_user_models');
 			$cursor = $qb->executeQuery();
 			$row = $cursor->fetch();
 			$cursor->closeCursor();

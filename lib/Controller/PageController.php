@@ -850,6 +850,12 @@ class PageController extends Controller
 		$requireSubstituteTypes = json_decode($requireSubstituteJson, true);
 		$requireSubstituteTypes = is_array($requireSubstituteTypes) ? $requireSubstituteTypes : [];
 
+		// Opt-in half-day types (AZC-HALF-DAY-NON-VACATION) — the day-length
+		// control renders only for these; credit-effect types get the
+		// "planned time credited at half" preview copy, others the neutral one.
+		$halfDayEnabledTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config);
+		$halfDayCreditTypes = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($halfDayEnabledTypes);
+
 		$navFlags = $this->getNavigationFlags($userId);
 
 		$employeeHasAssignableManager = $this->teamResolver->hasAssignableManagerForEmployee($userId);
@@ -901,6 +907,8 @@ class PageController extends Controller
 			'computedWorkingDays' => $computedWorkingDays,
 			'hasColleagues' => $hasColleagues,
 			'requireSubstituteTypes' => $requireSubstituteTypes,
+			'halfDayEnabledTypes' => $halfDayEnabledTypes,
+			'halfDayCreditTypes' => $halfDayCreditTypes,
 			'filterStartDate' => $filterStartDate,
 			'filterEndDate' => $filterEndDate,
 			'filterStatus' => $statusParam ?? '',
@@ -1641,7 +1649,9 @@ class PageController extends Controller
 		};
 
 		$pack = static function (string $key, string $label, array $row) use ($formatPeriod): array {
-			$worked = round((float)($row['total_hours_worked'] ?? 0), 2);
+			// FA-GLANCE: Ist = clocked + paid-absence credit (matches Saldo math;
+			// total_hours_worked itself stays clocked-only for reports).
+			$worked = round((float)($row['total_hours_worked'] ?? 0) + (float)($row['absence_credit_hours'] ?? 0), 2);
 			$target = round((float)($row['required_hours'] ?? 0), 2);
 			return [
 				'key' => $key,
@@ -1650,6 +1660,7 @@ class PageController extends Controller
 				'worked' => $worked,
 				'target' => $target,
 				'delta' => round($worked - $target, 2),
+				'credit' => round((float)($row['absence_credit_hours'] ?? 0), 2),
 			];
 		};
 

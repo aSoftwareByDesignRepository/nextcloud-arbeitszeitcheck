@@ -401,6 +401,46 @@ class PageControllerTest extends TestCase
 		$this->assertFalse($params['timeCapture']['manualTimeEntryEnabled']);
 	}
 
+	/**
+	 * FA-GLANCE (US-403): the glance tiles add the paid-absence credit to the
+	 * displayed Ist and carry it as an additive `credit` key — matching the
+	 * Saldo formula without ever mutating `total_hours_worked` (NN-07).
+	 */
+	public function testHoursGlanceAddsAbsenceCreditToWorked(): void
+	{
+		$ref = new \ReflectionMethod(PageController::class, 'buildHoursGlancePeriods');
+		$ref->setAccessible(true);
+
+		$day = ['total_hours_worked' => 0.0, 'required_hours' => 8.0, 'absence_credit_hours' => 0.0];
+		$week = ['total_hours_worked' => 10.0, 'required_hours' => 40.0, 'absence_credit_hours' => 0.0];
+		$month = [
+			'total_hours_worked' => 9.0,
+			'required_hours' => 56.0,
+			'absence_credit_hours' => 40.0,
+			'period_start' => '2026-11-01',
+			'period_end' => '2026-11-30',
+		];
+		$year = ['total_hours_worked' => 100.0, 'required_hours' => 400.0, 'absence_credit_hours' => 40.0];
+
+		$periods = $ref->invoke($this->controller, $day, $week, $month, $year);
+		$byKey = array_column($periods, null, 'key');
+
+		// AC-P2: 9 h clocked + 40 h credit → "49,00 / 56,00", delta −7,00.
+		$this->assertSame(49.0, $byKey['month']['worked']);
+		$this->assertSame(56.0, $byKey['month']['target']);
+		$this->assertSame(-7.0, $byKey['month']['delta']);
+		$this->assertSame(40.0, $byKey['month']['credit']);
+		$this->assertSame('2026-11-01 – 2026-11-30', $byKey['month']['period']);
+
+		// Credit-free periods behave exactly as before (US-403 AC-3).
+		$this->assertSame(0.0, $byKey['today']['credit']);
+		$this->assertSame(0.0, $byKey['today']['worked']);
+		$this->assertSame(-8.0, $byKey['today']['delta']);
+
+		// Input rows stay untouched — worked display ≠ stored worked hours.
+		$this->assertSame(9.0, $month['total_hours_worked']);
+	}
+
 	public function testTimeEntriesFiltersByWorkLocation(): void
 	{
 		$home = $this->entryWithLocation(1, 'home');

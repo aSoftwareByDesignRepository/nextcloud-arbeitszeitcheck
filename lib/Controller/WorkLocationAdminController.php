@@ -158,7 +158,14 @@ class WorkLocationAdminController extends Controller
 		$scopeType = trim((string)$this->request->getParam('scopeType', ''));
 		$scopeId = trim((string)$this->request->getParam('scopeId', ''));
 		if ($scopeType === '') {
-			return $this->notFound();
+			if ($scopeId !== '') {
+				return $this->fieldError('scopeType');
+			}
+			$items = array_map(
+				fn (WorkLocationDefaultPolicy $p) => $this->serializePolicy($p),
+				$this->adminService->policiesAll(),
+			);
+			return new JSONResponse(['success' => true, 'items' => array_values($items)]);
 		}
 		if (!in_array($scopeType, WorkLocationDefaultPolicy::SCOPE_TYPES, true)) {
 			return $this->fieldError('scopeType');

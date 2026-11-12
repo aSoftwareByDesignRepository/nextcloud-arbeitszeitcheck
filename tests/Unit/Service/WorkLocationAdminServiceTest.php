@@ -112,6 +112,7 @@ final class WorkLocationAdminServiceTest extends TestCase
 		$this->policyMapper->method('findByScope')->willReturnCallback(function (string $type, string $id) {
 			return array_values(array_filter($this->policies, fn ($p) => $p->getScopeType() === $type && $p->getScopeId() === $id));
 		});
+		$this->policyMapper->method('findAll')->willReturnCallback(fn () => array_values($this->policies));
 		$this->policyMapper->method('find')->willReturnCallback(function (int $id) {
 			foreach ($this->policies as $p) {
 				if ((int)$p->getId() === $id) {
@@ -292,6 +293,29 @@ final class WorkLocationAdminServiceTest extends TestCase
 		} catch (WorkLocationConflictException $e) {
 			self::assertSame(WorkLocationAdminService::ERR_NOT_FOUND, $e->getReasonCode());
 		}
+	}
+
+	public function testPoliciesAllReturnsEveryScope(): void
+	{
+		$this->service->createPolicy([
+			'scopeType' => 'org', 'locationCode' => 'home', 'effectiveFrom' => '2026-01-01',
+		], 'admin1');
+		$this->service->createPolicy([
+			'scopeType' => 'user', 'scopeId' => 'existing_user',
+			'locationCode' => 'office', 'effectiveFrom' => '2026-01-01',
+		], 'admin1');
+		$this->service->createPolicy([
+			'scopeType' => 'team', 'scopeId' => '7',
+			'locationCode' => 'home', 'effectiveFrom' => '2026-01-01',
+		], 'admin1');
+
+		$all = $this->service->policiesAll();
+		self::assertCount(3, $all);
+		self::assertSame(
+			['org', 'user', 'team'],
+			array_values(array_unique(array_map(fn ($p) => $p->getScopeType(), $all))),
+		);
+		self::assertCount(1, $this->service->policiesForScope('user', 'existing_user'));
 	}
 
 	public function testPolicyPriorityOutOfRangeRejected(): void

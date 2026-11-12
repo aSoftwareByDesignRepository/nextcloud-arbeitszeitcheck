@@ -114,6 +114,23 @@ class WorkLocationDefaultPolicyMapper extends QBMapper
 	}
 
 	/**
+	 * All policies across every scope, deterministically ordered for the
+	 * admin overview list.
+	 *
+	 * @return list<WorkLocationDefaultPolicy>
+	 */
+	public function findAll(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->orderBy('scope_type', 'ASC')
+			->addOrderBy('scope_id', 'ASC')
+			->addOrderBy('effective_from', 'ASC')
+			->addOrderBy('id', 'ASC');
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * @return list<WorkLocationDefaultPolicy>
 	 */
 	public function findByScope(string $scopeType, string $scopeId): array

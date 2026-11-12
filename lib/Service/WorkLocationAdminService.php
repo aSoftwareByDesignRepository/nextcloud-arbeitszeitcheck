@@ -365,6 +365,14 @@ final class WorkLocationAdminService
 		return $this->policyMapper->findByScope($scopeType, $scopeId);
 	}
 
+	/**
+	 * @return list<WorkLocationDefaultPolicy>
+	 */
+	public function policiesAll(): array
+	{
+		return $this->policyMapper->findAll();
+	}
+
 	private function assertNoActiveDefaults(string $code): void
 	{
 		if ($this->policyMapper->findActiveByLocationCode($code, (new \DateTime())->format('Y-m-d')) !== []) {

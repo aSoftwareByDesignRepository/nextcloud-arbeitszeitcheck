@@ -46,6 +46,9 @@ final class TransferService
 	private const LOCK_SUFFIX = '-config-transfer';
 	private const MAX_VALUE_DISPLAY = 120;
 
+	/** Lazy — createSchema() is a full-database introspection, not per-table. */
+	private ?\Doctrine\DBAL\Schema\Schema $schemaCache = null;
+
 	public function __construct(
 		private readonly IDBConnection $db,
 		private readonly IConfig $config,
@@ -1292,7 +1295,11 @@ final class TransferService
 	private function columnTypeFamilies(string $table): array
 	{
 		try {
-			$schema = $this->db->createSchema();
+			// createSchema() introspects the WHOLE database (~1s on a dev
+			// container with hundreds of oc_* tables) — the export loop calls
+			// this once per table, so the uncached call multiplied a ~1s cost
+			// into a ~37s export. Schema shape cannot change mid-request.
+			$schema = $this->schemaCache ??= $this->db->createSchema();
 			$prefix = (string)$this->config->getSystemValue('dbtableprefix', 'oc_');
 			$tbl = null;
 			foreach ([$prefix . $table, $table] as $name) {

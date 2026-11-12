@@ -54,7 +54,16 @@ $lastReceipt = is_array($_['transferLastReceipt'] ?? null) ? $_['transferLastRec
 	<p class="azc-transfer-last" id="azc-transfer-last">
 		<?php p($l->t('Last transfer')); ?>:
 		<strong><?php p((string)($lastReceipt['at'] ?? '—')); ?></strong>
-		· <?php p((string)($lastReceipt['mode'] ?? 'merge')); ?>
+		· <?php
+			$transferMode = (string)($lastReceipt['mode'] ?? '');
+			if ($transferMode === 'merge') {
+				p($l->t('Merge'));
+			} elseif ($transferMode === 'replace') {
+				p($l->t('Replace'));
+			} else {
+				p($transferMode !== '' ? $transferMode : '—');
+			}
+		?>
 		· <?php p(($lastReceipt['result'] ?? '') === 'applied' ? $l->t('applied') : $l->t('failed')); ?>
 		<?php if (($lastReceipt['snapshotId'] ?? null) !== null): ?>
 			· <?php p($l->t('undo via snapshot')); ?> <code><?php p((string)$lastReceipt['snapshotId']); ?></code>

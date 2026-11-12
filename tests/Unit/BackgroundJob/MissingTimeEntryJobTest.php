@@ -8,6 +8,10 @@ use OCA\ArbeitszeitCheck\BackgroundJob\MissingTimeEntryJob;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
@@ -37,6 +41,10 @@ class MissingTimeEntryJobTest extends TestCase
 	private $config;
 	/** @var LoggerInterface&MockObject */
 	private $logger;
+	/** @var UserWorkingTimeModelMapper&MockObject */
+	private $userWorkingTimeModelMapper;
+	/** @var WorkingTimeModelMapper&MockObject */
+	private $workingTimeModelMapper;
 	/** @var MissingTimeEntryJob */
 	private $job;
 
@@ -50,6 +58,8 @@ class MissingTimeEntryJobTest extends TestCase
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->config = $this->createMock(IConfig::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
+		$this->userWorkingTimeModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$this->workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$permissionService = $this->createMock(PermissionService::class);
 		$permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
 
@@ -63,7 +73,9 @@ class MissingTimeEntryJobTest extends TestCase
 			$this->config,
 			$this->logger,
 			$permissionService,
-			$this->createMock(ILockingProvider::class)
+			$this->createMock(ILockingProvider::class),
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper
 		);
 	}
 
@@ -151,6 +163,95 @@ class MissingTimeEntryJobTest extends TestCase
 		$this->absenceMapper->expects($this->never())->method('findByUserAndDateRange');
 
 		$this->assertTrue($this->invokeIsNonWorkingDay(self::USER_ID, $date));
+	}
+
+	/**
+	 * On-demand contract (Arbeit auf Abruf): every day is potentially free —
+	 * the job must skip reminder, holiday and absence lookups entirely.
+	 */
+	public function testIsNonWorkingDayReturnsTrueForOnDemandContract(): void
+	{
+		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(5);
+		$model = new WorkingTimeModel();
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('findCurrentByUser')
+			->with(self::USER_ID)
+			->willReturn($assignment);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('find')
+			->with(5)
+			->willReturn($model);
+		$this->holidayService->expects($this->never())->method('isHolidayForUser');
+		$this->absenceMapper->expects($this->never())->method('findByUserAndDateRange');
+
+		$this->assertTrue($this->invokeIsNonWorkingDay(self::USER_ID, $date));
+	}
+
+	/**
+	 * A user without any model assignment must keep today's behaviour —
+	 * otherwise genuine forgetfulness in regular staff is silenced (NN-06).
+	 */
+	public function testIsNonWorkingDayReturnsFalseWithoutModelAssignment(): void
+	{
+		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('findCurrentByUser')
+			->with(self::USER_ID)
+			->willReturn(null);
+		$this->holidayService->expects($this->once())
+			->method('isHolidayForUser')
+			->willReturn(false);
+		$this->absenceMapper->expects($this->once())
+			->method('findByUserAndDateRange')
+			->willReturn([]);
+
+		$this->assertFalse($this->invokeIsNonWorkingDay(self::USER_ID, $date));
+	}
+
+	/**
+	 * Many employees share one model — the per-run memo keeps the flag
+	 * lookup at a single WorkingTimeModelMapper::find() instead of an
+	 * N+1 per user.
+	 */
+	public function testOnDemandModelLookupIsMemoizedAcrossUsers(): void
+	{
+		$date = new \DateTime('2026-04-15 00:00:00');
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(5);
+		$model = new WorkingTimeModel();
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('find')
+			->with(5)
+			->willReturn($model);
+
+		$this->assertTrue($this->invokeIsNonWorkingDay('u-a', $date));
+		$this->assertTrue($this->invokeIsNonWorkingDay('u-b', $date));
+	}
+
+	/**
+	 * Orphaned assignment (model row gone) must fail open to reminders —
+	 * a resolution failure is not an on-demand contract.
+	 */
+	public function testIsNonWorkingDayFailsOpenWhenModelLookupThrows(): void
+	{
+		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(99);
+
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$this->workingTimeModelMapper->method('find')
+			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
+		$this->holidayService->method('isHolidayForUser')->willReturn(false);
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([]);
+
+		$this->assertFalse($this->invokeIsNonWorkingDay(self::USER_ID, $date));
 	}
 
 	public function testIsNonWorkingDayReturnsTrueWhenApprovedAbsenceExists(): void

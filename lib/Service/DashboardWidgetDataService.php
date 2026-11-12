@@ -88,6 +88,7 @@ class DashboardWidgetDataService {
 		}
 		$summary['weekHoursWorked'] = (float)($weekly['total_hours_worked'] ?? 0.0);
 		$summary['weekHoursRequired'] = (float)($weekly['required_hours'] ?? 0.0);
+		$summary['requiredHoursBasis'] = (string)($weekly['required_hours_basis'] ?? '');
 		return $summary;
 	}
 
@@ -169,6 +170,10 @@ class DashboardWidgetDataService {
 			'weekHoursWorked'        => (float)($weekly['total_hours_worked'] ?? 0.0),
 			'weekHoursRequired'      => (float)($weekly['required_hours'] ?? 0.0),
 			'weeklyContractHours'    => (float)($weekly['weekly_hours'] ?? 40.0),
+			// 'on_demand'|'degraded'|'weekly_contract'|'weekday_schedule' —
+			// additive; companions that know it can label intent-zero instead
+			// of showing a bare 0 contract-hours figure.
+			'requiredHoursBasis'     => (string)($weekly['required_hours_basis'] ?? ''),
 			// Contract daily hours (same as employee dashboard “Daily target”).
 			'impliedDailyHours'      => (float)($weekly['implied_daily_hours'] ?? 0.0),
 			'cumulativeBalance'      => (float)($weekly['cumulative_balance'] ?? 0.0),
@@ -640,6 +645,9 @@ class DashboardWidgetDataService {
 				'delta' => round($worked - $target, 2),
 				'credit' => $credit,
 				'period' => $formatPeriod($row),
+				// 'on_demand'|'degraded'|... — additive; lets clients label
+				// "no fixed target" instead of rendering a bare 0 target.
+				'basis' => (string)($row['required_hours_basis'] ?? ''),
 			];
 		};
 

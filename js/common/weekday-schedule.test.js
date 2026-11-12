@@ -39,6 +39,17 @@ describe('ArbeitszeitCheckWeekdaySchedule', () => {
 		expect(mod.collect(fs)).toBeNull()
 	})
 
+	it('collect returns an all-off payload when the caller opted into allOffSchedule', async () => {
+		const mod = await loadModule()
+		document.body.innerHTML = `<form>${mod.sectionHtml('ucm', null)}</form>`
+		const fs = document.querySelector('.wtm-weekday-schedule')
+		fs.dataset.allOffSchedule = '1'
+		const collected = mod.collect(fs)
+		expect(collected).not.toBeNull()
+		expect(collected.version).toBe(1)
+		expect(Object.values(collected.days).every((d) => d.work === false)).toBe(true)
+	})
+
 	it('collect gathers work rows and a single unpaid break', async () => {
 		const mod = await loadModule()
 		document.body.innerHTML = `<form>${mod.sectionHtml('ucm', null)}</form>`

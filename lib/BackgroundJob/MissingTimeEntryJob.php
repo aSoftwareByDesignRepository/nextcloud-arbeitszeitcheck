@@ -14,6 +14,8 @@ namespace OCA\ArbeitszeitCheck\BackgroundJob;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
@@ -43,6 +45,11 @@ class MissingTimeEntryJob extends TimedJob
 	private LoggerInterface $logger;
 	private ILockingProvider $locking;
 	private PermissionService $permissionService;
+	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
+	private WorkingTimeModelMapper $workingTimeModelMapper;
+	/** @var array<int, bool> per-run memo: model id => isOnDemand (many users share one model) */
+	private array $onDemandModelFlags = [];
+	private int $skippedOnDemand = 0;
 
 	public function __construct(
 		ITimeFactory $timeFactory,
@@ -54,7 +61,9 @@ class MissingTimeEntryJob extends TimedJob
 		IConfig $config,
 		LoggerInterface $logger,
 		PermissionService $permissionService,
-		ILockingProvider $locking
+		ILockingProvider $locking,
+		UserWorkingTimeModelMapper $userWorkingTimeModelMapper,
+		WorkingTimeModelMapper $workingTimeModelMapper
 	) {
 		parent::__construct($timeFactory);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -66,6 +75,8 @@ class MissingTimeEntryJob extends TimedJob
 		$this->logger = $logger;
 		$this->locking = $locking;
 		$this->permissionService = $permissionService;
+		$this->userWorkingTimeModelMapper = $userWorkingTimeModelMapper;
+		$this->workingTimeModelMapper = $workingTimeModelMapper;
 
 		// Run daily at 9 AM
 		$this->setInterval(24 * 60 * 60);
@@ -111,6 +122,9 @@ class MissingTimeEntryJob extends TimedJob
 		}
 
 		$this->logger->info('Starting missing time entry check');
+		// Reset per-run state — the job instance can be reused across runs.
+		$this->onDemandModelFlags = [];
+		$this->skippedOnDemand = 0;
 
 		try {
 			$yesterday = (new \DateTime())->modify('-1 day')->setTime(0, 0, 0);
@@ -142,9 +156,10 @@ class MissingTimeEntryJob extends TimedJob
 				}
 			});
 
-			if ($alertsSent > 0) {
+			if ($alertsSent > 0 || $this->skippedOnDemand > 0) {
 				$this->logger->info('Missing time entry check completed', [
 					'alerts_sent' => $alertsSent,
+					'skipped_on_demand' => $this->skippedOnDemand,
 					'check_date' => $yesterday->format('Y-m-d')
 				]);
 			}
@@ -219,6 +234,14 @@ class MissingTimeEntryJob extends TimedJob
 
 	private function isNonWorkingDay(string $userId, \DateTimeInterface $date): bool
 	{
+		// On-demand contracts (Arbeit auf Abruf): the employee has no fixed
+		// workdays at all, so a day without an assignment is never a missing
+		// entry. Check before holiday/absence lookups — it's cheaper and the
+		// outcome is the same.
+		if ($this->isOnDemandContract($userId, $date)) {
+			return true;
+		}
+
 		$weekday = (int)$date->format('N');
 		if ($weekday >= 6) {
 			return true;
@@ -238,5 +261,42 @@ class MissingTimeEntryJob extends TimedJob
 		}
 
 		return false;
+	}
+
+	/**
+	 * True when the user's working-time model effective at $date is of type
+	 * on_demand — date-scoped so a same-day contract switch is honoured in
+	 * the right direction. Resolution failures fail open to false: a missing
+	 * model must never silence reminders for regular staff.
+	 */
+	private function isOnDemandContract(string $userId, \DateTimeInterface $date): bool
+	{
+		try {
+			$day = \DateTime::createFromInterface($date)->setTime(0, 0, 0);
+			$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $day)
+				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+			if ($assignment === null) {
+				return false;
+			}
+			$modelId = (int)$assignment->getWorkingTimeModelId();
+			// Memoize per run: many employees share one model, so the flag
+			// lookup stays ≤1 extra assignment query per user instead of an
+			// N+1 on WorkingTimeModelMapper::find().
+			if (!array_key_exists($modelId, $this->onDemandModelFlags)) {
+				$this->onDemandModelFlags[$modelId] = $this->workingTimeModelMapper->find($modelId)->isOnDemand();
+			}
+			if ($this->onDemandModelFlags[$modelId]) {
+				$this->skippedOnDemand++;
+				$this->logger->debug('Missing time entry reminder skipped for on-demand contract', [
+					'user_id' => $userId,
+					'date' => $date->format('Y-m-d'),
+					'reason' => 'on_demand_model',
+				]);
+				return true;
+			}
+			return false;
+		} catch (\Throwable) {
+			return false;
+		}
 	}
 }

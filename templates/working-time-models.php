@@ -82,6 +82,7 @@ $models = $_['models'] ?? [];
                                         \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_FLEXIBLE => $l->t('Flexible'),
                                         \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_TRUST_BASED => $l->t('Trust-based'),
                                         \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK => $l->t('Shift work'),
+                                        \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_ON_DEMAND => $l->t('On demand'),
                                         default => $typeKey,
                                     };
                                     p($typeLabel);
@@ -160,6 +161,8 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.flexible = <?php echo json_encode($l->t('Flexible'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.trustBased = <?php echo json_encode($l->t('Trust-Based'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.shiftWork = <?php echo json_encode($l->t('Shift Work'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.onDemand = <?php echo json_encode($l->t('On demand (no fixed hours)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.onDemandHelp = <?php echo json_encode($l->t('No fixed hours and no fixed workdays — only actually worked time counts; there is no contractual target.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.modelNameHelp = <?php echo json_encode($l->t('Enter a name for this work schedule (e.g., "Full-Time", "Part-Time")'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.weeklyHoursHelp = <?php echo json_encode($l->t('Decimal hours are allowed (e.g. 38.7 h/week under a collective agreement). Overtime targets use this weekly total spread across your working days.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.dailyHoursHelp = <?php echo json_encode($l->t('Usual hours per workday (e.g. 7.74 if 38.7 h/week over five days). Overtime compares worked time to the weekly contract hours × (working days ÷ 5).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

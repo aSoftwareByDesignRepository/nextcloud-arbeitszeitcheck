@@ -932,6 +932,9 @@ class ReportController extends Controller
 			'entries_count',
 			'home_office_days',
 			'external_appointment_days',
+			// Trailing additive column — 'on_demand'|'degraded'|... lets
+			// downstream tell a contractual zero target from a computed one.
+			'required_hours_basis',
 		];
 
 		$fp = fopen('php://temp', 'r+');
@@ -959,6 +962,7 @@ class ReportController extends Controller
 					isset($member['entries_count']) ? (string)$member['entries_count'] : '',
 					isset($member['home_office_days']) ? (string)$member['home_office_days'] : '',
 					isset($member['external_appointment_days']) ? (string)$member['external_appointment_days'] : '',
+					isset($member['required_hours_basis']) ? self::sanitizeCsvCellValue((string)$member['required_hours_basis']) : '',
 				];
 				fputcsv($fp, $row);
 			}

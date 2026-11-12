@@ -289,6 +289,156 @@ class OvertimeServiceTest extends TestCase
 	}
 
 	/**
+	 * On-demand contracts (Arbeit auf Abruf): Soll is exactly 0 and the
+	 * basis must be distinguishable — worked time counts, nothing else.
+	 */
+	public function testCalculateOvertimeOnDemandModelReportsZeroSoll(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-07');
+
+		$userModel = new UserWorkingTimeModel();
+		$userModel->setUserId($userId);
+		$userModel->setWorkingTimeModelId(7);
+
+		$model = new WorkingTimeModel();
+		$model->setName('Abruf');
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$model->setDailyHours(0.0);
+		$model->setWeeklyHours(0.0);
+		$model->setWorkDaysPerWeek(0);
+
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
+			->method('findCurrentByUser')
+			->with($userId)
+			->willReturn($userModel);
+		$this->workingTimeModelMapper->expects($this->atLeastOnce())
+			->method('find')
+			->with(7)
+			->willReturn($model);
+
+		$entry = new TimeEntry();
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-02 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 13:30:00'));
+		$entry->setBreaks(json_encode([]));
+		$entry->setIsManualEntry(false);
+
+		$this->timeEntryMapper->expects($this->atLeastOnce())
+			->method('findByUserAndDateRange')
+			->willReturn([$entry]);
+
+		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
+
+		$this->assertSame(0.0, $result['required_hours']);
+		$this->assertSame('on_demand', $result['required_hours_basis']);
+		$this->assertEquals(4.5, $result['total_hours_worked']);
+		$this->assertEquals(4.5, $result['overtime_hours']);
+	}
+
+	/**
+	 * EC-12: a legacy non-on-demand model row with stored zero hours must
+	 * resolve as 'degraded', never silently as 'on_demand' — the basis is
+	 * the contract consumers use to tell corrupt data from intent.
+	 */
+	public function testCalculateOvertimeZeroContractModelIsDegraded(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-07');
+
+		$userModel = new UserWorkingTimeModel();
+		$userModel->setUserId($userId);
+		$userModel->setWorkingTimeModelId(9);
+
+		$model = new WorkingTimeModel();
+		$model->setName('Corrupt legacy row');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setDailyHours(0.0);
+		$model->setWeeklyHours(0.0);
+		$model->setWorkDaysPerWeek(0);
+
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
+			->method('findCurrentByUser')
+			->with($userId)
+			->willReturn($userModel);
+		$this->workingTimeModelMapper->expects($this->atLeastOnce())
+			->method('find')
+			->with(9)
+			->willReturn($model);
+
+		$this->timeEntryMapper->expects($this->atLeastOnce())
+			->method('findByUserAndDateRange')
+			->willReturn([]);
+
+		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
+
+		$this->assertSame('degraded', $result['required_hours_basis']);
+		$this->assertSame(0.0, $result['required_hours']);
+	}
+
+	/**
+	 * E-02 residual: org configures models but this user has none — the
+	 * 40h fallback numbers stay identical (legacy safe) yet the basis must
+	 * flag the estimate instead of pretending a weekly contract exists.
+	 */
+	public function testCalculateOvertimeUnassignedUserInModelOrgIsDegraded(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-07');
+
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
+			->method('findCurrentByUser')
+			->with($userId)
+			->willReturn(null);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('findAll')
+			->with(1)
+			->willReturn([new WorkingTimeModel()]);
+
+		$this->timeEntryMapper->expects($this->atLeastOnce())
+			->method('findByUserAndDateRange')
+			->willReturn([]);
+
+		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
+
+		$this->assertSame('degraded', $result['required_hours_basis']);
+		$this->assertSame(40.0, $result['weekly_hours']);
+	}
+
+	/**
+	 * Same user in an org that never created a model keeps the legacy
+	 * 'weekly_contract' basis — flagging them would be noise for a
+	 * feature the org never enabled.
+	 */
+	public function testCalculateOvertimeUnassignedUserWithoutModelsKeepsWeeklyBasis(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-01-01');
+		$endDate = new \DateTime('2024-01-07');
+
+		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
+			->method('findCurrentByUser')
+			->with($userId)
+			->willReturn(null);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('findAll')
+			->with(1)
+			->willReturn([]);
+
+		$this->timeEntryMapper->expects($this->atLeastOnce())
+			->method('findByUserAndDateRange')
+			->willReturn([]);
+
+		$result = $this->service->calculateOvertime($userId, $startDate, $endDate);
+
+		$this->assertSame('weekly_contract', $result['required_hours_basis']);
+	}
+
+	/**
 	 * Test calculateOvertime excludes non-completed entries
 	 */
 	public function testCalculateOvertimeExcludesNonCompleted(): void

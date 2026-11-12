@@ -124,4 +124,116 @@ class WorkingTimeModelTest extends TestCase
 		$errors = $model->validate();
 		self::assertArrayHasKey('name', $errors);
 	}
+
+	/**
+	 * AZC on-demand model (Arbeit auf Abruf): a fully zeroed contract is
+	 * legal ONLY for type on_demand — the customer ticket asked to disable
+	 * the > 0 guard globally; that path was rejected because downstream
+	 * code substitutes 0 with silent defaults (8.0h/day, clamped vacation).
+	 */
+	public function testOnDemandModelAllowsZeroContractHours(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Aushilfe');
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$model->setWeeklyHours(0.0);
+		$model->setDailyHours(0.0);
+		$model->setWorkDaysPerWeek(0.0);
+
+		self::assertSame([], $model->validate());
+		self::assertTrue($model->isOnDemand());
+	}
+
+	/**
+	 * Zero stays illegal for every other type — NN-01 of the spec: the
+	 * > 0 guard must not be weakened outside on_demand.
+	 *
+	 * @dataProvider zeroHoursRejectedForNonOnDemandTypesProvider
+	 */
+	public function testZeroHoursRejectedForNonOnDemandTypes(string $type): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Model');
+		$model->setType($type);
+		$model->setWeeklyHours(0.0);
+		$model->setDailyHours(0.0);
+		$model->setWorkDaysPerWeek(0.0);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('weeklyHours', $errors);
+		self::assertArrayHasKey('dailyHours', $errors);
+		self::assertArrayHasKey('workDaysPerWeek', $errors);
+	}
+
+	public static function zeroHoursRejectedForNonOnDemandTypesProvider(): array
+	{
+		return [
+			'full_time' => [WorkingTimeModel::TYPE_FULL_TIME],
+			'part_time' => [WorkingTimeModel::TYPE_PART_TIME],
+			'flexible' => [WorkingTimeModel::TYPE_FLEXIBLE],
+			'trust_based' => [WorkingTimeModel::TYPE_TRUST_BASED],
+			'shift_work' => [WorkingTimeModel::TYPE_SHIFT_WORK],
+		];
+	}
+
+	/** Negative hours are never legal — not even for on_demand. */
+	public function testNegativeHoursRejectedForOnDemand(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Aushilfe');
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$model->setWeeklyHours(-1.0);
+		$model->setDailyHours(0.0);
+		$model->setWorkDaysPerWeek(0.0);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('weeklyHours', $errors);
+	}
+
+	/** Upper bounds keep applying to on_demand too (G-03). */
+	public function testOnDemandStillHonoursUpperBounds(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Aushilfe');
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$model->setWeeklyHours(81.0);
+		$model->setDailyHours(0.0);
+		$model->setWorkDaysPerWeek(8.0);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('weeklyHours', $errors);
+		self::assertArrayHasKey('workDaysPerWeek', $errors);
+	}
+
+	/**
+	 * BQ-04 fail-closed: an on-demand model must never be the org default —
+	 * every new employee would silently inherit a zero-Soll contract.
+	 */
+	public function testOnDemandCannotBeDefaultModel(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Aushilfe');
+		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$model->setWeeklyHours(0.0);
+		$model->setDailyHours(0.0);
+		$model->setWorkDaysPerWeek(0.0);
+		$model->setIsDefault(true);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('isDefault', $errors);
+	}
+
+	/** Default stays legal for regular types — no regression of the existing rule. */
+	public function testFullTimeMayBeDefaultModel(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Vollzeit');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setWorkDaysPerWeek(5.0);
+		$model->setIsDefault(true);
+
+		self::assertSame([], $model->validate());
+	}
 }

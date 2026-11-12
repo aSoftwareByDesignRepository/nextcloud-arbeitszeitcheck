@@ -2959,6 +2959,9 @@ class TimeEntryController extends Controller
 					'overtime' => [
 						'overtime_hours' => $overtimeData['overtime_hours'],
 						'required_hours' => $overtimeData['required_hours'],
+						// Additive — 'on_demand'|'degraded'|... so clients can
+						// label intent-zero targets (US-003).
+						'required_hours_basis' => (string)($overtimeData['required_hours_basis'] ?? ''),
 						'total_hours_worked' => $overtimeData['total_hours_worked'],
 						'cumulative_balance' => $overtimeData['cumulative_balance_after']
 					],

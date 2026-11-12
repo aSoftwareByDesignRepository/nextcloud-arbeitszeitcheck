@@ -386,8 +386,15 @@ class PaidAbsencePlannedHoursCreditService
 			}
 		}
 
+		$onDemand = false;
 		if ($schedule === null || $dailyHours === null) {
-			[$schedule, $dailyHours] = $this->resolveContractForDate($userId, $day);
+			[$schedule, $dailyHours, $onDemand] = $this->resolveContractForDate($userId, $day);
+		}
+		if ($onDemand) {
+			// On-demand contract (Arbeit auf Abruf): no contractual Soll —
+			// an approved absence must neither credit nor deduct phantom
+			// hours. Early-return before the legacy `?: 8.0` substitution.
+			return 0.0;
 		}
 
 		$weight = 0.0;
@@ -479,7 +486,10 @@ class PaidAbsencePlannedHoursCreditService
 	 * without a covering assignment fall back to the current one, then to the
 	 * legacy daily-hours default — identical to the previous behaviour.
 	 *
-	 * @return array{0: ?WeekdaySchedule, 1: float}
+	 * @return array{0: ?WeekdaySchedule, 1: float, 2: bool}
+	 *   [schedule, dailyHours, isOnDemand] — the on-demand flag must be checked
+	 *   BEFORE any daily-hours default substitution: an intentional zero Soll
+	 *   is not "value missing → 8.0".
 	 */
 	private function resolveContractForDate(string $userId, \DateTimeInterface $date): array
 	{
@@ -488,12 +498,15 @@ class PaidAbsencePlannedHoursCreditService
 			$userModel = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $this->asDay($date))
 				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
 			if ($userModel === null) {
-				return [null, $dailyHours];
+				return [null, $dailyHours, false];
 			}
 			$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
+			if ($model->isOnDemand()) {
+				return [$model->getWeekdaySchedule(), 0.0, true];
+			}
 			$schedule = $model->getWeekdaySchedule();
 			if ($schedule !== null) {
-				return [$schedule, $schedule->averageDailyNetHours()];
+				return [$schedule, $schedule->averageDailyNetHours(), false];
 			}
 			$modelDaily = (float)$model->getDailyHours();
 			if (is_finite($modelDaily) && $modelDaily > 0.0) {
@@ -505,7 +518,7 @@ class PaidAbsencePlannedHoursCreditService
 			// defaults
 		}
 
-		return [null, $dailyHours];
+		return [null, $dailyHours, false];
 	}
 
 	private function asDay(\DateTimeInterface $d): \DateTime

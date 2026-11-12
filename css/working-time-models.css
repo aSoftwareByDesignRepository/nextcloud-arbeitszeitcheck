@@ -139,3 +139,18 @@
 	color: var(--color-text-maxcontrast);
 	font-style: italic;
 }
+
+/* On-demand (Arbeit auf Abruf): the weekday matrix is disabled for this
+   type but its state is preserved — muted, not hidden, so switching the
+   type back restores the schedule instead of silently losing it. */
+#app-content.azc-app--admin-working-time-models .wtm-weekday-schedule--inactive {
+	opacity: 0.6;
+}
+
+/* The type-help live region must stay mounted so textContent changes are
+   announced to screen readers; collapse its box when empty instead of
+   toggling `hidden` (which would drop it from the accessibility tree). */
+#app-content.azc-app--admin-working-time-models .wtm-model-type-help:empty {
+	margin: 0;
+	padding: 0;
+}

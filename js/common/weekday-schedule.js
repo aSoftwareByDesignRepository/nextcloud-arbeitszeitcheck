@@ -327,6 +327,12 @@
             days[day] = { work: true, start, end, breaks };
         });
         if (!any) {
+            // All-off is a real, persistable schedule only where the caller
+            // opted in (on-demand contracts) — otherwise "no day checked"
+            // still encodes "no schedule", so the field can be cleared.
+            if (fieldset.dataset.allOffSchedule === '1') {
+                return { version: 1, days };
+            }
             return null;
         }
         return { version: 1, days };

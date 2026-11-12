@@ -738,6 +738,9 @@ class ReportingService
 				'display_name' => $this->getDisplayName($uid),
 				'total_hours' => round($overtimeData['total_hours_worked'], 2),
 				'required_hours' => $overtimeData['required_hours'],
+				// 'on_demand'|'degraded'|... — additive so report surfaces can
+				// label intent-zero targets instead of showing a bare 0,0.
+				'required_hours_basis' => (string)($overtimeData['required_hours_basis'] ?? ''),
 				'overtime_hours' => round($overtimeData['overtime_hours'], 2),
 				'break_hours' => round($totalBreakHours, 2),
 				'violations_count' => count($violations),
@@ -884,6 +887,9 @@ class ReportingService
 			'display_name' => $this->getDisplayName($userId),
 			'total_hours_worked' => round((float)($overtimeData['total_hours_worked'] ?? 0), 2),
 			'required_hours' => round((float)($overtimeData['required_hours'] ?? 0), 2),
+			// 'on_demand'|'degraded'|... — additive; report UI labels
+			// intent-zero targets instead of rendering a bare 0,0.
+			'required_hours_basis' => (string)($overtimeData['required_hours_basis'] ?? ''),
 			'overtime_hours' => round($periodHours, 2),
 			'period_overtime_hours' => round(max(0.0, $periodHours), 2),
 			'period_undertime_hours' => round(max(0.0, -$periodHours), 2),

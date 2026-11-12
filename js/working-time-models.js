@@ -49,6 +49,7 @@
             ['flexible', 'flexible', 'Flexible'],
             ['trust_based', 'trustBased', 'Trust-Based'],
             ['shift_work', 'shiftWork', 'Shift Work'],
+            ['on_demand', 'onDemand', 'On demand (no fixed hours)'],
         ];
         return rows.map(function(row) {
             const value = row[0];
@@ -440,6 +441,89 @@
         return WeekdaySchedule.collect(fieldset);
     }
 
+    /**
+     * On-demand models (Arbeit auf Abruf): the three contract scalars are
+     * fixed at 0 and readonly — the type means "no contractual hours".
+     * Also tells the weekday-schedule collector that an all-off matrix is a
+     * real schedule for this type, not "no schedule".
+     */
+    function syncOnDemandState(form) {
+        const isOnDemand = form.querySelector('#wtm-model-type')?.value === 'on_demand';
+        const fieldset = form.querySelector('.wtm-weekday-schedule');
+        if (fieldset) {
+            if (isOnDemand) {
+                fieldset.dataset.allOffSchedule = '1';
+            } else {
+                delete fieldset.dataset.allOffSchedule;
+            }
+            // The weekday matrix is inactive for on-demand (no fixed days),
+            // but its state is preserved: inputs stay readable so switching
+            // the type back restores the schedule instead of destroying it.
+            fieldset.querySelectorAll('input, select').forEach(function(el) {
+                el.disabled = isOnDemand;
+            });
+            fieldset.classList.toggle('wtm-weekday-schedule--inactive', isOnDemand);
+        }
+        const scheduleActive = !!fieldset
+            && fieldset.querySelectorAll('.wtm-day-work:checked').length > 0;
+        ['weeklyHours', 'dailyHours', 'workDaysPerWeek'].forEach(function(name) {
+            const el = form.querySelector('[name="' + name + '"]');
+            if (!el) {
+                return;
+            }
+            if (isOnDemand) {
+                el.value = '0';
+                el.readOnly = true;
+                el.setAttribute('aria-readonly', 'true');
+            } else if (!scheduleActive) {
+                el.readOnly = false;
+                el.removeAttribute('aria-readonly');
+            }
+        });
+        // BQ-04 (fail closed): an on-demand model must never be the org
+        // default — every new employee would silently inherit zero Soll.
+        // The server-side validate() enforces the same rule for direct API
+        // writes; the checkbox is disabled so the UI can't offer it.
+        const defaultEl = form.querySelector('#wtm-model-is-default');
+        if (defaultEl) {
+            if (isOnDemand) {
+                defaultEl.checked = false;
+                defaultEl.disabled = true;
+            } else {
+                defaultEl.disabled = false;
+            }
+        }
+        const help = form.querySelector('#wtm-model-type-help');
+        if (help) {
+            // The live region stays mounted and only its text changes — that
+            // is what reliably announces the type switch to screen readers
+            // (toggling `hidden` together with the text does not).
+            help.textContent = isOnDemand
+                ? wtmMsg('onDemandHelp', 'No fixed hours and no fixed workdays — only actually worked time counts; there is no contractual target.')
+                : '';
+        }
+    }
+
+    function bindOnDemandTypeSync(form) {
+        const typeSelect = form && form.querySelector('#wtm-model-type');
+        if (!typeSelect) {
+            return;
+        }
+        typeSelect.addEventListener('change', function() {
+            syncOnDemandState(form);
+        });
+        // Also resync after the weekday matrix changes scalars — schedule
+        // edits run their own readonly logic that must not clobber the
+        // on-demand lock.
+        const fieldset = form.querySelector('.wtm-weekday-schedule');
+        if (fieldset) {
+            fieldset.addEventListener('change', function() {
+                syncOnDemandState(form);
+            });
+        }
+        syncOnDemandState(form);
+    }
+
     function buildBreakRulesPayload(form, existingBreakRules) {
         const fieldset = form.querySelector('.wtm-weekday-schedule');
         const schedule = collectWeekdaySchedule(fieldset);
@@ -714,9 +798,9 @@
 
         const nameVal = isEdit ? Utils.escapeHtml(model.name || '') : '';
         const descVal = isEdit ? Utils.escapeHtml(model.description || '') : '';
-        const weeklyVal = isEdit ? (model.weeklyHours || 40) : 40;
-        const dailyVal = isEdit ? (model.dailyHours || 8) : 8;
-        const workDaysVal = isEdit ? (model.workDaysPerWeek || 5) : 5;
+        const weeklyVal = isEdit ? (model.weeklyHours ?? 40) : 40;
+        const dailyVal = isEdit ? (model.dailyHours ?? 8) : 8;
+        const workDaysVal = isEdit ? (model.workDaysPerWeek ?? 5) : 5;
         const typeSelected = isEdit ? (model.type || 'full_time') : 'full_time';
         const isDefaultChecked = isEdit && model.isDefault ? ' checked' : '';
         const allowSundayChecked = (isEdit && model.breakRules && !!model.breakRules.allow_sunday_work) ? ' checked' : '';
@@ -776,9 +860,10 @@
                 <div class="wtm-field-grid">
                 <div class="form-group">
                     <label for="wtm-model-type" class="form-label">${Utils.escapeHtml(typeLabel)}</label>
-                    <select id="wtm-model-type" name="type" class="form-select">
+                    <select id="wtm-model-type" name="type" class="form-select" aria-describedby="wtm-model-type-help">
                         ${modelTypeSelectOptions(typeSelected)}
                     </select>
+                    <p id="wtm-model-type-help" class="form-help wtm-model-type-help" aria-live="polite"></p>
                 </div>
                 <div class="form-group">
                     <label for="wtm-model-weekly-hours" class="form-label">${Utils.escapeHtml(weeklyHoursLabel)} <span class="form-required">*</span></label>
@@ -863,6 +948,7 @@
             bindPresenceWindowsFieldset(form.querySelector('.wtm-presence-windows'));
             bindUeHelper(form.querySelector('.wtm-ue-helper'), form);
             bindPaidBreakControls(form);
+            bindOnDemandTypeSync(form);
             bindPaidBreakImpact(
                 form,
                 isEdit ? model.id : null,
@@ -1019,9 +1105,9 @@
                     name: targetName,
                     description: model.description || null,
                     type: model.type || 'full_time',
-                    weeklyHours: Number(model.weeklyHours) || 40,
-                    dailyHours: Number(model.dailyHours) || 8,
-                    workDaysPerWeek: Number(model.workDaysPerWeek) || 5,
+                    weeklyHours: Number.isFinite(Number(model.weeklyHours)) ? Number(model.weeklyHours) : 40,
+                    dailyHours: Number.isFinite(Number(model.dailyHours)) ? Number(model.dailyHours) : 8,
+                    workDaysPerWeek: Number.isFinite(Number(model.workDaysPerWeek)) ? Number(model.workDaysPerWeek) : 5,
                     overtimeRules: (model.overtimeRules && typeof model.overtimeRules === 'object' && !Array.isArray(model.overtimeRules))
                         ? model.overtimeRules
                         : {},

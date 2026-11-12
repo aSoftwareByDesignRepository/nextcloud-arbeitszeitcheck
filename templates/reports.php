@@ -543,6 +543,8 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
     window.ArbeitszeitCheck.l10n.premiumHint = <?php echo json_encode($l->t('Hours with a percentage for reporting — not pay, and not your overtime Saldo.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.premiumEmpty = <?php echo json_encode($l->t('No premium hours in this period.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.teamDownloadPremiumOk = <?php echo json_encode($l->t('Team download for hour premiums includes one row per person and category.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.requiredBasisOnDemand = <?php echo json_encode($l->t('On call — no fixed target'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.requiredBasisEstimated = <?php echo json_encode($l->t('(estimated)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.monthClosureSealed = <?php echo json_encode($l->t('This month is sealed. Figures below match the closed-month snapshot (including frozen hour premiums).'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.frozenPremiumsTitle = <?php echo json_encode($l->t('Frozen hour premiums'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.policyVersion = <?php echo json_encode($l->t('Policy version'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

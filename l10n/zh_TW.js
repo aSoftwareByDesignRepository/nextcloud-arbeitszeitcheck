@@ -553,6 +553,7 @@
 	"Another app noticed work time for you. It only counts once you confirm it." : "另一個應用注意到您的工作時間。經您確認後才計入。",
 	"Another badge operation is already running for this tablet or employee. Wait a few seconds and try again." : "此平板或員工的另一個工牌操作已在執行。請等幾秒後重試。",
 	"Another badge operation is already running. Wait a few seconds and try again." : "另一個工牌操作已在執行。請等幾秒後重試。",
+	"Another change is in progress for this time entry. Please wait a moment and try again." : "此時間記錄有另一項變更正在進行。請稍候再試。",
 	"Another change to the absence type catalog is in progress. Please wait a moment and try again." : "請假型別目錄的另一個變更正在進行中。請稍候重試。",
 	"Another change to your time tracking is in progress. Please wait a moment and try again." : "您的工時跟蹤有另一個變更正在進行中。請稍候重試。",
 	"Another time-tracking action is in progress on your account. Please wait a moment and try again." : "您的帳戶另一個工時操作正在進行中。請稍候重試。",
@@ -3110,6 +3111,7 @@
 	"No existing entries are affected — the setting applies to new records only." : "現有記錄不受影響——該設定僅適用於新記錄。",
 	"No finalized months are available for your access yet." : "您的授權範圍內暫無可用的已結算月份。",
 	"No finalized months for this employee." : "此員工沒有已結算月份。",
+	"No fixed hours and no fixed workdays — only actually worked time counts; there is no contractual target." : "沒有固定工時和固定工作日——僅計算實際工作的時間；沒有合約目標。",
 	"No groups selected (all users are allowed)." : "未選擇群組（所有使用者均允許）。",
 	"No groups selected." : "未選擇群組。",
 	"No holidays configured for this year." : "今年未配置假日。",
@@ -3291,6 +3293,8 @@
 	"On break" : "休息中",
 	"On break · Worked: %1$s" : "休息中 · 已工作：%1$s",
 	"On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day's target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance." : "預設開啟。已核准的年假、事假和特別假像工時一樣計入其計劃淨工時——年假日不再產生負工時。無薪假和育兒假改為免除當天目標，保持中性而不虛構帶薪工時。適用於未封存期間，並重算實時餘額。",
+	"On demand" : "隨需",
+	"On demand (no fixed hours)" : "隨需（無固定工時）",
 	"On how many days per week this person works (1–7)." : "此人每週工作天數（1–7）。",
 	"On target" : "符合目標",
 	"On that tablet, hold the card on NFC or the USB reader. The UID is stored as a secure hash — never shown in the admin UI." : "在該平板上將卡片貼近 NFC 或 USB 讀卡器。UID 以安全雜湊儲存——不會在管理介面顯示。",
@@ -5030,7 +5034,7 @@
 	"This session was left unfinished. Set the correct end time and save — the entry will then be recorded as completed." : "此記錄未完成。設定正確的結束時間並儲存——記錄隨後會記為已完成。",
 	"This session was not properly clocked out. Complete it (one click) or edit the times below." : "此記錄未正確簽退。一鍵完成它，或在下方編輯時間。",
 	"This shows how well this working time follows the configured labour law. 100%% means everything is perfect." : "這表示此工時對配置勞動法的符合程度。100%% 表示完全合規。",
-	"This shows how well your working time follows German labor law. 100% means everything is perfect." : "這表示您的工時對德國勞動法的符合程度。100% 表示完全合規。",
+	"This shows how well your working time follows German labor law. 100% means everything is perfect." : "這表示您的工時對德國勞動法的符合程度。100%% 表示完全合規。",
 	"This shows how well your working time follows the configured labour law. 100%% means everything is perfect." : "這表示您的工時對配置勞動法的符合程度。100%% 表示完全合規。",
 	"This starts a manual compliance scan for all users. Review the violations list afterward; no data is changed automatically." : "這將對所有使用者啟動手動合規掃描。之後請檢視違規列表；不會自動更改資料。",
 	"This suggestion is too old to confirm. Dismiss it or ask your administrator." : "此建議太舊，無法確認。請忽略它或聯絡管理員。",
@@ -6390,6 +6394,7 @@
 	"Warning: %d row(s) will be permanently deleted, then the file data is loaded." : "警告：%d 列將被永久刪除，然後載入檔案資料。",
 	"Writing data" : "正在寫入資料",
 	"Writing settings" : "正在寫入設定"
-	}
+	},
+	"nplurals=1; plural=0;"
 );
 }});})();

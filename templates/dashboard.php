@@ -605,6 +605,9 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     $gWorked = (float)($glanceRow['worked'] ?? 0);
                     $gTarget = (float)($glanceRow['target'] ?? 0);
                     $gDelta = (float)($glanceRow['delta'] ?? ($gWorked - $gTarget));
+                    $gBasis = (string)($glanceRow['basis'] ?? '');
+                    $gOnDemand = $gBasis === 'on_demand';
+                    $gDegraded = $gBasis === 'degraded';
                     $deltaClass = abs($gDelta) < 0.005
                         ? ''
                         : ($gDelta > 0 ? 'azc-dashboard-metric__value--positive' : 'azc-dashboard-metric__value--negative');
@@ -614,9 +617,22 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         : ($gDelta > 0
                             ? $l->t('%s h over', [$deltaPrefix . $arbeitszeitCheckFormatHours($gDelta)])
                             : $l->t('%s h under', [$arbeitszeitCheckFormatHours($gDelta)]));
+                    if ($gDegraded) {
+                        // Target comes from the fallback, not a real contract —
+                        // mark it instead of presenting it as fact (US-003 AC-2).
+                        $deltaLabel .= ' ' . $l->t('(estimated)');
+                    }
                     ?>
                     <div class="azc-dashboard-metric" role="listitem">
                         <span class="azc-dashboard-metric__label"><?php p((string)($glanceRow['label'] ?? '')); ?></span>
+                        <?php if ($gOnDemand): ?>
+                        <span class="azc-dashboard-metric__value azc-dashboard-metric__value--ratio"
+                              aria-label="<?php p($arbeitszeitCheckFormatHours($gWorked) . ' ' . $l->t('h') . ' — ' . $l->t('On call — no fixed target')); ?>">
+                            <?php p($arbeitszeitCheckFormatHours($gWorked)); ?>
+                            <span class="azc-dashboard-metric__unit"><?php p($l->t('h')); ?></span>
+                        </span>
+                        <span class="azc-dashboard-metric__delta"><?php p($l->t('On call — no fixed target')); ?></span>
+                        <?php else: ?>
                         <span class="azc-dashboard-metric__value azc-dashboard-metric__value--ratio"
                               aria-label="<?php p($l->t('%1$s of %2$s hours', [
                                   $arbeitszeitCheckFormatHours($gWorked),
@@ -628,6 +644,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <span class="azc-dashboard-metric__unit"><?php p($l->t('h')); ?></span>
                         </span>
                         <span class="azc-dashboard-metric__delta <?php p($deltaClass); ?>"><?php p($deltaLabel); ?></span>
+                        <?php endif; ?>
                         <?php $gCredit = (float)($glanceRow['credit'] ?? 0); if ($gCredit >= 0.01): ?>
                         <span class="azc-dashboard-metric__credit"><?php p($l->t('incl. %s h absence credit', [$arbeitszeitCheckFormatHours($gCredit)])); ?></span>
                         <?php endif; ?>

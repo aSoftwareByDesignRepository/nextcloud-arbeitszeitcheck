@@ -45,6 +45,34 @@ test.describe('Working time models inline editor', () => {
 		await expect(page.locator('#models-table')).toBeVisible()
 	})
 
+	test('J-WTM4: on_demand locks contract fields to zero (spec: readonly zeros, human label)', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+		await page.goto('/apps/arbeitszeitcheck/admin/working-time-models')
+		await assertArbeitszeitcheckLoaded(page)
+		await page.locator('#create-model').click()
+		await expect(page.locator('#wtm-model-form')).toBeVisible()
+
+		// The type option carries the human label, not a bare "0.0 h".
+		const option = page.locator('#wtm-model-type option[value="on_demand"]')
+		await expect(option).toHaveCount(1)
+		await expect(option).toHaveText(/On demand/i)
+
+		await page.locator('#wtm-model-type').selectOption('on_demand')
+		for (const name of ['weeklyHours', 'dailyHours', 'workDaysPerWeek']) {
+			const field = page.locator(`#wtm-model-form [name="${name}"]`)
+			await expect(field).toHaveValue('0')
+			await expect(field).toHaveAttribute('readonly', '')
+			await expect(field).toHaveAttribute('aria-readonly', 'true')
+		}
+		// Plain-language explanation replaces the raw zero semantics.
+		await expect(page.locator('#wtm-model-type-help')).toBeVisible()
+		await expect(page.locator('#wtm-model-type-help')).not.toBeEmpty()
+
+		// Switching back clears the on-demand explanation.
+		await page.locator('#wtm-model-type').selectOption('full_time')
+		await expect(page.locator('#wtm-model-type-help')).toBeHidden()
+	})
+
 	test('J-WTM3: axe clean on open create panel', async ({ page }) => {
 		await login(page, credsFromEnv('ADMIN'))
 		await page.goto('/apps/arbeitszeitcheck/admin/working-time-models')

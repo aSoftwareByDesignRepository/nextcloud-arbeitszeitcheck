@@ -73,8 +73,7 @@ class OvertimeService
 		$opening = $this->overtimeSettingsService->getOpeningBalanceHours($userId, $yearOfStart);
 		$trackingFrom = $this->overtimeSettingsService->getTrackingFrom($userId);
 
-		[$dailyHours, $weeklyHours, $schedule] = $this->resolveContractHours($userId);
-		$requiredHoursBasis = $schedule !== null ? 'weekday_schedule' : 'weekly_contract';
+		[$dailyHours, $weeklyHours, $schedule, $requiredHoursBasis] = $this->resolveContractHours($userId);
 		$rotationWeekLabel = null;
 
 		$periodStart = clone $startDate;
@@ -370,6 +369,9 @@ class OvertimeService
 		}
 	}
 
+	/** @var bool|null memoized "org has any org-level model" probe */
+	private ?bool $orgHasWorkingTimeModels = null;
+
 	private function tryRotationRequiredHours(string $userId, \DateTime $startDate, \DateTime $endDate): ?float
 	{
 		if ($this->dutyRotationSollProvider === null || !$this->dutyRotationSollProvider->isEnabledForOrg()) {
@@ -388,32 +390,79 @@ class OvertimeService
 	}
 
 	/**
-	 * @return array{0: float, 1: float, 2: ?\OCA\ArbeitszeitCheck\Support\WeekdaySchedule} [dailyHours, weeklyHours, schedule]
+	 * @return array{0: float, 1: float, 2: ?\OCA\ArbeitszeitCheck\Support\WeekdaySchedule, 3: string}
+	 *   [dailyHours, weeklyHours, schedule, required_hours_basis]
 	 */
 	private function resolveContractHours(string $userId): array
 	{
 		$dailyHours = 8.0;
 		$weeklyHours = 40.0;
 		$schedule = null;
+		$basis = 'weekly_contract';
 
 		$userModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
+		if ($userModel === null && $this->orgHasWorkingTimeModels()) {
+			// E-02 residual: this organisation configures working time models
+			// but never assigned one to this user — the 40h fallback is an
+			// assumption, not a contract. The computed numbers stay identical
+			// (legacy safe), but the basis flags the estimate so surfaces can
+			// show "no model assigned" instead of pretending a contract exists.
+			// Orgs that never created a model keep 'weekly_contract' — flagging
+			// every user there would be noise for a feature they never enabled.
+			$basis = 'degraded';
+		}
 		if ($userModel) {
 			try {
 				$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
+				if ($model->isOnDemand()) {
+					// On-demand (Arbeit auf Abruf): no contractual Soll — only
+					// actually worked time counts. Never substitute the legacy
+					// 8.0/40.0 defaults and never feed a stored schedule into
+					// required-hours math: Soll is exactly 0.
+					return [0.0, 0.0, null, 'on_demand'];
+				}
 				$schedule = $model->getWeekdaySchedule();
 				if ($schedule !== null) {
 					$dailyHours = $schedule->averageDailyNetHours();
 					$weeklyHours = $schedule->weeklyNetHours();
+					$basis = 'weekday_schedule';
 				} else {
 					$dailyHours = $model->getDailyHours();
 					$weeklyHours = $model->getWeeklyHours();
+					if ($dailyHours <= 0.0 || $weeklyHours <= 0.0) {
+						// Legacy rows may carry a stored 0 contract (pre-MH-02
+						// writes): Soll would silently collapse to 0 exactly
+						// like on_demand (EC-12) — mark the basis degraded so
+						// corrupt data stays distinguishable from intent.
+						$basis = 'degraded';
+					}
 				}
 			} catch (\Throwable $e) {
-				// Model not found, use defaults
+				// Assigned but model row missing/gone: keep the legacy default
+				// hours but mark the resolution degraded so downstream can tell
+				// "no contract loaded" apart from a real weekly contract.
+				$basis = 'degraded';
 			}
 		}
 
-		return [$dailyHours, $weeklyHours, $schedule];
+		return [$dailyHours, $weeklyHours, $schedule, $basis];
+	}
+
+	/**
+	 * True when the organisation has at least one org-level working time
+	 * model configured. Memoized per request — one cheap EXISTS-style query
+	 * total, not per user.
+	 */
+	private function orgHasWorkingTimeModels(): bool
+	{
+		if ($this->orgHasWorkingTimeModels === null) {
+			try {
+				$this->orgHasWorkingTimeModels = $this->workingTimeModelMapper->findAll(1) !== [];
+			} catch (\Throwable) {
+				$this->orgHasWorkingTimeModels = false;
+			}
+		}
+		return $this->orgHasWorkingTimeModels;
 	}
 
 	public function getOvertimeBalance(string $userId): float

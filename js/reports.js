@@ -715,7 +715,15 @@
 					html += `<tr>`
 						+ reportTd(L.name || 'Name', esc(u.display_name || u.user_id || '-'))
 						+ reportTd(L.workedHours || L.hours || 'Worked', esc(u.total_hours_worked != null ? u.total_hours_worked : '-'))
-						+ reportTd(L.requiredHours || 'Required', esc(u.required_hours != null ? u.required_hours : '-'))
+						// US-003: an on-demand contract has no fixed target —
+						// label it, never show a bare "0". Degraded keeps the
+						// number but marks it as estimated.
+						+ reportTd(L.requiredHours || 'Required', esc(
+							u.required_hours_basis === 'on_demand'
+								? (L.requiredBasisOnDemand || 'On call — no fixed target')
+								: (u.required_hours != null
+									? u.required_hours + (u.required_hours_basis === 'degraded' ? ' ' + (L.requiredBasisEstimated || '(estimated)') : '')
+									: '-')))
 						+ reportTd(L.periodOvertime || 'Period +', esc(u.period_overtime_hours != null ? u.period_overtime_hours : (u.overtime_hours > 0 ? u.overtime_hours : '0')))
 						+ reportTd(L.periodUndertime || 'Period −', esc(u.period_undertime_hours != null ? u.period_undertime_hours : '-'))
 						+ reportTd(bankOn ? (L.effectiveBalance || 'Effective balance') : (L.balance || 'Balance'), esc(u.effective_balance != null ? u.effective_balance : (u.cumulative_balance != null ? u.cumulative_balance : '-')))
@@ -1257,6 +1265,9 @@
 			if (bankOn) {
 				headers.push('banked_h', 'payout_eligible_h');
 			}
+			// Trailing additive column — 'on_demand'|'degraded'|... so a
+			// contractual zero target is distinguishable from a computed one.
+			headers.push('required_basis');
 			const rows = [headers.join(';')];
 			report.users.forEach((u) => {
 				const cols = [
@@ -1271,6 +1282,7 @@
 				if (bankOn) {
 					cols.push(csvCell(u.banked_hours), csvCell(u.payout_eligible_hours));
 				}
+				cols.push(csvCell(u.required_hours_basis));
 				rows.push(cols.join(';'));
 			});
 			const csv = '\uFEFF' + rows.join('\n');

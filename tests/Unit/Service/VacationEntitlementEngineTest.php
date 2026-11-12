@@ -266,6 +266,93 @@ class VacationEntitlementEngineTest extends TestCase {
 	}
 
 	/**
+	 * An on-demand model has workDaysPerWeek=0 by contract — no fixed weekday
+	 * basis to pro-rate against. The simple model must not silently compute
+	 * 30*(0/5)=0 (denies the statutory minimum) nor pretend precision: it
+	 * keeps the 1-day/week floor and flags the trace as degraded until
+	 * pro-rating on actual worked days lands (BQ-03).
+	 */
+	public function testOnDemandModelKeepsMinimumFloorAndFlagsDegraded(): void {
+		$policyMapper = $this->createMock(UserVacationPolicyAssignmentMapper::class);
+		$ruleSetMapper = $this->createMock(TariffRuleSetMapper::class);
+		$moduleMapper = $this->createMock(TariffRuleModuleMapper::class);
+		$userModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+
+		$policy = new UserVacationPolicyAssignment();
+		$policy->setVacationMode(Constants::VACATION_MODE_MODEL_BASED_SIMPLE);
+		$policy->setEffectiveFrom(new \DateTime('2026-01-01'));
+		$policyMapper->method('findCurrentByUser')->willReturn($policy);
+
+		$userModelAssignment = new UserWorkingTimeModel();
+		$userModelAssignment->setWorkingTimeModelId(7);
+		$userModelMapper->method('findByUserAndDate')->willReturn($userModelAssignment);
+
+		$workingTimeModel = new WorkingTimeModel();
+		$workingTimeModel->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$workingTimeModel->setWorkDaysPerWeek(0.0);
+		$workingTimeModelMapper->method('find')->with(7)->willReturn($workingTimeModel);
+
+		$engine = $this->makeEngine($policyMapper, $ruleSetMapper, $moduleMapper, $userModelMapper, $workingTimeModelMapper, $userSettingsMapper);
+		$result = $engine->computeForDate('od', new \DateTimeImmutable('2026-06-01'));
+
+		$this->assertSame('simple_model', $result['source']);
+		$this->assertEquals(6.0, $result['days']); // 30 * (1/5) — statutory-minimum approximation
+		$this->assertTrue($result['trace']['degraded']);
+		$this->assertSame('on_demand_model', $result['trace']['inner']['degraded']);
+	}
+
+	/**
+	 * Tariff mode has the same E-06-class residual: when the rule set leaves
+	 * work days unpinned the model is consulted, and an on-demand model's
+	 * contractual 0 hits the max(1.0) floor. The floor stays (statutory
+	 * minimum — BQ-03) but the trace must flag it, never mint a silent ~6
+	 * days.
+	 */
+	public function testTariffOnDemandModelKeepsFloorAndFlagsDegraded(): void {
+		$policyMapper = $this->createMock(UserVacationPolicyAssignmentMapper::class);
+		$ruleSetMapper = $this->createMock(TariffRuleSetMapper::class);
+		$moduleMapper = $this->createMock(TariffRuleModuleMapper::class);
+		$userModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+
+		$policy = new UserVacationPolicyAssignment();
+		$policy->setVacationMode(Constants::VACATION_MODE_TARIFF_RULE_BASED);
+		$policy->setTariffRuleSetId(12);
+		$policy->setEffectiveFrom(new \DateTime('2026-01-01'));
+		$policyMapper->method('findCurrentByUser')->willReturn($policy);
+
+		$ruleSet = new TariffRuleSet();
+		$ruleSet->setId(12);
+		$ruleSet->setStatus(Constants::TARIFF_RULE_SET_STATUS_ACTIVE);
+		$ruleSetMapper->method('find')->willReturn($ruleSet);
+
+		// work_days_per_week left unpinned -> engine consults the user's model
+		$base = new TariffRuleModule();
+		$base->setModuleType('base_formula');
+		$base->setConfig(['reference_days' => 30, 'work_days_per_week' => 0, 'reference_week_days' => 5]);
+		$moduleMapper->method('findByRuleSetId')->willReturn([$base]);
+
+		$userModelAssignment = new UserWorkingTimeModel();
+		$userModelAssignment->setWorkingTimeModelId(7);
+		$userModelMapper->method('findByUserAndDate')->willReturn($userModelAssignment);
+
+		$workingTimeModel = new WorkingTimeModel();
+		$workingTimeModel->setType(WorkingTimeModel::TYPE_ON_DEMAND);
+		$workingTimeModel->setWorkDaysPerWeek(0.0);
+		$workingTimeModelMapper->method('find')->with(7)->willReturn($workingTimeModel);
+
+		$engine = $this->makeEngine($policyMapper, $ruleSetMapper, $moduleMapper, $userModelMapper, $workingTimeModelMapper, $userSettingsMapper);
+		$result = $engine->computeForDate('od', new \DateTimeImmutable('2026-06-01'));
+
+		$this->assertEquals(6.0, $result['days']); // 30 * (1/5) floor, same as simple model
+		$this->assertTrue($result['trace']['degraded']);
+		$this->assertSame('on_demand_model', $result['trace']['inner']['degraded']);
+	}
+
+	/**
 	 * GAP-01 regression: the canonical rounder must use HALF_UP at 2 decimals,
 	 * never truncate to int, and clamp to [0, 366].
 	 *

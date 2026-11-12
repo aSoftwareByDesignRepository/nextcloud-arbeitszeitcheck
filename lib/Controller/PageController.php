@@ -1661,6 +1661,9 @@ class PageController extends Controller
 				'target' => $target,
 				'delta' => round($worked - $target, 2),
 				'credit' => round((float)($row['absence_credit_hours'] ?? 0), 2),
+				// 'on_demand'|'degraded'|'weekly_contract'|'weekday_schedule' —
+				// lets the tile render "no fixed target" instead of a bare 0,0 h.
+				'basis' => (string)($row['required_hours_basis'] ?? ''),
 			];
 		};
 

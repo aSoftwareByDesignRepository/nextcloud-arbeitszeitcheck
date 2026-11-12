@@ -575,6 +575,27 @@ class VacationEntitlementEngine {
 		if ($modelAssignment !== null) {
 			try {
 				$workingTimeModel = $this->workingTimeModelMapper->find($modelAssignment->getWorkingTimeModelId());
+				if ($workingTimeModel->isOnDemand()) {
+					// On-demand models carry workDaysPerWeek=0 by contract —
+					// there is no fixed weekday basis to pro-rate against.
+					// Silently computing 30*(0/5)=0 would deny the statutory
+					// minimum a Minijobber is still owed, while pretending a
+					// precise answer exists is just as wrong: the pro-rated
+					// entitlement must come from actual worked days, which
+					// this layer cannot see. Keep the 1-day/week floor and
+					// flag the trace so admin UIs surface it instead of
+					// showing a silently wrong number (BQ-03).
+					$degraded = 'on_demand_model';
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						sprintf(
+							'VacationEntitlementEngine: on-demand working time model #%d for user %s has no fixed work days — vacation entitlement falls back to the %d-day/week minimum until pro-rating on actual worked days is implemented.',
+							(int)$workingTimeModel->getId(),
+							$userId,
+							1,
+						),
+						['app' => 'arbeitszeitcheck']
+					);
+				}
 				$workDaysPerWeek = max(1.0, min(7.0, round((float)$workingTimeModel->getWorkDaysPerWeek(), 2)));
 			} catch (\Throwable) {
 				// EC-04: model deleted but the user still has an assignment
@@ -642,6 +663,7 @@ class VacationEntitlementEngine {
 		$deductions = 0.0;
 		$rounding = 'commercial';
 		$proRata = 'none';
+		$degraded = null;
 
 		foreach ($modules as $module) {
 			/** @var TariffRuleModule $module */
@@ -674,6 +696,25 @@ class VacationEntitlementEngine {
 			if ($modelAssignment !== null) {
 				try {
 					$workingTimeModel = $this->workingTimeModelMapper->find($modelAssignment->getWorkingTimeModelId());
+					if ($workingTimeModel->isOnDemand()) {
+						// Same E-06-class interim as resolveSimpleModel: an
+						// on-demand model carries workDaysPerWeek=0 by contract,
+						// so the max(1.0) floor below would silently mint
+						// ~6 days. Keep the floor (statutory minimum is still
+						// owed — BQ-03 pending) but flag the trace so admin
+						// surfaces can show it instead of a silently wrong
+						// number.
+						$degraded = 'on_demand_model';
+						\OCP\Log\logger('arbeitszeitcheck')->warning(
+							sprintf(
+								'VacationEntitlementEngine: tariff mode for user %s resolved work days from on-demand working time model #%d — keeping the %d-day/week floor until pro-rating on actual worked days is implemented (BQ-03).',
+								$userId,
+								(int)$workingTimeModel->getId(),
+								1,
+							),
+							['app' => 'arbeitszeitcheck']
+						);
+					}
 					$workDaysPerWeek = (float)$workingTimeModel->getWorkDaysPerWeek();
 				} catch (\Throwable) {
 					$workDaysPerWeek = 5.0;
@@ -716,6 +757,9 @@ class VacationEntitlementEngine {
 			],
 			'result_days' => $finalDays,
 		];
+		if ($degraded !== null) {
+			$trace['degraded'] = $degraded;
+		}
 		// EC-08: surface clamping so payroll auditors can spot rule-set
 		// misconfigurations that would otherwise be invisible behind the
 		// 0..366 invariant.
@@ -1070,7 +1114,10 @@ class VacationEntitlementEngine {
 			'result_days' => $days,
 			'inner' => $resolved['trace'],
 		];
-		if ($degraded) {
+		// A winner whose own resolution degraded (dangling model row, on-demand
+		// model with no fixed workday basis) must surface at the same flag
+		// consumers already read — otherwise it stays buried in trace.inner.
+		if ($degraded || isset($resolved['trace']['degraded'])) {
 			$trace['degraded'] = true;
 		}
 		// Preserve legacy "source" / "ruleSetId" keys verbatim so existing

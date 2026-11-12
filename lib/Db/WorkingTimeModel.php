@@ -50,6 +50,7 @@ class WorkingTimeModel extends Entity
     public const TYPE_FLEXIBLE = 'flexible';
     public const TYPE_TRUST_BASED = 'trust_based';
     public const TYPE_SHIFT_WORK = 'shift_work';
+    public const TYPE_ON_DEMAND = 'on_demand';
 
     /** @var string */
     protected $name;
@@ -113,6 +114,15 @@ class WorkingTimeModel extends Entity
     public function isPersonal(): bool
     {
         return $this->userId !== null && $this->userId !== '';
+    }
+
+    /**
+     * True for on-demand models (Arbeit auf Abruf): no contractual hours or
+     * fixed workdays — only actually worked time counts.
+     */
+    public function isOnDemand(): bool
+    {
+        return $this->type === self::TYPE_ON_DEMAND;
     }
 
     /**
@@ -191,22 +201,26 @@ class WorkingTimeModel extends Entity
             self::TYPE_PART_TIME,
             self::TYPE_FLEXIBLE,
             self::TYPE_TRUST_BASED,
-            self::TYPE_SHIFT_WORK
+            self::TYPE_SHIFT_WORK,
+            self::TYPE_ON_DEMAND
         ];
-        if (!in_array($this->type, $validTypes)) {
+        if (!in_array($this->type, $validTypes, true)) {
             $errors['type'] = 'Invalid working time model type';
         }
 
-        // Validate hours
-        if ($this->weeklyHours <= 0) {
+        // Zero contract hours are legal only for on-demand models; for every
+        // other type the > 0 guard stays the only barrier against silent
+        // downstream substitution (8.0h/day, clamped vacation days).
+        $onDemand = $this->isOnDemand();
+        if ($this->weeklyHours < 0 || ($this->weeklyHours == 0.0 && !$onDemand)) {
             $errors['weeklyHours'] = 'Weekly hours must be greater than 0';
         }
 
-        if ($this->dailyHours <= 0) {
+        if ($this->dailyHours < 0 || ($this->dailyHours == 0.0 && !$onDemand)) {
             $errors['dailyHours'] = 'Daily hours must be greater than 0';
         }
 
-        if ($this->workDaysPerWeek <= 0) {
+        if ($this->workDaysPerWeek < 0 || ($this->workDaysPerWeek == 0.0 && !$onDemand)) {
             $errors['workDaysPerWeek'] = 'Working days per week must be greater than 0';
         }
 
@@ -221,6 +235,13 @@ class WorkingTimeModel extends Entity
 
         if ($this->isPersonal() && $this->isDefault) {
             $errors['isDefault'] = 'A personal working time model cannot be the default model';
+        }
+
+        // On-demand models must never become the organisation default: every
+        // new employee would silently inherit a zero-Soll contract (BQ-04 —
+        // fail closed until an explicit product decision says otherwise).
+        if ($this->isOnDemand() && $this->isDefault) {
+            $errors['isDefault'] = 'An on-demand model cannot be the default model';
         }
 
         return $errors;

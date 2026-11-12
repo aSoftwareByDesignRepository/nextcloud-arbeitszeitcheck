@@ -677,7 +677,7 @@ class Application extends App implements IBootstrap {
 
 		$context->registerService(SealAbsenceDayFractions::class, function ($c): SealAbsenceDayFractions {
 			return new SealAbsenceDayFractions(
-				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(IDBConnection::class),
 				$c->query(HolidayService::class),
 			);
 		});

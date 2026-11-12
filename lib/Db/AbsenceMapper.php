@@ -219,25 +219,6 @@ class AbsenceMapper extends QBMapper
 	}
 
 	/**
-	 * Single-day absences with NULL fraction columns — the EC-18 seal repair
-	 * candidates (AZC-HALF-DAY-SLOTS-BOUNDARIES). `start_date = end_date` is
-	 * compared on the raw date columns.
-	 *
-	 * @return Absence[]
-	 */
-	public function findUnsealedSingleDayRows(): array
-	{
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('*')
-			->from($this->getTableName())
-			->where($qb->expr()->isNull('start_day_fraction'))
-			->andWhere($qb->expr()->isNull('end_day_fraction'))
-			->andWhere($qb->expr()->eq('start_date', 'end_date'))
-			->orderBy('id', 'ASC');
-		return $this->findEntities($qb);
-	}
-
-	/**
 	 * Find absences by status
 	 *
 	 * @param string $status

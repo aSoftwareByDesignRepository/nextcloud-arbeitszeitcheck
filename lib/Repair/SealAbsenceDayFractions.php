@@ -23,15 +23,15 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Repair;
 
-use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
+use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 
 class SealAbsenceDayFractions implements IRepairStep
 {
 	public function __construct(
-		private AbsenceMapper $absenceMapper,
+		private IDBConnection $db,
 		private HolidayService $holidayCalendarService
 	) {
 	}
@@ -43,8 +43,22 @@ class SealAbsenceDayFractions implements IRepairStep
 
 	public function run(IOutput $output): void
 	{
-		$absences = $this->absenceMapper->findUnsealedSingleDayRows();
-		$count = count($absences);
+		// Candidate scan and writes go through the raw query builder on
+		// purpose: this repair step is a new class, but AbsenceMapper /
+		// Absence may already be loaded in their PRE-RELEASE shape during an
+		// in-request upgrade. findUnsealedSingleDayRows() and the
+		// *DayFraction entity accessors do not exist there — calling them
+		// would throw an Error that escapes Repair::run (which only catches
+		// \Exception) and stalls the whole upgrade (symbol skew, cf. #45).
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'user_id', 'start_date', 'days')
+			->from('at_absences')
+			->where($qb->expr()->isNull('start_day_fraction'))
+			->andWhere($qb->expr()->isNull('end_day_fraction'))
+			->andWhere($qb->expr()->eq('start_date', 'end_date'))
+			->orderBy('id', 'ASC');
+		$rows = $qb->executeQuery()->fetchAll();
+		$count = count($rows);
 
 		if ($count === 0) {
 			return;
@@ -54,17 +68,18 @@ class SealAbsenceDayFractions implements IRepairStep
 		$output->startProgress($count);
 		$sealed = 0;
 
-		foreach ($absences as $absence) {
+		foreach ($rows as $row) {
+			$id = (int)$row['id'];
 			try {
-				$start = $absence->getStartDate();
-				$days = $absence->getDays();
-				if ($start === null || $days === null || !is_finite((float)$days)) {
+				$days = $row['days'] === null ? null : (float)$row['days'];
+				if ($row['start_date'] === null || $days === null || !is_finite($days)) {
 					$output->advance();
 					continue;
 				}
+				$start = new \DateTime((string)$row['start_date']);
 
 				$weight = $this->holidayCalendarService->computeWorkingDaysForUser(
-					$absence->getUserId(),
+					(string)$row['user_id'],
 					$start,
 					$start
 				);
@@ -73,18 +88,23 @@ class SealAbsenceDayFractions implements IRepairStep
 					continue;
 				}
 
-				$ratio = (float)$days / $weight;
+				$ratio = $days / $weight;
 				if (abs($ratio - 0.5) < 0.011) {
-					$absence->setStartDayFraction(0.5);
-					$absence->setUpdatedAt(new \DateTime());
-					$this->absenceMapper->update($absence);
+					$update = $this->db->getQueryBuilder();
+					$update->update('at_absences')
+						->set('start_day_fraction', $update->createNamedParameter(0.5))
+						->set('updated_at', $update->createNamedParameter(
+							(new \DateTime())->format('Y-m-d H:i:s')
+						))
+						->where($update->expr()->eq('id', $update->createNamedParameter($id)));
+					$update->executeStatement();
 					$sealed++;
 				}
 			} catch (\Throwable $e) {
 				// best-effort: a repair must continue past a bad row; each
 				// failure is logged with the absence id for follow-up.
 				\OCP\Log\logger('arbeitszeitcheck')->error(
-					'SealAbsenceDayFractions: failed for absence ' . $absence->getId(),
+					'SealAbsenceDayFractions: failed for absence ' . $id,
 					['exception' => $e]
 				);
 			}

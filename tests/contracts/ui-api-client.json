@@ -564,8 +564,9 @@
 				{
 					"file": "lib/Repair/SealAbsenceDayFractions.php",
 					"needles": [
-						"findUnsealedSingleDayRows",
-						"setStartDayFraction"
+						"start_day_fraction",
+						"computeWorkingDaysForUser",
+						"IDBConnection"
 					]
 				}
 			],

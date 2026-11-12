@@ -566,7 +566,7 @@
 	"Another app noticed work time for you. It only counts once you confirm it." : "Eine andere App hat Arbeitszeit für Sie erkannt. Sie zählt erst, wenn Sie sie bestätigen.",
 	"Another badge operation is already running for this tablet or employee. Wait a few seconds and try again." : "Für dieses Tablet oder diese Person läuft bereits eine Ausweis-Aktion. Einige Sekunden warten und erneut versuchen.",
 	"Another badge operation is already running. Wait a few seconds and try again." : "Es läuft bereits eine Ausweis-Aktion. Einige Sekunden warten und erneut versuchen.",
-	"Another change is in progress for this time entry. Please wait a moment and try again." : "Another change is in progress for this time entry. Please wait a moment and try again.",
+	"Another change is in progress for this time entry. Please wait a moment and try again." : "Für diesen Zeiteintrag läuft bereits eine andere Änderung. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
 	"Another change to the absence type catalog is in progress. Please wait a moment and try again." : "Eine andere Änderung am Katalog der Abwesenheitstypen läuft gerade. Bitte kurz warten und erneut versuchen.",
 	"Another change to your time tracking is in progress. Please wait a moment and try again." : "Eine weitere Änderung an Ihrer Zeiterfassung wird gerade verarbeitet. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
 	"Another time-tracking action is in progress on your account. Please wait a moment and try again." : "Eine weitere Zeiterfassungsaktion wird für Ihr Konto gerade verarbeitet. Bitte warten Sie einen Moment und versuchen Sie es erneut.",

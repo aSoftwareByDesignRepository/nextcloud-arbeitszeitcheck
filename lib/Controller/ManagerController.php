@@ -580,7 +580,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function employeeTimeEntriesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['common/time-pair-matrix', 'time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+		$this->registerFrontEndAssets('manager-time-entries', 'manager-time-entries', ['common/time-pair-matrix', 'time-entry-correction'], ['common/admin-user-picker', 'common/manager-scoped-employee-picker', 'common/table-pager']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 		if ($this->workforceSuiteConfig !== null
 			&& $this->workforceSuiteConfig->isEnabled('work_location_catalog_enabled')) {
@@ -610,11 +610,12 @@ class ManagerController extends Controller
 				$this->buildManagerShellParams(
 					'manager-time-entries',
 					$this->l10n->t('Employee time entries'),
-					$this->l10n->t('View your employees\' time entries directly in the app. Start by selecting a date range and optionally one person.'),
+					$this->l10n->t('View your employees\' time entries directly in the app.'),
 					$navFlags,
 				),
 				$this->managerEmployeeListTemplateParams('time-entries'),
 				[
+					'collapsePageHelp' => false,
 					'monthClosureEnabled' => $this->monthClosureEnabledParam(),
 					'projectCheckEnabled' => $this->projectCheckIntegration->isAdminIntegrationEnabled(),
 				]
@@ -629,7 +630,7 @@ class ManagerController extends Controller
 			$response = new TemplateResponse('arbeitszeitcheck', 'manager-time-entries', $this->buildManagerShellParams(
 				'manager-time-entries',
 				$this->l10n->t('Employee time entries'),
-				$this->l10n->t('View your employees\' time entries directly in the app. Start by selecting a date range and optionally one person.'),
+				$this->l10n->t('View your employees\' time entries directly in the app.'),
 				$navFlags,
 			) + [
 				'monthClosureEnabled' => $this->monthClosureEnabledParam(),
@@ -643,7 +644,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function employeeAbsencesPage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-absences', 'manager-time-entries', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker', 'common/absence-sick-conversion']);
+		$this->registerFrontEndAssets('manager-absences', 'manager-time-entries', [], ['common/admin-user-picker', 'common/manager-scoped-employee-picker', 'common/absence-sick-conversion', 'common/table-pager']);
 		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 
 		try {
@@ -710,7 +711,7 @@ class ManagerController extends Controller
 	#[NoCSRFRequired]
 	public function peoplePage(): TemplateResponse|\OCP\AppFramework\Http\RedirectResponse
 	{
-		$this->registerFrontEndAssets('manager-people', 'manager-people', [], ['common/view-components', 'common/admin-user-picker', 'common/manager-scoped-employee-picker']);
+		$this->registerFrontEndAssets('manager-people', 'manager-people', [], ['common/view-components', 'common/admin-user-picker', 'common/manager-scoped-employee-picker', 'common/table-pager']);
 
 		try {
 			$actorUserId = $this->getUserId();
@@ -777,7 +778,7 @@ class ManagerController extends Controller
 			return new \OCP\AppFramework\Http\RedirectResponse($this->urlGenerator->linkToRoute('arbeitszeitcheck.page.index'));
 		}
 
-		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips']);
+		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips'], ['common/table-pager']);
 		Util::addScript('arbeitszeitcheck', 'manager-business-trips');
 
 		try {

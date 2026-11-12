@@ -125,9 +125,9 @@
 		if (wrap) {
 			wrap.classList.add('visually-hidden');
 		}
-		const nav = document.querySelector('.manager-scope-page__pagination');
+		const nav = el('manager-people-pager');
 		if (nav) {
-			nav.classList.add('visually-hidden');
+			nav.hidden = true;
 		}
 	}
 
@@ -139,10 +139,6 @@
 		}
 		if (wrap) {
 			wrap.classList.remove('visually-hidden');
-		}
-		const nav = document.querySelector('.manager-scope-page__pagination');
-		if (nav) {
-			nav.classList.remove('visually-hidden');
 		}
 	}
 
@@ -160,23 +156,18 @@
 		}
 	}
 
-	function updatePagination() {
-		const pages = Math.max(1, Math.ceil(state.total / state.limit));
-		const page = Math.min(pages, Math.floor(state.offset / state.limit) + 1);
-		const indicator = el('manager-people-page-indicator');
-		if (indicator) {
-			indicator.textContent = state.total > 0
-				? t('Page {page} of {pages}', 'Page {page} of {pages}', { page: page, pages: pages })
-				: '';
+	function syncPager() {
+		const nav = el('manager-people-pager');
+		const pager = window.AzcTablePager;
+		if (!nav || !pager || typeof pager.update !== 'function') {
+			return;
 		}
-		const prev = el('manager-people-prev');
-		const next = el('manager-people-next');
-		if (prev) {
-			prev.disabled = state.offset <= 0 || state.loading;
-		}
-		if (next) {
-			next.disabled = (state.offset + state.limit) >= state.total || state.loading;
-		}
+		pager.update(nav, {
+			page: Math.floor(state.offset / state.limit) + 1,
+			pages: Math.max(1, Math.ceil(state.total / state.limit)),
+			total: state.total,
+			perPage: state.limit,
+		});
 	}
 
 	function buildUrl(path, params) {
@@ -351,7 +342,6 @@
 		return {
 			employeeId: String(formData.get('employee_id') || hiddenEl?.value || '').trim(),
 			year: String(formData.get('year') || '').trim(),
-			search: String(formData.get('search') || '').trim(),
 			sort: ['violations', 'name', 'vacation', 'overtime'].includes(sort) ? sort : 'violations',
 			filter: ['all', 'needs_attention', 'pending_absences'].includes(state.filter) ? state.filter : 'all',
 		};
@@ -387,9 +377,6 @@
 		if (filters.employeeId) {
 			params.set('employeeId', filters.employeeId);
 		}
-		if (filters.search) {
-			params.set('search', filters.search.slice(0, 200));
-		}
 		return params.toString();
 	}
 
@@ -412,7 +399,7 @@
 			setEmpty(t('Check your filters', 'Check your filters'), validation.message || '');
 			state.total = 0;
 			updateCount();
-			updatePagination();
+			syncPager();
 			return;
 		}
 		setFilterError('');
@@ -430,11 +417,16 @@
 						setEmpty(t('Could not load the people overview.', 'Could not load the people overview.'), message);
 						state.total = 0;
 						updateCount();
-						updatePagination();
+						syncPager();
 						return;
 					}
 					state.total = Number(data.total || 0);
 					const employees = Array.isArray(data.employees) ? data.employees : [];
+					if (employees.length === 0 && state.total > 0 && state.offset >= state.total) {
+						state.offset = Math.max(0, (Math.ceil(state.total / state.limit) - 1) * state.limit);
+						load();
+						return;
+					}
 					if (employees.length === 0) {
 						setEmpty(
 							t('No employees in your scope.', 'No employees in your scope.'),
@@ -448,7 +440,7 @@
 						Messaging?.showInfo?.(t('Some values could not be loaded. Try reloading the page.', 'Some values could not be loaded. Try reloading the page.'));
 					}
 					updateCount();
-					updatePagination();
+					syncPager();
 				} catch (err) {
 					state.total = 0;
 					const message = err?.message || t('Could not load the people overview.', 'Could not load the people overview.');
@@ -456,7 +448,7 @@
 					Messaging?.showError?.(message);
 					setEmpty(t('Could not load the people overview.', 'Could not load the people overview.'), message);
 					updateCount();
-					updatePagination();
+					syncPager();
 				}
 			},
 			onError: (error) => {
@@ -472,13 +464,13 @@
 				Messaging?.showError?.(message);
 				setEmpty(t('Could not load the people overview.', 'Could not load the people overview.'), message);
 				updateCount();
-				updatePagination();
+				syncPager();
 			},
 		});
 		if (ajaxPromise && typeof ajaxPromise.finally === 'function') {
 			ajaxPromise.finally(() => {
 				setLoading(false);
-				updatePagination();
+				syncPager();
 			});
 		} else {
 			setLoading(false);
@@ -536,10 +528,6 @@
 				if (search) {
 					search.value = '';
 				}
-				const nameSearch = el('manager-people-search');
-				if (nameSearch) {
-					nameSearch.value = '';
-				}
 				const sort = el('manager-people-sort');
 				if (sort) {
 					sort.value = 'violations';
@@ -558,23 +546,32 @@
 				}
 			});
 		}
-		const prev = el('manager-people-prev');
-		if (prev) {
-			prev.addEventListener('click', () => {
-				if (state.offset - state.limit >= 0) {
-					state.offset -= state.limit;
-					load();
-				}
-			});
+		// Design-system table pager (remote mode): the host owns the
+		// limit/offset fetch, the pack paints total, size select and pages.
+		const pagerSizes = (window.AzcTablePager && Array.isArray(window.AzcTablePager.SIZES))
+			? window.AzcTablePager.SIZES
+			: [10, 25, 50, 100];
+		const urlParams = new URLSearchParams(window.location.search);
+		const urlSize = Number(urlParams.get('pp_per_page'));
+		if (pagerSizes.includes(urlSize)) {
+			state.limit = urlSize;
 		}
-		const next = el('manager-people-next');
-		if (next) {
-			next.addEventListener('click', () => {
-				if (state.offset + state.limit < state.total) {
-					state.offset += state.limit;
-					load();
+		const urlPage = Number(urlParams.get('pp_page'));
+		if (Number.isInteger(urlPage) && urlPage > 1) {
+			state.offset = (urlPage - 1) * state.limit;
+		}
+		const pagerNav = el('manager-people-pager');
+		if (pagerNav) {
+			pagerNav.__goTo = (page, size) => {
+				if (state.loading) {
+					return;
 				}
-			});
+				if (pagerSizes.includes(Number(size))) {
+					state.limit = Number(size);
+				}
+				state.offset = Math.max(0, (Math.max(1, Number(page) || 1) - 1) * state.limit);
+				load();
+			};
 		}
 
 		load();

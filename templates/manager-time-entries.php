@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use OCA\ArbeitszeitCheck\Constants;
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
 
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
@@ -19,7 +20,12 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 			<header class="azc-card__header">
 				<div class="azc-card__header-text">
 					<h2 id="manager-create-time-entry-title" class="azc-card__title"><?php p($l->t('Record time for an employee')); ?></h2>
-					<p class="azc-card__lead"><?php p($l->t('Create a completed manual entry on behalf of someone you manage. The employee is notified and the change is logged for audit.')); ?></p>
+					<p class="azc-card__lead">
+						<?php p($l->t('Create a completed manual entry on behalf of someone you manage. The employee is notified and the change is logged for audit.')); ?>
+						<?php if (!empty($_['projectCheckEnabled'])): ?>
+							<?php p($l->t('When ProjectCheck is enabled, you can optionally link billing hours on a project the employee is allowed to use.')); ?>
+						<?php endif; ?>
+					</p>
 				</div>
 				<div class="azc-card__header-actions">
 					<button type="button" id="manager-open-create-time-entry" class="azc-btn azc-btn--primary">
@@ -27,11 +33,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 					</button>
 				</div>
 			</header>
-			<?php if (!empty($_['projectCheckEnabled'])): ?>
-				<p class="manager-scope-page__create-hint azc-callout azc-callout--neutral" role="note">
-					<?php p($l->t('When ProjectCheck is enabled, you can optionally link billing hours on a project the employee is allowed to use.')); ?>
-				</p>
-			<?php endif; ?>
 		</section>
 
 		<section class="azc-card manager-scope-page__results" aria-labelledby="employee-time-entries-results-title" aria-busy="false">
@@ -39,7 +40,7 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 				<div class="azc-card__header-text">
 					<h2 id="employee-time-entries-results-title" class="azc-card__title"><?php p($l->t('Time Entries')); ?></h2>
 					<p class="azc-card__lead">
-						<?php p($l->t('Choose who and which period to view, then click Show. The table below lists matching entries.')); ?>
+						<?php p($l->t('The table lists matching entries for the selected period. It loads the last month automatically; adjust the filters and click Show to change the view. Leave employee empty for your whole team, or search and select one person. Status is optional. Maximum range: %d days.', [$maxManagerListDateRangeDays])); ?>
 					</p>
 				</div>
 				<p id="employee-time-entries-count" class="azc-badge azc-badge--neutral" role="status" aria-live="polite"></p>
@@ -133,8 +134,10 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 									<button type="submit" class="azc-btn azc-btn--primary" id="employee-time-entries-submit">
 										<?php p($l->t('Show')); ?>
 									</button>
-									<button type="button" id="employee-time-entries-clear" class="azc-btn azc-btn--secondary">
-										<?php p($l->t('Reset')); ?>
+									<button type="button" id="employee-time-entries-clear" class="azc-btn azc-btn--secondary azc-icon-btn"
+										aria-label="<?php p($l->t('Reset')); ?>"
+										title="<?php p($l->t('Reset')); ?>">
+										<?php print_unescaped(IconCatalog::render('rotate')); ?>
 									</button>
 								</div>
 							</div>
@@ -144,9 +147,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 							<span class="azc-callout__text"></span>
 						</p>
 					</form>
-					<p id="employee-time-entries-filter-help" class="manager-scope-page__toolbar-footnote" role="note">
-						<?php p($l->t('Pick a date range, then Show. Leave employee empty for your whole team, or search and select one person. Maximum range: %d days.', [$maxManagerListDateRangeDays])); ?>
-					</p>
 				</div>
 
 				<div id="employee-time-entries-empty" class="azc-empty-state">
@@ -155,7 +155,7 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 				</div>
 
 				<div id="employee-time-entries-table-wrap" class="table-container visually-hidden" aria-live="polite">
-					<table class="table table--hover azc-table--responsive manager-scope-page__results-table" aria-label="<?php p($l->t('Employee time entries')); ?>">
+					<table id="employee-time-entries-table" class="table table--hover azc-table--responsive manager-scope-page__results-table" aria-label="<?php p($l->t('Employee time entries')); ?>">
 						<thead>
 							<tr>
 								<th scope="col"><?php p($l->t('Name')); ?></th>
@@ -174,11 +174,27 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 					</table>
 				</div>
 
-				<nav class="manager-scope-page__pagination" aria-label="<?php p($l->t('Results pagination')); ?>">
-					<button type="button" id="employee-time-entries-prev" class="azc-btn azc-btn--secondary" disabled><?php p($l->t('Previous')); ?></button>
-					<span id="employee-time-entries-page-indicator" class="manager-scope-page__pagination-info"></span>
-					<button type="button" id="employee-time-entries-next" class="azc-btn azc-btn--secondary" disabled><?php p($l->t('Next')); ?></button>
-				</nav>
+				<?php
+				$azcTablePager = [
+					'id' => 'employee-time-entries-pager',
+					'tableId' => 'employee-time-entries-table',
+					'label' => $l->t('Results pagination'),
+					'base' => '',
+					'filters' => [],
+					'allow' => [],
+					'state' => [
+						'total' => 0,
+						'page' => 1,
+						'pages' => 1,
+						'perPage' => \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE,
+						'items' => [1],
+					],
+					'pageParam' => 'te_page',
+					'sizeParam' => 'te_per_page',
+					'mode' => 'remote',
+				];
+				include __DIR__ . '/partials/table-pager.php';
+				?>
 			</div>
 		</section>
 

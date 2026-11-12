@@ -171,7 +171,7 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		expect(attention.success).toBe(true)
 	})
 
-	test('people page wires quick-filter pills, search and sort controls', async ({ page }) => {
+	test('people page wires quick-filter pills, employee picker and sort controls', async ({ page }) => {
 		await login(page, credsFromEnv('MANAGER'))
 		await page.goto('/apps/arbeitszeitcheck/manager/people')
 		await assertArbeitszeitcheckLoaded(page)
@@ -190,20 +190,21 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		await expect(pills.nth(2)).toHaveAttribute('tabindex', '0')
 		await expect(pills.nth(0)).toHaveAttribute('tabindex', '-1')
 
-		// Search + sort controls exist and are labeled.
-		await expect(page.locator('#manager-people-search')).toBeVisible()
+		// Employee picker + sort controls exist and are labeled.
+		await expect(page.locator('#manager-people-employee-filter-search')).toBeVisible()
 		await expect(page.locator('#manager-people-sort')).toBeVisible()
 
-		// Search applies on submit.
-		await page.locator('#manager-people-search').fill('e2e_employee')
+		// Picking one employee narrows the table to that person.
+		await page.locator('#manager-people-employee-filter-search').fill('e2e_employee')
+		const options = page.locator('#manager-people-employee-filter-listbox .user-picker__item[data-user-id]')
+		await expect(options.first()).toBeVisible({ timeout: 15000 })
+		const pickedUid = await options.first().getAttribute('data-user-id')
+		await options.first().click()
 		await page.locator('#manager-people-submit').click()
 		await page.waitForLoadState('networkidle')
 		const rows = page.locator('#manager-people-body tr')
-		const count = await rows.count()
-		expect(count).toBeGreaterThanOrEqual(1)
-		for (let i = 0; i < count; i++) {
-			await expect(rows.nth(i)).toContainText('e2e_employee')
-		}
+		await expect(rows).toHaveCount(1)
+		await expect(rows.first()).toContainText(pickedUid)
 	})
 
 	test('people page is axe-clean (WCAG 2.1 A/AA)', async ({ page }) => {

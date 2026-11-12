@@ -82,7 +82,10 @@
 	grid-area: dates;
 }
 
-/* Override global subgrid on .azc-filter-field (page-patterns.css) */
+/* Override global subgrid on .azc-filter-field (page-patterns.css).
+ * align-content: start keeps the label glued to its control — with the
+ * default stretch, any field taller than its siblings would distribute the
+ * surplus into the auto tracks and tear a gap between label and input. */
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field,
 #app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field,
 #app-content.azc-app--manager-absences .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field {
@@ -91,7 +94,17 @@
 	grid-row: auto;
 	grid-column: auto;
 	gap: var(--azc-manager-filter-label-gap);
+	align-content: start;
 	min-width: 0;
+}
+
+/* The actions field has only one in-flow child (the control, pushed down by
+ * margin-top). A second row would stay empty yet still occupy its 44px
+ * minimum, stretching the whole filter row for nothing. */
+#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field--actions,
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field--actions,
+#app-content.azc-app--manager-absences .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field--actions {
+	grid-template-rows: auto;
 }
 
 #app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .manager-scope-filter > .azc-filter-field--dates,
@@ -314,9 +327,9 @@
 	align-self: auto;
 }
 
-#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
-#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
-#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn {
+#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn),
+#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn),
+#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn) {
 	flex: 0 1 auto;
 	min-width: 6.75rem;
 	min-height: 44px;
@@ -338,19 +351,14 @@
 	color: var(--azc-muted, var(--color-text-maxcontrast));
 }
 
-/* ── People overview filter: search / employee / year / sort / actions ── */
+/* ── People overview filter: employee / year / sort / actions ── */
 #app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
 	grid-template-columns:
-		minmax(0, 1.1fr)
-		minmax(0, 1.4fr)
+		minmax(0, 1.6fr)
 		minmax(0, 0.6fr)
 		minmax(0, 0.9fr)
 		minmax(0, auto);
-	grid-template-areas: 'search employee year sort actions';
-}
-
-#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--search {
-	grid-area: search;
+	grid-template-areas: 'employee year sort actions';
 }
 
 #app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-field--employee {
@@ -373,7 +381,7 @@
 	#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		grid-template-areas:
-			'search employee'
+			'employee employee'
 			'year sort'
 			'actions actions';
 	}
@@ -383,7 +391,6 @@
 	#app-content.azc-app--manager-people .manager-scope-page__toolbar .manager-scope-filter {
 		grid-template-columns: 1fr;
 		grid-template-areas:
-			'search'
 			'employee'
 			'year'
 			'sort'
@@ -457,9 +464,9 @@
 		width: 100%;
 	}
 
-	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
-	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn,
-	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn {
+	#app-content.azc-app--manager-time-entries .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn),
+	#app-content.azc-app--manager-people .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn),
+	#app-content.azc-app--manager-absences .manager-scope-page__toolbar .azc-filter-actions .azc-btn:not(.azc-icon-btn) {
 		flex: 1 1 calc(50% - 0.5rem);
 		justify-content: center;
 		min-width: 0;

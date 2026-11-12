@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use OCA\ArbeitszeitCheck\Service\IconCatalog;
+
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
 $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
@@ -57,22 +59,6 @@ $currentYear = (int)(new \DateTime())->format('Y');
 						aria-describedby="manager-people-filter-error"
 					>
 						<div class="manager-scope-filter" role="group" aria-label="<?php p($l->t('Filter options')); ?>">
-							<div class="azc-filter-field azc-filter-field--search">
-								<label for="manager-people-search" class="azc-filter-field__label"><?php p($l->t('Search')); ?></label>
-								<div class="azc-filter-field__control">
-									<input
-										id="manager-people-search"
-										name="search"
-										type="search"
-										class="form-input"
-										maxlength="200"
-										autocomplete="off"
-										placeholder="<?php p($l->t('Name or user ID')); ?>"
-									/>
-								</div>
-								<p class="form-help"><?php p($l->t('Matches everyone whose name contains the text.')); ?></p>
-							</div>
-
 							<div class="azc-filter-field azc-filter-field--employee">
 								<label for="manager-people-employee-filter-search" class="azc-filter-field__label"><?php p($l->t('Employee')); ?></label>
 								<div class="azc-filter-field__control">
@@ -124,8 +110,10 @@ $currentYear = (int)(new \DateTime())->format('Y');
 									<button type="submit" class="azc-btn azc-btn--primary" id="manager-people-submit">
 										<?php p($l->t('Show')); ?>
 									</button>
-									<button type="button" id="manager-people-clear" class="azc-btn azc-btn--secondary">
-										<?php p($l->t('Reset')); ?>
+									<button type="button" id="manager-people-clear" class="azc-btn azc-btn--secondary azc-icon-btn"
+										aria-label="<?php p($l->t('Reset')); ?>"
+										title="<?php p($l->t('Reset')); ?>">
+										<?php print_unescaped(IconCatalog::render('rotate')); ?>
 									</button>
 								</div>
 							</div>
@@ -146,7 +134,7 @@ $currentYear = (int)(new \DateTime())->format('Y');
 				</div>
 
 				<div id="manager-people-table-wrap" class="table-container visually-hidden" aria-live="polite">
-					<table class="table table--hover azc-table--responsive manager-scope-page__results-table" aria-label="<?php p($l->t('People overview')); ?>">
+					<table id="manager-people-table" class="table table--hover azc-table--responsive manager-scope-page__results-table" aria-label="<?php p($l->t('People overview')); ?>">
 						<thead>
 							<tr>
 								<th scope="col"><?php p($l->t('Employee')); ?></th>
@@ -162,11 +150,27 @@ $currentYear = (int)(new \DateTime())->format('Y');
 					</table>
 				</div>
 
-				<nav class="manager-scope-page__pagination" aria-label="<?php p($l->t('Results pagination')); ?>">
-					<button type="button" id="manager-people-prev" class="azc-btn azc-btn--secondary" disabled><?php p($l->t('Previous')); ?></button>
-					<span id="manager-people-page-indicator" class="manager-scope-page__pagination-info"></span>
-					<button type="button" id="manager-people-next" class="azc-btn azc-btn--secondary" disabled><?php p($l->t('Next')); ?></button>
-				</nav>
+				<?php
+				$azcTablePager = [
+					'id' => 'manager-people-pager',
+					'tableId' => 'manager-people-table',
+					'label' => $l->t('Results pagination'),
+					'base' => '',
+					'filters' => [],
+					'allow' => [],
+					'state' => [
+						'total' => 0,
+						'page' => 1,
+						'pages' => 1,
+						'perPage' => \OCA\ArbeitszeitCheck\Support\TablePager::DEFAULT_SIZE,
+						'items' => [1],
+					],
+					'pageParam' => 'pp_page',
+					'sizeParam' => 'pp_per_page',
+					'mode' => 'remote',
+				];
+				include __DIR__ . '/partials/table-pager.php';
+				?>
 			</div>
 		</section>
 

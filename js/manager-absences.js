@@ -9,6 +9,7 @@
 		total: 0,
 		lastFilters: null,
 		loading: false,
+		pendingReload: false,
 		countBeforeLoad: '',
 		dateLocale: window.ArbeitszeitCheck?.dateLocale || document.documentElement.lang || undefined,
 	};
@@ -145,6 +146,10 @@
 
 		emptyEl.classList.remove('visually-hidden');
 		tableWrap.classList.add('visually-hidden');
+		const pagerNav = document.getElementById('employee-absences-pager');
+		if (pagerNav) {
+			pagerNav.hidden = true;
+		}
 		if (body) {
 			body.innerHTML = '';
 		}
@@ -294,23 +299,19 @@
 	}
 
 	function updatePagination() {
-		const prevBtn = document.getElementById('employee-absences-prev');
-		const nextBtn = document.getElementById('employee-absences-next');
-		const indicator = document.getElementById('employee-absences-page-indicator');
-		const currentPage = Math.floor(state.offset / state.limit) + 1;
-		const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
-
-		if (indicator) {
-			indicator.textContent = t('Page {page} of {pages}', 'Page {page} of {pages}')
-				.replace('{page}', String(currentPage))
-				.replace('{pages}', String(totalPages));
+		// Design-system table pager (remote mode): the pack paints total,
+		// size select and the numbered page list from server truth.
+		const nav = document.getElementById('employee-absences-pager');
+		const pager = window.AzcTablePager;
+		if (!nav || !pager || typeof pager.update !== 'function') {
+			return;
 		}
-		if (prevBtn) {
-			prevBtn.disabled = state.offset <= 0;
-		}
-		if (nextBtn) {
-			nextBtn.disabled = state.offset + state.limit >= state.total;
-		}
+		pager.update(nav, {
+			page: Math.floor(state.offset / state.limit) + 1,
+			pages: Math.max(1, Math.ceil(state.total / state.limit)),
+			total: state.total,
+			perPage: state.limit,
+		});
 	}
 
 	function updateCount() {
@@ -336,20 +337,12 @@
 		}
 		const submitBtn = document.getElementById('employee-absences-submit');
 		const clearBtn = document.getElementById('employee-absences-clear');
-		const prevBtn = document.getElementById('employee-absences-prev');
-		const nextBtn = document.getElementById('employee-absences-next');
 		if (submitBtn) {
 			submitBtn.disabled = isLoading;
 			submitBtn.setAttribute('aria-disabled', isLoading ? 'true' : 'false');
 		}
 		if (clearBtn) {
 			clearBtn.disabled = isLoading;
-		}
-		if (prevBtn) {
-			prevBtn.disabled = isLoading || state.offset <= 0;
-		}
-		if (nextBtn) {
-			nextBtn.disabled = isLoading || state.offset + state.limit >= state.total;
 		}
 		const countEl = document.getElementById('employee-absences-count');
 		if (!countEl) {
@@ -527,6 +520,9 @@
 		}
 
 		if (state.loading) {
+			// Queue the newest intent instead of dropping it: an in-flight
+			// auto-load must not swallow a submitted filter change.
+			state.pendingReload = true;
 			return;
 		}
 
@@ -564,10 +560,19 @@
 
 					clearFilterFieldErrors();
 					state.total = Number(data.total || 0);
+					const entries = Array.isArray(data.entries) ? data.entries : [];
+					if (entries.length === 0 && state.total > 0 && state.offset >= state.total) {
+						// Deep-linked or shrunken result set: the requested page
+						// no longer exists — clamp to the last real page and
+						// refetch through the queue (state.loading is still set).
+						state.offset = Math.max(0, (Math.ceil(state.total / state.limit) - 1) * state.limit);
+						state.pendingReload = true;
+						return;
+					}
 					const list = Array.isArray(data.employees) ? data.employees : [];
 					syncEmployeeFilterPicker(list);
 					syncRecordEmployeePicker(list);
-					renderEntries(Array.isArray(data.entries) ? data.entries : []);
+					renderEntries(entries);
 					updateCount();
 					state.countBeforeLoad = document.getElementById('employee-absences-count')?.textContent || '';
 					updatePagination();
@@ -593,27 +598,17 @@
 				updatePagination();
 			},
 		});
-		if (ajaxPromise && typeof ajaxPromise.finally === 'function') {
-			ajaxPromise.finally(() => {
-				setLoading(false);
-			});
-		} else {
+		const finishLoad = () => {
 			setLoading(false);
-		}
-	}
-
-	// NH-01: explicit opt-in — copy the list filter range into the record
-	// dates on click (retro-recording workflow), never implicitly.
-	function copyFilterRangeToRecord() {
-		const fs = document.getElementById('employee-absences-start-date-filter');
-		const fe = document.getElementById('employee-absences-end-date-filter');
-		const rs = document.getElementById('manager-absence-record-start');
-		const re = document.getElementById('manager-absence-record-end');
-		if (fs && rs && fs.value) {
-			rs.value = fs.value;
-		}
-		if (fe && re && fe.value) {
-			re.value = fe.value;
+			if (state.pendingReload) {
+				state.pendingReload = false;
+				loadEntries();
+			}
+		};
+		if (ajaxPromise && typeof ajaxPromise.finally === 'function') {
+			ajaxPromise.finally(finishLoad);
+		} else {
+			finishLoad();
 		}
 	}
 
@@ -1304,20 +1299,34 @@
 	}
 
 	function bindPagination() {
-		const prevBtn = document.getElementById('employee-absences-prev');
-		const nextBtn = document.getElementById('employee-absences-next');
-		if (prevBtn) {
-			prevBtn.addEventListener('click', () => {
-				state.offset = Math.max(0, state.offset - state.limit);
-				loadEntries();
-			});
+		// Remote-mode table pager: the host owns the limit/offset fetch,
+		// the pack paints total, size select and pages via update().
+		const nav = document.getElementById('employee-absences-pager');
+		if (!nav) {
+			return;
 		}
-		if (nextBtn) {
-			nextBtn.addEventListener('click', () => {
-				state.offset += state.limit;
-				loadEntries();
-			});
+		const pagerSizes = (window.AzcTablePager && Array.isArray(window.AzcTablePager.SIZES))
+			? window.AzcTablePager.SIZES
+			: [10, 25, 50, 100];
+		const urlParams = new URLSearchParams(window.location.search);
+		const urlSize = Number(urlParams.get('ab_per_page'));
+		if (pagerSizes.includes(urlSize)) {
+			state.limit = urlSize;
 		}
+		const urlPage = Number(urlParams.get('ab_page'));
+		if (Number.isInteger(urlPage) && urlPage > 1) {
+			state.offset = (urlPage - 1) * state.limit;
+		}
+		nav.__goTo = (page, size) => {
+			if (state.loading) {
+				return;
+			}
+			if (pagerSizes.includes(Number(size))) {
+				state.limit = Number(size);
+			}
+			state.offset = Math.max(0, (Math.max(1, Number(page) || 1) - 1) * state.limit);
+			loadEntries();
+		};
 	}
 
 	function bindForm() {
@@ -1345,30 +1354,15 @@
 				searchEl.focus();
 			}
 			state.offset = 0;
-			state.total = 0;
 			state.lastFilters = null;
 			state.countBeforeLoad = '';
-			setEmpty(
-				t('Select filters first', 'Select filters first'),
-				t('Choose a date range to load absences.', 'Choose a date range to load absences.')
-			);
-			const countEl = document.getElementById('employee-absences-count');
-			if (countEl) {
-				countEl.textContent = '';
-			}
-			updatePagination();
 			setRecordDatesToToday();
 			if (employeeFilterPicker) {
 				employeeFilterPicker.clear();
 			}
-			const tbody = document.getElementById('employee-absences-body');
-			const tableWrap = document.getElementById('employee-absences-table-wrap');
-			if (tbody) {
-				tbody.innerHTML = '';
-			}
-			if (tableWrap) {
-				tableWrap.classList.add('visually-hidden');
-			}
+			// Reset returns to the auto-loaded default view — same content
+			// as the initial page state.
+			loadEntries();
 		});
 
 		['employee-absences-start-date-filter', 'employee-absences-end-date-filter'].forEach((id) => {
@@ -1578,14 +1572,16 @@
 		initEmployeePickers();
 		setDefaultDateRange(false);
 		setRecordDatesToToday();
-		document.getElementById('manager-absence-record-copy-filter')
-			?.addEventListener('click', copyFilterRangeToRecord);
+
 		bindForm();
 		bindRecordForm();
 		bindRecordHistoricalHint();
 		bindPagination();
 		updatePagination();
 		bindManagerAbsenceActions();
+		// Default range (last month) is prefilled — load it without
+		// requiring a first explicit Show click.
+		loadEntries();
 	}
 
 	if (document.readyState === 'loading') {

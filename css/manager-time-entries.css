@@ -16,10 +16,6 @@
 	gap: var(--azc-space-4, 1rem);
 }
 
-#app-content.azc-app--manager-time-entries .manager-scope-page__create-hint {
-	margin: 0 var(--azc-space-4, 1rem) var(--azc-space-4, 1rem);
-}
-
 .manager-create-dialog__meta {
 	display: grid;
 	gap: var(--azc-space-4, 1rem);
@@ -59,23 +55,6 @@
 	pointer-events: none;
 }
 
-#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
-#app-content.azc-app--manager-absences .manager-scope-page__pagination {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--azc-space-3, 0.75rem);
-	margin: 0;
-	padding: var(--azc-space-4, 1rem) 0 0;
-	border-top: 1px solid var(--azc-border, var(--color-border));
-}
-
-#app-content.azc-app--manager-time-entries .manager-scope-page__pagination-info,
-#app-content.azc-app--manager-absences .manager-scope-page__pagination-info {
-	font-size: var(--azc-fs-sm, 0.875rem);
-	color: var(--azc-muted, var(--color-text-maxcontrast));
-}
-
 #app-content.azc-app--manager-absences .manager-scope-page__historical-hint {
 	margin-bottom: var(--azc-space-4, 1rem);
 }
@@ -85,6 +64,25 @@
 	flex-direction: column;
 	gap: var(--azc-space-2, 0.5rem);
 	margin-top: var(--azc-space-4, 1rem);
+}
+
+/* Conditional detail fields (day length / hours) are multi-part blocks —
+   they span the full grid width so the segments and the estimate callout
+   each get their own row instead of wrapping inside a narrow cell. */
+#app-content.azc-app--manager-absences #manager-absence-record-day-fraction-field,
+#app-content.azc-app--manager-absences #manager-absence-record-hours-field {
+	grid-column: 1 / -1;
+	grid-row: auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-2, 0.5rem);
+}
+
+/* Save action sits below the reason textarea, right-aligned like
+   .form-actions (full-width button on mobile via the shared rule). */
+#app-content.azc-app--manager-absences .manager-scope-page__record-actions {
+	margin-top: var(--azc-space-4, 1rem);
+	justify-content: flex-end;
 }
 
 #app-content.azc-app--manager-absences .manager-scope-page__reason-field .form-textarea {
@@ -107,20 +105,6 @@
 #app-content.azc-app--manager-absences .manager-scope-page .badge--past-record {
 	margin-top: 0;
 	margin-inline-start: 0;
-}
-
-@media (max-width: 768.98px) {
-	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
-	#app-content.azc-app--manager-absences .manager-scope-page__pagination {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination .azc-btn,
-	#app-content.azc-app--manager-absences .manager-scope-page__pagination .azc-btn {
-		width: 100%;
-		min-height: 46px;
-	}
 }
 
 /* Responsive results tables: card layout with readable long text columns */

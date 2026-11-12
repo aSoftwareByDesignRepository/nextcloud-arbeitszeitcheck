@@ -1026,6 +1026,30 @@ dialog .button.ghost,
 	text-decoration: none !important;
 }
 
+/* Overlay close buttons (.modal-close on JS-built dialogs, .toast-close on
+ * body-mounted toasts): unscoped component rules lose to NC core's button
+ * repaint (width:130px / pale fill / border at 0-1-1, margin-inline-start:0
+ * at 0-2-1) and render a ~130px pale block. Pin the declared shape
+ * !important inside the overlay scopes — same class as the variant armor
+ * above (overlay_toast_button_armor_gap). */
+.modal-backdrop button.modal-close,
+.azc-modal-backdrop button.modal-close,
+dialog button.modal-close,
+[role="dialog"] button.modal-close,
+[role="alertdialog"] button.modal-close,
+.toast-container button.toast-close,
+.toast button.toast-close {
+	width: auto !important;
+	height: auto !important;
+	min-width: 44px;
+	min-height: 44px;
+	padding: var(--azc-space-1, 0.25rem) !important;
+	margin: 0 !important;
+	margin-inline-start: auto !important;
+	background: transparent !important;
+	border: 0 !important;
+}
+
 #app-content.azc-app .azc-btn--sm,
 #app-content-wrapper .azc-btn--sm,
 .azc-nc-admin-settings .azc-btn--sm,

@@ -270,3 +270,12 @@
 		min-width: 8rem;
 	}
 }
+
+/* NH-05: fractional-day cells in the manager list get a dotted underline —
+   the standard "more info on hover" affordance, no new color surface. */
+#app-content.azc-app--manager-absences .azc-half-day-hint {
+	text-decoration: underline dotted;
+	text-decoration-color: var(--color-text-maxcontrast);
+	text-underline-offset: 0.15em;
+	cursor: help;
+}

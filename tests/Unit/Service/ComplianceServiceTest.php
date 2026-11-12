@@ -467,6 +467,16 @@ class ComplianceServiceTest extends TestCase
 		$this->assertFalse($result['valid']);
 		$this->assertNotNull($result['message']);
 		$this->assertStringContainsString('rest period', strtolower($result['message']));
+		// The block is statutory — the message must say so, and clients get
+		// structured details to localise the manual-entry variant.
+		$this->assertStringContainsString('cannot be switched off', $result['message']);
+		$this->assertSame('manual_entry', $result['details']['context']);
+		$this->assertSame(11, $result['details']['min_rest_hours']);
+		$this->assertSame('ArbZG §5', $result['details']['law_label']);
+		$this->assertSame('15.03.2026', $result['details']['last_end_date']);
+		$this->assertSame('06:00', $result['details']['last_end_clock']);
+		$this->assertSame('15.03.2026 17:00', $result['details']['earliest_start']);
+		$this->assertSame(7.0, $result['details']['hours_required']);
 	}
 
 	/**
@@ -1487,6 +1497,9 @@ class ComplianceServiceTest extends TestCase
 
 		$this->assertNotEmpty($issues);
 		$this->assertStringContainsString('30-minute', $issues[0]);
+		// The statutory break gate always blocks — the message must explain it
+		// cannot be disabled in the settings.
+		$this->assertStringContainsString('cannot be switched off', $issues[0]);
 	}
 
 	public function testBlockingIssuesForCompletedEntryAllowsCompliantBreaks(): void

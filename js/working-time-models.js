@@ -227,6 +227,161 @@
     }
 
     /**
+     * Break-tier editor (model-level "Pausenregeln (Verschärfung)"):
+     * rows of afterHours → breakMinutes (≤8) plus an optional
+     * min_break_minutes floor. Mirrors the resolver's strict rules:
+     * threshold >0–24 h, break 1–480 min. Tighten-only — max(law, org,
+     * model) always wins.
+     */
+    function breakTiersSectionHtml(prefix, existing, droppedCount) {
+        const title = wtmMsg('breakTiers', 'Break rules (stricter)');
+        const lead = wtmMsg(
+            'breakTiersHelp',
+            'These rules can only tighten statutory and organisation break rules, never weaken them. A tier applies when a day\'s working time exceeds the threshold — shorter days keep the smaller break.'
+        );
+        const afterLabel = wtmMsg('breakTierAfterHours', 'After more than (hours)');
+        const minutesLabel = wtmMsg('breakTierMinutes', 'Break (minutes)');
+        const addLabel = wtmMsg('breakTierAdd', 'Add break tier');
+        const emptyLabel = wtmMsg('breakTiersEmpty', 'No break tiers set — statutory and organisation rules apply.');
+        const removeLabel = wtmMsg('presenceWindowRemove', 'Remove');
+        const floorLabel = wtmMsg('minBreakMinutes', 'Minimum break length (minutes)');
+        const floorHelp = wtmMsg(
+            'minBreakMinutesHelp',
+            'Breaks shorter than this do not count as break time for this model. Leave empty for no minimum.'
+        );
+        const dropped = droppedCount > 0
+            ? wtmMsg('breakTiersDropped', 'Some stored break rules were invalid and have been removed — saving cleans them up.')
+            : '';
+
+        const tiers = existing && Array.isArray(existing.tiers) ? existing.tiers : [];
+        const floor = existing && existing.minBreakMinutes !== null && existing.minBreakMinutes !== undefined
+            ? String(existing.minBreakMinutes)
+            : '';
+        let rows = '';
+        tiers.forEach(function(t, i) {
+            rows += breakTierRowHtml(prefix, i, t, afterLabel, minutesLabel, removeLabel);
+        });
+
+        return `
+            <fieldset class="wtm-break-tiers" data-tier-prefix="${prefix}" data-max-rows="8">
+                <legend class="form-label">${Utils.escapeHtml(title)}</legend>
+                <p class="form-help" id="${prefix}-tier-help">${Utils.escapeHtml(lead)}</p>
+                ${dropped ? `<p class="form-help wtm-tier-dropped">${Utils.escapeHtml(dropped)}</p>` : ''}
+                <p class="wtm-tier-empty" ${tiers.length ? 'hidden' : ''}>${Utils.escapeHtml(emptyLabel)}</p>
+                <div class="wtm-tier-rows" role="group" aria-label="${Utils.escapeHtml(title)}">${rows}</div>
+                <p>
+                    <button type="button" class="azc-btn azc-btn--secondary azc-btn--sm" data-action="add-break-tier" aria-describedby="${prefix}-tier-help">
+                        ${Utils.escapeHtml(addLabel)}
+                    </button>
+                </p>
+                <div class="form-group">
+                    <label for="wtm-model-min-break-minutes" class="form-label">${Utils.escapeHtml(floorLabel)}</label>
+                    <input type="text" id="wtm-model-min-break-minutes" name="minBreakMinutes" class="form-input wtm-min-break-minutes"
+                           inputmode="numeric" pattern="^[0-9]{1,3}$" value="${Utils.escapeHtml(floor)}"
+                           aria-describedby="wtm-model-min-break-minutes-help">
+                    <p id="wtm-model-min-break-minutes-help" class="form-help">${Utils.escapeHtml(floorHelp)}</p>
+                </div>
+                <p class="wtm-tier-error form-help" role="alert" hidden></p>
+            </fieldset>`;
+    }
+
+    function breakTierRowHtml(prefix, index, t, afterLabel, minutesLabel, removeLabel) {
+        const after = t && t.afterHours !== undefined && t.afterHours !== null ? String(t.afterHours) : '';
+        const minutes = t && t.breakMinutes !== undefined && t.breakMinutes !== null ? String(t.breakMinutes) : '';
+        const idp = prefix + '-tier-' + index;
+        return `
+            <div class="wtm-tier-row" data-break-tier-row>
+                <label class="visually-hidden" for="${idp}-after">${Utils.escapeHtml(afterLabel)}</label>
+                <input type="text" class="form-input wtm-tier-after" id="${idp}-after" value="${Utils.escapeHtml(after)}"
+                       inputmode="decimal" placeholder="9" aria-label="${Utils.escapeHtml(afterLabel)}">
+                <label class="visually-hidden" for="${idp}-minutes">${Utils.escapeHtml(minutesLabel)}</label>
+                <input type="text" class="form-input wtm-tier-minutes" id="${idp}-minutes" value="${Utils.escapeHtml(minutes)}"
+                       inputmode="numeric" placeholder="180" aria-label="${Utils.escapeHtml(minutesLabel)}">
+                <button type="button" class="azc-btn azc-btn--tertiary azc-btn--sm" data-action="remove-break-tier" aria-label="${Utils.escapeHtml(removeLabel)}">
+                    ${Utils.escapeHtml(removeLabel)}
+                </button>
+            </div>`;
+    }
+
+    /**
+     * Collect tier rows + the min_break_minutes floor.
+     * Returns { tiers, minBreakMinutes, error } — error is a message when a
+     * row is half-filled or out of range; empty editor → tiers: null.
+     */
+    function collectBreakTiers(fieldset) {
+        if (!fieldset) {
+            return { tiers: null, minBreakMinutes: null, error: null };
+        }
+        const rows = fieldset.querySelectorAll('[data-break-tier-row]');
+        const out = [];
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const afterRaw = String(row.querySelector('.wtm-tier-after')?.value || '').trim();
+            const minutesRaw = String(row.querySelector('.wtm-tier-minutes')?.value || '').trim();
+            if (!afterRaw && !minutesRaw) {
+                continue; // untouched row — ignore silently
+            }
+            const after = /^\d+(\.\d+)?$/.test(afterRaw) ? parseFloat(afterRaw) : NaN;
+            const minutes = /^\d+$/.test(minutesRaw) ? parseInt(minutesRaw, 10) : NaN;
+            if (!(after > 0 && after <= 24) || !(minutes >= 1 && minutes <= 480)) {
+                return {
+                    tiers: null,
+                    minBreakMinutes: null,
+                    error: wtmMsg('breakTierInvalid', 'Each break tier needs a threshold in hours (0–24) and a break length in minutes (1–480).')
+                };
+            }
+            out.push({ afterHours: after, breakMinutes: minutes });
+        }
+        if (out.length > 8) {
+            return {
+                tiers: null,
+                minBreakMinutes: null,
+                error: wtmMsg('breakTierMax', 'At most 8 break tiers per model.')
+            };
+        }
+        const floorRaw = String(fieldset.querySelector('.wtm-min-break-minutes')?.value || '').trim();
+        let floor = null;
+        if (floorRaw !== '') {
+            if (!/^\d+$/.test(floorRaw) || parseInt(floorRaw, 10) < 1 || parseInt(floorRaw, 10) > 480) {
+                return {
+                    tiers: null,
+                    minBreakMinutes: null,
+                    error: wtmMsg('minBreakMinutesInvalid', 'Minimum break length must be a whole number of minutes between 1 and 480.')
+                };
+            }
+            floor = parseInt(floorRaw, 10);
+        }
+        return { tiers: out.length ? out : null, minBreakMinutes: floor, error: null };
+    }
+
+    /**
+     * Tolerant prefill normaliser for stored tiers — drops malformed rows
+     * (so a strict-validated save self-heals instead of locking the admin
+     * out) and reports how many were dropped.
+     */
+    function normalizeBreakTiersForPrefill(raw) {
+        const tiers = [];
+        let dropped = 0;
+        if (Array.isArray(raw)) {
+            raw.slice(0, 8).forEach(function(t) {
+                const after = t && (typeof t.afterHours === 'number' || (typeof t.afterHours === 'string' && /^\d+(\.\d+)?$/.test(t.afterHours.trim())))
+                    ? parseFloat(t.afterHours) : NaN;
+                const minutes = t && (/^\d+$/.test(String(t.breakMinutes ?? '')))
+                    ? parseInt(t.breakMinutes, 10) : NaN;
+                if (after > 0 && after <= 24 && minutes >= 1 && minutes <= 480) {
+                    tiers.push({ afterHours: after, breakMinutes: minutes });
+                } else {
+                    dropped++;
+                }
+            });
+            if (raw.length > 8) {
+                dropped += raw.length - 8;
+            }
+        }
+        return { tiers: tiers, dropped: dropped };
+    }
+
+    /**
      * B-6 teaching-unit helper: "27 UE à 45 min" → weeklyHours 20.25.
      * Display-only `ue_label` lives in break_rules; all math stays real hours.
      */
@@ -373,6 +528,92 @@
             err.textContent = '';
             err.hidden = true;
         }
+    }
+
+    function showBreakTierError(host, message) {
+        const fieldset = host && (host.matches && host.matches('.wtm-break-tiers')
+            ? host
+            : host.querySelector('.wtm-break-tiers'));
+        const err = fieldset && fieldset.querySelector('.wtm-tier-error');
+        if (err) {
+            err.textContent = message;
+            err.hidden = false;
+            const firstInput = fieldset.querySelector('.wtm-tier-after, .wtm-min-break-minutes');
+            if (firstInput && typeof firstInput.focus === 'function') {
+                firstInput.focus();
+            }
+        } else {
+            Messaging.showError(message);
+        }
+    }
+
+    function clearBreakTierError(fieldset) {
+        const err = fieldset && fieldset.querySelector('.wtm-tier-error');
+        if (err) {
+            err.textContent = '';
+            err.hidden = true;
+        }
+    }
+
+    function bindBreakTiersFieldset(fieldset) {
+        if (!fieldset || fieldset.dataset.bound === '1') {
+            return;
+        }
+        fieldset.dataset.bound = '1';
+        const prefix = fieldset.getAttribute('data-tier-prefix') || 'wtm';
+        const maxRows = parseInt(fieldset.getAttribute('data-max-rows') || '8', 10);
+        const rowsHost = fieldset.querySelector('.wtm-tier-rows');
+        const emptyHint = fieldset.querySelector('.wtm-tier-empty');
+
+        const refreshEmpty = function() {
+            if (emptyHint) {
+                emptyHint.hidden = rowsHost && rowsHost.querySelector('[data-break-tier-row]') !== null;
+            }
+        };
+        const nextIndex = function() {
+            return rowsHost ? rowsHost.querySelectorAll('[data-break-tier-row]').length : 0;
+        };
+
+        fieldset.addEventListener('click', function(e) {
+            const btn = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+            if (!btn || !fieldset.contains(btn)) {
+                return;
+            }
+            const action = btn.getAttribute('data-action');
+            if (action === 'add-break-tier') {
+                clearBreakTierError(fieldset);
+                const count = nextIndex();
+                if (count >= maxRows) {
+                    showBreakTierError(fieldset, wtmMsg('breakTierMax', 'At most 8 break tiers per model.'));
+                    return;
+                }
+                if (rowsHost) {
+                    rowsHost.insertAdjacentHTML('beforeend', breakTierRowHtml(
+                        prefix,
+                        count,
+                        null,
+                        wtmMsg('breakTierAfterHours', 'After more than (hours)'),
+                        wtmMsg('breakTierMinutes', 'Break (minutes)'),
+                        wtmMsg('presenceWindowRemove', 'Remove')
+                    ));
+                    refreshEmpty();
+                    const firstInput = rowsHost.querySelectorAll('[data-break-tier-row]')[count]?.querySelector('input');
+                    if (firstInput && typeof firstInput.focus === 'function') {
+                        firstInput.focus();
+                    }
+                }
+            } else if (action === 'remove-break-tier') {
+                const row = btn.closest('[data-break-tier-row]');
+                if (row) {
+                    row.remove();
+                    refreshEmpty();
+                    clearBreakTierError(fieldset);
+                }
+            }
+        });
+        fieldset.addEventListener('input', function() {
+            clearBreakTierError(fieldset);
+        });
     }
 
     function bindPresenceWindowsFieldset(fieldset) {
@@ -532,6 +773,11 @@
         if (presence.error) {
             return { error: presence.error };
         }
+        const tiersFieldset = form.querySelector('.wtm-break-tiers');
+        const tiers = collectBreakTiers(tiersFieldset);
+        if (tiers.error) {
+            return { error: tiers.error, field: 'breakTiers' };
+        }
         const base = (existingBreakRules && typeof existingBreakRules === 'object' && !Array.isArray(existingBreakRules))
             ? { ...existingBreakRules }
             : {};
@@ -576,6 +822,19 @@
         } else {
             delete base.breaks_count_as_work;
             delete base.paid_break_cap_minutes;
+        }
+        // Model break tiers + countable floor (resolver merges max(law, org,
+        // model)). Empty editor rows clear the keys — never send the raw
+        // stored document back unedited.
+        if (tiers.tiers) {
+            base.tiers = tiers.tiers;
+        } else {
+            delete base.tiers;
+        }
+        if (tiers.minBreakMinutes !== null) {
+            base.min_break_minutes = tiers.minBreakMinutes;
+        } else {
+            delete base.min_break_minutes;
         }
         return Object.keys(base).length ? base : null;
     }
@@ -712,7 +971,9 @@
     }
 
     function routeBreakRulesError(form, breakRules) {
-        if (breakRules && breakRules.field === 'paidBreakCap') {
+        if (breakRules && breakRules.field === 'breakTiers') {
+            showBreakTierError(form, breakRules.error);
+        } else if (breakRules && breakRules.field === 'paidBreakCap') {
             showPaidBreakError(form, breakRules.error);
         } else {
             showPresenceError(form, breakRules.error);
@@ -814,6 +1075,19 @@
         const existingUeLabel = (isEdit && model.breakRules && typeof model.breakRules.ue_label === 'string')
             ? model.breakRules.ue_label
             : null;
+        // Tolerant prefill: drop malformed stored tiers so a strict-validated
+        // save self-heals instead of locking the admin out (EC-06).
+        const existingTierData = (isEdit && model.breakRules)
+            ? normalizeBreakTiersForPrefill(model.breakRules.tiers)
+            : { tiers: [], dropped: 0 };
+        const existingTierRules = {
+            tiers: existingTierData.tiers,
+            minBreakMinutes: (isEdit && model.breakRules
+                && model.breakRules.min_break_minutes !== undefined
+                && model.breakRules.min_break_minutes !== null)
+                ? model.breakRules.min_break_minutes
+                : null
+        };
         const existingBreakRules = isEdit ? (model.breakRules || null) : null;
         const modelId = isEdit ? String(model.id) : '';
         const breaksPaidChecked = (isEdit && model.breakRules && model.breakRules.breaks_count_as_work === true) ? ' checked' : '';
@@ -930,6 +1204,7 @@
                 <p class="form-help wtm-weekday-absence-hint">${Utils.escapeHtml(window.ArbeitszeitCheck?.l10n?.weekdayScheduleAbsenceHint || '')}</p>
                 ${ueHelperSectionHtml(schedulePrefix, existingUeLabel)}
                 ${presenceWindowsSectionHtml(schedulePrefix, existingPresence)}
+                ${breakTiersSectionHtml(schedulePrefix, existingTierRules, existingTierData.dropped)}
                 <div class="form-actions wtm-editor-actions" role="group" aria-label="${Utils.escapeHtml(submitLabel)}">
                     <button type="submit" class="azc-btn azc-btn--primary azc-btn--touch" id="wtm-model-submit">${Utils.escapeHtml(submitLabel)}</button>
                     <button type="button" class="azc-btn azc-btn--secondary azc-btn--touch" data-action="close-editor">${Utils.escapeHtml(cancelLabel)}</button>
@@ -946,6 +1221,7 @@
         if (form) {
             bindWeekdayScheduleFieldset(form.querySelector('.wtm-weekday-schedule'));
             bindPresenceWindowsFieldset(form.querySelector('.wtm-presence-windows'));
+            bindBreakTiersFieldset(form.querySelector('.wtm-break-tiers'));
             bindUeHelper(form.querySelector('.wtm-ue-helper'), form);
             bindPaidBreakControls(form);
             bindOnDemandTypeSync(form);
@@ -1290,9 +1566,16 @@
         if (breakRules) {
             data.breakRules = breakRules;
         } else if (existingBreakRules && typeof existingBreakRules === 'object') {
+            // All-empty editor → send the stored doc minus every key the
+            // editor owns, so unchecked boxes actually clear (previously
+            // only schedule/presence were stripped and e.g. a paid-break
+            // flag silently survived the save).
             const cleared = { ...existingBreakRules };
-            delete cleared.weekday_schedule;
-            delete cleared.presence_windows;
+            [
+                'weekday_schedule', 'presence_windows', 'allow_sunday_work',
+                'breaks_count_as_work', 'paid_break_cap_minutes',
+                'tiers', 'min_break_minutes'
+            ].forEach(function(k) { delete cleared[k]; });
             data.breakRules = cleared;
         }
 
@@ -1432,6 +1715,9 @@
             ueHelperSectionHtml: ueHelperSectionHtml,
             bindUeHelper: bindUeHelper,
             bindPaidBreakImpact: bindPaidBreakImpact,
+            buildBreakRulesPayload: buildBreakRulesPayload,
+            collectBreakTiers: collectBreakTiers,
+            normalizeBreakTiersForPrefill: normalizeBreakTiersForPrefill,
         };
     }
 

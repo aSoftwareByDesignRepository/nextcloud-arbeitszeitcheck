@@ -343,10 +343,15 @@ class PaidAbsencePlannedHoursCreditService
 			return $targets;
 		}
 
-		$fraction = $this->dayFraction($userId, $absence);
+		// Per-day fraction (AZC-HALF-DAY-SLOTS-BOUNDARIES): explicit stored
+		// boundary fractions are the truth; NULL-column legacy rows fall back
+		// to the single-day days/weight derivation.
+		$legacyFraction = $this->dayFraction($userId, $absence);
 		$targets = [];
 		foreach ($plannedByDay as $key => $planned) {
-			$targets[$key] = [$planned * $fraction, $planned];
+			$explicit = \OCA\ArbeitszeitCheck\Support\AbsenceDayShape::fractionForBoundary($absence, new \DateTime($key));
+			$fraction = $explicit !== null ? $explicit : $legacyFraction;
+			$targets[$key] = [$planned * max(0.0, min(1.0, $fraction)), $planned];
 		}
 		return $targets;
 	}

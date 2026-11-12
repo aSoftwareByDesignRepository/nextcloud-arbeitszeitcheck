@@ -1,17 +1,34 @@
 import { expect } from '@playwright/test'
 
 export async function getRequestToken(page) {
-  const token = await page.evaluate(() => {
-    return (
-      (typeof window !== 'undefined' && window.OC && window.OC.requestToken) ||
-      (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) ||
-      ''
-    )
-  })
-  if (!token) {
-    throw new Error('Could not determine request token')
+  // A just-triggered navigation can destroy the JS execution context between
+  // waitForLoadState and this evaluate (e.g. a dialog-accept that reloads the
+  // page). The token read is read-only, so retrying after the page settles is
+  // safe and removes the recurring "Execution context was destroyed" flake.
+  let lastErr
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const token = await page.evaluate(() => {
+        return (
+          (typeof window !== 'undefined' && window.OC && window.OC.requestToken) ||
+          (document.querySelector('head') && document.querySelector('head').getAttribute('data-requesttoken')) ||
+          ''
+        )
+      })
+      if (!token) {
+        throw new Error('Could not determine request token')
+      }
+      return token
+    } catch (e) {
+      lastErr = e
+      if (!/Execution context was destroyed|frame was detached|Target closed/i.test(String(e?.message ?? e))) {
+        throw e
+      }
+      await page.waitForLoadState('load').catch(() => {})
+      await page.waitForLoadState('domcontentloaded').catch(() => {})
+    }
   }
-  return token
+  throw lastErr
 }
 
 export async function api(page, method, url, { data } = {}) {

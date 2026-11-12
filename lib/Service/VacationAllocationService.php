@@ -684,6 +684,34 @@ class VacationAllocationService
 		$startKey = $start->format('Y-m-d');
 		$endKey = $end->format('Y-m-d');
 		if ($startKey !== $endKey) {
+			// Multi-day with explicit boundary fractions (slots-boundaries
+			// spec): expected debit = calendar weight minus the uncovered
+			// remainder of each halved boundary day. Only fraction values the
+			// write path can produce ({0.5}) are trusted — anything else is
+			// treated as forged/foreign and falls back to calendar weight.
+			$loss = 0.0;
+			$hasFractionCols = false;
+			$startF = $absence->getStartDayFraction();
+			if ($startF !== null && is_finite((float)$startF) && (float)$startF < 1.0 - $eps) {
+				$hasFractionCols = true;
+				if (abs((float)$startF - 0.5) > $eps) {
+					return false;
+				}
+				$loss += (1.0 - (float)$startF);
+			}
+			$endF = $absence->getEndDayFraction();
+			if ($endF !== null && is_finite((float)$endF) && (float)$endF < 1.0 - $eps) {
+				$hasFractionCols = true;
+				if (abs((float)$endF - 0.5) > $eps) {
+					return false;
+				}
+				$loss += (1.0 - (float)$endF);
+			}
+			if ($hasFractionCols) {
+				// Boundary halves are only bookable on full-working-day
+				// boundaries (w_b ≥ 0.999 → loss contribution = w_b×(1−f) = 0.5).
+				return abs($stored - ($calendarTotal - $loss)) <= $eps;
+			}
 			// Multi-day: stored must match calendar (segment or full) — never prefer a forged 0.5.
 			return abs($stored - $calendarTotal) <= $eps;
 		}
@@ -729,6 +757,45 @@ class VacationAllocationService
 				&& self::isTrustedStoredVacationDays($absence, (float)$rawStored, $calendarTotal)
 			) {
 				$stored = (float)$rawStored;
+				// Boundary-aware split (AZC-HALF-DAY-SLOTS-BOUNDARIES): for a
+				// multi-day row with explicit boundary fractions the missing
+				// remainder belongs to the sub-segment containing that
+				// boundary day — not proportionally to raw calendar weight.
+				// Vacation boundary halves are booked only on full-weight
+				// days, so the lost amount per halved boundary is (1 - f).
+				$aStart = $absence->getStartDate();
+				$aEnd = $absence->getEndDate();
+				$hasBoundaryCols = $aStart !== null && $aEnd !== null
+					&& $aStart->format('Y-m-d') !== $aEnd->format('Y-m-d')
+					&& ($absence->getStartDayFraction() !== null || $absence->getEndDayFraction() !== null);
+				if ($hasBoundaryCols) {
+					$segStartYmd = max($aStart->format('Y-m-d'), \DateTimeImmutable::createFromInterface($rangeStart)->format('Y-m-d'));
+					$segEndYmd = min($aEnd->format('Y-m-d'), \DateTimeImmutable::createFromInterface($rangeEndInclusive)->format('Y-m-d'));
+					$expiryYmd = $expiryDate->format('Y-m-d');
+					$lossBefore = 0.0;
+					$lossAfter = 0.0;
+					foreach ([
+						[$aStart->format('Y-m-d'), $absence->getStartDayFraction()],
+						[$aEnd->format('Y-m-d'), $absence->getEndDayFraction()],
+					] as [$bYmd, $bF]) {
+						if ($bF === null || (float)$bF >= 1.0 - 0.011) {
+							continue;
+						}
+						if ($bYmd < $segStartYmd || $bYmd > $segEndYmd) {
+							continue; // boundary clipped out of this segment
+						}
+						$loss = 1.0 - (float)$bF;
+						if ($bYmd <= $expiryYmd) {
+							$lossBefore += $loss;
+						} else {
+							$lossAfter += $loss;
+						}
+					}
+					return [
+						'before' => round($daySplit['before'] - $lossBefore, 2, PHP_ROUND_HALF_UP),
+						'after' => round($daySplit['after'] - $lossAfter, 2, PHP_ROUND_HALF_UP),
+					];
+				}
 				$ratioBefore = $daySplit['before'] / $calendarTotal;
 				return [
 					'before' => round($stored * $ratioBefore, 2, PHP_ROUND_HALF_UP),

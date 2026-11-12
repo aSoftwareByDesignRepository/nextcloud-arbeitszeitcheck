@@ -29,11 +29,14 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		await halfFace.click();
 		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
 		await expect(page.locator('#absence-day-fraction-preview')).toContainText(/0\.5|0,5/);
+		await expect(page.locator('#absence-day-slot-group')).toBeVisible();
 
 		await page.locator('#absence-end-date').fill('14.08.2026');
 		await page.locator('#absence-end-date').dispatchEvent('change');
 		await expect(group).toBeHidden();
-		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
+		// Boundary halves replace the old "submit separately" tip.
+		await expect(page.locator('#absence-boundary-half-group')).toBeVisible();
+		await expect(page.locator('#absence-multi-day-half-tip')).toBeHidden();
 		await expect(page.locator('#absence-day-fraction-live')).toContainText(/single day|einzelnen Tag/i);
 
 		await page.locator('#absence-end-date').fill('12.08.2026');
@@ -82,11 +85,11 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		await page.locator('#absence-day-fraction-half + .absence-day-fraction__face').click();
 		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
 
-		// Multi-day range still hides the control for non-vacation types.
+		// Multi-day range hides the single-day control but offers boundary halves.
 		await page.locator('#absence-end-date').fill('14.08.2026');
 		await page.locator('#absence-end-date').dispatchEvent('change');
 		await expect(group).toBeHidden();
-		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
+		await expect(page.locator('#absence-boundary-half-group')).toBeVisible();
 	});
 
 	test('AC-G11 hours-mode: vacation loses Length, enabled non-vacation type keeps it', async ({ page }) => {
@@ -112,12 +115,13 @@ test.describe('Bachus: half-day days-mode fixture', () => {
 		await page.locator('#absence-day-fraction-half + .absence-day-fraction__face').click();
 		await expect(page.locator('#absence-day-fraction-half')).toBeChecked();
 
-		// Multi-day still hides it; hidden state resets to full day.
+		// Multi-day still hides it; hidden state resets to full day. Boundary
+		// halves stay available for the enabled non-vacation type.
 		await page.locator('#absence-end-date').fill('14.08.2026');
 		await page.locator('#absence-end-date').dispatchEvent('change');
 		await expect(group).toBeHidden();
 		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
-		await expect(page.locator('#absence-multi-day-half-tip')).toBeVisible();
+		await expect(page.locator('#absence-boundary-half-group')).toBeVisible();
 	});
 
 	test('responsive stacking adapts without overflow', async ({ page }) => {

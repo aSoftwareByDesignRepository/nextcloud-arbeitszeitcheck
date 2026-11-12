@@ -77,8 +77,9 @@
 	}
 }
 
-/* presence_windows editor (Feature A-2) + B-6 UE helper */
+/* presence_windows editor (Feature A-2) + B-6 UE helper + break tiers */
 #app-content.azc-app--admin-working-time-models .wtm-presence-windows,
+#app-content.azc-app--admin-working-time-models .wtm-break-tiers,
 #app-content.azc-app--admin-working-time-models .wtm-ue-helper {
 	margin-top: var(--azc-space-4, 1rem);
 	padding: var(--azc-space-4, 1rem);
@@ -87,12 +88,14 @@
 }
 
 #app-content.azc-app--admin-working-time-models .wtm-presence-windows > legend,
+#app-content.azc-app--admin-working-time-models .wtm-break-tiers > legend,
 #app-content.azc-app--admin-working-time-models .wtm-ue-helper > legend {
 	padding: 0 0.25rem;
 	font-weight: 600;
 }
 
-#app-content.azc-app--admin-working-time-models .wtm-presence-row {
+#app-content.azc-app--admin-working-time-models .wtm-presence-row,
+#app-content.azc-app--admin-working-time-models .wtm-tier-row {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -106,7 +109,8 @@
 	min-height: 44px;
 }
 
-#app-content.azc-app--admin-working-time-models .wtm-presence-row .form-input {
+#app-content.azc-app--admin-working-time-models .wtm-presence-row .form-input,
+#app-content.azc-app--admin-working-time-models .wtm-tier-row .form-input {
 	flex: 0 1 8rem;
 	min-width: 7rem;
 	min-height: 44px;
@@ -130,14 +134,20 @@
 	font-weight: 600;
 }
 
-#app-content.azc-app--admin-working-time-models .wtm-presence-error {
+#app-content.azc-app--admin-working-time-models .wtm-presence-error,
+#app-content.azc-app--admin-working-time-models .wtm-tier-error {
 	color: var(--color-error-text, var(--color-error));
 	font-weight: 600;
 }
 
-#app-content.azc-app--admin-working-time-models .wtm-presence-empty {
+#app-content.azc-app--admin-working-time-models .wtm-presence-empty,
+#app-content.azc-app--admin-working-time-models .wtm-tier-empty {
 	color: var(--color-text-maxcontrast);
 	font-style: italic;
+}
+
+#app-content.azc-app--admin-working-time-models .wtm-tier-dropped {
+	color: var(--color-warning-text, var(--color-warning));
 }
 
 /* On-demand (Arbeit auf Abruf): the weekday matrix is disabled for this

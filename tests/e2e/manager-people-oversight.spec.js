@@ -194,10 +194,16 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		await expect(page.locator('#manager-people-search')).toBeVisible()
 		await expect(page.locator('#manager-people-sort')).toBeVisible()
 
-		// Search applies on submit.
+		// Search applies on submit. Wait for the actual list request that
+		// carries the search param — networkidle can resolve before the
+		// XHR is even issued, and a fixed row assertion then races the
+		// previous (pill-filter) load's render under host contention.
+		const searchResponse = page.waitForResponse(
+			(resp) => resp.url().includes('people-overview') && resp.url().includes('search=e2e_employee')
+		)
 		await page.locator('#manager-people-search').fill('e2e_employee')
 		await page.locator('#manager-people-submit').click()
-		await page.waitForLoadState('networkidle')
+		await searchResponse
 		const rows = page.locator('#manager-people-body tr')
 		const count = await rows.count()
 		expect(count).toBeGreaterThanOrEqual(1)

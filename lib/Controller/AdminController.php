@@ -396,7 +396,17 @@ class AdminController extends Controller
 		'paid_break_cap_minutes',
 		'ue_label',
 		'allow_sunday_work',
+		'tiers',
+		'min_break_minutes',
+		'break_policy',
+		'auto_fallback_minutes',
 	];
+
+	/** Serialized size ceiling for the whole break_rules document. */
+	private const BREAK_RULES_MAX_BYTES = 32768;
+
+	/** overtime_rules is an opaque (currently unread) JSON map — bounded. */
+	private const OVERTIME_RULES_MAX_BYTES = 8192;
 
 	private const TARIFF_RULE_SET_REFERENCE_TABLES = [
 		'org_vacation_defaults' => 'at_org_vacation_defaults',
@@ -537,7 +547,7 @@ class AdminController extends Controller
 			if (!is_string($key) || in_array($key, self::BREAK_RULE_KEYS, true)) {
 				continue;
 			}
-			$normalized = strtolower(str_replace(['-', '_'], '', $key));
+			$normalized = strtolower(str_replace(['-', '_'], '', trim($key)));
 			foreach (self::BREAK_RULE_KEYS as $known) {
 				if ($normalized === strtolower(str_replace('_', '', $known))) {
 					return new JSONResponse([
@@ -568,6 +578,31 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 			$breakRules['presence_windows'] = $checked['normalized'];
+		}
+
+		// Resolver-owned keys (tiers, min_break_minutes, break_policy,
+		// auto_fallback_minutes, allow_sunday_work): strict validation —
+		// previously passthrough-by-design, so malformed shapes silently
+		// persisted and never applied.
+		$resolverForRules = $this->breakPolicyResolver();
+		if ($resolverForRules !== null) {
+			$checkedRules = $resolverForRules->validateModelBreakRules($breakRules);
+			if ($checkedRules['errors'] !== []) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Validation failed'),
+					'errors' => ['breakRules' => reset($checkedRules['errors'])],
+					'fields' => $checkedRules['errors'],
+					'code' => 'VALIDATION',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			foreach ($checkedRules['normalized'] as $ruleKey => $ruleValue) {
+				if ($ruleValue === null) {
+					unset($breakRules[$ruleKey]);
+				} else {
+					$breakRules[$ruleKey] = $ruleValue;
+				}
+			}
 		}
 
 		// Paid-break flag (TVöD §6 Abs. 1 S. 2): explicit parse — a form-encoded
@@ -622,6 +657,17 @@ class AdminController extends Controller
 			}
 		}
 
+		// Whole-document ceiling — passthrough keys are allowed by design,
+		// but the stored JSON must stay bounded.
+		if (strlen((string)json_encode($breakRules)) > self::BREAK_RULES_MAX_BYTES) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'errors' => ['breakRules' => 'VALIDATION_SIZE'],
+				'code' => 'VALIDATION_SIZE',
+			], Http::STATUS_BAD_REQUEST);
+		}
+
 		$scheduleRaw = $breakRules[WeekdaySchedule::KEY] ?? null;
 		if ($scheduleRaw !== null) {
 			if (!is_array($scheduleRaw)) {
@@ -652,6 +698,37 @@ class AdminController extends Controller
 		}
 
 		$model->setBreakRulesArray($breakRules);
+		return null;
+	}
+
+	/**
+	 * Apply overtime_rules; the document is currently opaque (no reader
+	 * consumes typed keys), so validation is limited to map shape and a
+	 * serialized size ceiling — anything else would silently persist junk.
+	 *
+	 * @return JSONResponse|null error response
+	 */
+	private function applyOvertimeRulesToWorkingTimeModel(
+		\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model,
+		mixed $overtimeRules,
+	): ?JSONResponse {
+		if (!is_array($overtimeRules) || ($overtimeRules !== [] && array_is_list($overtimeRules))) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'errors' => ['overtimeRules' => 'VALIDATION_SHAPE'],
+				'code' => 'VALIDATION_SHAPE',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if (strlen((string)json_encode($overtimeRules)) > self::OVERTIME_RULES_MAX_BYTES) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'errors' => ['overtimeRules' => 'VALIDATION_SIZE'],
+				'code' => 'VALIDATION_SIZE',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$model->setOvertimeRulesArray($overtimeRules);
 		return null;
 	}
 
@@ -5507,8 +5584,11 @@ class AdminController extends Controller
 					return $scheduleError;
 				}
 			}
-			if (isset($params['overtimeRules']) && is_array($params['overtimeRules'])) {
-				$model->setOvertimeRulesArray($params['overtimeRules']);
+			if (isset($params['overtimeRules'])) {
+				$overtimeError = $this->applyOvertimeRulesToWorkingTimeModel($model, $params['overtimeRules']);
+				if ($overtimeError !== null) {
+					return $overtimeError;
+				}
 			}
 
 			// Validate
@@ -5556,7 +5636,9 @@ class AdminController extends Controller
 					'weeklyHours' => $savedModel->getWeeklyHours(),
 					'dailyHours' => $savedModel->getDailyHours(),
 					'workDaysPerWeek' => $savedModel->getWorkDaysPerWeek(),
-					'isDefault' => $savedModel->getIsDefault()
+					'isDefault' => $savedModel->getIsDefault(),
+					'breakRules' => $savedModel->getBreakRulesArray(),
+					'overtimeRules' => $savedModel->getOvertimeRulesArray()
 				]
 			], Http::STATUS_CREATED);
 		} catch (\Throwable $e) {
@@ -5626,8 +5708,11 @@ class AdminController extends Controller
 					return $scheduleError;
 				}
 			}
-			if (isset($params['overtimeRules']) && is_array($params['overtimeRules'])) {
-				$model->setOvertimeRulesArray($params['overtimeRules']);
+			if (isset($params['overtimeRules'])) {
+				$overtimeError = $this->applyOvertimeRulesToWorkingTimeModel($model, $params['overtimeRules']);
+				if ($overtimeError !== null) {
+					return $overtimeError;
+				}
 			}
 
 			$model->setUpdatedAt($this->timeZoneService()->nowInStorage());
@@ -5693,7 +5778,9 @@ class AdminController extends Controller
 					'weeklyHours' => $updatedModel->getWeeklyHours(),
 					'dailyHours' => $updatedModel->getDailyHours(),
 					'workDaysPerWeek' => $updatedModel->getWorkDaysPerWeek(),
-					'isDefault' => $updatedModel->getIsDefault()
+					'isDefault' => $updatedModel->getIsDefault(),
+					'breakRules' => $updatedModel->getBreakRulesArray(),
+					'overtimeRules' => $updatedModel->getOvertimeRulesArray()
 				]
 			]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {

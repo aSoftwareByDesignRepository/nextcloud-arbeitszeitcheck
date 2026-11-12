@@ -1395,7 +1395,9 @@ class TimeEntryController extends Controller
 						if (!$restPeriodCheck['valid']) {
 							return new JSONResponse([
 								'success' => false,
-								'error' => $restPeriodCheck['message']
+								'error' => $restPeriodCheck['message'],
+								'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::REST_PERIOD_REQUIRED,
+								'error_details' => is_array($restPeriodCheck['details'] ?? null) ? $restPeriodCheck['details'] : [],
 							], Http::STATUS_BAD_REQUEST);
 						}
 					}
@@ -1927,7 +1929,9 @@ class TimeEntryController extends Controller
 						if (!$restPeriodCheck['valid']) {
 							return new JSONResponse([
 								'success' => false,
-								'error' => $restPeriodCheck['message']
+								'error' => $restPeriodCheck['message'],
+								'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::REST_PERIOD_REQUIRED,
+								'error_details' => is_array($restPeriodCheck['details'] ?? null) ? $restPeriodCheck['details'] : [],
 							], Http::STATUS_BAD_REQUEST);
 						}
 					}
@@ -2556,6 +2560,13 @@ class TimeEntryController extends Controller
 			return new JSONResponse(['success' => true, 'entry' => $result->getSummary()]);
 		} catch (DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Time entry not found')], Http::STATUS_NOT_FOUND);
+		} catch (LockedException $e) {
+			$message = $this->l10n->t('Another change is in progress for this time entry. Please wait a moment and try again.');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $message,
+				'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::LOCKED,
+			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error cancelling correction: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -3300,7 +3311,9 @@ class TimeEntryController extends Controller
 					if (!$restPeriodCheck['valid']) {
 						return new JSONResponse([
 							'success' => false,
-							'error' => $restPeriodCheck['message']
+							'error' => $restPeriodCheck['message'],
+							'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::REST_PERIOD_REQUIRED,
+							'error_details' => is_array($restPeriodCheck['details'] ?? null) ? $restPeriodCheck['details'] : [],
 						], Http::STATUS_BAD_REQUEST);
 					}
 				}
@@ -3327,6 +3340,8 @@ class TimeEntryController extends Controller
 								'error' => $this->l10n->t(
 									'This time entry would exceed the maximum daily working hours of %1$d hours (%2$s) on %3$s (%4$s hours on that calendar day).',
 									[(int)$maxDailyHours, $lawProfile->lawLabel('daily'), $violation['date'], $violation['hours']]
+								) . ' ' . $this->l10n->t(
+									'This statutory minimum always applies — it cannot be switched off in the settings.'
 								),
 								'errors' => [
 									'endTime' => $this->l10n->t('Maximum daily working hours already reached'),

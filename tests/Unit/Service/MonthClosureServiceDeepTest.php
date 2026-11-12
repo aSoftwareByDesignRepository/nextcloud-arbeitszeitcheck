@@ -797,4 +797,24 @@ final class MonthClosureServiceDeepTest extends TestCase
 			$this->svc()->tryAutomaticFinalize('alice', self::PAST_Y, self::PAST_M, new \DateTime('2025-06-01'))
 		);
 	}
+
+	/**
+	 * The DB locking provider is not re-entrant: a nested writer taking the
+	 * same month key inside an already-held window (correction approve →
+	 * paid-break recompute) self-deadlocked before the request refcount.
+	 * Nested acquire must be a no-op at provider level; only the outermost
+	 * release frees it.
+	 */
+	public function testTierLocksAreReentrantWithinRequest(): void
+	{
+		$keys = ['azc/mc/a', 'azc/mc/b'];
+		$this->lockingProvider->expects($this->exactly(2))->method('acquireLock');
+		$this->lockingProvider->expects($this->exactly(2))->method('releaseLock');
+
+		$svc = $this->svc();
+		$svc->acquireMonthClosureTierLocks($keys);
+		$svc->acquireMonthClosureTierLocks($keys);
+		$svc->releaseMonthClosureTierLocks($keys);
+		$svc->releaseMonthClosureTierLocks($keys);
+	}
 }

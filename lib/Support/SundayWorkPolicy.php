@@ -26,7 +26,11 @@ final class SundayWorkPolicy
 		if ($breakRules === null || $breakRules === []) {
 			return false;
 		}
-		if (!empty($breakRules[self::KEY])) {
+		// Strict-bool parse: a stored "false"/"0" string must not keep the
+		// Freibrief truthy-active (previously !empty() made "false" = true).
+		$flag = $breakRules[self::KEY] ?? null;
+		if ($flag === true || $flag === 1 || $flag === '1'
+			|| (is_string($flag) && strtolower(trim($flag)) === 'true')) {
 			return true;
 		}
 		$schedule = WeekdaySchedule::tryFromBreakRules($breakRules);

@@ -294,4 +294,157 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 		// The stored fraction carries: 0.5 vacation must not become a full sick day.
 		$this->assertEqualsWithDelta(0.5, (float)$storedSick->getDays(), 0.011);
 	}
+
+	public function testComplementarySlotHalvesCoexistOnSameDay(): void
+	{
+		\OCP\Server::get(IConfig::class)->setAppValue(
+			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
+			'["sick_leave","personal_leave"]'
+		);
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
+		$ymd = $this->weekday(70);
+		$svc = \OCP\Server::get(AbsenceService::class);
+
+		$am = $svc->createAbsence([
+			'type' => Absence::TYPE_SICK_LEAVE,
+			'start_date' => $ymd, 'end_date' => $ymd,
+			'day_fraction' => '0.5', 'day_slot' => 'am',
+		], $this->uid);
+		$this->createdAbsenceIds[] = (int)$am->getId();
+		$pm = $svc->createAbsence([
+			'type' => Absence::TYPE_PERSONAL_LEAVE,
+			'start_date' => $ymd, 'end_date' => $ymd,
+			'day_fraction' => '0.5', 'day_slot' => 'pm',
+		], $this->uid);
+		$this->createdAbsenceIds[] = (int)$pm->getId();
+
+		// DB ground truth: both rows exist with explicit slot columns.
+		$mapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class);
+		$storedAm = $mapper->find((int)$am->getId());
+		$storedPm = $mapper->find((int)$pm->getId());
+		$this->assertSame('am', $storedAm->getStartDaySlot());
+		$this->assertSame('pm', $storedPm->getStartDaySlot());
+		$this->assertEqualsWithDelta(0.5, (float)$storedAm->getStartDayFraction(), 0.001);
+		$this->assertEqualsWithDelta(0.5, (float)$storedPm->getStartDayFraction(), 0.001);
+
+		// A third half on that day must still be rejected — coverage is full.
+		try {
+			$svc->createAbsence([
+				'type' => Absence::TYPE_SICK_LEAVE,
+				'start_date' => $ymd, 'end_date' => $ymd,
+				'day_fraction' => '0.5', 'day_slot' => 'am',
+			], $this->uid);
+			$this->fail('Third half-day on a fully covered day must be rejected');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('overlap', $e->getMessage());
+		}
+	}
+
+	public function testSameSlotHalvesStillRejected(): void
+	{
+		\OCP\Server::get(IConfig::class)->setAppValue(
+			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
+			'["sick_leave","personal_leave"]'
+		);
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
+		$ymd = $this->weekday(71);
+		$svc = \OCP\Server::get(AbsenceService::class);
+
+		$first = $svc->createAbsence([
+			'type' => Absence::TYPE_SICK_LEAVE,
+			'start_date' => $ymd, 'end_date' => $ymd,
+			'day_fraction' => '0.5', 'day_slot' => 'am',
+		], $this->uid);
+		$this->createdAbsenceIds[] = (int)$first->getId();
+
+		try {
+			$svc->createAbsence([
+				'type' => Absence::TYPE_PERSONAL_LEAVE,
+				'start_date' => $ymd, 'end_date' => $ymd,
+				'day_fraction' => '0.5', 'day_slot' => 'am',
+			], $this->uid);
+			$this->fail('Same-slot halves must be rejected');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('overlap', $e->getMessage());
+		}
+	}
+
+	public function testSlotlessHalfCannotPairComplementary(): void
+	{
+		// Fail-closed: a legacy/slotless half cannot prove complementary
+		// coverage, so a slotted second half may not share the day.
+		\OCP\Server::get(IConfig::class)->setAppValue(
+			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
+			'["sick_leave","personal_leave"]'
+		);
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
+		$ymd = $this->weekday(72);
+		$svc = \OCP\Server::get(AbsenceService::class);
+
+		$first = $svc->createAbsence([
+			'type' => Absence::TYPE_SICK_LEAVE,
+			'start_date' => $ymd, 'end_date' => $ymd,
+			'day_fraction' => '0.5',
+		], $this->uid);
+		$this->createdAbsenceIds[] = (int)$first->getId();
+
+		try {
+			$svc->createAbsence([
+				'type' => Absence::TYPE_PERSONAL_LEAVE,
+				'start_date' => $ymd, 'end_date' => $ymd,
+				'day_fraction' => '0.5', 'day_slot' => 'pm',
+			], $this->uid);
+			$this->fail('Slotless half must not pair with a slotted half');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('overlap', $e->getMessage());
+		}
+	}
+
+	public function testMultiDayBoundaryHalvesPersist(): void
+	{
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
+		$start = new \DateTimeImmutable($this->weekday(80));
+		$end = $start->modify('+2 days');
+		while ((int)$end->format('N') > 5) {
+			$end = $end->modify('+1 day');
+		}
+		$svc = \OCP\Server::get(AbsenceService::class);
+		$row = $svc->createAbsence([
+			'type' => Absence::TYPE_SICK_LEAVE,
+			'start_date' => $start->format('Y-m-d'),
+			'end_date' => $end->format('Y-m-d'),
+			'start_day_fraction' => '0.5', 'start_day_slot' => 'am',
+			'end_day_fraction' => '0.5', 'end_day_slot' => 'pm',
+		], $this->uid);
+		$this->createdAbsenceIds[] = (int)$row->getId();
+
+		$mapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class);
+		$stored = $mapper->find((int)$row->getId());
+		$this->assertSame('am', $stored->getStartDaySlot());
+		$this->assertSame('pm', $stored->getEndDaySlot());
+		$this->assertEqualsWithDelta(0.5, (float)$stored->getStartDayFraction(), 0.001);
+		$this->assertEqualsWithDelta(0.5, (float)$stored->getEndDayFraction(), 0.001);
+		// interior day (1.0) + two boundary halves (0.5 + 0.5) on a 3-day range.
+		$this->assertEqualsWithDelta(2.0, (float)$stored->getDays(), 0.011);
+
+		// A full-day absence overlapping the interior day is still rejected.
+		$interior = $start->modify('+1 day');
+		while ((int)$interior->format('N') > 5) {
+			$interior = $interior->modify('+1 day');
+		}
+		try {
+			$svc->createAbsence([
+				'type' => Absence::TYPE_PERSONAL_LEAVE,
+				'start_date' => $interior->format('Y-m-d'),
+				'end_date' => $interior->format('Y-m-d'),
+			], $this->uid);
+			$this->fail('Full-day overlap on the interior day must be rejected');
+		} catch (\Throwable $e) {
+			$this->assertStringContainsString('overlap', $e->getMessage());
+		}
+	}
 }

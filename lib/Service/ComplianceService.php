@@ -259,6 +259,19 @@ class ComplianceService
     }
 
     /**
+     * Shared tail for messages of the always-on statutory gates (rest period,
+     * mandatory breaks, daily limit). Admins can disable the automatic check
+     * jobs, but these legal minimums reject saving/clock-in regardless — the
+     * suffix makes that explicit at the point of failure.
+     */
+    private function statutoryMinimumSuffix(): string
+    {
+        return $this->l10n->t(
+            'This statutory minimum always applies — it cannot be switched off in the settings.'
+        );
+    }
+
+    /**
      * Check compliance before clocking in
      *
      * @param string $userId
@@ -466,7 +479,8 @@ class ComplianceService
         $issues = [];
         $tier = $this->findViolatedBreakTier($timeEntry);
         if ($tier !== null) {
-            $issues[] = $this->missingBreakMessage($tier, $timeEntry->getUserId());
+            $issues[] = $this->missingBreakMessage($tier, $timeEntry->getUserId())
+                . ' ' . $this->statutoryMinimumSuffix();
         }
 
         return $issues;
@@ -1295,7 +1309,7 @@ class ComplianceService
                     $earliestDisplay,
                     $hoursRemainingSafe,
                 ]
-            ),
+            ) . ' ' . $this->statutoryMinimumSuffix(),
             'lastEndTime' => $lastEndTime,
             'earliestClockIn' => $earliestClockIn,
             'details' => [
@@ -1455,8 +1469,20 @@ class ComplianceService
                     $earliestStartDateFormatted,
                     abs($hoursStillNeeded),
                 ]
-            ),
+            ) . ' ' . $this->statutoryMinimumSuffix(),
             'earliestStartTime' => $earliestStartTime,
+            // Structured payload so API clients (companion app) can localise the
+            // manual-entry variant — same fields as the clock-in rest gate, but
+            // "hours_required"/"earliest_start" semantics and a manual context flag.
+            'details' => [
+                'min_rest_hours' => (int)$minRest,
+                'law_label' => $this->profile($userId)->lawLabel('rest'),
+                'last_end_date' => $lastEndDateFormatted,
+                'last_end_clock' => $this->displayClock($lastEndTime, $userId),
+                'earliest_start' => $earliestStartDateFormatted,
+                'hours_required' => round(abs($hoursStillNeeded), 1),
+                'context' => 'manual_entry',
+            ],
         ];
     }
 
@@ -1877,7 +1903,16 @@ class ComplianceService
                 return false;
             }
             $model = $this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
-            return SundayWorkPolicy::isAllowed($model->getBreakRulesArray());
+            $rules = $model->getBreakRulesArray();
+            if (is_array($rules)
+                && array_key_exists(SundayWorkPolicy::KEY, $rules)
+                && !is_bool($rules[SundayWorkPolicy::KEY]) && $rules[SundayWorkPolicy::KEY] !== null) {
+                \OCP\Log\logger('arbeitszeitcheck')->warning(
+                    'allow_sunday_work stored as non-bool — treated as not allowed',
+                    ['model_id' => $model->getId(), 'stored_type' => get_debug_type($rules[SundayWorkPolicy::KEY])]
+                );
+            }
+            return SundayWorkPolicy::isAllowed($rules);
         } catch (\Throwable) {
             return false;
         }

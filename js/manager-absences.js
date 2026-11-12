@@ -81,6 +81,26 @@
 		return num.toFixed(1);
 	}
 
+	// NH-05: fractional-day rows carry a tooltip so a bare "0.5" is never
+	// unexplained — same type-aware copy as the request-form previews.
+	function durationCellHtml(entry) {
+		const text = formatDuration(entry);
+		const daysNum = Number(entry && entry.days);
+		if (!Number.isFinite(daysNum) || daysNum <= 0 || Math.abs(daysNum % 1) < 1e-6) {
+			return escapeHtml(text);
+		}
+		const type = (entry && entry.type) || '';
+		const creditTypes = Array.isArray(window.ArbeitszeitCheck && window.ArbeitszeitCheck.halfDayCreditTypes)
+			? window.ArbeitszeitCheck.halfDayCreditTypes
+			: [];
+		const tip = type === 'vacation'
+			? t('This request uses 0.5 vacation day.', 'This request uses 0.5 vacation day.')
+			: (creditTypes.indexOf(type) !== -1
+				? t('This request uses 0.5 day and credits half of the planned working time for that day.', 'This request uses 0.5 day and credits half of the planned working time for that day.')
+				: t('This request uses 0.5 day.', 'This request uses 0.5 day.'));
+		return `<span class="azc-half-day-hint" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
+	}
+
 	function formatDuration(entry) {
 		const hoursRaw = entry && (entry.durationHours != null ? entry.durationHours : entry.duration_hours);
 		const hours = hoursRaw === null || hoursRaw === undefined || hoursRaw === '' ? null : Number(hoursRaw);
@@ -282,7 +302,7 @@
 			td(t('Type', 'Type'), escapeHtml(entry.typeLabel || entry.type || '-')),
 			td(t('Start date', 'Start date'), escapeHtml(formatDate(entry.startDate))),
 			td(t('End date', 'End date'), escapeHtml(formatDate(entry.endDate))),
-			td(t('Duration', 'Duration'), escapeHtml(formatDuration(entry))),
+			td(t('Duration', 'Duration'), durationCellHtml(entry)),
 			td(t('Status', 'Status'), statusCell),
 			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')) + (cancelRequested ? ` <span class="azc-status-chip" data-status="cancel_requested">${escapeHtml(t('Cancellation requested', 'Cancellation requested'))}</span>` : ''), 'reason-cell'),
 			td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${actionCell}</div>`, 'actions-cell'),
@@ -779,6 +799,8 @@
 		const hoursInput = document.getElementById('manager-absence-record-hours');
 		const hoursPreview = document.getElementById('manager-absence-record-hours-preview');
 		const dayFractionField = document.getElementById('manager-absence-record-day-fraction-field');
+		const daySlotGroup = document.getElementById('manager-absence-day-slot-group');
+		const boundaryGroup = document.getElementById('manager-absence-boundary-half-group');
 		const dayFractionFull = document.getElementById('manager-absence-day-fraction-full');
 		const dayFractionHalf = document.getElementById('manager-absence-day-fraction-half');
 		const dayFractionPreview = document.getElementById('manager-absence-day-fraction-preview');
@@ -995,18 +1017,31 @@
 			const start = parseDDMMYYYY(startEl && startEl.value);
 			const end = parseDDMMYYYY(endEl && endEl.value);
 			const singleDay = !!(start && end && toYmd(start) === toYmd(end));
+			const multiDay = !!(start && end && toYmd(start) !== toYmd(end));
 			// AC-G11: in a hours-unit org only vacation loses the control —
 			// enabled non-vacation types keep it.
 			const typeFractionCapable = daysMode || typeSel.value !== 'vacation';
-			const show = typeFractionCapable && halfDayEnabledTypes.indexOf(typeSel.value) !== -1 && singleDay;
+			const eligible = typeFractionCapable && halfDayEnabledTypes.indexOf(typeSel.value) !== -1;
+			const show = eligible && singleDay;
+			const showBoundary = eligible && multiDay;
 			const wasVisible = !dayFractionField.hidden;
 			dayFractionField.hidden = !show;
+			if (boundaryGroup) {
+				const resetBoundary = boundaryGroup.hidden && !showBoundary;
+				boundaryGroup.hidden = !showBoundary;
+				if (resetBoundary) {
+					boundaryGroup.querySelectorAll('input[value="1"]').forEach((r) => { r.checked = true; });
+				}
+			}
 			if (!show) {
 				if (dayFractionFull) {
 					dayFractionFull.checked = true;
 				}
 				if (dayFractionHalf) {
 					dayFractionHalf.checked = false;
+				}
+				if (daySlotGroup) {
+					daySlotGroup.hidden = true;
 				}
 				if (wasVisible && dayFractionLive && lastDayFractionAnnounce !== rangeAnnounceMsg) {
 					dayFractionLive.textContent = rangeAnnounceMsg;
@@ -1059,6 +1094,9 @@
 				return;
 			}
 			el.addEventListener('change', () => {
+				if (daySlotGroup) {
+					daySlotGroup.hidden = !(dayFractionHalf && dayFractionHalf.checked);
+				}
 				if (dayFractionPreview) {
 					dayFractionPreview.textContent = halfDayPreviewMsg(
 						!!(dayFractionHalf && dayFractionHalf.checked),
@@ -1173,6 +1211,24 @@
 			// vacation exclusion (AC-G11) — hidden controls never submit.
 			if (halfDayEnabledTypes.indexOf(type) !== -1 && dayFractionField && !dayFractionField.hidden) {
 				payload.dayFraction = (dayFractionHalf && dayFractionHalf.checked) ? '0.5' : '1';
+				if (dayFractionHalf && dayFractionHalf.checked) {
+					const slotEl = document.querySelector('input[name="record_day_slot"]:checked');
+					if (slotEl && (slotEl.value === 'am' || slotEl.value === 'pm')) {
+						payload.daySlot = slotEl.value;
+					}
+				}
+			}
+			if (boundaryGroup && !boundaryGroup.hidden) {
+				['start', 'end'].forEach(function (b) {
+					const sel = document.querySelector('input[name="record_' + b + '_day_fraction"]:checked');
+					if (sel && sel.value === '0.5') {
+						const slot = sel.getAttribute('data-slot');
+						payload[b + 'DayFraction'] = '0.5';
+						if (slot === 'am' || slot === 'pm') {
+							payload[b + 'DaySlot'] = slot;
+						}
+					}
+				});
 			}
 			form.querySelector('.azc-self-target-notice')?.remove();
 			Utils.ajax('/apps/arbeitszeitcheck/api/manager/employee-absences', {
@@ -1586,6 +1642,14 @@
 		bindPagination();
 		updatePagination();
 		bindManagerAbsenceActions();
+	}
+
+	if (typeof window !== 'undefined') {
+		window.__ArbeitszeitCheckManagerAbsencesTestables = {
+			durationCellHtml: durationCellHtml,
+			formatDuration: formatDuration,
+			formatDays: formatDays,
+		};
 	}
 
 	if (document.readyState === 'loading') {

@@ -2107,7 +2107,22 @@ class TimeTrackingService
 				$model = $this->workingTimeModelMapper->find($assignment->getWorkingTimeModelId());
 				$mode = $model->getType() === \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK ? 'strict_shift' : 'flex';
 				$rules = $model->getBreakRulesArray() ?? [];
-				$threshold = isset($rules['auto_fallback_minutes']) ? (int)$rules['auto_fallback_minutes'] : null;
+				$threshold = null;
+				if (isset($rules['auto_fallback_minutes'])) {
+					$fallbackRaw = $rules['auto_fallback_minutes'];
+					if (is_int($fallbackRaw)
+						|| (is_string($fallbackRaw) && preg_match('/^\d+$/', trim($fallbackRaw)))
+						|| (is_float($fallbackRaw) && floor($fallbackRaw) === $fallbackRaw)) {
+						$threshold = (int)$fallbackRaw;
+					} else {
+						// Stored garbage used to (int)-cast to 0 and clamp to
+						// 15 min — fall back to the configured default instead.
+						\OCP\Log\logger('arbeitszeitcheck')->warning(
+							'auto_fallback_minutes stored as invalid value — using default',
+							['model_id' => $model->getId(), 'stored_type' => get_debug_type($fallbackRaw)]
+						);
+					}
+				}
 				if (isset($rules['break_policy']) && in_array((string)$rules['break_policy'], ['flex', 'strict_shift'], true)) {
 					$mode = (string)$rules['break_policy'];
 				}

@@ -70,6 +70,44 @@ test.describe('Admin global settings multipage', () => {
 		await expect(page.locator('.azc-admin-settings-form__footer a').filter({ hasText: /Cancel|Abbrechen/i })).toHaveCount(0)
 	})
 
+	test('compliance page explains the always-on legal minimums honestly', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+		await page.goto('/apps/arbeitszeitcheck/admin/settings/compliance')
+		await assertArbeitszeitcheckLoaded(page)
+
+		// The callout must tell admins that statutory gates cannot be disabled —
+		// regression cover for the "I unchecked everything but saving still
+		// blocked" support report.
+		const callout = page.locator('.azc-callout--info').first()
+		await expect(callout).toBeVisible()
+		await expect(callout).toContainText(/Legal minimums always apply|Gesetzliche Mindestanforderungen/i)
+
+		// Strict-mode help must not claim violations are "shown but savable" —
+		// legal minimums block regardless.
+		await expect(page.locator('#complianceStrictMode-help')).toContainText(
+			/always block saving|blockieren das Speichern immer/i,
+		)
+		await expect(page.locator('#realtimeComplianceCheck-help')).toContainText(
+			/still rejected|auch dann abgelehnt/i,
+		)
+		await expect(page.locator('#autoComplianceCheck-help')).toContainText(
+			/Every night|Jede Nacht/i,
+		)
+		await expect(page.locator('#enableViolationNotifications-help')).toContainText(
+			/notification|Benachrichtigung/i,
+		)
+
+		// Every toggle must reference its own help text for screen readers.
+		for (const id of [
+			'autoComplianceCheck',
+			'realtimeComplianceCheck',
+			'complianceStrictMode',
+			'enableViolationNotifications',
+		]) {
+			await expect(page.locator(`#${id}`)).toHaveAttribute('aria-describedby', `${id}-help`)
+		}
+	})
+
 	test('legacy hash on index path forwards to owning section', async ({ page }) => {
 		await login(page, credsFromEnv('ADMIN'))
 		await page.goto('/apps/arbeitszeitcheck/admin/settings/access#section-hours-heading')

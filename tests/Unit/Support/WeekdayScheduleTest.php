@@ -118,6 +118,49 @@ class WeekdayScheduleTest extends TestCase
 		$this->assertSame(8.0, $schedule->netHoursForWeekday('mon'));
 	}
 
+	public function testStoredStringFalseWorkIsNotAWorkday(): void
+	{
+		// "work":"false" (form-encoded string) must never become a workday.
+		$raw = WeekdaySchedule::banssPreset();
+		$raw['days']['sun'] = [
+			'work' => 'false',
+			'start' => '08:00',
+			'end' => '16:00',
+			'breaks' => [],
+		];
+		$schedule = WeekdaySchedule::fromValidated($raw);
+		$this->assertFalse($schedule->isWorkDay('sun'));
+		$this->assertSame(0.0, $schedule->netHoursForWeekday('sun'));
+	}
+
+	public function testStoredStringFalsePaidStaysUnpaid(): void
+	{
+		// "paid":"false" must not turn an unpaid break into a paid one.
+		$raw = [
+			'version' => 1,
+			'days' => [
+				'mon' => [
+					'work' => true,
+					'start' => '08:00',
+					'end' => '16:00',
+					'breaks' => [
+						['start' => '12:00', 'end' => '13:00', 'paid' => 'false'],
+					],
+				],
+				'tue' => ['work' => false],
+				'wed' => ['work' => false],
+				'thu' => ['work' => false],
+				'fri' => ['work' => false],
+				'sat' => ['work' => false],
+				'sun' => ['work' => false],
+			],
+		];
+		$schedule = WeekdaySchedule::fromValidated($raw);
+		// unpaid 60-min break is deducted → 7h net, not 8h
+		$this->assertSame(7.0, $schedule->netHoursForWeekday('mon'));
+		$this->assertFalse($schedule->toArray()['days']['mon']['breaks'][0]['paid']);
+	}
+
 	public function testValidateRejectsEndBeforeStart(): void
 	{
 		$raw = WeekdaySchedule::banssPreset();

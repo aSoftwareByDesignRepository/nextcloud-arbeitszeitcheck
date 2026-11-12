@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCA\ArbeitszeitCheck\Repair\BackupBeforeUpdate;
 use OCA\ArbeitszeitCheck\Capabilities;
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
+use OCA\ArbeitszeitCheck\Repair\SealAbsenceDayFractions;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
@@ -669,6 +670,13 @@ class Application extends App implements IBootstrap {
 
 		$context->registerService(BackfillAbsenceDays::class, function ($c): BackfillAbsenceDays {
 			return new BackfillAbsenceDays(
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(HolidayService::class),
+			);
+		});
+
+		$context->registerService(SealAbsenceDayFractions::class, function ($c): SealAbsenceDayFractions {
+			return new SealAbsenceDayFractions(
 				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
 				$c->query(HolidayService::class),
 			);

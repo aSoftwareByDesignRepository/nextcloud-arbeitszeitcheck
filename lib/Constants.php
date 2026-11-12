@@ -446,6 +446,14 @@ final class Constants
 	/** day_fraction outside {1, 0.5} for a non-vacation type (400). */
 	public const HALF_DAY_INVALID = 'HALF_DAY_INVALID';
 
+	/**
+	 * AM/PM slot fields on at_absences (AZC-HALF-DAY-SLOTS-BOUNDARIES).
+	 * A slot is only meaningful together with a fractional boundary day;
+	 * slot values are strictly 'am'|'pm'. Boundary fractions reuse
+	 * HALF_DAY_INVALID / HALF_DAY_TYPE_NOT_ENABLED / HALF_DAY_RANGE_FORBIDDEN.
+	 */
+	public const HALF_DAY_SLOT_INVALID = 'HALF_DAY_SLOT_INVALID';
+
 	/** Calendar→anniversary while users lack employment_start without ack. */
 	public const VAC_YEAR_MISSING_HIRE_ACK_REQUIRED = 'VAC_YEAR_MISSING_HIRE_ACK_REQUIRED';
 

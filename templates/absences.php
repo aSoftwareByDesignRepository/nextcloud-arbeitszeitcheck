@@ -90,6 +90,11 @@ $halfSelected = $editIsHalf || (
 	&& $prefillHalf
 	&& $typeSupportsHalfDay
 );
+// Stored boundary shape for edit preselect (NULL columns = legacy/full).
+$storedStartFraction = $absence && $absence->getStartDayFraction() !== null ? (float)$absence->getStartDayFraction() : null;
+$storedStartSlot = is_string($absence?->getStartDaySlot()) ? $absence->getStartDaySlot() : null;
+$storedEndFraction = $absence && $absence->getEndDayFraction() !== null ? (float)$absence->getEndDayFraction() : null;
+$storedEndSlot = is_string($absence?->getEndDaySlot()) ? $absence->getEndDaySlot() : null;
 $showDayFractionInitially = in_array($mode, ['create', 'edit'], true)
 	&& $typeSupportsHalfDay
 	&& $absenceFormStartDisplay !== ''
@@ -408,10 +413,87 @@ if ($mode === 'list') {
                                 </label>
                             </div>
                         </fieldset>
-                        <p id="absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date. Morning or afternoon is not tracked.')); ?></p>
+                        <fieldset id="absence-day-slot-group"
+                                  class="absence-day-slot__fieldset"
+                                  <?php echo $halfSelected ? '' : 'hidden'; ?>>
+                            <legend id="absence-day-slot-legend" class="form-label absence-day-slot__legend"><?php p($l->t('Which half?')); ?></legend>
+                            <div class="absence-day-fraction__segments"
+                                 role="radiogroup"
+                                 aria-labelledby="absence-day-slot-legend"
+                                 aria-describedby="absence-day-slot-help">
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio"
+                                           name="day_slot"
+                                           id="absence-day-slot-am"
+                                           value="am"
+                                           <?php echo ($storedStartSlot === 'am') ? 'checked' : ''; ?>
+                                           class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Morning')); ?></span>
+                                </label>
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio"
+                                           name="day_slot"
+                                           id="absence-day-slot-pm"
+                                           value="pm"
+                                           <?php echo ($storedStartSlot === 'pm') ? 'checked' : ''; ?>
+                                           class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Afternoon')); ?></span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <p id="absence-day-slot-help" class="form-help" <?php echo $halfSelected ? '' : 'hidden'; ?>><?php p($l->t('Pick the half you are away. The other half stays free — e.g. a morning doctor visit plus afternoon vacation fits on one day.')); ?></p>
+                        <p id="absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date.')); ?></p>
                         <p id="absence-day-fraction-preview" class="azc-callout azc-callout--info absence-day-fraction__preview" role="status" aria-live="polite"></p>
                         <p id="absence-day-fraction-live" class="sr-only" aria-live="polite"></p>
                         <p id="absence-day-fraction-error" class="form-error" role="alert" hidden></p>
+                    </div>
+
+                    <div id="absence-boundary-half-group"
+                         class="form-group absence-boundary-half"
+                         data-days-mode="<?php echo $isVacationHours ? '0' : '1'; ?>"
+                         data-enabled-types="<?php p(json_encode(array_values($halfDayEnabledTypes), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'); ?>"
+                         hidden>
+                        <fieldset class="absence-day-fraction__fieldset">
+                            <legend id="absence-start-half-legend" class="form-label absence-day-fraction__legend"><?php p($l->t('First day')); ?></legend>
+                            <div class="absence-day-fraction__segments"
+                                 role="radiogroup"
+                                 aria-labelledby="absence-start-half-legend">
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="start_day_fraction" id="absence-start-frac-full" value="1" <?php echo ($storedStartFraction !== null && $storedStartFraction < 1.0) ? '' : 'checked'; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Full')); ?></span>
+                                </label>
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="start_day_fraction" id="absence-start-frac-am" value="0.5" data-slot="am" <?php echo ($storedStartFraction !== null && $storedStartFraction < 1.0 && $storedStartSlot === 'am') ? 'checked' : ''; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Morning half')); ?></span>
+                                </label>
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="start_day_fraction" id="absence-start-frac-pm" value="0.5" data-slot="pm" <?php echo ($storedStartFraction !== null && $storedStartFraction < 1.0 && $storedStartSlot === 'pm') ? 'checked' : ''; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Afternoon half')); ?></span>
+                                </label>
+                            </div>
+                            <input type="hidden" name="start_day_slot" id="absence-start-day-slot" value="<?php p((string)$storedStartSlot); ?>">
+                        </fieldset>
+                        <fieldset class="absence-day-fraction__fieldset">
+                            <legend id="absence-end-half-legend" class="form-label absence-day-fraction__legend"><?php p($l->t('Last day')); ?></legend>
+                            <div class="absence-day-fraction__segments"
+                                 role="radiogroup"
+                                 aria-labelledby="absence-end-half-legend">
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="end_day_fraction" id="absence-end-frac-full" value="1" <?php echo ($storedEndFraction !== null && $storedEndFraction < 1.0) ? '' : 'checked'; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Full')); ?></span>
+                                </label>
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="end_day_fraction" id="absence-end-frac-am" value="0.5" data-slot="am" <?php echo ($storedEndFraction !== null && $storedEndFraction < 1.0 && $storedEndSlot === 'am') ? 'checked' : ''; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Morning half')); ?></span>
+                                </label>
+                                <label class="absence-day-fraction__segment">
+                                    <input type="radio" name="end_day_fraction" id="absence-end-frac-pm" value="0.5" data-slot="pm" <?php echo ($storedEndFraction !== null && $storedEndFraction < 1.0 && $storedEndSlot === 'pm') ? 'checked' : ''; ?> class="absence-day-fraction__input">
+                                    <span class="absence-day-fraction__face"><?php p($l->t('Afternoon half')); ?></span>
+                                </label>
+                            </div>
+                            <input type="hidden" name="end_day_slot" id="absence-end-day-slot" value="<?php p((string)$storedEndSlot); ?>">
+                        </fieldset>
+                        <p class="form-help"><?php p($l->t('Take half of the first or last day — the days in between stay full.')); ?></p>
                     </div>
 
                     <div id="absence-duration-hours-group"
@@ -1521,11 +1603,47 @@ if ($mode === 'list') {
                 }
             }
 
+            const slotGroup = document.getElementById('absence-day-slot-group');
+            const slotHelp = document.getElementById('absence-day-slot-help');
+            const slotAm = document.getElementById('absence-day-slot-am');
+            const slotPm = document.getElementById('absence-day-slot-pm');
+            const boundaryGroup = document.getElementById('absence-boundary-half-group');
+            const startSlotHidden = document.getElementById('absence-start-day-slot');
+            const endSlotHidden = document.getElementById('absence-end-day-slot');
+
+            function syncSlotVisibility() {
+                const isHalf = halfRadio && halfRadio.checked && isEligibleType() && isSingleDay();
+                if (slotGroup) slotGroup.hidden = !isHalf;
+                if (slotHelp) slotHelp.hidden = !isHalf;
+            }
+
+            function syncBoundaryGroup() {
+                if (!boundaryGroup) return;
+                const show = isEligibleType() && isMultiDayRange();
+                boundaryGroup.hidden = !show;
+                if (!show) {
+                    const sf = document.getElementById('absence-start-frac-full');
+                    const ef = document.getElementById('absence-end-frac-full');
+                    if (sf) sf.checked = true;
+                    if (ef) ef.checked = true;
+                    if (startSlotHidden) startSlotHidden.value = '';
+                    if (endSlotHidden) endSlotHidden.value = '';
+                }
+            }
+
+            function syncBoundarySlot(prefix) {
+                const hidden = prefix === 'start' ? startSlotHidden : endSlotHidden;
+                if (!hidden) return;
+                const sel = document.querySelector('input[name="' + prefix + '_day_fraction"]:checked');
+                hidden.value = (sel && sel.getAttribute('data-slot')) || '';
+            }
+
             function syncMultiTip() {
                 if (!multiTip) {
                     return;
                 }
-                multiTip.hidden = !(isEligibleType() && isMultiDayRange());
+                // Boundary halves replace the "submit separately" tip.
+                multiTip.hidden = true;
             }
 
             function syncVisibility() {
@@ -1549,11 +1667,22 @@ if ($mode === 'list') {
                     if (liveEl) liveEl.textContent = '';
                 }
                 updatePreview();
+                syncSlotVisibility();
+                syncBoundaryGroup();
                 syncMultiTip();
             }
 
-            if (fullRadio) fullRadio.addEventListener('change', updatePreview);
-            if (halfRadio) halfRadio.addEventListener('change', updatePreview);
+            if (fullRadio) fullRadio.addEventListener('change', function () { updatePreview(); syncSlotVisibility(); });
+            if (halfRadio) halfRadio.addEventListener('change', function () { updatePreview(); syncSlotVisibility(); });
+            if (boundaryGroup) {
+                boundaryGroup.addEventListener('change', function (ev) {
+                    const name = ev.target && ev.target.name;
+                    if (name === 'start_day_fraction') syncBoundarySlot('start');
+                    if (name === 'end_day_fraction') syncBoundarySlot('end');
+                });
+                syncBoundarySlot('start');
+                syncBoundarySlot('end');
+            }
             if (typeEl) typeEl.addEventListener('change', syncVisibility);
             if (startEl) {
                 startEl.addEventListener('change', syncVisibility);
@@ -1569,6 +1698,29 @@ if ($mode === 'list') {
             window.ArbeitszeitCheck.getAbsenceDayFraction = function () {
                 if (group.hidden) return null;
                 return selectedFraction();
+            };
+            window.ArbeitszeitCheck.getAbsenceDayShape = function () {
+                const shape = {};
+                if (!group.hidden) {
+                    shape.day_fraction = selectedFraction();
+                    if (slotGroup && !slotGroup.hidden && selectedFraction() === '0.5') {
+                        const slot = (slotAm && slotAm.checked) ? 'am' : ((slotPm && slotPm.checked) ? 'pm' : '');
+                        if (slot) shape.day_slot = slot;
+                    }
+                }
+                if (boundaryGroup && !boundaryGroup.hidden) {
+                    const sf = document.querySelector('input[name="start_day_fraction"]:checked');
+                    const ef = document.querySelector('input[name="end_day_fraction"]:checked');
+                    if (sf && sf.value === '0.5') {
+                        shape.start_day_fraction = '0.5';
+                        if (sf.getAttribute('data-slot')) shape.start_day_slot = sf.getAttribute('data-slot');
+                    }
+                    if (ef && ef.value === '0.5') {
+                        shape.end_day_fraction = '0.5';
+                        if (ef.getAttribute('data-slot')) shape.end_day_slot = ef.getAttribute('data-slot');
+                    }
+                }
+                return shape;
             };
             window.ArbeitszeitCheck.showDayFractionError = function (msg) {
                 if (!errorEl) return;
@@ -2122,13 +2274,17 @@ if ($mode === 'list') {
                     // Web may fill from working days if the hours field is empty (backup path).
                     body.set('server_may_fill_hours', '1');
                 }
-                if (window.ArbeitszeitCheck && typeof window.ArbeitszeitCheck.getAbsenceDayFraction === 'function') {
-                    const dayFraction = window.ArbeitszeitCheck.getAbsenceDayFraction();
-                    if (dayFraction === '0.5' || dayFraction === '1') {
-                        body.set('day_fraction', dayFraction);
+                if (window.ArbeitszeitCheck && typeof window.ArbeitszeitCheck.getAbsenceDayShape === 'function') {
+                    const dayShape = window.ArbeitszeitCheck.getAbsenceDayShape();
+                    if (dayShape.day_fraction === '0.5' || dayShape.day_fraction === '1') {
+                        body.set('day_fraction', dayShape.day_fraction);
                     }
+                    ['day_slot', 'start_day_fraction', 'start_day_slot', 'end_day_fraction', 'end_day_slot'].forEach(function (k) {
+                        if (dayShape[k] !== undefined && dayShape[k] !== '') body.set(k, dayShape[k]);
+                    });
                 }
-                const submittedDayFraction = body.get('day_fraction');
+                const submittedDayFraction = body.get('day_fraction')
+                    || ((body.get('start_day_fraction') === '0.5' || body.get('end_day_fraction') === '0.5') ? '0.5' : null);
                 const requestToken = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.getRequestToken && window.ArbeitszeitCheck.getRequestToken()) || (typeof OC !== 'undefined' && OC.requestToken) || '';
                 if (requestToken) body.set('requesttoken', requestToken);
 

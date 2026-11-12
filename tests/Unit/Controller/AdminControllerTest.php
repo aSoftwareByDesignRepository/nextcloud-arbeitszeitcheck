@@ -2401,6 +2401,202 @@ class AdminControllerTest extends TestCase
 		$this->assertSame('SCHEDULE_INVALID', $data['code']);
 	}
 
+	public function testCreateWorkingTimeModelPersistsTiersNormalized(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => '35h + 3h break',
+				'type' => 'full_time',
+				'weeklyHours' => 35.0,
+				'dailyHours' => 7.0,
+				'breakRules' => [
+					// Unsorted on purpose — must persist ascending.
+					'tiers' => [
+						['afterHours' => '9', 'breakMinutes' => '180'],
+						['afterHours' => 6, 'breakMinutes' => 30],
+					],
+					'min_break_minutes' => '20',
+				],
+			]);
+
+		$this->workingTimeModelMapper->method('findDefault')->willReturn(null);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->with($this->callback(function (WorkingTimeModel $model): bool {
+				$rules = $model->getBreakRulesArray();
+				// afterHours survives a JSON round-trip as int — compare loosely.
+				return (float)($rules['tiers'][0]['afterHours'] ?? 0) === 6.0
+					&& ($rules['tiers'][0]['breakMinutes'] ?? null) === 30
+					&& (float)($rules['tiers'][1]['afterHours'] ?? 0) === 9.0
+					&& ($rules['tiers'][1]['breakMinutes'] ?? null) === 180
+					&& ($rules['min_break_minutes'] ?? null) === 20;
+			}))
+			->willReturnCallback(function (WorkingTimeModel $model) {
+				$model->setId(43);
+				return $model;
+			});
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_CREATED, $response->getStatus());
+		$data = $response->getData();
+		$this->assertTrue($data['success']);
+		// Save responses echo the normalized, persisted document.
+		$this->assertEquals(6.0, $data['model']['breakRules']['tiers'][0]['afterHours']);
+		$this->assertSame(20, $data['model']['breakRules']['min_break_minutes']);
+	}
+
+	public function testCreateWorkingTimeModelRejectsInvalidTier(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'Broken tier',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'breakRules' => [
+					'tiers' => [
+						['afterHours' => 'abc', 'breakMinutes' => 180],
+					],
+				],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('VALIDATION', $data['code']);
+		$this->assertSame('VALIDATION_TIER', $data['fields']['tiers.0']);
+	}
+
+	public function testCreateWorkingTimeModelRejectsTooManyTiers(): void
+	{
+		$tiers = [];
+		for ($i = 1; $i <= 9; $i++) {
+			$tiers[] = ['afterHours' => $i, 'breakMinutes' => 15];
+		}
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'Too many tiers',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'breakRules' => ['tiers' => $tiers],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('VALIDATION_TOO_MANY', $data['fields']['tiers']);
+	}
+
+	public function testCreateWorkingTimeModelRejectsTiersNearMissKey(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'CamelCase tiers',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				// Case near-miss of 'tiers' — silently persists and never applies.
+				'breakRules' => ['Tiers' => [['afterHours' => 9, 'breakMinutes' => 180]]],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('BREAK_RULE_KEY_UNKNOWN', $data['code']);
+	}
+
+	public function testCreateWorkingTimeModelRejectsWhitespaceTiersKey(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'Whitespace tiers',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'breakRules' => [' tiers ' => [['afterHours' => 9, 'breakMinutes' => 180]]],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('BREAK_RULE_KEY_UNKNOWN', $data['code']);
+	}
+
+	public function testCreateWorkingTimeModelRejectsInvalidMinBreakMinutes(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'Bad floor',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'breakRules' => ['min_break_minutes' => 'abc'],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('VALIDATION_RANGE', $data['fields']['min_break_minutes']);
+	}
+
+	public function testCreateWorkingTimeModelNormalizesSundayWorkStringFalse(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'Sunday false string',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'breakRules' => ['allow_sunday_work' => 'false'],
+			]);
+
+		$this->workingTimeModelMapper->method('findDefault')->willReturn(null);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->with($this->callback(function (WorkingTimeModel $model): bool {
+				return ($model->getBreakRulesArray()['allow_sunday_work'] ?? null) === false;
+			}))
+			->willReturnCallback(function (WorkingTimeModel $model) {
+				$model->setId(44);
+				return $model;
+			});
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_CREATED, $response->getStatus());
+	}
+
+	public function testCreateWorkingTimeModelRejectsListOvertimeRules(): void
+	{
+		$this->request->method('getParams')
+			->willReturn([
+				'name' => 'List overtime',
+				'type' => 'full_time',
+				'weeklyHours' => 40.0,
+				'dailyHours' => 8.0,
+				'overtimeRules' => ['not', 'a', 'map'],
+			]);
+
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$data = $response->getData();
+		$this->assertSame('VALIDATION_SHAPE', $data['code']);
+		$this->assertSame('VALIDATION_SHAPE', $data['errors']['overtimeRules']);
+	}
+
 	/**
 	 * Test deleteWorkingTimeModel deletes model
 	 */

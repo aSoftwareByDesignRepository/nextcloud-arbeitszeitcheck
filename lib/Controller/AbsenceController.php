@@ -1384,6 +1384,23 @@ class AbsenceController extends Controller
 				$df = $params['day_fraction'];
 				$data['day_fraction'] = is_array($df) ? (string)reset($df) : (string)$df;
 			}
+			// Slot + boundary-half fields (AZC-HALF-DAY-SLOTS-BOUNDARIES),
+			// camelCase aliases accepted for JSON clients.
+			foreach ([
+				'day_slot' => ['day_slot', 'daySlot'],
+				'start_day_fraction' => ['start_day_fraction', 'startDayFraction'],
+				'start_day_slot' => ['start_day_slot', 'startDaySlot'],
+				'end_day_fraction' => ['end_day_fraction', 'endDayFraction'],
+				'end_day_slot' => ['end_day_slot', 'endDaySlot'],
+			] as $shapeKey => $aliases) {
+				foreach ($aliases as $alias) {
+					if (array_key_exists($alias, $params)) {
+						$v = $params[$alias];
+						$data[$shapeKey] = is_array($v) ? (string)reset($v) : ($v !== null ? (string)$v : null);
+						break;
+					}
+				}
+			}
 
 			if (empty($data['type']) || empty($data['start_date']) || empty($data['end_date'])) {
 				$msg = $this->l10n->t('Please choose a type and fill in start and end date.');
@@ -1561,6 +1578,7 @@ class AbsenceController extends Controller
 		try {
 			$userId = $this->getUserId();
 			$data = [];
+			$params = $this->request->getParams();
 
 			if ($start_date) {
 				$data['start_date'] = $start_date;
@@ -1579,6 +1597,25 @@ class AbsenceController extends Controller
 			}
 			if ($duration_hours !== null && $duration_hours !== '') {
 				$data['duration_hours'] = $duration_hours;
+			}
+			// Slot + boundary-half fields (AZC-HALF-DAY-SLOTS-BOUNDARIES):
+			// read straight from the request so every routed entry point
+			// (form POST, apiUpdate) shares one mapping; camelCase aliases
+			// keep JSON clients on the same contract.
+			foreach ([
+				'day_slot' => ['day_slot', 'daySlot'],
+				'start_day_fraction' => ['start_day_fraction', 'startDayFraction'],
+				'start_day_slot' => ['start_day_slot', 'startDaySlot'],
+				'end_day_fraction' => ['end_day_fraction', 'endDayFraction'],
+				'end_day_slot' => ['end_day_slot', 'endDaySlot'],
+			] as $shapeKey => $aliases) {
+				foreach ($aliases as $alias) {
+					if (array_key_exists($alias, $params)) {
+						$v = $params[$alias];
+						$data[$shapeKey] = is_array($v) ? (string)reset($v) : ($v !== null ? (string)$v : null);
+						break;
+					}
+				}
 			}
 
 			try {

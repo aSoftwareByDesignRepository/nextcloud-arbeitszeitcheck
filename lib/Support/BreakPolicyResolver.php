@@ -360,6 +360,96 @@ final class BreakPolicyResolver
 	}
 
 	/**
+	 * Strict write-boundary validation for the resolver-owned `break_rules`
+	 * keys on a working-time model (`tiers`, `min_break_minutes`,
+	 * `break_policy`, `auto_fallback_minutes`, `allow_sunday_work`). Keys not
+	 * listed here are owned elsewhere and ignored. `null`/`''` clears a
+	 * scalar; `normalized` then carries `null` so the caller can `unset()`.
+	 *
+	 * @param array<string, mixed> $rules raw submitted break_rules map
+	 * @return array{errors: array<string, string>, normalized: array<string, mixed>}
+	 */
+	public function validateModelBreakRules(array $rules): array
+	{
+		$errors = [];
+		$normalized = [];
+
+		if (array_key_exists('tiers', $rules)) {
+			$tiersRaw = $rules['tiers'];
+			if (!is_array($tiersRaw) || ($tiersRaw !== [] && !array_is_list($tiersRaw))) {
+				$errors['tiers'] = 'VALIDATION_SHAPE';
+			} elseif (count($tiersRaw) > self::MAX_TIERS) {
+				$errors['tiers'] = 'VALIDATION_TOO_MANY';
+			} else {
+				$tiers = [];
+				foreach ($tiersRaw as $i => $tier) {
+					$t = $this->normalizeTierStrict($tier);
+					if ($t === null) {
+						$errors['tiers.' . $i] = 'VALIDATION_TIER';
+						continue;
+					}
+					$tiers[] = $t;
+				}
+				$normalized['tiers'] = $this->sortTiersAscending($tiers);
+			}
+		}
+
+		if (array_key_exists('min_break_minutes', $rules)) {
+			$floorRaw = $rules['min_break_minutes'];
+			if ($floorRaw === null || $floorRaw === '') {
+				$normalized['min_break_minutes'] = null;
+			} else {
+				$floor = $this->strictInt($floorRaw);
+				if ($floor === null || $floor < 1 || $floor > self::MAX_WINDOW_MINUTES) {
+					$errors['min_break_minutes'] = 'VALIDATION_RANGE';
+				} else {
+					$normalized['min_break_minutes'] = $floor;
+				}
+			}
+		}
+
+		// Auto-break fallback policy for a model without an explicit policy:
+		// 'flex' (midpoint window) or 'strict_shift'. Anything else would be
+		// silently ignored by the reader — reject it here instead.
+		if (array_key_exists('break_policy', $rules)) {
+			$mode = $rules['break_policy'];
+			if ($mode === null || $mode === '') {
+				$normalized['break_policy'] = null;
+			} elseif (is_string($mode) && in_array($mode, ['flex', 'strict_shift'], true)) {
+				$normalized['break_policy'] = $mode;
+			} else {
+				$errors['break_policy'] = 'VALIDATION_VALUE';
+			}
+		}
+
+		if (array_key_exists('auto_fallback_minutes', $rules)) {
+			$fallbackRaw = $rules['auto_fallback_minutes'];
+			if ($fallbackRaw === null || $fallbackRaw === '') {
+				$normalized['auto_fallback_minutes'] = null;
+			} else {
+				$fallback = $this->strictInt($fallbackRaw);
+				if ($fallback === null || $fallback < 15 || $fallback > 720) {
+					$errors['auto_fallback_minutes'] = 'VALIDATION_RANGE';
+				} else {
+					$normalized['auto_fallback_minutes'] = $fallback;
+				}
+			}
+		}
+
+		// Sunday-work flag: explicit parse — a form-encoded "false"/"0"
+		// string must never become truthy (fail closed = not allowed).
+		if (array_key_exists('allow_sunday_work', $rules)) {
+			$flagRaw = $rules['allow_sunday_work'];
+			$normalized['allow_sunday_work'] = $flagRaw === true
+				|| $flagRaw === 1
+				|| $flagRaw === '1'
+				|| (is_string($flagRaw) && strtolower(trim($flagRaw)) === 'true');
+		}
+
+		return ['errors' => $errors, 'normalized' => $normalized];
+	}
+
+	/**
 	 * Effective paid-break policy for a user on a calendar day.
 	 *
 	 * Resolves the working-time model assigned as-of $asOf (storage TZ date —

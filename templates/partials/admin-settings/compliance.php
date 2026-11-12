@@ -30,6 +30,12 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                     </header>
                     <div class="azc-card__body">
                     <h3 class="admin-settings-subsection__title"><?php p($l->t('Compliance checks')); ?></h3>
+                <div class="azc-callout azc-callout--info">
+                    <div class="azc-callout__body">
+                        <p class="azc-callout__text"><strong><?php p($l->t('Legal minimums always apply — they cannot be switched off.')); ?></strong></p>
+                        <p class="azc-callout__text"><?php p($l->t('Clocking in and saving an entry is always rejected when it would break the minimum rest period, a mandatory break, or the daily working-time limit. The options below only control additional checks and alerts.')); ?></p>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label class="form-label"><?php p($l->t('Configured timezone')); ?></label>
                     <p class="form-help">
@@ -43,11 +49,11 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php echo ($settings['autoComplianceCheck'] ?? true) ? 'checked' : ''; ?>
                             aria-describedby="autoComplianceCheck-help">
                         <label for="autoComplianceCheck" class="form-label">
-                            <?php p($l->t('Check working time rules automatically')); ?>
+                            <?php p($l->t('Check working times automatically every day')); ?>
                         </label>
                     </div>
                     <p id="autoComplianceCheck-help" class="form-help">
-                        <?php p($l->t('The system will automatically check if working hours follow the configured country labour law (ArbZG, AZG/ARG or ArG). For example, it will warn when required breaks are missing.')); ?>
+                        <?php p($l->t('Every night, the previous day\'s entries are re-checked and violations are recorded in the compliance overview. This only logs findings — it never changes entries.')); ?>
                     </p>
                 </div>
 
@@ -57,11 +63,11 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php echo ($settings['realtimeComplianceCheck'] ?? true) ? 'checked' : ''; ?>
                             aria-describedby="realtimeComplianceCheck-help">
                         <label for="realtimeComplianceCheck" class="form-label">
-                            <?php p($l->t('Real-time compliance check when recording')); ?>
+                            <?php p($l->t('Check entries immediately when they are saved')); ?>
                         </label>
                     </div>
                     <p id="realtimeComplianceCheck-help" class="form-help">
-                        <?php p($l->t('Checks working times immediately when saving or editing. Disable only if you run compliance checks exclusively via batch processing.')); ?>
+                        <?php p($l->t('Completed entries are checked as soon as they are saved, and violations are recorded right away instead of only in the nightly run. Entries that break legal minimums are still rejected when this is off.')); ?>
                     </p>
                 </div>
 
@@ -71,24 +77,25 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             <?php echo ($settings['complianceStrictMode'] ?? false) ? 'checked' : ''; ?>
                             aria-describedby="complianceStrictMode-help">
                         <label for="complianceStrictMode" class="form-label">
-                            <?php p($l->t('Strict mode: Violations block saving')); ?>
+                            <?php p($l->t('Strict mode: block saving on every violation')); ?>
                         </label>
                     </div>
                     <p id="complianceStrictMode-help" class="form-help">
-                        <?php p($l->t('In default mode, violations are shown but saving is still possible. In strict mode, violations prevent saving the time entry.')); ?>
+                        <?php p($l->t('Legal minimums always block saving. With strict mode on, every other detected violation rejects the entry too instead of only being recorded.')); ?>
                     </p>
                 </div>
 
                 <div class="form-group">
                     <div class="form-checkbox">
                         <input type="checkbox" id="enableViolationNotifications" name="enableViolationNotifications"
-                            <?php echo ($settings['enableViolationNotifications'] ?? true) ? 'checked' : ''; ?>>
+                            <?php echo ($settings['enableViolationNotifications'] ?? true) ? 'checked' : ''; ?>
+                            aria-describedby="enableViolationNotifications-help">
                         <label for="enableViolationNotifications" class="form-label">
                             <?php p($l->t('Send alerts when working time rules are broken')); ?>
                         </label>
                     </div>
-                    <p class="form-help">
-                        <?php p($l->t('When someone works too many hours or doesn\'t take required breaks, the system will send a notification to managers and the employee.')); ?>
+                    <p id="enableViolationNotifications-help" class="form-help">
+                        <?php p($l->t('When a check finds a violation, the employee and the responsible manager receive a notification.')); ?>
                     </p>
                 </div>
                 <h3 class="admin-settings-subsection__title" id="azc-break-policy-heading"><?php p($l->t('Central break rules')); ?></h3>

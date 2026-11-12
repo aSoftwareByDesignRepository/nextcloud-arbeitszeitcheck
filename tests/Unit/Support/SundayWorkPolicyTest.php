@@ -28,6 +28,19 @@ class SundayWorkPolicyTest extends TestCase
 		$this->assertTrue(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => 1]));
 	}
 
+	public function testStoredStringFalseIsNotAllowed(): void
+	{
+		// Legacy API/JS writes could persist "false" as a string — !empty()
+		// made that truthy and silently allowed Sunday work (SC-03).
+		$this->assertFalse(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => 'false']));
+		$this->assertFalse(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => '0']));
+		$this->assertFalse(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => 'yes']));
+		$this->assertFalse(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => '']));
+		$this->assertFalse(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => 0]));
+		$this->assertTrue(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => 'true']));
+		$this->assertTrue(SundayWorkPolicy::isAllowed([SundayWorkPolicy::KEY => '1']));
+	}
+
 	public function testWeekdayScheduleSundayWorkAllows(): void
 	{
 		$raw = WeekdaySchedule::banssPreset();

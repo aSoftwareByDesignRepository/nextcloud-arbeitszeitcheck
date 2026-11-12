@@ -32,9 +32,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - absence payload carries additive `canShorten` flag for owners
   (server-computed eligibility; older servers fall back to the
   isCurrent+approved derivation)
+- **opt-in half-day for non-vacation absence types**: new admin multiselect
+  "Allow half days for" (`half_day_enabled_types`, default `["vacation"]` —
+  byte-identical legacy behaviour). Enabled types get the day-length control
+  on the manager record form, the employee request form, and the mobile
+  companion (manager record + employee create screens); the server debits
+  `days = schedule weight × 0.5`, rejects fractions on non-enabled types
+  loudly (`HALF_DAY_TYPE_NOT_ENABLED`) and on multi-day ranges
+  (`HALF_DAY_RANGE_FORBIDDEN`), keeps stored fractions on reason-only edits
+  and vacation→sick conversion, and preserves them across the
+  schedule-recompute repair. Custom absence types can be opted in
+  individually; `overtime_comp`, `parental_leave` and entitlement-bound
+  types stay excluded (their {0.25,0.5,0.75} contract is untouched)
+- working-time-model editor section "Break rules (stricter)": per-model
+  break tiers (`afterHours` → `breakMinutes`, ≤8) and minimum countable
+  break length — the central policy engine already merged them as
+  `max(law, org, model)`; malformed stored fragments prefill tolerantly
+  with a cleanup hint so a save self-heals
+- strict write validation for all `break_rules` keys on working-time
+  models (tiers, floor, break_policy, auto_fallback_minutes,
+  allow_sunday_work) + completed key registry so near-miss names reject
+  with 400 instead of persisting silently; save responses echo the
+  normalized stored document
 
 ### Fixed
 
+- planned-hours credit no longer double-halves a **full** absence day that
+  lands on a half-weight company holiday: the fraction is derived as
+  `days ÷ single-day weight` instead of a literal `days ≈ 0.5` match (a full
+  sick day at weight 0.5 was credited net×0.25 instead of net×0.5)
+- stored `"false"`/`"0"` strings no longer stay truthy-active:
+  `allow_sunday_work` (Sunday-work Freibrief), `weekday_schedule` `work`
+  and break `paid` flags (an unpaid break could have been paid), and
+  premium-category `enabled` now parse strict-bool — fail closed
+- `auto_fallback_minutes` stored garbage falls back to the configured
+  default instead of silently clamping to 15 minutes
+- `overtimeRules` is now a bounded map-only document (≤8 KB);
+  `break_rules` documents are capped at 32 KB
+- clearing every editor-owned break rule on a model now actually clears
+  them (paid-break flag and others previously survived an all-empty save)
 - absence `days` now counts the employee's `weekday_schedule` work days
   instead of hardcoded Mon–Fri — part-time employees (e.g. 4-day model)
   were debited one day too many for every Mon–Fri vacation week; a repair

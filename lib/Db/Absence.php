@@ -55,6 +55,14 @@ use OCA\ArbeitszeitCheck\Service\HolidayService;
  * @method void setCancelRequestedBy(string|null $cancelRequestedBy)
  * @method string|null getCancelReason()
  * @method void setCancelReason(string|null $cancelReason)
+ * @method float|null getStartDayFraction()
+ * @method void setStartDayFraction(float|null $startDayFraction)
+ * @method string|null getStartDaySlot()
+ * @method void setStartDaySlot(string|null $startDaySlot)
+ * @method float|null getEndDayFraction()
+ * @method void setEndDayFraction(float|null $endDayFraction)
+ * @method string|null getEndDaySlot()
+ * @method void setEndDaySlot(string|null $endDaySlot)
  */
 class Absence extends Entity
 {
@@ -132,6 +140,18 @@ class Absence extends Entity
 	/** @var string|null */
 	protected $cancelReason;
 
+	/** @var float|null Explicit fraction of the first day (NULL = full/legacy-derived). */
+	protected $startDayFraction;
+
+	/** @var string|null 'am'|'pm' — which half of a fractional first day. */
+	protected $startDaySlot;
+
+	/** @var float|null Explicit fraction of the last day (multi-day only). */
+	protected $endDayFraction;
+
+	/** @var string|null 'am'|'pm' — which half of a fractional last day. */
+	protected $endDaySlot;
+
 	/**
 	 * Absence constructor
 	 */
@@ -155,6 +175,10 @@ class Absence extends Entity
 		$this->addType('cancelRequestedAt', 'datetime');
 		$this->addType('cancelRequestedBy', 'string');
 		$this->addType('cancelReason', 'string');
+		$this->addType('startDayFraction', 'float');
+		$this->addType('startDaySlot', 'string');
+		$this->addType('endDayFraction', 'float');
+		$this->addType('endDaySlot', 'string');
 	}
 
 	/**
@@ -347,6 +371,10 @@ class Absence extends Entity
 			'endDate' => $endDate ? $endDate->format('Y-m-d') : null,
 			'days' => $this->getDays(),
 			'durationHours' => $this->getDurationHours(),
+			'startDayFraction' => $this->getStartDayFraction(),
+			'startDaySlot' => $this->getStartDaySlot(),
+			'endDayFraction' => $this->getEndDayFraction(),
+			'endDaySlot' => $this->getEndDaySlot(),
 			'workingDays' => $this->calculateWorkingDays(),
 			'reason' => $this->getReason(),
 			'status' => $this->getStatus(),

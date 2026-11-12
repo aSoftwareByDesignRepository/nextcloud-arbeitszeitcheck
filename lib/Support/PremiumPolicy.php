@@ -48,6 +48,16 @@ final class PremiumPolicy
 	}
 
 	/**
+	 * Strict-bool parse — a "false"/"0" string must never enable a category
+	 * (fail closed = disabled).
+	 */
+	private static function truthyFlag(mixed $value): bool
+	{
+		return $value === true || $value === 1 || $value === '1'
+			|| (is_string($value) && strtolower(trim($value)) === 'true');
+	}
+
+	/**
 	 * @param array<string, mixed> $raw
 	 * @return list<string> error codes
 	 */
@@ -77,6 +87,13 @@ final class PremiumPolicy
 			$rate = (float)($cat['rate'] ?? -1);
 			if (!is_finite($rate) || $rate < 0.0 || $rate > 3.0) {
 				$errors[] = 'PREMIUM_RATE_INVALID';
+			}
+			// enabled: only real bools or canonical form-encoded values —
+			// anything else is rejected instead of !empty()-smuggled to true.
+			if (array_key_exists('enabled', $cat)
+				&& !is_bool($cat['enabled'])
+				&& !in_array($cat['enabled'], [0, 1, '0', '1', 'true', 'false'], true)) {
+				$errors[] = 'PREMIUM_ENABLED_INVALID';
 			}
 			$applies = (string)($cat['applies_to'] ?? '');
 			if ($applies === self::APPLIES_WEEKDAY) {
@@ -124,7 +141,7 @@ final class PremiumPolicy
 				'id' => $id,
 				'label' => trim((string)($cat['label'] ?? $id)),
 				'rate' => round(max(0.0, min(3.0, (float)($cat['rate'] ?? 0))), 4),
-				'enabled' => !array_key_exists('enabled', $cat) || !empty($cat['enabled']),
+				'enabled' => !array_key_exists('enabled', $cat) || self::truthyFlag($cat['enabled']),
 				'applies_to' => (string)($cat['applies_to'] ?? ''),
 			];
 			if ($row['applies_to'] === self::APPLIES_WEEKDAY) {

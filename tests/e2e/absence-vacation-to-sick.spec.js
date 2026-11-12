@@ -35,10 +35,27 @@ function dmy(offsetDays) {
 }
 
 /**
- * Seed an approved vacation via the manager API, probing backwards for a
- * free window — the shared dev accounts accumulate absences across runs.
+ * Seed an approved vacation via the manager API. The shared dev accounts
+ * accumulate absence residue across runs until every probe window is taken
+ * (real failure 2026-11-12: "no free vacation seed window found within 400
+ * days"), so reuse a residue row first — an already-ended approved vacation
+ * is exactly what this spec needs, and converting a disposable residue row
+ * mutates nothing a sibling spec can rely on.
  */
 async function seedApprovedVacation(page, userId, startOffset, endOffset) {
+	// The list endpoint caps ranges at ~365 days — one back-looking window.
+	const list = await apiAllowFailure(page, 'GET',
+		`${APP}/api/manager/employee-absences?employeeId=${userId}&startDate=${ymd(-360)}&endDate=${ymd(-1)}&limit=300`)
+	const rows = list.json?.entries ?? []
+	const reusable = rows.find((a) =>
+		a.type === 'vacation' && a.status === 'approved'
+		&& !a.cancelRequested && a.canConvertToSick !== false
+		&& a.startDate && a.endDate && a.endDate <= ymd(-1)
+		// conversion tail-shortens — need ≥3 days of room for sickStart
+		&& (Date.parse(a.endDate) - Date.parse(a.startDate)) >= 3 * 86400000)
+	if (reusable) {
+		return reusable
+	}
 	for (let back = 0; back < 400; back += 7) {
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/manager/employee-absences`, {
 			data: {
@@ -70,8 +87,14 @@ test.describe('Vacation to sick conversion', () => {
 		const vacation = await seedApprovedVacation(page, employee, -10, -3)
 		expect(vacation.status).toBe('approved')
 
-		// Sick range ending on the last vacation day → tail shorten.
-		const sickStart = shiftYmd(vacation.startDate, 2)
+		// Sick range ending on the last vacation day → tail shorten. The real
+		// convert rejects a shortened remainder with zero working days —
+		// a Saturday-start vacation leaves only Sat+Sun in front of +2, so
+		// shift one more day to keep Monday inside the remainder (observed
+		// 2026-11-12 on residue row 3033: "Vacation must include at least
+		// one working day").
+		const startDow = new Date(`${vacation.startDate}T12:00:00Z`).getUTCDay()
+		const sickStart = shiftYmd(vacation.startDate, startDow === 6 ? 3 : 2)
 		const sickEnd = vacation.endDate
 		const dry = await api(page, 'POST',
 			`${APP}/api/manager/employee-absences/${vacation.id}/convert-to-sick`, {

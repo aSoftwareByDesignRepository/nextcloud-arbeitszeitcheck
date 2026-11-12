@@ -495,6 +495,7 @@ gruppevalg
 grønne
 gyldig
 gyldige
+gårsdagens
 halvdags
 halvdagsferie
 halvdagshelligdag

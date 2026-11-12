@@ -81,6 +81,9 @@ class TimeEntryControllerTest extends TestCase
 	/** @var ComplianceService|\PHPUnit\Framework\MockObject\MockObject */
 	private $complianceService;
 
+	/** @var array|null per-test override for checkRestPeriodForStartTime */
+	private ?array $restPeriodCheckResult = null;
+
 	/** @var TimeTrackingService|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeTrackingService;
 
@@ -130,10 +133,9 @@ class TimeEntryControllerTest extends TestCase
 		$this->cspService = $this->createMock(CSPService::class);
 		$this->cspService->method('applyPolicyWithNonce')->willReturnCallback(static fn ($r) => $r);
 		$this->complianceService = $this->createMock(ComplianceService::class);
-		$this->complianceService->method('checkRestPeriodForStartTime')->willReturn([
-			'valid' => true,
-			'message' => '',
-		]);
+		$this->complianceService->method('checkRestPeriodForStartTime')->willReturnCallback(
+			fn () => $this->restPeriodCheckResult ?? ['valid' => true, 'message' => '']
+		);
 		$this->timeTrackingService = $this->createMock(TimeTrackingService::class);
 		$this->timeTrackingService->method('calculateAndSetAutomaticBreak');
 		$this->timeTrackingService->method('adjustEndTimeForDailyMaximum');
@@ -541,6 +543,45 @@ class TimeEntryControllerTest extends TestCase
 		$data = $response->getData();
 
 		$this->assertTrue($data['success']);
+	}
+
+	/**
+	 * A statutory rest-period block must carry a machine-readable error_code and
+	 * structured error_details so API clients can localise the rejection
+	 * instead of showing the raw server message.
+	 */
+	public function testStoreRestPeriodBlockReturnsErrorCodeAndDetails(): void
+	{
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('testuser');
+		$this->userSession->method('getUser')->willReturn($user);
+
+		$this->restPeriodCheckResult = [
+			'valid' => false,
+			'message' => 'Minimum 11-hour rest period required between shifts (ArbZG §5).',
+			'details' => [
+				'min_rest_hours' => 11,
+				'law_label' => 'ArbZG §5',
+				'last_end_date' => '15.03.2026',
+				'last_end_clock' => '06:00',
+				'earliest_start' => '15.03.2026 17:00',
+				'hours_required' => 7.0,
+				'context' => 'manual_entry',
+			],
+		];
+
+		$response = $this->controller->store('2024-01-15', 8.0);
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($data['success']);
+		$this->assertSame(
+			\OCA\ArbeitszeitCheck\BusinessRuleCode::REST_PERIOD_REQUIRED,
+			$data['error_code'] ?? null
+		);
+		$this->assertSame('manual_entry', $data['error_details']['context'] ?? null);
+		$this->assertSame('ArbZG §5', $data['error_details']['law_label'] ?? null);
+		$this->assertNotEmpty($data['error']);
 	}
 
 	/**

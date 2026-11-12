@@ -7,7 +7,7 @@
 	<style>
 		body { font-family: "Segoe UI", sans-serif; margin: 0; background: #f4f6f4; color: #1a1a1a; }
 		main { max-width: 36rem; margin: 1.5rem auto; padding: 1.25rem; background: #fff; border: 1px solid #c8c8c8; border-radius: 8px; }
-		.absence-day-fraction__fieldset { border: 0; margin: 0; padding: 0; }
+		.absence-day-fraction__fieldset, .absence-day-slot__fieldset { border: 0; margin: 0; padding: 0; }
 		.absence-day-fraction__segments { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 		.absence-day-fraction__segment { position: relative; display: flex; flex: 1 1 10rem; min-width: 8rem; min-height: 3rem; margin: 0; cursor: pointer; }
 		.absence-day-fraction__input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -66,9 +66,44 @@
 					</label>
 				</div>
 			</fieldset>
-			<p id="absence-day-fraction-help" class="form-help">Full day or half day for this date. Morning or afternoon is not tracked.</p>
+			<fieldset id="absence-day-slot-group" class="absence-day-slot__fieldset" hidden>
+				<legend id="absence-day-slot-legend">Which half?</legend>
+				<div class="absence-day-fraction__segments" role="radiogroup" aria-labelledby="absence-day-slot-legend" aria-describedby="absence-day-slot-help">
+					<label class="absence-day-fraction__segment">
+						<input type="radio" name="day_slot" id="absence-day-slot-am" value="am" class="absence-day-fraction__input">
+						<span class="absence-day-fraction__face">Morning</span>
+					</label>
+					<label class="absence-day-fraction__segment">
+						<input type="radio" name="day_slot" id="absence-day-slot-pm" value="pm" class="absence-day-fraction__input">
+						<span class="absence-day-fraction__face">Afternoon</span>
+					</label>
+				</div>
+			</fieldset>
+			<p id="absence-day-slot-help" class="form-help" hidden>Pick the half you are away. The other half stays free — e.g. a morning doctor visit plus afternoon vacation fits on one day.</p>
+			<p id="absence-day-fraction-help" class="form-help">Full day or half day for this date.</p>
 			<p id="absence-day-fraction-preview" role="status" aria-live="polite">This request uses 1 vacation day.</p>
 			<p id="absence-day-fraction-live" class="sr-only" aria-live="polite"></p>
+		</div>
+		<div id="absence-boundary-half-group" class="form-group absence-boundary-half" data-days-mode="1" hidden>
+			<fieldset class="absence-day-fraction__fieldset">
+				<legend id="absence-start-half-legend">First day</legend>
+				<div class="absence-day-fraction__segments" role="radiogroup" aria-labelledby="absence-start-half-legend">
+					<label class="absence-day-fraction__segment"><input type="radio" name="start_day_fraction" id="absence-start-frac-full" value="1" checked class="absence-day-fraction__input"><span class="absence-day-fraction__face">Full</span></label>
+					<label class="absence-day-fraction__segment"><input type="radio" name="start_day_fraction" id="absence-start-frac-am" value="0.5" data-slot="am" class="absence-day-fraction__input"><span class="absence-day-fraction__face">Morning half</span></label>
+					<label class="absence-day-fraction__segment"><input type="radio" name="start_day_fraction" id="absence-start-frac-pm" value="0.5" data-slot="pm" class="absence-day-fraction__input"><span class="absence-day-fraction__face">Afternoon half</span></label>
+				</div>
+				<input type="hidden" name="start_day_slot" id="absence-start-day-slot" value="">
+			</fieldset>
+			<fieldset class="absence-day-fraction__fieldset">
+				<legend id="absence-end-half-legend">Last day</legend>
+				<div class="absence-day-fraction__segments" role="radiogroup" aria-labelledby="absence-end-half-legend">
+					<label class="absence-day-fraction__segment"><input type="radio" name="end_day_fraction" id="absence-end-frac-full" value="1" checked class="absence-day-fraction__input"><span class="absence-day-fraction__face">Full</span></label>
+					<label class="absence-day-fraction__segment"><input type="radio" name="end_day_fraction" id="absence-end-frac-am" value="0.5" data-slot="am" class="absence-day-fraction__input"><span class="absence-day-fraction__face">Morning half</span></label>
+					<label class="absence-day-fraction__segment"><input type="radio" name="end_day_fraction" id="absence-end-frac-pm" value="0.5" data-slot="pm" class="absence-day-fraction__input"><span class="absence-day-fraction__face">Afternoon half</span></label>
+				</div>
+				<input type="hidden" name="end_day_slot" id="absence-end-day-slot" value="">
+			</fieldset>
+			<p class="form-help">Take half of the first or last day — the days in between stay full.</p>
 		</div>
 		<button type="submit">Submit</button>
 	</form>
@@ -78,6 +113,9 @@
 	const group = document.getElementById('absence-day-fraction-group');
 	const full = document.getElementById('absence-day-fraction-full');
 	const half = document.getElementById('absence-day-fraction-half');
+	const slotGroup = document.getElementById('absence-day-slot-group');
+	const slotHelp = document.getElementById('absence-day-slot-help');
+	const boundaryGroup = document.getElementById('absence-boundary-half-group');
 	const preview = document.getElementById('absence-day-fraction-preview');
 	const live = document.getElementById('absence-day-fraction-live');
 	const multiTip = document.getElementById('absence-multi-day-half-tip');
@@ -95,6 +133,12 @@
 		}
 	}
 
+	function syncSlot(prefix) {
+		const hidden = document.getElementById('absence-' + prefix + '-day-slot');
+		const sel = document.querySelector('input[name="' + prefix + '_day_fraction"]:checked');
+		if (hidden) hidden.value = (sel && sel.getAttribute('data-slot')) || '';
+	}
+
 	function sync() {
 		const single = startEl.value === endEl.value;
 		const multi = startEl.value && endEl.value && startEl.value !== endEl.value;
@@ -106,7 +150,10 @@
 		const show = eligible && single;
 		const was = !group.hidden;
 		group.hidden = !show;
-		if (multiTip) multiTip.hidden = !(eligible && multi);
+		slotGroup.hidden = !(show && half.checked);
+		slotHelp.hidden = slotGroup.hidden;
+		if (boundaryGroup) boundaryGroup.hidden = !(eligible && multi);
+		if (multiTip) multiTip.hidden = true; // boundary controls replace the tip
 		if (!show) {
 			full.checked = true;
 			half.checked = false;
@@ -133,6 +180,12 @@
 	}
 
 	[full, half, typeEl, startEl, endEl].forEach((el) => el.addEventListener('change', sync));
+	if (boundaryGroup) {
+		boundaryGroup.addEventListener('change', function (ev) {
+			if (ev.target && ev.target.name === 'start_day_fraction') syncSlot('start');
+			if (ev.target && ev.target.name === 'end_day_fraction') syncSlot('end');
+		});
+	}
 	startEl.addEventListener('input', sync);
 	endEl.addEventListener('input', sync);
 	sync();

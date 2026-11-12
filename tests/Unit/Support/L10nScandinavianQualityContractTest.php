@@ -366,6 +366,10 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// 2026-11-24: 'netto' — column header, legit shared da/sv spelling
 		// (same word both languages).
 		'netto',
+		// 2026-11-25: 'Eftermiddag' — half-day slot label, legit shared
+		// da/sv spelling (same word both languages).
+		'Eftermiddag', 'Eftermiddag (halv dag)', 'Förmiddag', 'Förmiddag (halv dag)',
+		'eftermiddag', 'förmiddag',
 	];
 
 	/**

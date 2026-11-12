@@ -431,6 +431,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 			<step>OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState</step>
 			<step>OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog</step>
 			<step>OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays</step>
+			<step>OCA\ArbeitszeitCheck\Repair\SealAbsenceDayFractions</step>
 			<step>OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences</step>
 			<step>OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries</step>
 			<step>OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks</step>

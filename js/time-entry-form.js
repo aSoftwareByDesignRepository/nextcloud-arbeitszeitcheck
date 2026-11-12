@@ -113,6 +113,11 @@ class TimeEntryFormManager {
 
 		// Initial summary; auto-breaks only when the user opted in (toggle on, not dismissed).
 		setTimeout(() => {
+			// The deferred tick can outlive the page context (SPA-style
+			// teardown, test environments) — bail before touching window.
+			if (typeof window === 'undefined') {
+				return;
+			}
 			if (this.hasFormData()) {
 				if (this.shouldRunAutoBreakCalculation()) {
 					this.handleAutoBreakCalculation({ notify: false });

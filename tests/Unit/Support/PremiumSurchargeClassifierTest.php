@@ -247,4 +247,52 @@ class PremiumPolicyTest extends TestCase
 		$raw['categories'][0]['rate'] = 9.0;
 		$this->assertContains('PREMIUM_RATE_INVALID', PremiumPolicy::validate($raw));
 	}
+
+	/**
+	 * enabled flag (SC-05): a "false"/"0" string must never activate a
+	 * category — validate rejects non-canonical values, fromValidated parses
+	 * strict-bool (fail closed = disabled).
+	 */
+	private function policyWithEnabled(mixed $enabled): array
+	{
+		$cat = [
+			'id' => 'sun_premium',
+			'rate' => 0.5,
+			'applies_to' => PremiumPolicy::APPLIES_WEEKDAY,
+			'weekdays' => ['sun'],
+		];
+		if ($enabled !== null) {
+			$cat['enabled'] = $enabled;
+		}
+		return ['stacking' => PremiumPolicy::STACKING_MAX_SINGLE, 'categories' => [$cat]];
+	}
+
+	public function testEnabledAcceptsCanonicalValues(): void
+	{
+		foreach ([true, 1, '1', 'true'] as $on) {
+			$policy = PremiumPolicy::fromValidated($this->policyWithEnabled($on));
+			$this->assertTrue($policy->getCategories()[0]['enabled'], 'enabled ' . var_export($on, true));
+			$this->assertCount(1, $policy->getEnabledCategories());
+		}
+		foreach ([false, 0, '0', 'false'] as $off) {
+			$this->assertSame([], PremiumPolicy::validate($this->policyWithEnabled($off)), 'validate ' . var_export($off, true));
+			$policy = PremiumPolicy::fromValidated($this->policyWithEnabled($off));
+			$this->assertFalse($policy->getCategories()[0]['enabled'], 'enabled ' . var_export($off, true));
+			$this->assertCount(0, $policy->getEnabledCategories());
+		}
+	}
+
+	public function testEnabledAbsentDefaultsTrue(): void
+	{
+		$policy = PremiumPolicy::fromValidated($this->policyWithEnabled(null));
+		$this->assertTrue($policy->getCategories()[0]['enabled']);
+	}
+
+	public function testValidateRejectsNonCanonicalEnabled(): void
+	{
+		foreach (['maybe', 'yes', 2, 'FALSE '] as $bad) {
+			$errors = PremiumPolicy::validate($this->policyWithEnabled($bad));
+			$this->assertContains('PREMIUM_ENABLED_INVALID', $errors, 'enabled ' . var_export($bad, true));
+		}
+	}
 }

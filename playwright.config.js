@@ -52,6 +52,11 @@ const STATEFUL_SPECS = [
   // momos clocks in/out with the shared employee in its double-clock-in race
   // and toggles license/kiosk state — same shared-state race class.
   /momos-adversarial\.spec\.js/,
+  // Drives the shared employee's live clock session through a pending
+  // correction → withdraw → resumable cycle. A parallel spec stamping the
+  // same employee lands `clocked_out` where the test expects the session
+  // to resume (observed 2026-11-12, both fresh runs).
+  /single-stamp-correction\.spec\.js/,
   /compliance-gate-smoke\.spec\.js/,
   /concurrent-pending-decision\.spec\.js/,
   /manual-create-pending-approval\.spec\.js/,
@@ -61,6 +66,9 @@ const STATEFUL_SPECS = [
   // Mutates the shared employee's working-time assignment (personal model
   // create/assign/prune) — same shared-state class as admin-users-profile.
   /concurrent-personal-model\.spec\.js/,
+  // Creates a 4-day model, assigns it to the shared employee, restores —
+  // same working-time-assignment shared-state class as concurrent-personal-model.
+  /absence-day-accuracy\.spec\.js/,
   // Paid breaks: creates a model, reassigns the shared employee, writes an
   // entry and toggles org manual-entry settings — serialized + restored.
   /paid-breaks\.spec\.js/,
@@ -107,6 +115,11 @@ const STATEFUL_SPECS = [
   // Bulk decision creates + approves pending absences on the shared employee
   // — same absence-window/lock class as concurrent-absence-decision.
   /bulk-decision\.spec\.js/,
+  // Reuses/converts a residue vacation on the shared employee across a
+  // dry-run → real-convert → stale-CAS sequence — a parallel absence writer
+  // mutating the same row between calls flips the CAS mid-assert. Same
+  // per-account change-lock class as absence-new-types (observed 2026-11-12).
+  /absence-vacation-to-sick\.spec\.js/,
   // Seeds a pending external stamp on the shared e2e_employee — the
   // "Suggested stamps" card is visible on that fixture's dashboard for the
   // probe's duration and must not appear mid-run on a parallel spec.

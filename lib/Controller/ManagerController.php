@@ -2371,6 +2371,22 @@ class ManagerController extends Controller
 				$df = $payload['dayFraction'] ?? $payload['day_fraction'];
 				$data['day_fraction'] = is_array($df) ? (string)reset($df) : (string)$df;
 			}
+			// Slot + boundary-half fields (AZC-HALF-DAY-SLOTS-BOUNDARIES).
+			foreach ([
+				'day_slot' => ['daySlot', 'day_slot'],
+				'start_day_fraction' => ['startDayFraction', 'start_day_fraction'],
+				'start_day_slot' => ['startDaySlot', 'start_day_slot'],
+				'end_day_fraction' => ['endDayFraction', 'end_day_fraction'],
+				'end_day_slot' => ['endDaySlot', 'end_day_slot'],
+			] as $shapeKey => $aliases) {
+				foreach ($aliases as $alias) {
+					if (array_key_exists($alias, $payload)) {
+						$v = $payload[$alias];
+						$data[$shapeKey] = is_array($v) ? (string)reset($v) : ($v !== null ? (string)$v : null);
+						break;
+					}
+				}
+			}
 
 			try {
 				$absence = $this->absenceService->createApprovedAbsenceForEmployeeByManager($actorUserId, $targetUserId, $data);
@@ -3871,6 +3887,16 @@ class ManagerController extends Controller
 			], Http::STATUS_NOT_FOUND);
 		} catch (ConcurrentDecisionException $e) {
 			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+		} catch (\OCP\Lock\LockedException $e) {
+			// Month-closure / per-entry write lock held by an in-flight
+			// finalize or concurrent change: retryable busy, never a masked
+			// 500 (same contract as TimeTrackingController's LOCKED wire).
+			$message = $this->l10n->t('Another change is in progress for this time entry. Please wait a moment and try again.');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $message,
+				'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::LOCKED,
+			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
 				'Error in ManagerController::approveTimeEntryCorrection',
@@ -3978,6 +4004,13 @@ class ManagerController extends Controller
 			], Http::STATUS_NOT_FOUND);
 		} catch (ConcurrentDecisionException $e) {
 			return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+		} catch (\OCP\Lock\LockedException $e) {
+			$message = $this->l10n->t('Another change is in progress for this time entry. Please wait a moment and try again.');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $message,
+				'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::LOCKED,
+			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
 				'Error in ManagerController::rejectTimeEntryCorrection',
@@ -4126,6 +4159,13 @@ class ManagerController extends Controller
 			]);
 		} catch (DoesNotExistException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('Time entry not found')], Http::STATUS_NOT_FOUND);
+		} catch (\OCP\Lock\LockedException $e) {
+			$message = $this->l10n->t('Another change is in progress for this time entry. Please wait a moment and try again.');
+			return new JSONResponse([
+				'success' => false,
+				'error' => $message,
+				'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::LOCKED,
+			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ManagerController::correctTimeEntry', ['exception' => $e]);
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.')], Http::STATUS_INTERNAL_SERVER_ERROR);

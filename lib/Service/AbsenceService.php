@@ -19,7 +19,9 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
+use OCA\ArbeitszeitCheck\Support\AbsenceDayShape;
 use OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy;
+use OCA\ArbeitszeitCheck\Support\ShapeInputException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IDBConnection;
@@ -269,6 +271,14 @@ class AbsenceService
 				);
 				$absence->setDays($workingDays);
 			}
+			// Persist explicit fraction/slot columns (slots-boundaries spec):
+			// the stored shape, not days/weight derivation, is the truth.
+			if (!$this->isEntitlementDaysBoundType($data['type'])) {
+				$this->applyDayShapeColumns(
+					$absence,
+					$this->canonicalDayShape($data, $absence->getStartDate(), $absence->getEndDate())
+				);
+			}
 			$specialAmount = null;
 			if ($specialContext !== null) {
 				$specialAmount = $this->specialEntitlementService->requestAmount($specialContext, $absence);
@@ -298,9 +308,10 @@ class AbsenceService
 				// pre-check is outside this lock domain.
 				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), null);
-				if (!empty($overlappingInTx)) {
-					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
-				}
+				$this->assertNoCoverageConflict(
+					$userId, $absence->getStartDate(), $absence->getEndDate(),
+					$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+				);
 
 				$savedAbsence = $this->absenceMapper->insert($absence);
 				if ($specialContext !== null && $specialAmount !== null) {
@@ -456,6 +467,12 @@ class AbsenceService
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$this->applyVacationDurationHours($absence, $data, $workingDays);
 			}
+			if (!$this->isEntitlementDaysBoundType((string)$absence->getType())) {
+				$this->applyDayShapeColumns(
+					$absence,
+					$this->canonicalDayShape($data, $absence->getStartDate(), $absence->getEndDate())
+				);
+			}
 			$specialAmount = null;
 			if ($specialContext !== null) {
 				$specialAmount = $this->specialEntitlementService->requestAmount($specialContext, $absence);
@@ -477,9 +494,10 @@ class AbsenceService
 				// Re-assert under the month-closure locks (see createAbsence).
 				$this->assertAbsenceMutable($absence);
 				$overlappingInTx = $this->absenceMapper->findOverlapping($targetUserId, $absence->getStartDate(), $absence->getEndDate(), null);
-				if (!empty($overlappingInTx)) {
-					throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
-				}
+				$this->assertNoCoverageConflict(
+					$targetUserId, $absence->getStartDate(), $absence->getEndDate(),
+					$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+				);
 				if ($absence->getType() === Absence::TYPE_VACATION) {
 					$sd = $absence->getStartDate();
 					$ed = $absence->getEndDate();
@@ -649,15 +667,48 @@ class AbsenceService
 		// entry UI, not historical truth — but keeps normalize/range/integrity
 		// checks. An explicit client day_fraction is never trusted.
 		$fractionTrusted = false;
-		if (array_key_exists('day_fraction', $data)) {
-			$validateData['day_fraction'] = $data['day_fraction'];
+		// Explicit fraction/slot fields flow into the validation payload;
+		// absent → stored columns (sealed truth) or legacy days/weight
+		// derivation decide what the row really is.
+		$shapeInput = AbsenceDayShape::hasShapeInput($data);
+		foreach (['day_fraction', 'day_slot', 'start_day_fraction', 'start_day_slot', 'end_day_fraction', 'end_day_slot'] as $shapeKey) {
+			if (array_key_exists($shapeKey, $data)) {
+				$validateData[$shapeKey] = $data[$shapeKey];
+			}
+		}
+		$datesChanged = $originalStart !== null && $originalEnd !== null
+			&& ($originalStart->format('Y-m-d') !== $startDate->format('Y-m-d')
+				|| $originalEnd->format('Y-m-d') !== $endDate->format('Y-m-d'));
+		$storedShape = $this->entityDayShape($absence);
+		if ($shapeInput) {
+			// explicit input — validated via $validateData below
+		} elseif (!$datesChanged && $storedShape['fractional']) {
+			// Stored explicit columns are the trusted shape (EC-18 sealed):
+			// feed them back into validation so gate+overlap see real truth.
+			if ($storedShape['start_fraction'] < 1.0 - AbsenceDayShape::EPS) {
+				$validateData['start_day_fraction'] = (string)$storedShape['start_fraction'];
+				if ($storedShape['start_slot'] !== null) {
+					$validateData['start_day_slot'] = $storedShape['start_slot'];
+				}
+				if ($storedShape['single']) {
+					$validateData['day_fraction'] = (string)$storedShape['start_fraction'];
+				}
+			}
+			if (!$storedShape['single'] && $storedShape['end_fraction'] < 1.0 - AbsenceDayShape::EPS) {
+				$validateData['end_day_fraction'] = (string)$storedShape['end_fraction'];
+				if ($storedShape['end_slot'] !== null) {
+					$validateData['end_day_slot'] = $storedShape['end_slot'];
+				}
+			}
+			$fractionTrusted = true;
 		} elseif (
 			$absence->getType() === Absence::TYPE_VACATION
 			&& $this->vacationUnitService?->isHoursMode() !== true
 			&& $absence->getDays() !== null
+			&& !$storedShape['fractional']
 		) {
 			// Preserve trusted half-day when clients omit day_fraction (reason/substitute-only
-			// patches, older mobile APIs). Without this, normalizeDayFraction(null) → 1.0 and
+			// patches, older mobile APIs). Without this, an absent day_fraction → full day and
 			// silently inflates a 0.5 debit to a full working day (Zeus MF-01).
 			$storedDays = (float)$absence->getDays();
 			$calendarForNewDates = $this->computeWorkingDaysForUser(
@@ -722,6 +773,18 @@ class AbsenceService
 			);
 			$absence->setDays($workingDays);
 		}
+		// Shape column lifecycle (slots-boundaries spec): explicit input or a
+		// trusted fractional shape re-seals the columns; a date move without
+		// input clears them (shape belonged to the old calendar); otherwise
+		// stored columns stay untouched.
+		if (!$this->isEntitlementDaysBoundType((string)$absence->getType())) {
+			$finalShape = $this->canonicalDayShape($validateData, $absence->getStartDate(), $absence->getEndDate());
+			if ($shapeInput || $finalShape['fractional']) {
+				$this->applyDayShapeColumns($absence, $finalShape);
+			} elseif ($datesChanged) {
+				$this->applyDayShapeColumns($absence, AbsenceDayShape::full());
+			}
+		}
 		$absence->setUpdatedAt(new \DateTime());
 
 		// Normalize substitute workflow whenever substitute assignment changes.
@@ -760,9 +823,10 @@ class AbsenceService
 				$this->monthClosureService->assertDateRangeMutable($userId, $originalStart, $originalEnd);
 			}
 			$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), $id);
-			if (!empty($overlappingInTx)) {
-				throw new \Exception($this->l10n->t('This period overlaps with an existing absence.'));
-			}
+			$this->assertNoCoverageConflict(
+				$userId, $absence->getStartDate(), $absence->getEndDate(),
+				$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+			);
 
 			$this->specialEntitlementService?->syncForUpdatedAbsence($absence, $validateData, $oldData, $userId);
 			$updatedAbsence = $this->absenceMapper->update($absence);
@@ -2462,20 +2526,35 @@ class AbsenceService
 		// Extract type early (needed for past-date and overlap logic)
 		$type = isset($data['type']) && !is_array($data['type']) ? (string)$data['type'] : (is_array($data['type'] ?? null) && !empty($data['type']) ? (string)reset($data['type']) : '');
 
-		// Check for overlapping absences (exclude current absence when updating)
+		// Canonical day shape for the slot-aware overlap predicate.
+		// Entitlement-bound types keep their own fraction contract (EC-14):
+		// they reject the boundary/slot fields and stay full-coverage rows.
+		$isEntitlementBound = $type !== '' && $this->isEntitlementDaysBoundType($type);
+		if ($isEntitlementBound) {
+			$this->assertNoBoundaryShapeInput($data);
+			$dayShape = [
+				'single' => $startDate->format('Y-m-d') === $endDate->format('Y-m-d'),
+				'start_fraction' => 1.0,
+				'start_slot' => null,
+				'end_fraction' => 1.0,
+				'end_slot' => null,
+				'fractional' => false,
+			];
+		} else {
+			$dayShape = $this->canonicalDayShape(
+				$data,
+				$startDate,
+				$endDate,
+				$type === Absence::TYPE_VACATION ? Constants::VAC_HALF_DAY_INVALID : Constants::HALF_DAY_INVALID
+			);
+		}
+
+		// Slot-aware overlap check (exclude current absence when updating):
+		// complementary am/pm halves on the same day are legal, everything
+		// else stays a conflict exactly as before.
 		$overlapping = $this->absenceMapper->findOverlapping($userId, $startDate, $endDate, $excludeAbsenceId);
 		if (!empty($overlapping)) {
-			$first = $overlapping[0];
-			$overlapType = $first->getType();
-			$overlapStart = $first->getStartDate() ? $first->getStartDate()->format('d.m.Y') : '?';
-			$overlapEnd = $first->getEndDate() ? $first->getEndDate()->format('d.m.Y') : '?';
-			$overlapTypeLabel = AbsenceTypeCatalog::label($this->l10n, (string)$overlapType);
-			$baseMsg = $this->l10n->t('This period overlaps with an existing %1$s (%2$s – %3$s).', [$overlapTypeLabel, $overlapStart, $overlapEnd]);
-			if (in_array($type, [Absence::TYPE_SICK_LEAVE, Absence::TYPE_CHILD_SICK], true) && $overlapType === Absence::TYPE_VACATION) {
-				$hint = $this->l10n->t('If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.');
-				throw new \Exception($baseMsg . ' ' . $hint);
-			}
-			throw new \Exception($baseMsg);
+			$this->assertNoCoverageConflict($userId, $startDate, $endDate, $dayShape, $overlapping, $type);
 		}
 
 		// Validate type (single enumeration point: AbsenceTypeCatalog)
@@ -2870,54 +2949,218 @@ class AbsenceService
 	}
 
 	/**
-	 * Normalize request day_fraction to 1.0 or 0.5 (SEC-02 / Argus TH-04).
+	 * Canonicalize request fraction/slot fields into a day shape
+	 * (AZC-HALF-DAY-SLOTS-BOUNDARIES). Pure mapping — the enabled-gate and
+	 * range rules live in the debit resolvers to preserve error precedence.
 	 *
-	 * @param mixed $raw
+	 * @param array<string, mixed> $data
 	 * @throws BusinessRuleException
 	 */
-	private function normalizeDayFraction(mixed $raw, string $invalidCode = Constants::VAC_HALF_DAY_INVALID): float
+	private function canonicalDayShape(array $data, \DateTimeInterface $start, \DateTimeInterface $end, string $invalidCode = Constants::HALF_DAY_INVALID): array
 	{
-		if ($raw === null || $raw === '' || (is_array($raw) && $raw === [])) {
-			return 1.0;
+		try {
+			return AbsenceDayShape::canonicalize($data, $start, $end);
+		} catch (ShapeInputException $e) {
+			switch ($e->getMessage()) {
+				case AbsenceDayShape::ERR_SLOT:
+					throw new BusinessRuleException(
+						$this->l10n->t('Invalid day slot. Use morning or afternoon.'),
+						Constants::HALF_DAY_SLOT_INVALID
+					);
+				case AbsenceDayShape::ERR_SLOT_GHOST:
+					throw new BusinessRuleException(
+						$this->l10n->t('A morning/afternoon slot only makes sense together with a half day.'),
+						Constants::HALF_DAY_SLOT_INVALID
+					);
+				case AbsenceDayShape::ERR_END_ON_SINGLE:
+				case AbsenceDayShape::ERR_CONFLICT:
+				default:
+					throw new BusinessRuleException(
+						$this->l10n->t('Invalid day fraction. Use full day or half day.'),
+						$invalidCode
+					);
+			}
 		}
-		if (is_array($raw)) {
-			$raw = reset($raw);
-		}
-		if (is_bool($raw) || is_object($raw)) {
+	}
+
+	/**
+	 * Entitlement-bound types own their fraction contract (EC-14): the new
+	 * boundary/slot fields are not part of it — fail loud, never silently
+	 * drop them into a shape the entitlement path cannot see.
+	 *
+	 * @param array<string, mixed> $data
+	 * @throws BusinessRuleException
+	 */
+	private function assertNoBoundaryShapeInput(array $data): void
+	{
+		foreach (['day_slot', 'start_day_fraction', 'start_day_slot', 'end_day_fraction', 'end_day_slot'] as $key) {
+			$v = $data[$key] ?? null;
+			if ($v === null || $v === '' || (is_array($v) && $v === [])) {
+				continue;
+			}
 			throw new BusinessRuleException(
-				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				$invalidCode
+				$this->l10n->t('Half-day boundary options are not available for this absence type.'),
+				Constants::HALF_DAY_INVALID
 			);
 		}
-		$s = trim((string)$raw);
-		if ($s === '') {
-			return 1.0;
+	}
+
+	/**
+	 * Day-shape derived from a stored entity's explicit columns (tx rechecks,
+	 * update-overlap). Fraction<1 only when a column is set — NULL means full.
+	 */
+	private function entityDayShape(Absence $a): array
+	{
+		$start = $a->getStartDate();
+		$end = $a->getEndDate();
+		$single = $start !== null && $end !== null
+			&& $start->format('Y-m-d') === $end->format('Y-m-d');
+		$sF = $a->getStartDayFraction();
+		$eF = $a->getEndDayFraction();
+		$sFv = ($sF !== null && is_finite((float)$sF)) ? (float)$sF : 1.0;
+		$eFv = (!$single && $eF !== null && is_finite((float)$eF)) ? (float)$eF : 1.0;
+		return [
+			'single' => $single,
+			'start_fraction' => $sFv,
+			'start_slot' => $sFv < 1.0 - AbsenceDayShape::EPS ? $a->getStartDaySlot() : null,
+			'end_fraction' => $eFv,
+			'end_slot' => $eFv < 1.0 - AbsenceDayShape::EPS ? $a->getEndDaySlot() : null,
+			'fractional' => $sFv < 1.0 - AbsenceDayShape::EPS || $eFv < 1.0 - AbsenceDayShape::EPS,
+		];
+	}
+
+	/**
+	 * Persist the four fraction/slot columns from a canonical shape.
+	 * Full boundaries normalize to NULL ("nothing special stored").
+	 */
+	private function applyDayShapeColumns(Absence $absence, array $shape): void
+	{
+		[$sF, $sS, $eF, $eS] = AbsenceDayShape::columnsForShape($shape);
+		$absence->setStartDayFraction($sF);
+		$absence->setStartDaySlot($sS);
+		$absence->setEndDayFraction($eF);
+		$absence->setEndDaySlot($eS);
+	}
+
+	/**
+	 * Slot-aware overlap authority (AZC-HALF-DAY-SLOTS-BOUNDARIES, NN-02).
+	 *
+	 * A calendar day may be shared only by covers that are all fractional,
+	 * sum to ≤1.0 and carry distinct explicit slots (am/pm). Everything
+	 * else is a conflict. The candidate coverage comes from the canonical
+	 * request shape (validate) or the persisted entity columns (tx recheck).
+	 *
+	 * @param array{single: bool, start_fraction: float, start_slot: ?string, end_fraction: float, end_slot: ?string} $shape
+	 * @param Absence[] $overlapping
+	 * @throws \Exception overlap conflict (same wire contract as before)
+	 */
+	private function assertNoCoverageConflict(
+		string $userId,
+		\DateTime $startDate,
+		\DateTime $endDate,
+		array $shape,
+		array $overlapping,
+		string $type,
+	): void {
+		$sY = $startDate->format('Y-m-d');
+		$eY = $endDate->format('Y-m-d');
+		$fracDays = [];
+		if ($shape['start_fraction'] < 1.0 - AbsenceDayShape::EPS) {
+			$fracDays[$sY] = true;
 		}
-		$s = str_replace(',', '.', $s);
-		if (!preg_match('/^\d+(\.\d+)?$/', $s)) {
-			throw new BusinessRuleException(
-				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				$invalidCode
-			);
+		if (!$shape['single'] && $shape['end_fraction'] < 1.0 - AbsenceDayShape::EPS) {
+			$fracDays[$eY] = true;
 		}
-		$v = (float)$s;
-		if (!is_finite($v)) {
-			throw new BusinessRuleException(
-				$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-				$invalidCode
-			);
+		$weightFor = function (string $ymd) use ($userId): float {
+			$d = \DateTime::createFromFormat('!Y-m-d', $ymd) ?: new \DateTime($ymd);
+			return $this->computeWorkingDaysForUser($userId, $d, $d);
+		};
+		$candidateCover = function (string $ymd) use ($shape, $sY, $eY): array {
+			if ($shape['single'] || $ymd === $sY) {
+				return [$shape['start_fraction'], $shape['start_slot']];
+			}
+			if ($ymd === $eY) {
+				return [$shape['end_fraction'], $shape['end_slot']];
+			}
+			return [1.0, null];
+		};
+
+		$conflict = null; // ['row' => Absence, 'ymd' => string, 'slots' => list<?string>]
+		foreach ($overlapping as $row) {
+			$rs = $row->getStartDate();
+			$re = $row->getEndDate();
+			if ($rs === null || $re === null) {
+				continue;
+			}
+			$aY = max($rs->format('Y-m-d'), $sY);
+			$bY = min($re->format('Y-m-d'), $eY);
+			if ($aY > $bY) {
+				continue;
+			}
+			// Every shared day must be a fractional boundary of the candidate;
+			// any other shared day is claimed fully by the candidate → conflict.
+			if ($aY === $bY) {
+				if (!isset($fracDays[$aY])) {
+					$conflict = ['row' => $row, 'ymd' => $aY, 'slots' => []];
+					break;
+				}
+				$sharedDays = [$aY];
+			} else {
+				if (!($aY === $sY && $bY === $eY && isset($fracDays[$sY]) && isset($fracDays[$eY])
+					&& $startDate->diff($endDate)->days === 1)) {
+					$conflict = ['row' => $row, 'ymd' => $aY, 'slots' => []];
+					break;
+				}
+				$sharedDays = [$aY, $bY];
+			}
+			// Aggregate coverage per shared day across ALL overlapping rows.
+			foreach ($sharedDays as $ymd) {
+				$covers = [$candidateCover($ymd)];
+				$slots = [];
+				$dObj = \DateTime::createFromFormat('!Y-m-d', $ymd) ?: new \DateTime($ymd);
+				foreach ($overlapping as $other) {
+					$c = AbsenceDayShape::coverageOn($other, $dObj, $weightFor);
+					if ($c <= AbsenceDayShape::EPS) {
+						continue;
+					}
+					$sl = AbsenceDayShape::slotOn($other, $dObj);
+					$covers[] = [$c, $sl];
+					$slots[] = $sl;
+				}
+				if (!AbsenceDayShape::coversCompatible($covers)) {
+					$conflict = ['row' => $row, 'ymd' => $ymd, 'slots' => $slots];
+					break 2;
+				}
+			}
 		}
-		// Strict membership on the parsed float (rejects 0.5000001 / 0.25).
-		if (abs($v - 1.0) < 1e-9) {
-			return 1.0;
+
+		if ($conflict === null) {
+			return;
 		}
-		if (abs($v - 0.5) < 1e-9) {
-			return 0.5;
+		$row = $conflict['row'];
+		$overlapType = $row->getType();
+		$overlapStart = $row->getStartDate() ? $row->getStartDate()->format('d.m.Y') : '?';
+		$overlapEnd = $row->getEndDate() ? $row->getEndDate()->format('d.m.Y') : '?';
+		$overlapTypeLabel = AbsenceTypeCatalog::label($this->l10n, (string)$overlapType);
+		$baseMsg = $this->l10n->t('This period overlaps with an existing %1$s (%2$s – %3$s).', [$overlapTypeLabel, $overlapStart, $overlapEnd]);
+		$slot = null;
+		foreach ($conflict['slots'] as $sl) {
+			if ($sl !== null) {
+				$slot = $sl;
+				break;
+			}
 		}
-		throw new BusinessRuleException(
-			$this->l10n->t('Invalid day fraction. Use full day or half day.'),
-			$invalidCode
-		);
+		if ($slot !== null) {
+			$slotLabel = $slot === AbsenceDayShape::SLOT_AM
+				? $this->l10n->t('morning')
+				: $this->l10n->t('afternoon');
+			$baseMsg .= ' ' . $this->l10n->t('It already covers the %1$s of %2$s.', [$slotLabel, (new \DateTime($conflict['ymd']))->format('d.m.Y')]);
+		}
+		if (in_array($type, [Absence::TYPE_SICK_LEAVE, Absence::TYPE_CHILD_SICK], true) && $overlapType === Absence::TYPE_VACATION) {
+			$hint = $this->l10n->t('If you were sick during vacation, please shorten or cancel the vacation first, then submit a separate sick leave request.');
+			throw new \Exception($baseMsg . ' ' . $hint);
+		}
+		throw new \Exception($baseMsg);
 	}
 
 	/**
@@ -2948,7 +3191,12 @@ class AbsenceService
 		if (!is_finite($srcWeight) || $srcWeight <= 0.011) {
 			return $targetWeight;
 		}
-		$fraction = min(1.0, (float)$srcDays / $srcWeight);
+		// Explicit stored fraction is the truth; only NULL-column legacy rows
+		// fall back to the days/weight derivation (EC-18).
+		$fraction = AbsenceDayShape::fractionForBoundary($source, $srcStart);
+		if ($fraction === null) {
+			$fraction = min(1.0, (float)$srcDays / $srcWeight);
+		}
 		if ($fraction >= 1.0 - 0.011) {
 			return $targetWeight;
 		}
@@ -2994,12 +3242,12 @@ class AbsenceService
 		array $data,
 		bool $fractionTrusted = false,
 	): float {
-		$w = $this->computeWorkingDaysForUser($userId, $start, $end);
 		if ($this->isEntitlementDaysBoundType($type)) {
-			return $w;
+			$this->assertNoBoundaryShapeInput($data);
+			return $this->computeWorkingDaysForUser($userId, $start, $end);
 		}
-		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null, Constants::HALF_DAY_INVALID);
-		if (abs($fraction - 0.5) < 1e-9) {
+		$shape = $this->canonicalDayShape($data, $start, $end, Constants::HALF_DAY_INVALID);
+		if ($shape['fractional']) {
 			if (!$fractionTrusted
 				&& !HalfDayTypePolicy::isEnabledForType($type, $this->halfDayEnabledTypes())) {
 				throw new BusinessRuleException(
@@ -3007,15 +3255,21 @@ class AbsenceService
 					Constants::HALF_DAY_TYPE_NOT_ENABLED
 				);
 			}
-			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
+			if ($shape['legacy_range_fraction']) {
 				throw new BusinessRuleException(
-					$this->l10n->t('A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
+					$this->l10n->t('A half day is only allowed when start and end are the same day. To take half of the first or last day of a longer period, use the boundary half-day options.'),
 					Constants::HALF_DAY_RANGE_FORBIDDEN
 				);
 			}
-			return $w * 0.5;
 		}
-		return $w;
+		$debit = AbsenceDayShape::debitForShape(
+			$shape,
+			$userId,
+			$start,
+			$end,
+			fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($userId, $a, $b)
+		);
+		return (float)$debit['days'];
 	}
 
 	/**
@@ -3040,9 +3294,9 @@ class AbsenceService
 			return $w;
 		}
 
-		$fraction = $this->normalizeDayFraction($data['day_fraction'] ?? null);
+		$shape = $this->canonicalDayShape($data, $start, $end, Constants::VAC_HALF_DAY_INVALID);
 
-		if (abs($fraction - 0.5) < 1e-9
+		if ($shape['fractional']
 			&& !$fractionTrusted
 			&& !$this->isEntitlementDaysBoundType(Absence::TYPE_VACATION)
 			&& !HalfDayTypePolicy::isEnabledForType(Absence::TYPE_VACATION, $this->halfDayEnabledTypes())) {
@@ -3052,40 +3306,65 @@ class AbsenceService
 			);
 		}
 
-		if (abs($fraction - 0.5) < 1e-9) {
-			if ($start->format('Y-m-d') !== $end->format('Y-m-d')) {
+		if ($shape['fractional']) {
+			if ($shape['legacy_range_fraction']) {
 				throw new BusinessRuleException(
-					$this->l10n->t('Half-day vacation is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
+					$this->l10n->t('Half-day vacation is only allowed when start and end are the same day. To take half of the first or last day of a longer period, use the boundary half-day options.'),
 					Constants::VAC_HALF_DAY_RANGE_FORBIDDEN
 				);
 			}
-			if ($w < 0.999) {
+			$debit = AbsenceDayShape::debitForShape(
+				$shape,
+				$userId,
+				$start,
+				$end,
+				fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($userId, $a, $b)
+			);
+			// Vacation keeps its absolute-0.5 semantic: a halved day must be a
+			// full working day, so weight × 0.5 = 0.5 exactly. Generalized per
+			// halved boundary day (AZC-HALF-DAY-SLOTS-BOUNDARIES AC-S6/S7).
+			if ($shape['start_fraction'] < 1.0 - AbsenceDayShape::EPS
+				&& $debit['start_weight'] < 0.999) {
 				throw new BusinessRuleException(
 					$this->l10n->t('This day is not a full working day; half-day vacation cannot be booked.'),
 					Constants::VAC_HALF_DAY_NON_WORKING
 				);
 			}
-			$debit = 0.5;
+			if (!$shape['single'] && $shape['end_fraction'] < 1.0 - AbsenceDayShape::EPS
+				&& $debit['end_weight'] < 0.999) {
+				throw new BusinessRuleException(
+					$this->l10n->t('This day is not a full working day; half-day vacation cannot be booked.'),
+					Constants::VAC_HALF_DAY_NON_WORKING
+				);
+			}
+			$debitDays = (float)$debit['days'];
 		} else {
 			if ($w < 0.01) {
 				throw new \Exception($this->l10n->t('Vacation must include at least one working day. The selected period contains only weekends or public holidays.'));
 			}
-			$debit = $w;
+			$debitDays = $w;
 		}
 
 		// Defensive write-path integrity (should always hold when only this helper sets days).
 		$probe = new Absence();
 		$probe->setStartDate(clone $start);
 		$probe->setEndDate(clone $end);
-		$probe->setDays($debit);
-		if (!VacationAllocationService::isTrustedStoredVacationDays($probe, $debit, $w)) {
+		$probe->setDays($debitDays);
+		if ($shape['fractional']) {
+			[$psF, $psS, $peF, $peS] = AbsenceDayShape::columnsForShape($shape);
+			$probe->setStartDayFraction($psF);
+			$probe->setStartDaySlot($psS);
+			$probe->setEndDayFraction($peF);
+			$probe->setEndDaySlot($peS);
+		}
+		if (!VacationAllocationService::isTrustedStoredVacationDays($probe, $debitDays, $w)) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Vacation day amount is inconsistent with the selected dates.'),
 				Constants::VAC_HALF_DAY_INTEGRITY
 			);
 		}
 
-		return $debit;
+		return $debitDays;
 	}
 
 	/**
@@ -3334,6 +3613,17 @@ class AbsenceService
 				$sick->setEndDate($sickEnd);
 				$sick->setReason($reason !== '' ? $reason : null);
 				$sick->setDays($this->daysWithCarriedFraction($absence, $ownerUserId, $sickStart, $sickEnd));
+				// Shape columns: snapshot the source BEFORE its dates are
+				// mutated below — the sick row and any tail inherit boundary
+				// fractions/slots only where they still cover the original
+				// boundary day (columnsInheritedForRange, spec edge-case
+				// "conversion preserves boundary halves still in range").
+				$shapeSource = clone $absence;
+				[$skF, $skS, $skEF, $skES] = AbsenceDayShape::columnsInheritedForRange($shapeSource, $sickStart, $sickEnd);
+				$sick->setStartDayFraction($skF);
+				$sick->setStartDaySlot($skS);
+				$sick->setEndDayFraction($skEF);
+				$sick->setEndDaySlot($skES);
 				$now = $this->nowInStorage();
 				if ($managerFlow) {
 					$sick->setStatus(Absence::STATUS_APPROVED);
@@ -3364,18 +3654,49 @@ class AbsenceService
 					if ($plan['mode'] === 'head') {
 						$absence->setStartDate($plan['vacStart']);
 					}
+					// Kept range: boundary halves survive only when that
+					// boundary day is still inside the kept window — columns
+					// and debit are recomputed together from the inherited
+					// shape so stored days and stored shape can never drift.
+					[$abF, $abS, $abEF, $abES] = AbsenceDayShape::columnsInheritedForRange(
+						$shapeSource, $absence->getStartDate(), $absence->getEndDate()
+					);
+					$inheritedData = [
+						'type' => (string)$absence->getType(),
+						'start_date' => $absence->getStartDate()->format('Y-m-d'),
+						'end_date' => $absence->getEndDate()->format('Y-m-d'),
+						'start_day_fraction' => $abF,
+						'start_day_slot' => $abS,
+						'end_day_fraction' => $abEF,
+						'end_day_slot' => $abES,
+					];
 					if ($isVacation) {
-						$absence->setDays($this->resolveVacationDaysDebit($ownerUserId, $absence->getStartDate(), $absence->getEndDate(), [
-							'type' => Absence::TYPE_VACATION,
-							'start_date' => $absence->getStartDate()->format('Y-m-d'),
-							'end_date' => $absence->getEndDate()->format('Y-m-d'),
-						]));
+						$absence->setDays($this->resolveVacationDaysDebit(
+							$ownerUserId, $absence->getStartDate(), $absence->getEndDate(), $inheritedData, true
+						));
 						if ($this->vacationUnitService?->isHoursMode()) {
 							$this->recomputeVacationHoursAfterShorten($absence, $vacEnd, $oldData, (float)$absence->getDays());
 						}
 					} else {
-						$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $absence->getStartDate(), $absence->getEndDate()));
+						// Trusted inherited shape — no gate re-run (the row
+						// was already validated at create). Pure shape math
+						// keeps entitlement-bound types at full weight since
+						// they can never carry boundary columns.
+						try {
+							$shape = AbsenceDayShape::canonicalize($inheritedData, $absence->getStartDate(), $absence->getEndDate());
+							$debit = AbsenceDayShape::debitForShape(
+								$shape, $ownerUserId, $absence->getStartDate(), $absence->getEndDate(),
+								fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($ownerUserId, $a, $b)
+							);
+							$absence->setDays($debit['days']);
+						} catch (ShapeInputException) {
+							$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $absence->getStartDate(), $absence->getEndDate()));
+						}
 					}
+					$absence->setStartDayFraction($abF);
+					$absence->setStartDaySlot($abS);
+					$absence->setEndDayFraction($abEF);
+					$absence->setEndDaySlot($abES);
 					if ($plan['mode'] === 'split') {
 						$tail = new Absence();
 						$tail->setUserId($ownerUserId);
@@ -3390,12 +3711,25 @@ class AbsenceService
 						$tail->setApprovedByUserId($absence->getApprovedByUserId());
 						$tail->setApprovedAt($absence->getApprovedAt());
 						$tail->setApproverComment($absence->getApproverComment());
+						// The tail covers the later part of the ORIGINAL
+						// range — it inherits the original end-boundary half
+						// (and never a start half: its first day is interior).
+						[$tF, $tS, $tEF, $tES] = AbsenceDayShape::columnsInheritedForRange(
+							$shapeSource, $tail->getStartDate(), $tail->getEndDate()
+						);
+						$tailData = [
+							'type' => (string)$tail->getType(),
+							'start_date' => $tail->getStartDate()->format('Y-m-d'),
+							'end_date' => $tail->getEndDate()->format('Y-m-d'),
+							'start_day_fraction' => $tF,
+							'start_day_slot' => $tS,
+							'end_day_fraction' => $tEF,
+							'end_day_slot' => $tES,
+						];
 						if ($isVacation) {
-							$tail->setDays($this->resolveVacationDaysDebit($ownerUserId, $tail->getStartDate(), $tail->getEndDate(), [
-								'type' => Absence::TYPE_VACATION,
-								'start_date' => $tail->getStartDate()->format('Y-m-d'),
-								'end_date' => $tail->getEndDate()->format('Y-m-d'),
-							]));
+							$tail->setDays($this->resolveVacationDaysDebit(
+								$ownerUserId, $tail->getStartDate(), $tail->getEndDate(), $tailData, true
+							));
 							if ($this->vacationUnitService?->isHoursMode()) {
 								$tail->setDurationHours(null);
 								$this->applyVacationDurationHours($tail, [
@@ -3404,8 +3738,21 @@ class AbsenceService
 								], (float)$tail->getDays());
 							}
 						} else {
-							$tail->setDays($this->computeWorkingDaysForUser($ownerUserId, $tail->getStartDate(), $tail->getEndDate()));
+							try {
+								$tShape = AbsenceDayShape::canonicalize($tailData, $tail->getStartDate(), $tail->getEndDate());
+								$tDebit = AbsenceDayShape::debitForShape(
+									$tShape, $ownerUserId, $tail->getStartDate(), $tail->getEndDate(),
+									fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($ownerUserId, $a, $b)
+								);
+								$tail->setDays($tDebit['days']);
+							} catch (ShapeInputException) {
+								$tail->setDays($this->computeWorkingDaysForUser($ownerUserId, $tail->getStartDate(), $tail->getEndDate()));
+							}
 						}
+						$tail->setStartDayFraction($tF);
+						$tail->setStartDaySlot($tS);
+						$tail->setEndDayFraction($tEF);
+						$tail->setEndDaySlot($tES);
 						$tail->setCreatedAt($now);
 						$tail->setUpdatedAt($now);
 					}

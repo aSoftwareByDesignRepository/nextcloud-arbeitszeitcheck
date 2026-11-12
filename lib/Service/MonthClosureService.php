@@ -53,6 +53,8 @@ class MonthClosureService
 	private ?PremiumSurchargeService $premiumSurchargeService;
 	private MonthClosureContributorRegistry $contributorRegistry;
 	private WorkforceSuiteConfig $workforceConfig;
+	/** @var array<string, int> request-scoped refcount for held month_closure locks */
+	private array $heldMonthClosureLocks = [];
 
 	public function __construct(
 		MonthClosureMapper $closureMapper,
@@ -518,25 +520,45 @@ class MonthClosureService
 	 */
 	public function acquireMonthClosureTierLocks(array $keys): void
 	{
+		// Re-entrant: a nested writer (e.g. correction approve → paid-break
+		// recompute, which takes the same month keys) must not deadlock on
+		// the exclusive lock this request already holds — the DB provider
+		// is not re-entrant. Refcount per key; only the outermost release
+		// frees the provider lock.
 		$held = [];
 		try {
 			foreach ($keys as $key) {
-				$this->lockingProvider->acquireLock(
-					$key,
-					ILockingProvider::LOCK_EXCLUSIVE,
-					'Month-closure window write'
-				);
+				if (($this->heldMonthClosureLocks[$key] ?? 0) > 0) {
+					$this->heldMonthClosureLocks[$key]++;
+				} else {
+					$this->lockingProvider->acquireLock(
+						$key,
+						ILockingProvider::LOCK_EXCLUSIVE,
+						'Month-closure window write'
+					);
+					$this->heldMonthClosureLocks[$key] = 1;
+				}
 				$held[] = $key;
 			}
 		} catch (\Throwable $e) {
 			foreach (array_reverse($held) as $key) {
-				try {
-					$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
-				} catch (\Throwable) {
-					// Best effort — the lock TTL is the final safety net.
-				}
+				$this->releaseMonthClosureLock($key);
 			}
 			throw $e;
+		}
+	}
+
+	private function releaseMonthClosureLock(string $key): void
+	{
+		if (($this->heldMonthClosureLocks[$key] ?? 0) > 1) {
+			$this->heldMonthClosureLocks[$key]--;
+			return;
+		}
+		unset($this->heldMonthClosureLocks[$key]);
+		try {
+			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		} catch (\Throwable $e) {
+			$this->logger->warning('Failed to release month closure lock: ' . $e->getMessage(), ['exception' => $e]);
 		}
 	}
 
@@ -549,11 +571,7 @@ class MonthClosureService
 	public function releaseMonthClosureTierLocks(array $keys): void
 	{
 		foreach (array_reverse($keys) as $key) {
-			try {
-				$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
-			} catch (\Throwable $e) {
-				$this->logger->warning('Failed to release month closure lock: ' . $e->getMessage(), ['exception' => $e]);
-			}
+			$this->releaseMonthClosureLock($key);
 		}
 	}
 

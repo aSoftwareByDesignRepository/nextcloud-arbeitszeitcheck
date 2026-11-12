@@ -40,6 +40,7 @@ function restore(string $source, string $backup): void
 
 $suiteFilters = [
 	'AbsenceHalfDayNonVacationTest',
+	'AbsenceDayShapeTest',
 	'HalfDayTypePolicyTest',
 	'PaidAbsencePlannedHoursCreditServiceTest',
 	'RecomputeAbsenceDaysScheduleTest',
@@ -93,59 +94,49 @@ $mutations = [
 		],
 	],
 	[
-		'name' => 'drop_single_day_guard',
+		'name' => 'drop_legacy_range_fraction_guard',
 		'file' => 'lib/Service/AbsenceService.php',
-		'from' => "			if (\$start->format('Y-m-d') !== \$end->format('Y-m-d')) {
-				throw new BusinessRuleException(
-					\$this->l10n->t('A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
-					Constants::HALF_DAY_RANGE_FORBIDDEN
-				);
-			}",
+		'from' => "			if (\$shape['legacy_range_fraction']) {
+				throw new BusinessRuleException(",
 		'to' => "			if (false) {
-				throw new BusinessRuleException(
-					\$this->l10n->t('A half day is only allowed when start and end are the same day. For mixed half and full days, submit separate requests.'),
-					Constants::HALF_DAY_RANGE_FORBIDDEN
-				);
-			}",
+				throw new BusinessRuleException(",
 		'filters' => ['AbsenceHalfDayNonVacationTest::testCreateSickMultiDayHalfRejected'],
 	],
 	[
 		'name' => 'drop_fraction_multiply',
-		'file' => 'lib/Service/AbsenceService.php',
-		'from' => 'return $w * 0.5;',
-		'to' => 'return $w;',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => "'days' => round(\$wStart * \$shape['start_fraction'], 4),",
+		'to' => "'days' => round(\$wStart, 4),",
 		'filters' => [
+			'AbsenceDayShapeTest::testDebitSingleDayHalfWeightRelative',
 			'AbsenceHalfDayNonVacationTest::testCreateSickHalfDayWhenEnabled',
 			'AbsenceHalfDayNonVacationTest::testHalfDayOnHalfWeightDayStoresQuarter',
 			'AbsenceHalfDayNonVacationTest::testManagerCreateApprovedSickHalfDay',
 		],
 	],
 	[
+		'name' => 'drop_boundary_fraction_multiply',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => "\$days = \$interior
+			+ \$wStart * \$shape['start_fraction']
+			+ \$wEnd * \$shape['end_fraction'];",
+		'to' => "\$days = \$interior
+			+ \$wStart
+			+ \$wEnd;",
+		'filters' => ['AbsenceDayShapeTest::testDebitBoundaryHalvesMultiDay'],
+	],
+	[
 		'name' => 'drop_entitlement_bypass',
 		'file' => 'lib/Service/AbsenceService.php',
 		'from' => "		if (\$this->isEntitlementDaysBoundType(\$type)) {
-			return \$w;
+			\$this->assertNoBoundaryShapeInput(\$data);
+			return \$this->computeWorkingDaysForUser(\$userId, \$start, \$end);
 		}",
 		'to' => "		if (false && \$this->isEntitlementDaysBoundType(\$type)) {
-			return \$w;
+			\$this->assertNoBoundaryShapeInput(\$data);
+			return \$this->computeWorkingDaysForUser(\$userId, \$start, \$end);
 		}",
 		'filters' => ['AbsenceHalfDayNonVacationTest::testEntitlementBoundTypeBypassesGate'],
-	],
-	[
-		'name' => 'accept_quarter_fraction',
-		'file' => 'lib/Service/AbsenceService.php',
-		'from' => "		if (abs(\$v - 0.5) < 1e-9) {
-			return 0.5;
-		}
-		throw new BusinessRuleException(",
-		'to' => "		if (abs(\$v - 0.5) < 1e-9) {
-			return 0.5;
-		}
-		if (abs(\$v - 0.25) < 1e-9) {
-			return 0.25;
-		}
-		throw new BusinessRuleException(",
-		'filters' => ['AbsenceHalfDayNonVacationTest::testCreateSickInvalidFractionRejected'],
 	],
 	[
 		'name' => 'drop_trusted_preserve',
@@ -196,6 +187,51 @@ $mutations = [
 		'from' => 'foreach ([0.25, 0.5, 0.75] as $knownFraction) {',
 		'to' => 'foreach ([] as $knownFraction) {',
 		'filters' => ['RecomputeAbsenceDaysScheduleTest'],
+	],
+	[
+		'name' => 'shape_ghost_slot_allowed',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => 'if ($slot !== null && $f >= 1.0 - self::EPS) {
+				throw new ShapeInputException(self::ERR_SLOT_GHOST);',
+		'to' => 'if (false) {
+				throw new ShapeInputException(self::ERR_SLOT_GHOST);',
+		'filters' => ['AbsenceDayShapeTest::testGhostSlotWithoutFractionThrows'],
+	],
+	[
+		'name' => 'shape_same_slot_pair_allowed',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => 'if (isset($slots[$slot])) {
+				return false;
+			}',
+		'to' => 'if (false) {
+				return false;
+			}',
+		'filters' => ['AbsenceDayShapeTest::testSameSlotRejected'],
+	],
+	[
+		'name' => 'shape_slotless_pair_allowed',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => 'if ($slot === null || !in_array($slot, [self::SLOT_AM, self::SLOT_PM], true)) {
+				return false;
+			}',
+		'to' => 'if (false && ($slot === null || !in_array($slot, [self::SLOT_AM, self::SLOT_PM], true))) {
+				return false;
+			}',
+		'filters' => ['AbsenceDayShapeTest::testSlotlessHalfCannotPair'],
+	],
+	[
+		'name' => 'shape_overfill_allowed',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => 'return $sum <= 1.0 + self::EPS;',
+		'to' => 'return true;',
+		'filters' => ['AbsenceDayShapeTest::testDistinctSlotsOverfillRejected'],
+	],
+	[
+		'name' => 'shape_full_shortcircuit_removed',
+		'file' => 'lib/Support/AbsenceDayShape.php',
+		'from' => "if (!\$shape['fractional']) {",
+		'to' => "if (true) {",
+		'filters' => ['AbsenceDayShapeTest::testDebitSingleDayHalfWeightRelative','AbsenceDayShapeTest::testDebitBoundaryHalvesMultiDay'],
 	],
 ];
 

@@ -74,6 +74,16 @@ final class WeekdaySchedule
 	}
 
 	/**
+	 * Strict-bool parse for stored form-ish flags — a "false"/"0" string must
+	 * never be truthy (fail closed: not-working / unpaid).
+	 */
+	private static function truthyFlag(mixed $value): bool
+	{
+		return $value === true || $value === 1 || $value === '1'
+			|| (is_string($value) && strtolower(trim($value)) === 'true');
+	}
+
+	/**
 	 * @param array<string, mixed> $raw
 	 * @return list<string> error codes
 	 */
@@ -91,7 +101,7 @@ final class WeekdaySchedule
 				continue;
 			}
 			$row = $days[$day];
-			$work = !empty($row['work']);
+			$work = self::truthyFlag($row['work'] ?? null);
 			if (!$work) {
 				continue;
 			}
@@ -145,7 +155,7 @@ final class WeekdaySchedule
 		$normalized = [];
 		foreach (self::DAYS as $day) {
 			$row = is_array($daysIn[$day] ?? null) ? $daysIn[$day] : ['work' => false];
-			$work = !empty($row['work']);
+			$work = self::truthyFlag($row['work'] ?? null);
 			if (!$work) {
 				$normalized[$day] = ['work' => false];
 				continue;
@@ -158,7 +168,7 @@ final class WeekdaySchedule
 				$breaks[] = [
 					'start' => (string)$break['start'],
 					'end' => (string)$break['end'],
-					'paid' => !empty($break['paid']),
+					'paid' => self::truthyFlag($break['paid'] ?? null),
 				];
 			}
 			$normalized[$day] = [

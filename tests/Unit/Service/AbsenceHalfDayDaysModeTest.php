@@ -391,18 +391,19 @@ class AbsenceHalfDayDaysModeTest extends TestCase
 		$this->assertEqualsWithDelta(8.0, (float)$absence->getDurationHours(), 0.001);
 	}
 
-	public function testNormalizeDayFractionMatrixViaReflection(): void
+	public function testDayFractionMatrixViaCanonicalize(): void
 	{
-		$ref = new ReflectionClass(AbsenceService::class);
-		$m = $ref->getMethod('normalizeDayFraction');
-		$m->setAccessible(true);
-		$this->assertSame(1.0, $m->invoke($this->service, null));
-		$this->assertSame(1.0, $m->invoke($this->service, ''));
-		$this->assertSame(0.5, $m->invoke($this->service, '0.5'));
-		$this->assertSame(0.5, $m->invoke($this->service, '0,5'));
-		$this->assertSame(1.0, $m->invoke($this->service, '1,0'));
-		$this->expectException(BusinessRuleException::class);
-		$m->invoke($this->service, '0.5000001');
+		$date = new \DateTime('2026-08-12');
+		$canon = fn (array $data): array => \OCA\ArbeitszeitCheck\Support\AbsenceDayShape::canonicalize(
+			$data, $date, clone $date
+		);
+		$this->assertEqualsWithDelta(1.0, $canon([])['start_fraction'], 1e-9);
+		$this->assertEqualsWithDelta(1.0, $canon(['day_fraction' => ''])['start_fraction'], 1e-9);
+		$this->assertEqualsWithDelta(0.5, $canon(['day_fraction' => '0.5'])['start_fraction'], 1e-9);
+		$this->assertEqualsWithDelta(0.5, $canon(['day_fraction' => '0,5'])['start_fraction'], 1e-9);
+		$this->assertEqualsWithDelta(1.0, $canon(['day_fraction' => '1,0'])['start_fraction'], 1e-9);
+		$this->expectException(\OCA\ArbeitszeitCheck\Support\ShapeInputException::class);
+		$canon(['day_fraction' => '0.5000001']);
 	}
 
 	public function testUpdateHalfToFullAndFullToHalf(): void

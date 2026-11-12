@@ -257,7 +257,58 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 									</label>
 								</div>
 							</fieldset>
-							<p id="manager-absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date. Morning or afternoon is not tracked.')); ?></p>
+							<fieldset id="manager-absence-day-slot-group" class="absence-day-slot__fieldset" hidden>
+								<legend id="manager-absence-day-slot-legend" class="azc-filter-field__label"><?php p($l->t('Which half?')); ?></legend>
+								<div class="absence-day-fraction__segments"
+									 role="radiogroup"
+									 aria-labelledby="manager-absence-day-slot-legend">
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_day_slot" id="manager-absence-day-slot-am" value="am" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('Morning')); ?></span>
+									</label>
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_day_slot" id="manager-absence-day-slot-pm" value="pm" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('Afternoon')); ?></span>
+									</label>
+								</div>
+							</fieldset>
+							<fieldset id="manager-absence-boundary-half-group" class="absence-day-slot__fieldset" hidden>
+								<legend id="manager-absence-boundary-legend" class="azc-filter-field__label"><?php p($l->t('First and last day')); ?></legend>
+								<div class="absence-day-fraction__segments"
+									 role="radiogroup"
+									 aria-labelledby="manager-absence-boundary-legend">
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_start_day_fraction" id="manager-absence-start-frac-full" value="1" data-boundary="start" checked class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('First day full')); ?></span>
+									</label>
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_start_day_fraction" id="manager-absence-start-frac-am" value="0.5" data-boundary="start" data-slot="am" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('First day morning')); ?></span>
+									</label>
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_start_day_fraction" id="manager-absence-start-frac-pm" value="0.5" data-boundary="start" data-slot="pm" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('First day afternoon')); ?></span>
+									</label>
+								</div>
+								<div class="absence-day-fraction__segments"
+									 role="radiogroup"
+									 aria-labelledby="manager-absence-boundary-legend">
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_end_day_fraction" id="manager-absence-end-frac-full" value="1" data-boundary="end" checked class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('Last day full')); ?></span>
+									</label>
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_end_day_fraction" id="manager-absence-end-frac-am" value="0.5" data-boundary="end" data-slot="am" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('Last day morning')); ?></span>
+									</label>
+									<label class="absence-day-fraction__segment">
+										<input type="radio" name="record_end_day_fraction" id="manager-absence-end-frac-pm" value="0.5" data-boundary="end" data-slot="pm" class="absence-day-fraction__input">
+										<span class="absence-day-fraction__face"><?php p($l->t('Last day afternoon')); ?></span>
+									</label>
+								</div>
+								<p class="form-help"><?php p($l->t('Take half of the first or last day — the days in between stay full.')); ?></p>
+							</fieldset>
+							<p id="manager-absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date. For a half day, choose morning or afternoon.')); ?></p>
 							<p id="manager-absence-day-fraction-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite"></p>
 							<p id="manager-absence-day-fraction-live" class="sr-only" aria-live="polite"></p>
 						</div>

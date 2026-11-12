@@ -826,4 +826,78 @@ class BreakPolicyResolverTest extends TestCase
 			);
 		}
 	}
+
+	public function testValidateModelBreakRulesNormalizesTiersAndFloor(): void
+	{
+		$v = $this->resolver->validateModelBreakRules([
+			'tiers' => [
+				['afterHours' => '9', 'breakMinutes' => '180'],
+				['afterHours' => 6, 'breakMinutes' => 30],
+			],
+			'min_break_minutes' => '20',
+			// Unknown keys are owned elsewhere — left untouched, no error.
+			'weekday_schedule' => ['x' => 1],
+		]);
+		$this->assertSame([], $v['errors']);
+		$this->assertSame(6.0, $v['normalized']['tiers'][0]['afterHours']);
+		$this->assertSame(30, $v['normalized']['tiers'][0]['breakMinutes']);
+		$this->assertSame(9.0, $v['normalized']['tiers'][1]['afterHours']);
+		$this->assertSame(180, $v['normalized']['tiers'][1]['breakMinutes']);
+		$this->assertSame(20, $v['normalized']['min_break_minutes']);
+	}
+
+	public function testValidateModelBreakRulesRejectsBadTiers(): void
+	{
+		foreach ([
+			['afterHours' => 'abc', 'breakMinutes' => 30],
+			['afterHours' => 0, 'breakMinutes' => 30],
+			['afterHours' => 25, 'breakMinutes' => 30],
+			['afterHours' => 6, 'breakMinutes' => 0],
+			['afterHours' => 6, 'breakMinutes' => 481],
+			['afterHours' => '2e3', 'breakMinutes' => 30], // float-notation smuggle
+			'not-a-map',
+		] as $badTier) {
+			$v = $this->resolver->validateModelBreakRules(['tiers' => [$badTier]]);
+			$this->assertNotSame([], $v['errors'], 'tier ' . json_encode($badTier) . ' must be rejected');
+		}
+
+		$v = $this->resolver->validateModelBreakRules(['tiers' => 'not-an-array']);
+		$this->assertSame('VALIDATION_SHAPE', $v['errors']['tiers']);
+
+		$v = $this->resolver->validateModelBreakRules([
+			'tiers' => array_fill(0, 9, ['afterHours' => 6, 'breakMinutes' => 30]),
+		]);
+		$this->assertSame('VALIDATION_TOO_MANY', $v['errors']['tiers']);
+	}
+
+	public function testValidateModelBreakRulesFloorAndFallbackBounds(): void
+	{
+		foreach (['abc', 0, 481, -5, 12.5] as $bad) {
+			$v = $this->resolver->validateModelBreakRules(['min_break_minutes' => $bad]);
+			$this->assertSame('VALIDATION_RANGE', $v['errors']['min_break_minutes'] ?? null, 'floor ' . var_export($bad, true));
+		}
+		foreach ([14, 721, 'abc'] as $bad) {
+			$v = $this->resolver->validateModelBreakRules(['auto_fallback_minutes' => $bad]);
+			$this->assertSame('VALIDATION_RANGE', $v['errors']['auto_fallback_minutes'] ?? null, 'fallback ' . var_export($bad, true));
+		}
+		$v = $this->resolver->validateModelBreakRules(['break_policy' => 'bogus']);
+		$this->assertSame('VALIDATION_VALUE', $v['errors']['break_policy']);
+
+		// null/'' clears a scalar → normalized null lets the caller unset.
+		$v = $this->resolver->validateModelBreakRules(['min_break_minutes' => null]);
+		$this->assertSame([], $v['errors']);
+		$this->assertNull($v['normalized']['min_break_minutes']);
+	}
+
+	public function testValidateModelBreakRulesSundayWorkStrictBool(): void
+	{
+		foreach (['false', '0', 'yes', 0, ''] as $off) {
+			$v = $this->resolver->validateModelBreakRules(['allow_sunday_work' => $off]);
+			$this->assertFalse($v['normalized']['allow_sunday_work'], 'value ' . var_export($off, true));
+		}
+		foreach ([true, 1, '1', 'true'] as $on) {
+			$v = $this->resolver->validateModelBreakRules(['allow_sunday_work' => $on]);
+			$this->assertTrue($v['normalized']['allow_sunday_work'], 'value ' . var_export($on, true));
+		}
+	}
 }

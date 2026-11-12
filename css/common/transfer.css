@@ -81,6 +81,12 @@
 	border: 1px solid var(--color-border, #c8c8c8);
 	border-radius: var(--azc-radius-lg, 12px);
 	padding: 0;
+	/* NC core reset (server.css/styles.css 'html,body,…,dialog,…{margin:0}')
+	   collapses the UA 'margin:auto' that centers a top-layer <dialog>;
+	   without this every pack dialog anchors to the viewport top-left
+	   (native_dialog_margin_reset_uncentered). The ≤480px media query below
+	   re-asserts margin:0 for the full-bleed sheet. */
+	margin: auto;
 	max-width: min(40rem, calc(100vw - 2rem));
 	width: 100%;
 	box-sizing: border-box;

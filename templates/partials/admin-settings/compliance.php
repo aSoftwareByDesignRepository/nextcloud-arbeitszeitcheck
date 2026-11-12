@@ -315,7 +315,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                         <?php p($l->t('Recommended: 120 to 240 minutes. After this threshold, an open break is automatically finalized by clocking out.')); ?>
                     </p>
                 </div>
-                <div class="form-row form-row--inline" role="group" aria-labelledby="breakAutoFallbackEnabled">
+                <div class="form-row form-row--2" role="group" aria-labelledby="breakAutoFallbackEnabled">
                     <div class="form-group">
                         <label for="breakAutoFallbackFlexWindowStart" class="form-label"><?php p($l->t('Flex policy quiet window start hour')); ?></label>
                         <input type="number"

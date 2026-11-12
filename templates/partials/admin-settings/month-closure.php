@@ -105,7 +105,7 @@ $monthClosureOn = !empty($settings['monthClosureEnabled']);
                                 <?php p($l->t('Type at least 2 characters, then select the employee whose finalized month you are reopening.')); ?>
                             </p>
                         </div>
-                        <div class="form-row form-row--inline" role="group" aria-labelledby="month-closure-reopen-legend" aria-describedby="month-closure-reopen-intro month-closure-reopen-separate-notice">
+                        <div class="form-row form-row--2" role="group" aria-labelledby="month-closure-reopen-legend" aria-describedby="month-closure-reopen-intro month-closure-reopen-separate-notice">
                             <div class="form-group">
                                 <label for="monthClosureReopenYear" class="form-label"><?php p($l->t('Year')); ?></label>
                                 <input type="number" id="monthClosureReopenYear" class="form-input" min="1970" max="2100" step="1" aria-required="true">

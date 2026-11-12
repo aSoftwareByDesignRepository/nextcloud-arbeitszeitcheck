@@ -306,7 +306,7 @@
   min-width: 0;
 }
 
-.azc-nc-admin-settings .azc-card__title {
+#app-content .azc-nc-admin-settings .azc-card__title {
   margin: 0;
   font-size: var(--azc-fs-lg, 1.125rem);
   font-weight: 600;
@@ -335,9 +335,9 @@
   scroll-margin-top: calc(var(--azc-space-6, 1.5rem) + 3rem);
 }
 
-.admin-settings-subsection__title {
+#app-content .admin-settings-subsection__title {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   margin: var(--space-6, 1.5rem) 0 var(--space-3, 0.75rem);
   color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text));
 }
@@ -382,7 +382,6 @@
 #admin-settings-form .checkbox,
 #admin-notifications-form .checkbox{
   display: flex;
-  align-items: flex-start;
   gap: var(--space-3, 0.75rem);
   min-height: 2.75rem; /* ~44px touch target */
   padding: var(--space-1, 0.25rem) 0;
@@ -394,7 +393,6 @@
 #admin-notifications-form .checkbox input[type="checkbox"]{
   flex-shrink: 0;
   margin: 0;
-  margin-block-start: 0.2rem;
   padding: 0;
   width: 1.25rem;
   height: 1.25rem;
@@ -429,6 +427,15 @@
   text-align: start;
 }
 
+/* Checkbox + subtitle: with the row content centered, zeroing the adjacent
+   help margin lands the visible gap at ~half of the previous offset. */
+#admin-settings-form .form-checkbox + .form-help,
+#admin-notifications-form .form-checkbox + .form-help,
+#admin-settings-form .checkbox + .form-help,
+#admin-notifications-form .checkbox + .form-help{
+  margin-top: 0;
+}
+
 /* ===== FIELDSETS ===== */
 #admin-settings-form .form-fieldset,
 #admin-notifications-form .form-fieldset{
@@ -442,7 +449,7 @@
 #admin-settings-form .form-legend,
 #admin-notifications-form .form-legend{
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   padding: 0 var(--space-2, 0.5rem);
   color: var(--arbeitszeitcheck-color-main-text, var(--color-main-text));
 }
@@ -506,6 +513,22 @@
 #admin-settings-form #accessAllowedGroupsSearch,
 #admin-settings-form #accessAllowedUsersSearch,
 #admin-notifications-form #accessAllowedGroupsSearch{
+  max-width: 100%;
+}
+
+/* App-admin filter: 2x the default 12rem cap so the DE placeholder fits */
+#admin-settings-form #appAdminUsersSearch{
+  max-width: 24rem;
+}
+
+/* Compliance break rules: 2x the 12rem cap so DE placeholders fit */
+#admin-settings-form #breakPolicyMinBreakMinutes,
+#admin-settings-form #breakPolicyPaidCapMinutes{
+  max-width: 24rem;
+}
+
+/* Month closure reopen: reason textarea spans the full two-column row */
+#admin-settings-form #monthClosureReopenReason{
   max-width: 100%;
 }
 
@@ -957,6 +980,26 @@
 	#app-content.azc-app--admin-settings .form-row--2 {
 		grid-template-columns: 1fr;
 	}
+}
+
+/* Month closure reopen: Year/Month equal-width on one row with a small gap.
+   flex:1 on equal basis keeps both fields identical; wrap stacks them on
+   narrow viewports. width:auto overrides the app.css `.form-group {width:100%}`
+   that would force one item per row. */
+#admin-settings-form .form-fieldset[aria-labelledby="month-closure-reopen-legend"] .form-row--2 {
+	display: flex;
+	flex-wrap: wrap;
+	column-gap: var(--azc-space-3, 0.75rem);
+	row-gap: var(--azc-space-2, 0.5rem);
+}
+
+#admin-settings-form .form-fieldset[aria-labelledby="month-closure-reopen-legend"] .form-row--2 > .form-group {
+	width: auto;
+	flex: 1 1 12rem;
+}
+
+#admin-settings-form .form-fieldset[aria-labelledby="month-closure-reopen-legend"] .form-row--2 > .form-group .form-input {
+	max-width: 100%;
 }
 
 /*
@@ -1729,4 +1772,116 @@
 		margin-inline-start: 0;
 		align-self: flex-end;
 	}
+}
+
+/* ===== WORK LOCATIONS (admin/work-locations) =====
+   Entity lists + JS-rendered rows; mirrors the access-groups-list card chrome. */
+
+/* List sections: double breathing room above the heading, half the
+   heading→list offset (12px → 6px + 8px → 4px). */
+#admin-settings-form .azc-work-location-admin .admin-settings-subsection__title {
+  margin-top: var(--azc-space-7, 3rem);
+  margin-bottom: calc(var(--space-3, 0.75rem) / 4);
+}
+
+#admin-settings-form .azc-work-location-admin .admin-settings-subsection__title + .form-help {
+  margin-top: calc(var(--space-1, 0.25rem) / 2);
+}
+
+/* The status <p> sits in the card body's 16px flex-gap chain — when empty it
+   still burns a full gap slot between heading and list. */
+#admin-settings-form .azc-work-location-admin .form-help:empty {
+  display: none;
+}
+
+#admin-settings-form .azc-work-location-admin .azc-list {
+  margin: calc(var(--space-2, 0.5rem) / 4) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--azc-border, var(--color-border));
+  border-radius: var(--azc-radius-md, 12px);
+  background: var(--azc-bg-card, var(--color-main-background));
+  overflow: hidden;
+}
+
+#admin-settings-form .azc-list:empty {
+  display: none;
+}
+
+#admin-settings-form .azc-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--azc-space-3, 0.75rem);
+  padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
+}
+
+#admin-settings-form .azc-list__item + .azc-list__item {
+  border-top: 1px solid var(--azc-border, var(--color-border));
+}
+
+#admin-settings-form .azc-list__item > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#admin-settings-form .azc-list__item .form-help {
+  margin-top: 0.125rem;
+}
+
+#admin-settings-form .azc-list__actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--azc-space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+/* Policy end-date input is rendered by JS without .form-input — apply the same chrome. */
+#admin-settings-form .azc-list__actions input[type="date"] {
+  min-height: 2.75rem;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  font: inherit;
+  color: var(--arbeitszeitcheck-color-text, var(--color-main-text));
+  background-color: var(--arbeitszeitcheck-color-form-background, var(--color-main-background));
+  border: 1px solid var(--arbeitszeitcheck-color-form-border, var(--color-border));
+  border-radius: var(--radius-base);
+  box-sizing: border-box;
+}
+
+/* Create/policy fields spread across columns (auto-fit: 3 → 2 → 1 as space
+   allows; end-aligned controls like form-row--thresholds). */
+#admin-settings-form .azc-wl-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4, 1rem);
+  align-items: start;
+  margin-bottom: var(--space-4, 1rem);
+}
+
+#admin-settings-form .azc-wl-fields .form-group {
+  margin-bottom: 0;
+}
+
+#admin-settings-form .azc-wl-fields .form-input,
+#admin-settings-form .azc-wl-fields .form-select {
+  max-width: 100%;
+}
+
+/* Inline per-field errors (azc-field-error is a JS hook; give it the DS error ink). */
+#admin-settings-form .azc-field-error:not([hidden]) {
+  margin: var(--space-1, 0.25rem) 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-error-text);
+}
+
+@media (max-width: 42.5rem) {
+  #admin-settings-form .azc-list__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #admin-settings-form .azc-list__actions {
+    justify-content: flex-start;
+  }
 }

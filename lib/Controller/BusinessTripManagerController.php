@@ -33,6 +33,7 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IUserManager;
 use OCP\IUserSession;
 
 final class BusinessTripManagerController extends Controller
@@ -45,6 +46,7 @@ final class BusinessTripManagerController extends Controller
 		private readonly BusinessTripMapper $tripMapper,
 		private readonly PermissionService $permissions,
 		private readonly WorkforceSuiteConfig $config,
+		private readonly IUserManager $userManager,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -160,12 +162,16 @@ final class BusinessTripManagerController extends Controller
 		return $trip;
 	}
 
+	/** @var array<string, string> memoized uid → display name (per request) */
+	private array $displayNames = [];
+
 	/** @return array<string,mixed> */
 	private function serialize(BusinessTrip $trip): array
 	{
 		return [
 			'id' => (int)$trip->getId(),
 			'userId' => (string)$trip->getUserId(),
+			'displayName' => $this->displayName((string)$trip->getUserId()),
 			'status' => (string)$trip->getStatus(),
 			'startsAtUtc' => $trip->getStartsAtUtc()?->format('c'),
 			'endsAtUtc' => $trip->getEndsAtUtc()?->format('c'),
@@ -175,7 +181,19 @@ final class BusinessTripManagerController extends Controller
 			'purpose' => $trip->getPurpose(),
 			'revision' => (int)$trip->getRevision(),
 			'currentSnapshotId' => $trip->getCurrentSnapshotId(),
+			'updatedAt' => $trip->getUpdatedAt()?->format('c'),
 		];
+	}
+
+	/** Display name for the queue/detail "Employee" label; uid fallback for deleted users. */
+	private function displayName(string $uid): string
+	{
+		if (!array_key_exists($uid, $this->displayNames)) {
+			$user = $this->userManager->get($uid);
+			$name = $user !== null ? trim($user->getDisplayName()) : '';
+			$this->displayNames[$uid] = $name !== '' ? $name : $uid;
+		}
+		return $this->displayNames[$uid];
 	}
 
 	private function enabled(): bool

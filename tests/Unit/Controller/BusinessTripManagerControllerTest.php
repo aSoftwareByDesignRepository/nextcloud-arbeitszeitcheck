@@ -48,6 +48,7 @@ use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IRequest;
 use OCP\IUser;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
@@ -110,6 +111,16 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->createMock(MonthClosureService::class),
 			$this->createMock(AuditLogMapper::class),
 		);
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			$known = ['alice' => 'Alice Employee', 'bob' => 'Bob Employee'];
+			if (!isset($known[$uid])) {
+				return null;
+			}
+			$u = $this->createMock(IUser::class);
+			$u->method('getDisplayName')->willReturn($known[$uid]);
+			return $u;
+		});
 		return new BusinessTripManagerController(
 			'arbeitszeitcheck',
 			$request,
@@ -118,6 +129,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->tripMapper,
 			$this->permissions,
 			$config,
+			$userManager,
 		);
 	}
 
@@ -153,6 +165,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 	public function testIndexScopesManagerToTeamMembers(): void
 	{
 		$in = $this->submittedTrip(7, 'alice');
+		$in->setUpdatedAt(new \DateTime('2026-03-09 12:00:00', new \DateTimeZone('UTC')));
 		$out = $this->submittedTrip(8, 'mallory');
 		$this->permissions->method('isAdmin')->with('manager')->willReturn(false);
 		$this->permissions->method('canAccessManagerDashboard')->with('manager')->willReturn(true);
@@ -162,6 +175,8 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$items = $this->payload($r)['items'];
 		$this->assertCount(1, $items);
 		$this->assertSame(7, $items[0]['id']);
+		$this->assertSame('Alice Employee', $items[0]['displayName']);
+		$this->assertSame('2026-03-09T12:00:00+00:00', $items[0]['updatedAt']);
 	}
 
 	public function testIndexAdminSeesAll(): void
@@ -172,7 +187,10 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->submittedTrip(8, 'mallory'),
 		]);
 		$r = $this->controller()->index();
-		$this->assertCount(2, $this->payload($r)['items']);
+		$items = $this->payload($r)['items'];
+		$this->assertCount(2, $items);
+		// Unknown/deleted users keep the uid as label — never blank, never fatal.
+		$this->assertSame('mallory', $items[1]['displayName']);
 	}
 
 	public function testIndexDeniesPlainEmployee(): void

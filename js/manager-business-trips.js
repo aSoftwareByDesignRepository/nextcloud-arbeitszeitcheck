@@ -17,9 +17,9 @@
 
 	const els = {
 		queueCard: $('mbt-queue-card'),
-		queue: $('mbt-queue'),
+		queueBody: $('mbt-queue-body'),
+		emptyRow: $('mbt-empty-row'),
 		queueStatus: $('mbt-queue-status'),
-		empty: $('mbt-empty'),
 		detail: $('mbt-detail'),
 		detailSubtitle: $('mbt-detail-subtitle'),
 		detailStatus: $('mbt-detail-status'),
@@ -51,6 +51,7 @@
 	};
 
 	let current = null; // {trip, snapshotToken}
+	let queueSeq = 0; // last-write-wins guard for overlapping queue fetches
 
 	function tpl(name, id) {
 		return root.dataset[name].replace('__ID__', encodeURIComponent(String(id)));
@@ -88,39 +89,90 @@
 		els.error.hidden = false;
 	}
 
+	function icon(name) {
+		return (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render(name) : '';
+	}
+
+	function cell(label) {
+		const td = document.createElement('td');
+		td.dataset.label = label;
+		return td;
+	}
+
+	function employeeCell(item) {
+		const td = cell(t('Employee'));
+		const wrap = document.createElement('span');
+		wrap.className = 'mbt-emp';
+		const name = document.createElement('span');
+		name.className = 'mbt-emp__name';
+		name.textContent = item.displayName || item.userId || '';
+		wrap.appendChild(name);
+		if (item.userId && item.userId !== name.textContent) {
+			const uid = document.createElement('span');
+			uid.className = 'mbt-emp__uid';
+			uid.textContent = item.userId;
+			wrap.appendChild(uid);
+		}
+		td.appendChild(wrap);
+		return td;
+	}
+
+	function queueRow(item) {
+		const who = item.displayName || item.userId || '';
+		const range = fmtDateTime(item.startsAtUtc) + ' – ' + fmtDateTime(item.endsAtUtc);
+		const tr = document.createElement('tr');
+		tr.setAttribute('data-azc-row', '');
+
+		const tdTrip = cell(t('Business trip'));
+		tdTrip.textContent = range;
+		const tdPurpose = cell(t('Purpose'));
+		tdPurpose.textContent = item.purpose || '—';
+		const tdSubmitted = cell(t('Submitted'));
+		tdSubmitted.textContent = fmtDateTime(item.updatedAt);
+
+		const tdActions = cell(t('Actions'));
+		tdActions.className = 'actions-cell';
+		const group = document.createElement('div');
+		group.className = 'azc-table-actions';
+		group.setAttribute('role', 'group');
+		group.setAttribute('aria-label', t('Actions'));
+		const review = document.createElement('button');
+		review.type = 'button';
+		review.className = 'azc-btn azc-btn--secondary azc-icon-btn';
+		review.setAttribute('aria-label', t('Review business trip') + ': ' + who + ', ' + range);
+		review.title = t('Review');
+		review.innerHTML = icon('info');
+		review.addEventListener('click', () => openDetail(item.id));
+		group.appendChild(review);
+		tdActions.appendChild(group);
+
+		tr.append(employeeCell(item), tdTrip, tdPurpose, tdSubmitted, tdActions);
+		return tr;
+	}
+
 	async function loadQueue() {
+		const seq = ++queueSeq;
 		els.queueStatus.textContent = t('Loading…');
 		try {
 			const body = await call(root.dataset.queueUrl);
+			if (seq !== queueSeq) {
+				return; // a newer fetch supersedes this response
+			}
 			const items = body.items || [];
-			els.queue.replaceChildren();
-			els.empty.hidden = items.length !== 0;
-			items.forEach((item) => {
-				const li = document.createElement('li');
-				li.className = 'azc-list__item bt-trip-item';
-				const btn = document.createElement('button');
-				btn.type = 'button';
-				btn.className = 'bt-trip-item__link bt-trip-item__button';
-				const title = document.createElement('span');
-				title.className = 'bt-trip-item__title';
-				title.textContent = (item.userId || '') + ' · ' + fmtDateTime(item.startsAtUtc) + ' – ' + fmtDateTime(item.endsAtUtc);
-				const sub = document.createElement('span');
-				sub.className = 'bt-trip-item__sub';
-				sub.textContent = item.purpose || '';
-				btn.append(title, sub);
-				btn.addEventListener('click', () => openDetail(item.id));
-				li.appendChild(btn);
-				els.queue.appendChild(li);
-			});
+			els.queueBody.replaceChildren(els.emptyRow, ...items.map(queueRow));
+			els.emptyRow.hidden = items.length !== 0;
 			els.queueStatus.textContent = '';
 		} catch (e) {
+			if (seq !== queueSeq) {
+				return;
+			}
 			els.queueStatus.textContent = e.message;
 		}
 	}
 
 	function renderDetail(body) {
 		const trip = body.trip;
-		els.detailSubtitle.textContent = (trip.userId || '') + ' · ' + fmtDateTime(trip.startsAtUtc) + ' – ' + fmtDateTime(trip.endsAtUtc) + (trip.purpose ? ' · ' + trip.purpose : '');
+		els.detailSubtitle.textContent = (trip.displayName || trip.userId || '') + ' · ' + fmtDateTime(trip.startsAtUtc) + ' – ' + fmtDateTime(trip.endsAtUtc) + (trip.purpose ? ' · ' + trip.purpose : '');
 		els.detailStatus.dataset.status = trip.status;
 		els.detailStatus.textContent = STATUS_LABELS[trip.status] || trip.status;
 
@@ -171,16 +223,27 @@
 		const decidable = trip.status === 'submitted';
 		els.approve.hidden = !decidable;
 		els.rejectToggle.hidden = !decidable;
+		if (!decidable) {
+			resetRejectUi();
+		}
 		els.approve.disabled = !body.snapshotToken;
 		current = { trip, snapshotToken: body.snapshotToken };
+	}
+
+	function resetRejectUi() {
+		els.rejectGroup.hidden = true;
+		els.rejectConfirm.hidden = true;
+		els.rejectReason.value = '';
+		els.rejectReason.removeAttribute('aria-invalid');
+		els.rejectError.textContent = '';
+		els.rejectError.hidden = true;
 	}
 
 	async function openDetail(id) {
 		els.detail.hidden = false;
 		els.error.hidden = true;
 		els.conflict.hidden = true;
-		els.rejectGroup.hidden = true;
-		els.rejectConfirm.hidden = true;
+		resetRejectUi();
 		els.detailStatusMsg.textContent = t('Loading…');
 		try {
 			const body = await call(tpl('detailTemplate', id));

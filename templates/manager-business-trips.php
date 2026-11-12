@@ -24,8 +24,44 @@ declare(strict_types=1);
 		</header>
 		<div class="azc-card__body">
 			<p id="mbt-queue-status" role="status" aria-live="polite" class="form-help"></p>
-			<ul id="mbt-queue" class="azc-list bt-trip-list" aria-label="<?php p($l->t('Submitted business trips')); ?>"></ul>
-			<p id="mbt-empty" class="azc-empty-state" hidden><?php p($l->t('No business trips are waiting for review.')); ?></p>
+			<div class="table-container">
+				<table class="table table--hover azc-table--responsive" id="mbt-queue-table" aria-label="<?php p($l->t('Submitted business trips')); ?>">
+					<thead>
+						<tr>
+							<th scope="col"><?php p($l->t('Employee')); ?></th>
+							<th scope="col"><?php p($l->t('Business trip')); ?></th>
+							<th scope="col"><?php p($l->t('Purpose')); ?></th>
+							<th scope="col"><?php p($l->t('Submitted')); ?></th>
+							<th scope="col" class="azc-table-actions-col"><?php p($l->t('Actions')); ?></th>
+						</tr>
+					</thead>
+					<tbody id="mbt-queue-body">
+						<tr id="mbt-empty-row" hidden>
+							<td colspan="5" class="azc-table-empty">
+								<div class="azc-empty-state">
+									<h3 class="azc-empty-state__title"><?php p($l->t('No business trips are waiting for review.')); ?></h3>
+									<p class="azc-empty-state__text"><?php p($l->t('Trips your team members submit for approval will show up here.')); ?></p>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<?php
+			$azcTablePager = [
+				'id' => 'mbt-queue-pager',
+				'tableId' => 'mbt-queue-table',
+				'label' => $l->t('Business trips pagination'),
+				'base' => '',
+				'filters' => [],
+				'allow' => [],
+				'state' => \OCA\ArbeitszeitCheck\Support\TablePager::state(0, null, null),
+				'pageParam' => 'bt_page',
+				'sizeParam' => 'bt_per_page',
+				'mode' => 'client',
+			];
+			include __DIR__ . '/partials/table-pager.php';
+			?>
 		</div>
 	</section>
 

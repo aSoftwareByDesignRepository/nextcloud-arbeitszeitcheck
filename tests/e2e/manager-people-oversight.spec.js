@@ -113,8 +113,13 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		const managed = await api(page, 'GET', `${VIOLATIONS_API}?scope=managed`)
 		expect(managed.success).toBe(true)
 		expect(managed.scope).toBe('managed')
+		// Allowlist comes from the managed scope itself — the people overview
+		// is the same scope resolver, so any legitimately managed member
+		// (e.g. seeded accounts) must be allowed without a hardcoded list.
+		const people = await api(page, 'GET', PEOPLE_API)
+		const managedIds = new Set(people.employees.map((e) => e.userId))
 		for (const v of managed.violations) {
-			expect(['e2e_employee', 'e2e_substitute', 'e2e_manager']).toContain(v.userId)
+			expect(managedIds.has(v.userId), `violation leaked for out-of-scope uid ${v.userId}`).toBe(true)
 		}
 
 		const org = await apiAllowFailure(page, 'GET', `${VIOLATIONS_API}?scope=organization`)
@@ -193,6 +198,11 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		// Employee picker + sort controls exist and are labeled.
 		await expect(page.locator('#manager-people-employee-filter-search')).toBeVisible()
 		await expect(page.locator('#manager-people-sort')).toBeVisible()
+
+		// Restore "Everyone" — the narrowing check below asserts exactly one
+		// row, which requires the pending-absences pill to be off.
+		await pills.nth(0).click()
+		await expect(pills.nth(0)).toHaveAttribute('aria-pressed', 'true')
 
 		// Picking one employee narrows the table to that person.
 		await page.locator('#manager-people-employee-filter-search').fill('e2e_employee')

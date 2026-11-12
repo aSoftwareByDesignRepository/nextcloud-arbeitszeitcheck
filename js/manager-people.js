@@ -15,6 +15,7 @@
 		offset: 0,
 		total: 0,
 		loading: false,
+		pendingReload: false,
 		employeePicker: null,
 		filter: 'all',
 	};
@@ -124,6 +125,13 @@
 		}
 		if (wrap) {
 			wrap.classList.add('visually-hidden');
+		}
+		// Clear stale rows: visually-hidden keeps them in the a11y tree,
+		// so screen readers would announce outdated results alongside the
+		// empty state.
+		const body = el('manager-people-body');
+		if (body) {
+			body.innerHTML = '';
 		}
 		const nav = el('manager-people-pager');
 		if (nav) {
@@ -403,6 +411,12 @@
 			return;
 		}
 		setFilterError('');
+		if (state.loading) {
+			// Queue the newest intent instead of dropping it — an in-flight
+			// load must not swallow a filter change or pager click.
+			state.pendingReload = true;
+			return;
+		}
 		setLoading(true);
 
 		const requestUrl = config.apiUrl + (config.apiUrl.indexOf('?') === -1 ? '?' : '&') + buildQuery(filters, validation.year);
@@ -471,6 +485,10 @@
 			ajaxPromise.finally(() => {
 				setLoading(false);
 				syncPager();
+				if (state.pendingReload) {
+					state.pendingReload = false;
+					load();
+				}
 			});
 		} else {
 			setLoading(false);
@@ -563,9 +581,6 @@
 		const pagerNav = el('manager-people-pager');
 		if (pagerNav) {
 			pagerNav.__goTo = (page, size) => {
-				if (state.loading) {
-					return;
-				}
 				if (pagerSizes.includes(Number(size))) {
 					state.limit = Number(size);
 				}

@@ -326,25 +326,30 @@
     }
 
     // ===== TABS =====
-    function selectPendingTab(which) {
+    function selectPendingTab(which, options) {
         const tabAbsences = document.getElementById('tab-absences');
         const tabTimeEntries = document.getElementById('tab-time-entries');
         const panelAbsences = document.getElementById('pending-absences-panel');
         const panelTimeEntries = document.getElementById('pending-time-entries-panel');
         if (!tabAbsences || !tabTimeEntries || !panelAbsences || !panelTimeEntries) return;
 
+        const focusTab = options && options.focusTab === true;
         const showTimeEntries = which === 'time-entries';
-        tabTimeEntries.classList.toggle('pending-approvals-tab--active', showTimeEntries);
         tabTimeEntries.setAttribute('aria-selected', showTimeEntries ? 'true' : 'false');
-        tabAbsences.classList.toggle('pending-approvals-tab--active', !showTimeEntries);
+        tabTimeEntries.setAttribute('tabindex', showTimeEntries ? '0' : '-1');
         tabAbsences.setAttribute('aria-selected', showTimeEntries ? 'false' : 'true');
+        tabAbsences.setAttribute('tabindex', showTimeEntries ? '-1' : '0');
+        if (focusTab) {
+            (showTimeEntries ? tabTimeEntries : tabAbsences).focus();
+        }
         panelTimeEntries.classList.toggle('pending-approvals-panel--hidden', !showTimeEntries);
         panelTimeEntries.setAttribute('aria-hidden', showTimeEntries ? 'false' : 'true');
         panelAbsences.classList.toggle('pending-approvals-panel--hidden', showTimeEntries);
         panelAbsences.setAttribute('aria-hidden', showTimeEntries ? 'true' : 'false');
 
+        const focusPanel = options && options.focusPanel === true;
         const focusTarget = showTimeEntries ? panelTimeEntries : panelAbsences;
-        if (focusTarget && typeof focusTarget.focus === 'function') {
+        if (focusPanel && focusTarget && typeof focusTarget.focus === 'function') {
             if (!focusTarget.hasAttribute('tabindex')) {
                 focusTarget.setAttribute('tabindex', '-1');
             }
@@ -361,18 +366,32 @@
         const tabTimeEntries = document.getElementById('tab-time-entries');
         if (!tabAbsences || !tabTimeEntries) return;
 
+        function onTabKey(event, which) {
+            var next = null;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                next = which === 'absences' ? 'time-entries' : 'absences';
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                next = which === 'absences' ? 'time-entries' : 'absences';
+            }
+            if (!next) return;
+            event.preventDefault();
+            selectPendingTab(next, { focusTab: true });
+        }
+
         tabAbsences.addEventListener('click', function() {
             selectPendingTab('absences');
         });
+        tabAbsences.addEventListener('keydown', function(event) { onTabKey(event, 'absences'); });
         tabTimeEntries.addEventListener('click', function() {
             selectPendingTab('time-entries');
         });
+        tabTimeEntries.addEventListener('keydown', function(event) { onTabKey(event, 'time-entries'); });
 
         document.querySelectorAll('[data-manager-pending-tab]').forEach(function(tile) {
             tile.addEventListener('click', function() {
                 const which = tile.getAttribute('data-manager-pending-tab');
                 if (which === 'time-entries' || which === 'absences') {
-                    selectPendingTab(which);
+                    selectPendingTab(which, { focusPanel: true });
                 }
             });
         });

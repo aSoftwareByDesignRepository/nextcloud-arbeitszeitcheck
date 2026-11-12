@@ -183,117 +183,113 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
 
             <!-- Step 2: export type -->
             <section class="azc-card reports-step-card report-selection-section" aria-labelledby="report-type-heading">
-                <header class="azc-card__header">
-                    <div class="azc-card__header-text">
-                        <h2 id="report-type-heading" class="azc-card__title"><?php p($l->t('Choose an export')); ?></h2>
-                        <p class="azc-card__lead"><?php p($l->t('Choose one of these exports, then set the period and format below.')); ?></p>
-                    </div>
-                </header>
-                <div class="azc-card__body">
-                    <div
-                        class="report-types-grid"
-                        role="radiogroup"
-                        aria-labelledby="report-type-heading"
-                        aria-describedby="report-type-hint"
+                <h3 id="report-type-heading" class="reports-section__title"><?php p($l->t('Choose an export')); ?></h3>
+                <p class="reports-section__desc">
+                    <?php p($l->t('Choose one of these exports, then set the period and format below.')); ?>
+                </p>
+                <div
+                    class="report-types-grid"
+                    role="radiogroup"
+                    aria-labelledby="report-type-heading"
+                    aria-describedby="report-type-hint"
+                >
+                    <p id="report-type-hint" class="visually-hidden">
+                        <?php p($l->t('Use the arrow keys to move between exports, then press Enter or Space to select.')); ?>
+                    </p>
+
+                    <button
+                        type="button"
+                        class="report-type-card btn-select-report"
+                        role="radio"
+                        aria-checked="false"
+                        data-report="monthly"
+                        data-report-type="monthly"
+                        data-label-select="<?php p($l->t('Select')); ?>"
+                        data-label-selected="<?php p($l->t('Selected')); ?>"
                     >
-                        <p id="report-type-hint" class="visually-hidden">
-                            <?php p($l->t('Use the arrow keys to move between exports, then press Enter or Space to select.')); ?>
-                        </p>
+                        <span class="report-type-card__icon" aria-hidden="true">
+                            <?php print_unescaped(IconCatalog::render('clock', 'report-type-card__icon-svg', 2.5)); ?>
+                        </span>
+                        <span class="report-type-card__body">
+                            <span class="report-type-card__title"><?php p($l->t('Working Time Export')); ?></span>
+                            <span class="report-type-card__desc"><?php p($l->t('Export a clear overview of worked hours for the selected period.')); ?></span>
+                        </span>
+                        <span class="report-type-card__action" aria-hidden="true">
+                            <span class="report-type-card__action-mark"></span>
+                            <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
+                        </span>
+                    </button>
 
-                        <button
-                            type="button"
-                            class="report-type-card btn-select-report"
-                            role="radio"
-                            aria-checked="false"
-                            data-report="monthly"
-                            data-report-type="monthly"
-                            data-label-select="<?php p($l->t('Select')); ?>"
-                            data-label-selected="<?php p($l->t('Selected')); ?>"
-                        >
-                            <span class="report-type-card__icon" aria-hidden="true">
-                                <?php print_unescaped(IconCatalog::render('clock', 'report-type-card__icon-svg', 2.5)); ?>
-                            </span>
-                            <span class="report-type-card__body">
-                                <span class="report-type-card__title"><?php p($l->t('Working Time Export')); ?></span>
-                                <span class="report-type-card__desc"><?php p($l->t('Export a clear overview of worked hours for the selected period.')); ?></span>
-                            </span>
-                            <span class="report-type-card__action" aria-hidden="true">
-                                <span class="report-type-card__action-mark"></span>
-                                <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
-                            </span>
-                        </button>
+                    <button
+                        type="button"
+                        class="report-type-card btn-select-report"
+                        role="radio"
+                        aria-checked="false"
+                        data-report="absence"
+                        data-report-type="absence"
+                        data-label-select="<?php p($l->t('Select')); ?>"
+                        data-label-selected="<?php p($l->t('Selected')); ?>"
+                    >
+                        <span class="report-type-card__icon" aria-hidden="true">
+                            <?php print_unescaped(IconCatalog::render('calendar-off', 'report-type-card__icon-svg', 2.5)); ?>
+                        </span>
+                        <span class="report-type-card__body">
+                            <span class="report-type-card__title"><?php p($l->t('Absence Export')); ?></span>
+                            <span class="report-type-card__desc"><?php p($l->t('Export vacation and absence data with totals and status.')); ?></span>
+                        </span>
+                        <span class="report-type-card__action" aria-hidden="true">
+                            <span class="report-type-card__action-mark"></span>
+                            <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
+                        </span>
+                    </button>
 
-                        <button
-                            type="button"
-                            class="report-type-card btn-select-report"
-                            role="radio"
-                            aria-checked="false"
-                            data-report="absence"
-                            data-report-type="absence"
-                            data-label-select="<?php p($l->t('Select')); ?>"
-                            data-label-selected="<?php p($l->t('Selected')); ?>"
-                        >
-                            <span class="report-type-card__icon" aria-hidden="true">
-                                <?php print_unescaped(IconCatalog::render('calendar-off', 'report-type-card__icon-svg', 2.5)); ?>
-                            </span>
-                            <span class="report-type-card__body">
-                                <span class="report-type-card__title"><?php p($l->t('Absence Export')); ?></span>
-                                <span class="report-type-card__desc"><?php p($l->t('Export vacation and absence data with totals and status.')); ?></span>
-                            </span>
-                            <span class="report-type-card__action" aria-hidden="true">
-                                <span class="report-type-card__action-mark"></span>
-                                <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
-                            </span>
-                        </button>
+                    <button
+                        type="button"
+                        class="report-type-card btn-select-report"
+                        role="radio"
+                        aria-checked="false"
+                        data-report="compliance"
+                        data-report-type="compliance"
+                        data-label-select="<?php p($l->t('Select')); ?>"
+                        data-label-selected="<?php p($l->t('Selected')); ?>"
+                    >
+                        <span class="report-type-card__icon" aria-hidden="true">
+                            <?php print_unescaped(IconCatalog::render('shield-check', 'report-type-card__icon-svg', 2.5)); ?>
+                        </span>
+                        <span class="report-type-card__body">
+                            <span class="report-type-card__title"><?php p($l->t('Compliance Export')); ?></span>
+                            <span class="report-type-card__desc"><?php p($l->t('Export labor law compliance violations and severity details.')); ?></span>
+                        </span>
+                        <span class="report-type-card__action" aria-hidden="true">
+                            <span class="report-type-card__action-mark"></span>
+                            <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
+                        </span>
+                    </button>
 
-                        <button
-                            type="button"
-                            class="report-type-card btn-select-report"
-                            role="radio"
-                            aria-checked="false"
-                            data-report="compliance"
-                            data-report-type="compliance"
-                            data-label-select="<?php p($l->t('Select')); ?>"
-                            data-label-selected="<?php p($l->t('Selected')); ?>"
-                        >
-                            <span class="report-type-card__icon" aria-hidden="true">
-                                <?php print_unescaped(IconCatalog::render('shield-check', 'report-type-card__icon-svg', 2.5)); ?>
-                            </span>
-                            <span class="report-type-card__body">
-                                <span class="report-type-card__title"><?php p($l->t('Compliance Export')); ?></span>
-                                <span class="report-type-card__desc"><?php p($l->t('Export labor law compliance violations and severity details.')); ?></span>
-                            </span>
-                            <span class="report-type-card__action" aria-hidden="true">
-                                <span class="report-type-card__action-mark"></span>
-                                <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
-                            </span>
-                        </button>
-
-                        <?php if (!empty($_['premiumSurchargesEnabled'])): ?>
-                        <button
-                            type="button"
-                            class="report-type-card btn-select-report"
-                            role="radio"
-                            aria-checked="false"
-                            data-report="premium"
-                            data-report-type="premium"
-                            data-label-select="<?php p($l->t('Select')); ?>"
-                            data-label-selected="<?php p($l->t('Selected')); ?>"
-                        >
-                            <span class="report-type-card__icon" aria-hidden="true">
-                                <?php print_unescaped(IconCatalog::render('coins', 'report-type-card__icon-svg', 2.5)); ?>
-                            </span>
-                            <span class="report-type-card__body">
-                                <span class="report-type-card__title"><?php p($l->t('Hour premiums (Zuschläge)')); ?></span>
-                                <span class="report-type-card__desc"><?php p($l->t('Hours with a percentage for payroll handoff — not Saldo and not pay.')); ?></span>
-                            </span>
-                            <span class="report-type-card__action" aria-hidden="true">
-                                <span class="report-type-card__action-mark"></span>
-                                <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
-                            </span>
-                        </button>
-                        <?php endif; ?>
-                    </div>
+                    <?php if (!empty($_['premiumSurchargesEnabled'])): ?>
+                    <button
+                        type="button"
+                        class="report-type-card btn-select-report"
+                        role="radio"
+                        aria-checked="false"
+                        data-report="premium"
+                        data-report-type="premium"
+                        data-label-select="<?php p($l->t('Select')); ?>"
+                        data-label-selected="<?php p($l->t('Selected')); ?>"
+                    >
+                        <span class="report-type-card__icon" aria-hidden="true">
+                            <?php print_unescaped(IconCatalog::render('coins', 'report-type-card__icon-svg', 2.5)); ?>
+                        </span>
+                        <span class="report-type-card__body">
+                            <span class="report-type-card__title"><?php p($l->t('Hour premiums (Zuschläge)')); ?></span>
+                            <span class="report-type-card__desc"><?php p($l->t('Hours with a percentage for payroll handoff — not Saldo and not pay.')); ?></span>
+                        </span>
+                        <span class="report-type-card__action" aria-hidden="true">
+                            <span class="report-type-card__action-mark"></span>
+                            <span class="report-type-card__action-label"><?php p($l->t('Select')); ?></span>
+                        </span>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </section>
 

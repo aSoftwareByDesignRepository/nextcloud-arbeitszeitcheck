@@ -323,6 +323,7 @@ th[scope] {
 
 /* ===== NATIVE <dialog> (Nextcloud core sets dialog { display: block }) ===== */
 
+dialog.azc-dialog:not([open]),
 dialog.azc-native-dialog:not([open]),
 dialog.layer-dialog:not([open]),
 dialog.entitlement-explain-dialog:not([open]) {
@@ -330,6 +331,7 @@ dialog.entitlement-explain-dialog:not([open]) {
 	pointer-events: none;
 }
 
+dialog.azc-dialog[open],
 dialog.azc-native-dialog[open],
 dialog.layer-dialog[open],
 dialog.entitlement-explain-dialog[open] {

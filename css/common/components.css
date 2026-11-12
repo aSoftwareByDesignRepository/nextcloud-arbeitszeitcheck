@@ -1916,40 +1916,66 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   box-shadow: 0 0 0 1px var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
 }
 
-/* Manager dashboard: tabs */
-.pending-approvals-tabs {
+/* ===== TABS (design system §3.12) ===== */
+/* One row of text labels; underline only the active tab. Reference impl:
+   admin-teams in-card tabs. In-card tablists use role=tab/tabpanel and
+   drive the active state via aria-selected — no --active class. */
+#app-content.azc-app .azc-tabs__row {
   display: flex;
-  gap: 0;
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--azc-space-4, 16px);
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
-.pending-approvals-tab {
-  padding: var(--space-2) var(--space-4);
-  background: transparent;
-  border: none;
+#app-content.azc-app .azc-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: var(--azc-touch, 44px);
+  min-width: var(--azc-touch, 44px);
+  padding: var(--azc-space-2, 8px) var(--azc-space-1, 4px);
+  border: 0;
   border-bottom: 2px solid transparent;
-  font-size: var(--arbeitszeitcheck-font-size-base);
-  color: var(--arbeitszeitcheck-color-text-secondary);
-  cursor: pointer;
-  margin-bottom: -1px;
   border-radius: 0;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  background: transparent;
+  box-shadow: none;
+  color: var(--azc-text, var(--color-main-text));
+  font-size: var(--azc-fs-sm, 0.875rem);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.pending-approvals-tab:hover {
-  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab:hover {
+  color: var(--color-primary-element);
+  background: transparent;
+  border-bottom-color: transparent;
+  text-decoration: none;
 }
 
-.pending-approvals-tab--active {
-  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
-  border-bottom-color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab[aria-selected='true'],
+#app-content.azc-app .azc-tab[aria-selected='true']:hover {
+  border-bottom-color: var(--color-primary-element);
+  background: transparent;
+  color: var(--azc-text, var(--color-main-text));
   font-weight: 600;
 }
 
-.pending-approvals-tab:focus-visible {
-  outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
   outline-offset: 2px;
+}
+
+/* Manager dashboard: tabs */
+.pending-approvals-tabs {
+  margin-bottom: var(--space-4);
 }
 
 .pending-approvals-panel {

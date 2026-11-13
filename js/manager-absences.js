@@ -78,11 +78,17 @@
 		if (Number.isNaN(num)) {
 			return '-';
 		}
-		return num.toFixed(1);
+		// Two decimals keep quarter-day debits (0.25 on half-weight schedule
+		// days) truthful; stripping one trailing zero keeps "4.5"/"5.0".
+		return num.toFixed(2).replace(/0$/, '');
 	}
 
 	// NH-05: fractional-day rows carry a tooltip so a bare "0.5" is never
 	// unexplained — same type-aware copy as the request-form previews.
+	// The copy branches on the persisted boundary shape: a real half day
+	// gets the half-day wording, a schedule-derived fractional count
+	// (e.g. 4.5 over a half-weight day) gets neutral wording — the tooltip
+	// must never claim a "0.5" or a half day that is not stored.
 	function durationCellHtml(entry) {
 		const text = formatDuration(entry);
 		const daysNum = Number(entry && entry.days);
@@ -93,11 +99,23 @@
 		const creditTypes = Array.isArray(window.ArbeitszeitCheck && window.ArbeitszeitCheck.halfDayCreditTypes)
 			? window.ArbeitszeitCheck.halfDayCreditTypes
 			: [];
-		const tip = type === 'vacation'
-			? t('This request uses 0.5 vacation day.', 'This request uses 0.5 vacation day.')
-			: (creditTypes.indexOf(type) !== -1
-				? t('This request uses 0.5 day and credits half of the planned working time for that day.', 'This request uses 0.5 day and credits half of the planned working time for that day.')
-				: t('This request uses 0.5 day.', 'This request uses 0.5 day.'));
+		const shapeFrac = function (v) {
+			const n = Number(v);
+			return Number.isFinite(n) && n > 1e-6 && n < 1 - 1e-6;
+		};
+		const hasHalfShape = entry && (
+			shapeFrac(entry.startDayFraction ?? entry.start_day_fraction)
+			|| shapeFrac(entry.endDayFraction ?? entry.end_day_fraction));
+		let tip;
+		if (hasHalfShape) {
+			tip = type === 'vacation'
+				? t('This request includes a half vacation day.', 'This request includes a half vacation day.')
+				: (creditTypes.indexOf(type) !== -1
+					? t('This request includes a half day and credits half of the planned working time for that day.', 'This request includes a half day and credits half of the planned working time for that day.')
+					: t('This request includes a half day.', 'This request includes a half day.'));
+		} else {
+			tip = t("The day count is adjusted for the employee's work schedule.", "The day count is adjusted for the employee's work schedule.");
+		}
 		return `<span class="azc-half-day-hint" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
 	}
 

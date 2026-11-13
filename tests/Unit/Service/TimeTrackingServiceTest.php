@@ -25,8 +25,11 @@ use OCA\ArbeitszeitCheck\Service\TimeZoneService;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Service\MonthClosureGuard;
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
+use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
+use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IDateTimeZone;
@@ -1678,5 +1681,224 @@ class TimeTrackingServiceTest extends TestCase {
 		$result = $this->service->clockOutAt('alice', 43, $endAt);
 
 		$this->assertSame('2026-10-28 12:15:00', $result->getEndTime()?->format('Y-m-d H:i:s'));
+	}
+
+	// ------------------------------------------------------------------
+	// calculateAndSetAutomaticBreak — fixpoint funnel (SPEC §8 A1–A13)
+	// ------------------------------------------------------------------
+
+	/**
+	 * Service + resolver wired to a mutable app-policy document, sharing
+	 * this suite's mocked mappers so day-level queries see only the test
+	 * fixtures.
+	 *
+	 * @return array{0: TimeTrackingService, 1: BreakPolicyResolver}
+	 */
+	private function serviceWithPolicy(array $appValuesExtra = []): array
+	{
+		$appValues = array_merge([
+			'max_daily_hours' => '10',
+			'min_rest_period' => '11',
+			'app_timezone' => 'Europe/Berlin',
+			'country' => 'DE',
+		], $appValuesExtra);
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			fn ($app, $key, $default) => $appValues[$key] ?? $default
+		);
+		$config->method('getUserValue')->willReturn('');
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+		$userSettingsMapper->method('getStringSetting')->willReturn('1');
+		$userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$lawProfileFactory = new LaborLawProfileFactory($config, $userSettingsMapper);
+		$resolver = new BreakPolicyResolver(
+			$config,
+			$lawProfileFactory,
+			$userSettingsMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->timeEntryMapper,
+			$this->timeZoneService,
+			$l10n,
+		);
+		$complianceService = $this->createMock(ComplianceService::class);
+		$service = new TimeTrackingService(
+			$this->timeEntryMapper,
+			$this->violationMapper,
+			$this->auditLogMapper,
+			$this->projectCheckService,
+			$complianceService,
+			$l10n,
+			$config,
+			$userSettingsMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->monthClosureGuard,
+			$this->db,
+			$this->lockingProvider,
+			$this->timeZoneService,
+			$this->dailyHoursCalculator,
+			null,
+			null,
+			$lawProfileFactory,
+			$resolver,
+		);
+		return [$service, $resolver];
+	}
+
+	private function completedEntry(string $start, string $end): TimeEntry
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime($start, $tz));
+		$entry->setEndTime(new \DateTime($end, $tz));
+		return $entry;
+	}
+
+	public function testAutomaticBreakNineOhFiveInsertsThirtyNotFortyFive(): void
+	{
+		// A1 — the reported over-deduction: 9h05m presence → 30 min.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:05:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(1, $breaks);
+		$portion = $breaks[0];
+		$this->assertSame(30, $portion['duration_minutes']);
+		$this->assertTrue($portion['automatic']);
+		$this->assertSame('strict', $portion['deduction_mode']);
+		$this->assertSame(30, $portion['required_break_minutes']);
+		$this->assertArrayNotHasKey('capped', $portion);
+		// Inside the entry span, ending strictly before the end (E-23).
+		$this->assertLessThan($entry->getEndTime()->getTimestamp(), strtotime($portion['end']));
+		$this->assertGreaterThanOrEqual($entry->getStartTime()->getTimestamp(), strtotime($portion['start']));
+	}
+
+	public function testAutomaticBreakNineThirtyOneInsertsFortyFiveStrict(): void
+	{
+		// A2 — strict at 9h31m stays 45 (net 8h46 needs only 30, but the
+		// smallest consistent statutory amount is 45).
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:31:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertSame(45, $breaks[0]['duration_minutes']);
+	}
+
+	public function testAutomaticBreakCapModeTailPlacesOverhang(): void
+	{
+		// A8/A12 — cap mode at 9h31m: 31 min tail [end−31m, end], flagged.
+		[$service] = $this->serviceWithPolicy([
+			Constants::CONFIG_BREAK_POLICY_JSON => json_encode(['deduction_mode' => 'cap_overhang']),
+		]);
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:31:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(1, $breaks);
+		$portion = $breaks[0];
+		$this->assertSame(31, $portion['duration_minutes']);
+		$this->assertTrue($portion['automatic']);
+		$this->assertTrue($portion['capped']);
+		$this->assertSame('cap_overhang', $portion['deduction_mode']);
+		$this->assertSame(45, $portion['required_break_minutes'],
+			'required_break_minutes stays the strict target for auditability');
+		// Tail placement: ends exactly at the entry end (EC-8).
+		$this->assertSame($entry->getEndTime()->getTimestamp(), strtotime($portion['end']));
+		$this->assertSame(
+			$entry->getEndTime()->getTimestamp() - 31 * 60,
+			strtotime($portion['start'])
+		);
+	}
+
+	public function testAutomaticBreakManualSuppressesInsertion(): void
+	{
+		// A-13/EC-3 — a manual break on the day suppresses insertion.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:05:00');
+		$entry->setBreaks(json_encode([
+			['start' => '2026-11-13T12:00:00+01:00', 'end' => '2026-11-13T12:30:00+01:00'],
+		]));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertFalse($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(1, $breaks);
+		$this->assertArrayNotHasKey('automatic', $breaks[0]);
+	}
+
+	public function testStaleAutomaticPortionTrimmedToFixpointRemainder(): void
+	{
+		// US-003/A-20 — the customer's exact scenario: auto-45 booked by the
+		// old logic, employee later records a real 30-min break → the stale
+		// portion shrinks to 0, leaving only the manual reality.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:05:00');
+		$manual = ['start' => '2026-11-13T12:00:00+01:00', 'end' => '2026-11-13T12:30:00+01:00'];
+		$entry->setBreaks(json_encode([
+			$manual,
+			[
+				'start' => '2026-11-13T13:00:00+01:00',
+				'end' => '2026-11-13T13:45:00+01:00',
+				'duration_minutes' => 45,
+				'automatic' => true,
+			],
+		]));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(1, $breaks);
+		$this->assertSame($manual, $breaks[0], 'manual portion bytes untouched (NN-06)');
+	}
+
+	public function testStaleAutomaticPortionPartiallyTrimmed(): void
+	{
+		// Auto-45 + manual 10 on a 9h40m day: fixpoint target is 45 total,
+		// so 35 min of automatic break may remain → trim by 10.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:40:00');
+		$entry->setBreaks(json_encode([
+			['start' => '2026-11-13T12:00:00+01:00', 'end' => '2026-11-13T12:10:00+01:00'],
+			[
+				'start' => '2026-11-13T13:00:00+01:00',
+				'end' => '2026-11-13T13:45:00+01:00',
+				'duration_minutes' => 45,
+				'automatic' => true,
+			],
+		]));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$breaks = json_decode((string)$entry->getBreaks(), true);
+		$this->assertCount(2, $breaks);
+		$this->assertSame(10, (strtotime($breaks[0]['end']) - strtotime($breaks[0]['start'])) / 60);
+		$this->assertSame(35, (strtotime($breaks[1]['end']) - strtotime($breaks[1]['start'])) / 60);
+		$this->assertSame(35, $breaks[1]['duration_minutes']);
+		$this->assertTrue($breaks[1]['automatic']);
+	}
+
+	public function testAutomaticBreakIdempotentOnRepeat(): void
+	{
+		// Re-running on an entry that already carries the fixpoint amount
+		// must be a no-op (E day-level totals already cover the target).
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->completedEntry('2026-11-13 08:00:00', '2026-11-13 17:05:00');
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->assertTrue($service->calculateAndSetAutomaticBreak($entry));
+		$before = $entry->getBreaks();
+		$this->assertFalse($service->calculateAndSetAutomaticBreak($entry),
+			'no manual break + covered target → no second insertion');
+		$this->assertSame($before, $entry->getBreaks());
 	}
 }

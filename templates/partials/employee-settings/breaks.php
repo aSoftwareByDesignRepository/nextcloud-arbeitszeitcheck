@@ -89,6 +89,12 @@ $breakPolicyPresenceLines = is_array($breakPolicy['presenceLines'] ?? null) ? $b
 				</div>
 			</div>
 			<?php endif; ?>
+			<?php if (($breakPolicy['deductionMode'] ?? 'strict') === 'cap_overhang'): ?>
+			<p class="settings-form__help">
+				<strong><?php p($l->t('Automatic break deduction:')); ?></strong>
+				<?php p($l->t('only the minutes beyond a statutory threshold are recorded — the resulting working time stays exactly at the threshold.')); ?>
+			</p>
+			<?php endif; ?>
 			<div class="settings-form__group">
 				<label for="hours-display" class="form-label"><?php p($l->t('Hours display')); ?></label>
 				<select id="hours-display"

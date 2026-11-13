@@ -1,6 +1,11 @@
 /**
  * Live proof: two concurrent manager decisions on one pending entry → exactly one
- * winner in DB; loser gets HTTP 409 already_decided (not last-write-wins).
+ * winner in DB; the loser is serialized — either HTTP 409 already_decided (lost
+ * the CAS check after the winner committed) or HTTP 423 locked (lost the
+ * per-entity mutation lock before reaching it). Both outcomes prove no
+ * last-write-wins. The losing request is then replayed: it must observe the
+ * decided state (already_decided/409), proving the lock released and the
+ * decision is final.
  */
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv, hasCreds } from './helpers/auth.js'
@@ -21,7 +26,7 @@ test.describe('Concurrent pending time-entry decision (live)', () => {
 		'Requires NC_ADMIN_USER, NC_EMPLOYEE_USER, NC_MANAGER_USER',
 	)
 
-	test('parallel approve+reject → one DB decision and one 409', async ({ browser }) => {
+	test('parallel approve+reject → one DB decision, loser serialized, replay sees already_decided', async ({ browser }) => {
 		const adminContext = await browser.newContext()
 		const employeeContext = await browser.newContext()
 		const managerContext = await browser.newContext()
@@ -98,13 +103,31 @@ test.describe('Concurrent pending time-entry decision (live)', () => {
 
 			const bodies = [a.json, b.json]
 			const successCount = bodies.filter((j) => j && j.success === true).length
-			const conflictCount = [a, b].filter(
-				(r) => r.status === 409 || r.json?.error_code === 'already_decided',
-			).length
+			const isLoser = (r) =>
+				r.status === 409 ||
+				r.status === 423 ||
+				r.json?.error_code === 'already_decided' ||
+				r.json?.error_code === 'locked'
+			const conflictCount = [a, b].filter(isLoser).length
 
 			expect(successCount, JSON.stringify({ a, b })).toBe(1)
 			expect(conflictCount, JSON.stringify({ a, b })).toBe(1)
-			expect([a.status, b.status].filter((s) => s === 200 || s === 409).length).toBe(2)
+			expect(
+				[a.status, b.status].filter((s) => s === 200 || s === 409 || s === 423).length,
+			).toBe(2)
+
+			// Replay the losing decision: the lock must be released and the
+			// committed decision must reject it — 409/already_decided, never a
+			// second success (CAS still guards after lock release).
+			const loser = a.json?.success !== true ? { res: a, url: approveUrl } : { res: b, url: rejectUrl }
+			const replay = await apiAllowFailure(managerPage, 'POST', loser.url, {
+				data: loser.url === rejectUrl ? { reason: 'concurrent loser' } : {},
+			})
+			expect(
+				replay.status === 409 || replay.json?.error_code === 'already_decided',
+				JSON.stringify({ a, b, replay }),
+			).toBe(true)
+			expect(replay.json?.success, JSON.stringify({ a, b, replay })).not.toBe(true)
 
 			const after = await api(
 				employeePage,

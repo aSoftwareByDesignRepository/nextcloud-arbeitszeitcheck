@@ -121,6 +121,9 @@ class SettingsController extends Controller
 				'success' => true,
 				'settings' => $settings,
 				'break_policy_enforced' => $policyEnforced,
+				// Effective automatic-break convention (model ?? org ??
+				// 'strict'); informational only — employees cannot override it.
+				'break_policy_deduction_mode' => $this->breakDeductionMode($userId ?? null),
 			]);
 		} catch (\Throwable $e) {
 			if ($this->isMissingTableException($e)) {
@@ -589,6 +592,26 @@ class SettingsController extends Controller
 				['exception' => $e]
 			);
 			return false;
+		}
+	}
+
+	/**
+	 * Effective automatic-break deduction mode for the current user.
+	 * Fails safe to 'strict' — a resolver fault must never report a laxer
+	 * convention than the one actually applied.
+	 */
+	private function breakDeductionMode(?string $userId): string
+	{
+		try {
+			$resolver = $this->breakPolicyResolver
+				?? Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+			return $resolver->deductionModeForUser($userId);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Break-policy deduction-mode lookup failed — defaulting to strict: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::DEDUCTION_STRICT;
 		}
 	}
 

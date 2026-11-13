@@ -33,14 +33,21 @@ function run_unit_tests(string $appRoot, string $phpunit, array $filters): int
 
 function restore(string $source, string $backup): void
 {
+	// copy() truncates the destination in place: the source inode — and
+	// therefore its host-side owner/group — is preserved. A rename() would
+	// replace the inode with the container-user-owned backup and leave
+	// root-owned files on the bind-mounted app tree.
 	if (is_file($backup)) {
-		rename($backup, $source);
+		copy($backup, $source);
+		unlink($backup);
 	}
 }
 
 $suiteFilters = [
 	'AbsenceHalfDayNonVacationTest',
 	'AbsenceDayShapeTest',
+	'AbsenceShortenShapeDebitTest',
+	'AbsenceCustomMaxDaysDebitTest',
 	'HalfDayTypePolicyTest',
 	'PaidAbsencePlannedHoursCreditServiceTest',
 	'RecomputeAbsenceDaysScheduleTest',
@@ -232,6 +239,88 @@ $mutations = [
 		'from' => "if (!\$shape['fractional']) {",
 		'to' => "if (true) {",
 		'filters' => ['AbsenceDayShapeTest::testDebitSingleDayHalfWeightRelative','AbsenceDayShapeTest::testDebitBoundaryHalvesMultiDay'],
+	],
+	[
+		'name' => 'shorten_full_weight_debit',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		\$debit = AbsenceDayShape::debitForShape(
+			\$this->entityDayShape(\$absence),",
+		'to' => "		\$debit = AbsenceDayShape::debitForShape(
+			AbsenceDayShape::full(),",
+		'filters' => [
+			'AbsenceShortenShapeDebitTest::testStartHalfSurvivesShortenAndKeepsReducingDebit',
+			'AbsenceShortenShapeDebitTest::testBothBoundaryHalvesShorten',
+			'AbsenceShortenShapeDebitTest::testShortenToSingleDayKeepsStartHalfAsSingleDayShape',
+		],
+	],
+	[
+		'name' => 'shorten_keeps_stale_end_shape',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		\$absence->setEndDayFraction(\$eF);
+		\$absence->setEndDaySlot(\$eS);",
+		'to' => "		\$absence->setEndDayFraction(\$shapeSource->getEndDayFraction());
+		\$absence->setEndDaySlot(\$shapeSource->getEndDaySlot());",
+		'filters' => [
+			'AbsenceShortenShapeDebitTest::testStaleEndHalfIsClearedAndDoesNotTravel',
+			'AbsenceShortenShapeDebitTest::testBothBoundaryHalvesShorten',
+		],
+	],
+	[
+		'name' => 'shorten_drops_start_shape',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		\$absence->setStartDayFraction(\$sF);
+		\$absence->setStartDaySlot(\$sS);",
+		'to' => "		\$absence->setStartDayFraction(null);
+		\$absence->setStartDaySlot(null);",
+		'filters' => [
+			'AbsenceShortenShapeDebitTest::testStartHalfSurvivesShortenAndKeepsReducingDebit',
+			'AbsenceShortenShapeDebitTest::testBothBoundaryHalvesShorten',
+			'AbsenceShortenShapeDebitTest::testShortenToSingleDayKeepsStartHalfAsSingleDayShape',
+			'AbsenceShortenShapeDebitTest::testNonVacationTypeKeepsStartHalf',
+		],
+	],
+	[
+		'name' => 'custom_maxdays_ignores_debit',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		if (\$exceeds && \$this->customMaxDaysSatisfiedByDebit(\$type, \$startDate, \$endDate, \$data, \$userId, \$maxDays)) {
+			\$exceeds = false;
+		}",
+		'to' => "		if (false && \$exceeds) {
+			\$exceeds = false;
+		}",
+		'filters' => [
+			'AbsenceCustomMaxDaysDebitTest::testCallSiteAcceptsCustomRangeWhenHalvesFitCap',
+			'AbsenceCustomMaxDaysDebitTest::testCallSiteRejectsCustomRangeWhenDebitStillOverCap',
+			'AbsenceCustomMaxDaysDebitTest::testBoundaryHalvesBringDebitWithinMax',
+			'AbsenceCustomMaxDaysDebitTest::testWeightReducedRangeCountsAsDebit',
+		],
+	],
+	[
+		'name' => 'custom_maxdays_applies_to_builtins',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		if (!str_starts_with(\$type, 'custom_') || \$userId === '') {
+			return false;
+		}",
+		'to' => "		if (\$userId === '') {
+			return false;
+		}",
+		'filters' => [
+			'AbsenceCustomMaxDaysDebitTest::testBuiltInTypeNeverUsesDebitCount',
+			'AbsenceCustomMaxDaysDebitTest::testCallSiteKeepsCalendarCapForBuiltIn',
+		],
+	],
+	[
+		'name' => 'custom_maxdays_fails_open_on_bad_shape',
+		'file' => 'lib/Service/AbsenceService.php',
+		'from' => "		} catch (\Throwable) {
+			return false;
+		}
+		return is_finite(\$debitDays) && \$debitDays <= \$maxDays + AbsenceDayShape::EPS;",
+		'to' => "		} catch (\Throwable) {
+			return true;
+		}
+		return is_finite(\$debitDays) && \$debitDays <= \$maxDays + AbsenceDayShape::EPS;",
+		'filters' => ['AbsenceCustomMaxDaysDebitTest::testInvalidShapeInputNeverFailsOpen'],
 	],
 ];
 

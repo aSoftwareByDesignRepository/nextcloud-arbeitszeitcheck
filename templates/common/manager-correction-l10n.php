@@ -127,12 +127,24 @@ $managerCorrectionL10n = array_merge($managerCorrectionL10n, [
 	'Keep current project link' => $l->t('Keep current project link'),
 ]);
 
+// Effective deduction mode for the entry's owner where resolvable —
+// correction preview mirrors the same insertion semantics as clock-out.
+$azcMgrDeductionMode = 'strict';
+try {
+	$azcMgrUserId = $_['managerCorrectionEntryUserId'] ?? null;
+	$azcMgrResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+	$azcMgrDeductionMode = $azcMgrResolver->deductionModeForUser(is_string($azcMgrUserId) ? $azcMgrUserId : null);
+} catch (\Throwable) {
+	$azcMgrDeductionMode = 'strict';
+}
+
 $azcMgrComplianceParams = [
 	'country' => $azcMgrLawProfile->country,
 	'breakTiers' => $azcMgrLawProfile->breakTiersAscending(),
 	'minBreakMinutes' => $azcMgrMinBreak,
 	'maxDailyHoursDefault' => $azcMgrLawProfile->dailyMaxHoursDefault,
 	'allowedBreakSplitPatterns' => $azcMgrLawProfile->allowedBreakSplitPatterns,
+	'deductionMode' => $azcMgrDeductionMode,
 	'lawLabels' => [
 		'breaks' => $azcMgrLawProfile->lawLabel('breaks'),
 		'daily' => $azcMgrLawProfile->lawLabel('daily'),

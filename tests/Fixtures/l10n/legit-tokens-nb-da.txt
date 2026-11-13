@@ -272,6 +272,7 @@ enkeltpersoner
 enkeltvis
 enkle
 enten
+erklærer
 erstatning
 erstatte
 erstatter
@@ -961,8 +962,12 @@ overlappe
 overlapper
 overskred
 overskredet
+overskredne
 overskride
+overskridelse
+overskridelsesbegrensning
 overskrider
+overskrides
 overskriver
 oversteg
 overstige
@@ -995,6 +1000,7 @@ pause
 pauseandel
 pauseberegning
 pausede
+pausefradrag
 pausegenerering
 pauseinformation
 pausekrav
@@ -1120,6 +1126,7 @@ restferietimer
 resultat
 resultater
 resultatet
+resulterende
 resumé
 resuméer
 retning
@@ -1288,6 +1295,7 @@ stilling
 stoppe
 stopper
 stoppet
+stramme
 streng
 strengere
 strengt

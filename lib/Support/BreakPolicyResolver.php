@@ -65,6 +65,18 @@ final class BreakPolicyResolver
 	public const FIELD_WINDOWS = 'breakPolicyWindows';
 	public const FIELD_EXEMPTIONS = 'presenceExemptions';
 	public const FIELD_PAID_CAP = 'breakPolicyPaidCapMinutes';
+	public const FIELD_DEDUCTION_MODE = 'breakPolicyDeductionMode';
+
+	/**
+	 * Automatic break-deduction conventions. `strict` deducts the minimal
+	 * internally-consistent statutory amount (fixpoint). `cap_overhang`
+	 * additionally opts in to recording only the minutes beyond the breached
+	 * statutory threshold — never more than `strict` demands, never less than
+	 * the resulting net still requires.
+	 */
+	public const DEDUCTION_STRICT = 'strict';
+	public const DEDUCTION_CAP_OVERHANG = 'cap_overhang';
+	public const DEDUCTION_MODES = [self::DEDUCTION_STRICT, self::DEDUCTION_CAP_OVERHANG];
 
 	private const TIME_PATTERN = '/^([01]\d|2[0-3]):[0-5]\d$/';
 	private const DATE_PATTERN = '/^\d{4}-\d{2}-\d{2}$/';
@@ -140,7 +152,8 @@ final class BreakPolicyResolver
 	 *   min_break_minutes: int|null,
 	 *   tiers: list<array{afterHours: float, breakMinutes: int}>,
 	 *   windows: list<array{start: string, end: string, minutes: int|null, mode: string}>,
-	 *   presence_exemptions: list<array{start: string, end: string}>
+	 *   presence_exemptions: list<array{start: string, end: string}>,
+	 *   deduction_mode: string
 	 * }
 	 */
 	private static function emptyPolicy(): array
@@ -156,6 +169,10 @@ final class BreakPolicyResolver
 			// but whose own cap is unset inherit this; null = no org default
 			// (model-unset then means full inclusion, MF-01).
 			'paid_break_cap_minutes' => null,
+			// Additive (POLICY_VERSION stays 1): automatic-break deduction
+			// convention. Defaults to strict so documents written before the
+			// field existed decode identically.
+			'deduction_mode' => self::DEDUCTION_STRICT,
 		];
 	}
 
@@ -267,6 +284,7 @@ final class BreakPolicyResolver
 	 *   presence_windows: list<array{weekday: int, start: string, end: string}>,
 	 *   breaks_count_as_work: bool,
 	 *   paid_break_cap_minutes: int|null,
+	 *   deduction_mode: string|null,
 	 * }
 	 */
 	public function modelRulesForUser(?string $userId): array
@@ -291,6 +309,8 @@ final class BreakPolicyResolver
 			'presence_windows' => [],
 			'breaks_count_as_work' => false,
 			'paid_break_cap_minutes' => null,
+			// Model-level deduction-mode override; null = inherit org mode.
+			'deduction_mode' => null,
 		];
 	}
 
@@ -356,6 +376,18 @@ final class BreakPolicyResolver
 			}
 		}
 
+		// Deduction-mode override (null = inherit org). Tolerant decode:
+		// anything that is not a known mode falls back to null so a corrupt
+		// fragment silently inherits — never weakens to a laxer convention.
+		if (array_key_exists('deduction_mode', $raw)) {
+			$modeRaw = $raw['deduction_mode'];
+			if ($modeRaw === null || $modeRaw === '') {
+				$rules['deduction_mode'] = null;
+			} elseif (is_string($modeRaw) && in_array($modeRaw, self::DEDUCTION_MODES, true)) {
+				$rules['deduction_mode'] = $modeRaw;
+			}
+		}
+
 		return $rules;
 	}
 
@@ -391,6 +423,9 @@ final class BreakPolicyResolver
 					$tiers[] = $t;
 				}
 				$normalized['tiers'] = $this->sortTiersAscending($tiers);
+				if ($errors === []) {
+					$this->assertTiersMonotone($normalized['tiers'], 'tiers', $errors);
+				}
 			}
 		}
 
@@ -444,6 +479,20 @@ final class BreakPolicyResolver
 				|| $flagRaw === 1
 				|| $flagRaw === '1'
 				|| (is_string($flagRaw) && strtolower(trim($flagRaw)) === 'true');
+		}
+
+		// Deduction-mode override: 'strict'/'cap_overhang', null/'' clears to
+		// inherit the organisation mode. Unknown strings are rejected — a
+		// model must never smuggle an undefined convention past validation.
+		if (array_key_exists('deduction_mode', $rules)) {
+			$modeRaw = $rules['deduction_mode'];
+			if ($modeRaw === null || $modeRaw === '') {
+				$normalized['deduction_mode'] = null;
+			} elseif (is_string($modeRaw) && in_array($modeRaw, self::DEDUCTION_MODES, true)) {
+				$normalized['deduction_mode'] = $modeRaw;
+			} else {
+				$errors['deduction_mode'] = 'VALIDATION_VALUE';
+			}
 		}
 
 		return ['errors' => $errors, 'normalized' => $normalized];
@@ -617,6 +666,216 @@ final class BreakPolicyResolver
 			}
 		}
 		return $required;
+	}
+
+	/**
+	 * Effective automatic-break deduction mode for a user:
+	 * working-time-model override ?? organisation policy ?? 'strict'.
+	 * Fails safe to strict on any resolver fault (never a laxer convention).
+	 */
+	public function deductionModeForUser(?string $userId): string
+	{
+		try {
+			$modelMode = $this->modelRulesForUser($userId)['deduction_mode'] ?? null;
+			if (is_string($modelMode) && in_array($modelMode, self::DEDUCTION_MODES, true)) {
+				return $modelMode;
+			}
+		} catch (\Throwable $e) {
+			$this->logWarning('deduction_mode model lookup failed', $e);
+		}
+		try {
+			$orgMode = $this->orgConfig()['deduction_mode'] ?? null;
+			if (is_string($orgMode) && in_array($orgMode, self::DEDUCTION_MODES, true)) {
+				return $orgMode;
+			}
+		} catch (\Throwable $e) {
+			$this->logWarning('deduction_mode org lookup failed', $e);
+		}
+		return self::DEDUCTION_STRICT;
+	}
+
+	/**
+	 * Minimal internally-consistent break deduction (seconds) for a day.
+	 *
+	 * Statutory break requirements apply to the RESULTING net working time —
+	 * never to the gross presence and never to the pre-deduction net. The
+	 * target d* is the smallest deduction such that required(P − d*) ≤ d*.
+	 * This is the fix for the reported over-deduction: evaluating the tier on
+	 * the pre-decision duration demands 45 min for ~9h presence even though
+	 * the post-deduction net only ever requires 30 min.
+	 *
+	 * - strict:       d* = min { t ∈ {0} ∪ tier amounts : R(P − t) ≤ t }
+	 * - cap_overhang: d starts at the already-recorded break E and iterates
+	 *   d := min(r, P − T(r)) until consistent — landing the net on the
+	 *   producing threshold so only the overhang is recorded. Each step
+	 *   strictly increases d (T(r) < P − d ⟹ P − T(r) > d), so the loop
+	 *   terminates within MAX_TIERS + a margin of iterations.
+	 *
+	 * The cap insert is rounded UP to whole minutes — a sub-minute overhang
+	 * must never leave the net a second above its threshold.
+	 *
+	 * @return array{
+	 *   total_seconds: int,
+	 *   insert_seconds: int,
+	 *   capped: bool,
+	 *   strict_target_seconds: int,
+	 *   landed_threshold_seconds: int|null
+	 * }
+	 */
+	public function minimalConsistentBreakSeconds(
+		int $presenceSeconds,
+		int $existingBreakSeconds,
+		string $mode,
+		?string $userId = null,
+	): array {
+		$presenceSeconds = max(0, $presenceSeconds);
+		$existingBreakSeconds = max(0, $existingBreakSeconds);
+		$strictTotal = $this->fixpointBreakSeconds($presenceSeconds, $userId);
+
+		$result = [
+			'total_seconds' => $strictTotal,
+			'insert_seconds' => max(0, $strictTotal - $existingBreakSeconds),
+			'capped' => false,
+			'strict_target_seconds' => $strictTotal,
+			'landed_threshold_seconds' => null,
+		];
+
+		if ($mode !== self::DEDUCTION_CAP_OVERHANG) {
+			return $result;
+		}
+
+		[$capTotal, $landedThreshold] = $this->cappedBreakSeconds(
+			$presenceSeconds,
+			$existingBreakSeconds,
+			$userId
+		);
+		$insert = max(0, $capTotal - $existingBreakSeconds);
+		if ($insert > 0) {
+			$insert = (int)(ceil($insert / 60) * 60);
+		}
+		$result['total_seconds'] = $existingBreakSeconds + $insert;
+		$result['insert_seconds'] = $insert;
+		// `capped` marks reduced overhang portions (the cap result sits below
+		// the strict tier target) — they get tail placement. Flagging on the
+		// pre-ceil cap total keeps the marker true when rounding adds <1 min.
+		$result['capped'] = $insert > 0 && $capTotal < $strictTotal;
+		$result['landed_threshold_seconds'] = $landedThreshold;
+
+		return $result;
+	}
+
+	/**
+	 * Strict-mode fixpoint: the smallest candidate from {0} ∪ tier break
+	 * amounts that satisfies R(P − t) ≤ t. Always exists (the top tier amount
+	 * itself satisfies the predicate once it triggers).
+	 */
+	private function fixpointBreakSeconds(int $presenceSeconds, ?string $userId): int
+	{
+		$tiers = $this->effectiveTiers($userId);
+		$candidates = [0];
+		foreach ($tiers as $tier) {
+			$candidates[] = (int)$tier['breakMinutes'] * 60;
+		}
+		$candidates = array_values(array_unique($candidates));
+		sort($candidates);
+
+		foreach ($candidates as $candidate) {
+			$net = max(0, $presenceSeconds - $candidate);
+			if ($this->requiredBreakMinutes($net, $userId) * 60 <= $candidate) {
+				return $candidate;
+			}
+		}
+
+		// Unreachable with sane tiers (top tier amount always satisfies) —
+		// the top tier amount is the safe maximum deduction either way.
+		$top = end($candidates);
+		return $top === false ? 0 : (int)$top;
+	}
+
+	/**
+	 * Cap-overhang iteration: start at the recorded break E and repeatedly
+	 * raise d to the lesser of the requirement r and the overhang P − T(r)
+	 * (T = smallest threshold producing r). Landing the net exactly on T
+	 * removes every tier producing r (thresholds are exclusive), and
+	 * min(r, …) never overshoots the requirement mid-flight.
+	 *
+	 * @return array{0: int, 1: int|null} [total deduction seconds, landed threshold]
+	 */
+	private function cappedBreakSeconds(int $presenceSeconds, int $existingBreakSeconds, ?string $userId): array
+	{
+		$d = $existingBreakSeconds;
+		$landed = null;
+		for ($i = 0; $i < self::MAX_TIERS + 8; $i++) {
+			$net = max(0, $presenceSeconds - $d);
+			[$required, $threshold] = $this->requirementAndProducingThreshold($net, $userId);
+			if ($required <= $d) {
+				return [$d, $landed];
+			}
+			// Landing the net exactly on the producing threshold …
+			$next = min($required, $presenceSeconds - $threshold);
+			if ($next <= $d) {
+				// Defensive: cannot happen for a triggered producer
+				// (T < net ⟹ P − T > d); bail to the strict requirement.
+				break;
+			}
+			if ($next === $presenceSeconds - $threshold) {
+				$landed = $threshold;
+			}
+			$d = $next;
+		}
+
+		// Fallback on iteration exhaustion: the strict requirement at gross
+		// presence is always ≥ every consistent deduction — safe, never lax.
+		$fallback = max(
+			$this->requiredBreakMinutes($presenceSeconds, $userId) * 60,
+			$existingBreakSeconds
+		);
+		$this->logWarning('cap_overhang iteration exhausted; falling back to strict requirement');
+		return [$fallback, $landed];
+	}
+
+	/**
+	 * Requirement at $netSeconds plus the smallest tier threshold that
+	 * produces it. Used by the cap iteration: deducting down to that
+	 * threshold un-triggers every tier yielding the same requirement.
+	 *
+	 * @return array{0: int, 1: int} [required seconds, producing threshold seconds]
+	 */
+	private function requirementAndProducingThreshold(int $netSeconds, ?string $userId): array
+	{
+		$required = 0;
+		$producer = 0;
+		foreach ($this->effectiveTiers($userId) as $tier) {
+			$threshold = (int)round(((float)$tier['afterHours']) * 3600);
+			$tierSeconds = (int)$tier['breakMinutes'] * 60;
+			if ($netSeconds > $threshold && $tierSeconds >= $required) {
+				if ($tierSeconds > $required || $producer === 0 || $threshold < $producer) {
+					$producer = $threshold;
+				}
+				$required = $tierSeconds;
+			}
+		}
+		return [$required, $producer];
+	}
+
+	/**
+	 * Reject non-monotone tier lists at write boundaries: breakMinutes must
+	 * be non-decreasing along ascending afterHours. A later, lower tier can
+	 * never produce the maximum requirement — keeping it would only confuse
+	 * the cap-overhang producing-threshold search.
+	 *
+	 * @param list<array{afterHours: float, breakMinutes: int}> $tiers ascending
+	 */
+	private function assertTiersMonotone(array $tiers, string $fieldPrefix, array &$errors): void
+	{
+		$previous = 0;
+		foreach ($tiers as $i => $tier) {
+			if ((int)$tier['breakMinutes'] < $previous) {
+				$errors[$fieldPrefix . '.' . $i] = 'VALIDATION_TIER_MONOTONE';
+				return;
+			}
+			$previous = (int)$tier['breakMinutes'];
+		}
 	}
 
 	// ------------------------------------------------------------------ //
@@ -911,17 +1170,28 @@ final class BreakPolicyResolver
 	// ------------------------------------------------------------------ //
 
 	/**
-	 * Plan an automatic break for $entry: the day-level remainder after
-	 * existing day breaks, placed in the first applicable window (daily order),
-	 * else the shift midpoint. Never ends at/after the shift end.
+	 * Plan an automatic break for $entry: $requiredMinutes is the day-level
+	 * break requirement (the caller's minimal-consistent target); the
+	 * remainder after the day's existing breaks is inserted.
+	 * Strict mode places in the first applicable window (daily order), else
+	 * the shift midpoint, and never ends at/after the shift end (E-23).
+	 * Cap-overhang portions anchor to the tail [endTs − d, endTs) of the
+	 * completing entry — they may end exactly AT the shift end.
 	 *
-	 * Returns null when nothing should be inserted (day already covered or a
+	 * Returns null when nothing should be inserted (nothing needed or a
 	 * manual break suppresses automatic insertion — E-25).
 	 *
+	 * @param array<string,mixed>|null $daySummary Optional precomputed
+	 *        {@see dayBreakSummary()} for the entry's start day — saves one
+	 *        overlap query when the caller already computed it.
 	 * @return array{start: \DateTime, end: \DateTime, seconds: int, window: array<string,mixed>|null}|null
 	 */
-	public function planAutoBreak(TimeEntry $entry, int $requiredMinutes): ?array
-	{
+	public function planAutoBreak(
+		TimeEntry $entry,
+		int $requiredMinutes,
+		bool $cappedTail = false,
+		?array $daySummary = null,
+	): ?array {
 		$start = $entry->getStartTime();
 		$end = $entry->getEndTime();
 		$userId = (string)$entry->getUserId();
@@ -934,14 +1204,34 @@ final class BreakPolicyResolver
 			return null;
 		}
 
-		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($start);
-		$summary = $this->dayBreakSummary($userId, $dayStart, $dayEnd, $entry, $entry->getId());
-		if ($summary['has_manual']) {
+		if ($daySummary === null) {
+			[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($start);
+			$daySummary = $this->dayBreakSummary($userId, $dayStart, $dayEnd, $entry, $entry->getId());
+		}
+		if ($daySummary['has_manual']) {
 			return null; // any manual break on the day suppresses auto insertion
 		}
-		$neededSeconds = $requiredMinutes * 60 - $summary['total_seconds'];
+		$neededSeconds = $requiredMinutes * 60 - $daySummary['total_seconds'];
 		if ($neededSeconds <= 0) {
 			return null; // day already covered — no second auto break
+		}
+
+		if ($cappedTail) {
+			// Cap-overhang convention: the tail minutes of the completing
+			// entry are recorded as break, ending exactly at endTs. Insertions
+			// are whole minutes (sub-minute overhangs round up), and the tail
+			// must stay strictly inside the entry interval.
+			$neededSeconds = (int)(ceil($neededSeconds / 60)) * 60;
+			if ($neededSeconds >= $endTs - $startTs) {
+				return null;
+			}
+			$tz = $this->timeZoneService->storageTimeZone();
+			return [
+				'start' => (new \DateTime('@' . ($endTs - $neededSeconds)))->setTimezone($tz),
+				'end' => (new \DateTime('@' . $endTs))->setTimezone($tz),
+				'seconds' => $neededSeconds,
+				'window' => null,
+			];
 		}
 
 		// First applicable window in daily order wins.
@@ -1170,6 +1460,7 @@ final class BreakPolicyResolver
 				$normalized['tiers'][] = $t;
 			}
 			$normalized['tiers'] = $this->sortTiersAscending($normalized['tiers']);
+			$this->assertTiersMonotone($normalized['tiers'], self::FIELD_TIERS, $errors);
 		}
 
 		// windows — ≤4, no overlaps (incl. wrap), required ⇒ minutes ≤ length.
@@ -1202,6 +1493,16 @@ final class BreakPolicyResolver
 			} else {
 				$normalized['paid_break_cap_minutes'] = $paidCap;
 			}
+		}
+
+		// deduction_mode — 'strict' | 'cap_overhang'; anything else is a
+		// rejected write, never a silent fallback (the org must pick a known
+		// convention explicitly).
+		$modeRaw = $input['deduction_mode'] ?? self::DEDUCTION_STRICT;
+		if (is_string($modeRaw) && in_array($modeRaw, self::DEDUCTION_MODES, true)) {
+			$normalized['deduction_mode'] = $modeRaw;
+		} else {
+			$errors[self::FIELD_DEDUCTION_MODE] = 'VALIDATION_VALUE';
 		}
 
 		// presence_exemptions — ≤8 ISO ranges, start ≤ end (overlaps allowed).
@@ -1259,6 +1560,21 @@ final class BreakPolicyResolver
 				}
 			}
 			$policy['tiers'] = $this->sortTiersAscending($policy['tiers']);
+			// Stored non-monotone fragments are rejected at the write
+			// boundary; a document that predates or bypassed it is repaired
+			// here — a later, weaker tier can never produce the maximum
+			// requirement, so dropping it changes nothing observable.
+			$kept = [];
+			$previousMinutes = 0;
+			foreach ($policy['tiers'] as $tier) {
+				if ((int)$tier['breakMinutes'] < $previousMinutes) {
+					$drop('non-monotone tier');
+					continue;
+				}
+				$previousMinutes = (int)$tier['breakMinutes'];
+				$kept[] = $tier;
+			}
+			$policy['tiers'] = $kept;
 		} elseif ($tiers !== [] && $tiers !== null) {
 			$drop('tiers');
 		}
@@ -1299,6 +1615,17 @@ final class BreakPolicyResolver
 			$drop('paid_break_cap_minutes');
 		}
 
+		// deduction_mode — tolerant: an unknown stored value degrades to
+		// 'strict' (the safe default) instead of poisoning the whole document.
+		$modeRaw = $decoded['deduction_mode'] ?? null;
+		if ($modeRaw === null) {
+			// Absent (documents written before the field existed) → strict.
+		} elseif (is_string($modeRaw) && in_array($modeRaw, self::DEDUCTION_MODES, true)) {
+			$policy['deduction_mode'] = $modeRaw;
+		} else {
+			$drop('deduction_mode');
+		}
+
 		return $policy;
 	}
 
@@ -1311,6 +1638,11 @@ final class BreakPolicyResolver
 	{
 		if ($normalized['windows'] !== [] || $normalized['presence_exemptions'] !== []
 			|| $normalized['tiers'] === [] && $normalized['min_break_minutes'] === null) {
+			return false;
+		}
+		// Cap-overhang always does something — it changes how automatic
+		// deductions are recorded even when every tier is statutory-shadowed.
+		if (($normalized['deduction_mode'] ?? self::DEDUCTION_STRICT) === self::DEDUCTION_CAP_OVERHANG) {
 			return false;
 		}
 
@@ -1333,6 +1665,11 @@ final class BreakPolicyResolver
 	public function policyWarnings(array $normalized): array
 	{
 		$warnings = [];
+		if (($normalized['deduction_mode'] ?? self::DEDUCTION_STRICT) === self::DEDUCTION_CAP_OVERHANG) {
+			$warnings[] = $this->l10n->t(
+				'Cap-overhang is active: automatic breaks record only the minutes beyond a statutory threshold. The organisation declares that employees were not working during these minutes.'
+			);
+		}
 		foreach ($this->activeCountries() as $country) {
 			$profile = LaborLawProfileFactory::profileForCountry($country);
 			foreach ($normalized['tiers'] as $tier) {

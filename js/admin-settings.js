@@ -191,6 +191,8 @@
             }
             const enforced = !!(document.getElementById('breakPolicyEnforced') || {}).checked;
             const minBreak = String((document.getElementById('breakPolicyMinBreakMinutes') || {}).value || '').trim();
+            const modeInput = document.querySelector('input[name="breakPolicyDeductionMode"]:checked');
+            const deductionMode = modeInput ? modeInput.value : 'strict';
             const tiers = collectRows('tiers');
             const windows = collectRows('windows');
             const exemptions = collectRows('exemptions');
@@ -211,6 +213,9 @@
             });
             if (minBreak !== '') {
                 parts.push(t('Only breaks of at least {m} min count.', 'Only breaks of at least {m} min count.').replace('{m}', minBreak));
+            }
+            if (deductionMode === 'cap_overhang') {
+                parts.push(t('Automatic breaks record only the minutes beyond a threshold.', 'Automatic breaks record only the minutes beyond a threshold.'));
             }
             windows.forEach(function(w) {
                 if (w.start && w.end) {
@@ -260,6 +265,9 @@
         if (minBreakEl) {
             Utils.on(minBreakEl, 'input', updatePreview);
         }
+        document.querySelectorAll('input[name="breakPolicyDeductionMode"]').forEach(function(el) {
+            Utils.on(el, 'change', updatePreview);
+        });
         updatePreview();
     }
 
@@ -272,7 +280,7 @@
         const editor = form.querySelector('#azc-break-policy-editor');
         if (!editor) {
             ['breakPolicyEnforced', 'breakPolicyMinBreakMinutes', 'breakPolicyPaidCapMinutes', 'breakPolicyTiers',
-                'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm'].forEach(function(k) {
+                'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm', 'breakPolicyDeductionMode'].forEach(function(k) {
                 delete formData[k];
             });
             return false;
@@ -300,6 +308,8 @@
         formData.breakPolicyMinBreakMinutes = minBreak === '' ? null : minBreak;
         const paidCap = String((document.getElementById('breakPolicyPaidCapMinutes') || {}).value || '').trim();
         formData.breakPolicyPaidCapMinutes = paidCap === '' ? null : paidCap;
+        const modeInput = document.querySelector('input[name="breakPolicyDeductionMode"]:checked');
+        formData.breakPolicyDeductionMode = modeInput ? modeInput.value : 'strict';
         formData.breakPolicyTiers = JSON.stringify(collect('tiers'));
         formData.breakPolicyWindows = JSON.stringify(collect('windows'));
         formData.presenceExemptions = JSON.stringify(collect('exemptions'));
@@ -366,11 +376,14 @@
             VALIDATION_MINUTES: t('Please enter the minutes as a whole number.', 'Please enter the minutes as a whole number.'),
             VALIDATION_MINUTES_EXCEED_WINDOW: t('The required minutes are longer than the window itself.', 'The required minutes are longer than the window itself.'),
             VALIDATION_OVERLAP: t('These rows overlap — adjust the times.', 'These rows overlap — adjust the times.'),
+            VALIDATION_VALUE: t('Please choose a valid value.', 'Please choose a valid value.'),
+            VALIDATION_TIER_MONOTONE: t('Break rules must stay the same or get stricter as working time increases.', 'Break rules must stay the same or get stricter as working time increases.'),
         };
         const fieldLabels = {
             breakPolicyEnforced: t('Enforce central break rules', 'Enforce central break rules'),
             breakPolicyMinBreakMinutes: t('Minimum countable break', 'Minimum countable break'),
             breakPolicyPaidCapMinutes: t('Default paid break time', 'Default paid break time'),
+            breakPolicyDeductionMode: t('Automatic break deduction', 'Automatic break deduction'),
             breakPolicyTiers: t('Break rules', 'Break rules'),
             breakPolicyWindows: t('Break windows', 'Break windows'),
             presenceExemptions: t('Presence exceptions', 'Presence exceptions'),
@@ -408,6 +421,13 @@
                 if (input) {
                     input.setAttribute('aria-invalid', 'true');
                 }
+            } else if (base === 'breakPolicyDeductionMode') {
+                document.querySelectorAll('input[name="breakPolicyDeductionMode"]').forEach(function(input) {
+                    input.setAttribute('aria-invalid', 'true');
+                    Utils.on(input, 'change', function() {
+                        input.removeAttribute('aria-invalid');
+                    }, { once: true });
+                });
             }
         });
     }

@@ -1500,12 +1500,14 @@ class PageController extends Controller
 	 *   enforced: bool,
 	 *   ruleLines: list<string>,
 	 *   windowLines: list<string>,
-	 *   presenceLines: list<string>
+	 *   presenceLines: list<string>,
+	 *   deductionMode: string
 	 * }
 	 */
 	private function buildBreakPolicyBlockForSettings(?string $userId): array
 	{
-		$empty = ['enforced' => false, 'ruleLines' => [], 'windowLines' => [], 'presenceLines' => []];
+		$empty = ['enforced' => false, 'ruleLines' => [], 'windowLines' => [], 'presenceLines' => [],
+			'deductionMode' => \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::DEDUCTION_STRICT];
 		try {
 			$resolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
 		} catch (\Throwable) {
@@ -1556,6 +1558,7 @@ class PageController extends Controller
 				'ruleLines' => $ruleLines,
 				'windowLines' => $windowLines,
 				'presenceLines' => $presenceLines,
+				'deductionMode' => $resolver->deductionModeForUser($userId),
 			];
 		} catch (\Throwable) {
 			return $empty;

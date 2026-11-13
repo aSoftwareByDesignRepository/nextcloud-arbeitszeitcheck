@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\BusinessRuleCode;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService;
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -1461,48 +1462,110 @@ class TimeTrackingService
 	public function calculateAndSetAutomaticBreak(TimeEntry $timeEntry): bool
 	{
 		$userId = $timeEntry->getUserId();
-		if (!$this->isAutoBreakCalculationEnabled($userId)) {
-			return false;
-		}
-
 		$startTime = $timeEntry->getStartTime();
 		$endTime = $timeEntry->getEndTime();
 		if (!$startTime || !$endTime) {
 			return false;
 		}
 
+		$autoBreakEnabled = $this->isAutoBreakCalculationEnabled($userId);
+		$entryCarriesAutomatic = $this->entryHasAutomaticBreakPortion($timeEntry);
+		if (!$autoBreakEnabled && !$entryCarriesAutomatic) {
+			return false;
+		}
+
+		$resolver = $this->breakPolicyResolver();
+
 		// Break requirements are based on TOTAL working time of the calendar
 		// day (peak across the entry's span), not this single row — ArbZG §4
-		// and the org/model policy tiers share that day-level semantics.
-		$totalWorkingHoursForDay = $this->dailyWorkingHoursCalculator->getPeakWorkingHoursForEntrySpan(
+		// and the org/model policy tiers share that day-level semantics. The
+		// peak day is selected exactly as before (net hours); the fixpoint is
+		// then evaluated on that day's GROSS presence and recorded breaks.
+		$peak = $this->dailyWorkingHoursCalculator->describePeakWorkingDay(
 			$userId,
 			$timeEntry,
 			$endTime,
 			$timeEntry->getId(),
 		);
-		$workSeconds = (int)round($totalWorkingHoursForDay * 3600);
+		$dayStart = $peak['dayStart'];
+		$dayEnd = $peak['dayEnd'];
 
-		$resolver = $this->breakPolicyResolver();
-		$required = $resolver->requiredBreakDetailed($workSeconds, $userId);
-		$requiredBreakMinutes = $required['minutes'];
-		if ($requiredBreakMinutes <= 0) {
-			return false;
+		$presenceSeconds = $resolver->intervalSeconds(
+			$resolver->dayWork($userId, $dayStart, $dayEnd, $timeEntry, $timeEntry->getId())
+		);
+		$summary = $resolver->dayBreakSummary($userId, $dayStart, $dayEnd, $timeEntry, $timeEntry->getId());
+		$existingBreakSeconds = $summary['total_seconds'];
+
+		$mode = $resolver->deductionModeForUser($userId);
+		$target = $resolver->minimalConsistentBreakSeconds($presenceSeconds, $existingBreakSeconds, $mode, $userId);
+		$strictTargetSeconds = $target['strict_target_seconds'];
+
+		// Reconciliation (E-25/D-5): manual breaks suppress insertion, and
+		// stale automatic portions ON THIS ENTRY shrink to what the minimal
+		// consistent deduction still needs. Manual reality is never rewritten
+		// and other entries are never touched.
+		$changed = false;
+		if ($summary['has_manual'] && $entryCarriesAutomatic) {
+			$reconcile = $resolver->minimalConsistentBreakSeconds(
+				$presenceSeconds,
+				$summary['manual_seconds'],
+				$mode,
+				$userId
+			);
+			$autoTargetSeconds = max(0, $reconcile['total_seconds'] - $summary['manual_seconds']);
+			$excessSeconds = max(0, $summary['automatic_seconds'] - $autoTargetSeconds);
+			if ($excessSeconds > 0) {
+				$removedSeconds = $this->trimAutomaticBreakPortions($timeEntry, $excessSeconds);
+				if ($removedSeconds > 0) {
+					$changed = true;
+					$summary['total_seconds'] -= $removedSeconds;
+					$summary['automatic_seconds'] -= $removedSeconds;
+					\OCP\Log\logger('arbeitszeitcheck')->info('Stale automatic break trimmed on time entry', [
+						'time_entry_id' => $timeEntry->getId(),
+						'user_id' => $userId,
+						'deduction_mode' => $mode,
+						'removed_break_seconds' => $removedSeconds,
+						'manual_break_seconds' => $summary['manual_seconds'],
+						'required_break_minutes' => (int)round($reconcile['total_seconds'] / 60),
+					]);
+				}
+			}
 		}
 
-		$plan = $resolver->planAutoBreak($timeEntry, $requiredBreakMinutes);
+		$insertSeconds = $autoBreakEnabled ? $target['insert_seconds'] : 0;
+		if ($insertSeconds <= 0) {
+			return $changed;
+		}
+
+		// planAutoBreak takes the day-level requirement (whole minutes) and
+		// subtracts the day's already-recorded breaks itself. Capped tails
+		// re-ceil the remainder inside the resolver — floor here is exact.
+		$plan = $resolver->planAutoBreak(
+			$timeEntry,
+			intdiv($target['total_seconds'], 60),
+			$target['capped'],
+			$summary
+		);
 		if ($plan === null) {
-			return false;
+			return $changed;
 		}
 
 		$placedMinutes = (int)round($plan['seconds'] / 60);
+		$requiredBreakMinutes = (int)round($strictTargetSeconds / 60);
+		$required = $resolver->requiredBreakDetailed(
+			max(0, $presenceSeconds - $strictTargetSeconds),
+			$userId
+		);
 		$reasonSource = $required['source'] ?? \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_LAW;
-		$reason = $reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_LAW
-			? $this->l10n->t('Automatically added: Legal break requirement (%s)', [$this->lawProfile($userId)->lawLabel('breaks')])
-			: $this->l10n->t('Automatically added: Organisational break policy (%s)', [
-				$reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_MODEL
-					? $this->l10n->t('working time model')
-					: $this->l10n->t('organisation policy'),
-			]);
+		$reason = $target['capped']
+			? $this->l10n->t('Automatically added: break threshold overhang (%s)', [$this->lawProfile($userId)->lawLabel('breaks')])
+			: ($reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_LAW
+				? $this->l10n->t('Automatically added: Legal break requirement (%s)', [$this->lawProfile($userId)->lawLabel('breaks')])
+				: $this->l10n->t('Automatically added: Organisational break policy (%s)', [
+					$reasonSource === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::SOURCE_MODEL
+						? $this->l10n->t('working time model')
+						: $this->l10n->t('organisation policy'),
+				]));
 
 		// Append — never rebuild the list. Existing automatic top-ups and any
 		// portions written by pause flows stay untouched.
@@ -1513,21 +1576,28 @@ class TimeTrackingService
 		if (!is_array($breaks)) {
 			$breaks = [];
 		}
-		$breaks[] = [
+		$portion = [
 			'start' => $plan['start']->format('c'),
 			'end' => $plan['end']->format('c'),
 			'duration_minutes' => $placedMinutes,
 			'automatic' => true,
+			'deduction_mode' => $mode,
 			'reason' => $reason,
 			'policy_source' => $reasonSource,
 			'required_break_minutes' => $requiredBreakMinutes,
 		];
+		if ($target['capped']) {
+			$portion['capped'] = true;
+		}
+		$breaks[] = $portion;
 		$timeEntry->setBreaks(json_encode($breaks));
 
-		\OCP\Log\logger('arbeitszeitcheck')->info('Automatic break added to time entry', [
+		$logFields = [
 			'time_entry_id' => $timeEntry->getId(),
 			'user_id' => $userId,
 			'total_duration_hours' => round(($endTime->getTimestamp() - $startTime->getTimestamp()) / 3600, 2),
+			'deduction_mode' => $mode,
+			'capped' => $target['capped'],
 			'required_break_minutes' => $requiredBreakMinutes,
 			'placed_break_minutes' => $placedMinutes,
 			'policy_source' => $reasonSource,
@@ -1536,9 +1606,111 @@ class TimeTrackingService
 				: null,
 			'break_start' => $plan['start']->format('c'),
 			'break_end' => $plan['end']->format('c'),
-		]);
+		];
+		if ($target['capped']) {
+			$logFields['overhang_seconds'] = $target['landed_threshold_seconds'] !== null
+				? max(0, $presenceSeconds - $target['landed_threshold_seconds'])
+				: $insertSeconds;
+		}
+		\OCP\Log\logger('arbeitszeitcheck')->info('Automatic break added to time entry', $logFields);
 
 		return true;
+	}
+
+	/**
+	 * Whether this entry's `breaks` JSON already carries an automatic portion.
+	 */
+	private function entryHasAutomaticBreakPortion(TimeEntry $entry): bool
+	{
+		$json = $entry->getBreaks();
+		if (!is_string($json) || $json === '') {
+			return false;
+		}
+		$decoded = json_decode($json, true);
+		if (!is_array($decoded)) {
+			return false;
+		}
+		foreach ($decoded as $portion) {
+			if (is_array($portion) && ($portion['automatic'] ?? false) === true) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Shrink stale automatic break portions on $entry by up to $excessSeconds,
+	 * newest-first. Portions flagged `capped` keep their tail anchor (the end
+	 * timestamp is preserved, the start moves forward); every other automatic
+	 * portion keeps its start anchor. Manual portions are never touched.
+	 *
+	 * @return int seconds actually removed
+	 */
+	private function trimAutomaticBreakPortions(TimeEntry $entry, int $excessSeconds): int
+	{
+		$json = $entry->getBreaks();
+		if (!is_string($json) || $json === '' || $excessSeconds <= 0) {
+			return 0;
+		}
+		$breaks = json_decode($json, true);
+		if (!is_array($breaks)) {
+			return 0;
+		}
+
+		$tz = $this->timeZoneService->storageTimeZone();
+		$automaticIndexes = [];
+		foreach ($breaks as $i => $portion) {
+			if (is_array($portion) && ($portion['automatic'] ?? false) === true
+				&& isset($portion['start'], $portion['end'])) {
+				$automaticIndexes[] = $i;
+			}
+		}
+		// Newest automatic portion first — later insertions are the most
+		// likely stale top-ups.
+		usort($automaticIndexes, static function (int $a, int $b) use ($breaks): int {
+			return strcmp((string)$breaks[$b]['start'], (string)$breaks[$a]['start']);
+		});
+
+		$removed = 0;
+		$remaining = $excessSeconds;
+		foreach ($automaticIndexes as $i) {
+			if ($remaining <= 0) {
+				break;
+			}
+			$portion = $breaks[$i];
+			try {
+				$startTs = (new \DateTime((string)$portion['start']))->getTimestamp();
+				$endTs = (new \DateTime((string)$portion['end']))->getTimestamp();
+			} catch (\Throwable) {
+				continue;
+			}
+			$length = $endTs - $startTs;
+			if ($length <= 0) {
+				continue;
+			}
+			if ($length <= $remaining) {
+				$removed += $length;
+				$remaining -= $length;
+				unset($breaks[$i]);
+				continue;
+			}
+			// Partial trim.
+			if (($portion['capped'] ?? false) === true) {
+				// Tail-anchored: move the start forward, keep the end.
+				$breaks[$i]['start'] = (new \DateTime('@' . ($startTs + $remaining)))->setTimezone($tz)->format('c');
+			} else {
+				// Start-anchored: pull the end earlier (keeps window overlap).
+				$breaks[$i]['end'] = (new \DateTime('@' . ($endTs - $remaining)))->setTimezone($tz)->format('c');
+			}
+			$breaks[$i]['duration_minutes'] = (int)round(($length - $remaining) / 60);
+			$removed += $remaining;
+			$remaining = 0;
+		}
+
+		if ($removed > 0) {
+			$entry->setBreaks(json_encode(array_values($breaks)));
+		}
+		return $removed;
 	}
 
 	/**
@@ -2205,7 +2377,7 @@ class TimeTrackingService
 			self::$userMutationLockDepth[$key]++;
 			return $key;
 		}
-		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Time tracking workflow lock for user ' . $userId);
+		DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, 'Time tracking workflow lock for user ' . $userId);
 		self::$userMutationLockDepth[$key] = 1;
 		return $key;
 	}

@@ -337,7 +337,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			], $this->uid);
 			$this->fail('Third half-day on a fully covered day must be rejected');
 		} catch (\Throwable $e) {
-			$this->assertStringContainsString('overlap', $e->getMessage());
+			$this->assertOverlapMessage($e->getMessage());
 		}
 	}
 
@@ -367,7 +367,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			], $this->uid);
 			$this->fail('Same-slot halves must be rejected');
 		} catch (\Throwable $e) {
-			$this->assertStringContainsString('overlap', $e->getMessage());
+			$this->assertOverlapMessage($e->getMessage());
 		}
 	}
 
@@ -399,7 +399,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			], $this->uid);
 			$this->fail('Slotless half must not pair with a slotted half');
 		} catch (\Throwable $e) {
-			$this->assertStringContainsString('overlap', $e->getMessage());
+			$this->assertOverlapMessage($e->getMessage());
 		}
 	}
 
@@ -444,7 +444,96 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			], $this->uid);
 			$this->fail('Full-day overlap on the interior day must be rejected');
 		} catch (\Throwable $e) {
-			$this->assertStringContainsString('overlap', $e->getMessage());
+			$this->assertOverlapMessage($e->getMessage());
 		}
+	}
+
+	public function testShortenPreservesStartHalfAndDropsStaleEndHalf(): void
+	{
+		$mapper = \OCP\Server::get(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class);
+		$counter = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class);
+
+		// Started range: most recent weekday <= today → weekday three weeks out.
+		$start = new \DateTimeImmutable('today');
+		while ((int)$start->format('N') > 5) {
+			$start = $start->modify('-1 day');
+		}
+		$end = new \DateTimeImmutable($this->weekday(21));
+		$newEnd = new \DateTimeImmutable($this->weekday(7));
+
+		$startDate = new \DateTime($start->format('Y-m-d'));
+		$endDate = new \DateTime($end->format('Y-m-d'));
+		$newEndDate = new \DateTime($newEnd->format('Y-m-d'));
+
+		$fullWeight = $counter->daysForUser($this->uid, $startDate, $endDate);
+		$wStart = $counter->daysForUser($this->uid, $startDate, $startDate);
+		$wEndOrig = $counter->daysForUser($this->uid, $endDate, $endDate);
+		$this->assertGreaterThan(0.0, $wStart, 'start day must be a working day for this scenario');
+
+		$a = new Absence();
+		$a->setUserId($this->uid);
+		$a->setType(Absence::TYPE_SICK_LEAVE);
+		$a->setStatus(Absence::STATUS_APPROVED);
+		$a->setStartDate($startDate);
+		$a->setEndDate($endDate);
+		// Stored shape: half first day + half last day.
+		$a->setDays($fullWeight - 0.5 * $wStart - 0.5 * $wEndOrig);
+		$a->setStartDayFraction(0.5);
+		$a->setStartDaySlot('am');
+		$a->setEndDayFraction(0.5);
+		$a->setEndDaySlot('pm');
+		$a->setCreatedAt(new \DateTime());
+		$a->setUpdatedAt(new \DateTime());
+		$a = $mapper->insert($a);
+		$this->createdAbsenceIds[] = (int)$a->getId();
+
+		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
+		\OCP\Server::get(IUserSession::class)->setUser($user);
+
+		\OCP\Server::get(AbsenceService::class)->shortenAbsence(
+			(int)$a->getId(), $this->uid, $newEnd->format('Y-m-d')
+		);
+
+		$stored = $mapper->find((int)$a->getId());
+		// Start half stays truthful (the day already happened); the old end
+		// half left the range and must be cleared, not carried to the new end.
+		$this->assertEqualsWithDelta(0.5, (float)$stored->getStartDayFraction(), 0.001);
+		$this->assertSame('am', $stored->getStartDaySlot());
+		$this->assertNull($stored->getEndDayFraction());
+		$this->assertNull($stored->getEndDaySlot());
+
+		$fullKept = $counter->daysForUser($this->uid, $startDate, $newEndDate);
+		$wNewEnd = $counter->daysForUser($this->uid, $newEndDate, $newEndDate);
+		$expected = $fullKept - 0.5 * $wStart; // new end full (no travel)
+		$this->assertEqualsWithDelta($expected, (float)$stored->getDays(), 0.011,
+			'shortened debit must keep the start half and charge the new end at full weight');
+	}
+
+	/**
+	 * Locale-safe overlap assertion — the instance default_language in dev
+	 * containers can be pt_BR/de/…, so the rejection message must be
+	 * recognised across locales (same pattern as
+	 * HalfDayVacationDaysModeIntegrationTest).
+	 */
+	private function assertOverlapMessage(string $message): void
+	{
+		$msg = mb_strtolower($message);
+		$looksLikeOverlap = str_contains($msg, 'overlap')
+			|| str_contains($msg, 'überschneid')
+			|| str_contains($msg, 'uberschneid')
+			|| str_contains($msg, 'nakłada')
+			|| str_contains($msg, 'naklada')
+			|| str_contains($msg, 'nachodzi')
+			|| str_contains($msg, 'chevauche')
+			|| str_contains($msg, 'solapa')
+			|| str_contains($msg, 'sobrep')
+			|| str_contains($msg, 'sovrapp')
+			|| str_contains($msg, 'overlapt')
+			|| str_contains($msg, 'överlapp')
+			|| str_contains($msg, 'overlapp');
+		$this->assertTrue(
+			$looksLikeOverlap,
+			'Overlap rejection message must be recognisable across locales, got: ' . $message
+		);
 	}
 }

@@ -636,6 +636,118 @@ const ArbeitszeitCheckValidation = {
   },
 
   /**
+   * Effective deduction convention from bootstrap complianceParams.
+   * 'strict' when the key is missing or unknown (older servers) — never
+   * a laxer guess.
+   */
+  getDeductionMode() {
+    const raw = window.ArbeitszeitCheck?.complianceParams?.deductionMode;
+    return raw === 'cap_overhang' ? 'cap_overhang' : 'strict';
+  },
+
+  /**
+   * Client mirror of BreakPolicyResolver::minimalConsistentBreakSeconds.
+   *
+   * Statutory break requirements apply to the RESULTING net working time —
+   * the smallest total deduction d* such that required(P − d*) ≤ d* where
+   * P is the gross presence. Evaluating the pre-decision duration instead
+   * is the over-deduction this fixes (≈9h day → 45 min demanded although
+   * the post-deduction net only requires 30 min).
+   *
+   * - strict:       d* = min { t ∈ {0} ∪ tier amounts : R(P − t) ≤ t }
+   * - cap_overhang: d iterates d := min(r, P − T(r)) from the recorded
+   *   break total until consistent — landing the net on the producing
+   *   threshold so only the overhang is recorded.
+   *
+   * All math runs in whole minutes against minute-precision thresholds —
+   * form inputs are HH:MM so sub-minute overhang never occurs here; the
+   * server rounds the capped insert up to whole minutes where it does.
+   *
+   * @param {number} presenceMinutes Gross presence (merged work span)
+   * @param {number} existingBreakMinutes Already-recorded break minutes
+   * @param {Array<{afterHours:number,breakMinutes:number}>|null} tiers
+   *        null/undefined uses bootstrap complianceParams tiers.
+   * @param {string} mode 'strict' | 'cap_overhang'
+   * @returns {{targetMinutes:number, insertMinutes:number, capped:boolean}}
+   */
+  minimalConsistentBreakMinutes(presenceMinutes, existingBreakMinutes, tiers, mode) {
+    const presence = Number(presenceMinutes);
+    const existing = Math.max(0, Number(existingBreakMinutes) || 0);
+    const empty = { targetMinutes: 0, insertMinutes: 0, capped: false };
+    if (!Number.isFinite(presence) || presence <= 0) {
+      return empty;
+    }
+
+    const tierList = (Array.isArray(tiers) && tiers.length > 0 ? tiers : this.getBreakTiers())
+      .map((t) => ({
+        thresholdMinutes: Math.round(Number(t.afterHours) * 60),
+        breakMinutes: Math.round(Number(t.breakMinutes)),
+      }))
+      .filter((t) => Number.isFinite(t.thresholdMinutes) && t.thresholdMinutes > 0
+        && Number.isFinite(t.breakMinutes) && t.breakMinutes > 0)
+      .sort((a, b) => a.thresholdMinutes - b.thresholdMinutes);
+
+    const requiredAt = (netMinutes) => {
+      let required = 0;
+      for (const tier of tierList) {
+        if (netMinutes > tier.thresholdMinutes && tier.breakMinutes > required) {
+          required = tier.breakMinutes;
+        }
+      }
+      return required;
+    };
+
+    // Strict fixpoint: smallest candidate satisfying R(P − t) ≤ t.
+    const candidates = [...new Set([0, ...tierList.map((t) => t.breakMinutes)])].sort((a, b) => a - b);
+    let strictTarget = candidates[candidates.length - 1] || 0;
+    for (const candidate of candidates) {
+      if (requiredAt(Math.max(0, presence - candidate)) <= candidate) {
+        strictTarget = candidate;
+        break;
+      }
+    }
+
+    if (mode !== 'cap_overhang') {
+      return {
+        targetMinutes: strictTarget,
+        insertMinutes: Math.max(0, strictTarget - existing),
+        capped: false,
+      };
+    }
+
+    // Cap-overhang iteration — terminates because every producer threshold
+    // is strictly below the current net (T < P − d ⟹ P − T > d).
+    let deduction = existing;
+    for (let guard = 0; guard < 16; guard++) {
+      const net = Math.max(0, presence - deduction);
+      let required = 0;
+      let producer = 0;
+      for (const tier of tierList) {
+        if (net > tier.thresholdMinutes && tier.breakMinutes >= required) {
+          if (tier.breakMinutes > required || producer === 0 || tier.thresholdMinutes < producer) {
+            producer = tier.thresholdMinutes;
+          }
+          required = tier.breakMinutes;
+        }
+      }
+      if (required <= deduction) {
+        break;
+      }
+      const next = Math.min(required, presence - producer);
+      if (next <= deduction) {
+        break; // defensive — unreachable for a triggered producer
+      }
+      deduction = next;
+    }
+    const insert = Math.max(0, deduction - existing);
+    return {
+      targetMinutes: existing + insert,
+      insertMinutes: insert,
+      capped: insert > 0,
+    };
+  },
+
+  /**
    * @deprecated Prefer calculateRequiredBreakMinutes(); kept for callers that expect hours.
    */
   calculateRequiredBreakTime(workingHours) {

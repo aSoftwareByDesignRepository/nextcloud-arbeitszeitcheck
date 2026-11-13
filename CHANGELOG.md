@@ -54,9 +54,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   allow_sunday_work) + completed key registry so near-miss names reject
   with 400 instead of persisting silently; save responses echo the
   normalized stored document
+- **opt-in `cap_overhang` deduction mode** (org policy `deduction_mode`,
+  model override, `model ?? org ?? strict` resolution): automatic breaks
+  record only the overhang minutes beyond the crossed threshold so the
+  recorded net lands exactly on it (9h31m → 31 min, net 9h00m); admin
+  radio with informed-consent copy + CONFIRM_REQUIRED gate on the
+  strict→cap transition, capped portions tail-placed `[end−d, end]`,
+  flagged `capped:true`/`deduction_mode` in the breaks JSON, sub-floor
+  exempt from the manual countability floor, and audit-logged
+  (`deduction_mode`, `capped`, `overhang_seconds`)
+- stale same-entry automatic break portions are now trimmed newest-first
+  when a manual break is recorded afterwards (manual reality is never
+  rewritten)
+- `deductionMode` additive key in `capabilities.compliance` and the web
+  `complianceParams` bootstrap (strict fallback for older servers);
+  mobile companion computes the statutory requirement on the declared
+  net (span − recorded breaks) inside `validateManualEntry`, fixing the
+  gross-span 45-min demand on 9h0Xm entries
 
 ### Fixed
 
+- **automatic break deduction evaluated on the resulting net working
+  time** (minimal-consistent fixpoint `required(P − d) ≤ d`): a ~9h05m
+  presence now inserts the statutory 30 min instead of 45 — the
+  over-deduction reported by Cecilienstift Halberstadt; mobile companion
+  computes the statutory requirement on the declared net (span −
+  recorded breaks) instead of the gross span (9h0Xm + 30m break no
+  longer demands 45)
 - planned-hours credit no longer double-halves a **full** absence day that
   lands on a half-weight company holiday: the fraction is derived as
   `days ÷ single-day weight` instead of a literal `days ≈ 0.5` match (a full

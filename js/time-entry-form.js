@@ -486,25 +486,40 @@ class TimeEntryFormManager {
 				return;
 			}
 
-			const grossHours = workDurationMs / (1000 * 60 * 60);
 			const manualBreakMinutes = this.calculateManualBreakTime(dateStr);
 			const validation = window.ArbeitszeitCheckValidation;
-			const netWorkingHours = validation && typeof validation.netWorkingHours === 'function'
-				? validation.netWorkingHours(grossHours, manualBreakMinutes)
-				: Math.max(0, grossHours - manualBreakMinutes / 60);
-			const requiredBreakMinutes = this.resolveRequiredBreakMinutes(netWorkingHours);
 
-			if (requiredBreakMinutes === 0) {
-				this.removeAutoAddedBreaks();
-				return;
+			let insertMinutes;
+			let capped = false;
+			if (validation && typeof validation.minimalConsistentBreakMinutes === 'function') {
+				// Fixed-point: smallest total deduction satisfying
+				// required(P − d*) ≤ d* — never the pre-decision duration.
+				const mode = typeof validation.getDeductionMode === 'function'
+					? validation.getDeductionMode()
+					: 'strict';
+				const plan = validation.minimalConsistentBreakMinutes(
+					workDurationMs / 60000,
+					manualBreakMinutes,
+					null,
+					mode
+				);
+				insertMinutes = plan.insertMinutes;
+				capped = plan.capped === true;
+			} else {
+				// Fallback for stale validation.js — historical pre-deduction
+				// behaviour, kept only so a cached script never crashes.
+				const grossHours = workDurationMs / (1000 * 60 * 60);
+				const netWorkingHours = validation && typeof validation.netWorkingHours === 'function'
+					? validation.netWorkingHours(grossHours, manualBreakMinutes)
+					: Math.max(0, grossHours - manualBreakMinutes / 60);
+				const requiredBreakMinutes = this.resolveRequiredBreakMinutes(netWorkingHours);
+				insertMinutes = Math.max(0, requiredBreakMinutes - manualBreakMinutes);
 			}
-
-			const shortfallMinutes = Math.max(0, requiredBreakMinutes - manualBreakMinutes);
 
 			this.removeAutoAddedBreaks();
 
-			if (shortfallMinutes > 0) {
-				this.addAutomaticBreak(startDateTime, endDateTime, shortfallMinutes, notify);
+			if (insertMinutes > 0) {
+				this.addAutomaticBreak(startDateTime, endDateTime, insertMinutes, notify, capped);
 			}
 		} catch (error) {
 			console.warn('Error in auto-break calculation:', error);
@@ -581,19 +596,22 @@ class TimeEntryFormManager {
 
 	/**
 	 * Add an automatic break to cover the required shortfall in break minutes.
+	 * Cap-overhang portions anchor to the tail of the entry ([end − d, end]).
 	 */
-	addAutomaticBreak(startDateTime, endDateTime, shortfallMinutes, notify = true) {
-		const breakStartTime = this.calculateOptimalBreakTime(startDateTime, endDateTime, shortfallMinutes);
-		if (!breakStartTime) {
+	addAutomaticBreak(startDateTime, endDateTime, shortfallMinutes, notify = true, capped = false) {
+		const breakStartTime = capped
+			? new Date(endDateTime.getTime() - shortfallMinutes * 60 * 1000)
+			: this.calculateOptimalBreakTime(startDateTime, endDateTime, shortfallMinutes);
+		if (!breakStartTime || breakStartTime < startDateTime) {
 			return;
 		}
 
-		if (this.populateEmptyBreakRow(breakStartTime, shortfallMinutes)) {
+		if (this.populateEmptyBreakRow(breakStartTime, shortfallMinutes, capped)) {
 			this.updateTimeSummary();
 			return;
 		}
 
-		this.createAutoBreak(breakStartTime, shortfallMinutes);
+		this.createAutoBreak(breakStartTime, shortfallMinutes, capped);
 
 		if (notify && window.OC && OC.Notification) {
 			const loc = window.ArbeitszeitCheck && window.ArbeitszeitCheck.l10n;
@@ -612,7 +630,7 @@ class TimeEntryFormManager {
 	 *
 	 * @returns {boolean} true when an empty row was populated
 	 */
-	populateEmptyBreakRow(breakStartTime, breakMinutes) {
+	populateEmptyBreakRow(breakStartTime, breakMinutes, capped = false) {
 		if (!this.breaksContainer) {
 			return false;
 		}
@@ -623,7 +641,7 @@ class TimeEntryFormManager {
 			const endHidden = entry.querySelector('input.break-end-time');
 			if (startHidden && endHidden &&
 				(!startHidden.value || startHidden.value === '' || startHidden.value === '00:00')) {
-				this.updateAutoBreak(entry, breakStartTime, breakMinutes);
+				this.updateAutoBreak(entry, breakStartTime, breakMinutes, capped);
 				this.bindBreakTimeInputs(entry);
 				return true;
 			}
@@ -659,7 +677,7 @@ class TimeEntryFormManager {
 	/**
 	 * Create a new auto-break entry in the form for the given start time and duration.
 	 */
-	createAutoBreak(breakStartTime, breakMinutes) {
+	createAutoBreak(breakStartTime, breakMinutes, capped = false) {
 		if (!this.breaksContainer) {
 			return;
 		}
@@ -668,7 +686,7 @@ class TimeEntryFormManager {
 		this.breaksContainer.appendChild(breakEntry);
 
 		// Update the break with calculated times and mark it as auto-generated
-		this.updateAutoBreak(breakEntry, breakStartTime, breakMinutes);
+		this.updateAutoBreak(breakEntry, breakStartTime, breakMinutes, capped);
 
 		this.breakIndex++;
 		this.updateTimeSummary();
@@ -677,7 +695,7 @@ class TimeEntryFormManager {
 	/**
 	 * Update an existing break entry with given start time and duration and mark it as auto-generated.
 	 */
-	updateAutoBreak(breakEntry, breakStartTime, breakMinutes) {
+	updateAutoBreak(breakEntry, breakStartTime, breakMinutes, capped = false) {
 		const index = breakEntry.getAttribute('data-break-index');
 		if (!index) return;
 
@@ -702,8 +720,15 @@ class TimeEntryFormManager {
 			endHidden.value = `${endHour}:${endMinute}`;
 		}
 
-		// Mark as auto-generated
+		// Mark as auto-generated (+ cap-overhang metadata when applicable)
 		breakEntry.setAttribute('data-auto-break', 'true');
+		if (capped) {
+			breakEntry.setAttribute('data-capped', 'true');
+			breakEntry.setAttribute('data-deduction-mode', 'cap_overhang');
+		} else {
+			breakEntry.removeAttribute('data-capped');
+			breakEntry.removeAttribute('data-deduction-mode');
+		}
 
 		// Add a note below the auto-break row (full width under the time pair)
 		const formGrid = breakEntry.querySelector('.time-pair-matrix__grid--row');
@@ -712,7 +737,9 @@ class TimeEntryFormManager {
 			autoNote.className = 'form-help auto-break-note';
 			autoNote.setAttribute('role', 'status');
 			const autoNoteSmall = document.createElement('small');
-			autoNoteSmall.textContent = t('autoBreakNote');
+			autoNoteSmall.textContent = capped
+				? (t('autoBreakCappedNote') || t('autoBreakNote'))
+				: t('autoBreakNote');
 			autoNote.appendChild(autoNoteSmall);
 			formGrid.appendChild(autoNote);
 			formGrid.classList.add('time-pair-matrix__grid--row--with-note');

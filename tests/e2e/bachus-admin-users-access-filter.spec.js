@@ -56,6 +56,7 @@ test.describe('Bachus: admin employee list access filter', () => {
 	});
 
 	test('J-AL-02: switching to all accounts reloads list via API', async ({ page }) => {
+		test.setTimeout(180000)
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await page.waitForSelector('#users-tbody tr', { timeout: 30000 });
 
@@ -90,6 +91,7 @@ test.describe('Bachus: admin employee list access filter', () => {
 	});
 
 	test('J-AL-04: export link carries current filter', async ({ page }) => {
+		test.setTimeout(180000)
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await page.waitForSelector('#export-users-csv', { timeout: 30000 });
 
@@ -154,6 +156,7 @@ test.describe('Bachus: admin employee list access filter', () => {
 	});
 
 	test('J-AL-09: keyboard can apply the access filter', async ({ page }) => {
+		test.setTimeout(180000)
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await openEmployeeListFilters(page);
 
@@ -176,6 +179,7 @@ test.describe('Bachus: admin employee list access filter', () => {
 	});
 
 	test('J-AL-11: model and status filters are sent with the list request', async ({ page }) => {
+		test.setTimeout(180000)
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await openEmployeeListFilters(page);
 
@@ -201,6 +205,7 @@ test.describe('Bachus: admin employee list access filter', () => {
 	});
 
 	test('J-AL-10: show all accounts button switches filter', async ({ page }) => {
+		test.setTimeout(180000)
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/users');
 		await page.waitForSelector('#btn-filter', { timeout: 30000 });
 

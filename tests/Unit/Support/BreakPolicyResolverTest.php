@@ -900,4 +900,303 @@ class BreakPolicyResolverTest extends TestCase
 			$this->assertTrue($v['normalized']['allow_sunday_work'], 'value ' . var_export($on, true));
 		}
 	}
+
+	// ------------------------------------------------------------------
+	// Deduction mode — resolution + persistence contract
+	// ------------------------------------------------------------------
+
+	public function testDeductionModeDefaultsStrict(): void
+	{
+		$this->assertSame('strict', $this->resolver->deductionModeForUser('u1'));
+		$this->assertSame('strict', $this->resolver->deductionModeForUser(null));
+	}
+
+	public function testDeductionModeOrgCap(): void
+	{
+		$this->setPolicy(['deduction_mode' => 'cap_overhang']);
+		$this->assertSame('cap_overhang', $this->resolver->deductionModeForUser('u1'));
+	}
+
+	public function testDeductionModeModelOverridesOrg(): void
+	{
+		$this->setPolicy(['deduction_mode' => 'strict']);
+		$this->assignModel(['deduction_mode' => 'cap_overhang']);
+		$this->assertSame('cap_overhang', $this->resolver->deductionModeForUser('u1'));
+		$this->assertSame('strict', $this->resolver->deductionModeForUser('other'));
+	}
+
+	public function testDeductionModeModelNullInheritsOrg(): void
+	{
+		$this->setPolicy(['deduction_mode' => 'cap_overhang']);
+		$this->assignModel(['deduction_mode' => null]);
+		$this->assertSame('cap_overhang', $this->resolver->deductionModeForUser('u1'));
+	}
+
+	public function testDeductionModeUnknownStoredFallsBackStrict(): void
+	{
+		$this->setPolicy(['deduction_mode' => 'bogus']);
+		$this->assertSame('strict', $this->resolver->deductionModeForUser('u1'));
+
+		$this->assignModel(['deduction_mode' => 'nonsense']);
+		$this->setPolicy(['deduction_mode' => 'cap_overhang']);
+		$this->assertSame('cap_overhang', $this->resolver->deductionModeForUser('u1'),
+			'invalid model value must inherit, not poison');
+	}
+
+	public function testValidatePolicyRejectsUnknownDeductionMode(): void
+	{
+		$v = $this->resolver->validatePolicy(['deduction_mode' => 'bogus']);
+		$this->assertSame('VALIDATION_VALUE', $v['errors'][BreakPolicyResolver::FIELD_DEDUCTION_MODE] ?? null);
+
+		foreach (['strict', 'cap_overhang'] as $ok) {
+			$v = $this->resolver->validatePolicy(['deduction_mode' => $ok]);
+			$this->assertArrayNotHasKey(BreakPolicyResolver::FIELD_DEDUCTION_MODE, $v['errors']);
+			$this->assertSame($ok, $v['normalized']['deduction_mode']);
+		}
+	}
+
+	public function testValidateModelBreakRulesDeductionMode(): void
+	{
+		foreach (['strict', 'cap_overhang'] as $ok) {
+			$v = $this->resolver->validateModelBreakRules(['deduction_mode' => $ok]);
+			$this->assertSame([], $v['errors']);
+			$this->assertSame($ok, $v['normalized']['deduction_mode']);
+		}
+		$v = $this->resolver->validateModelBreakRules(['deduction_mode' => null]);
+		$this->assertSame([], $v['errors']);
+		$this->assertNull($v['normalized']['deduction_mode']);
+
+		$v = $this->resolver->validateModelBreakRules(['deduction_mode' => 'bogus']);
+		$this->assertSame('VALIDATION_VALUE', $v['errors']['deduction_mode'] ?? null);
+	}
+
+	// ------------------------------------------------------------------
+	// Monotone tiers — write boundary + stored-document repair
+	// ------------------------------------------------------------------
+
+	public function testValidatePolicyRejectsNonMonotoneTiers(): void
+	{
+		$v = $this->resolver->validatePolicy([
+			'tiers' => [
+				['afterHours' => 6, 'breakMinutes' => 45],
+				['afterHours' => 9, 'breakMinutes' => 15],
+			],
+		]);
+		$this->assertSame('VALIDATION_TIER_MONOTONE', $v['errors'][BreakPolicyResolver::FIELD_TIERS . '.1'] ?? null);
+	}
+
+	public function testValidatePolicyAcceptsMonotoneTiers(): void
+	{
+		$v = $this->resolver->validatePolicy([
+			'tiers' => [
+				['afterHours' => 9, 'breakMinutes' => 45],
+				['afterHours' => 6, 'breakMinutes' => 45], // sorted ascending by normalize
+			],
+		]);
+		$this->assertSame([], $v['errors']);
+	}
+
+	public function testStoredNonMonotoneTierIsDroppedTolerantly(): void
+	{
+		$this->setPolicy([
+			'tiers' => [
+				['afterHours' => 6, 'breakMinutes' => 45],
+				['afterHours' => 9, 'breakMinutes' => 15],
+			],
+		]);
+		$org = $this->resolver->orgConfig();
+		$this->assertCount(1, $org['tiers']);
+		$this->assertSame(45, $org['tiers'][0]['breakMinutes']);
+	}
+
+	// ------------------------------------------------------------------
+	// Strict fixpoint — spec §9.4 worked-example matrix (DE tiers, E=0)
+	// ------------------------------------------------------------------
+
+	/**
+	 * @return array<string,array{0:int,1:int}>
+	 */
+	public static function strictFixpointMatrix(): array
+	{
+		$h = 3600; $m = 60;
+		return [
+			'5h59m' => [5 * $h + 59 * $m, 0],
+			'6h00m00s' => [6 * $h, 0],
+			'6h00m01s' => [6 * $h + 1, 30 * $m],
+			'6h45m' => [6 * $h + 45 * $m, 30 * $m],
+			'9h00m00s' => [9 * $h, 30 * $m],
+			'9h00m01s' => [9 * $h + 1, 30 * $m],
+			'9h05m' => [9 * $h + 5 * $m, 30 * $m],
+			'9h20m' => [9 * $h + 20 * $m, 30 * $m],
+			'9h31m' => [9 * $h + 31 * $m, 45 * $m],
+			'9h40m' => [9 * $h + 40 * $m, 45 * $m],
+			'9h50m' => [9 * $h + 50 * $m, 45 * $m],
+			'10h00m' => [10 * $h, 45 * $m],
+		];
+	}
+
+	/**
+	 * @dataProvider strictFixpointMatrix
+	 */
+	public function testStrictFixpointMatrix(int $presence, int $expectedTotal): void
+	{
+		$r = $this->resolver->minimalConsistentBreakSeconds($presence, 0, 'strict');
+		$this->assertSame($expectedTotal, $r['total_seconds'], 'P=' . $presence);
+		$this->assertSame($expectedTotal, $r['insert_seconds']);
+		$this->assertFalse($r['capped']);
+		$this->assertSame($expectedTotal, $r['strict_target_seconds']);
+
+		// Consistency invariant: recorded books always satisfy R(P−d*) ≤ d*.
+		$net = max(0, $presence - $r['total_seconds']);
+		$this->assertLessThanOrEqual(
+			$r['total_seconds'],
+			$this->resolver->requiredBreakMinutes($net) * 60,
+			'required(P−d*) ≤ d* for P=' . $presence
+		);
+	}
+
+	public function testStrictExistingBreakSuppressesInsert(): void
+	{
+		// 9h10m presence with 30m recorded → consistent already, insert 0.
+		$r = $this->resolver->minimalConsistentBreakSeconds(9 * 3600 + 10 * 60, 30 * 60, 'strict');
+		$this->assertSame(30 * 60, $r['total_seconds']);
+		$this->assertSame(0, $r['insert_seconds']);
+
+		// 9h40m presence with 30m recorded → still short; insert the delta.
+		$r = $this->resolver->minimalConsistentBreakSeconds(9 * 3600 + 40 * 60, 30 * 60, 'strict');
+		$this->assertSame(45 * 60, $r['total_seconds']);
+		$this->assertSame(15 * 60, $r['insert_seconds']);
+	}
+
+	public function testStrictExcessExistingBreakNeverNegative(): void
+	{
+		// Employee recorded more than needed — never a negative insert.
+		$r = $this->resolver->minimalConsistentBreakSeconds(9 * 3600 + 10 * 60, 60 * 60, 'strict');
+		$this->assertSame(30 * 60, $r['total_seconds']);
+		$this->assertSame(0, $r['insert_seconds']);
+	}
+
+	// ------------------------------------------------------------------
+	// Cap-overhang — spec §9.4 worked examples + A7–A11
+	// ------------------------------------------------------------------
+
+	public function testCapOverhangWorkedExamples(): void
+	{
+		$h = 3600; $m = 60;
+		// [presence, expected total deduction, expected capped flag]
+		$cases = [
+			'5h59m' => [5 * $h + 59 * $m, 0, false],
+			'6h00m01s' => [6 * $h + 1, 1 * $m, true],   // sub-minute overhang ceil→1m (EC-2)
+			'6h10m' => [6 * $h + 10 * $m, 10 * $m, true],
+			'6h45m' => [6 * $h + 45 * $m, 30 * $m, false], // equals strict tier amount
+			'9h05m' => [9 * $h + 5 * $m, 30 * $m, false],
+			'9h20m' => [9 * $h + 20 * $m, 30 * $m, false],
+			'9h31m' => [9 * $h + 31 * $m, 31 * $m, true],  // net lands on 9h00m
+			'9h40m' => [9 * $h + 40 * $m, 40 * $m, true],
+			'9h50m' => [9 * $h + 50 * $m, 45 * $m, false], // saturates at requirement
+			'10h00m' => [10 * $h, 45 * $m, false],
+		];
+		foreach ($cases as $label => [$presence, $expectedTotal, $expectedCapped]) {
+			$r = $this->resolver->minimalConsistentBreakSeconds($presence, 0, 'cap_overhang');
+			$this->assertSame($expectedTotal, $r['total_seconds'], $label);
+			$this->assertSame($expectedTotal, $r['insert_seconds'], $label);
+			$this->assertSame($expectedCapped, $r['capped'], $label);
+
+			// NN-02 invariant: cap output still satisfies R(P−d*) ≤ d*.
+			$net = max(0, $presence - $r['total_seconds']);
+			$this->assertLessThanOrEqual(
+				$r['total_seconds'],
+				$this->resolver->requiredBreakMinutes($net) * 60,
+				'consistency for ' . $label
+			);
+		}
+	}
+
+	public function testCapOverhangRespectsExistingBreak(): void
+	{
+		// 6h10m presence, 5m recorded → cap totals 10m, insert 5m.
+		$r = $this->resolver->minimalConsistentBreakSeconds(6 * 3600 + 10 * 60, 5 * 60, 'cap_overhang');
+		$this->assertSame(10 * 60, $r['total_seconds']);
+		$this->assertSame(5 * 60, $r['insert_seconds']);
+
+		// 9h40m presence, 30m recorded → cap totals 40m, insert 10m.
+		$r = $this->resolver->minimalConsistentBreakSeconds(9 * 3600 + 40 * 60, 30 * 60, 'cap_overhang');
+		$this->assertSame(40 * 60, $r['total_seconds']);
+		$this->assertSame(10 * 60, $r['insert_seconds']);
+		$this->assertTrue($r['capped']);
+	}
+
+	public function testCapOverhangCustomTierLatticeEc12(): void
+	{
+		// Org adds a 4h→20m tier below the statutory 6h→30 (EC-12/A-11).
+		$this->setPolicy(['tiers' => [['afterHours' => 4, 'breakMinutes' => 20]]]);
+
+		$r = $this->resolver->minimalConsistentBreakSeconds(6 * 3600 + 5 * 60, 0, 'cap_overhang');
+		// min(30m, overhang 5m)=5 → required(6h00m)=20m > 5 → land on 20m.
+		$this->assertSame(20 * 60, $r['total_seconds']);
+		$net = 6 * 3600 + 5 * 60 - $r['total_seconds'];
+		$this->assertLessThanOrEqual(
+			$r['total_seconds'],
+			$this->resolver->requiredBreakMinutes($net) * 60
+		);
+	}
+
+	/**
+	 * Property invariant over the presence lattice for both modes and a
+	 * few representative existing-break values (NN-02).
+	 */
+	public function testConsistencyInvariantAcrossLattice(): void
+	{
+		foreach (['strict', 'cap_overhang'] as $mode) {
+			foreach ([0, 10 * 60, 30 * 60] as $existing) {
+				for ($p = 5 * 3600; $p <= 11 * 3600; $p += 67) {
+					$r = $this->resolver->minimalConsistentBreakSeconds($p, $existing, $mode);
+					$total = $r['total_seconds'];
+					$net = max(0, $p - $total);
+					$this->assertLessThanOrEqual(
+						$total,
+						$this->resolver->requiredBreakMinutes($net) * 60,
+						"mode=$mode P=$p E=$existing"
+					);
+					$this->assertLessThanOrEqual($p, $total, "deduction never exceeds presence");
+				}
+			}
+		}
+	}
+
+	public function testChFractionalThresholdStrict(): void
+	{
+		// CH tiers include a 5.5h threshold — second-precision comparisons,
+		// never float equality (EC-13).
+		$this->appValues['country'] = 'CH';
+		$this->resolver->clearCache();
+		for ($p = 4 * 3600; $p <= 10 * 3600; $p += 137) {
+			$r = $this->resolver->minimalConsistentBreakSeconds($p, 0, 'strict');
+			$net = max(0, $p - $r['total_seconds']);
+			$this->assertLessThanOrEqual(
+				$r['total_seconds'],
+				$this->resolver->requiredBreakMinutes($net) * 60,
+				"CH P=$p"
+			);
+		}
+		$this->appValues['country'] = 'DE';
+		$this->resolver->clearCache();
+	}
+
+	public function testModelTierParticipatesInFixpoint(): void
+	{
+		// Model tier (>4h→60m) merges as a producer — the fixpoint must
+		// evaluate the effective merged tiers, not just law.
+		$this->assignModel(['tiers' => [['afterHours' => 4, 'breakMinutes' => 60]]]);
+		$r = $this->resolver->minimalConsistentBreakSeconds(4 * 3600 + 10 * 60, 0, 'strict', 'u1');
+		// Candidates {0,60m,30m,45m}: R(4h10m−30m=3h40m)=0≤30m → D*=30m.
+		// Hmm — 30m is a statutory-amount candidate that satisfies R(P−30m)=0.
+		// The strict target is the SMALLEST consistent statutory amount.
+		$this->assertSame(30 * 60, $r['total_seconds']);
+		$net = 4 * 3600 + 10 * 60 - $r['total_seconds'];
+		$this->assertLessThanOrEqual(
+			$r['total_seconds'],
+			$this->resolver->requiredBreakMinutes($net, 'u1') * 60
+		);
+	}
 }

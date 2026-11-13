@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Controller;
 
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
@@ -400,6 +401,7 @@ class AdminController extends Controller
 		'min_break_minutes',
 		'break_policy',
 		'auto_fallback_minutes',
+		'deduction_mode',
 	];
 
 	/** Serialized size ceiling for the whole break_rules document. */
@@ -3578,7 +3580,7 @@ class AdminController extends Controller
 				// Acquire contested locks BEFORE any writes — otherwise a 409 leaves half-saved siblings.
 				if ($premiumWrite !== null) {
 					try {
-						$locking->acquireLock($policyLock, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Premium policy save');
+						DbLockGuard::acquire($locking, $policyLock, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Premium policy save');
 						$heldPremiumExclusive = true;
 					} catch (\OCP\Lock\LockedException $e) {
 						return new JSONResponse([
@@ -3590,7 +3592,7 @@ class AdminController extends Controller
 				}
 				if ($yearModeFlip !== null) {
 					try {
-						$locking->acquireLock($yearLock, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Vacation year mode flip');
+						DbLockGuard::acquire($locking, $yearLock, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Vacation year mode flip');
 						$heldYearExclusive = true;
 					} catch (\OCP\Lock\LockedException $e) {
 						return new JSONResponse([
@@ -4055,6 +4057,7 @@ class AdminController extends Controller
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_TIERS,
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_WINDOWS,
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_EXEMPTIONS,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE,
 		] as $field) {
 			if (array_key_exists($field, $params)) {
 				$submitted = true;
@@ -4168,6 +4171,12 @@ class AdminController extends Controller
 				\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_PAID_CAP, $params)
 				? $params[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_PAID_CAP]
 				: $current['paid_break_cap_minutes'],
+			// Deduction mode: absent param ⇒ keep current — a partial write
+			// from an older client must never flip the convention silently.
+			'deduction_mode' => array_key_exists(
+				\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE, $params)
+				? $params[\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE]
+				: $current['deduction_mode'],
 		];
 
 		$errors = [];
@@ -4204,6 +4213,24 @@ class AdminController extends Controller
 				'code' => 'CONFIRM_REQUIRED',
 				'warnings' => $resolver->policyWarnings($normalized),
 				'fields' => [\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_ENFORCED => 'CONFIRM_REQUIRED'],
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		// CONFIRM_REQUIRED gate for enabling cap-overhang: the organisation
+		// declares that automatically-recorded tail minutes beyond a statutory
+		// threshold were not worked. Only the strict→cap transition asks —
+		// every other save must not keep nagging (form would dead-lock).
+		if (!$confirmed
+			&& ($normalized['deduction_mode'] ?? null) === \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::DEDUCTION_CAP_OVERHANG
+			&& ($current['deduction_mode'] ?? null) !== \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::DEDUCTION_CAP_OVERHANG) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('With cap-overhang, only the minutes beyond a statutory break threshold are recorded as automatic break. You declare that employees were not working during these minutes.'),
+				'code' => 'CONFIRM_REQUIRED',
+				'warnings' => [
+					$this->l10n->t('Cap-overhang changes how automatic breaks are recorded for future entries. Already recorded entries are not changed.'),
+				],
+				'fields' => [\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE => 'CONFIRM_REQUIRED'],
 			], Http::STATUS_BAD_REQUEST);
 		}
 
@@ -5835,7 +5862,7 @@ class AdminController extends Controller
 			$locking = $this->lockingProvider ?? \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
 			$catalogKey = \OCA\ArbeitszeitCheck\Service\DbLockKeys::workingTimeModelCatalog();
 			try {
-				$locking->acquireLock($catalogKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Working time model delete');
+				DbLockGuard::acquire($locking, $catalogKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Working time model delete');
 			} catch (\OCP\Lock\LockedException $e) {
 				return new JSONResponse([
 					'success' => false,

@@ -34,7 +34,7 @@ function run_unit_tests(string $appRoot, string $phpunit, array $filters): int
 function restore(string $source, string $backup): void
 {
 	if (is_file($backup)) {
-		rename($backup, $source);
+		copy($backup, $source); unlink($backup);
 	}
 }
 

@@ -343,7 +343,11 @@ class TimeEntry extends Entity
 					}
 					$durationSeconds = $end->getTimestamp() - $start->getTimestamp();
 
-					if ($durationSeconds >= $minBreakDurationSeconds) {
+					// Automatic portions (e.g. a capped statutory overhang)
+					// may legitimately be shorter than the countable floor —
+					// the floor only gates USER-RECORDED reality.
+					$isAutomatic = ($break['automatic'] ?? false) === true;
+					if ($durationSeconds >= $minBreakDurationSeconds || $isAutomatic) {
 						$breakPeriods[] = [
 							'start' => $start->getTimestamp(),
 							'end' => $end->getTimestamp()
@@ -587,7 +591,11 @@ class TimeEntry extends Entity
 						$breakEnd = new \DateTime($break['end']);
 						$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
 
-						if ($breakDurationSeconds < $minBreakDurationSeconds) {
+						// Automatic portions may be shorter than the countable
+						// floor (capped overhang) — only user-recorded breaks
+						// are floor-gated.
+						$isAutomatic = ($break['automatic'] ?? false) === true;
+						if (!$isAutomatic && $breakDurationSeconds < $minBreakDurationSeconds) {
 							$errors['breaks'] = sprintf(
 								'Break #%d must be at least %d minutes long to count toward the legal break requirement. Current duration: %d minutes',
 								$index + 1,

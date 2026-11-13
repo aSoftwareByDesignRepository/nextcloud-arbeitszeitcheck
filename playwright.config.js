@@ -36,6 +36,13 @@ const baseURL = process.env.NC_BASE_URL || 'http://localhost:8081'
 // into unrelated parallel tests (e.g. approval flag flipped while another
 // spec asserts the create form). These run serialized via project deps below.
 const STATEFUL_SPECS = [
+	// Mutates the shared e2e_employee's absence rows AND its account-wide
+	// mutation lock: while any sibling absence spec holds that lock, every
+	// probe POST returns 'locked' regardless of date — day-scanning cannot
+	// escape it (observed 2026-11-29, 240s budget exhausted under pool load).
+	// In isolation 'locked' can only come from the test's own parallel posts,
+	// which is exactly the race it proves.
+	/atlas-absence-slot-api-probe\.spec\.js/,
   /bachus-theme-responsive\.spec\.js/,
   /feedback-companion-theme-a11y\.spec\.js/,
   /paid-absence-theme-responsive\.spec\.js/,
@@ -137,7 +144,11 @@ const STATEFUL_SPECS = [
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  timeout: 60_000,
+  // 14 workers saturate the shared NC instance: login + page loads sporadically
+  // exceed 60s (three canonical runs died on different victims mid-goto/login,
+  // zero assertion failures). The budget must outlast the slowest legit page
+  // load or pool flakes gate the entire stateful chain behind `dependencies`.
+  timeout: 120_000,
   // One transient shared-instance flake must not abort the 31-project
   // dependent chain: project `dependencies` skip all downstream stateful
   // specs when any earlier project fails. A single retry recovers genuine

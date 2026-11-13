@@ -4,6 +4,7 @@ declare(strict_types=1);
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Service\IconCatalog;
 use OCA\ArbeitszeitCheck\Support\BadgeVariant;
+use OCA\ArbeitszeitCheck\Util\AbsenceTypeLabel;
 use OCA\ArbeitszeitCheck\Util\TemplateL10n;
 
 /**
@@ -698,10 +699,17 @@ if ($mode === 'list') {
                             <span class="badge badge--past-record"><?php p($l->t('Past record')); ?></span>
                         <?php endif; ?>
                         <?php
-                        $detailIsHalf = $absence->getType() === 'vacation'
-                            && !$isVacationHours
-                            && $days !== null
-                            && abs((float)$days - 0.5) < 0.011;
+                        // Sealed shape columns are authoritative (1.0 = explicit
+                        // full day); the literal 0.5 stays the unsealed-legacy
+                        // fallback for vacation only.
+                        $detailFrac = $absence->getStartDayFraction();
+                        $detailIsHalf = !$isVacationHours
+                            && $start->format('Y-m-d') === $end->format('Y-m-d')
+                            && ($detailFrac !== null
+                                ? (float)$detailFrac < 0.999
+                                : ($absence->getType() === 'vacation'
+                                    && $days !== null
+                                    && abs((float)$days - 0.5) < 0.011));
                         if ($detailIsHalf): ?>
                             <span class="badge badge--info absence-half-day-badge"><?php p($l->t('Half day')); ?></span>
                         <?php endif; ?>
@@ -716,12 +724,12 @@ if ($mode === 'list') {
                         if ($showHoursDetail) {
                             p(sprintf('%s %s', (string)round((float)$detailHours, 1), $l->t('hours')));
                         } else {
-                            $dayLabel = round((float)$days, 1);
+                            $dayNum = round((float)$days, 2);
                             // n() needs an integer for plural selection; show the real amount separately when fractional.
-                            if (abs($dayLabel - (int)$dayLabel) < 0.05) {
-                                p($l->n('%n working day', '%n working days', (int)round($dayLabel)));
+                            if (abs($dayNum - (int)$dayNum) < 0.005) {
+                                p($l->n('%n working day', '%n working days', (int)round($dayNum)));
                             } else {
-                                p($l->t('%s working days', [(string)$dayLabel]));
+                                p($l->t('%s working days', [AbsenceTypeLabel::formatDaysAmount($dayNum)]));
                             }
                         }
                         ?>
@@ -884,7 +892,7 @@ if ($mode === 'list') {
                             <dl class="absence-detail-list">
                                 <div class="absence-detail-row">
                                     <dt class="absence-detail-label"><?php p($l->t('Working days in range')); ?></dt>
-                                    <dd class="absence-detail-value"><?php p((string)round((float)$days, 1)); ?></dd>
+                                    <dd class="absence-detail-value"><?php p(AbsenceTypeLabel::formatDaysAmount((float)$days)); ?></dd>
                                 </div>
                             </dl>
                             <p class="form-help"><?php p($l->t('This is the calendar weight for your schedule — not a second vacation balance in days.')); ?></p>
@@ -1237,7 +1245,7 @@ if ($mode === 'list') {
                         </div>
                         <div class="stat-card stat-card--used">
                             <span class="stat-label" id="stat-used-label"><?php p($l->t('Used this year')); ?></span>
-                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-used-label"><?php p((string)round($stats['vacation_days_used_this_year'] ?? 0, 1)); ?></span>
+                            <span class="stat-value stat-value--secondary" aria-labelledby="stat-used-label"><?php p(AbsenceTypeLabel::formatDaysAmount((float)($stats['vacation_days_used_this_year'] ?? 0))); ?></span>
                             <span class="stat-sublabel"><?php p($unitSublabel); ?></span>
                         </div>
                         <div class="stat-card stat-card--remaining stat-card--hero">
@@ -1742,6 +1750,19 @@ if ($mode === 'list') {
                     ? String(v).trim().split('.') : null;
                 return p ? p[2] + '-' + p[1] + '-' + p[0] : '';
             };
+            // Boundary halves reduce the debit by half a day each — vacation
+            // halves are only accepted on full-weight days, so −0.5 per
+            // selected boundary is exact (SF-Z2 client-side multiplication).
+            const boundaryHalvesSelected = () => {
+                const bg = document.getElementById('absence-boundary-half-group');
+                if (!bg || bg.hidden) return 0;
+                let n = 0;
+                const sf = document.querySelector('input[name="start_day_fraction"]:checked');
+                const ef = document.querySelector('input[name="end_day_fraction"]:checked');
+                if (sf && sf.value === '0.5') n++;
+                if (ef && ef.value === '0.5') n++;
+                return n;
+            };
             let seq = 0, timer = null;
             const hide = () => { el.hidden = true; el.textContent = ''; };
             const run = async () => {
@@ -1755,7 +1776,8 @@ if ($mode === 'list') {
                     const res = api && api.fetch ? await api.fetch(url) : null;
                     if (mySeq !== seq) return;
                     if (res && res.ok && res.data && res.data.success !== false && res.data.days > 0) {
-                        const n = res.data.days;
+                        const n = Math.max(0, Math.round((res.data.days - boundaryHalvesSelected() * 0.5) * 100) / 100);
+                        if (n <= 0) { hide(); return; }
                         const basisSuffix = res.data.basis === 'weekday_schedule'
                             ? ' ' + <?php echo json_encode($l->t('(per work model)')); ?>
                             : ' ' + <?php echo json_encode($l->t('(Mon–Fri)')); ?>;
@@ -1767,6 +1789,8 @@ if ($mode === 'list') {
             const deb = () => { clearTimeout(timer); timer = setTimeout(run, 400); };
             [startEl, endEl].forEach(i => { i.addEventListener('change', deb); i.addEventListener('input', deb); });
             typeEl.addEventListener('change', deb);
+            const boundaryGroupEl = document.getElementById('absence-boundary-half-group');
+            if (boundaryGroupEl) boundaryGroupEl.addEventListener('change', deb);
             run();
         })();
 

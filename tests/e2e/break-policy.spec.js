@@ -29,6 +29,7 @@ async function clearPolicy(page) {
 			breakPolicyTiers: [],
 			breakPolicyWindows: [],
 			presenceExemptions: [],
+			breakPolicyDeductionMode: 'strict',
 		},
 	})
 }
@@ -186,6 +187,9 @@ test.describe('Organisational break policy', () => {
 	})
 
 	test('employee sees locked auto-break and the applied rules summary', async ({ page, browser }) => {
+		// Two full logins (admin + a second employee context) can exceed the
+		// default 60s budget on a loaded dev container.
+		test.setTimeout(180000)
 		test.skip(!hasCreds('EMPLOYEE'), 'Requires NC_EMPLOYEE_USER / NC_EMPLOYEE_PASS')
 		await login(page, credsFromEnv('ADMIN'))
 		await clearPolicy(page)
@@ -304,5 +308,58 @@ test.describe('Organisational break policy', () => {
 		const policy = await persistedPolicy(page)
 		expect(policy.presence_exemptions).toEqual([{ start: '2026-12-24', end: '2027-01-06' }])
 		expect(policy.windows).toEqual([{ start: '12:00', end: '13:00', minutes: 30, mode: 'required' }])
+	})
+
+	test('deduction mode: strict default, cap confirm gate, round-trip, invalid rejection', async ({ page }) => {
+		await login(page, credsFromEnv('ADMIN'))
+		await clearPolicy(page)
+
+		// Invalid mode → 400 with a field-level error on the radio group.
+		const bad = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
+			data: {
+				...COMPLIANCE,
+				breakPolicyDeductionMode: 'bogus',
+			},
+		})
+		expect(bad.ok).toBe(false)
+		expect(bad.status).toBe(400)
+		expect(bad.json?.code).toBe('VALIDATION')
+		expect(bad.json?.fields?.breakPolicyDeductionMode).toBeTruthy()
+
+		await openCompliance(page)
+		// Strict is the rendered default.
+		await expect(page.locator('#breakPolicyDeductionMode-strict')).toBeChecked()
+
+		// Selecting cap-overhang and saving must bounce with CONFIRM_REQUIRED.
+		await page.locator('#breakPolicyDeductionMode-capOverhang').check()
+		await clickSave(page)
+		const confirmBox = page.locator('#azc-policy-confirm')
+		await expect(confirmBox).toBeVisible({ timeout: 15000 })
+		await expect(confirmBox).toHaveAttribute('role', 'alert')
+
+		// Nothing persisted while the gate is open (reload also closes it).
+		let policy = await persistedPolicy(page)
+		expect(policy.deduction_mode ?? 'strict').toBe('strict')
+
+		// Re-trigger the save so the confirm box reopens, then confirm + resave.
+		await page.locator('#breakPolicyDeductionMode-capOverhang').check()
+		await clickSave(page)
+		await expect(confirmBox).toBeVisible({ timeout: 15000 })
+		await page.locator('#breakPolicyConfirm').check()
+		await clickSave(page)
+		policy = await persistedPolicy(page)
+		expect(policy.deduction_mode).toBe('cap_overhang')
+
+		// Re-saving while already in cap mode must not deadlock on the gate.
+		await clickSave(page)
+		await expect(page.locator('#azc-policy-confirm')).toBeHidden()
+		policy = await persistedPolicy(page)
+		expect(policy.deduction_mode).toBe('cap_overhang')
+
+		// Switching back to strict persists without a confirm round-trip.
+		await page.locator('#breakPolicyDeductionMode-strict').check()
+		await clickSave(page)
+		policy = await persistedPolicy(page)
+		expect(policy.deduction_mode ?? 'strict').toBe('strict')
 	})
 })

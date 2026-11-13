@@ -164,6 +164,38 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                         </p>
                     </div>
 
+                    <fieldset class="form-fieldset" aria-describedby="breakPolicyDeductionMode-help breakPolicyDeductionMode-consent">
+                        <legend class="form-legend"><?php p($l->t('Automatic break deduction')); ?></legend>
+                        <p class="form-help form-help--block">
+                            <?php p($l->t('Controls how much break the app records automatically once a daily threshold is crossed. Recorded breaks are never changed afterwards.')); ?>
+                        </p>
+                        <div class="form-radio">
+                            <input type="radio" id="breakPolicyDeductionMode-strict" name="breakPolicyDeductionMode"
+                                value="strict"
+                                <?php echo (($bpPolicy['deduction_mode'] ?? 'strict') !== 'cap_overhang') ? 'checked' : ''; ?>>
+                            <label for="breakPolicyDeductionMode-strict" class="form-label">
+                                <?php p($l->t('Statutory amount')); ?>
+                                <small class="form-help"><?php p($l->t('Records the full legally required break once a threshold is crossed (default).')); ?></small>
+                            </label>
+                        </div>
+                        <div class="form-radio">
+                            <input type="radio" id="breakPolicyDeductionMode-capOverhang" name="breakPolicyDeductionMode"
+                                value="cap_overhang"
+                                <?php echo (($bpPolicy['deduction_mode'] ?? 'strict') === 'cap_overhang') ? 'checked' : ''; ?>>
+                            <label for="breakPolicyDeductionMode-capOverhang" class="form-label">
+                                <?php p($l->t('Only the minutes beyond the threshold')); ?>
+                                <small class="form-help"><?php p($l->t('Records only the minutes above the crossed threshold — the resulting working time stays exactly at the threshold.')); ?></small>
+                            </label>
+                        </div>
+                        <p id="breakPolicyDeductionMode-help" class="form-help">
+                            <?php p($l->t('Example: with “Only the minutes beyond the threshold”, a 6 h 10 min day records a 10 minute break instead of 30 minutes.')); ?>
+                        </p>
+                        <p id="breakPolicyDeductionMode-consent" class="form-help">
+                            <strong><?php p($l->t('Note:')); ?></strong>
+                            <?php p($l->t('With “Only the minutes beyond the threshold”, the minutes beyond the threshold are recorded as break. You declare that employees did not work during these minutes.')); ?>
+                        </p>
+                    </fieldset>
+
                     <fieldset class="form-fieldset azc-policy-rows" data-bp-rows="tiers" data-bp-max="8">
                         <legend class="form-legend"><?php p($l->t('Required break by daily working time')); ?></legend>
                         <p class="form-help form-help--block">

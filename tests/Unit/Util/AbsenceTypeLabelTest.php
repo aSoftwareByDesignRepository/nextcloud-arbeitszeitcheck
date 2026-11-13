@@ -29,6 +29,8 @@ class AbsenceTypeLabelTest extends TestCase
 		$l10n->method('n')->willReturn('unused');
 
 		$this->assertSame('0.5 working days', AbsenceTypeLabel::formatWorkingDays($l10n, 0.5));
+		$this->assertSame('0.25 working days', AbsenceTypeLabel::formatWorkingDays($l10n, 0.25));
+		$this->assertSame('4.5 working days', AbsenceTypeLabel::formatWorkingDays($l10n, 4.5));
 	}
 
 	public function testFormatWorkingDaysZeroUsesExplicitLabel(): void

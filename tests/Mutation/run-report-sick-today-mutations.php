@@ -42,7 +42,7 @@ function run_filters(string $appRoot, string $phpunit, array $filters): int
 function restore_file(string $path, string $backup): void
 {
 	if (is_file($backup)) {
-		rename($backup, $path);
+		copy($backup, $path); unlink($backup);
 	}
 }
 

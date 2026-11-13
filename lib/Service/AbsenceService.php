@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCA\ArbeitszeitCheck\Support\AbsenceDayShape;
@@ -1115,8 +1116,10 @@ class AbsenceService
 
 			$oldData = $absence->getSummary();
 
-			$absence->setEndDate($newEnd);
-			$workingDays = $this->computeWorkingDaysForUser($userId, $absence->getStartDate(), $newEnd);
+			// Shape lifecycle on shorten (EC-13 + slots-boundaries): see
+			// applyShortenedRangeShape — boundary halves belong to concrete
+			// calendar days and can never drift from the debit.
+			$workingDays = $this->applyShortenedRangeShape($absence, $userId, $newEnd);
 			if ($absence->getType() === Absence::TYPE_VACATION && $workingDays < 0.01) {
 				throw new \Exception($this->l10n->t(
 					'Vacation must include at least one working day. The selected period contains only weekends or public holidays.'
@@ -1683,7 +1686,7 @@ class AbsenceService
 	{
 		$key = DbLockKeys::absenceUser($userId);
 		try {
-			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Absence workflow lock for user ' . $userId);
+			DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, 'Absence workflow lock for user ' . $userId);
 		} catch (\OCP\Lock\LockedException $e) {
 			throw new AbsenceMutationBusyException(
 				$this->l10n->t('Another absence change is in progress on this account. Please wait a moment and try again.')
@@ -1742,7 +1745,7 @@ class AbsenceService
 		$held = [];
 		try {
 			foreach ($keys as $key) {
-				$this->lockingProvider->acquireLock(
+				DbLockGuard::acquire($this->lockingProvider, 
 					$key,
 					ILockingProvider::LOCK_EXCLUSIVE,
 					'Absence write against month-closure window'
@@ -1799,7 +1802,7 @@ class AbsenceService
 			return false;
 		}
 		try {
-			$this->lockingProvider->acquireLock(
+			DbLockGuard::acquire($this->lockingProvider, 
 				DbLockKeys::absenceTypeCatalog(),
 				ILockingProvider::LOCK_SHARED,
 				'Absence write referencing a custom absence type',
@@ -1845,7 +1848,7 @@ class AbsenceService
 		}
 		$key = DbLockKeys::vacationUnitMigration();
 		try {
-			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_SHARED, 'Vacation unit migrate idle shared');
+			DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_SHARED, 'Vacation unit migrate idle shared');
 		} catch (\OCP\Lock\LockedException $e) {
 			$this->releaseVacationYearModeSharedLock();
 			throw new BusinessRuleException(
@@ -1881,7 +1884,7 @@ class AbsenceService
 		}
 		$key = DbLockKeys::vacationYearMode();
 		try {
-			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_SHARED, 'Vacation year mode idle shared');
+			DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_SHARED, 'Vacation year mode idle shared');
 		} catch (\OCP\Lock\LockedException $e) {
 			throw new BusinessRuleException(
 				$this->l10n->t('Vacation year mode is being updated. Please try again.'),
@@ -2689,8 +2692,12 @@ class AbsenceService
 	{
 		$days = $startDate->diff($endDate)->days + 1;
 		$maxDays = AbsenceTypeCatalog::maxCalendarDays($type);
+		$exceeds = $days > $maxDays;
+		if ($exceeds && $this->customMaxDaysSatisfiedByDebit($type, $startDate, $endDate, $data, $userId, $maxDays)) {
+			$exceeds = false;
+		}
 
-		if ($days > $maxDays) {
+		if ($exceeds) {
 			switch ($type) {
 				case Absence::TYPE_VACATION:
 					throw new \Exception($this->l10n->t('Vacation cannot exceed 30 days'));
@@ -2751,6 +2758,51 @@ class AbsenceService
 				}
 			}
 		}
+	}
+
+	/**
+	 * EC-16: a custom type's `max_days` counts the fractional `days` debit
+	 * (schedule weight × boundary fractions), not the raw calendar range.
+	 * A 4-calendar-day request whose first and last day are halves debits
+	 * 3.0 and fits a maxDays=3 type. Built-in caps stay calendar sanity
+	 * limits ("duration seems unreasonable") — only `custom_*` codes use
+	 * this path.
+	 *
+	 * Any shape-parse failure or missing user context falls back to the
+	 * calendar count — the downstream shape validation produces the real
+	 * error; this check must never swallow it or fail open.
+	 */
+	private function customMaxDaysSatisfiedByDebit(
+		string $type,
+		\DateTime $startDate,
+		\DateTime $endDate,
+		array $data,
+		string $userId,
+		int $maxDays
+	): bool {
+		if (!str_starts_with($type, 'custom_') || $userId === '') {
+			return false;
+		}
+		try {
+			if ($this->isEntitlementDaysBoundType($type)) {
+				// Entitlement-bound rows debit full schedule weight
+				// (duration ≠ budget; EC-14) — no generic fractions.
+				$debitDays = $this->computeWorkingDaysForUser($userId, $startDate, $endDate);
+			} else {
+				$shape = $this->canonicalDayShape($data, $startDate, $endDate);
+				$debit = AbsenceDayShape::debitForShape(
+					$shape,
+					$userId,
+					$startDate,
+					$endDate,
+					fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($userId, $a, $b)
+				);
+				$debitDays = (float)$debit['days'];
+			}
+		} catch (\Throwable) {
+			return false;
+		}
+		return is_finite($debitDays) && $debitDays <= $maxDays + AbsenceDayShape::EPS;
 	}
 
 	/**
@@ -3040,6 +3092,45 @@ class AbsenceService
 		$absence->setStartDaySlot($sS);
 		$absence->setEndDayFraction($eF);
 		$absence->setEndDaySlot($eS);
+	}
+
+	/**
+	 * Shorten shape lifecycle (EC-13 + slots-boundaries): moves the end date
+	 * to $newEnd, re-derives the four shape columns via
+	 * columnsInheritedForRange, and returns the recomputed debit for the
+	 * kept range.
+	 *
+	 * Boundary fractions belong to concrete calendar days: the start day
+	 * already happened — a stored start fraction stays truthful and keeps
+	 * reducing the debit. The new end was an interior day, which is always
+	 * full, so a stored end fraction/slot is stale and is cleared
+	 * (a fraction never "travels" to a different day). Debit and columns
+	 * are recomputed together — they can never drift.
+	 *
+	 * The source snapshot happens BEFORE the end date is mutated, the same
+	 * contract as convertVacationToSick.
+	 */
+	private function applyShortenedRangeShape(Absence $absence, string $userId, \DateTime $newEnd): float
+	{
+		$shapeSource = clone $absence;
+		$absence->setEndDate($newEnd);
+		[$sF, $sS, $eF, $eS] = AbsenceDayShape::columnsInheritedForRange(
+			$shapeSource,
+			$shapeSource->getStartDate(),
+			$newEnd
+		);
+		$absence->setStartDayFraction($sF);
+		$absence->setStartDaySlot($sS);
+		$absence->setEndDayFraction($eF);
+		$absence->setEndDaySlot($eS);
+		$debit = AbsenceDayShape::debitForShape(
+			$this->entityDayShape($absence),
+			$userId,
+			$absence->getStartDate(),
+			$newEnd,
+			fn (\DateTimeInterface $a, \DateTimeInterface $b): float => $this->computeWorkingDaysForUser($userId, $a, $b)
+		);
+		return (float)$debit['days'];
 	}
 
 	/**
@@ -4433,8 +4524,7 @@ class AbsenceService
 					$this->assertVacationUnitMigrationIdle();
 				}
 				$oldData = $absence->getSummary();
-				$absence->setEndDate($newEnd);
-				$absence->setDays($this->computeWorkingDaysForUser($ownerUserId, $startDate, $newEnd));
+				$absence->setDays($this->applyShortenedRangeShape($absence, $ownerUserId, $newEnd));
 				if ($absence->getType() === Absence::TYPE_VACATION) {
 					// DC-04: hours-mode duration_hours follows the shortened
 					// range, same rule as the owner shorten path.

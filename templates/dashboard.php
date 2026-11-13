@@ -1000,7 +1000,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <span class="dashboard-stat-card__label" id="dashboard-sick-days-label"><?php p($l->t('Sick days this year')); ?></span>
                             <span class="dashboard-stat-card__value dashboard-stat-card__value--hero"
                                   id="dashboard-sick-days-value"
-                                  aria-labelledby="dashboard-sick-days-label"><?php p((string)round((float)($dashStats['sick_days_this_year'] ?? 0), 1)); ?></span>
+                                  aria-labelledby="dashboard-sick-days-label"><?php p(\OCA\ArbeitszeitCheck\Util\AbsenceTypeLabel::formatDaysAmount((float)($dashStats['sick_days_this_year'] ?? 0))); ?></span>
                             <span class="dashboard-stat-card__unit"><?php p($l->t('days')); ?></span>
                         </div>
                         <div class="dashboard-stat-card__actions">

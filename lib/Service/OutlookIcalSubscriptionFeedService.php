@@ -159,10 +159,15 @@ final class OutlookIcalSubscriptionFeedService
 		if ($start === null || $end === null) {
 			return null;
 		}
-		$isHalf =
-			$days !== null
-			&& abs((float)$days - 0.5) < 1e-9
-			&& $start->format('Y-m-d') === $end->format('Y-m-d'); // locked decision: half-day is single-day
+		// Sealed shape columns are authoritative (a stored 1.0 means an
+		// explicit FULL day even where days==0.5 on a half-weight day);
+		// the literal days≈0.5 test is only the fallback for unsealed
+		// legacy rows.
+		$frac = $absence->getStartDayFraction();
+		$isHalf = $start->format('Y-m-d') === $end->format('Y-m-d') // locked decision: half-day is single-day
+			&& ($frac !== null
+				? (float)$frac < 0.999
+				: ($days !== null && abs((float)$days - 0.5) < 1e-9));
 
 		if (!$isHalf) {
 			return null;

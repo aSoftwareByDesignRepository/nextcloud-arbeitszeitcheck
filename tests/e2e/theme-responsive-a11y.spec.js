@@ -85,11 +85,41 @@ async function expectNoHorizontalOverflow(page, label) {
 		const app = document.querySelector('#app-content.azc-app')
 		const shell = document.querySelector('#app-content-wrapper.azc-shell, .azc-shell')
 		const main = document.getElementById('azc-main-content')
+		// main.scrollWidth is the wrong bound: designed full-bleed elements
+		// (the sticky save bar's negative-margin bleed over the shell padding)
+		// legitimately cross main's padding edge into the shell's padding zone
+		// without creating any horizontal scroll. The real invariant is
+		// "nothing escapes the scrollport unclipped" — measure the deepest
+		// descendant right edge against the viewport.
+		//
+		// Any element with a non-visible overflow-x ancestor owns its
+		// descendants' horizontal extent: auto/scroll makes them reachable,
+		// hidden/clip makes them invisible-by-design (e.g. the sr-only table
+		// thead clipped to a 1px box, or text-overflow truncation). The walk
+		// deliberately stops AT main: content clipped only by main's own
+		// overflow-x is still flagged — it is neither visible nor reachable.
+		let mainOverflow = 0
+		if (main) {
+			const portRight = doc.clientWidth
+			const clippedOrScrollable = (el) => {
+				for (let a = el.parentElement; a && a !== main; a = a.parentElement) {
+					const o = getComputedStyle(a).overflowX
+					if (o !== 'visible') return true
+				}
+				return false
+			}
+			for (const el of main.querySelectorAll('*')) {
+				const r = el.getBoundingClientRect()
+				if (r.width && !clippedOrScrollable(el)) {
+					mainOverflow = Math.max(mainOverflow, r.right - portRight)
+				}
+			}
+		}
 		return {
 			doc: doc.scrollWidth - doc.clientWidth,
 			app: app ? app.scrollWidth - app.clientWidth : 0,
 			shell: shell ? shell.scrollWidth - shell.clientWidth : 0,
-			main: main ? main.scrollWidth - main.clientWidth : 0,
+			main: mainOverflow,
 		}
 	})
 	expect(overflow.doc, `document horizontal overflow at ${label}`).toBeLessThanOrEqual(1)

@@ -1216,7 +1216,7 @@
             if (created === '1' || updated === '1') {
                 const msg = created === '1'
                     ? (params.get('half') === '1'
-                        ? mainT('Half-day vacation request submitted successfully')
+                        ? mainT('Half-day absence request submitted successfully')
                         : mainT('Absence request submitted successfully'))
                     : mainT('Absence request updated');
                 if (window.OC && window.OC.Notification && window.OC.Notification.showTemporary) {

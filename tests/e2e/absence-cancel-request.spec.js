@@ -133,6 +133,8 @@ test.describe('Absence cancel request + manager cancel', () => {
 	)
 
 	test('owner request → approve roundtrip: flags set, approved until decision, CAS everywhere', async ({ browser }) => {
+		// Two sequential context logins can exceed the 60s budget on a loaded dev container.
+		test.setTimeout(180000)
 		const role = ownerRole()
 		const ownerId = process.env[`NC_${role}_USER`]
 		const mgr = await browser.newPage()
@@ -193,6 +195,8 @@ test.describe('Absence cancel request + manager cancel', () => {
 	})
 
 	test('owner withdraw clears flags without touching the status', async ({ browser }) => {
+		// Two sequential context logins can exceed the 60s budget on a loaded dev container.
+		test.setTimeout(180000)
 		const role = ownerRole()
 		const ownerId = process.env[`NC_${role}_USER`]
 		const mgr = await browser.newPage()
@@ -221,6 +225,8 @@ test.describe('Absence cancel request + manager cancel', () => {
 	})
 
 	test('open cancel-request card passes an axe scan (WCAG)', async ({ browser }) => {
+		// Two sequential context logins can exceed the 60s budget on a loaded dev container.
+		test.setTimeout(180000)
 		const role = ownerRole()
 		const ownerId = process.env[`NC_${role}_USER`]
 		// AxeBuilder requires a page from an explicit browser context.
@@ -257,6 +263,8 @@ test.describe('Absence cancel request + manager cancel', () => {
 	})
 
 	test('manager decline keeps the absence approved and clears the request', async ({ browser }) => {
+		// Two sequential context logins can exceed the 60s budget on a loaded dev container.
+		test.setTimeout(180000)
 		const role = ownerRole()
 		const ownerId = process.env[`NC_${role}_USER`]
 		const mgr = await browser.newPage()
@@ -283,6 +291,7 @@ test.describe('Absence cancel request + manager cancel', () => {
 	})
 
 	test('manager direct cancel: reason_required, revision_stale, cancelled; ended → already_ended', async ({ browser }) => {
+		test.setTimeout(180000)
 		const role = ownerRole()
 		const ownerId = process.env[`NC_${role}_USER`]
 		const mgr = await browser.newPage()

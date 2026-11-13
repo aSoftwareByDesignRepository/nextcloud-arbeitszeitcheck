@@ -1454,7 +1454,12 @@ class AbsenceController extends Controller
 			if (!$json) {
 				$url = $this->urlGenerator->linkToRoute('arbeitszeitcheck.page.absences') . '?created=1';
 				$days = $absence->getDays();
-				if ($days !== null && abs((float)$days - 0.5) < 0.011) {
+				$sF = $absence->getStartDayFraction();
+				$eF = $absence->getEndDayFraction();
+				$isHalf = ($sF !== null || $eF !== null)
+					? (($sF !== null && (float)$sF < 0.999) || ($eF !== null && (float)$eF < 0.999))
+					: ($days !== null && abs((float)$days - 0.5) < 0.011);
+				if ($isHalf) {
 					$url .= '&half=1';
 				}
 				return new RedirectResponse($url, Http::STATUS_SEE_OTHER);

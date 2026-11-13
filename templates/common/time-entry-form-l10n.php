@@ -69,6 +69,8 @@ $timeEntryFormMessageIds = [
 	'complianceRecalculatingBreak' => 'Recalculating automatic break...',
 	'complianceBreakNotMet' => 'Break requirement not met (%s)',
 	'complianceBreakSplitInvalid' => 'Breaks must be one continuous block of the required length, or 2×15 minutes, or 3×10 minutes (AZG §11)',
+	'complianceCappedBreak' => 'Compliant - minutes beyond the threshold recorded as break',
+	'autoBreakCappedNote' => 'Automatically added: only the minutes beyond the statutory threshold (%s)',
 	'complianceShortShift' => 'Short shift - no breaks required',
 	'complianceAuto30' => 'Compliant - automatic 30 min break',
 	'complianceManual30' => 'Compliant - 30 min break provided',
@@ -106,6 +108,7 @@ foreach ($timeEntryFormMessageIds as $key => $messageId) {
 
 // Inject law citations into parametric messages after translation.
 $timeEntryFormL10n['autoBreakNote'] = sprintf($timeEntryFormL10n['autoBreakNote'], $azcBreakLaw);
+$timeEntryFormL10n['autoBreakCappedNote'] = sprintf($timeEntryFormL10n['autoBreakCappedNote'], $azcBreakLaw);
 $timeEntryFormL10n['complianceMaxHours'] = sprintf($timeEntryFormL10n['complianceMaxHours'], $azcDailyLaw);
 $timeEntryFormL10n['complianceBreakNotMet'] = sprintf($timeEntryFormL10n['complianceBreakNotMet'], $azcBreakLaw);
 // Keep legacy keys (breakRequired30/45) for older cached JS, then overwrite
@@ -144,12 +147,25 @@ foreach ($azcAscendingTiers as $tier) {
 	);
 }
 
+// Effective deduction mode for the current user (model ?? org ?? 'strict').
+// Fails safe to 'strict' — the preview must never promise a laxer
+// convention than the server will record.
+$azcDeductionMode = 'strict';
+try {
+	$azcResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
+	$azcCurrentUser = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
+	$azcDeductionMode = $azcResolver->deductionModeForUser($azcCurrentUser !== null ? $azcCurrentUser->getUID() : null);
+} catch (\Throwable) {
+	$azcDeductionMode = 'strict';
+}
+
 $azcComplianceParams = [
 	'country' => $azcLawProfile->country,
 	'breakTiers' => $azcLawProfile->breakTiersAscending(),
 	'minBreakMinutes' => $azcLawProfile->minBreakMinutes,
 	'maxDailyHoursDefault' => $azcLawProfile->dailyMaxHoursDefault,
 	'allowedBreakSplitPatterns' => $azcLawProfile->allowedBreakSplitPatterns,
+	'deductionMode' => $azcDeductionMode,
 	'lawLabels' => [
 		'breaks' => $azcBreakLaw,
 		'daily' => $azcDailyLaw,

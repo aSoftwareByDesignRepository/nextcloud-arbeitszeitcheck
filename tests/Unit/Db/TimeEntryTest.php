@@ -64,6 +64,62 @@ class TimeEntryTest extends TestCase
 		$this->assertStringContainsString('15 minutes', $errors['breaks']);
 	}
 
+	public function testSubFloorAutomaticPortionCountsAndValidates(): void
+	{
+		// EC-5/MH-06: a capped overhang portion (e.g. 10 min) is below the
+		// 15-min manual floor — it must still count toward the recorded net
+		// and must not be rejected by validate(). The floor gates only
+		// user-recorded reality, never system insertions.
+		$entry = new TimeEntry();
+		$entry->setUserId('de-user');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 15:10:00')); // 6h10m
+		$entry->setCountableMinBreakMinutes(15);
+		$entry->setBreaks(json_encode([
+			[
+				'start' => '2024-01-01T15:00:00+00:00',
+				'end' => '2024-01-01T15:10:00+00:00',
+				'duration_minutes' => 10,
+				'automatic' => true,
+				'capped' => true,
+				'deduction_mode' => 'cap_overhang',
+			],
+		]));
+
+		$this->assertEqualsWithDelta(10 / 60, $entry->getBreakDurationHours(), 0.0001);
+		$this->assertEqualsWithDelta(6.0, $entry->getDurationHours(), 0.0001);
+		$errors = $entry->validate(15);
+		$this->assertArrayNotHasKey('breaks', $errors);
+	}
+
+	public function testSubFloorManualPortionStillRejectedBesideAutomatic(): void
+	{
+		// A manual sub-floor portion must still be flagged even when a valid
+		// automatic portion shares the entry (NN-06 boundary).
+		$entry = new TimeEntry();
+		$entry->setUserId('de-user');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 09:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 18:00:00'));
+		$entry->setCountableMinBreakMinutes(15);
+		$entry->setBreaks(json_encode([
+			[
+				'start' => '2024-01-01T17:50:00+00:00',
+				'end' => '2024-01-01T18:00:00+00:00',
+				'automatic' => true,
+				'capped' => true,
+			],
+			['start' => '2024-01-01T12:00:00+00:00', 'end' => '2024-01-01T12:10:00+00:00'],
+		]));
+
+		$this->assertEqualsWithDelta(10 / 60, $entry->getBreakDurationHours(), 0.0001,
+			'manual 10m stays uncounted, automatic 10m counts');
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+		$this->assertStringContainsString('Break #2', $errors['breaks']);
+	}
+
 	public function testCanDeleteManualCompletedEntry(): void
 	{
 		$entry = new TimeEntry();

@@ -18,7 +18,7 @@ if (!is_file($phpunit)) {
 
 function restore_file(string $path, string $backup): void {
 	if (is_file($backup)) {
-		rename($backup, $path);
+		copy($backup, $path); unlink($backup);
 	}
 }
 

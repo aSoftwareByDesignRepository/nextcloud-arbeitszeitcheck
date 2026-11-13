@@ -66,7 +66,7 @@ function runQueryInChunkerMutationFilter(string $root, string $phpunit, string $
 function restoreQueryInChunkerMutationFile(string $path, string $backup): void
 {
 	if (is_file($backup)) {
-		rename($backup, $path);
+		copy($backup, $path); unlink($backup);
 	}
 }
 

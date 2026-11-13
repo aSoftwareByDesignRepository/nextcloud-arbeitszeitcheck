@@ -1386,6 +1386,16 @@ test.describe('ATLAS durable-mutation sweep', () => {
 		const mgr = await browser.newPage()
 		const sub = await browser.newPage()
 		const seededIds = []
+		// Direct-edit legs below need entries that are editable on create.
+		// A leaked `manualTimeEntriesRequireApproval=true` (killed run leaving
+		// admin state behind) would land them in pending_approval, so snapshot
+		// and force it off — restored in finally like test D does.
+		await loginAs(page, 'ADMIN')
+		const approvalBefore = await api(page, 'GET', `${APP}/api/admin/settings`)
+		const approvalWasOn = approvalBefore.settings?.manualTimeEntriesRequireApproval === true
+		if (approvalWasOn) {
+			await api(page, 'POST', `${APP}/api/admin/settings`, { data: { manualTimeEntriesRequireApproval: false } })
+		}
 		try {
 			await login(emp, credsFromEnv('EMPLOYEE'))
 			await gotoApp(emp, `${APP}/time-entries`)
@@ -1604,6 +1614,9 @@ test.describe('ATLAS durable-mutation sweep', () => {
 				}
 			}
 		} finally {
+			if (approvalWasOn) {
+				await apiAllowFailure(page, 'POST', `${APP}/api/admin/settings`, { data: { manualTimeEntriesRequireApproval: true } })
+			}
 			await emp.close()
 			await mgr.close()
 			await sub.close()

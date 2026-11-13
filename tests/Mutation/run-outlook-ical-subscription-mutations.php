@@ -68,7 +68,7 @@ $phpunit = is_file($root . '/vendor/bin/phpunit') ? $root . '/vendor/bin/phpunit
 $appId = basename($root);
 $workspaceRoot = dirname($root, 2);
 
-function runOutlookMutationFilter(string $root, string $phpunit, string $filter, string $workspaceRoot, string $appId): int
+function runOutlookMutationFilter(string $root, string $phpunit, string $filter, string $workspaceRoot, string $appId, string $testFile = 'tests/Unit/Service/OutlookIcalSubscriptionServiceTest.php'): int
 {
 	$inside = is_file('/var/www/html/lib/base.php');
 	if ($inside) {
@@ -76,7 +76,7 @@ function runOutlookMutationFilter(string $root, string $phpunit, string $filter,
 			. ' -d opcache.enable_cli=0 -d opcache.enable=0 '
 			. escapeshellarg($phpunit)
 			. ' -c ' . escapeshellarg($root . '/phpunit.xml')
-			. ' tests/Unit/Service/OutlookIcalSubscriptionServiceTest.php'
+			. ' ' . escapeshellarg($testFile)
 			. ' --filter ' . escapeshellarg($filter)
 			. ' > /dev/null 2>&1';
 	} else {
@@ -84,7 +84,7 @@ function runOutlookMutationFilter(string $root, string $phpunit, string $filter,
 			. ' exec -u www-data -T nextcloud php -d opcache.enable_cli=0 -d opcache.enable=0 '
 			. '/var/www/html/custom_apps/' . $appId . '/vendor/bin/phpunit '
 			. '-c /var/www/html/custom_apps/' . $appId . '/phpunit.xml '
-			. '/var/www/html/custom_apps/' . $appId . '/tests/Unit/Service/OutlookIcalSubscriptionServiceTest.php '
+			. '/var/www/html/custom_apps/' . $appId . '/' . $testFile . ' '
 			. '--filter ' . escapeshellarg($filter)
 			. ' > /dev/null 2>&1';
 	}
@@ -95,7 +95,7 @@ function runOutlookMutationFilter(string $root, string $phpunit, string $filter,
 function restoreOutlookMutationFile(string $path, string $backup): void
 {
 	if (is_file($backup)) {
-		rename($backup, $path);
+		copy($backup, $path); unlink($backup);
 	}
 }
 
@@ -131,6 +131,45 @@ if ($mutated === 0) {
 	exit(1);
 }
 fwrite(STDOUT, "killed drop_in_place_scope_update\n");
+
+// --- half-day label shape authority (FU5 sealed columns vs literal days) ---
+$feedPath = $root . '/lib/Service/OutlookIcalSubscriptionFeedService.php';
+$feedOriginal = file_get_contents($feedPath);
+if ($feedOriginal === false) {
+	fwrite(STDERR, "Cannot read feed service file\n");
+	exit(1);
+}
+$halfTestFile = 'tests/Unit/Service/OutlookIcalHalfDayLabelTest.php';
+$halfBaseline = runOutlookMutationFilter($root, $phpunit, 'OutlookIcalHalfDayLabelTest', $workspaceRoot, $appId, $halfTestFile);
+if ($halfBaseline !== 0) {
+	fwrite(STDERR, "Baseline halfDayLabel unit tests must pass before mutation run\n");
+	exit(1);
+}
+
+$shapeAnchor = "\t\t\$frac = \$absence->getStartDayFraction();\n\t\t\$isHalf = \$start->format('Y-m-d') === \$end->format('Y-m-d') // locked decision: half-day is single-day\n\t\t\t&& (\$frac !== null\n\t\t\t\t? (float)\$frac < 0.999\n\t\t\t\t: (\$days !== null && abs((float)\$days - 0.5) < 1e-9));";
+$shapeLiteral = "\t\t\$isHalf = \$days !== null && abs((float)\$days - 0.5) < 1e-9\n\t\t\t&& \$start->format('Y-m-d') === \$end->format('Y-m-d');";
+$shapeNoFallback = "\t\t\$frac = \$absence->getStartDayFraction();\n\t\t\$isHalf = \$start->format('Y-m-d') === \$end->format('Y-m-d')\n\t\t\t&& \$frac !== null && (float)\$frac < 0.999;";
+
+foreach ([
+	['halfday_label_drops_shape', $shapeAnchor, $shapeLiteral],
+	['halfday_label_drops_legacy_fallback', $shapeAnchor, $shapeNoFallback],
+] as [$name, $from, $to]) {
+	if (!str_contains($feedOriginal, $from)) {
+		fwrite(STDERR, "Mutation anchor not found for $name\n");
+		exit(1);
+	}
+	$backup2 = $feedPath . '.mutation-bak';
+	file_put_contents($backup2, $feedOriginal);
+	file_put_contents($feedPath, str_replace($from, $to, $feedOriginal));
+	echo "\n== mutation: $name ==\n";
+	$rc = runOutlookMutationFilter($root, $phpunit, 'OutlookIcalHalfDayLabelTest', $workspaceRoot, $appId, $halfTestFile);
+	restoreOutlookMutationFile($feedPath, $backup2);
+	if ($rc === 0) {
+		fwrite(STDERR, "MUTATION SURVIVED: $name\n");
+		exit(1);
+	}
+	fwrite(STDOUT, "killed $name\n");
+}
 
 if ($failures > 0) {
 	fwrite(STDERR, "\n$failures mutation contract failure(s)\n");

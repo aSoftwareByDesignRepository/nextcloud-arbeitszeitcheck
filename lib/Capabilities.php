@@ -79,10 +79,12 @@ class Capabilities implements ICapability {
 		// capabilities hiccup never locks companion clients into wrong UI.
 		$breakPolicyEnforced = false;
 		$breakPolicyActive = false;
+		$breakDeductionMode = \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::DEDUCTION_STRICT;
 		try {
 			$policyResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::class);
 			$breakPolicyEnforced = $policyResolver->isEnforced();
 			$breakPolicyActive = $policyResolver->isPolicyActive($user !== null ? $user->getUID() : null);
+			$breakDeductionMode = $policyResolver->deductionModeForUser($user !== null ? $user->getUID() : null);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->warning(
 				'Capabilities: break-policy resolver failed — reporting non-enforced: ' . $e->getMessage(),
@@ -177,6 +179,10 @@ class Capabilities implements ICapability {
 					'allowedBreakSplitPatterns' => $profile->allowedBreakSplitPatterns,
 					'weeklyAbsoluteMaxHours' => $profile->weeklyAbsoluteMaxHours,
 					'german-labor-law' => $isGermany,
+					// Effective automatic-break deduction convention for this
+					// user (model ?? org ?? 'strict'). Additive — older
+					// clients ignore it and behave as strict.
+					'deductionMode' => $breakDeductionMode,
 					// Additive: older clients ignore this; new clients use it
 					// to lock break preferences and explain managed rules.
 					'breakPolicy' => [

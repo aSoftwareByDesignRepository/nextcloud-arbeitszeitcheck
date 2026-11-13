@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\PremiumPolicy;
 use OCA\ArbeitszeitCheck\Support\PremiumSurchargeClassifier;
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
@@ -169,7 +170,7 @@ class PremiumSurchargeService
 
 		$locking = $this->lockingProvider ?? \OCP\Server::get(\OCP\Lock\ILockingProvider::class);
 		$lockKey = DbLockKeys::premiumPolicy();
-		$locking->acquireLock($lockKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Premium seal snapshot');
+		DbLockGuard::acquire($locking, $lockKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Premium seal snapshot');
 		try {
 			$policy = $this->getPolicy();
 			$version = (int)$this->config->getAppValue(

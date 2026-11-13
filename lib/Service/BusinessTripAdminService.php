@@ -14,6 +14,7 @@ use OCA\ArbeitszeitCheck\Db\BusinessTripMapper;
 use OCA\ArbeitszeitCheck\Db\UserBusinessTripProfile;
 use OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDBConnection;
 use OCP\IUserManager;
@@ -180,7 +181,7 @@ final class BusinessTripAdminService
 		}
 
 		$lock = DbLockKeys::businessTripRuleCatalog();
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
 		try {
 			// One assignment per scope per effective window — overlaps fork
 			// precedence silently, so reject them under the catalog lock.
@@ -220,7 +221,7 @@ final class BusinessTripAdminService
 	{
 		$this->assertEnabled();
 		$lock = DbLockKeys::businessTripRuleCatalog();
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
 		try {
 			$assignment = $this->requireAssignment($id);
 			if ($expectedRevision !== (int)$assignment->getRevision()) {

@@ -11,6 +11,7 @@ use OCA\ArbeitszeitCheck\Kiosk\KioskCrypto;
 use OCA\ArbeitszeitCheck\Service\LicenseService;
 use OCA\ArbeitszeitCheck\Service\TerminalDeviceService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCP\Lock\ILockingProvider;
 
@@ -80,7 +81,7 @@ class KioskTerminalService
 			throw new KioskException('TERMINAL_LICENSE_REQUIRED');
 		}
 
-		$this->lockingProvider->acquireLock(DbLockKeys::kioskPairing(), ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk terminal pairing');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::kioskPairing(), ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk terminal pairing');
 		try {
 			$now = $this->timeFactory->getDateTime();
 			$pending = $this->findPendingByPairingCode($pairingCode, $now);

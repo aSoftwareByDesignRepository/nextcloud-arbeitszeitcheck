@@ -27,6 +27,7 @@ use OCA\ArbeitszeitCheck\Db\SpecialEntitlementType;
 use OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper;
 use OCA\ArbeitszeitCheck\Exception\SpecialEntitlementException;
 use OCA\ArbeitszeitCheck\Policy\IdempotencyKey;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDBConnection;
 use OCP\Lock\ILockingProvider;
@@ -382,7 +383,7 @@ final class SpecialEntitlementService
 	public function consumeForAbsence(Absence $absence, string $actorUid): void
 	{
 		$lock = DbLockKeys::specialEntitlementAbsence((int)$absence->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
 		try {
 			$reservation = $this->reservations->findByAbsenceId((int)$absence->getId());
 			if ($reservation === null) {
@@ -443,7 +444,7 @@ final class SpecialEntitlementService
 			return;
 		}
 		$lock = DbLockKeys::specialEntitlementAbsence((int)$absence->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
 		try {
 			$this->adjustConsumedAbsenceLocked($absence, $data, $oldSummary, $actorUid, $reservation);
 		} finally {
@@ -515,7 +516,7 @@ final class SpecialEntitlementService
 	public function releaseForAbsence(Absence $absence, string $actorUid): void
 	{
 		$lock = DbLockKeys::specialEntitlementAbsence((int)$absence->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement absence');
 		try {
 			$reservation = $this->reservations->findByAbsenceId((int)$absence->getId());
 			if ($reservation === null || $reservation->getStatus() === SpecialEntitlementReservation::STATUS_RELEASED) {
@@ -839,7 +840,7 @@ final class SpecialEntitlementService
 	private function acquire(array &$locks, string $key, string $description): void
 	{
 		try {
-			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, $description);
+			DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, $description);
 			$locks[] = $key;
 		} catch (\Throwable $e) {
 			$this->releaseLockList(array_reverse($locks));

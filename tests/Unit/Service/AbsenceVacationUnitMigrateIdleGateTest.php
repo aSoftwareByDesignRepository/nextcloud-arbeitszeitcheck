@@ -115,7 +115,7 @@ class AbsenceVacationUnitMigrateIdleGateTest extends TestCase
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturn('');
 		$locking = $this->createMock(ILockingProvider::class);
-		$locking->expects($this->once())
+		$locking->expects($this->exactly(2)) // DbLockGuard retries once after stale-sweep
 			->method('acquireLock')
 			->with(DbLockKeys::vacationYearMode(), ILockingProvider::LOCK_SHARED, $this->anything())
 			->willThrowException(new LockedException(DbLockKeys::vacationYearMode()));
@@ -134,7 +134,9 @@ class AbsenceVacationUnitMigrateIdleGateTest extends TestCase
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturn('');
 		$locking = $this->createMock(ILockingProvider::class);
-		$locking->expects($this->exactly(2))
+		// 1 × vacationYearMode success + 2 × vacationUnitMigration attempts
+		// (DbLockGuard sweeps stale rows and retries once before propagating).
+		$locking->expects($this->exactly(3))
 			->method('acquireLock')
 			->willReturnCallback(static function (string $key, int $type, string $label = '') {
 				unset($type, $label);

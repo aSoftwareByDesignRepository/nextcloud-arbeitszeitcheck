@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\BackgroundJob;
 
 use OCA\ArbeitszeitCheck\Service\ComplianceService;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
@@ -60,7 +61,7 @@ class DailyComplianceCheckJob extends TimedJob
 		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
 		// on their interval.
 		try {
-			$this->locking->acquireLock(
+			DbLockGuard::acquire($this->locking, 
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'daily compliance check',

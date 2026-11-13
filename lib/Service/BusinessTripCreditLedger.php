@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\Db\BusinessTrip;
 use OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerEntry;
 use OCA\ArbeitszeitCheck\Db\BusinessTripCreditLedgerMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\Lock\ILockingProvider;
 
 /**
@@ -43,7 +44,7 @@ final class BusinessTripCreditLedger
 	public function postTopUps(BusinessTrip $trip, array $days, string $actor): array
 	{
 		$lock = DbLockKeys::businessTripLedger($trip->getUserId(), (int)$trip->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip credit ledger');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip credit ledger');
 		try {
 			return $this->postTopUpsUnderLock($trip, $days, $actor);
 		} finally {
@@ -89,7 +90,7 @@ final class BusinessTripCreditLedger
 	public function reverseAll(BusinessTrip $trip, string $actor, string $reason): array
 	{
 		$lock = DbLockKeys::businessTripLedger($trip->getUserId(), (int)$trip->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip credit ledger');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip credit ledger');
 		try {
 			return $this->reverseAllUnderLock($trip, $actor, $reason);
 		} finally {

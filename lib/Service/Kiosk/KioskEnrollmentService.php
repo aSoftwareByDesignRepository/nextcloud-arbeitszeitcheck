@@ -9,6 +9,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\KioskEnrollment;
 use OCA\ArbeitszeitCheck\Db\KioskEnrollmentMapper;
 use OCA\ArbeitszeitCheck\Db\KioskTerminalMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\ICacheFactory;
 use OCP\IUserManager;
@@ -454,7 +455,7 @@ class KioskEnrollmentService
 		$delayUs = 40000; // 40ms, then 80ms, 160ms… capped at 200ms
 		for ($i = 0; $i < $attempts; $i++) {
 			try {
-				$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, $label);
+				DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, $label);
 				return;
 			} catch (LockedException) {
 				if ($i + 1 >= $attempts) {

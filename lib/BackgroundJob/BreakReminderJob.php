@@ -13,6 +13,7 @@ namespace OCA\ArbeitszeitCheck\BackgroundJob;
 
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -89,7 +90,7 @@ class BreakReminderJob extends TimedJob
 		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
 		// on their interval.
 		try {
-			$this->locking->acquireLock(
+			DbLockGuard::acquire($this->locking, 
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'break reminder check',

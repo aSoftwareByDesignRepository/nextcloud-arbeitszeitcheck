@@ -17,6 +17,7 @@ namespace OCA\ArbeitszeitCheck\Repair;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
 use OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter;
@@ -139,7 +140,7 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 		// between our read and the write must drift-skip, never clobber.
 		$lockKey = DbLockKeys::absenceUser($userId);
 		try {
-			$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Absence days recompute');
+			DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Absence days recompute');
 		} catch (\Throwable) {
 			return false; // held by a live mutation — rerun picks this row up
 		}

@@ -29,6 +29,7 @@ use OCA\ArbeitszeitCheck\Db\WorkLocationDefinition;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDefinitionMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\WorkLocationConflictException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
@@ -107,7 +108,7 @@ final class WorkLocationAdminService
 		);
 
 		$lock = DbLockKeys::policyCatalog('work_location');
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
 		try {
 			if ($this->catalog->isKnown($code) || $this->definitionMapper->codeExists($code)) {
 				throw new WorkLocationConflictException(self::ERR_CODE_EXISTS);
@@ -149,7 +150,7 @@ final class WorkLocationAdminService
 	public function update(int $id, array $params, string $actorUserId): WorkLocationDefinition
 	{
 		$lock = DbLockKeys::policyCatalog('work_location');
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
 		try {
 			try {
 				$row = $this->definitionMapper->find($id);
@@ -226,7 +227,7 @@ final class WorkLocationAdminService
 	public function delete(int $id, string $actorUserId): void
 	{
 		$lock = DbLockKeys::policyCatalog('work_location');
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location catalog mutation');
 		try {
 			try {
 				$row = $this->definitionMapper->find($id);
@@ -287,7 +288,7 @@ final class WorkLocationAdminService
 		}
 
 		$lock = DbLockKeys::policyCatalog('work_location');
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location policy mutation');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location policy mutation');
 		try {
 			if ($this->policyMapper->findOverlapping($scopeType, $scopeId, $from, $to) !== []) {
 				throw new WorkLocationConflictException(self::ERR_POLICY_OVERLAP);
@@ -331,7 +332,7 @@ final class WorkLocationAdminService
 	{
 		$to = $this->parseDate($effectiveTo, 'effectiveTo');
 		$lock = DbLockKeys::policyCatalog('work_location');
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location policy mutation');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Work-location policy mutation');
 		try {
 			try {
 				$row = $this->policyMapper->find($id);

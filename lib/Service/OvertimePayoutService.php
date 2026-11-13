@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimePayout;
 use OCA\ArbeitszeitCheck\Db\OvertimePayoutMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\IConfig;
 use OCP\IUserManager;
 
@@ -309,7 +310,7 @@ class OvertimePayoutService
 			// same month. Post-seal payout stays allowed — the lock only
 			// orders the write, never blocks it.
 			$mcKey = DbLockKeys::monthClosure($userId, $year, $month);
-			$this->lockingProvider->acquireLock($mcKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime payout against month-closure window');
+			DbLockGuard::acquire($this->lockingProvider, $mcKey, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime payout against month-closure window');
 			try {
 				return $work();
 			} finally {
@@ -336,7 +337,7 @@ class OvertimePayoutService
 	private function withOvertimeBalanceLock(string $userId, callable $callback): mixed
 	{
 		$key = DbLockKeys::overtimeBalance($userId);
-		$this->lockingProvider->acquireLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
+		DbLockGuard::acquire($this->lockingProvider, $key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
 		try {
 			return $callback();
 		} finally {

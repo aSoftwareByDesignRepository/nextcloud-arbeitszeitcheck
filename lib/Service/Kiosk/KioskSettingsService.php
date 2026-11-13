@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\AppInfo\Application;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Kiosk\KioskCrypto;
 use OCP\IConfig;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCP\Lock\ILockingProvider;
 
@@ -54,7 +55,7 @@ class KioskSettingsService
 			return $salt;
 		}
 
-		$this->lockingProvider->acquireLock(DbLockKeys::kioskRfidSalt(), ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk RFID salt bootstrap');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::kioskRfidSalt(), ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk RFID salt bootstrap');
 		try {
 			$salt = (string)$this->config->getAppValue(Application::APP_ID, Constants::CONFIG_KIOSK_RFID_SALT, '');
 			if ($salt === '') {

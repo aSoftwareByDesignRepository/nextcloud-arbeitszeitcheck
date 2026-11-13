@@ -33,6 +33,7 @@ namespace OCA\ArbeitszeitCheck\BackgroundJob;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -221,7 +222,7 @@ class PaidBreakRecomputeJob extends QueuedJob
 		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
 		// on their interval.
 		try {
-			$this->locking->acquireLock(
+			DbLockGuard::acquire($this->locking, 
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'paid-break recompute',

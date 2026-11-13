@@ -125,7 +125,7 @@ class AdminPremiumPolicyBusyBehaviorTest extends TestCase
 		]);
 
 		$lockingMock = $this->createMock(ILockingProvider::class);
-		$lockingMock->expects($this->once())
+		$lockingMock->expects($this->exactly(2)) // DbLockGuard retries once after stale-sweep
 			->method('acquireLock')
 			->with(DbLockKeys::premiumPolicy(), ILockingProvider::LOCK_EXCLUSIVE, $this->anything())
 			->willThrowException(new \OCP\Lock\LockedException(DbLockKeys::premiumPolicy()));

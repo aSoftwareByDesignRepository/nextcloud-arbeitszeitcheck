@@ -18,6 +18,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 use DateTimeImmutable;
 use DateTimeZone;
 use OCA\ArbeitszeitCheck\Exception\UpgradeBackupException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\App\IAppManager;
 use OCP\Files\File;
 use OCP\Files\Folder;
@@ -878,7 +879,7 @@ class UpgradeBackupService
 	private function runExclusive(string $label, callable $callback)
 	{
 		try {
-			$this->locking->acquireLock(self::LOCK_KEY, ILockingProvider::LOCK_EXCLUSIVE, $label);
+			DbLockGuard::acquire($this->locking, self::LOCK_KEY, ILockingProvider::LOCK_EXCLUSIVE, $label);
 		} catch (LockedException $e) {
 			throw new UpgradeBackupException(
 				'Another ArbeitszeitCheck backup or restore is already in progress.',

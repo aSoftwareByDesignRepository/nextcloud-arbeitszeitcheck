@@ -23,6 +23,7 @@ use OCA\ArbeitszeitCheck\Db\MonthClosureRevisionMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\IDBConnection;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -123,7 +124,7 @@ class MonthClosureService
 	private function acquireFinalizeLock(string $userId, int $year, int $month): string
 	{
 		$key = DbLockKeys::monthClosure($userId, $year, $month);
-		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Month closure finalize lock');
+		DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, 'Month closure finalize lock');
 		return $key;
 	}
 
@@ -531,7 +532,7 @@ class MonthClosureService
 				if (($this->heldMonthClosureLocks[$key] ?? 0) > 0) {
 					$this->heldMonthClosureLocks[$key]++;
 				} else {
-					$this->lockingProvider->acquireLock(
+					DbLockGuard::acquire($this->lockingProvider, 
 						$key,
 						ILockingProvider::LOCK_EXCLUSIVE,
 						'Month-closure window write'

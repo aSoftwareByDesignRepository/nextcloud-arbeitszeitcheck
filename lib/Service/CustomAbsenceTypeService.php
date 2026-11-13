@@ -21,6 +21,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\CustomAbsenceType;
 use OCA\ArbeitszeitCheck\Db\CustomAbsenceTypeMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\TTransactional;
@@ -66,7 +67,7 @@ class CustomAbsenceTypeService
 	 */
 	private function atomicWithCatalogLock(callable $callback): mixed
 	{
-		$this->lockingProvider->acquireLock(
+		DbLockGuard::acquire($this->lockingProvider, 
 			DbLockKeys::absenceTypeCatalog(),
 			ILockingProvider::LOCK_EXCLUSIVE,
 			'Custom absence type catalog write',

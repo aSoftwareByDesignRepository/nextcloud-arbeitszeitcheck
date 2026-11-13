@@ -92,11 +92,14 @@ class KioskCredentialServiceLockRecoveryTest extends TestCase
 	public function testGeneratePinPurgesOrphanLocksOnlyAfterRetriesExhausted(): void
 	{
 		// Orphan lock: 8 retry attempts fail, purge once, final attempt succeeds.
+		// DbLockGuard retries once per acquire call → each of the service's
+		// 8 outer retries costs 2 provider attempts; purge fires after all
+		// outer retries are exhausted, then the recovery acquire succeeds.
 		$calls = 0;
 		$this->lockingProvider->method('acquireLock')
 			->willReturnCallback(function () use (&$calls): void {
 				$calls++;
-				if ($calls <= 8) {
+				if ($calls <= 16) {
 					throw new LockedException('orphan');
 				}
 			});
@@ -112,7 +115,7 @@ class KioskCredentialServiceLockRecoveryTest extends TestCase
 
 		$result = $this->service->generatePin('alice', 'admin');
 		$this->assertSame(12, $result['id']);
-		$this->assertSame(9, $calls);
+		$this->assertSame(17, $calls);
 	}
 
 	public function testGeneratePinSurfacesBusyWhenLockStaysHeldEvenAfterPurge(): void

@@ -6,6 +6,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\MobileSeat;
 use OCA\ArbeitszeitCheck\Db\MobileSeatMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IDBConnection;
@@ -79,7 +80,7 @@ class MobileSeatService
 		// Exclusive capacity lock (parity with TerminalDeviceService::reserveSlot):
 		// under READ COMMITTED two concurrent assignSeat calls must not both observe
 		// free capacity and exceed the licensed seat limit.
-		$this->lockingProvider->acquireLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
 		try {
 			$this->db->beginTransaction();
 			try {
@@ -150,7 +151,7 @@ class MobileSeatService
 		$skipped = 0;
 		$failed = 0;
 
-		$this->lockingProvider->acquireLock(DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::mobileSeatCapacity(), ILockingProvider::LOCK_EXCLUSIVE, 'Mobile seat capacity');
 		try {
 			foreach ($unique as $userId) {
 				if ($this->userManager->get($userId) === null) {

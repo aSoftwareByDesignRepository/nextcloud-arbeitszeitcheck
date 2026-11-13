@@ -19,6 +19,7 @@ use OCA\ArbeitszeitCheck\Db\UserBusinessTripProfileMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
 use OCA\ArbeitszeitCheck\Policy\IdempotencyKey;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDBConnection;
 use OCP\Lock\ILockingProvider;
@@ -254,7 +255,7 @@ final class BusinessTripService
 		$this->assertEnabled();
 		$this->assertStatus($trip, BusinessTrip::STATUS_DRAFT);
 		$lock = DbLockKeys::businessTripTrip((int)$trip->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business trip');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business trip');
 		try {
 			// Re-read under lock: the entity handed in may be stale.
 			$trip = $this->trips->find((int)$trip->getId());
@@ -315,7 +316,7 @@ final class BusinessTripService
 		$this->assertEnabled();
 		$this->assertStatus($trip, BusinessTrip::STATUS_DRAFT);
 		$linkLock = DbLockKeys::businessTripLinkedEntries((int)$trip->getId());
-		$this->lockingProvider->acquireLock($linkLock, ILockingProvider::LOCK_EXCLUSIVE, 'Trip time-entry links');
+		DbLockGuard::acquire($this->lockingProvider, $linkLock, ILockingProvider::LOCK_EXCLUSIVE, 'Trip time-entry links');
 		try {
 			// Re-read under lock — the trip may have transitioned meanwhile.
 			$trip = $this->trips->find((int)$trip->getId());
@@ -361,7 +362,7 @@ final class BusinessTripService
 		$this->assertEnabled();
 		$this->assertStatus($trip, BusinessTrip::STATUS_DRAFT);
 		$linkLock = DbLockKeys::businessTripLinkedEntries((int)$trip->getId());
-		$this->lockingProvider->acquireLock($linkLock, ILockingProvider::LOCK_EXCLUSIVE, 'Trip time-entry links');
+		DbLockGuard::acquire($this->lockingProvider, $linkLock, ILockingProvider::LOCK_EXCLUSIVE, 'Trip time-entry links');
 		try {
 			$trip = $this->trips->find((int)$trip->getId());
 			$this->assertStatus($trip, BusinessTrip::STATUS_DRAFT);
@@ -386,7 +387,7 @@ final class BusinessTripService
 	{
 		$this->assertEnabled();
 		$lock = DbLockKeys::businessTripTrip((int)$trip->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_SHARED, 'Business trip');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_SHARED, 'Business trip');
 		try {
 			$segments = $this->segments->findForTrip((int)$trip->getId());
 			$entries = $this->linkedEntries($trip);
@@ -449,7 +450,7 @@ final class BusinessTripService
 			throw $this->staleRevision();
 		}
 		$lock = DbLockKeys::businessTripTrip((int)$trip->getId());
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business trip');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business trip');
 		try {
 			// Re-read under lock — the CAS predicate must bind to fresh state.
 			$trip = $this->trips->find((int)$trip->getId());
@@ -791,7 +792,7 @@ final class BusinessTripService
 		$held = [];
 		try {
 			foreach ($keys as $key) {
-				$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, $note);
+				DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, $note);
 				$held[] = $key;
 			}
 		} catch (\Throwable $e) {

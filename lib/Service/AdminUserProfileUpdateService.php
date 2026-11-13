@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\AdminUserProfileUpdateException;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\OpeningBalanceYearValidator;
 use OCA\ArbeitszeitCheck\Support\RegionRegistry;
@@ -96,7 +97,7 @@ class AdminUserProfileUpdateService
 		}
 		$key = DbLockKeys::userProfile($userId);
 		try {
-			$this->lockingProvider->acquireLock($key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Employee profile update for user ' . $userId);
+			DbLockGuard::acquire($this->lockingProvider, $key, \OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE, 'Employee profile update for user ' . $userId);
 		} catch (\OCP\Lock\LockedException $e) {
 			throw new AdminUserProfileUpdateException(
 				$this->l10n->t('This employee profile is being updated by another request. Please wait a moment and try again.'),
@@ -287,7 +288,7 @@ class AdminUserProfileUpdateService
 			return $callback();
 		}
 		try {
-			$this->lockingProvider->acquireLock(
+			DbLockGuard::acquire($this->lockingProvider, 
 				DbLockKeys::workingTimeModelCatalog(),
 				\OCP\Lock\ILockingProvider::LOCK_SHARED,
 				'Working-time-model assignment write',

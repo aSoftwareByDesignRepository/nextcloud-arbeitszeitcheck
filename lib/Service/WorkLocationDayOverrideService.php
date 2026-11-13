@@ -22,6 +22,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDayOverride;
 use OCA\ArbeitszeitCheck\Db\WorkLocationDayOverrideMapper;
 use OCA\ArbeitszeitCheck\Exception\WorkLocationDayConflictException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\DB\Exception as DbException;
 
 final class WorkLocationDayOverrideService
@@ -94,7 +95,7 @@ final class WorkLocationDayOverrideService
 		$expected = $this->normalizeRevision($expectedRevision);
 
 		$lock = DbLockKeys::workLocationDay($userId, $localDate);
-		$this->lockingProvider->acquireLock(
+		DbLockGuard::acquire($this->lockingProvider, 
 			$lock,
 			\OCP\Lock\ILockingProvider::LOCK_EXCLUSIVE,
 			'Work-location day override for user ' . $userId,

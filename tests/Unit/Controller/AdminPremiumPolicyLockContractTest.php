@@ -31,8 +31,8 @@ class AdminPremiumPolicyLockContractTest extends TestCase
 		$this->assertStringContainsString('LOCK_EXCLUSIVE', $method);
 		$this->assertStringContainsString('lockingProvider ?? \\OCP\\Server::get', $method);
 		// Busy paths must acquire before sibling IConfig writes (atomic preflight).
-		$premiumPos = strpos($method, 'acquireLock($policyLock');
-		$yearPos = strpos($method, 'acquireLock($yearLock');
+		$premiumPos = strpos($method, 'acquire($locking, $policyLock');
+		$yearPos = strpos($method, 'acquire($locking, $yearLock');
 		$commitPos = strpos($method, '// ── Commit phase (sibling settings)');
 		$this->assertNotFalse($premiumPos);
 		$this->assertNotFalse($yearPos);

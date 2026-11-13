@@ -43,7 +43,7 @@ class VacationUnitMigrationLockTest extends TestCase
 		$db->expects($this->never())->method('beginTransaction');
 
 		$locking = $this->createMock(ILockingProvider::class);
-		$locking->expects($this->once())
+		$locking->expects($this->exactly(2)) // DbLockGuard retries once after stale-sweep
 			->method('acquireLock')
 			->with(DbLockKeys::vacationUnitMigration(), ILockingProvider::LOCK_EXCLUSIVE, $this->anything())
 			->willThrowException(new LockedException(DbLockKeys::vacationUnitMigration()));

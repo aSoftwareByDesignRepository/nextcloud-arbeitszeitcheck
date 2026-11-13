@@ -16,6 +16,7 @@ use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\NotificationService;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
@@ -93,7 +94,7 @@ class MissingTimeEntryJob extends TimedJob
 		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
 		// on their interval.
 		try {
-			$this->locking->acquireLock(
+			DbLockGuard::acquire($this->locking, 
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'missing time entry check',

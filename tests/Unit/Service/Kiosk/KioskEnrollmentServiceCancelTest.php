@@ -187,8 +187,9 @@ class KioskEnrollmentServiceCancelTest extends TestCase
 			->with('term-1')
 			->willReturn(1);
 
-		// Exhaust retries on the user lock (8 attempts).
-		$this->lockingProvider->expects($this->exactly(8))
+		// Exhaust retries on the user lock (8 outer attempts × 2 provider
+		// calls each — DbLockGuard sweeps stale rows and retries once).
+		$this->lockingProvider->expects($this->exactly(16))
 			->method('acquireLock')
 			->willThrowException(new LockedException('held'));
 

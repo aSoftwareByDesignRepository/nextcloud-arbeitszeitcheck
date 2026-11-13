@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\BackgroundJob;
 
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCA\ArbeitszeitCheck\Service\VacationRolloverService;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -39,7 +40,7 @@ class VacationRolloverJob extends TimedJob
 		// truncate+reinsert. A skip is not a failure: TimedJobs re-run
 		// on their interval.
 		try {
-			$this->locking->acquireLock(
+			DbLockGuard::acquire($this->locking, 
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'vacation rollover',

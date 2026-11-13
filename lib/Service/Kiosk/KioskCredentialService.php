@@ -9,6 +9,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\KioskCred;
 use OCA\ArbeitszeitCheck\Db\KioskCredMapper;
 use OCA\ArbeitszeitCheck\Kiosk\KioskCrypto;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
@@ -260,7 +261,7 @@ class KioskCredentialService
 	private function acquireExclusive(string $lockKey, string $label): void
 	{
 		try {
-			$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, $label);
+			DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, $label);
 		} catch (LockedException) {
 			throw new KioskException('KIOSK_BUSY');
 		}

@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\EntitlementComputationSnapshot;
 use OCA\ArbeitszeitCheck\Db\EntitlementComputationSnapshotMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\Lock\ILockingProvider;
 
 class EntitlementSnapshotService {
@@ -29,7 +30,7 @@ class EntitlementSnapshotService {
 	): EntitlementComputationSnapshot {
 		$asOfDateOnly = new \DateTime($asOfDate->format('Y-m-d'));
 		$lockKey = DbLockKeys::entitlementSnapshot($userId, $year, $asOfDateOnly->format('Y-m-d'));
-		$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Entitlement snapshot lock ' . $userId . ' ' . $year);
+		DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Entitlement snapshot lock ' . $userId . ' ' . $year);
 		try {
 			$snapshot = new EntitlementComputationSnapshot();
 			$snapshot->setUserId($userId);
@@ -71,7 +72,7 @@ class EntitlementSnapshotService {
 		$asOfDateOnly = new \DateTime($asOfDate->format('Y-m-d'));
 		$periodKey = 'se' . substr(md5($entitlementTypeId . '|' . $periodStartDate->format('Y-m-d')), 0, 14);
 		$lockKey = DbLockKeys::entitlementSnapshot($userId, (int)$periodStartDate->format('Y'), $asOfDateOnly->format('Y-m-d'));
-		$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement snapshot lock ' . $userId);
+		DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement snapshot lock ' . $userId);
 		try {
 			$snapshot = new EntitlementComputationSnapshot();
 			$snapshot->setUserId($userId);

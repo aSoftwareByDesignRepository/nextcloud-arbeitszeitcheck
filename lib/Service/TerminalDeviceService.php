@@ -6,6 +6,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\TerminalDevice;
 use OCA\ArbeitszeitCheck\Db\TerminalDeviceMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\Kiosk\KioskException;
 use OCP\IDBConnection;
 use OCP\Lock\ILockingProvider;
@@ -45,7 +46,7 @@ class TerminalDeviceService
 	 */
 	public function reserveSlot(string $label): TerminalDevice
 	{
-		$this->lockingProvider->acquireLock(DbLockKeys::terminalDeviceSlot(), ILockingProvider::LOCK_EXCLUSIVE, 'Terminal device capacity');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::terminalDeviceSlot(), ILockingProvider::LOCK_EXCLUSIVE, 'Terminal device capacity');
 		try {
 			$this->db->beginTransaction();
 			try {

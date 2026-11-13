@@ -43,6 +43,7 @@ use OCA\ArbeitszeitCheck\Db\TeamVacationPolicy;
 use OCA\ArbeitszeitCheck\Db\TeamVacationPolicyMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\StrictYmdDates;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\TTransactional;
@@ -624,7 +625,7 @@ class LayeredVacationDefaultsService
 	private function acquireWriteLock(string $lockKey, string $reason): void
 	{
 		try {
-			$this->lockingProvider->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, $reason);
+			DbLockGuard::acquire($this->lockingProvider, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, $reason);
 		} catch (LockedException $e) {
 			throw new LayeredVacationConflictException(
 				'Another administrator is currently editing this layer. Refresh and try again.',

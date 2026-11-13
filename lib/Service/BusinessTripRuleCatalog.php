@@ -8,6 +8,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSet;
 use OCA\ArbeitszeitCheck\Db\BusinessTripRuleSetMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessTripException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -37,7 +38,7 @@ final class BusinessTripRuleCatalog
 	public function activate(int $ruleSetId, string $actor): BusinessTripRuleSet
 	{
 		$lock = DbLockKeys::businessTripRuleCatalog();
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
 		try {
 			try {
 				$target = $this->ruleSets->find($ruleSetId);
@@ -126,7 +127,7 @@ final class BusinessTripRuleCatalog
 		// unvalidated config into the catalog.
 		$this->validator->validate($configJson);
 		$lock = DbLockKeys::businessTripRuleCatalog();
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Business-trip rule catalog');
 		try {
 			$this->db->beginTransaction();
 			try {

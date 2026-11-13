@@ -11,6 +11,7 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Exception\StampReplayException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IL10N;
@@ -152,7 +153,7 @@ class ExternalStampService
 	private function decide(string $uid, int $id, bool $confirm): array
 	{
 		$lock = 'azc_ext_stamp_decide_' . $id;
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE);
 		$monthClosureKeys = [];
 		try {
 			// Month-closure tier BEFORE the tx (last in DbLockKeys::ORDER):

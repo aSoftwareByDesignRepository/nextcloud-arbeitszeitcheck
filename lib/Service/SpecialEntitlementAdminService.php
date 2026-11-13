@@ -35,6 +35,7 @@ use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\SpecialEntitlementException;
 use OCA\ArbeitszeitCheck\Policy\IdempotencyKey;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDBConnection;
@@ -144,8 +145,8 @@ final class SpecialEntitlementAdminService
 		$labelI18n = $this->labelMap($params['labelI18n'] ?? $params['label_i18n'] ?? null);
 		$confidentialLabel = $this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'] ?? null, 'confidentialLabel');
 
-		$this->lockingProvider->acquireLock(DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_EXCLUSIVE, 'Absence type catalog');
-		$this->lockingProvider->acquireLock(DbLockKeys::policyCatalog('special_entitlement'), ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement catalog');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_EXCLUSIVE, 'Absence type catalog');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCatalog('special_entitlement'), ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement catalog');
 		try {
 			$this->db->beginTransaction();
 			try {
@@ -234,7 +235,7 @@ final class SpecialEntitlementAdminService
 			$locks[] = DbLockKeys::absenceTypeCatalog();
 		}
 		foreach ($locks as $lock) {
-			$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement type');
+			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement type');
 		}
 		try {
 			$type = $this->requireType($typeId);
@@ -301,7 +302,7 @@ final class SpecialEntitlementAdminService
 			DbLockKeys::absenceTypeCatalog(),
 		];
 		foreach ($locks as $lock) {
-			$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement type');
+			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement type');
 		}
 		try {
 			$this->db->beginTransaction();
@@ -371,7 +372,7 @@ final class SpecialEntitlementAdminService
 
 		$locks = [DbLockKeys::specialEntitlementType((int)$type->getId()), DbLockKeys::specialEntitlementPolicy((int)$type->getId())];
 		foreach ($locks as $lock) {
-			$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement policy');
+			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement policy');
 		}
 		try {
 			if ($this->policies->findOverlapping((int)$type->getId(), $scopeType, $scopeId, $priority, $from, $to) !== []) {
@@ -463,7 +464,7 @@ final class SpecialEntitlementAdminService
 
 		$locks = [DbLockKeys::specialEntitlementType((int)$type->getId()), DbLockKeys::specialEntitlementPolicy((int)$type->getId())];
 		foreach ($locks as $lock) {
-			$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement policy');
+			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement policy');
 		}
 		try {
 			try {
@@ -665,7 +666,7 @@ final class SpecialEntitlementAdminService
 			}
 		}
 
-		$this->lockingProvider->acquireLock(DbLockKeys::policyCatalog('policy_cohort'), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort catalog');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCatalog('policy_cohort'), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort catalog');
 		try {
 			foreach ($this->cohorts->findAll(true) as $existing) {
 				if (hash_equals((string)$existing->getCode(), $code)) {
@@ -717,7 +718,7 @@ final class SpecialEntitlementAdminService
 	public function updateCohort(int $cohortId, array $params, string $actorUid): array
 	{
 		$this->assertEnabled();
-		$this->lockingProvider->acquireLock(DbLockKeys::policyCohort($cohortId), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCohort($cohortId), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
 		try {
 			try {
 				$cohort = $this->cohorts->find($cohortId);
@@ -793,7 +794,7 @@ final class SpecialEntitlementAdminService
 			throw new SpecialEntitlementException('VALIDATION_ERROR', 'The end date must not be before the start date.', 400, ['effectiveTo' => 'after_from']);
 		}
 
-		$this->lockingProvider->acquireLock(DbLockKeys::policyCohort($cohortId), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCohort($cohortId), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
 		try {
 			if ($this->cohortMemberships->findOverlapping($cohortId, $userId, $from->format('Y-m-d'), $to?->format('Y-m-d')) !== []) {
 				throw new SpecialEntitlementException('ASSIGNMENT_OVERLAP', 'This person already has an overlapping membership.', 409, ['effectiveFrom' => 'overlap']);
@@ -841,7 +842,7 @@ final class SpecialEntitlementAdminService
 		} catch (DoesNotExistException) {
 			throw new SpecialEntitlementException('NOT_FOUND', 'Not found.', 404);
 		}
-		$this->lockingProvider->acquireLock(DbLockKeys::policyCohort((int)$m->getCohortId()), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
+		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCohort((int)$m->getCohortId()), ILockingProvider::LOCK_EXCLUSIVE, 'Policy cohort');
 		try {
 			$m = $this->cohortMemberships->find($membershipId);
 			$this->assertRevision($params, (int)$m->getRevision());
@@ -1030,7 +1031,7 @@ final class SpecialEntitlementAdminService
 			throw new SpecialEntitlementException('NOT_FOUND', 'Not found.', 404);
 		}
 		$lock = $this->periodLockKey($period);
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement period');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement period');
 		try {
 			$period = $this->periods->find($periodId);
 			$this->assertRevision(['revision' => $revision], (int)$period->getRevision());
@@ -1088,7 +1089,7 @@ final class SpecialEntitlementAdminService
 		}
 		$eventKey = $this->eventKey($params['eventKey'] ?? $params['event_key'] ?? null);
 		$lock = $this->periodLockKey($period);
-		$this->lockingProvider->acquireLock($lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement ledger');
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement ledger');
 		try {
 			$period = $this->periods->find($periodId);
 			$this->assertRevision(['revision' => $revision], (int)$period->getRevision());

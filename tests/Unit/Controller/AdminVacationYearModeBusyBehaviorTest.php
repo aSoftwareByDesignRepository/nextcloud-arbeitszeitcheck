@@ -135,7 +135,7 @@ class AdminVacationYearModeBusyBehaviorTest extends TestCase
 		]);
 
 		$lockingMock = $this->createMock(ILockingProvider::class);
-		$lockingMock->expects($this->once())
+		$lockingMock->expects($this->exactly(2)) // DbLockGuard retries once after stale-sweep
 			->method('acquireLock')
 			->with(DbLockKeys::vacationYearMode(), ILockingProvider::LOCK_EXCLUSIVE, $this->anything())
 			->willThrowException(new LockedException(DbLockKeys::vacationYearMode()));

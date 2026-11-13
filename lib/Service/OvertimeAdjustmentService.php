@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Service;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustment;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 
@@ -199,7 +200,7 @@ class OvertimeAdjustmentService
 	private function withOvertimeBalanceLock(string $userId, callable $callback): mixed
 	{
 		$key = DbLockKeys::overtimeBalance($userId);
-		$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
+		DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
 		try {
 			return $callback();
 		} finally {

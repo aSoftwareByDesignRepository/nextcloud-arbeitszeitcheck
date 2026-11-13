@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Db\KioskTerminal;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Kiosk\KioskCrypto;
 use OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TimeCaptureMethodService;
 use OCA\ArbeitszeitCheck\Service\TimeTrackingService;
@@ -81,7 +82,7 @@ class KioskAuthService
 			$this->assertNoActiveEnrollment($terminal->getTerminalId(), $now);
 			$termLock = KioskEnrollmentLockKeys::forTerminal($terminal->getTerminalId());
 			try {
-				$this->lockingProvider->acquireLock($termLock, ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk identify enrollment gate');
+				DbLockGuard::acquire($this->lockingProvider, $termLock, ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk identify enrollment gate');
 			} catch (LockedException) {
 				throw new KioskException('ENROLLMENT_ACTIVE');
 			}
@@ -99,7 +100,7 @@ class KioskAuthService
 			// deleteUnused each other's brand-new unused session.
 			$termLock = KioskEnrollmentLockKeys::forTerminal($terminal->getTerminalId());
 			try {
-				$this->lockingProvider->acquireLock($termLock, ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk identify PIN session gate');
+				DbLockGuard::acquire($this->lockingProvider, $termLock, ILockingProvider::LOCK_EXCLUSIVE, 'Kiosk identify PIN session gate');
 			} catch (LockedException) {
 				throw new KioskException('KIOSK_BUSY');
 			}

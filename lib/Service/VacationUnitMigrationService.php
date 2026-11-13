@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OrgVacationDefaultMapper;
 use OCA\ArbeitszeitCheck\Db\UserVacationPolicyAssignmentMapper;
 use OCA\ArbeitszeitCheck\Db\VacationYearBalanceMapper;
+use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\Lock\ILockingProvider;
@@ -66,7 +67,7 @@ final class VacationUnitMigrationService
 		}
 		$lockKey = DbLockKeys::vacationUnitMigration();
 		try {
-			$locking->acquireLock($lockKey, ILockingProvider::LOCK_SHARED, 'Vacation unit migrate idle probe');
+			DbLockGuard::acquire($locking, $lockKey, ILockingProvider::LOCK_SHARED, 'Vacation unit migrate idle probe');
 			try {
 				$locking->releaseLock($lockKey, ILockingProvider::LOCK_SHARED);
 			} catch (\Throwable) {
@@ -99,7 +100,7 @@ final class VacationUnitMigrationService
 		}
 		$lockKey = DbLockKeys::vacationUnitMigration();
 		try {
-			$locking->acquireLock($lockKey, ILockingProvider::LOCK_SHARED, 'Vacation unit idle shared');
+			DbLockGuard::acquire($locking, $lockKey, ILockingProvider::LOCK_SHARED, 'Vacation unit idle shared');
 		} catch (LockedException $e) {
 			throw new \RuntimeException(Constants::VAC_UNIT_MIGRATE_IN_PROGRESS, 0, $e);
 		}
@@ -138,7 +139,7 @@ final class VacationUnitMigrationService
 		$acquiredHere = false;
 		if (!$alreadyHoldingExclusive && $locking !== null) {
 			try {
-				$locking->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Vacation unit migrate heal');
+				DbLockGuard::acquire($locking, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Vacation unit migrate heal');
 				$acquiredHere = true;
 			} catch (LockedException) {
 				// Migrate (or another heal) holds exclusive — leave pending untouched.
@@ -273,7 +274,7 @@ final class VacationUnitMigrationService
 		$locking = $this->lockingProvider;
 		if ($locking !== null) {
 			try {
-				$locking->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Vacation unit migration');
+				DbLockGuard::acquire($locking, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'Vacation unit migration');
 			} catch (LockedException $e) {
 				throw new \RuntimeException('VAC_UNIT_MIGRATE_IN_PROGRESS', 0, $e);
 			}

@@ -165,7 +165,7 @@ final class DedicatedAppAdminContractTest extends TestCase
 		$src = (string)file_get_contents($this->root . '/lib/Service/MobileSeatService.php');
 		$this->assertStringContainsString('DbLockKeys::mobileSeatCapacity()', $src);
 		$this->assertStringContainsString('LOCK_EXCLUSIVE', $src);
-		$this->assertStringContainsString('acquireLock', $src);
+		$this->assertStringContainsString('DbLockGuard::acquire(', $src);
 		$this->assertStringContainsString('releaseLock', $src);
 	}
 

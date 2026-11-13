@@ -325,7 +325,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 	<screenshot>https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/appstore/04.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/appstore/05.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/refs/heads/master/screenshots/appstore/06.png</screenshot>
-	<version>1.9.11</version>
+	<version>1.10.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="info@software-by-design.de" homepage="http://nextcloud.software-by-design.de">Software by Design GbR</author>
 

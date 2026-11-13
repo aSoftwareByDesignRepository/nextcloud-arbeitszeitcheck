@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 1.10.0 - 2026-11-13
+
 
 ### Added
 
@@ -74,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- database lock rows left behind by killed requests no longer block
+  catalog and admin mutations for up to an hour: acquisitions now sweep
+  provably-expired rows once and retry (genuine contention unchanged)
 - **automatic break deduction evaluated on the resulting net working
   time** (minimal-consistent fixpoint `required(P − d) ≤ d`): a ~9h05m
   presence now inserts the statutory 30 min instead of 45 — the

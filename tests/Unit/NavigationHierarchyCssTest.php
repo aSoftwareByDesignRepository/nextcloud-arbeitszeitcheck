@@ -62,6 +62,22 @@ final class NavigationHierarchyCssTest extends TestCase {
 		self::assertStringContainsString('azc-nav-rail-left) - var(--azc-nav-item-inset)', $css);
 	}
 
+	public function testDisclosureChevronPinsToTrailingEdge(): void {
+		$css = $this->css();
+		// <button> keeps intrinsic sizing; the li must be a flex column so the
+		// toggle row fills the sidebar instead of hugging its label text.
+		self::assertMatchesRegularExpression(
+			'/\.nav-item-has-children\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/s',
+			$css,
+			'.nav-item-has-children must be a flex column (button rows must fill the sidebar)'
+		);
+		self::assertMatchesRegularExpression(
+			'/\.nav-parent-chevron\s*\{[^}]*margin-inline-start:\s*auto/s',
+			$css,
+			'.nav-parent-chevron must pin to the trailing edge via margin-inline-start:auto'
+		);
+	}
+
 	public function testNavigationTemplateExposesChevronsOnAccordions(): void {
 		$src = (string)file_get_contents(dirname(__DIR__, 2) . '/templates/common/navigation.php');
 		self::assertSame(2, substr_count($src, 'class="nav-parent-chevron"'));

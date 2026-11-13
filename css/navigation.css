@@ -115,6 +115,13 @@ html.azc-nav-scroll-pending #app-navigation .nav-menu {
     list-style: none;
     margin: 0;
     padding: 0;
+    /* Load-bearing: a <button> keeps intrinsic (shrink-to-fit) sizing even
+     * with display:flex + width:auto, so the toggle would hug its text and
+     * the chevron would drift row to row. As a stretched flex item the row
+     * fills the sidebar and the chevron pins to one shared trailing edge. */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 .nav-parent-toggle,

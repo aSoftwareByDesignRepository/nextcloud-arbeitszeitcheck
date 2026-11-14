@@ -236,7 +236,6 @@ class AbsenceHalfDayNonVacationTest extends TestCase
 		);
 		$ref = new ReflectionClass($this->service);
 		$p = $ref->getProperty('specialEntitlementService');
-		$p->setAccessible(true);
 		$p->setValue($this->service, $special);
 	}
 

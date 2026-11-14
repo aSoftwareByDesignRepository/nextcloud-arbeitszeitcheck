@@ -619,10 +619,8 @@ class AbsenceServiceTest extends TestCase
 
 		$ref = new \ReflectionClass($this->service);
 		$unitProp = $ref->getProperty('vacationUnitService');
-		$unitProp->setAccessible(true);
 		$unitProp->setValue($this->service, $unit);
 		$debitProp = $ref->getProperty('vacationHoursDebitService');
-		$debitProp->setAccessible(true);
 		$debitProp->setValue($this->service, $debit);
 
 		$this->expectException(\Exception::class);
@@ -2295,7 +2293,6 @@ class AbsenceServiceTest extends TestCase
 	public function testValidateAbsenceTypeRulesEnforcesPerTypeCaps(): void
 	{
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		$d = static fn (int $n): \DateTime => new \DateTime('2026-01-01 +' . ($n - 1) . ' days');
 		$start = new \DateTime('2026-01-01');
 
@@ -2362,7 +2359,6 @@ class AbsenceServiceTest extends TestCase
 	{
 		[$service] = $this->serviceWithCompGuards();
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		$this->expectException(\OCA\ArbeitszeitCheck\Exception\BusinessRuleException::class);
 		$this->expectExceptionMessage('whole days');
 		$m->invoke(
@@ -2382,7 +2378,6 @@ class AbsenceServiceTest extends TestCase
 			'hours' => 0.0, 'one_day_hours' => 0.0, 'average_daily' => 0.0, 'basis' => 'none',
 		]);
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		try {
 			$m->invoke(
 				$service,
@@ -2408,7 +2403,6 @@ class AbsenceServiceTest extends TestCase
 		$entry = $this->createMock(\OCA\ArbeitszeitCheck\Db\TimeEntry::class);
 		$entries->method('findByUserAndDateRange')->willReturn([$entry]);
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		try {
 			$m->invoke(
 				$service,
@@ -2432,7 +2426,6 @@ class AbsenceServiceTest extends TestCase
 		]);
 		$entries->method('findByUserAndDateRange')->willReturn([]);
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		$m->invoke(
 			$service,
 			Absence::TYPE_OVERTIME_COMP,
@@ -2448,7 +2441,6 @@ class AbsenceServiceTest extends TestCase
 	{
 		[$service] = $this->serviceWithCompGuards();
 		$m = new \ReflectionMethod(AbsenceService::class, 'validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		try {
 			$m->invoke(
 				$service,
@@ -2769,7 +2761,6 @@ class AbsenceServiceTest extends TestCase
 		// same clock source the service uses keeps this deterministic in
 		// any storage TZ (TimeZoneService is final, no mock).
 		$prop = new \ReflectionProperty(AbsenceService::class, 'timeZoneService');
-		$prop->setAccessible(true);
 		[$todayStart] = $prop->getValue($this->service)->todayWindowInStorage();
 		$absence = $this->runningVacation();
 		$absence->setStartDate((clone $todayStart)->modify('-5 days'));

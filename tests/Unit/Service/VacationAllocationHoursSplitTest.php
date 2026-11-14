@@ -64,7 +64,6 @@ class VacationAllocationHoursSplitTest extends TestCase
 			'holidayCalendarService' => $this->createMock(\OCA\ArbeitszeitCheck\Service\HolidayService::class),
 		] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($svc, $val);
 		}
 		$holiday = $ref->getProperty('holidayCalendarService')->getValue($svc);
@@ -88,7 +87,6 @@ class VacationAllocationHoursSplitTest extends TestCase
 		$absence->setDurationHours(38.5);
 
 		$m = $ref->getMethod('splitConsumptionForRangeSegment');
-		$m->setAccessible(true);
 		$split = $m->invoke(
 			$svc,
 			'alice',
@@ -126,13 +124,10 @@ class VacationAllocationHoursSplitTest extends TestCase
 		/** @var VacationAllocationService $svc */
 		$svc = $ref->newInstanceWithoutConstructor();
 		$p = $ref->getProperty('vacationUnitService');
-		$p->setAccessible(true);
 		$p->setValue($svc, $unit);
 		$debitP = $ref->getProperty('vacationHoursDebitService');
-		$debitP->setAccessible(true);
 		$debitP->setValue($svc, null);
 		$h = $ref->getProperty('holidayCalendarService');
-		$h->setAccessible(true);
 		$holiday = $this->createMock(\OCA\ArbeitszeitCheck\Service\HolidayService::class);
 		$holiday->method('computeWorkingDaysForUser')->willReturn(0.0);
 		$h->setValue($svc, $holiday);
@@ -140,7 +135,6 @@ class VacationAllocationHoursSplitTest extends TestCase
 		$absence = new Absence();
 		$absence->setDurationHours(8.0);
 		$m = $ref->getMethod('splitConsumptionForRangeSegment');
-		$m->setAccessible(true);
 		$split = $m->invoke(
 			$svc,
 			'alice',

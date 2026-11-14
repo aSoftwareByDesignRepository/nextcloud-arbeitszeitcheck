@@ -16,7 +16,6 @@ final class FrontEndAssetServiceTest extends TestCase
 		$ref = new \ReflectionClass(FrontEndAssetService::class);
 		foreach (['coreRegistered', 'translationsRegistered'] as $property) {
 			$prop = $ref->getProperty($property);
-			$prop->setAccessible(true);
 			$prop->setValue(null, false);
 		}
 		parent::tearDown();
@@ -28,7 +27,6 @@ final class FrontEndAssetServiceTest extends TestCase
 
 		$ref = new \ReflectionClass(Util::class);
 		$scriptsProp = $ref->getProperty('scripts');
-		$scriptsProp->setAccessible(true);
 		/** @var array<string, list<string>> $scripts */
 		$scripts = $scriptsProp->getValue();
 		$azc = $scripts[Application::APP_ID] ?? [];

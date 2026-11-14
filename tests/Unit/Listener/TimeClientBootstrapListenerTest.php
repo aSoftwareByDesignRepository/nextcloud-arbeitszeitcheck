@@ -21,7 +21,6 @@ class TimeClientBootstrapListenerTest extends TestCase {
 		$ref = new \ReflectionClass(TimeClientBootstrap::class);
 		foreach (['configRegistered', 'scriptsRegistered'] as $property) {
 			$prop = $ref->getProperty($property);
-			$prop->setAccessible(true);
 			$prop->setValue(null, false);
 		}
 		parent::tearDown();

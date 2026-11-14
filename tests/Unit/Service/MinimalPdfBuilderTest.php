@@ -47,7 +47,6 @@ class MinimalPdfBuilderTest extends TestCase
 	{
 		// last-resort mapper used when mbstring+iconv are unavailable
 		$m = new \ReflectionMethod(MinimalPdfBuilder::class, 'utf8ToWindows1252ByCodepoint');
-		$m->setAccessible(true);
 
 		$this->assertSame("\x80", $m->invoke(null, "\u{20AC}"));           // Euro
 		$this->assertSame("\x91\x92", $m->invoke(null, "\u{2018}\u{2019}")); // quotes

@@ -372,7 +372,6 @@ class AbsenceHalfDayDaysModeTest extends TestCase
 		$ref = new ReflectionClass($this->service);
 		foreach (['vacationUnitService' => $unit, 'config' => $config] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($this->service, $val);
 		}
 

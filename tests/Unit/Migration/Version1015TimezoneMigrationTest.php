@@ -40,7 +40,6 @@ class Version1015TimezoneMigrationTest extends TestCase
 			$this->createMock(IConfig::class),
 		);
 		$method = new \ReflectionMethod(Version1015Date20260415120000::class, 'convertUtcStringToTimezone');
-		$method->setAccessible(true);
 
 		return [$migration, $method];
 	}

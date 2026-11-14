@@ -73,7 +73,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 			$this->assertTrue(true);
 		} finally {
@@ -109,7 +108,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -172,7 +170,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -241,7 +238,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -341,7 +337,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -453,7 +448,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -564,7 +558,6 @@ class BreakReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);

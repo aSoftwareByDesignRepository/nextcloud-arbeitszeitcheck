@@ -33,7 +33,6 @@ class KioskMaintenanceJobTest extends TestCase
 		$job = new KioskMaintenanceJob($time, $terminals, $enrollments, $logger, $this->createMock(ILockingProvider::class));
 		$ref = new ReflectionClass($job);
 		$method = $ref->getMethod('run');
-		$method->setAccessible(true);
 		$method->invoke($job, null);
 	}
 }

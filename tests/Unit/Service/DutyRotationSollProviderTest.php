@@ -244,7 +244,6 @@ final class DutyRotationSollProviderTest extends TestCase
 	{
 		$svc = $this->svc();
 		$rm = new \ReflectionMethod(DutyRotationSollProvider::class, 'isoMonday');
-		$rm->setAccessible(true);
 		// Sunday 2025-02-09 -> Monday 2025-02-03
 		$this->assertSame('2025-02-03', $rm->invoke($svc, new \DateTime('2025-02-09'))->format('Y-m-d'));
 		// already Monday stays

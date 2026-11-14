@@ -4241,20 +4241,17 @@ class AdminControllerTest extends TestCase
 	{
 		$ref = new \ReflectionClass($this->controller);
 		$teamMapper = $ref->getProperty('teamMapper');
-		$teamMapper->setAccessible(true);
 		/** @var \PHPUnit\Framework\MockObject\MockObject $tm */
 		$tm = $teamMapper->getValue($this->controller);
 		$tm->method('findAll')->willReturn([]);
 		$tm->method('find')->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
 
 		$memberMapper = $ref->getProperty('teamMemberMapper');
-		$memberMapper->setAccessible(true);
 		/** @var \PHPUnit\Framework\MockObject\MockObject $mm */
 		$mm = $memberMapper->getValue($this->controller);
 		$mm->method('findByTeamId')->willReturn([]);
 
 		$managerMapper = $ref->getProperty('teamManagerMapper');
-		$managerMapper->setAccessible(true);
 		/** @var \PHPUnit\Framework\MockObject\MockObject $mg */
 		$mg = $managerMapper->getValue($this->controller);
 		$mg->method('findByTeamId')->willReturn([]);
@@ -4406,7 +4403,6 @@ class AdminControllerTest extends TestCase
 		$orphanLevel->setCreatedAt(new \DateTime());
 
 		$rp = new \ReflectionProperty($this->controller, 'teamMapper');
-		$rp->setAccessible(true);
 		$teamMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\TeamMapper::class);
 		$teamMapper->method('findAll')->willReturn([$parent, $child, $orphanLevel]);
 		$rp->setValue($this->controller, $teamMapper);
@@ -4428,7 +4424,6 @@ class AdminControllerTest extends TestCase
 			'ok' => false, 'error' => 'team_not_found', 'httpStatus' => 404,
 		]);
 		$rp = new \ReflectionProperty($this->controller, 'adminBatchMutationService');
-		$rp->setAccessible(true);
 		$rp->setValue($this->controller, $batch);
 
 		$this->request->method('getParams')->willReturn(['userIds' => ['alice']]);
@@ -4450,7 +4445,6 @@ class AdminControllerTest extends TestCase
 			'dryRun' => false,
 		]);
 		$rp = new \ReflectionProperty($this->controller, 'adminBatchMutationService');
-		$rp->setAccessible(true);
 		$rp->setValue($this->controller, $batch);
 
 		$this->request->method('getParams')->willReturn([
@@ -4667,7 +4661,6 @@ class AdminControllerTest extends TestCase
 	public function testIsVacationUnitSchemaOutdatedErrorDetection(): void
 	{
 		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\AdminController::class, 'isVacationUnitSchemaOutdatedError');
-		$m->setAccessible(true);
 
 		$this->assertTrue($m->invoke($this->controller,
 			new \RuntimeException(\OCA\ArbeitszeitCheck\Constants::VAC_UNIT_SCHEMA_OUTDATED)));
@@ -4689,7 +4682,6 @@ class AdminControllerTest extends TestCase
 	public function testIsMissingTableExceptionDetection(): void
 	{
 		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\AdminController::class, 'isMissingTableException');
-		$m->setAccessible(true);
 
 		$this->assertTrue($m->invoke($this->controller, new \Exception('no such table: at_teams')));
 		$this->assertTrue($m->invoke($this->controller, new \Exception("Table 'oc_at_teams' doesn't exist")));

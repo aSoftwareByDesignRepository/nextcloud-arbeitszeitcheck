@@ -60,10 +60,103 @@
 .azc-transfer-last { margin: 0 0 var(--azc-space-4, 16px); }
 .azc-fieldset { border: 0; padding: 0; margin: 0 0 var(--azc-space-3, 12px); }
 .azc-fieldset legend { font-weight: 600; padding: 0 0 var(--azc-space-2, 8px); }
-.azc-radio { display: flex; gap: var(--azc-space-2, 8px); align-items: flex-start; min-height: 44px; padding: var(--azc-space-1, 4px) 0; }
-.azc-radio input { margin-top: 4px; min-width: 20px; min-height: 20px; }
-.azc-radio span { min-width: 0; }
-.azc-radio--danger strong { color: var(--color-element-error, #e9322d); }
+/* Mode choice cards — DESIGN-SYSTEM §3.6.5a (the AZC azc-choice-card
+   recipe): one labelled card per option, title + hint copy, checked =
+   primary border + tint, destructive = --danger. The whole card is the
+   hit target; bare radio rows + red text are banned for this control. */
+.azc-choice-cards {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--azc-space-3, 12px);
+	width: 100%;
+	min-width: 0;
+}
+@media (min-width: 520px) {
+	.azc-choice-cards { grid-template-columns: 1fr 1fr; }
+}
+.azc-choice-card {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--azc-space-3, 12px);
+	width: 100%;
+	min-width: 0;
+	min-height: 48px;
+	margin: 0;
+	padding: var(--azc-space-4, 16px);
+	border: 2px solid var(--azc-form-border, var(--color-border-maxcontrast, #767676));
+	border-radius: var(--azc-radius-md, 8px);
+	background: var(--color-main-background, #fff);
+	box-sizing: border-box;
+	cursor: pointer;
+	user-select: none;
+	text-align: start;
+}
+.azc-choice-card > input[type="radio"] {
+	/* Beat NC core input width/min-height clickable-area defaults */
+	flex: 0 0 1.25rem;
+	width: 1.25rem;
+	height: 1.25rem;
+	min-width: 1.25rem;
+	min-height: 1.25rem;
+	max-width: 1.25rem;
+	max-height: 1.25rem;
+	/* Optical align with the first title line */
+	margin: calc((1.125rem * 1.3 - 1.25rem) / 2) 0 0;
+	padding: 0;
+	accent-color: var(--color-primary-element, #0082c9);
+}
+.azc-choice-card__copy {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1 1 auto;
+	line-height: 1.3;
+}
+.azc-choice-card__title {
+	font-size: 1.05em;
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--color-main-text, #222);
+}
+.azc-choice-card__hint {
+	font-size: .92em;
+	line-height: 1.4;
+	color: var(--color-text-maxcontrast, #6b6b6b);
+}
+.azc-choice-card:not(:has(> input[type="radio"]:disabled)):hover {
+	border-color: var(--color-primary-element, #0082c9);
+}
+.azc-choice-card:focus-within {
+	outline: 2px solid var(--color-primary-element, #0082c9);
+	outline-offset: 2px;
+}
+.azc-choice-card:has(> input[type="radio"]:checked) {
+	border-color: var(--color-primary-element, #0082c9);
+	background: color-mix(in srgb, var(--color-primary-element, #0082c9) 8%, var(--color-main-background, #fff));
+}
+.azc-choice-card:has(> input[type="radio"]:checked) .azc-choice-card__hint {
+	color: var(--color-main-text, #222);
+}
+.azc-choice-card--danger .azc-choice-card__title {
+	color: var(--color-error-text, var(--color-element-error, #e9322d));
+}
+.azc-choice-card--danger:not(:has(> input[type="radio"]:disabled)):hover {
+	border-color: var(--color-element-error, #e9322d);
+}
+.azc-choice-card--danger:has(> input[type="radio"]:checked) {
+	border-color: var(--color-element-error, #e9322d);
+	background: color-mix(in srgb, var(--color-element-error, #e9322d) 10%, var(--color-main-background, #fff));
+}
+.azc-choice-card:has(> input[type="radio"]:disabled) {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+.azc-choice-card:has(> input[type="radio"]:disabled) input { cursor: not-allowed; }
+@media (forced-colors: active) {
+	.azc-choice-card { border-color: ButtonBorder; }
+	.azc-choice-card:has(> input[type="radio"]:checked) { outline: 2px solid Highlight; }
+}
 /* NC core pins input[type=file] to width:auto (inputs.css, 0-1-1) — the
    intrinsic ~320px min-size overflows narrow sheets. check-shell
    form-controls.css re-pins it at #content.app-* #app-content level (2-2-1)
@@ -129,7 +222,7 @@ dialog.azc-dialog:not([open]) {
 }
 .azc-dialog__footer .azc-actions { display: flex; gap: var(--azc-space-3, 12px); justify-content: flex-end; }
 .azc-transfer-report__verdict { font-size: 1.05rem; font-weight: 600; }
-.azc-transfer-report__verdict.is-danger { color: var(--color-element-error, #e9322d); }
+.azc-transfer-report__verdict.is-danger { color: var(--color-error-text, var(--color-element-error, var(--color-error))); }
 .azc-transfer-group { margin: var(--azc-space-2, 8px) 0; }
 .azc-transfer-group summary {
 	cursor: pointer;
@@ -139,7 +232,7 @@ dialog.azc-dialog:not([open]) {
 	font-weight: 600;
 }
 .azc-transfer-group.is-security summary {
-	color: var(--color-element-error, #e9322d);
+	color: var(--color-error-text, var(--color-element-error, var(--color-error)));
 }
 .azc-transfer-group ul { margin: 0 0 var(--azc-space-2, 8px); padding-inline-start: 1.5rem; }
 .azc-transfer-group li { padding: 2px 0; font-family: var(--azc-mono, monospace); font-size: .92em; word-break: break-all; }

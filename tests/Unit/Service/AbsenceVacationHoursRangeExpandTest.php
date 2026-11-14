@@ -27,7 +27,6 @@ class AbsenceVacationHoursRangeExpandTest extends TestCase
 		$ref = new ReflectionClass($svc);
 		/** @var ReflectionMethod $m */
 		$m = $ref->getMethod('resolveVacationDurationHours');
-		$m->setAccessible(true);
 		return (float)$m->invoke($svc, $data, $workingDays);
 	}
 
@@ -51,15 +50,12 @@ class AbsenceVacationHoursRangeExpandTest extends TestCase
 		/** @var AbsenceService $svc */
 		$svc = $ref->newInstanceWithoutConstructor();
 		$prop = $ref->getProperty('vacationUnitService');
-		$prop->setAccessible(true);
 		$prop->setValue($svc, $unit);
 		$l10n = $this->createMock(\OCP\IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $s) => $s);
 		$l10nProp = $ref->getProperty('l10n');
-		$l10nProp->setAccessible(true);
 		$l10nProp->setValue($svc, $l10n);
 		$debitProp = $ref->getProperty('vacationHoursDebitService');
-		$debitProp->setAccessible(true);
 		$debitProp->setValue($svc, null);
 		return $svc;
 	}
@@ -115,11 +111,9 @@ class AbsenceVacationHoursRangeExpandTest extends TestCase
 		]);
 		$ref = new ReflectionClass($svc);
 		$prop = $ref->getProperty('vacationHoursDebitService');
-		$prop->setAccessible(true);
 		$prop->setValue($svc, $debit);
 
 		$m = $ref->getMethod('resolveVacationDurationHours');
-		$m->setAccessible(true);
 		$start = new \DateTimeImmutable('2026-08-04'); // Tue
 		$end = new \DateTimeImmutable('2026-08-07'); // Fri
 		// Client sum Tue–Fri nets without holiday weight.

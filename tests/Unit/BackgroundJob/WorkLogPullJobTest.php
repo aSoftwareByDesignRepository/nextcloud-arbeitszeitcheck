@@ -22,7 +22,6 @@ class WorkLogPullJobTest extends TestCase
 	private function invokeRun(WorkLogPullJob $job): void
 	{
 		$m = new \ReflectionMethod($job, 'run');
-		$m->setAccessible(true);
 		$m->invoke($job, null);
 	}
 

@@ -29,7 +29,6 @@ class OutlookIcalHalfDayLabelTest extends TestCase
 		$ref = new ReflectionClass(OutlookIcalSubscriptionFeedService::class);
 		$svc = $ref->newInstanceWithoutConstructor();
 		$m = $ref->getMethod('halfDayLabel');
-		$m->setAccessible(true);
 
 		$absence = new Absence();
 		$absence->setStartDate(new \DateTime($start));

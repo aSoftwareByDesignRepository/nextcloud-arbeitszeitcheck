@@ -53,7 +53,6 @@ class AbsenceShortenShapeDebitTest extends TestCase
 		);
 		foreach (['scheduledWorkdayCounter' => null, 'holidayCalendarService' => $holidays] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($svc, $val);
 		}
 		$this->svc = $svc;
@@ -63,7 +62,6 @@ class AbsenceShortenShapeDebitTest extends TestCase
 	{
 		$ref = new ReflectionClass($this->svc);
 		$m = $ref->getMethod('applyShortenedRangeShape');
-		$m->setAccessible(true);
 		return (float)$m->invoke($this->svc, $absence, 'alice', new \DateTime($newEndYmd));
 	}
 

@@ -126,7 +126,6 @@ class PaidBreakRecomputeJobTest extends TestCase
 	{
 		$ref = new ReflectionClass($job);
 		$m = $ref->getMethod('run');
-		$m->setAccessible(true);
 		$m->invoke($job, $argument);
 	}
 

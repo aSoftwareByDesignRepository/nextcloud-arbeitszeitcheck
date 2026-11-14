@@ -21,7 +21,6 @@ class AuditLogCaptureSourceTest extends TestCase
 	{
 		$mapper = new AuditLogMapper($this->createMock(IDBConnection::class));
 		$method = new ReflectionMethod(AuditLogMapper::class, 'extractCaptureSource');
-		$method->setAccessible(true);
 
 		$this->assertSame(
 			Constants::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
@@ -36,7 +35,6 @@ class AuditLogCaptureSourceTest extends TestCase
 	{
 		$mapper = new AuditLogMapper($this->createMock(IDBConnection::class));
 		$method = new ReflectionMethod(AuditLogMapper::class, 'extractCaptureSource');
-		$method->setAccessible(true);
 
 		// MH-P24 channel attribution promotes to the indexed column.
 		foreach (['widget', 'kiosk', 'api', 'sync'] as $channel) {

@@ -13,7 +13,6 @@ class CSPServiceTest extends TestCase
 	private function prop(object $obj, string $name): mixed
 	{
 		$p = new \ReflectionProperty(ContentSecurityPolicy::class, $name);
-		$p->setAccessible(true);
 		return $p->getValue($obj);
 	}
 

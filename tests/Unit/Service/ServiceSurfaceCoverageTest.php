@@ -136,7 +136,6 @@ final class ServiceSurfaceCoverageTest extends TestCase
 	{
 		$target = $this->serviceFor($class);
 		$rm = new \ReflectionMethod($class, $method);
-		$rm->setAccessible(true);
 		try {
 			$rm->invokeArgs($target, $this->resolveArgs($args));
 		} catch (BusinessRuleException | KioskException | DoesNotExistException | MultipleObjectsReturnedException | \InvalidArgumentException $e) {

@@ -754,7 +754,6 @@ class TimeEntryControllerTest extends TestCase
 		// rebuild controller seam: projectCheck denies the attach
 		$pc = (function (): void {
 			$rp = new \ReflectionProperty($this->controller, 'projectCheckIntegration');
-			$rp->setAccessible(true);
 			$mock = $this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class);
 			$mock->method('userMayAttachProjectCheckProjectToOwnTime')->willReturn(false);
 			$rp->setValue($this->controller, $mock);
@@ -1889,7 +1888,6 @@ class TimeEntryControllerTest extends TestCase
 	{
 		$ref = new \ReflectionClass($this->controller);
 		$prop = $ref->getProperty('timeCaptureMethodService');
-		$prop->setAccessible(true);
 		$prop->setValue($this->controller, $service);
 	}
 
@@ -2464,7 +2462,6 @@ class TimeEntryControllerTest extends TestCase
 	public function testInvalidWorkLocationResponseShape(): void
 	{
 		$m = new \ReflectionMethod(\OCA\ArbeitszeitCheck\Controller\TimeEntryController::class, 'invalidWorkLocationResponse');
-		$m->setAccessible(true);
 
 		/** @var \OCP\AppFramework\Http\JSONResponse $response */
 		$response = $m->invoke($this->controller);

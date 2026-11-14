@@ -63,7 +63,6 @@ class AbsenceCustomMaxDaysDebitTest extends TestCase
 			'specialEntitlementService' => null,
 		] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($svc, $val);
 		}
 		$this->svc = $svc;
@@ -78,7 +77,6 @@ class AbsenceCustomMaxDaysDebitTest extends TestCase
 		$cat = new ReflectionClass(AbsenceTypeCatalog::class);
 		foreach (['customLoaded' => true, 'customCache' => ['custom_training' => $custom]] as $prop => $val) {
 			$p = $cat->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue(null, $val);
 		}
 	}
@@ -92,7 +90,6 @@ class AbsenceCustomMaxDaysDebitTest extends TestCase
 	{
 		$ref = new ReflectionClass($this->svc);
 		$m = $ref->getMethod('customMaxDaysSatisfiedByDebit');
-		$m->setAccessible(true);
 		return (bool)$m->invoke($this->svc, $type, new \DateTime($start), new \DateTime($end), $data, $userId, $maxDays);
 	}
 
@@ -104,7 +101,6 @@ class AbsenceCustomMaxDaysDebitTest extends TestCase
 	{
 		$ref = new ReflectionClass($this->svc);
 		$m = $ref->getMethod('validateAbsenceTypeRules');
-		$m->setAccessible(true);
 		try {
 			$m->invoke($this->svc, $type, new \DateTime($start), new \DateTime($end), $data, $userId);
 			return null;

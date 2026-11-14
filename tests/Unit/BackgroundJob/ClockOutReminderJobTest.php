@@ -88,7 +88,6 @@ class ClockOutReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 			$this->assertTrue(true);
 		} finally {
@@ -123,7 +122,6 @@ class ClockOutReminderJobTest extends TestCase
 
 			$ref = new ReflectionClass($job);
 			$method = $ref->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);
@@ -183,7 +181,6 @@ class ClockOutReminderJobTest extends TestCase
 			);
 
 			$method = (new ReflectionClass($job))->getMethod('run');
-			$method->setAccessible(true);
 			$method->invoke($job, null);
 		} finally {
 			date_default_timezone_set($previousTz);

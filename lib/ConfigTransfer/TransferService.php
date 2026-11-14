@@ -23,7 +23,6 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\ConfigTransfer;
 
-use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\App\IAppManager;
 use OCP\Files\IRootFolder;
@@ -324,7 +323,7 @@ final class TransferService
 		// ── exclusive mutex — one transfer at a time, whoever runs it ──
 		$lockKey = $this->appId . self::LOCK_SUFFIX;
 		try {
-			DbLockGuard::acquire($this->locking, $lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'config transfer apply');
+			$this->locking->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE, 'config transfer apply');
 		} catch (LockedException $e) {
 			$state = $this->receiptStore->jobState() ?? [];
 			throw new TransferException('TRANSFER_IN_PROGRESS', [
@@ -341,7 +340,7 @@ final class TransferService
 		$backupLockAcquired = false;
 		if (!$backupLockHeld) {
 			try {
-				DbLockGuard::acquire($this->locking, 
+				$this->locking->acquireLock(
 					UpgradeBackupService::LOCK_KEY,
 					ILockingProvider::LOCK_SHARED,
 					'config transfer apply',

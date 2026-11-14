@@ -211,7 +211,6 @@ class TeamResolverServiceTest extends TestCase
 	private function injectPermissionService($permissionService): void
 	{
 		$ref = new \ReflectionProperty($this->service, 'permissionServiceInstance');
-		$ref->setAccessible(true);
 		$ref->setValue($this->service, $permissionService);
 	}
 

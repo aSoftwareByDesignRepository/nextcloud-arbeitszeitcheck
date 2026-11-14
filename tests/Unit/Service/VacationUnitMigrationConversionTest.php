@@ -118,7 +118,6 @@ class VacationUnitMigrationConversionTest extends TestCase
 
 		$ref = new \ReflectionClass($svc);
 		$method = $ref->getMethod('rescaleCarryoverMaxConfig');
-		$method->setAccessible(true);
 		$method->invoke($svc, 8.0, true);
 		$this->assertSame('40', $stored['vacation_carryover_max_days']);
 		$method->invoke($svc, 8.0, false);
@@ -324,7 +323,6 @@ class VacationUnitMigrationConversionTest extends TestCase
 		], $updates);
 		$svc = $this->migrationServiceWith($db);
 		$m = new \ReflectionMethod(VacationUnitMigrationService::class, 'rescaleUserSettingsVacationDays');
-		$m->setAccessible(true);
 		$m->invoke($svc, 8.0, true);
 		// only the valid non-empty numeric row produced an UPDATE (garbage skipped, not zeroed)
 		$this->assertCount(1, $updates);
@@ -341,7 +339,6 @@ class VacationUnitMigrationConversionTest extends TestCase
 		], $updates);
 		$svc = $this->migrationServiceWith($db);
 		$m = new \ReflectionMethod(VacationUnitMigrationService::class, 'rescaleTariffRuleModuleDayAmounts');
-		$m->setAccessible(true);
 		$m->invoke($svc, 8.0, true);
 		// base_formula + additional_entitlements updated; unknown type + bad JSON skipped
 		$this->assertCount(2, $updates);

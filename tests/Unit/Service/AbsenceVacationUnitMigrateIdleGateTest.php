@@ -67,17 +67,14 @@ class AbsenceVacationUnitMigrateIdleGateTest extends TestCase
 	private function invokeAssert(AbsenceService $svc): void
 	{
 		$m = new ReflectionMethod(AbsenceService::class, 'assertVacationUnitMigrationIdle');
-		$m->setAccessible(true);
 		$m->invoke($svc);
 	}
 
 	private function invokeReleaseShared(AbsenceService $svc): void
 	{
 		$m = new ReflectionMethod(AbsenceService::class, 'releaseVacationUnitMigrationSharedLock');
-		$m->setAccessible(true);
 		$m->invoke($svc);
 		$m2 = new ReflectionMethod(AbsenceService::class, 'releaseVacationYearModeSharedLock');
-		$m2->setAccessible(true);
 		$m2->invoke($svc);
 	}
 
@@ -187,10 +184,8 @@ class AbsenceVacationUnitMigrateIdleGateTest extends TestCase
 			$acquired
 		);
 		$prop = new ReflectionProperty(AbsenceService::class, 'heldVacationUnitMigrateSharedLock');
-		$prop->setAccessible(true);
 		$this->assertSame(DbLockKeys::vacationUnitMigration(), $prop->getValue($svc));
 		$yearProp = new ReflectionProperty(AbsenceService::class, 'heldVacationYearModeSharedLock');
-		$yearProp->setAccessible(true);
 		$this->assertSame(DbLockKeys::vacationYearMode(), $yearProp->getValue($svc));
 		$this->invokeReleaseShared($svc);
 		$this->assertNull($prop->getValue($svc));

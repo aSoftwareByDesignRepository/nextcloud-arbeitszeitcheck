@@ -63,7 +63,6 @@ class ArbzgRestMidnightMutationTest extends TestCase
 
 		$ref = new \ReflectionClass($service);
 		$prop = $ref->getProperty('timeEntryMapper');
-		$prop->setAccessible(true);
 		$prop->setValue($service, $mapper);
 
 		$last = new TimeEntry();
@@ -88,7 +87,6 @@ class ArbzgRestMidnightMutationTest extends TestCase
 
 		$ref = new \ReflectionClass($service);
 		$prop = $ref->getProperty('timeEntryMapper');
-		$prop->setAccessible(true);
 		$prop->setValue($service, $mapper);
 
 		$last = new TimeEntry();
@@ -113,7 +111,6 @@ class ArbzgRestMidnightMutationTest extends TestCase
 
 		$ref = new \ReflectionClass($service);
 		$prop = $ref->getProperty('timeEntryMapper');
-		$prop->setAccessible(true);
 		$prop->setValue($service, $mapper);
 
 		$tzSvc = $ref->getProperty('timeZoneService')->getValue($service);
@@ -154,7 +151,6 @@ class ArbzgRestMidnightMutationTest extends TestCase
 
 		$ref = new \ReflectionClass($service);
 		$prop = $ref->getProperty('timeEntryMapper');
-		$prop->setAccessible(true);
 		$prop->setValue($service, $mapper);
 
 		$tzSvc = $ref->getProperty('timeZoneService')->getValue($service);

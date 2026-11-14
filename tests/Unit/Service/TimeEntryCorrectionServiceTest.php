@@ -537,7 +537,6 @@ class TimeEntryCorrectionServiceTest extends TestCase
 	{
 		$entry = $this->buildEntry();
 		$reflection = new \ReflectionMethod($this->service, 'applyProposal');
-		$reflection->setAccessible(true);
 		$reflection->invoke($this->service, $entry, [
 			'breaks' => [
 				['start' => '2026-01-15T12:00:00+00:00', 'end' => '2026-01-15T12:05:00+00:00'], // 5min - dropped
@@ -558,7 +557,6 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		]));
 
 		$reflection = new \ReflectionMethod($this->service, 'applyProposal');
-		$reflection->setAccessible(true);
 		$reflection->invoke($this->service, $entry, ['breaks' => []]);
 
 		$this->assertNull($entry->getBreaks());
@@ -570,7 +568,6 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		$entry->setPaidBreakSeconds(1800);
 
 		$reflection = new \ReflectionMethod($this->service, 'applyProposal');
-		$reflection->setAccessible(true);
 		$reflection->invoke($this->service, $entry, [
 			'description' => 'new desc',
 			'paid_break_seconds' => 99999,

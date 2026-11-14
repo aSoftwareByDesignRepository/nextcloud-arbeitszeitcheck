@@ -1348,7 +1348,6 @@ class AbsenceControllerTest extends TestCase
 			'end_date' => '01.06.2024',
 		]);
 		$prop = new \ReflectionProperty(Controller::class, 'request');
-		$prop->setAccessible(true);
 		$prop->setValue($this->controller, $formRequest);
 
 		$r = $this->controller->store();

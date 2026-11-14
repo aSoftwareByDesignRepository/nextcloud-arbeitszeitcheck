@@ -133,7 +133,6 @@ class StampIdempotencyMaintenanceIntegrationTest extends TestCase
 
 		$job = \OC::$server->get(StampIdempotencyCleanupJob::class);
 		$run = new \ReflectionMethod(StampIdempotencyCleanupJob::class, 'run');
-		$run->setAccessible(true);
 		$run->invoke($job, null);
 
 		$this->assertNull($this->mobile->findByUserAndRequestId(self::TEST_USER, 'req-exp'));

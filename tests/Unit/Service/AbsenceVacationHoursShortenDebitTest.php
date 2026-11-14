@@ -51,7 +51,6 @@ class AbsenceVacationHoursShortenDebitTest extends TestCase
 			'l10n' => $this->createMock(\OCP\IL10N::class),
 		] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($svc, $val);
 		}
 		$l10n = $ref->getProperty('l10n')->getValue($svc);
@@ -69,7 +68,6 @@ class AbsenceVacationHoursShortenDebitTest extends TestCase
 	): void {
 		$ref = new ReflectionClass($svc);
 		$m = $ref->getMethod('recomputeVacationHoursAfterShorten');
-		$m->setAccessible(true);
 		$m->invoke($svc, $absence, $originalEnd, $oldData, $workingDays);
 	}
 

@@ -213,7 +213,6 @@ final class UpgradeBackupServiceLockTest extends TestCase
 	public function testCopyFolderTreeCopiesNestedFilesAndRejectsTraversal(): void
 	{
 		$m = new \ReflectionMethod(UpgradeBackupService::class, 'copyFolderTree');
-		$m->setAccessible(true);
 
 		$file = $this->createMock(\OCP\Files\File::class);
 		$file->method('getName')->willReturn('a.txt');
@@ -254,7 +253,6 @@ final class UpgradeBackupServiceLockTest extends TestCase
 	public function testCopyAppDataTreeRefusesUnknownFolder(): void
 	{
 		$m = new \ReflectionMethod(UpgradeBackupService::class, 'copyAppDataTree');
-		$m->setAccessible(true);
 		try {
 			$m->invoke($this->service, '../etc', $this->createMock(Folder::class));
 			$this->fail('expected UpgradeBackupException');
@@ -266,7 +264,6 @@ final class UpgradeBackupServiceLockTest extends TestCase
 	public function testRestoreAppDataFolderRefusesUnknownFolder(): void
 	{
 		$m = new \ReflectionMethod(UpgradeBackupService::class, 'restoreAppDataFolder');
-		$m->setAccessible(true);
 		try {
 			$m->invoke($this->service, $this->createMock(Folder::class), 'not-allowed');
 			$this->fail('expected UpgradeBackupException');

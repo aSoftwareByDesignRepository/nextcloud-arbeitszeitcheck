@@ -345,7 +345,6 @@ class PageControllerTest extends TestCase
 	{
 		$ref = new \ReflectionClass($this->controller);
 		$display = $ref->getProperty('overtimeDisplayService');
-		$display->setAccessible(true);
 		/** @var \PHPUnit\Framework\MockObject\MockObject $svc */
 		$svc = $display->getValue($this->controller);
 		$svc->method('getYearToDateBalanceForTrafficLight')->willReturn(0.0);
@@ -409,7 +408,6 @@ class PageControllerTest extends TestCase
 	public function testHoursGlanceAddsAbsenceCreditToWorked(): void
 	{
 		$ref = new \ReflectionMethod(PageController::class, 'buildHoursGlancePeriods');
-		$ref->setAccessible(true);
 
 		$day = ['total_hours_worked' => 0.0, 'required_hours' => 8.0, 'absence_credit_hours' => 0.0];
 		$week = ['total_hours_worked' => 10.0, 'required_hours' => 40.0, 'absence_credit_hours' => 0.0];
@@ -606,7 +604,6 @@ class PageControllerTest extends TestCase
 		}
 		self::assertNotFalse($ref);
 		$prop = $ref->getProperty($name);
-		$prop->setAccessible(true);
 		return $prop->getValue($this->controller);
 	}
 
@@ -641,7 +638,6 @@ class PageControllerTest extends TestCase
 		}
 		self::assertNotFalse($ref);
 		$prop = $ref->getProperty($name);
-		$prop->setAccessible(true);
 		$prop->setValue($this->controller, $value);
 	}
 }

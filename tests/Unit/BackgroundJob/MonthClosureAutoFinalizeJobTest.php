@@ -41,7 +41,6 @@ class MonthClosureAutoFinalizeJobTest extends TestCase
 
 		$ref = new ReflectionClass($job);
 		$method = $ref->getMethod('run');
-		$method->setAccessible(true);
 		$method->invoke($job, null);
 	}
 }

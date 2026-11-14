@@ -700,7 +700,6 @@ final class MonthClosureServiceDeepTest extends TestCase
 	{
 		$svc = $this->svc();
 		$rm = new \ReflectionMethod(MonthClosureService::class, 'enrichSnapshotForPdfPayout');
-		$rm->setAccessible(true);
 
 		$snap = ['overtime_bank' => ['enabled' => true, 'payout_record' => null]];
 		// no live payout row -> snapshot unchanged

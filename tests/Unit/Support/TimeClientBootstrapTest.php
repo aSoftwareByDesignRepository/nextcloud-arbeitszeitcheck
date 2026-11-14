@@ -19,12 +19,10 @@ class TimeClientBootstrapTest extends TestCase {
 		$ref = new \ReflectionClass(TimeClientBootstrap::class);
 		foreach (['configRegistered', 'scriptsRegistered'] as $property) {
 			$prop = $ref->getProperty($property);
-			$prop->setAccessible(true);
 			$prop->setValue(null, false);
 		}
 		$ref = new \ReflectionClass(DashboardWidgetAssetBootstrap::class);
 		$prop = $ref->getProperty('deskletAssetsRegistered');
-		$prop->setAccessible(true);
 		$prop->setValue(null, false);
 		parent::tearDown();
 	}
@@ -79,7 +77,6 @@ class TimeClientBootstrapTest extends TestCase {
 
 		$ref = new \ReflectionClass(\OCP\Util::class);
 		$initProp = $ref->getProperty('scriptsInit');
-		$initProp->setAccessible(true);
 		/** @var list<string> $initScripts */
 		$initScripts = $initProp->getValue();
 
@@ -97,7 +94,6 @@ class TimeClientBootstrapTest extends TestCase {
 		}
 
 		$scriptsProp = $ref->getProperty('scripts');
-		$scriptsProp->setAccessible(true);
 		/** @var array<string, list<string>> $scripts */
 		$scripts = $scriptsProp->getValue();
 		$azc = $scripts['arbeitszeitcheck'] ?? [];
@@ -129,7 +125,6 @@ class TimeClientBootstrapTest extends TestCase {
 
 		$ref = new \ReflectionClass(\OCP\Util::class);
 		$scriptsProp = $ref->getProperty('scripts');
-		$scriptsProp->setAccessible(true);
 		/** @var array<string, list<string>> $scripts */
 		$scripts = $scriptsProp->getValue();
 		$azc = $scripts['arbeitszeitcheck'] ?? [];

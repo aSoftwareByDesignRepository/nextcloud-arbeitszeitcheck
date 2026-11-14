@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\BackgroundJob;
 
 use OCA\ArbeitszeitCheck\ConfigTransfer\TransferService;
-use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
@@ -49,7 +48,7 @@ class TransferApplyJob extends QueuedJob
 		// return would strand the pending apply forever (NN-15) and a throw
 		// would not be retried either.
 		try {
-			DbLockGuard::acquire($this->locking, 
+			$this->locking->acquireLock(
 				UpgradeBackupService::LOCK_KEY,
 				ILockingProvider::LOCK_SHARED,
 				'config transfer apply',

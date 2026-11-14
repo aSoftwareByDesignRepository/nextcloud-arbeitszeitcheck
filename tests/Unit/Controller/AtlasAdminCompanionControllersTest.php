@@ -171,7 +171,6 @@ class AtlasAdminCompanionControllersTest extends TestCase
 
 		// CSV import happy path + KioskException arm
 		$reqProp = new \ReflectionProperty(\OCP\AppFramework\Controller::class, 'request');
-		$reqProp->setAccessible(true);
 		$reqProp->setValue($c2k, $this->requestWithParams(['csv' => "uid,type\nemp1,pin"]));
 		$this->assertTrue($c2k->importCredentials()->getData()['success']);
 		$creds2x = $this->createMock(KioskCredentialService::class);
@@ -189,7 +188,6 @@ class AtlasAdminCompanionControllersTest extends TestCase
 		$reqEnabled->method('getParams')->willReturn(['enabled' => false]);
 		$ref = new \ReflectionClass($c);
 		$prop = $ref->getProperty('request');
-		$prop->setAccessible(true);
 		$prop->setValue($c, $reqEnabled);
 		$this->assertTrue($c->setKioskEnabled()->getData()['success']);
 

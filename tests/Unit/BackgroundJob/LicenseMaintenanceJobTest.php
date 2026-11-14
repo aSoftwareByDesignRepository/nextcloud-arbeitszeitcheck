@@ -61,7 +61,6 @@ class LicenseMaintenanceJobTest extends TestCase
 	{
 		$reflection = new \ReflectionClass($this->job);
 		$runMethod = $reflection->getMethod('run');
-		$runMethod->setAccessible(true);
 		$runMethod->invoke($this->job, null);
 	}
 }

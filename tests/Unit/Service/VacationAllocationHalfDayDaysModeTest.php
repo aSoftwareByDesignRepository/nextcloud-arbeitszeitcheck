@@ -62,7 +62,6 @@ class VacationAllocationHalfDayDaysModeTest extends TestCase
 
 		$ref = new ReflectionClass(VacationAllocationService::class);
 		$m = $ref->getMethod('splitConsumptionForRangeSegment');
-		$m->setAccessible(true);
 		$split = $m->invoke(
 			$svc,
 			'u1',
@@ -88,7 +87,6 @@ class VacationAllocationHalfDayDaysModeTest extends TestCase
 
 		$ref = new ReflectionClass(VacationAllocationService::class);
 		$m = $ref->getMethod('splitConsumptionForRangeSegment');
-		$m->setAccessible(true);
 		$split = $m->invoke(
 			$svc,
 			'u1',
@@ -263,7 +261,6 @@ class VacationAllocationHalfDayDaysModeTest extends TestCase
 			'holidayCalendarService' => $holiday,
 		] as $prop => $val) {
 			$p = $ref->getProperty($prop);
-			$p->setAccessible(true);
 			$p->setValue($svc, $val);
 		}
 

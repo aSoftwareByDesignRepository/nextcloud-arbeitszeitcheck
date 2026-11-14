@@ -537,7 +537,6 @@ class ComplianceServiceTest extends TestCase
 		$dailyHours->method('getWorkingHoursForToday')->willReturn(10.5);
 		$ref = new \ReflectionClass($this->service);
 		$prop = $ref->getProperty('dailyWorkingHoursCalculator');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $dailyHours);
 
 		$this->timeEntryMapper->expects($this->once())
@@ -1698,7 +1697,6 @@ class ComplianceServiceTest extends TestCase
 			->willReturn(61.5);
 
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkAbsoluteWeeklyHours');
-		$method->setAccessible(true);
 		$result = $method->invoke(
 			$this->service,
 			'at-user',
@@ -1721,7 +1719,6 @@ class ComplianceServiceTest extends TestCase
 			->willReturn(46.0);
 
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkAbsoluteWeeklyHours');
-		$method->setAccessible(true);
 		$result = $method->invoke(
 			$this->service,
 			'ch-user',
@@ -1742,7 +1739,6 @@ class ComplianceServiceTest extends TestCase
 			->method('getTotalHoursByUserAndDateRange');
 
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkAbsoluteWeeklyHours');
-		$method->setAccessible(true);
 		$result = $method->invoke(
 			$this->service,
 			'de-user',
@@ -1892,7 +1888,6 @@ class ComplianceServiceTest extends TestCase
 		$dailyHours->method('getWorkingHoursForToday')->willReturn(0.0);
 		$ref = new \ReflectionClass($this->service);
 		$prop = $ref->getProperty('dailyWorkingHoursCalculator');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $dailyHours);
 
 		// Absolute weekly uses getTotalHours for the current calendar week.
@@ -1921,7 +1916,6 @@ class ComplianceServiceTest extends TestCase
 		$dailyHours->method('getWorkingHoursForToday')->willReturn(0.0);
 		$ref = new \ReflectionClass($this->service);
 		$prop = $ref->getProperty('dailyWorkingHoursCalculator');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $dailyHours);
 
 		// Weekly average path may query hours; absolute must stay silent for DE.
@@ -1966,7 +1960,6 @@ class ComplianceServiceTest extends TestCase
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkSixMonthAverageAndWeeklyHours');
-		$method->setAccessible(true);
 		$method->invoke($this->service, $entry);
 	}
 
@@ -1989,7 +1982,6 @@ class ComplianceServiceTest extends TestCase
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 
 		$method = new \ReflectionMethod(ComplianceService::class, 'checkSixMonthAverageAndWeeklyHours');
-		$method->setAccessible(true);
 		$method->invoke($this->service, $entry);
 	}
 

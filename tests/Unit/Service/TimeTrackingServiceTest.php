@@ -535,7 +535,6 @@ class TimeTrackingServiceTest extends TestCase {
 
 		$ref = new \ReflectionClass($this->service);
 		$prop = $ref->getProperty('timeCaptureMethodService');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $timeCapture);
 
 		$this->expectException(\OCA\ArbeitszeitCheck\Exception\TimeCaptureForbiddenException::class);
@@ -590,7 +589,6 @@ class TimeTrackingServiceTest extends TestCase {
 		$dailyHours->method('getWorkingHoursForToday')->willReturn(10.5);
 		$ref = new \ReflectionClass($this->service);
 		$prop = $ref->getProperty('dailyWorkingHoursCalculator');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $dailyHours);
 
 		$this->l10n->method('t')->willReturnCallback(static fn ($s) => $s);

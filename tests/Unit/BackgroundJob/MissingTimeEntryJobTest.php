@@ -335,7 +335,6 @@ class MissingTimeEntryJobTest extends TestCase
 	{
 		$reflection = new \ReflectionClass($this->job);
 		$runMethod = $reflection->getMethod('run');
-		$runMethod->setAccessible(true);
 		$runMethod->invoke($this->job, null);
 	}
 
@@ -343,7 +342,6 @@ class MissingTimeEntryJobTest extends TestCase
 	{
 		$reflection = new \ReflectionClass($this->job);
 		$method = $reflection->getMethod('isNonWorkingDay');
-		$method->setAccessible(true);
 		return $method->invoke($this->job, $userId, $date);
 	}
 
@@ -351,7 +349,6 @@ class MissingTimeEntryJobTest extends TestCase
 	{
 		$reflection = new \ReflectionClass($this->job);
 		$method = $reflection->getMethod('processUserForDate');
-		$method->setAccessible(true);
 		return $method->invoke($this->job, $userId, $yesterday, $today);
 	}
 

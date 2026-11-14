@@ -69,19 +69,6 @@ final class UpgradeBackupStateGuard
 			'',
 		);
 		$this->previousMaxSnapshots = $max === '' ? null : $max;
-		// Raise the rotation ceiling to the hard clamp so the test's
-		// snapshots cannot evict a pre-existing backup folder mid-run —
-		// guaranteed while pre-existing + test-created <=
-		// MAX_SNAPSHOTS_LIMIT; an instance already AT the clamp can still
-		// lose its oldest dir, which tearDown() then reports loudly.
-		// NOTE: a snapshot created by a concurrent writer between setUp
-		// and tearDown is not in the baseline and is deleted — the farm
-		// runs single-writer; the window is the test duration.
-		$this->config->setAppValue(
-			UpgradeBackupCatalog::APP_ID,
-			UpgradeBackupCatalog::CONFIG_MAX_SNAPSHOTS,
-			(string)UpgradeBackupCatalog::MAX_SNAPSHOTS_LIMIT,
-		);
 		// A restore can delete+recreate configured appdata folders — when
 		// the suite runs as container root the recreated dir is root-owned
 		// and the www-data web process can no longer write into it. Record
@@ -92,6 +79,29 @@ final class UpgradeBackupStateGuard
 			$appDir = $dataDir . '/appdata_' . $instanceId . '/' . UpgradeBackupCatalog::APP_ID;
 			$this->snapshotRootPath = $appDir . '/' . UpgradeBackupCatalog::APPDATA_ROOT;
 			$this->preExistingDirNames = $this->snapshotEntryNames();
+			// Zero headroom under the hard clamp: rotation WILL evict a
+			// pre-existing snapshot for every snapshot the test creates —
+			// running here destroys real backups. Refuse loudly instead of
+			// letting tearDown() count the corpses.
+			if (count($this->preExistingDirNames) >= UpgradeBackupCatalog::MAX_SNAPSHOTS_LIMIT) {
+				\PHPUnit\Framework\Assert::markTestSkipped(
+					'upgrade-backups already at hard clamp (' . count($this->preExistingDirNames)
+					. ' >= ' . UpgradeBackupCatalog::MAX_SNAPSHOTS_LIMIT
+					. '): any test snapshot evicts a pre-existing one — prune or raise retention first',
+				);
+			}
+			// Raise the rotation ceiling to the hard clamp so the test's
+			// snapshots cannot evict a pre-existing backup folder mid-run —
+			// guaranteed while pre-existing + test-created <=
+			// MAX_SNAPSHOTS_LIMIT (enforced by the skip above).
+			// NOTE: a snapshot created by a concurrent writer between setUp
+			// and tearDown is not in the baseline and is deleted — the farm
+			// runs single-writer; the window is the test duration.
+			$this->config->setAppValue(
+				UpgradeBackupCatalog::APP_ID,
+				UpgradeBackupCatalog::CONFIG_MAX_SNAPSHOTS,
+				(string)UpgradeBackupCatalog::MAX_SNAPSHOTS_LIMIT,
+			);
 			foreach (UpgradeBackupCatalog::APPDATA_FOLDERS as $folderName) {
 				$path = $appDir . '/' . $folderName;
 				// If the folder does not exist yet, the appdata app dir's

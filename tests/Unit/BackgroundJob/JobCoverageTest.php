@@ -30,7 +30,6 @@ class JobCoverageTest extends TestCase
 	private function invokeRun(object $job): void
 	{
 		$m = new \ReflectionMethod($job, 'run');
-		$m->setAccessible(true);
 		$m->invoke($job, null);
 	}
 

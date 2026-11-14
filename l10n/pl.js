@@ -3569,7 +3569,7 @@
 	"Organisation default (Office)" : "Domyślne dla organizacji (Biuro)",
 	"Organisation default history" : "Domyślna historia organizacji",
 	"Organisation download includes every enabled user who has a DATEV Personalnummer. Set Personalnummer on each employee profile." : "Pobranie organizacji obejmuje każdego włączonego użytkownika, który ma DATEV Personalnummer. Ustaw Personalnummer w każdym profilu pracownika.",
-	"Organisation license" : "Organisation licencja",
+	"Organisation license" : "Licencja organizacji",
 	"Organisation license for Mobile and Terminal apps" : "Licencja organizacji na aplikacje Mobile i Terminal",
 	"Organisation numbers are set, but your DATEV Personalnummer is missing. Add it on your employee profile to download your own file." : "Numery organizacji są ustawione, ale brakuje DATEV Personalnummer. Dodaj go w profilu pracownika, aby pobrać własny plik.",
 	"Organisation time recording methods updated" : "Zaktualizowano metody rejestracji czasu w organizacji",
@@ -6508,7 +6508,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "„Generuj URL kanału” tworzy pierwszy link dla zakresu. „Unieważnij i odśwież” zastępuje istniejący link — stary URL natychmiast przestaje działać.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "„Umiejscowienie” umieszcza automatyczne przerwy wewnątrz okna. „Wymagane” oznacza, że przerwa musi pokrywać się z oknem o podaną liczbę minut.",
 	"…" : "…"
-	},
-	"nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
+	}
 );
 }});})();

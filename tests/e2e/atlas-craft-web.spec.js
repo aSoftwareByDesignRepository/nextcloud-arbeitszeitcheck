@@ -146,6 +146,7 @@ const ADMIN_THEME_VIEWS = [
 	['admin-dashboard', '/apps/arbeitszeitcheck/admin', '#azc-main-content'],
 	['admin-users', '/apps/arbeitszeitcheck/admin/users', '#azc-main-content'],
 	['admin-settings-access', '/apps/arbeitszeitcheck/admin/settings/access', '#azc-main-content'],
+	['admin-license', '/apps/arbeitszeitcheck/admin/license', '#azc-license-page'],
 ];
 
 const MANAGER_THEME_VIEWS = [
@@ -779,6 +780,21 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		expect(seats.ok, `seat restore failed: ${JSON.stringify(seats.json)}`).toBe(true);
 		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
 		await expect(page.locator('#azc-license-clear')).toBeVisible({ timeout: 15_000 });
+
+		/* r51 breadth: 375px mobile reflow on the converged pack — the license
+		   form must not scroll-trap at handset width. */
+		await page.setViewportSize({ width: 375, height: 800 });
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await dismissToasts(page);
+		await shot(page, 'azc-admin-license-mobile-375.png', { waitFor: '#azc-license-page', settleMs: 600 });
+		const mGeo = await page.evaluate(() => ({
+			scrollW: document.documentElement.scrollWidth,
+			docW: document.documentElement.clientWidth,
+		}));
+		expect(mGeo.scrollW, 'no horizontal page scroll at 375 on license page')
+			.toBeLessThanOrEqual(mGeo.docW + 1);
+		await page.setViewportSize({ width: 1280, height: 900 });
 
 		await resetUserTheme(page).catch(() => {});
 	});

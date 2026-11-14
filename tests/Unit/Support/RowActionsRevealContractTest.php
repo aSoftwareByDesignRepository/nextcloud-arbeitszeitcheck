@@ -101,7 +101,10 @@ class RowActionsRevealContractTest extends TestCase
 			if (!str_contains($text, 'actions-cell')) {
 				continue;
 			}
-			if (!str_contains($text, 'azc-table-actions')) {
+			// The synced shared license page builds the class from its
+			// runtime prefix (p + '-table-actions') — same contract.
+			if (!str_contains($text, 'azc-table-actions')
+				&& !str_contains($text, "-table-actions")) {
 				$missing[] = substr($path, strlen($root) + 1);
 			}
 		}

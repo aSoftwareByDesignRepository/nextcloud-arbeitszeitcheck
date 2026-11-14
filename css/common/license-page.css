@@ -1,0 +1,732 @@
+/*
+ * Check family — canonical license page (canonical source in _shared/license-page).
+ * SYNCED FILE — never edit the in-app copy; edit the source and re-run
+ * sync_license_page.py. azc is substituted with the app prefix at sync time.
+ *
+ * Self-contained: every class lives under .azc-license-page so the block looks
+ * identical whether it is a standalone admin page or a settings section.
+ * Token vars (--azc-*) fall back to the canonical values so the page renders
+ * correctly even in apps without a full token block.
+ *
+ * Design: ArbeitszeitCheck admin-license page (the family reference).
+ *
+ * @license AGPL-3.0-or-later
+ */
+
+.azc-license-page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-5, 1.25rem);
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+}
+
+/* ── Screen-reader-only + live regions ───────────────────────── */
+.azc-license-sr-only,
+.azc-license-page .azc-license-sr-only {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	white-space: nowrap !important;
+	border: 0 !important;
+}
+
+/* ── Visible feedback banner ─────────────────────────────────── */
+.azc-license-feedback {
+	margin: 0;
+	padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
+	border-radius: var(--azc-radius-sm, 8px);
+	border: 1px solid var(--color-border);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	line-height: var(--azc-line-base, 1.5);
+}
+
+.azc-license-feedback--success {
+	border-color: var(--color-success-text, var(--color-success));
+	background: color-mix(in srgb, var(--color-success-text, var(--color-success)) 12%, var(--color-main-background));
+	color: var(--color-main-text);
+}
+
+.azc-license-feedback--error {
+	border-color: var(--color-error-text, var(--color-error));
+	background: color-mix(in srgb, var(--color-error-text, var(--color-error)) 12%, var(--color-main-background));
+	color: var(--color-main-text);
+}
+
+/* ── Callouts ────────────────────────────────────────────────── */
+.azc-license-callout {
+	display: flex;
+	gap: var(--azc-space-3, 0.75rem);
+	margin: 0;
+	padding: var(--azc-space-4, 1rem);
+	border: 1px solid var(--color-border);
+	border-inline-start: 4px solid var(--color-primary-element);
+	border-radius: var(--azc-radius-md, 10px);
+	background: var(--color-main-background);
+}
+
+.azc-license-callout--info {
+	border-inline-start-color: var(--color-primary-element);
+	background: color-mix(in srgb, var(--color-primary-element) 7%, var(--color-main-background));
+}
+
+.azc-license-callout--warning {
+	border-inline-start-color: var(--color-warning-text, var(--color-warning));
+	background: color-mix(in srgb, var(--color-warning-text, var(--color-warning)) 12%, var(--color-main-background));
+}
+
+.azc-license-callout--danger {
+	border-inline-start-color: var(--color-error-text, var(--color-error));
+	background: color-mix(in srgb, var(--color-error-text, var(--color-error)) 10%, var(--color-main-background));
+}
+
+.azc-license-callout__title {
+	margin: 0 0 var(--azc-space-1, 0.25rem);
+	font-size: var(--azc-fs-md, 1rem);
+	font-weight: 600;
+}
+
+.azc-license-callout__text {
+	margin: 0;
+	line-height: var(--azc-line-base, 1.5);
+}
+
+.azc-license-callout__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+	margin-top: var(--azc-space-3, 0.75rem);
+}
+
+/* ── Stat tiles (design-system §3.5) ─────────────────────────── */
+.azc-license-stat-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+	gap: var(--azc-space-3, 0.75rem);
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	min-width: 0;
+	list-style: none;
+}
+
+.azc-license-stat-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 0.25rem;
+	min-height: 6.5rem;
+	min-width: 0;
+	margin: 0;
+	padding: var(--azc-space-4, 1rem);
+	border: 1px solid var(--color-border);
+	border-inline-start: 3px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--azc-radius-md, 10px);
+	background: var(--color-main-background);
+	text-align: left;
+	color: inherit;
+}
+
+.azc-license-stat-tile--primary { border-inline-start-color: var(--color-primary-element); }
+.azc-license-stat-tile--success { border-inline-start-color: var(--color-success-text, var(--color-success)); }
+.azc-license-stat-tile--warning { border-inline-start-color: var(--color-warning-text, var(--color-warning)); }
+.azc-license-stat-tile--neutral { border-inline-start-color: var(--color-border); }
+
+.azc-license-stat-tile__label {
+	margin: 0;
+	font-size: var(--azc-fs-xs, 0.8125rem);
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+.azc-license-stat-tile__value {
+	margin: 0;
+	font-size: clamp(1.25rem, 2vw, 1.6rem);
+	font-weight: 700;
+	line-height: var(--azc-line-tight, 1.2);
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+
+.azc-license-stat-tile__sep {
+	margin-inline: 0.15em;
+	font-weight: 500;
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+.azc-license-stat-tile__meta {
+	margin: 0;
+	font-size: var(--azc-fs-xs, 0.8125rem);
+	line-height: 1.4;
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+.azc-license-stat__meta-label { font-weight: 600; }
+
+/* Usage meter */
+.azc-license-meter {
+	height: 0.375rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--color-main-text) 8%, transparent);
+	overflow: hidden;
+	margin-top: auto;
+}
+
+.azc-license-meter__fill {
+	height: 100%;
+	border-radius: inherit;
+	background: var(--color-primary-element);
+	transition: width 0.25s ease;
+}
+
+.azc-license-meter__fill--full {
+	background: var(--color-warning-text, var(--color-warning));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.azc-license-meter__fill { transition: none; }
+}
+
+/* ── Badges ──────────────────────────────────────────────────── */
+.azc-license-badge {
+	display: inline-block;
+	padding: 0.25rem 0.65rem;
+	border-radius: 999px;
+	font-size: var(--azc-fs-xs, 0.8125rem);
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.azc-license-badge--success {
+	background: color-mix(in srgb, var(--color-success-text, var(--color-success)) 18%, var(--color-main-background));
+	color: var(--color-success-text, var(--color-success));
+}
+
+.azc-license-badge--warning {
+	background: color-mix(in srgb, var(--color-warning-text, var(--color-warning)) 22%, var(--color-main-background));
+	color: var(--color-warning-text, var(--color-warning));
+}
+
+/* ── Section cards ───────────────────────────────────────────── */
+.azc-license-card {
+	margin: 0;
+	border: 1px solid var(--color-border);
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--color-main-background);
+	min-width: 0;
+}
+
+.azc-license-card__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--azc-space-3, 0.75rem);
+	padding: var(--azc-space-4, 1rem) var(--azc-space-4, 1rem) 0;
+}
+
+.azc-license-card__title {
+	margin: 0;
+	font-size: var(--azc-fs-lg, 1.125rem);
+	font-weight: 700;
+}
+
+.azc-license-card__lead {
+	margin: var(--azc-space-1, 0.25rem) 0 0;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	line-height: var(--azc-line-base, 1.5);
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+.azc-license-card__header-actions {
+	flex: 0 0 auto;
+}
+
+.azc-license-card__body {
+	padding: var(--azc-space-4, 1rem);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.azc-license-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4em;
+	min-height: var(--azc-touch, 44px);
+	min-width: 44px;
+	padding: 0.5rem 1rem;
+	border: 2px solid transparent;
+	border-radius: var(--azc-radius-sm, 8px);
+	font: inherit;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	box-sizing: border-box;
+}
+
+.azc-license-btn--primary {
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text, var(--color-primary-text));
+	border-color: var(--color-primary-element);
+}
+
+.azc-license-btn--secondary {
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border-color: var(--color-border-maxcontrast, var(--color-border));
+}
+
+.azc-license-btn--danger {
+	background: var(--color-element-error, var(--color-error));
+	color: var(--color-primary-element-text, var(--color-primary-text));
+	border-color: var(--color-element-error, var(--color-error));
+}
+
+.azc-license-btn--sm {
+	min-height: var(--azc-touch, 44px);
+	padding: 0.375rem 0.875rem;
+	font-size: var(--azc-fs-sm, 0.875rem);
+}
+
+.azc-license-btn:hover { filter: brightness(0.95); }
+
+.azc-license-btn:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 55%, transparent);
+	outline-offset: 2px;
+}
+
+.azc-license-btn--danger:hover,
+.azc-license-btn--danger:focus-visible {
+	filter: brightness(0.92);
+	outline: 3px solid color-mix(in srgb, var(--color-element-error, var(--color-error)) 55%, transparent);
+	outline-offset: 2px;
+}
+
+.azc-license-btn:disabled,
+.azc-license-btn[aria-disabled='true'] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.azc-license-btn--icon {
+	padding: 0.5rem;
+}
+
+.azc-license-btn--icon svg {
+	width: 1.125rem;
+	height: 1.125rem;
+	display: block;
+}
+
+/* ── Form elements ───────────────────────────────────────────── */
+.azc-license-field__label {
+	display: block;
+	margin: 0 0 var(--azc-space-2, 0.5rem);
+	font-weight: 600;
+	font-size: var(--azc-fs-sm, 0.875rem);
+}
+
+.azc-license-field__hint {
+	margin: var(--azc-space-2, 0.5rem) 0 0;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	line-height: var(--azc-line-base, 1.5);
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+.azc-license-input,
+.azc-license-page .azc-license-input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: var(--azc-space-3, 0.75rem);
+	border: 2px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--azc-radius-sm, 8px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font: inherit;
+}
+
+.azc-license-input:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 55%, transparent);
+	outline-offset: 2px;
+	border-color: var(--color-primary-element);
+}
+
+.azc-license-input:disabled,
+.azc-license-input[aria-disabled='true'] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.azc-license-key-input {
+	min-height: 6rem;
+	font-family: var(--font-face-monospace, ui-monospace, monospace);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	line-height: 1.45;
+	resize: vertical;
+}
+
+.azc-license-instance-box {
+	margin-top: var(--azc-space-4, 1rem);
+	padding: var(--azc-space-4, 1rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--azc-radius-sm, 8px);
+	background: color-mix(in srgb, var(--color-primary-element) 6%, var(--color-main-background));
+}
+
+.azc-license-instance-box .azc-license-field__label { margin-bottom: 0; }
+
+.azc-license-instance-id {
+	display: block;
+	margin-top: var(--azc-space-2, 0.5rem);
+	padding: var(--azc-space-2, 0.5rem) var(--azc-space-3, 0.75rem);
+	font-family: var(--font-face-monospace, ui-monospace, monospace);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	word-break: break-all;
+	background: var(--color-main-background);
+	border-radius: var(--azc-radius-sm, 8px);
+	border: 1px solid var(--color-border);
+}
+
+.azc-license-form__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+	margin-top: var(--azc-space-4, 1rem);
+}
+
+/* ── Current license details ─────────────────────────────────── */
+.azc-license-status {
+	margin-top: var(--azc-space-5, 1.25rem);
+	padding-top: var(--azc-space-5, 1.25rem);
+	border-top: 1px solid var(--color-border);
+}
+
+/* Neutralise Nextcloud core server.css definition-list styling. */
+.azc-license-status__grid dt,
+.azc-license-status__grid dd {
+	display: block;
+	width: auto;
+	padding: 0;
+	text-align: start;
+	white-space: normal;
+}
+
+.azc-license-status__title {
+	font-size: var(--azc-fs-md, 1rem);
+	font-weight: 600;
+	margin: 0 0 var(--azc-space-3, 0.75rem);
+}
+
+.azc-license-status__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: var(--azc-space-4, 1rem);
+	margin: 0;
+}
+
+.azc-license-status__item dt {
+	font-size: var(--azc-fs-xs, 0.8125rem);
+	font-weight: 600;
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+	margin: 0 0 var(--azc-space-1, 0.25rem);
+}
+
+.azc-license-status__item dd {
+	margin: 0;
+	font-size: var(--azc-fs-md, 1rem);
+	word-break: break-word;
+}
+
+.azc-license-status__purchase {
+	margin: var(--azc-space-4, 1rem) 0 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+}
+
+.azc-license-expiry-callout { margin-top: var(--azc-space-4, 1rem); }
+.azc-license-no-key-callout { margin-bottom: 0; }
+
+/* ── Seat picker combobox ────────────────────────────────────── */
+.azc-license-seat-picker { margin-bottom: var(--azc-space-5, 1.25rem); }
+
+.azc-license-search-wrap {
+	position: relative;
+	max-width: 32rem;
+}
+
+.azc-license-search-input { width: 100%; }
+
+.azc-license-seat-count {
+	margin: var(--azc-space-2, 0.5rem) 0 0;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	font-weight: 600;
+}
+
+.azc-license-seats-full-hint {
+	color: var(--color-warning-text, var(--color-warning));
+	font-weight: 500;
+}
+
+.azc-license-assign-btn { margin-top: var(--azc-space-3, 0.75rem); }
+
+.azc-license-batch-result { margin-top: var(--azc-space-3, 0.75rem); }
+
+.azc-seat-search-results {
+	list-style: none;
+	position: absolute;
+	z-index: 20;
+	left: 0;
+	right: 0;
+	margin: var(--azc-space-1, 0.25rem) 0 0;
+	padding: 0;
+	border: 2px solid var(--color-border);
+	border-radius: var(--azc-radius-sm, 8px);
+	background: var(--color-main-background);
+	max-height: 14rem;
+	overflow-y: auto;
+	box-shadow: 0 8px 24px color-mix(in srgb, var(--color-main-text) 12%, transparent);
+}
+
+.azc-seat-search-results li { margin: 0; }
+
+.azc-seat-search-results li[role='option'] {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	min-height: var(--azc-touch, 44px);
+	padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
+	color: var(--color-main-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	box-sizing: border-box;
+}
+
+.azc-seat-search-results li[role='option']:hover {
+	background: var(--color-background-hover);
+}
+
+.azc-seat-search-results li[role='option'][aria-selected='true'],
+.azc-seat-search-results li[role='option'].is-active {
+	background: color-mix(in srgb, var(--color-primary-element) 14%, transparent);
+	box-shadow: inset 3px 0 0 var(--color-primary-element);
+}
+
+.azc-seat-search-results__label {
+	display: flex;
+	align-items: center;
+	gap: var(--azc-space-3, 0.75rem);
+	width: 100%;
+	cursor: pointer;
+}
+
+.azc-seat-search-results__check {
+	width: 1.1rem;
+	height: 1.1rem;
+	margin: 0;
+	flex: 0 0 auto;
+}
+
+.azc-seat-search-results__empty {
+	padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+	font-size: var(--azc-fs-sm, 0.875rem);
+}
+
+/* ── Seats / devices tables ──────────────────────────────────── */
+.azc-license-seats-table-wrap { margin-top: var(--azc-space-3, 0.75rem); }
+
+/* Self-contained table styling: NC core server.css sets
+   table { white-space: nowrap; border-collapse: separate }. */
+.azc-license-seats-table {
+	width: 100%;
+	border-collapse: collapse;
+	border-spacing: 0;
+	white-space: normal;
+}
+
+.azc-license-seats-table th,
+.azc-license-seats-table td {
+	padding: var(--azc-space-3, 0.75rem) var(--azc-space-4, 1rem);
+	text-align: start;
+	vertical-align: middle;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	border-bottom: 1px solid var(--color-border);
+}
+
+.azc-license-seats-table thead th {
+	font-weight: 600;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+	background: var(--color-background-dark, var(--color-background-hover));
+}
+
+.azc-license-seats-table tbody tr:last-child td { border-bottom: none; }
+.azc-license-seats-table tbody tr:hover { background: var(--color-background-hover); }
+
+.azc-license-seats-table td.actions-cell {
+	text-align: end;
+	white-space: nowrap;
+}
+
+.azc-license-table-actions {
+	display: inline-flex;
+	gap: var(--azc-space-2, 0.5rem);
+}
+
+.azc-license-user-id {
+	font-size: var(--azc-fs-xs, 0.8125rem);
+	padding: 0.1rem 0.35rem;
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--color-main-text) 6%, transparent);
+}
+
+/* ── Empty states ────────────────────────────────────────────── */
+.azc-license-empty-state {
+	padding: var(--azc-space-5, 1.25rem) var(--azc-space-4, 1rem);
+	text-align: center;
+}
+
+.azc-license-empty-state__title {
+	margin: 0 0 var(--azc-space-1, 0.25rem);
+	font-weight: 600;
+}
+
+.azc-license-empty-state__text {
+	margin: 0;
+	font-size: var(--azc-fs-sm, 0.875rem);
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+
+/* ── Devices card ────────────────────────────────────────────── */
+.azc-license-terminal-summary {
+	margin: 0 0 var(--azc-space-4, 1rem);
+	font-size: var(--azc-fs-md, 1rem);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.azc-license-terminal-form { margin-bottom: var(--azc-space-4, 1rem); }
+
+.azc-license-terminal-fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+	gap: var(--azc-space-4, 1rem);
+}
+
+.azc-license-terminal-field { min-width: 0; }
+
+.azc-license-token-value {
+	display: block;
+	margin: 0 0 var(--azc-space-4, 1rem);
+	padding: var(--azc-space-3, 0.75rem);
+	font-family: var(--font-face-monospace, ui-monospace, monospace);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	word-break: break-all;
+	white-space: pre-wrap;
+	background: color-mix(in srgb, var(--color-main-text) 5%, var(--color-main-background));
+	border: 1px solid var(--color-border);
+	border-radius: var(--azc-radius-sm, 8px);
+	max-height: 10rem;
+	overflow-y: auto;
+}
+
+/* ── Confirmation / token modals ─────────────────────────────── */
+.azc-license-modal::backdrop {
+	background: var(--azc-scrim, color-mix(in srgb, var(--color-main-text) 45%, transparent));
+}
+
+.azc-license-modal {
+	margin: auto;
+	padding: var(--azc-space-5, 1.25rem);
+	max-width: min(28rem, calc(100vw - 2rem));
+	width: 100%;
+	border: 2px solid var(--color-primary-element);
+	border-radius: var(--azc-radius-lg, 12px);
+	background: var(--color-main-background);
+	box-shadow: 0 8px 24px color-mix(in srgb, var(--color-main-text) 12%, transparent);
+	box-sizing: border-box;
+}
+
+.azc-license-modal h3 {
+	margin: 0 0 var(--azc-space-2, 0.5rem);
+	font-size: var(--azc-fs-lg, 1.125rem);
+}
+
+.azc-license-modal__hint {
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+	margin: 0 0 var(--azc-space-4, 1rem);
+	line-height: var(--azc-line-base, 1.5);
+}
+
+.azc-license-modal__actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--azc-space-3, 0.75rem);
+}
+
+body.azc-license-modal-open { overflow: hidden; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+	.azc-license-stat-grid { grid-template-columns: 1fr; }
+	.azc-license-status__grid { grid-template-columns: 1fr; }
+
+	.azc-license-form__actions .azc-license-btn,
+	.azc-license-modal__actions .azc-license-btn {
+		flex: 1 1 auto;
+		justify-content: center;
+	}
+}
+
+/* Mobile table → labeled rows (design-system §3.7) */
+@media (max-width: 768.98px) {
+	.azc-license-seats-table thead { display: none; }
+
+	.azc-license-seats-table,
+	.azc-license-seats-table tbody,
+	.azc-license-seats-table tr,
+	.azc-license-seats-table td { display: block; width: 100%; }
+
+	.azc-license-seats-table tr {
+		border: 1px solid var(--color-border);
+		border-radius: var(--azc-radius-sm, 8px);
+		margin-bottom: var(--azc-space-3, 0.75rem);
+		padding: var(--azc-space-2, 0.5rem) 0;
+	}
+
+	.azc-license-seats-table td {
+		border-bottom: none;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--azc-space-3, 0.75rem);
+	}
+
+	.azc-license-seats-table td::before {
+		content: attr(data-label);
+		font-weight: 600;
+		font-size: var(--azc-fs-xs, 0.8125rem);
+		color: var(--azc-muted, var(--color-text-maxcontrast));
+	}
+
+	.azc-license-seats-table td.actions-cell { text-align: start; }
+}
+
+@media (forced-colors: active) {
+	.azc-license-stat-tile,
+	.azc-license-modal,
+	.azc-license-card { border-color: CanvasText; }
+
+	.azc-license-meter__fill { background: Highlight; }
+}

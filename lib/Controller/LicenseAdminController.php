@@ -90,7 +90,7 @@ class LicenseAdminController extends Controller
 	#[NoCSRFRequired]
 	public function index(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('admin-license', 'admin-license');
+		$this->registerFrontEndAssets('common/license-page', 'common/license-page');
 
 		$summary = $this->licenseService->getLicenseSummary();
 		$mobileLimit = $this->licenseService->getMobileSeatLimit();

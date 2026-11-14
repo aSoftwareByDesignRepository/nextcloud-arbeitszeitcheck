@@ -1156,6 +1156,7 @@
 			if (terminalEmpty) {
 				terminalEmpty.hidden = true;
 			}
+			const colActions = escapeAttr(t('Actions'));
 			devices.forEach((dev) => {
 				const devId = String(dev.id || dev.deviceId || '');
 				const tr = document.createElement('tr');

@@ -492,17 +492,31 @@
 				}
 			});
 		};
+		// NC's notifications app preventDefault()s the global Escape keydown,
+		// which suppresses the native <dialog> `cancel` event — wire an
+		// explicit Escape keydown close for each modal.
+		const onEscapeClose = (dlg, closeFn) => {
+			dlg.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape') {
+					e.stopPropagation();
+					closeFn();
+				}
+			});
+		};
 		if (clearModal) {
 			clearModal.addEventListener('cancel', (e) => { e.preventDefault(); closeClearModal(); });
 			onOutsideClick(clearModal, () => closeClearModal());
+			onEscapeClose(clearModal, () => closeClearModal());
 		}
 		if (confirmModal) {
 			confirmModal.addEventListener('cancel', (e) => { e.preventDefault(); closeConfirm({ confirmed: false }); });
 			onOutsideClick(confirmModal, () => closeConfirm({ confirmed: false }));
+			onEscapeClose(confirmModal, () => closeConfirm({ confirmed: false }));
 		}
 		if (tokenModal) {
 			tokenModal.addEventListener('cancel', (e) => { e.preventDefault(); closeTokenModal(); });
 			onOutsideClick(tokenModal, () => closeTokenModal());
+			onEscapeClose(tokenModal, () => closeTokenModal());
 		}
 
 		/* ── Save / clear license ────────────────────────────────── */

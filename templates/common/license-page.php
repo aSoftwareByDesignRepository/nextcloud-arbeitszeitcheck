@@ -210,9 +210,50 @@ $i18nMsgids = [
 	'regenDone' => 'New pairing code generated.',
 	'regenFailed' => 'Could not generate a pairing code.',
 ];
+// printf-style placeholders must survive server-side translation — the
+// client substitutes values at runtime. NC's L10NString always runs
+// vsprintf(), so a bare t() call on a %1$d msgid fatals (ValueError:
+// arguments array must contain N items) and (%n) is consumed as count=1.
+// Numeric sentinels round-trip %d and %n through the formatter; %s is a
+// vsprintf fixed point (vsprintf('%1$s', ['%1$s']) === '%1$s').
+$lpTranslate = static function (string $msgid) use ($l): string {
+	$hasPlural = str_contains($msgid, '%n');
+	preg_match_all('/%(?:(\d+)\$)?[sd]/', $msgid, $matches, PREG_SET_ORDER);
+	if (!$hasPlural && $matches === []) {
+		return (string)$l->t($msgid);
+	}
+	$byPosition = [];
+	$restore = [];
+	$sequential = 0;
+	foreach ($matches as $match) {
+		$spec = $match[0];
+		$position = ($match[1] ?? '') !== '' ? (int)$match[1] - 1 : $sequential++;
+		if (str_ends_with($spec, 'd')) {
+			$sentinel = 1908074000 + $position;
+			$byPosition[$position] = $sentinel;
+			$restore[(string)$sentinel] = $spec;
+		} else {
+			$byPosition[$position] = $spec;
+		}
+	}
+	$arguments = [];
+	for ($i = 0, $max = $byPosition === [] ? -1 : max(array_keys($byPosition)); $i <= $max; $i++) {
+		$arguments[] = $byPosition[$i] ?? '';
+	}
+	if ($hasPlural) {
+		$countSentinel = '1908074099';
+		$translated = method_exists($l, 'n')
+			? (string)$l->n($msgid, $msgid, (int)$countSentinel, $arguments)
+			: $msgid;
+		$restore[$countSentinel] = '%n';
+	} else {
+		$translated = (string)$l->t($msgid, $arguments);
+	}
+	return $restore === [] ? $translated : strtr($translated, $restore);
+};
 $i18n = [];
 foreach ($i18nMsgids as $k => $msgid) {
-	$i18n[$k] = $l->t($msgid);
+	$i18n[$k] = $lpTranslate($msgid);
 	$i18n[$msgid] = $i18n[$k];
 }
 if (is_array($_['i18n'] ?? null)) {

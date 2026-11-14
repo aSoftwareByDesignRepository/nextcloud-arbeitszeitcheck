@@ -106,7 +106,7 @@ class LicenseAdminController extends Controller
 				'license' => $summary,
 				'productCode' => 'AZC2',
 				'companionText' => $this->l10n->t('the Mobile and Terminal apps'),
-				'seatAppName' => $this->l10n->t('the ArbeitszeitCheck mobile companion app'),
+				'seatAppName' => $this->l10n->t('the mobile companion app'),
 				'mobileSeatsUsed' => $this->mobileSeatService->getAssignedCount(),
 				'mobileSeatsLimit' => $mobileLimit,
 				'terminalDevicesUsed' => $this->terminalDeviceService->getActiveCount(),

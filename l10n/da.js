@@ -6428,6 +6428,7 @@
 	"territory" : "territorium",
 	"testing" : "afprøvning",
 	"the companion apps" : "companion-apps",
+	"the Mobile and Terminal apps" : "Mobile- og Terminal-apps",
 	"the mobile companion app" : "mobil-companion-appen",
 	"third" : "tredje",
 	"this work schedule" : "denne arbejdsplan",
@@ -6508,7 +6509,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generer feed-URL» opretter det første link for et omfang. «Tilbagekald og roter» erstatter et eksisterende link — den gamle URL virker ikke længere med det samme.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "»Placering« placerer automatiske pauser inde i vinduet. »Påkrævet« betyder, at pausen skal overlappe vinduet med det angivne antal minutter.",
 	"…" : "…"
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

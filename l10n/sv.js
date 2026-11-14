@@ -6428,6 +6428,7 @@
 	"territory" : "territorium",
 	"testing" : "testning",
 	"the companion apps" : "kompanjonapparna",
+	"the Mobile and Terminal apps" : "Mobile- och Terminal-apparna",
 	"the mobile companion app" : "den mobila kompanjonappen",
 	"third" : "tredje",
 	"this work schedule" : "detta arbetsschema",
@@ -6508,7 +6509,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Generera flödes-URL» skapar den första länken för ett omfattning. «Återkalla och rotera» ersätter en befintlig länk — den gamla URL:en slutar fungera direkt.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "”Placering” lägger automatiska raster inom fönstret. ”Obligatorisk” betyder att rasten måste överlappa fönstret med angivna minuter.",
 	"…" : "…"
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

@@ -6428,6 +6428,7 @@
 	"territory" : "territorium",
 	"testing" : "utprøving",
 	"the companion apps" : "følge-appene",
+	"the Mobile and Terminal apps" : "Mobile- og Terminal-appene",
 	"the mobile companion app" : "mobilfølge-appen",
 	"third" : "tredje",
 	"this work schedule" : "denne arbeidsplan",

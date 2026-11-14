@@ -6428,6 +6428,7 @@
 	"territory" : "bölge",
 	"testing" : "test",
 	"the companion apps" : "eşlik uygulamaları",
+	"the Mobile and Terminal apps" : "Mobil ve Terminal uygulamalarını",
 	"the mobile companion app" : "mobil eşlik uygulaması",
 	"third" : "üçüncü",
 	"this work schedule" : "bu çalışma çizelgesi",
@@ -6508,7 +6509,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "“Akış URL'si oluştur” bir kapsam için ilk bağlantıyı oluşturur. “İptal et ve döndür” mevcut bir bağlantıyı değiştirir — eski URL hemen çalışmayı durdurur.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "“Yerleşim” otomatik molaları pencere içine yerleştirir. “Zorunlu”, molanın verilen dakikalar boyunca pencereyle çakışması gerektiği anlamına gelir.",
 	"…" : "…"
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

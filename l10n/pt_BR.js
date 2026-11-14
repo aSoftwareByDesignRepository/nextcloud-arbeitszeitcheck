@@ -6428,6 +6428,7 @@
 	"territory" : "território",
 	"testing" : "testando",
 	"the companion apps" : "os aplicativos complementares",
+	"the Mobile and Terminal apps" : "os aplicativos móveis e de terminal",
 	"the mobile companion app" : "o aplicativo complementar móvel",
 	"third" : "terceiro",
 	"this work schedule" : "este horário de trabalho",
@@ -6508,7 +6509,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "«Gerar URL do feed» cria o primeiro link de um escopo. «Revogar e rotacionar» substitui um link existente — a URL antiga para de funcionar imediatamente.",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "\"Posicionamento\" coloca os intervalos automáticos dentro da janela. \"Obrigatório\" significa que o intervalo deve sobrepor a janela pelos minutos indicados.",
 	"…" : "…"
-	},
-	"nplurals=2; plural=(n > 1);"
+	}
 );
 }});})();

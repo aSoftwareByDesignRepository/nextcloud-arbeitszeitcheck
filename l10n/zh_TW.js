@@ -6428,6 +6428,7 @@
 	"territory" : "區域",
 	"testing" : "測試",
 	"the companion apps" : "配套應用程式",
+	"the Mobile and Terminal apps" : "行動端和終端機應用",
 	"the mobile companion app" : "行動版配套應用程式",
 	"third" : "第三",
 	"this work schedule" : "此工作計劃",
@@ -6508,7 +6509,6 @@
 	"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately." : "“生成訂閱 URL”為一個範圍建立首個連結。“吊銷並輪換”替換現有連結——舊 URL 立即失效。",
 	"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes." : "“放置”把自動休息安排在時段內。“要求”表示休息必須與該時段重疊指定分鐘數。",
 	"…" : "…"
-	},
-	"nplurals=1; plural=0;"
+	}
 );
 }});})();

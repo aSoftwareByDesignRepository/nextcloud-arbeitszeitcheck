@@ -325,6 +325,187 @@
 	display: block;
 }
 
+/* ── Button-variant armor ──────────────────────────────────────
+ * NC core inputs.scss repaints every button:not(.button-vue,
+ * [class^=vs__]) at specificity (0,1,1) with the pale
+ * --color-primary-element-light fill + light-text ink — stronger
+ * than the lone .azc-license-btn--{variant} rules above (0,1,0),
+ * so every variant collapses to the same pale skin
+ * (button_variant_specificity_collapse; dutycheck visual r40:
+ * destructive "Remove license" ≡ secondary "Cancel").
+ *
+ * Canonical fix shape (same as the .dc-btn armor in app
+ * css/app.css): ONE scope list — the pack page root, the app's
+ * content canvas, and every body-mounted overlay scope the pack
+ * <dialog> modals can land under — applying !important fills for
+ * EVERY variant incl. :hover/:focus-visible/:active. A new
+ * overlay is armored by landing on the scope list, never by a
+ * per-dialog-class rule. */
+.azc-license-page .azc-license-btn--primary,
+#app-content .azc-license-btn--primary,
+#app-content-wrapper .azc-license-btn--primary,
+.azc-license-modal .azc-license-btn--primary,
+.azc-modal .azc-license-btn--primary,
+.azc-dialog .azc-license-btn--primary,
+dialog .azc-license-btn--primary,
+[role="dialog"] .azc-license-btn--primary,
+[role="alertdialog"] .azc-license-btn--primary {
+	background: var(--color-primary-element) !important;
+	border-color: var(--color-primary-element) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+.azc-license-page .azc-license-btn--primary:hover,
+#app-content .azc-license-btn--primary:hover,
+#app-content-wrapper .azc-license-btn--primary:hover,
+.azc-license-modal .azc-license-btn--primary:hover,
+.azc-modal .azc-license-btn--primary:hover,
+.azc-dialog .azc-license-btn--primary:hover,
+dialog .azc-license-btn--primary:hover,
+[role="dialog"] .azc-license-btn--primary:hover,
+[role="alertdialog"] .azc-license-btn--primary:hover {
+	background: var(--color-primary-element-hover, var(--color-primary-element)) !important;
+	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+.azc-license-page .azc-license-btn--primary:focus-visible,
+#app-content .azc-license-btn--primary:focus-visible,
+#app-content-wrapper .azc-license-btn--primary:focus-visible,
+.azc-license-modal .azc-license-btn--primary:focus-visible,
+.azc-modal .azc-license-btn--primary:focus-visible,
+.azc-dialog .azc-license-btn--primary:focus-visible,
+dialog .azc-license-btn--primary:focus-visible,
+[role="dialog"] .azc-license-btn--primary:focus-visible,
+[role="alertdialog"] .azc-license-btn--primary:focus-visible {
+	background: var(--color-primary-element-hover, var(--color-primary-element)) !important;
+	border-color: var(--color-primary-element-hover, var(--color-primary-element)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 55%, transparent);
+	outline-offset: 2px;
+}
+.azc-license-page .azc-license-btn--primary:active,
+#app-content .azc-license-btn--primary:active,
+#app-content-wrapper .azc-license-btn--primary:active,
+.azc-license-modal .azc-license-btn--primary:active,
+.azc-modal .azc-license-btn--primary:active,
+.azc-dialog .azc-license-btn--primary:active,
+dialog .azc-license-btn--primary:active,
+[role="dialog"] .azc-license-btn--primary:active,
+[role="alertdialog"] .azc-license-btn--primary:active {
+	background: var(--color-primary-element) !important;
+	border-color: var(--color-primary-element) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+
+.azc-license-page .azc-license-btn--secondary,
+#app-content .azc-license-btn--secondary,
+#app-content-wrapper .azc-license-btn--secondary,
+.azc-license-modal .azc-license-btn--secondary,
+.azc-modal .azc-license-btn--secondary,
+.azc-dialog .azc-license-btn--secondary,
+dialog .azc-license-btn--secondary,
+[role="dialog"] .azc-license-btn--secondary,
+[role="alertdialog"] .azc-license-btn--secondary {
+	background: var(--color-main-background) !important;
+	border-color: var(--color-border-maxcontrast, var(--color-border)) !important;
+	color: var(--color-main-text) !important;
+}
+.azc-license-page .azc-license-btn--secondary:hover,
+#app-content .azc-license-btn--secondary:hover,
+#app-content-wrapper .azc-license-btn--secondary:hover,
+.azc-license-modal .azc-license-btn--secondary:hover,
+.azc-dialog .azc-license-btn--secondary:hover,
+.azc-modal .azc-license-btn--secondary:hover,
+dialog .azc-license-btn--secondary:hover,
+[role="dialog"] .azc-license-btn--secondary:hover,
+[role="alertdialog"] .azc-license-btn--secondary:hover {
+	background: var(--color-background-hover, var(--color-main-background)) !important;
+	border-color: var(--color-border-maxcontrast, var(--color-border)) !important;
+	color: var(--color-main-text) !important;
+}
+.azc-license-page .azc-license-btn--secondary:focus-visible,
+#app-content .azc-license-btn--secondary:focus-visible,
+#app-content-wrapper .azc-license-btn--secondary:focus-visible,
+.azc-license-modal .azc-license-btn--secondary:focus-visible,
+.azc-dialog .azc-license-btn--secondary:focus-visible,
+.azc-modal .azc-license-btn--secondary:focus-visible,
+dialog .azc-license-btn--secondary:focus-visible,
+[role="dialog"] .azc-license-btn--secondary:focus-visible,
+[role="alertdialog"] .azc-license-btn--secondary:focus-visible {
+	background: var(--color-background-hover, var(--color-main-background)) !important;
+	border-color: var(--color-border-maxcontrast, var(--color-border)) !important;
+	color: var(--color-main-text) !important;
+	outline: 3px solid color-mix(in srgb, var(--color-primary-element) 55%, transparent);
+	outline-offset: 2px;
+}
+.azc-license-page .azc-license-btn--secondary:active,
+#app-content .azc-license-btn--secondary:active,
+#app-content-wrapper .azc-license-btn--secondary:active,
+.azc-license-modal .azc-license-btn--secondary:active,
+.azc-dialog .azc-license-btn--secondary:active,
+.azc-modal .azc-license-btn--secondary:active,
+dialog .azc-license-btn--secondary:active,
+[role="dialog"] .azc-license-btn--secondary:active,
+[role="alertdialog"] .azc-license-btn--secondary:active {
+	background: var(--color-main-background) !important;
+	border-color: var(--color-border-maxcontrast, var(--color-border)) !important;
+	color: var(--color-main-text) !important;
+}
+
+.azc-license-page .azc-license-btn--danger,
+#app-content .azc-license-btn--danger,
+#app-content-wrapper .azc-license-btn--danger,
+.azc-license-modal .azc-license-btn--danger,
+.azc-modal .azc-license-btn--danger,
+.azc-dialog .azc-license-btn--danger,
+dialog .azc-license-btn--danger,
+[role="dialog"] .azc-license-btn--danger,
+[role="alertdialog"] .azc-license-btn--danger {
+	background: var(--color-element-error, var(--color-error)) !important;
+	border-color: var(--color-element-error, var(--color-error)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+.azc-license-page .azc-license-btn--danger:hover,
+#app-content .azc-license-btn--danger:hover,
+#app-content-wrapper .azc-license-btn--danger:hover,
+.azc-license-modal .azc-license-btn--danger:hover,
+.azc-modal .azc-license-btn--danger:hover,
+.azc-dialog .azc-license-btn--danger:hover,
+dialog .azc-license-btn--danger:hover,
+[role="dialog"] .azc-license-btn--danger:hover,
+[role="alertdialog"] .azc-license-btn--danger:hover {
+	background: var(--color-element-error, var(--color-error)) !important;
+	border-color: var(--color-element-error, var(--color-error)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+.azc-license-page .azc-license-btn--danger:focus-visible,
+#app-content .azc-license-btn--danger:focus-visible,
+#app-content-wrapper .azc-license-btn--danger:focus-visible,
+.azc-license-modal .azc-license-btn--danger:focus-visible,
+.azc-modal .azc-license-btn--danger:focus-visible,
+.azc-dialog .azc-license-btn--danger:focus-visible,
+dialog .azc-license-btn--danger:focus-visible,
+[role="dialog"] .azc-license-btn--danger:focus-visible,
+[role="alertdialog"] .azc-license-btn--danger:focus-visible {
+	background: var(--color-element-error, var(--color-error)) !important;
+	border-color: var(--color-element-error, var(--color-error)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+	outline: 3px solid color-mix(in srgb, var(--color-element-error, var(--color-error)) 55%, transparent);
+	outline-offset: 2px;
+}
+.azc-license-page .azc-license-btn--danger:active,
+#app-content .azc-license-btn--danger:active,
+#app-content-wrapper .azc-license-btn--danger:active,
+.azc-license-modal .azc-license-btn--danger:active,
+.azc-modal .azc-license-btn--danger:active,
+.azc-dialog .azc-license-btn--danger:active,
+dialog .azc-license-btn--danger:active,
+[role="dialog"] .azc-license-btn--danger:active,
+[role="alertdialog"] .azc-license-btn--danger:active {
+	background: var(--color-element-error, var(--color-error)) !important;
+	border-color: var(--color-element-error, var(--color-error)) !important;
+	color: var(--color-primary-element-text, var(--color-primary-text)) !important;
+}
+
 /* ── Form elements ───────────────────────────────────────────── */
 .azc-license-field__label {
 	display: block;

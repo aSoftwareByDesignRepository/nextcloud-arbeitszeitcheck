@@ -529,20 +529,49 @@
 				}
 			});
 		};
+		// Chrome lets Tab/Shift+Tab leave a modal <dialog> at its boundaries —
+		// focus lands on <body>/browser chrome, and once outside, Escape never
+		// reaches the dialog's keydown handler (and the suppressed `cancel`
+		// event cannot close it either) leaving the modal stuck open. Trap Tab
+		// at both boundaries — same fix shape as dc-swap-dialog.
+		const FOCUSABLE_SEL = 'a[href],input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[tabindex]:not([tabindex="-1"])';
+		const onFocusTrap = (dlg) => {
+			dlg.addEventListener('keydown', (e) => {
+				if (e.key !== 'Tab') return;
+				const list = Array.from(dlg.querySelectorAll(FOCUSABLE_SEL))
+					.filter((node) => node.offsetParent !== null || node === document.activeElement);
+				if (list.length === 0) {
+					e.preventDefault();
+					return;
+				}
+				const first = list[0];
+				const last = list[list.length - 1];
+				if (e.shiftKey && document.activeElement === first) {
+					e.preventDefault();
+					last.focus();
+				} else if (!e.shiftKey && document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			});
+		};
 		if (clearModal) {
 			clearModal.addEventListener('cancel', (e) => { e.preventDefault(); closeClearModal(); });
 			onOutsideClick(clearModal, () => closeClearModal());
 			onEscapeClose(clearModal, () => closeClearModal());
+			onFocusTrap(clearModal);
 		}
 		if (confirmModal) {
 			confirmModal.addEventListener('cancel', (e) => { e.preventDefault(); closeConfirm({ confirmed: false }); });
 			onOutsideClick(confirmModal, () => closeConfirm({ confirmed: false }));
 			onEscapeClose(confirmModal, () => closeConfirm({ confirmed: false }));
+			onFocusTrap(confirmModal);
 		}
 		if (tokenModal) {
 			tokenModal.addEventListener('cancel', (e) => { e.preventDefault(); closeTokenModal(); });
 			onOutsideClick(tokenModal, () => closeTokenModal());
 			onEscapeClose(tokenModal, () => closeTokenModal());
+			onFocusTrap(tokenModal);
 		}
 
 		/* ── Save / clear license ────────────────────────────────── */

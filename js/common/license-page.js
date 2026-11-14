@@ -265,6 +265,36 @@
 			return result;
 		}
 
+		// Navigation/teardown aborts are not connectivity failures — suppress
+		// the network-error flash when the fetch was cancelled by page unload
+		// or an in-flight abort (mirrors common/api.js REQUEST_ABORTED).
+		function isNavOrAbort(e) {
+			return !!(e && (e.name === 'AbortError' || e.code === 'REQUEST_ABORTED'
+				|| (e.cause && (e.cause.name === 'AbortError' || e.cause.code === 20))));
+		}
+		function showNetworkErrorUnlessAbort(e) {
+			if (!isNavOrAbort(e)) {
+				showFeedback(t('Network error. Please try again.'), 'error');
+			}
+		}
+
+		// Focus lost to <body> on dialog close (trigger detached by a re-render)
+		// strands keyboard users — only restore when the trigger is still
+		// connected, else land on the app's main landmark.
+		function restoreFocus(el) {
+			if (el && el.isConnected) {
+				el.focus();
+				return;
+			}
+			const main = document.getElementById(p + '-main-content');
+			if (main && main.focus) {
+				if (main.tabIndex < 0) {
+					main.tabIndex = -1;
+				}
+				main.focus();
+			}
+		}
+
 		function escapeHtml(s) {
 			const d = document.createElement('div');
 			d.textContent = s;
@@ -402,9 +432,7 @@
 				confirmModal.close();
 			}
 			document.body.classList.remove(p + '-license-modal-open');
-			if (confirmReturnFocus && confirmReturnFocus.focus) {
-				confirmReturnFocus.focus();
-			}
+			restoreFocus(confirmReturnFocus);
 			confirmReturnFocus = null;
 			if (confirmResolver) {
 				const resolve = confirmResolver;
@@ -448,9 +476,7 @@
 				tokenModal.close();
 			}
 			document.body.classList.remove(p + '-license-modal-open');
-			if (tokenReturnFocus && tokenReturnFocus.focus) {
-				tokenReturnFocus.focus();
-			}
+			restoreFocus(tokenReturnFocus);
 			tokenReturnFocus = null;
 		}
 
@@ -548,7 +574,7 @@
 					}
 					showFeedback(data.message || data.error || t('Could not save license.'), 'error');
 				} catch (e) {
-					showFeedback(t('Network error. Please try again.'), 'error');
+					showNetworkErrorUnlessAbort(e);
 				}
 				saveBtn.disabled = false;
 				saveBtn.textContent = originalLabel;
@@ -575,9 +601,7 @@
 				clearModal.close();
 			}
 			document.body.classList.remove(p + '-license-modal-open');
-			if (modalReturnFocus) {
-				modalReturnFocus.focus();
-			}
+			restoreFocus(modalReturnFocus);
 		}
 
 		if (clearBtn) {
@@ -609,7 +633,7 @@
 					}
 					showFeedback(data.message || data.error || t('Could not remove license.'), 'error');
 				} catch (e) {
-					showFeedback(t('Network error. Please try again.'), 'error');
+					showNetworkErrorUnlessAbort(e);
 				}
 				if (clearBtn) {
 					clearBtn.disabled = false;
@@ -729,7 +753,7 @@
 						showFeedback(data.message || data.error || t('Could not remove seat.'), 'error');
 					}
 				} catch (e) {
-					showFeedback(t('Network error. Please try again.'), 'error');
+					showNetworkErrorUnlessAbort(e);
 				} finally {
 					btn.disabled = false;
 				}
@@ -932,7 +956,7 @@
 					showFeedback(data.message || data.error || t('Could not assign seat.'), 'error');
 				}
 			} catch (e) {
-				showFeedback(t('Network error. Please try again.'), 'error');
+				showNetworkErrorUnlessAbort(e);
 			} finally {
 				updateAssignSelectedButton();
 			}
@@ -1163,7 +1187,7 @@
 						showFeedback(data.message || data.error || t('Could not register device.'), 'error');
 					}
 				} catch (e) {
-					showFeedback(t('Network error. Please try again.'), 'error');
+					showNetworkErrorUnlessAbort(e);
 				} finally {
 					terminalRegister.disabled = false;
 				}
@@ -1210,7 +1234,7 @@
 							showFeedback(regen.data.message || regen.data.error || t('Could not generate a pairing code.'), 'error');
 						}
 					} catch (e) {
-						showFeedback(t('Network error. Please try again.'), 'error');
+						showNetworkErrorUnlessAbort(e);
 					}
 					regenBtn.disabled = false;
 					return;
@@ -1257,7 +1281,7 @@
 						showFeedback(data.message || data.error || t('Could not revoke device.'), 'error');
 					}
 				} catch (e) {
-					showFeedback(t('Network error. Please try again.'), 'error');
+					showNetworkErrorUnlessAbort(e);
 				} finally {
 					btn.disabled = false;
 				}

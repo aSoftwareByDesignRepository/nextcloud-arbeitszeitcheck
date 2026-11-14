@@ -838,6 +838,14 @@ dialog .azc-license-btn--danger:active,
 	box-sizing: border-box;
 }
 
+/* Nextcloud core's reset prints `dialog { display: block }` at author
+   origin — it outranks the UA `dialog:not([open]) { display: none }`
+   rule, so a closed license modal would still paint (and catch clicks /
+   enter the a11y tree) mid-page. Re-hide it explicitly. */
+.azc-license-modal:not([open]) {
+	display: none;
+}
+
 .azc-license-modal h3 {
 	margin: 0 0 var(--azc-space-2, 0.5rem);
 	font-size: var(--azc-fs-lg, 1.125rem);

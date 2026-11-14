@@ -202,7 +202,20 @@ test.describe('Bachus: half-day days-mode live create', () => {
 		await expect(page.locator('#absence-type')).toHaveValue('sick_leave');
 		await expect(page.locator('#absence-start-date')).toHaveValue(display);
 		await expect(page.locator('#absence-end-date')).toHaveValue(display);
-		await expect(page.locator('#absence-day-fraction-group')).toBeHidden();
+		// Visibility depends on the org's half_day_enabled_types opt-in —
+		// assert against the same data attribute the product reads, and pin
+		// the real contract either way: the link never preselects half day.
+		const group = page.locator('#absence-day-fraction-group');
+		const hoursMode = await page.locator('#absence-duration-hours-group').getAttribute('data-hours-mode');
+		let enabledTypes = [];
+		try {
+			enabledTypes = JSON.parse(await group.getAttribute('data-enabled-types') || '[]') || [];
+		} catch (e) { enabledTypes = []; }
+		if (hoursMode !== '1' && enabledTypes.includes('sick_leave')) {
+			await expect(group).toBeVisible();
+		} else {
+			await expect(group).toBeHidden();
+		}
 		await expect(page.locator('#absence-day-fraction-half')).not.toBeChecked();
 		await expect(page.locator('#absence-reason')).toHaveValue('');
 	});

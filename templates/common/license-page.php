@@ -671,21 +671,21 @@ if (!is_string($i18nJson)) {
 	</dialog>
 
 	<dialog id="azc-license-confirm-modal" class="azc-license-modal" aria-labelledby="azc-license-confirm-title" aria-describedby="azc-license-confirm-body">
-		<h3 id="azc-license-confirm-title"></h3>
+		<h3 id="azc-license-confirm-title"><?php p($l->t('Confirm')); ?></h3>
 		<p class="azc-license-modal__hint" id="azc-license-confirm-body"></p>
 		<div class="azc-license-modal__actions">
-			<button type="button" id="azc-license-confirm-cancel" class="azc-license-btn azc-license-btn--secondary"></button>
-			<button type="button" id="azc-license-confirm-ok" class="azc-license-btn azc-license-btn--danger"></button>
+			<button type="button" id="azc-license-confirm-cancel" class="azc-license-btn azc-license-btn--secondary"><?php p($l->t('Cancel')); ?></button>
+			<button type="button" id="azc-license-confirm-ok" class="azc-license-btn azc-license-btn--danger"><?php p($l->t('Confirm')); ?></button>
 		</div>
 	</dialog>
 
 	<dialog id="azc-license-token-modal" class="azc-license-modal" aria-labelledby="azc-license-token-title">
-		<h3 id="azc-license-token-title"></h3>
-		<p class="azc-license-modal__hint" id="azc-license-token-hint"></p>
+		<h3 id="azc-license-token-title"><?php p($l->t('New pairing code')); ?></h3>
+		<p class="azc-license-modal__hint" id="azc-license-token-hint"><?php p($l->t('This token is shown only once. Paste it into the companion app on the device.')); ?></p>
 		<code class="azc-license-token-value" id="azc-license-token-value" tabindex="0"></code>
 		<div class="azc-license-modal__actions">
-			<button type="button" id="azc-license-token-copy" class="azc-license-btn azc-license-btn--primary"></button>
-			<button type="button" id="azc-license-token-close" class="azc-license-btn azc-license-btn--secondary"></button>
+			<button type="button" id="azc-license-token-copy" class="azc-license-btn azc-license-btn--primary"><?php p($l->t('Copy token')); ?></button>
+			<button type="button" id="azc-license-token-close" class="azc-license-btn azc-license-btn--secondary"><?php p($l->t('Done')); ?></button>
 		</div>
 	</dialog>
 </div>

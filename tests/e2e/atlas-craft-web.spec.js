@@ -696,6 +696,93 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await resetUserTheme(page).catch(() => {});
 	});
 
+	test('craft admin license surface + pack dialogs (r50 delta)', async ({ page }) => {
+		test.skip(!hasCreds('ADMIN'), 'Requires NC_ADMIN_* creds');
+		test.setTimeout(300_000);
+
+		await login(page, credsFromEnv('ADMIN'));
+		await resetUserTheme(page).catch(() => {});
+		await setUserTheme(page, 'light');
+
+		/* --- r50 recapture on the converged shared pack (@208c0f6): chrome +
+		   populated dialog labels + armored button variants. Destructive legs
+		   restore in-band (clear → re-apply → re-seat). */
+		const licSeed = await applyLabLicense(page, apiAllowFailure);
+		expect(licSeed.ok, `license seed failed: ${JSON.stringify(licSeed.res?.json)}`).toBe(true);
+		// Guarantee ≥1 seat row so the seat-remove confirm trigger exists.
+		await apiAllowFailure(page, 'POST',
+			'/apps/arbeitszeitcheck/api/admin/license/mobile-seats/batch',
+			{ data: { userIds: ['e2e_employee', 'e2e_manager', 'e2e_substitute', 'azc_gdpr_probe'] } });
+
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
+		await page.waitForSelector('#azc-main-content', { timeout: 30_000 });
+		await dismissToasts(page);
+		await shot(page, 'azc-admin-license.png', { waitFor: '#azc-license-page', settleMs: 700 });
+
+		/* clear modal — open → cancel (zero mutation) */
+		await page.locator('#azc-license-clear').click();
+		const clearDlg = page.locator('#azc-license-clear-modal');
+		await expect(clearDlg).toBeVisible({ timeout: 10_000 });
+		await shot(page, 'azc-admin-license-dialog-clear.png', { settleMs: 300 });
+		await page.locator('#azc-license-clear-cancel').click();
+		await expect(clearDlg).toBeHidden({ timeout: 10_000 });
+
+		/* generic confirm modal via the REAL seat-remove trigger — populated
+		   title/body/labels, danger-variant confirm. Cancel → zero mutation. */
+		const seatRemove = page.locator('.azc-seat-remove').first();
+		await expect(seatRemove).toBeVisible({ timeout: 15_000 });
+		await seatRemove.click();
+		const confirmDlg = page.locator('#azc-license-confirm-modal');
+		await expect(confirmDlg).toBeVisible({ timeout: 10_000 });
+		await expect(confirmDlg.locator('#azc-license-confirm-body')).not.toBeEmpty();
+		await shot(page, 'azc-admin-license-dialog-confirm.png', { settleMs: 300 });
+		await page.locator('#azc-license-confirm-cancel').click();
+		await expect(confirmDlg).toBeHidden({ timeout: 10_000 });
+
+		/* token modal — AZC renders terminalMode 'link': kiosk pairing lives on
+		   the kiosk admin page, so this page exposes no register/regen trigger.
+		   Synthetic open replicates openTokenModal() exactly (title/hint/labels
+		   are server-rendered populated; the one-time value is a fixture). */
+		await page.evaluate(() => {
+			const modal = document.getElementById('azc-license-token-modal');
+			const value = document.getElementById('azc-license-token-value');
+			if (value) {
+				value.textContent = 'AZC2.CRAFT-PAIRING-FIXTURE';
+			}
+			modal.showModal();
+			document.body.classList.add('azc-license-modal-open');
+		});
+		const tokenDlg = page.locator('#azc-license-token-modal');
+		await expect(tokenDlg).toBeVisible({ timeout: 5_000 });
+		await shot(page, 'azc-admin-license-dialog-token.png', { settleMs: 300 });
+		await page.evaluate(() => {
+			const modal = document.getElementById('azc-license-token-modal');
+			if (modal && modal.open) {
+				modal.close();
+			}
+			document.body.classList.remove('azc-license-modal-open');
+		});
+
+		/* real confirm leg: open → CONFIRM → cleared-state re-read → re-apply
+		   the lab license + re-seat so shared fixture state is restored. */
+		await page.locator('#azc-license-clear').click();
+		await expect(clearDlg).toBeVisible({ timeout: 10_000 });
+		await shot(page, 'azc-admin-license-clear-confirm.png', { settleMs: 300 });
+		await page.locator('#azc-license-clear-confirm').click();
+		await page.waitForSelector('#azc-license-key-input', { timeout: 30_000 });
+		await expect(page.locator('#azc-license-clear')).toHaveCount(0);
+		const lic = await applyLabLicense(page, apiAllowFailure);
+		expect(lic.ok, `license re-apply failed: ${JSON.stringify(lic.res?.json)}`).toBe(true);
+		const seats = await apiAllowFailure(page, 'POST',
+			'/apps/arbeitszeitcheck/api/admin/license/mobile-seats/batch',
+			{ data: { userIds: ['e2e_employee', 'e2e_manager', 'e2e_substitute', 'azc_gdpr_probe'] } });
+		expect(seats.ok, `seat restore failed: ${JSON.stringify(seats.json)}`).toBe(true);
+		await gotoApp(page, '/apps/arbeitszeitcheck/admin/license');
+		await expect(page.locator('#azc-license-clear')).toBeVisible({ timeout: 15_000 });
+
+		await resetUserTheme(page).catch(() => {});
+	});
+
 	test('craft admin dialogs + filter toolbars (3.5.15 inventory)', async ({ page, browser }) => {
 		test.skip(!hasCreds('ADMIN'), 'Requires NC_ADMIN_* creds');
 		test.setTimeout(480_000);
@@ -950,7 +1037,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		const clearOpen = page.locator('#azc-license-clear');
 		await expect(clearOpen).toBeVisible({ timeout: 15_000 });
 		await clearOpen.click();
-		const clearModal = page.locator('#azc-license-clear-modal[role="dialog"]');
+		const clearModal = page.locator('#azc-license-clear-modal');
 		await expect(clearModal).toBeVisible({ timeout: 10_000 });
 		await shot(page, 'azc-admin-license-clear-confirm.png', { settleMs: 300 });
 		await page.locator('#azc-license-clear-confirm').click();
@@ -1010,9 +1097,24 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 
 	test.afterAll(async () => {
 		fs.mkdirSync(OUT, { recursive: true });
+		const manifestPath = path.join(OUT, '_manifest.json');
+		// Merge, never clobber: focused re-captures only cover a subset of the
+		// surface list — keep prior entries for files that still exist on disk.
+		let prior = [];
+		try {
+			prior = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).files || [];
+		} catch { /* first run or corrupt manifest — start fresh */ }
+		const byPath = new Map(
+			prior
+				.filter((f) => f && f.path && fs.existsSync(path.join(OUT, path.basename(f.path))))
+				.map((f) => [f.path, f]),
+		);
+		for (const entry of MANIFEST) {
+			byPath.set(entry.path, entry);
+		}
 		fs.writeFileSync(
-			path.join(OUT, '_manifest.json'),
-			JSON.stringify({ app: 'arbeitszeitcheck', captured_at: new Date().toISOString(), files: MANIFEST }, null, 1),
+			manifestPath,
+			JSON.stringify({ app: 'arbeitszeitcheck', captured_at: new Date().toISOString(), files: [...byPath.values()] }, null, 1),
 		);
 	});
 });

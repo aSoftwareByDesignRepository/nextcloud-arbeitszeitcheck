@@ -66,7 +66,7 @@
 	margin-bottom: var(--space-10, 2.5rem);
 }
 
-.reports-section__title {
+#app-content.azc-app--reports .reports-section__title {
 	margin: 0 0 var(--space-2, 0.5rem);
 	font-size: 1.25rem;
 	font-weight: 600;
@@ -188,14 +188,6 @@
 }
 
 /* ========== Report type chooser (theme-safe option list) ========== */
-#app-content.azc-app--reports .report-selection-section {
-	padding: 0;
-}
-
-#app-content.azc-app--reports .report-selection-section .azc-card__body {
-	padding-top: var(--azc-space-4, 1rem);
-}
-
 #app-content.azc-app--reports .report-types-grid {
 	display: flex;
 	flex-direction: column;
@@ -669,7 +661,7 @@
 	background: var(--azc-bg-soft, var(--color-background-hover));
 }
 
-.datev-export-panel__title {
+#app-content.azc-app--reports .datev-export-panel__title {
 	display: flex;
 	align-items: center;
 	gap: var(--azc-space-2, 0.5rem);

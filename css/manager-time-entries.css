@@ -16,20 +16,260 @@
 	gap: var(--azc-space-4, 1rem);
 }
 
-#app-content.azc-app--manager-time-entries .manager-scope-page__create-hint {
-	margin: 0 var(--azc-space-4, 1rem) var(--azc-space-4, 1rem);
-}
-
 .manager-create-dialog__meta {
 	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--azc-space-4, 1rem);
 	margin-bottom: var(--azc-space-4, 1rem);
 }
 
-@media (min-width: 40rem) {
+@media (max-width: 575.98px) {
 	.manager-create-dialog__meta {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+#manager-create-time-entry-modal .manager-create-dialog__employee .user-picker__search,
+#manager-create-time-entry-modal .manager-create-dialog__project .form-select {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+/* Date | Start | End on one row inside the modal, mirroring the employee
+   create form (.form-grid--3 on time-entries.css is page-scoped and cannot
+   reach the body-portaled dialog). Collapses to a single column on small
+   screens — same convention as the other modal breakpoints. */
+#manager-create-time-entry-modal .clock-form-when {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--azc-space-4, 1rem);
+	align-items: start;
+}
+
+@media (max-width: 575.98px) {
+	#manager-create-time-entry-modal .clock-form-when {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* Day summary card at the end of the create form — page styling lives in
+   time-entries.css (#app-content scope); this is the modal twin. */
+#manager-create-time-entry-modal .clock-form-summary {
+	margin: var(--azc-space-4, 1rem) 0 0;
+	padding: var(--azc-space-4, 1rem);
+	border: 1px solid var(--azc-border, var(--color-border));
+	border-radius: var(--azc-radius-md, var(--border-radius-large, 10px));
+	background: var(--azc-bg-soft, var(--color-background-hover));
+}
+
+#manager-create-time-entry-modal .clock-form-summary .time-summary-title {
+	margin: 0 0 var(--azc-space-3, 0.75rem);
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--color-main-text);
+}
+
+#manager-create-time-entry-modal .clock-form-summary .summary-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--azc-space-4, 1rem);
+	padding: var(--azc-space-1, 0.25rem) 0;
+}
+
+#manager-create-time-entry-modal .clock-form-summary .summary-value {
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+}
+
+/* Date field = input + attached calendar segment. The field border lives
+   on the host (not the input) and overflow:hidden clips the toggle to the
+   exact field edge — pixel-flush by construction, no offset arithmetic. */
+#manager-create-time-entry-modal .form-input-wrapper--date > .azc-datepicker-host {
+	display: flex;
+	align-items: stretch;
+	box-sizing: border-box;
+	min-height: 44px;
+	border: 1px solid var(--azc-form-border, var(--color-border-maxcontrast, var(--color-border)));
+	border-radius: var(--azc-radius-md, 12px);
+	background: var(--color-main-background);
+	overflow: hidden;
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date > .azc-datepicker-host:focus-within {
+	border-color: var(--color-primary-element);
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date .datepicker-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding-inline-end: var(--space-3, 0.75rem);
+	border: 0;
+	background: transparent;
+	color: var(--color-main-text);
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date .datepicker-input:focus,
+#manager-create-time-entry-modal .form-input-wrapper--date .datepicker-input:focus-visible {
+	border: 0;
+	outline: none;
+	box-shadow: none;
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date .azc-datepicker-toggle {
+	position: static;
+	flex: 0 0 44px;
+	width: 44px;
+	margin: 0;
+	height: auto;
+	min-height: 0;
+	transform: none;
+	color: var(--color-main-text);
+	background: color-mix(in srgb, var(--color-primary-element) 12%, var(--color-main-background));
+	border: 0;
+	border-inline-start: 1px solid color-mix(in srgb, var(--color-primary-element) 35%, var(--azc-form-border));
+	border-radius: 0;
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date .azc-datepicker-toggle:focus-visible {
+	outline: 3px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+#manager-create-time-entry-modal .form-input-wrapper--date > .btn {
+	flex: 0 0 auto;
+	min-height: 44px;
+}
+
+/* Time picker parity with the employee form: the numbers carry no boxes,
+   the clock trigger hugs the right edge of the field. */
+#manager-create-time-entry-modal .azc-timepicker__section {
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+#manager-create-time-entry-modal .azc-timepicker__open {
+	margin-inline-start: auto;
+}
+
+/* Help text under the fields reads as light-grey guidance, not body text
+   (page parity; --color-text-maxcontrast stays WCAG AA on the dialog). */
+#manager-create-time-entry-modal .clock-form-when .form-help,
+#manager-create-time-entry-modal .correction-fieldset--breaks .form-help {
+	color: var(--color-text-maxcontrast, var(--color-main-text));
+	opacity: 1;
+}
+
+/* Section lead sits directly under the dialog title — tighter than the
+   generic form-help margin so it reads as the dialog's subtitle. */
+#manager-create-time-entry-modal .manager-create-dialog__lead {
+	margin-top: 0;
+	margin-bottom: var(--azc-space-4, 1rem);
+	max-width: 60ch;
+}
+
+/* Date/Time labels: icon + title on a single line (page parity). Flex
+   keeps the icon glued to the first word; long translations still wrap. */
+/* Flat sections like the employee form — the correction recipe boxes
+   fieldsets with border + background, the create dialog stays open. */
+#manager-create-time-entry-modal .correction-fieldset--breaks {
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+#manager-create-time-entry-modal .correction-fieldset--breaks .time-pair-matrix--breaks {
+	margin-block-start: var(--space-5, 1.25rem);
+}
+
+/* The .form-group bottom margin stretched the row ~22px below the field
+   and the flex-end action cell dragged Remove down with it — reset it so
+   the button's bottom edge lands flush with the picker's. */
+/* The invisible sr-only row labels still reserved a 1.5rem + margin slot
+   between the column headers and the fields — collapse it in the modal. */
+#manager-create-time-entry-modal .time-pair-matrix--breaks .time-pair-matrix__grid--row .form-label {
+	min-height: 0;
+	margin-bottom: 0;
+}
+
+#manager-create-time-entry-modal .time-pair-matrix__grid--row .form-group {
+	margin-bottom: 0;
+}
+
+#manager-create-time-entry-modal .time-pair-matrix__grid--row .time-pair-matrix__action {
+	padding-bottom: 0;
+}
+
+#manager-create-time-entry-modal .time-pair-matrix__action .azc-btn {
+	margin: 0;
+}
+
+#manager-create-time-entry-modal .mgr-create-add-break {
+	margin-block-start: var(--space-6, 1.5rem);
+}
+
+/* Stacked layout hides the column headers — reveal the per-field labels
+   (sr-only on desktop, like the employee form; !important because the
+   shared .sr-only recipe is !important). */
+@media (max-width: 639.98px) {
+	#manager-create-time-entry-modal .time-pair-matrix__row-label .sr-only {
+		position: static !important;
+		width: auto !important;
+		height: auto !important;
+		padding: 0 !important;
+		margin: 0 0 var(--azc-space-1, 0.25rem) !important;
+		overflow: visible !important;
+		clip-path: none !important;
+		white-space: normal !important;
+		font-weight: 600;
+	}
+}
+
+#manager-create-time-entry-modal .clock-form-when .form-label {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1, 0.25rem);
+}
+
+/* Auto-break status pill — badges.css scopes .azc-status-pill /
+   .auto-break-toggle__status to #app-content.azc-app; this is the modal twin. */
+#manager-create-time-entry-modal .auto-break-toggle__status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.75rem;
+	min-width: 5.5rem;
+	padding: 0.375rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	line-height: 1.35;
+	text-transform: uppercase;
+	white-space: nowrap;
+	border-radius: var(--border-radius-pill, 999px);
+	border: 2px solid var(--color-border-maxcontrast);
+	background: var(--color-background-hover, var(--color-main-background));
+	color: var(--color-main-text);
+	box-sizing: border-box;
+}
+
+#manager-create-time-entry-modal .auto-break-toggle__status--on {
+	border-color: color-mix(in srgb, var(--color-success-text, var(--color-success)) 50%, var(--color-border-maxcontrast));
+	background: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
+	color: var(--color-success-text, var(--color-success));
+}
+
+/* Reason block gets its own breathing room below the work-location
+   fieldset — same vertical rhythm the employee form uses between cards. */
+#manager-create-time-entry-modal .clock-form-reason {
+	margin-top: var(--azc-space-5, 1.5rem);
 }
 
 /* ── List card: filters flush above table (no nested box) ───── */
@@ -59,23 +299,6 @@
 	pointer-events: none;
 }
 
-#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
-#app-content.azc-app--manager-absences .manager-scope-page__pagination {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--azc-space-3, 0.75rem);
-	margin: 0;
-	padding: var(--azc-space-4, 1rem) 0 0;
-	border-top: 1px solid var(--azc-border, var(--color-border));
-}
-
-#app-content.azc-app--manager-time-entries .manager-scope-page__pagination-info,
-#app-content.azc-app--manager-absences .manager-scope-page__pagination-info {
-	font-size: var(--azc-fs-sm, 0.875rem);
-	color: var(--azc-muted, var(--color-text-maxcontrast));
-}
-
 #app-content.azc-app--manager-absences .manager-scope-page__historical-hint {
 	margin-bottom: var(--azc-space-4, 1rem);
 }
@@ -84,6 +307,32 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--azc-space-2, 0.5rem);
+	margin-top: var(--azc-space-4, 1rem);
+}
+
+/* Conditional detail fields (day length / hours) are multi-part blocks —
+   they span the full grid width so the segments and the estimate callout
+   each get their own row instead of wrapping inside a narrow cell. */
+#app-content.azc-app--manager-absences #manager-absence-record-day-fraction-field,
+#app-content.azc-app--manager-absences #manager-absence-record-hours-field {
+	grid-column: 1 / -1;
+	grid-row: auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-2, 0.5rem);
+}
+
+/* Save action sits below the reason textarea, right-aligned like
+   .form-actions (full-width button on mobile via the shared rule). */
+#app-content.azc-app--manager-absences .manager-scope-page__record-actions {
+	margin-top: var(--azc-space-4, 1rem);
+	justify-content: flex-end;
+}
+
+/* Usage previews (vacation days / vacation hours debit) render below the
+   reason textarea. Spacing lives on the callout itself so a hidden
+   sibling adds no gap before the save action. */
+#app-content.azc-app--manager-absences .manager-scope-page__record-preview .azc-callout {
 	margin-top: var(--azc-space-4, 1rem);
 }
 
@@ -107,20 +356,6 @@
 #app-content.azc-app--manager-absences .manager-scope-page .badge--past-record {
 	margin-top: 0;
 	margin-inline-start: 0;
-}
-
-@media (max-width: 768.98px) {
-	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination,
-	#app-content.azc-app--manager-absences .manager-scope-page__pagination {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	#app-content.azc-app--manager-time-entries .manager-scope-page__pagination .azc-btn,
-	#app-content.azc-app--manager-absences .manager-scope-page__pagination .azc-btn {
-		width: 100%;
-		min-height: 46px;
-	}
 }
 
 /* Responsive results tables: card layout with readable long text columns */

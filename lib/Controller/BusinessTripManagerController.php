@@ -33,6 +33,7 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IUserManager;
 use OCP\IUserSession;
 
 final class BusinessTripManagerController extends Controller
@@ -45,11 +46,12 @@ final class BusinessTripManagerController extends Controller
 		private readonly BusinessTripMapper $tripMapper,
 		private readonly PermissionService $permissions,
 		private readonly WorkforceSuiteConfig $config,
+		private readonly IUserManager $userManager,
 	) {
 		parent::__construct($appName, $request);
 	}
 
-	/** GET /api/manager/business-trips — submitted trips within scope. */
+	/** GET /api/manager/business-trips — pending reviews first, decided trips below, within scope. */
 	#[NoAdminRequired]
 	public function index(): JSONResponse
 	{
@@ -69,7 +71,7 @@ final class BusinessTripManagerController extends Controller
 			? null
 			: array_fill_keys($this->permissions->getManagedEmployeeIds($manager), true);
 		$items = [];
-		foreach ($this->tripMapper->findSubmitted(200) as $trip) {
+		foreach (array_merge($this->tripMapper->findSubmitted(200), $this->tripMapper->findDecided(500)) as $trip) {
 			if ($members === null || isset($members[(string)$trip->getUserId()])) {
 				$items[] = $this->serialize($trip);
 			}
@@ -157,8 +159,18 @@ final class BusinessTripManagerController extends Controller
 			$this->permissions->logPermissionDenied($this->uid(), $action, 'business_trip', (string)$id);
 			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
 		}
+		// Drafts are the employee's private pre-submission workspace: the
+		// manager surface must not disclose them. Same uniform 404 — never
+		// a state oracle. Decided trips (approved/rejected/cancelled) stay
+		// viewable; their facts were already disclosed at decision time.
+		if ($trip->getStatus() === BusinessTrip::STATUS_DRAFT) {
+			throw new BusinessTripException('TRIP_NOT_FOUND', 'Not found.', 404);
+		}
 		return $trip;
 	}
+
+	/** @var array<string, string> memoized uid → display name (per request) */
+	private array $displayNames = [];
 
 	/** @return array<string,mixed> */
 	private function serialize(BusinessTrip $trip): array
@@ -166,6 +178,7 @@ final class BusinessTripManagerController extends Controller
 		return [
 			'id' => (int)$trip->getId(),
 			'userId' => (string)$trip->getUserId(),
+			'displayName' => $this->displayName((string)$trip->getUserId()),
 			'status' => (string)$trip->getStatus(),
 			'startsAtUtc' => $trip->getStartsAtUtc()?->format('c'),
 			'endsAtUtc' => $trip->getEndsAtUtc()?->format('c'),
@@ -175,7 +188,19 @@ final class BusinessTripManagerController extends Controller
 			'purpose' => $trip->getPurpose(),
 			'revision' => (int)$trip->getRevision(),
 			'currentSnapshotId' => $trip->getCurrentSnapshotId(),
+			'updatedAt' => $trip->getUpdatedAt()?->format('c'),
 		];
+	}
+
+	/** Display name for the queue/detail "Employee" label; uid fallback for deleted users. */
+	private function displayName(string $uid): string
+	{
+		if (!array_key_exists($uid, $this->displayNames)) {
+			$user = $this->userManager->get($uid);
+			$name = $user !== null ? trim($user->getDisplayName()) : '';
+			$this->displayNames[$uid] = $name !== '' ? $name : $uid;
+		}
+		return $this->displayNames[$uid];
 	}
 
 	private function enabled(): bool

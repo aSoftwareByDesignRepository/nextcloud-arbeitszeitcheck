@@ -113,7 +113,7 @@
 
 #app-content.azc-app--settings .settings-form__checkbox {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	gap: var(--azc-space-3, 0.75rem);
 }
 
@@ -124,7 +124,7 @@
 	min-height: 1.25rem;
 	max-width: 1.25rem;
 	max-height: 1.25rem;
-	margin-block-start: 0.2rem;
+	margin-block-start: 0;
 	padding: 0;
 	cursor: pointer;
 	box-sizing: border-box;

@@ -27,7 +27,7 @@ $base = (string)($pager['base'] ?? '');
 $id = (string)($pager['id'] ?? '');
 $tableId = (string)($pager['tableId'] ?? '');
 $label = (string)($pager['label'] ?? $l->t('Results pagination'));
-$mode = ($pager['mode'] ?? '') === 'client' ? 'client' : 'navigate';
+$mode = in_array($pager['mode'] ?? '', ['client', 'remote'], true) ? $pager['mode'] : 'navigate';
 $hash = (string)($pager['hash'] ?? '');
 if (preg_match('/^[A-Za-z][\w:-]{0,80}$/', $hash) !== 1) {
 	$hash = '';

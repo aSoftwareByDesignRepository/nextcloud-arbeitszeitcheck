@@ -198,6 +198,9 @@
 	}
 
 	function showPage(nav, page, push) {
+		if (nav.dataset.mode === 'remote') {
+			return;
+		}
 		var size = perPage(nav.dataset.perPage);
 		var rows = dataRows(nav);
 		var total = rows.length;
@@ -220,6 +223,13 @@
 
 	function applySize(nav, size) {
 		size = perPage(size);
+		if (nav.dataset.mode === 'remote') {
+			nav.dataset.perPage = String(size);
+			if (typeof nav.__goTo === 'function') {
+				nav.__goTo(1, size);
+			}
+			return;
+		}
 		if (nav.dataset.mode === 'client') {
 			nav.dataset.perPage = String(size);
 			var select = nav.querySelector('select');
@@ -238,6 +248,12 @@
 			var rawPage = params.get(pageKeyOf(nav));
 			var page = rawPage && /^[1-9]\d*$/.test(rawPage) ? Number(rawPage) : 1;
 			var rawSize = params.get(sizeKeyOf(nav));
+			if (nav.dataset.mode === 'remote') {
+				if (typeof nav.__goTo === 'function') {
+					nav.__goTo(page, rawSize ? perPage(rawSize) : null);
+				}
+				return;
+			}
 			if (rawSize) {
 				nav.dataset.perPage = String(perPage(rawSize));
 				var select = nav.querySelector('select');
@@ -306,15 +322,50 @@
 				return;
 			}
 			event.preventDefault();
+			if (nav.dataset.mode === 'remote') {
+				if (typeof nav.__goTo === 'function') {
+					nav.__goTo(Number(link.dataset.page), null);
+				}
+				return;
+			}
 			showPage(nav, Number(link.dataset.page), true);
 		});
 	}
 
 	function resync(nav) {
-		if (!nav) {
+		if (!nav || nav.dataset.mode === 'remote') {
 			return;
 		}
 		showPage(nav, Number(nav.dataset.page) || 1, false);
+	}
+
+	/**
+	 * Remote mode: the page host fetches each slice itself and reports the
+	 * result here so the footer can repaint. State is the server truth —
+	 * page, pages, total — plus the size the host actually applied.
+	 */
+	function update(nav, state) {
+		if (!nav || !state || nav.dataset.mode !== 'remote') {
+			return;
+		}
+		var total = Math.max(0, Number(state.total) || 0);
+		var size = perPage(state.perPage != null ? state.perPage : nav.dataset.perPage);
+		nav.dataset.perPage = String(size);
+		var select = nav.querySelector('select');
+		if (select) {
+			select.value = String(size);
+		}
+		if (total <= 0) {
+			nav.hidden = true;
+			nav.dataset.page = '1';
+			return;
+		}
+		var pages = Math.max(1, Number(state.pages) || 1);
+		var page = Math.min(Math.max(1, Number(state.page) || 1), pages);
+		nav.hidden = false;
+		nav.dataset.page = String(page);
+		paint(nav, page, pages, total);
+		remember(nav, page, size, false);
 	}
 
 	function boot() {
@@ -332,6 +383,7 @@
 		attach: attach,
 		resync: resync,
 		showPage: showPage,
+		update: update,
 	};
 
 	if (typeof window !== 'undefined') {

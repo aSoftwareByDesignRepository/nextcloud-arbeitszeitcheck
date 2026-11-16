@@ -141,16 +141,6 @@
  * below are only the per-page augmentations, mirroring
  * manager-time-entries.css so both manager tables render identically. */
 @media (max-width: 768.98px) {
-	#app-content.azc-app--manager-people .manager-scope-page__pagination {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	#app-content.azc-app--manager-people .manager-scope-page__pagination .azc-btn {
-		width: 100%;
-		min-height: 46px;
-	}
-
 	#app-content.azc-app--manager-people .manager-scope-page__results-table.azc-table--responsive tbody tr {
 		padding: var(--azc-space-4, 1rem);
 		box-shadow: 0 1px 2px color-mix(in srgb, var(--color-main-text) 6%, transparent);

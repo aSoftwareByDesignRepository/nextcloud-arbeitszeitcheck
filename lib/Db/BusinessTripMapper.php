@@ -94,6 +94,26 @@ class BusinessTripMapper extends QBMapper
 		return $this->findEntities($qb);
 	}
 
+	/**
+	 * @return list<BusinessTrip> decided trips (approved/rejected/cancelled),
+	 * newest decision first. Drafts are an explicit allowlist exclusion —
+	 * employee-private until submitted. Bounded; callers still filter by
+	 * scope per row.
+	 */
+	public function findDecided(int $limit = 500): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from($this->getTableName())
+			->where($qb->expr()->in('status', $qb->createNamedParameter([
+				BusinessTrip::STATUS_APPROVED,
+				BusinessTrip::STATUS_REJECTED,
+				BusinessTrip::STATUS_CANCELLED,
+			], IQueryBuilder::PARAM_STR_ARRAY)))
+			->orderBy('updated_at', 'DESC')
+			->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
+
 	/** @return list<BusinessTrip> trips in a state that blocks month closure inside the window. */
 	public function findClosureBlockers(string $userId, \DateTimeInterface $monthStart, \DateTimeInterface $monthEnd): array
 	{

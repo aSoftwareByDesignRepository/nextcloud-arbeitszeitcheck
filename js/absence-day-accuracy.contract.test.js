@@ -43,18 +43,11 @@ describe('FA-RECDATE — record form defaults to today', () => {
 	})
 })
 
-describe('NH-01 — explicit "copy filter range" affordance', () => {
-	it('offers a button that copies filter → record on click only', () => {
-		expect(managerAbsencesTpl).toContain('manager-absence-record-copy-filter')
-		expect(managerAbsencesJs).toContain('function copyFilterRangeToRecord()')
-		expect(managerAbsencesJs).toContain(
-			"getElementById('manager-absence-record-copy-filter')"
-		)
-	})
-
-	it('is a secondary button, never a submit', () => {
-		expect(managerAbsencesTpl).toContain('type="button" id="manager-absence-record-copy-filter"')
-		expect(managerAbsencesTpl).toContain('azc-btn--secondary')
+describe('NH-01 — record dates never inherit the list filter', () => {
+	it('has no copy-filter affordance or filter→record bridge', () => {
+		expect(managerAbsencesTpl).not.toContain('manager-absence-record-copy-filter')
+		expect(managerAbsencesJs).not.toContain('manager-absence-record-copy-filter')
+		expect(managerAbsencesJs).not.toContain('copyFilterRangeToRecord')
 	})
 })
 

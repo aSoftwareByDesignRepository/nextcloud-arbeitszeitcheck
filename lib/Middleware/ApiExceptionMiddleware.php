@@ -69,6 +69,16 @@ final class ApiExceptionMiddleware extends Middleware
 			$payload['fields'] = new \stdClass();
 			return new JSONResponse($payload, Http::STATUS_BAD_REQUEST);
 		}
+		// Contended mutation lock is a retryable client-visible state, not a
+		// server fault — HTTP 423 matches the app's `locked` error_code.
+		if ($exception instanceof \OCP\Lock\LockedException) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Another change is in progress. Please retry.'),
+				'error_code' => 'locked',
+				'fields' => new \stdClass(),
+			], Http::STATUS_LOCKED);
+		}
 
 		$this->logger->error('ArbeitszeitCheck API request failed: ' . $methodName, [
 			'app' => 'arbeitszeitcheck',

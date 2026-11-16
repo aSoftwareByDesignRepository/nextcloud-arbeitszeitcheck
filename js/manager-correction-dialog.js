@@ -144,7 +144,7 @@
 		].join('');
 	}
 
-	function open(entryId, updatedAt, summary) {
+	async function open(entryId, updatedAt, summary) {
 		if (!ClockForm || !Components.createModal) {
 			Messaging.showError(t('Could not open correction dialog.', 'Could not open correction dialog.'));
 			return;
@@ -154,6 +154,13 @@
 			return;
 		}
 
+		const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
+		if (wlCatalog && typeof wlCatalog.load === 'function') {
+			try {
+				await wlCatalog.load();
+			} catch (e) { /* catalog unavailable — builtin fallback labels apply */ }
+		}
+
 		const modalId = 'manager-correct-entry-' + entryId;
 		const existing = document.getElementById(modalId);
 		if (existing) {
@@ -161,7 +168,6 @@
 		}
 
 		const idPrefix = 'mgr-correct-' + entryId;
-		const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
 		const wlOptions = wlCatalog ? wlCatalog.options() : null;
 		const formHtml = buildSnapshotHtml(summary) + ClockForm.buildFormHtml(idPrefix, labels(), { workLocations: wlOptions }) + '</section>';
 		const footerHtml = [

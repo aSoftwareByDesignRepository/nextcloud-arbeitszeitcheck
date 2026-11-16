@@ -133,4 +133,60 @@ test.describe('absence-day-accuracy-pack', () => {
 			)
 		}
 	})
+
+	test('FA-PREVIEW: record-form days badge survives range changes and refines per employee', async ({ page }) => {
+		skipIfMissingCreds('MANAGER')
+		await login(page, creds('MANAGER'))
+		await page.goto('/apps/arbeitszeitcheck/manager/absences')
+
+		const badge = page.locator('#manager-absence-record-days-consumption')
+		const start = page.locator('#manager-absence-record-start')
+		const end = page.locator('#manager-absence-record-end')
+
+		// Defaults to today — a single day owned by the fraction preview —
+		// so the range badge starts hidden.
+		await expect(badge).toBeHidden()
+
+		const { mon, fri } = nextWeekRange()
+		const de = (iso) => iso.split('-').reverse().join('.')
+
+		// Multi-day vacation range → badge appears with a weekday count.
+		await start.fill(de(mon))
+		await end.fill(de(fri))
+		await expect(badge).toBeVisible()
+		await expect(badge).toContainText(/vacation days|Urlaubstage/i)
+		const firstCount = await badge.textContent()
+
+		// Extending the range updates the count — the badge must not vanish.
+		const nextMon = new Date(mon)
+		nextMon.setDate(nextMon.getDate() + 7)
+		await end.fill(de(nextMon.toISOString().slice(0, 10)))
+		await expect(badge).toBeVisible()
+		const secondCount = await badge.textContent()
+		expect(secondCount).not.toBe(firstCount)
+
+		// Reversed range (start after end) → badge hides, no stale count.
+		const afterNextMon = new Date(nextMon)
+		afterNextMon.setDate(afterNextMon.getDate() + 1)
+		await start.fill(de(afterNextMon.toISOString().slice(0, 10)))
+		await start.dispatchEvent('input')
+		await expect(badge).toBeHidden()
+
+		// Valid again + employee picked → server estimate refines in place.
+		await start.fill(de(mon))
+		await end.fill(de(fri))
+		await end.dispatchEvent('input')
+		await expect(badge).toBeVisible()
+		const search = page.locator('#manager-absence-record-employee-search')
+		await search.fill(process.env.NC_EMPLOYEE_USER || 'e2e')
+		const option = page.locator('[role="option"].user-picker__item').first()
+		await expect(option).toBeVisible({ timeout: 5000 })
+		const estimate = page.waitForResponse(
+			(r) => r.url().includes('employee-absences/estimate-days') && r.status() === 200,
+		)
+		await option.click()
+		await estimate
+		await expect(badge).toBeVisible()
+		await expect(badge).toContainText(/vacation days|Urlaubstage/i)
+	})
 })

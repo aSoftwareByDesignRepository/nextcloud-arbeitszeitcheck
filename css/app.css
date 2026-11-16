@@ -7,7 +7,7 @@
 @import url('common/colors.css');
 @import url('common/typography.css?v=20261031-tile');
 @import url('common/base.css?v=20261109-skiplink');
-@import url('common/components.css');
+@import url('common/components.css?v=20261215-toggle');
 @import url('common/user-picker.css');
 @import url('common/layout.css');
 @import url('common/app-layout.css');
@@ -18,7 +18,7 @@
 @import url('common/utilities.css');
 @import url('common/responsive.css');
 @import url('common/mobile-nav.css');
-@import url('common/accessibility.css?v=20261031-tile');
+@import url('common/accessibility.css?v=20261113-dialog');
 @import url('common/semantic-surfaces.css');
 @import url('common/callout-banner.css');
 @import url('common/legacy-alert.css');
@@ -655,6 +655,30 @@
 	outline-offset: 2px;
 }
 
+/* Same rule for body-mounted overlays (native <dialog> reparented to
+   <body>, layer dialogs, ARIA panels): the page scopes above cannot reach
+   them, and NC server's button reset otherwise strips the ring entirely
+   (0px outline on .azc-btn inside dialogs; sub-3:1 UA ring on .modal-close).
+   !important: server.css ships its own !important button focus ring —
+   specificity alone cannot beat it. Same canonical scope list as the
+   button-variant armoring below. */
+dialog.azc-dialog .azc-btn:focus-visible,
+dialog.azc-dialog .modal-close:focus-visible,
+dialog.azc-dialog button:focus-visible,
+.azc-dialog .azc-btn:focus-visible,
+.azc-dialog .modal-close:focus-visible,
+.azc-dialog button:focus-visible,
+.azc-modal-backdrop .azc-btn:focus-visible,
+.azc-modal-backdrop .modal-close:focus-visible,
+.azc-modal-backdrop button:focus-visible,
+[role="dialog"] .azc-btn:focus-visible,
+[role="dialog"] .modal-close:focus-visible,
+[role="alertdialog"] .azc-btn:focus-visible,
+[role="alertdialog"] .modal-close:focus-visible {
+	outline: 3px solid var(--color-primary-element) !important;
+	outline-offset: 2px;
+}
+
 /* Canonical body-mounted-overlay scopes for every variant rule below:
  * .azc-modal-backdrop + .azc-dialog (components.js JS-built dialogs),
  * dialog (ANY native <dialog>, current and future — layer-dialog,
@@ -1170,6 +1194,13 @@ dialog .azc-icon-btn > svg,
 	border-bottom: 1px solid var(--azc-border);
 	background: var(--azc-bg-soft);
 }
+/* Header-only cards (e.g. the manager "Record time" action card) get no
+ * divider and no soft band — both only earn their keep above a body. */
+#app-content.azc-app .azc-card__header:last-child {
+	border-bottom: 0;
+	background: transparent;
+}
+
 #app-content.azc-app .azc-card__header-text {
 	flex: 1 1 14rem;
 	min-width: 0;
@@ -1695,9 +1726,10 @@ dialog .azc-icon-btn > svg,
 	height: 48px;
 	color: var(--azc-muted);
 }
-.azc-empty-state__title {
+#app-content.azc-app .azc-empty-state__title {
 	margin: 0;
 	font-size: var(--azc-fs-lg);
+	font-weight: 600;
 }
 .azc-empty-state__lead {
 	margin: 0;
@@ -1888,6 +1920,30 @@ dialog.azc-native-dialog::backdrop,
 dialog.layer-dialog::backdrop,
 dialog.entitlement-explain-dialog::backdrop {
 	background: color-mix(in srgb, var(--color-main-text) 45%, transparent);
+}
+
+/* Simple azc-dialog natives ship loose content (title + form fields) —
+   the frame carries the canonical padding (same as .azc-dialog__body).
+   Structured variants (.azc-dialog__body/__footer) keep padding: 0 so
+   the footer divider reaches the edges. */
+dialog.azc-dialog:not(:has(.azc-dialog__body)) {
+	padding: var(--azc-space-5);
+	overflow-y: auto;
+}
+
+dialog.azc-dialog .azc-dialog__title {
+	margin: 0 0 var(--azc-space-4);
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+dialog.azc-dialog .azc-dialog__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--azc-space-2);
+	margin-top: var(--azc-space-4);
+	padding-top: var(--azc-space-4);
+	border-top: 1px solid var(--azc-border);
 }
 
 /* === app-feedback:azc start === */

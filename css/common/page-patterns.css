@@ -145,8 +145,7 @@
 		minmax(0, 1.2fr)
 		minmax(0, 1fr)
 		minmax(0, 1fr)
-		minmax(0, 1fr)
-		auto;
+		minmax(0, 1fr);
 }
 
 #app-content.azc-app .azc-filter-field {

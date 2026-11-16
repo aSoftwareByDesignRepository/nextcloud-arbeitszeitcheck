@@ -109,9 +109,11 @@ $teamMembers = $_['teamMembers'] ?? [];
 				</div>
 			</header>
 			<div class="azc-card__body">
-				<div class="pending-approvals-tabs" role="tablist" aria-label="<?php p($l->t('Filter pending approvals by type')); ?>">
-					<button type="button" class="pending-approvals-tab pending-approvals-tab--active" role="tab" aria-selected="true" aria-controls="pending-absences-panel" id="tab-absences"><?php p($l->t('Absences')); ?></button>
-					<button type="button" class="pending-approvals-tab" role="tab" aria-selected="false" aria-controls="pending-time-entries-panel" id="tab-time-entries"><?php p($l->t('Time entries')); ?></button>
+				<div class="azc-tabs pending-approvals-tabs" role="tablist" aria-label="<?php p($l->t('Filter pending approvals by type')); ?>">
+					<div class="azc-tabs__row">
+						<button type="button" class="azc-tab" role="tab" aria-selected="true" aria-controls="pending-absences-panel" id="tab-absences" tabindex="0"><?php p($l->t('Absences')); ?></button>
+						<button type="button" class="azc-tab" role="tab" aria-selected="false" aria-controls="pending-time-entries-panel" id="tab-time-entries" tabindex="-1"><?php p($l->t('Time entries')); ?></button>
+					</div>
 				</div>
 				<div id="bulk-decision-toolbar" class="bulk-decision-toolbar visually-hidden" role="toolbar" aria-label="<?php p($l->t('Bulk actions for selected approvals')); ?>" aria-hidden="true">
 					<span id="bulk-decision-count" class="bulk-decision-toolbar__count" role="status"></span>

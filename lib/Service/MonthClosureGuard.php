@@ -18,6 +18,18 @@ class MonthClosureGuard
 {
 	private MonthClosureService $monthClosureService;
 
+	/**
+	 * In-request refcount of held month-closure keys. The DB locking
+	 * provider is NOT reentrant: a nested writer (e.g. the paid-break
+	 * recompute inside a month-closure-locked entry write) re-acquiring an
+	 * already-held key would deadlock itself — after the outer insert has
+	 * already committed. Tracking depth lets nested scopes share the outer
+	 * hold; the DB lock is released only when the outermost scope releases.
+	 *
+	 * @var array<string,int>
+	 */
+	private array $heldMonthClosureKeys = [];
+
 	public function __construct(MonthClosureService $monthClosureService)
 	{
 		$this->monthClosureService = $monthClosureService;
@@ -85,20 +97,33 @@ class MonthClosureGuard
 	public function acquireMutableRangeLocks(string $userId, \DateTimeInterface $rangeStart, \DateTimeInterface $rangeEnd): array
 	{
 		$keys = $this->monthClosureService->mutableRangeLockKeys($userId, $rangeStart, $rangeEnd);
-		$this->monthClosureService->acquireMonthClosureTierLocks($keys);
+		$this->acquireMutableRangeLockKeys($keys);
 		return $keys;
 	}
 
 	/**
 	 * Acquire exclusive month-closure locks for a precomputed key set —
 	 * e.g. the union of several ranges when an update moves a row between
-	 * months.
+	 * months. Reentrant within a request: keys the caller (or an outer
+	 * scope) already holds are refcounted instead of re-acquired, because
+	 * the DB locking provider is not reentrant and would throw a
+	 * LockedException against the request's own hold.
 	 *
 	 * @param list<string> $keys
 	 */
 	public function acquireMutableRangeLockKeys(array $keys): void
 	{
-		$this->monthClosureService->acquireMonthClosureTierLocks($keys);
+		$keys = array_values(array_unique($keys));
+		// Canonical acquisition order — merged multi-range sets can arrive
+		// out of order, and different orders on the same key set deadlock.
+		sort($keys);
+		$missing = array_values(array_diff($keys, array_keys($this->heldMonthClosureKeys)));
+		if ($missing !== []) {
+			$this->monthClosureService->acquireMonthClosureTierLocks($missing);
+		}
+		foreach ($keys as $key) {
+			$this->heldMonthClosureKeys[$key] = ($this->heldMonthClosureKeys[$key] ?? 0) + 1;
+		}
 	}
 
 	/**
@@ -142,6 +167,21 @@ class MonthClosureGuard
 	 */
 	public function releaseMutableRangeLocks(array $keys): void
 	{
-		$this->monthClosureService->releaseMonthClosureTierLocks($keys);
+		$releasable = [];
+		foreach (array_unique($keys) as $key) {
+			if (!isset($this->heldMonthClosureKeys[$key])) {
+				// Not tracked (acquired outside this refcount path or
+				// already released) — release directly, legacy semantics.
+				$releasable[] = $key;
+				continue;
+			}
+			if (--$this->heldMonthClosureKeys[$key] <= 0) {
+				unset($this->heldMonthClosureKeys[$key]);
+				$releasable[] = $key;
+			}
+		}
+		if ($releasable !== []) {
+			$this->monthClosureService->releaseMonthClosureTierLocks($releasable);
+		}
 	}
 }

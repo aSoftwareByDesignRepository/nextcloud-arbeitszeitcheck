@@ -29,48 +29,92 @@
 				'The entry is saved as completed and counts toward the employee\'s hours. A reason is required for the audit log.'
 			),
 			workingDayLegend: t('correctionWorkingDayLegend', 'Working day'),
+			dateTimeLegend: t('Date and time', 'Date and time'),
 			date: t('Date', 'Date'),
 			required: t('required', 'required'),
 			datePlaceholder: t('dd.mm.yyyy', 'dd.mm.yyyy'),
 			today: t('Today', 'Today'),
-			dateHelp: t('correctionDateHelp', 'Format: dd.mm.yyyy'),
+			dateHelp: t(
+				'Day you worked (dd.mm.yyyy). Use “Today” for the current day.',
+				'Day you worked (dd.mm.yyyy). Use “Today” for the current day.'
+			),
 			workingHours: t('Working Hours', 'Working Hours'),
 			startTime: t('Start Time', 'Start Time'),
 			endTime: t('End Time', 'End Time'),
 			start: t('Start', 'Start'),
 			end: t('End', 'End'),
+			startTimeHelp: t(
+				'Type the hour and minute, or open the clock to pick a time. Example: 09:00.',
+				'Type the hour and minute, or open the clock to pick a time. Example: 09:00.'
+			),
+			startHourLabel: t('Start hour', 'Start hour'),
+			startMinuteLabel: t('Start minute', 'Start minute'),
+			endHourLabel: t('End hour', 'End hour'),
+			endMinuteLabel: t('End minute', 'End minute'),
+			startOpenLabel: t('Choose start time', 'Choose start time'),
+			endOpenLabel: t('Choose end time', 'Choose end time'),
+			pickerHoursLabel: t('Hours', 'Hours'),
+			pickerMinutesLabel: t('Minutes', 'Minutes'),
+			pickerDoneLabel: t('Done', 'Done'),
+			pickerNotSetLabel: t('Not set', 'Not set'),
 			nightShiftHint: t(
-				'correctionNightShiftHint',
-				'Night shift: if end is earlier than start (e.g. 22:00–06:00), end counts as the next day.'
+				'When you finished. Night shifts: use the next calendar day if end is after midnight.',
+				'When you finished. Night shifts: use the next calendar day if end is after midnight.'
 			),
 			breaksOptional: t('correctionBreaksOptional', 'Breaks (optional)'),
-			breaksHelp: t('managerCorrectionBreaksHelp', 'Adjust breaks if needed. Each break must be at least 15 minutes and within working hours.'),
+			breaksHelp: '',
 			breaksEmpty: t('correctionBreaksEmpty', 'No breaks added.'),
 			actions: t('Actions', 'Actions'),
-			addBreak: t('correctionAddBreak', 'Add break'),
+			addBreak: t('Add another break', 'Add another break'),
 			reason: t('Reason (min. 10 characters)', 'Reason (min. 10 characters)'),
-			reasonHelp: t('correctionReasonHelp', 'Required for the audit trail (at least 10 characters).'),
+			reasonHelp: '',
 			workLocationLegend: t('workLocationLabel', 'Work location'),
 			workLocationUnspecified: t('workLocationUnspecified', 'Not specified'),
 			workLocationOffice: t('workLocationOffice', 'Office'),
 			workLocationHome: t('workLocationHome', 'Home office'),
 			workLocationExternal: t('workLocationExternal', 'External appointment'),
+			daySummary: t('Day Summary', 'Day Summary'),
+			breakTime: t('Break Time', 'Break Time'),
+			autoBreakToggle: t('autoBreakToggleLabel', 'Automatically add required breaks'),
+			autoBreakHelp: t('autoBreakToggleHelp', 'Turn off only if you want to enter every break manually.'),
+			autoBreakStateOn: t('autoBreakStateOn', 'Enabled'),
+			autoBreakStateOff: t('autoBreakStateOff', 'Disabled'),
+			autoBreakNote: t('autoBreakNote', 'Automatically added for labour-law compliance.'),
+			breakTierLine: t('breakTierLine', 'From %1$s hours of work: at least %2$d minutes break (%3$s)'),
+			autoBreakIntroSuffix: t('autoBreakIntroSuffix', 'Enable automatic breaks or add times yourself.'),
 		};
+	}
+
+	function europeanDateOffset(days) {
+		const d = new Date();
+		d.setDate(d.getDate() + days);
+		return String(d.getDate()).padStart(2, '0')
+			+ '.' + String(d.getMonth() + 1).padStart(2, '0')
+			+ '.' + d.getFullYear();
+	}
+
+	function resetProjectOptions(selectEl, label) {
+		selectEl.innerHTML = '';
+		const none = document.createElement('option');
+		none.value = '';
+		none.textContent = label;
+		selectEl.appendChild(none);
 	}
 
 	function loadProjectOptions(selectEl, employeeId) {
 		if (!selectEl) {
 			return Promise.resolve();
 		}
-		selectEl.innerHTML = '';
-		const none = document.createElement('option');
-		none.value = '';
-		none.textContent = t('No project link', 'No project link');
-		selectEl.appendChild(none);
+		// Monotonic token: a slow response must never repopulate the select
+		// for an employee the user already moved away from.
+		const seq = (selectEl._loadSeq = (selectEl._loadSeq || 0) + 1);
+		const isCurrent = () => selectEl._loadSeq === seq;
 		if (!employeeId || !window.ArbeitszeitCheck?.projectCheckEnabled) {
+			resetProjectOptions(selectEl, t('No project link', 'No project link'));
 			selectEl.disabled = true;
 			return Promise.resolve();
 		}
+		resetProjectOptions(selectEl, t('Loading…', 'Loading…'));
 		selectEl.disabled = true;
 		const url = OC.generateUrl(
 			'/apps/arbeitszeitcheck/api/manager/employees/{employeeId}/projectcheck-assignable-projects',
@@ -79,6 +123,10 @@
 		return fetch(url, { headers: { requesttoken: OC.requestToken } })
 			.then((r) => r.json())
 			.then((data) => {
+				if (!isCurrent()) {
+					return;
+				}
+				resetProjectOptions(selectEl, t('No project link', 'No project link'));
 				if (!data.success || !Array.isArray(data.projects)) {
 					return;
 				}
@@ -90,20 +138,25 @@
 				});
 			})
 			.catch(() => {
+				if (!isCurrent()) {
+					return;
+				}
+				resetProjectOptions(selectEl, t('No project link', 'No project link'));
 				Messaging.showError(t('Could not load projects.', 'Could not load projects.'));
 			})
 			.finally(() => {
-				selectEl.disabled = false;
+				if (isCurrent()) {
+					selectEl.disabled = false;
+				}
 			});
 	}
 
 	function buildEmployeeField() {
 		const wrap = document.createElement('div');
-		wrap.className = 'azc-filter-field manager-create-dialog__employee';
+		wrap.className = 'form-group manager-create-dialog__employee';
 		const prefix = 'mgr-create-employee';
 		wrap.innerHTML = [
-			`<label for="${prefix}-search" class="azc-filter-field__label">${t('Select employee', 'Select employee')} <span class="required-star" aria-hidden="true">*</span></label>`,
-			'<div class="azc-filter-field__control">',
+			`<label for="${prefix}-search" class="form-label">${t('Select employee', 'Select employee')} <span class="form-required" aria-hidden="true">*</span></label>`,
 			`<input type="hidden" id="${prefix}-id" value="">`,
 			`<div class="user-picker user-picker--in-modal" id="${prefix}-wrap">`,
 			'<div class="user-picker__control">',
@@ -114,20 +167,19 @@
 			`<div id="${prefix}-listbox" class="user-picker__list" role="listbox" hidden aria-label="${t('Matching employees', 'Matching employees')}"></div>`,
 			`<p id="${prefix}-status" class="azc-sr-only" role="status" aria-live="polite" aria-atomic="true"></p>`,
 			'</div>',
-			'</div>',
 		].join('');
 		return { wrap, prefix };
 	}
 
 	function buildProjectField() {
 		const wrap = document.createElement('div');
-		wrap.className = 'azc-filter-field manager-create-dialog__project';
+		wrap.className = 'form-group manager-create-dialog__project';
 		const id = 'mgr-create-project';
 		wrap.innerHTML = [
-			`<label for="${id}" class="azc-filter-field__label">${t('Project (optional)', 'Project (optional)')}</label>`,
-			'<div class="azc-filter-field__control">',
-			`<select id="${id}" class="form-select" disabled></select>`,
-			'</div>',
+			`<label for="${id}" class="form-label">${t('Project (optional)', 'Project (optional)')}</label>`,
+			`<select id="${id}" class="form-select" disabled>`,
+			`<option value="">${t('No project link', 'No project link')}</option>`,
+			'</select>',
 		].join('');
 		return { wrap, sel: wrap.querySelector('select') };
 	}
@@ -169,10 +221,17 @@
 		host?.querySelector('.azc-self-target-notice')?.remove();
 	}
 
-	function open() {
+	async function open() {
 		if (!ClockForm || !Components.createModal) {
 			Messaging.showError(t('Could not open form.', 'Could not open form.'));
 			return;
+		}
+
+		const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
+		if (wlCatalog && typeof wlCatalog.load === 'function') {
+			try {
+				await wlCatalog.load();
+			} catch (e) { /* catalog unavailable — builtin fallback labels apply */ }
 		}
 
 		(() => {
@@ -185,11 +244,19 @@
 			const idPrefix = 'mgr-create';
 			const { wrap: empWrap, prefix: empPrefix } = buildEmployeeField();
 			const { wrap: projWrap, sel: projSel } = buildProjectField();
-			const wlCatalog = window.ArbeitszeitCheckWorkLocationCatalog;
 			const wlOptions = wlCatalog ? wlCatalog.options() : null;
-			const formHtml = ClockForm.buildFormHtml(idPrefix, labels(), { workLocations: wlOptions });
+			const formOptions = {
+				workLocations: wlOptions,
+				useTimePicker: true,
+				summary: true,
+				autoBreak: true,
+				defaults: { start: '09:00', end: '17:00', date: europeanDateOffset(0) },
+				dateMin: europeanDateOffset(-365),
+				dateMax: europeanDateOffset(1),
+			};
+			const formHtml = ClockForm.buildFormHtml(idPrefix, labels(), formOptions);
 			const footerHtml = [
-				'<div class="reject-modal-actions modal-footer">',
+				'<div class="form-actions">',
 				`<button type="button" class="btn btn--secondary btn-mgr-create-cancel">${t('Cancel', 'Cancel')}</button>`,
 				`<button type="button" class="btn btn--primary btn-mgr-create-save">${t('Save time entry', 'Save time entry')}</button>`,
 				'</div>',
@@ -201,14 +268,30 @@
 				content: '<div class="manager-create-dialog__meta"></div>' + formHtml + footerHtml,
 				size: 'xl',
 			});
+			// Reuse the correction-dialog field chrome — same ClockForm markup,
+			// same modal-scoped recipe, no duplicated CSS.
+			modal.classList.add('azc-manager-correction-modal');
 
 			const meta = modal.querySelector('.manager-create-dialog__meta');
+			// The intro sentence belongs under the dialog title, not between
+			// the employee/project row and the date fields.
+			const introEl = modal.querySelector('.clock-form-intro');
+			if (introEl) {
+				introEl.classList.add('manager-create-dialog__lead');
+				meta.parentNode.insertBefore(introEl, meta);
+			}
 			meta.appendChild(empWrap);
 			if (window.ArbeitszeitCheck?.projectCheckEnabled) {
 				meta.appendChild(projWrap);
 			}
 
-			const bindOpts = { minBreakMinutes: undefined, workLocations: wlOptions };
+			const bindOpts = {
+				minBreakMinutes: undefined,
+				workLocations: wlOptions,
+				useTimePicker: true,
+				autoBreak: true,
+				defaults: { start: '09:00', end: '17:00', date: europeanDateOffset(0) },
+			};
 			const formApi = ClockForm.bindForm(modal, idPrefix, {}, t, bindOpts);
 			const initPicker = window.ArbeitszeitCheck?.initManagerScopedEmployeePicker;
 			let employeePicker = null;

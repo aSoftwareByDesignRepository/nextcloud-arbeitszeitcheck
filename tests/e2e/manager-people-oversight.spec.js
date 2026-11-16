@@ -113,8 +113,13 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		const managed = await api(page, 'GET', `${VIOLATIONS_API}?scope=managed`)
 		expect(managed.success).toBe(true)
 		expect(managed.scope).toBe('managed')
+		// Allowlist comes from the managed scope itself — the people overview
+		// is the same scope resolver, so any legitimately managed member
+		// (e.g. seeded accounts) must be allowed without a hardcoded list.
+		const people = await api(page, 'GET', PEOPLE_API)
+		const managedIds = new Set(people.employees.map((e) => e.userId))
 		for (const v of managed.violations) {
-			expect(['e2e_employee', 'e2e_substitute', 'e2e_manager']).toContain(v.userId)
+			expect(managedIds.has(v.userId), `violation leaked for out-of-scope uid ${v.userId}`).toBe(true)
 		}
 
 		const org = await apiAllowFailure(page, 'GET', `${VIOLATIONS_API}?scope=organization`)
@@ -171,7 +176,7 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		expect(attention.success).toBe(true)
 	})
 
-	test('people page wires quick-filter pills, search and sort controls', async ({ page }) => {
+	test('people page wires quick-filter pills, employee picker and sort controls', async ({ page }) => {
 		await login(page, credsFromEnv('MANAGER'))
 		await page.goto('/apps/arbeitszeitcheck/manager/people')
 		await assertArbeitszeitcheckLoaded(page)
@@ -190,26 +195,33 @@ test.describe('Manager people oversight (Docker dev)', () => {
 		await expect(pills.nth(2)).toHaveAttribute('tabindex', '0')
 		await expect(pills.nth(0)).toHaveAttribute('tabindex', '-1')
 
-		// Search + sort controls exist and are labeled.
-		await expect(page.locator('#manager-people-search')).toBeVisible()
+		// Employee picker + sort controls exist and are labeled.
+		await expect(page.locator('#manager-people-employee-filter-search')).toBeVisible()
 		await expect(page.locator('#manager-people-sort')).toBeVisible()
 
-		// Search applies on submit. Wait for the actual list request that
-		// carries the search param — networkidle can resolve before the
-		// XHR is even issued, and a fixed row assertion then races the
-		// previous (pill-filter) load's render under host contention.
+		// Restore "Everyone" — the narrowing check below asserts exactly one
+		// row, which requires the pending-absences pill to be off.
+		await pills.nth(0).click()
+		await expect(pills.nth(0)).toHaveAttribute('aria-pressed', 'true')
+
+		// Picking one employee narrows the table to that person. Wait for the
+		// actual list request that carries the employee param — networkidle can
+		// resolve before the XHR is even issued, and a fixed row assertion then
+		// races the previous (pill-filter) load's render under host contention.
+		await page.locator('#manager-people-employee-filter-search').fill('e2e_employee')
+		const options = page.locator('#manager-people-employee-filter-listbox .user-picker__item[data-user-id]')
+		await expect(options.first()).toBeVisible({ timeout: 15000 })
+		const pickedUid = await options.first().getAttribute('data-user-id')
 		const searchResponse = page.waitForResponse(
-			(resp) => resp.url().includes('people-overview') && resp.url().includes('search=e2e_employee')
+			(resp) => resp.url().includes('people-overview')
+				&& new URL(resp.url()).searchParams.get('employeeId') === pickedUid
 		)
-		await page.locator('#manager-people-search').fill('e2e_employee')
+		await options.first().click()
 		await page.locator('#manager-people-submit').click()
 		await searchResponse
 		const rows = page.locator('#manager-people-body tr')
-		const count = await rows.count()
-		expect(count).toBeGreaterThanOrEqual(1)
-		for (let i = 0; i < count; i++) {
-			await expect(rows.nth(i)).toContainText('e2e_employee')
-		}
+		await expect(rows).toHaveCount(1)
+		await expect(rows.first()).toContainText(pickedUid)
 	})
 
 	test('people page is axe-clean (WCAG 2.1 A/AA)', async ({ page }) => {

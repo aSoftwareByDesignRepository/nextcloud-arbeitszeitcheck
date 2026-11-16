@@ -177,16 +177,13 @@
 			row.append(text, endGroup);
 			policyList.append(row);
 		});
-		policyStatus.textContent = items.length === 0 ? t('No policies found for this scope.') : '';
+		policyStatus.textContent = items.length === 0 ? t('No default policies found.') : '';
 	}
 
 	async function loadPolicies() {
-		const scopeId = selectedScopeId();
-		if (!scopeId) { policyList.replaceChildren(); policyStatus.textContent = ''; return; }
 		policyStatus.textContent = t('Loading…');
 		try {
-			const query = new URLSearchParams({ scopeType: scopeType.value, scopeId });
-			const body = await request(`${root.dataset.policiesUrl}?${query}`);
+			const body = await request(root.dataset.policiesUrl);
 			renderPolicies(body.items || []);
 		} catch (error) { policyStatus.textContent = error.message; }
 	}

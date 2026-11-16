@@ -506,14 +506,14 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
 }
 
 /* Form Checkbox and Radio
- * Multi-line labels are common (DE admin copy). Align control to the first
- * line (flex-start + optical margin), not the vertical center of the block.
+ * Control and label are vertically centered in the row (design-system
+ * default; same geometry as customercheck and style-guide demos).
  * Size caps beat Nextcloud core `input { min-height: var(--default-clickable-area) }`.
  */
 .form-checkbox,
 .form-radio {
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
   cursor: pointer;
   user-select: none;
@@ -528,8 +528,6 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   max-width: 1.25rem;
   max-height: 1.25rem;
   margin: 0;
-  /* Optical align with first label line (~1rem × 1.3–1.4 lh) */
-  margin-block-start: 0.2rem;
   padding: 0;
   flex-shrink: 0;
   cursor: pointer;
@@ -1918,40 +1916,66 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   box-shadow: 0 0 0 1px var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
 }
 
-/* Manager dashboard: tabs */
-.pending-approvals-tabs {
+/* ===== TABS (design system §3.12) ===== */
+/* One row of text labels; underline only the active tab. Reference impl:
+   admin-teams in-card tabs. In-card tablists use role=tab/tabpanel and
+   drive the active state via aria-selected — no --active class. */
+#app-content.azc-app .azc-tabs__row {
   display: flex;
-  gap: 0;
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--arbeitszeitcheck-color-border, var(--color-border));
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--azc-space-4, 16px);
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
-.pending-approvals-tab {
-  padding: var(--space-2) var(--space-4);
-  background: transparent;
-  border: none;
+#app-content.azc-app .azc-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: var(--azc-touch, 44px);
+  min-width: var(--azc-touch, 44px);
+  padding: var(--azc-space-2, 8px) var(--azc-space-1, 4px);
+  border: 0;
   border-bottom: 2px solid transparent;
-  font-size: var(--arbeitszeitcheck-font-size-base);
-  color: var(--arbeitszeitcheck-color-text-secondary);
-  cursor: pointer;
-  margin-bottom: -1px;
   border-radius: 0;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  background: transparent;
+  box-shadow: none;
+  color: var(--azc-text, var(--color-main-text));
+  font-size: var(--azc-fs-sm, 0.875rem);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.pending-approvals-tab:hover {
-  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab:hover {
+  color: var(--color-primary-element);
+  background: transparent;
+  border-bottom-color: transparent;
+  text-decoration: none;
 }
 
-.pending-approvals-tab--active {
-  color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
-  border-bottom-color: var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab[aria-selected='true'],
+#app-content.azc-app .azc-tab[aria-selected='true']:hover {
+  border-bottom-color: var(--color-primary-element);
+  background: transparent;
+  color: var(--azc-text, var(--color-main-text));
   font-weight: 600;
 }
 
-.pending-approvals-tab:focus-visible {
-  outline: 2px solid var(--arbeitszeitcheck-color-primary, var(--color-primary-element));
+#app-content.azc-app .azc-tab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary-element) 60%, transparent);
   outline-offset: 2px;
+}
+
+/* Manager dashboard: tabs */
+.pending-approvals-tabs {
+  margin-bottom: var(--space-4);
 }
 
 .pending-approvals-panel {
@@ -2367,4 +2391,134 @@ body[data-theme-dark-highcontrast] .form-input.form-select option {
   margin-top: 0;
   margin-bottom: var(--space-3, 12px);
   line-height: 1.5;
+}
+
+/* ── Accessible toggle switch + auto-break panel (shared by employee
+   time-entry form and manager dialogs — moved from time-entries.css so
+   body-portaled modals get the recipe too) ── */
+
+.auto-break-indicator {
+    font-style: italic;
+    color: var(--arbeitszeitcheck-color-text-secondary);
+}
+
+.auto-break-note {
+    margin-top: var(--space-2, 0.5rem);
+    margin-bottom: 0;
+    padding-top: var(--space-2, 0.5rem);
+    color: var(--color-main-text);
+}
+
+.auto-break-note small {
+    font-size: 0.85em;
+}
+
+.auto-break-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--azc-space-2, 0.5rem);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.auto-break-panel__control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4, 1rem);
+}
+
+.auto-break-panel .form-toggle {
+    padding-inline-start: calc(52px + 2rem);
+    flex: 0 1 auto;
+}
+
+.auto-break-panel__help {
+    margin: 0;
+    max-width: 65ch;
+}
+
+/* Status pills: css/common/badges.css (.auto-break-toggle__status) */
+
+.form-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    cursor: pointer;
+    user-select: none;
+    min-height: 44px;
+    padding: 0.25rem 0;
+    padding-inline-start: 3.5rem;
+    flex: 1 1 14rem;
+    max-width: 100%;
+}
+
+.form-toggle input[type="checkbox"] {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    width: 52px;
+    height: 32px;
+    margin: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.form-toggle input[type="checkbox"]:focus-visible + .toggle-slider {
+    outline: 3px solid var(--color-primary-element);
+    outline-offset: 3px;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-shrink: 0;
+    width: 52px;
+    height: 30px;
+    background: color-mix(in srgb, var(--color-main-text) 18%, var(--color-main-background));
+    border: 2px solid var(--color-main-text);
+    border-radius: 30px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    box-shadow: inset 0 1px 3px color-mix(in srgb, var(--color-main-text) 20%, transparent);
+    pointer-events: none;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    inset-inline-start: 2px;
+    width: 22px;
+    height: 22px;
+    background: var(--color-main-background);
+    border: 2px solid var(--color-main-text);
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--color-main-text) 25%, transparent);
+}
+
+.form-toggle input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--color-element-success);
+    border-color: var(--color-element-success);
+}
+
+.form-toggle input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(22px);
+    border-color: color-mix(in srgb, var(--color-element-success) 65%, var(--color-main-text));
+    background: var(--color-main-background);
+}
+
+.toggle-label {
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.4;
+    color: var(--color-main-text);
 }

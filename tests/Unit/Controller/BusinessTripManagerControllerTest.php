@@ -48,6 +48,7 @@ use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IRequest;
 use OCP\IUser;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
@@ -110,6 +111,16 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->createMock(MonthClosureService::class),
 			$this->createMock(AuditLogMapper::class),
 		);
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willReturnCallback(function (string $uid): ?IUser {
+			$known = ['alice' => 'Alice Employee', 'bob' => 'Bob Employee'];
+			if (!isset($known[$uid])) {
+				return null;
+			}
+			$u = $this->createMock(IUser::class);
+			$u->method('getDisplayName')->willReturn($known[$uid]);
+			return $u;
+		});
 		return new BusinessTripManagerController(
 			'arbeitszeitcheck',
 			$request,
@@ -118,6 +129,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->tripMapper,
 			$this->permissions,
 			$config,
+			$userManager,
 		);
 	}
 
@@ -153,15 +165,39 @@ final class BusinessTripManagerControllerTest extends TestCase
 	public function testIndexScopesManagerToTeamMembers(): void
 	{
 		$in = $this->submittedTrip(7, 'alice');
+		$in->setUpdatedAt(new \DateTime('2026-03-09 12:00:00', new \DateTimeZone('UTC')));
 		$out = $this->submittedTrip(8, 'mallory');
 		$this->permissions->method('isAdmin')->with('manager')->willReturn(false);
 		$this->permissions->method('canAccessManagerDashboard')->with('manager')->willReturn(true);
 		$this->permissions->method('getManagedEmployeeIds')->with('manager')->willReturn(['alice', 'bob']);
 		$this->tripMapper->method('findSubmitted')->willReturn([$in, $out]);
+		$this->tripMapper->method('findDecided')->willReturn([]);
 		$r = $this->controller()->index();
 		$items = $this->payload($r)['items'];
 		$this->assertCount(1, $items);
 		$this->assertSame(7, $items[0]['id']);
+		$this->assertSame('Alice Employee', $items[0]['displayName']);
+		$this->assertSame('2026-03-09T12:00:00+00:00', $items[0]['updatedAt']);
+	}
+
+	public function testIndexListsDecidedTripsAfterPendingWithinScope(): void
+	{
+		$pending = $this->submittedTrip(7, 'alice');
+		$approved = $this->submittedTrip(8, 'bob');
+		$approved->setStatus(BusinessTrip::STATUS_APPROVED);
+		$rejectedOut = $this->submittedTrip(9, 'mallory');
+		$rejectedOut->setStatus(BusinessTrip::STATUS_REJECTED);
+		$this->permissions->method('isAdmin')->with('manager')->willReturn(false);
+		$this->permissions->method('canAccessManagerDashboard')->with('manager')->willReturn(true);
+		$this->permissions->method('getManagedEmployeeIds')->with('manager')->willReturn(['alice', 'bob']);
+		$this->tripMapper->method('findSubmitted')->willReturn([$pending]);
+		$this->tripMapper->method('findDecided')->willReturn([$approved, $rejectedOut]);
+		$r = $this->controller()->index();
+		$items = $this->payload($r)['items'];
+		// Pending first, decided appended, out-of-scope dropped from both sets.
+		$this->assertSame([7, 8], array_column($items, 'id'));
+		$this->assertSame('submitted', $items[0]['status']);
+		$this->assertSame('approved', $items[1]['status']);
 	}
 
 	public function testIndexAdminSeesAll(): void
@@ -171,8 +207,12 @@ final class BusinessTripManagerControllerTest extends TestCase
 			$this->submittedTrip(7, 'alice'),
 			$this->submittedTrip(8, 'mallory'),
 		]);
+		$this->tripMapper->method('findDecided')->willReturn([]);
 		$r = $this->controller()->index();
-		$this->assertCount(2, $this->payload($r)['items']);
+		$items = $this->payload($r)['items'];
+		$this->assertCount(2, $items);
+		// Unknown/deleted users keep the uid as label — never blank, never fatal.
+		$this->assertSame('mallory', $items[1]['displayName']);
 	}
 
 	public function testIndexDeniesPlainEmployee(): void
@@ -184,6 +224,7 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$this->permissions->expects($this->once())->method('logPermissionDenied')
 			->with('mallory', 'list_business_trips', 'manager_api');
 		$this->tripMapper->expects($this->never())->method('findSubmitted');
+		$this->tripMapper->expects($this->never())->method('findDecided');
 		$r = $this->controller([], true, 'mallory')->index();
 		$this->assertSame(Http::STATUS_FORBIDDEN, $r->getStatus());
 		$this->assertSame('Access denied.', $this->payload($r)['error']);
@@ -280,6 +321,31 @@ final class BusinessTripManagerControllerTest extends TestCase
 		$this->assertSame(7, $p['trip']['id']);
 		$this->assertSame('submitted', $p['trip']['status']);
 		$this->assertArrayHasKey('snapshotToken', $p);
+	}
+
+	public function testShowDraftTripIsUniform404(): void
+	{
+		// Drafts are pre-submission private data: in-scope or not, the
+		// decision surface answers the same uniform 404 as a missing id.
+		$draft = $this->submittedTrip(7, 'alice');
+		$draft->setStatus(BusinessTrip::STATUS_DRAFT);
+		$this->tripMapper->method('find')->willReturn($draft);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'alice')->willReturn(true);
+		$r = $this->controller()->show(7);
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
+		$this->assertSame('NOT_FOUND', $this->payload($r)['error']);
+	}
+
+	public function testApproveDraftTripIsUniform404(): void
+	{
+		$draft = $this->submittedTrip(7, 'alice');
+		$draft->setStatus(BusinessTrip::STATUS_DRAFT);
+		$this->tripMapper->method('find')->willReturn($draft);
+		$this->permissions->method('canDecideEntryApproval')->with('manager', 'alice')->willReturn(true);
+		$r = $this->controller(['snapshotToken' => 'tok', 'revision' => '4'])->approve(7);
+		// 404 — the controller rejects before the service (which would
+		// answer TRIP_STATE_INVALID 409 for a draft -> approved jump).
+		$this->assertSame(Http::STATUS_NOT_FOUND, $r->getStatus());
 	}
 
 	public function testShowNonAdminSelfTripIsUniform404(): void

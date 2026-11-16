@@ -404,20 +404,14 @@
 }
 
 @media (min-width: 769px) {
-	/* Tablet/desktop: restore compact checkbox alignment (pre-GH#40 parity). */
+	/* Tablet/desktop: restore compact checkbox row spacing (pre-GH#40 parity).
+	   Label alignment stays centered — the design-system default. */
 	#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox,
 	#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox,
 	#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox {
 		min-height: unset;
-		align-items: flex-start;
 		width: auto;
 		padding-block: 0;
-	}
-
-	#app-content.azc-app--admin-overtime-settings .azc-admin-policy-section .form-checkbox input[type="checkbox"],
-	#app-content.azc-app--admin-notifications .azc-admin-policy-section .form-checkbox input[type="checkbox"],
-	#app-content.azc-app--admin-vacation-rules .azc-admin-policy-section .form-checkbox input[type="checkbox"] {
-		margin-block-start: 0.2rem;
 	}
 }
 

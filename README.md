@@ -1,4 +1,4 @@
-# ArbeitszeitCheck (TimeGuard)
+ArbeitszeitCheck (TimeGuard)
 
 [![Nextcloud](https://img.shields.io/badge/Nextcloud-32–35-0082c9?logo=nextcloud&logoColor=white)](https://nextcloud.com/)
 [![PHP](https://img.shields.io/badge/PHP-8.1–8.5-777BB4?logo=php&logoColor=white)](https://www.php.net/)
@@ -111,3 +111,7 @@ Sicherheitsmeldungen privat an den Maintainer (`appinfo/info.xml`).
 ### Lizenz
 
 [AGPL-3.0-or-later](LICENSE).
+
+# Release tarballs
+
+App Store download URLs. Do not delete — store release records link here permanently.

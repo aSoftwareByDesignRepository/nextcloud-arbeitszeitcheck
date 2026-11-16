@@ -225,6 +225,8 @@
 	"A working time model" : "一种工时模式",
 	"A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation." : "可向我们购买的年度工时包，并为您的组织提供优先邮件回复。这是可开票的服务，不是捐赠。",
 	"AB" : "AB",
+	"Another change is in progress. Please retry." : "另一项更改正在进行中，请重试。",
+	"Another time-tracking action is in progress for this employee. Please wait a moment and try again." : "该员工的另一项工时记录操作正在进行中，请稍候再试。",
 	"AT Tarif\/KV example" : "奥地利劳资协议示例",
 	"Aargau" : "阿尔高州",
 	"About" : "关于",

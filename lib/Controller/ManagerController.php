@@ -2970,6 +2970,14 @@ class ManagerController extends Controller
 			], Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['success' => false, 'error' => $this->l10n->t($e->getMessage())], Http::STATUS_BAD_REQUEST);
+		} catch (\OCP\Lock\LockedException $e) {
+			// A finalize/reopen of an overlapping month is in flight —
+			// retryable busy, never a masked internal error.
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Another time-tracking action is in progress for this employee. Please wait a moment and try again.'),
+				'error_code' => \OCA\ArbeitszeitCheck\BusinessRuleCode::LOCKED,
+			], Http::STATUS_LOCKED);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('Error in ManagerController::createEmployeeTimeEntry', ['exception' => $e]);
 			return new JSONResponse([

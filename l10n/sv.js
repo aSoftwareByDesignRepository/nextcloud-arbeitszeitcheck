@@ -225,6 +225,8 @@
 	"A working time model" : "En arbetstidsmodell",
 	"A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation." : "En årlig timbank som ni kan boka hos oss, plus prioriterade e-postsvar för er organisation. Det är en fakturerbar tjänst — inte en donation.",
 	"AB" : "FA",
+	"Another change is in progress. Please retry." : "En annan ändring pågår. Försök igen.",
+	"Another time-tracking action is in progress for this employee. Please wait a moment and try again." : "En annan tidsregistreringsåtgärd pågår för den här anställda. Vänta en stund och försök igen.",
 	"AT Tarif\/KV example" : "AT-tariff\/KV-exempel",
 	"Aargau" : "Kanton Aargau",
 	"About" : "Om",

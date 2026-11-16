@@ -225,6 +225,8 @@
 	"A working time model" : "A working time model",
 	"A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation." : "A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation.",
 	"AB" : "AB",
+	"Another change is in progress. Please retry." : "Another change is in progress. Please retry.",
+	"Another time-tracking action is in progress for this employee. Please wait a moment and try again." : "Another time-tracking action is in progress for this employee. Please wait a moment and try again.",
 	"AT Tarif\/KV example" : "AT Tarif\/KV example",
 	"Aargau" : "Aargau",
 	"About" : "About",

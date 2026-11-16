@@ -225,6 +225,8 @@
 	"A working time model" : "Un modelo de tiempo de trabajo",
 	"A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation." : "Un pack anual de horas que puede reservar con nosotros, más respuestas de correo prioritarias para su organización. Es un servicio facturable, no una donación.",
 	"AB" : "AU",
+	"Another change is in progress. Please retry." : "Hay otro cambio en curso. Inténtelo de nuevo.",
+	"Another time-tracking action is in progress for this employee. Please wait a moment and try again." : "Hay otra acción de registro horario en curso para este empleado. Espere un momento e inténtelo de nuevo.",
 	"AT Tarif\/KV example" : "Ejemplo tarifa\/KV AT",
 	"Aargau" : "Argovia",
 	"About" : "Acerca de",

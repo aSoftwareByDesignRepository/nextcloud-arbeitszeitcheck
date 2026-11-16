@@ -225,6 +225,8 @@
 	"A working time model" : "Bir çalışma süresi modeli",
 	"A yearly pack of hours you can book with us, plus priority email replies for your organisation. This is invoiceable service — not a donation." : "Bizden satın alabileceğiniz yıllık saat paketi ve kurumunuza öncelikli e-posta yanıtları. Bu faturalandırılabilir bir hizmettir — bağış değildir.",
 	"AB" : "YO",
+	"Another change is in progress. Please retry." : "Başka bir değişiklik sürüyor. Lütfen yeniden deneyin.",
+	"Another time-tracking action is in progress for this employee. Please wait a moment and try again." : "Bu çalışan için başka bir zaman kaydı işlemi sürüyor. Lütfen biraz bekleyip yeniden deneyin.",
 	"AT Tarif\/KV example" : "AT Tarif\/KV örneği",
 	"Aargau" : "Aargau",
 	"About" : "Hakkında",

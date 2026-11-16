@@ -96,6 +96,7 @@ $managerCorrectionL10n = array_merge($managerCorrectionL10n, [
 	'correctionBreaksEmpty' => $l->t('No breaks added.'),
 	'correctionAddBreak' => $l->t('Add break'),
 	'correctionReasonHelp' => $l->t('Required for the audit trail (at least 10 characters).'),
+	'autoBreakNote' => $l->t('Automatically added for labour-law compliance (%s)', [$azcMgrLawProfile->lawLabel('breaks')]),
 	'invalidDate' => $l->t('Please enter a valid date (dd.mm.yyyy).'),
 	'invalidWorkTimes' => $l->t('Please enter valid start and end times.'),
 	'invalidBreakTimes' => $l->t('Please enter valid break times.'),

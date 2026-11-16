@@ -7,7 +7,7 @@
 @import url('common/colors.css');
 @import url('common/typography.css?v=20261031-tile');
 @import url('common/base.css?v=20261109-skiplink');
-@import url('common/components.css?v=20261112-tabs');
+@import url('common/components.css?v=20261215-toggle');
 @import url('common/user-picker.css');
 @import url('common/layout.css');
 @import url('common/app-layout.css');
@@ -652,6 +652,30 @@
 .azc-nc-settings-panel .azc-btn:focus-visible,
 .azc-app .btn:focus-visible {
 	outline: 3px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+/* Same rule for body-mounted overlays (native <dialog> reparented to
+   <body>, layer dialogs, ARIA panels): the page scopes above cannot reach
+   them, and NC server's button reset otherwise strips the ring entirely
+   (0px outline on .azc-btn inside dialogs; sub-3:1 UA ring on .modal-close).
+   !important: server.css ships its own !important button focus ring —
+   specificity alone cannot beat it. Same canonical scope list as the
+   button-variant armoring below. */
+dialog.azc-dialog .azc-btn:focus-visible,
+dialog.azc-dialog .modal-close:focus-visible,
+dialog.azc-dialog button:focus-visible,
+.azc-dialog .azc-btn:focus-visible,
+.azc-dialog .modal-close:focus-visible,
+.azc-dialog button:focus-visible,
+.azc-modal-backdrop .azc-btn:focus-visible,
+.azc-modal-backdrop .modal-close:focus-visible,
+.azc-modal-backdrop button:focus-visible,
+[role="dialog"] .azc-btn:focus-visible,
+[role="dialog"] .modal-close:focus-visible,
+[role="alertdialog"] .azc-btn:focus-visible,
+[role="alertdialog"] .modal-close:focus-visible {
+	outline: 3px solid var(--color-primary-element) !important;
 	outline-offset: 2px;
 }
 

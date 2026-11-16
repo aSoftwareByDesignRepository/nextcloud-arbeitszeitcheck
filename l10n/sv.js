@@ -711,6 +711,7 @@
 	"Automatically added for German labor law compliance (%s)" : "Tillagt automatiskt för efterlevnad av tysk arbetslag (%s)",
 	"Automatically added for German labor law compliance (ArbZG §4)" : "Tillagd automatiskt för efterlevnad av den tyska arbetstidslagen (ArbZG §4)",
 	"Automatically added for labour-law compliance (%s)" : "Tillagt automatiskt för efterlevnad av arbetslag (%s)",
+	"Automatically added for labour-law compliance." : "Tillagd automatiskt för att uppfylla arbetslagstiftningen.",
 	"Automatically added: Legal break requirement (%s)" : "Tillagt automatiskt: Lagstadgat rastkrav (%s)",
 	"Automatically added: Legal break requirement (ArbZG §4)" : "Automatiskt tillagd: lagstadgad rast enligt (ArbZG §4)",
 	"Automatically added: Organisational break policy (%s)" : "Automatiskt tillagd: organisationens rastregel (%s)",

@@ -711,6 +711,7 @@
 	"Automatically added for German labor law compliance (%s)" : "Añadido automáticamente para el cumplimiento de la normativa laboral alemana (%s)",
 	"Automatically added for German labor law compliance (ArbZG §4)" : "Añadido automáticamente por cumplimiento de la legislación laboral alemana (ArbZG §4)",
 	"Automatically added for labour-law compliance (%s)" : "Añadido automáticamente para el cumplimiento de la normativa laboral (%s)",
+	"Automatically added for labour-law compliance." : "Añadido automáticamente para cumplir la legislación laboral.",
 	"Automatically added: Legal break requirement (%s)" : "Añadido automáticamente: pausa legalmente obligatoria (%s)",
 	"Automatically added: Legal break requirement (ArbZG §4)" : "Añadido automáticamente: requisito legal de pausa (ArbZG §4)",
 	"Automatically added: Organisational break policy (%s)" : "Añadido automáticamente: política de pausas de la organización (%s)",

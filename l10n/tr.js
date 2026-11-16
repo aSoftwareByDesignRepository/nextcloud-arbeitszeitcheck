@@ -711,6 +711,7 @@
 	"Automatically added for German labor law compliance (%s)" : "Alman iş hukuku uyumu için otomatik eklendi (%s)",
 	"Automatically added for German labor law compliance (ArbZG §4)" : "Alman iş hukuku uyumu için otomatik eklendi (ArbZG §4)",
 	"Automatically added for labour-law compliance (%s)" : "İş hukuku uyumu için otomatik eklendi (%s)",
+	"Automatically added for labour-law compliance." : "İş mevzuatına uyum için otomatik olarak eklendi.",
 	"Automatically added: Legal break requirement (%s)" : "Otomatik eklendi: Yasal mola zorunluluğu (%s)",
 	"Automatically added: Legal break requirement (ArbZG §4)" : "Otomatik eklendi: Yasal mola zorunluluğu (ArbZG §4)",
 	"Automatically added: Organisational break policy (%s)" : "Otomatik eklendi: Kurumsal mola politikası (%s)",

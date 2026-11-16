@@ -711,6 +711,7 @@
 	"Automatically added for German labor law compliance (%s)" : "為滿足德國勞動法要求自動新增（%s）",
 	"Automatically added for German labor law compliance (ArbZG §4)" : "為滿足德國勞動法要求自動新增（ArbZG §4）",
 	"Automatically added for labour-law compliance (%s)" : "為滿足勞動法要求自動新增（%s）",
+	"Automatically added for labour-law compliance." : "為遵守勞動法規自動新增。",
 	"Automatically added: Legal break requirement (%s)" : "已自動新增：法定休息要求（%s）",
 	"Automatically added: Legal break requirement (ArbZG §4)" : "已自動新增：法定休息要求（ArbZG §4）",
 	"Automatically added: Organisational break policy (%s)" : "已自動新增：組織休息政策（%s）",

@@ -40,8 +40,6 @@
 		"%1$s: %2$s (%3$s h)": "%1$s: %2$s (%3$s t)",
 		"%d minutes": "%d minutters",
 		"%d of %d steps done.": "%d af %d trin færdige.",
-		"%d row(s) need a value on this instance": "%d række(r) kræver en værdi på denne instans",
-		"%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d række(r) sprunget over og %d reference(r) uopløst — se grupperne nedenfor.",
 		"%n Nextcloud accounts without app access are hidden.": "%n Nextcloud-konti uden app-adgang er skjult.",
 		"%n absence request": "%n fraværsanmodning",
 		"%n absence requests": "%n fraværsanmodninger",
@@ -128,10 +126,6 @@
 		"%s working days": "%s arbejdsdage",
 		"%s/page": "%s/side",
 		"(%1$s employees in scope)": "(%1$s ansatte i omfang)",
-		"(%d env-bound value(s) emptied)": "(%d instansbundne værdier tømt)",
-		"(%d filtered)": "(%d filtreret)",
-		"(%d secret(s) redacted)": "(%d hemmelighed(er) sløret)",
-		"(%d unresolved ref)": "(%d uopløst reference)",
 		"(Mon–Fri)": "(man–fre)",
 		"(all Nextcloud accounts)": "(alle Nextcloud-konti)",
 		"(estimated)": "(estimated)",
@@ -3951,7 +3945,7 @@
 		"Protected group created.": "Beskyttet gruppe oprettet.",
 		"Protected groups hold sensitive tariff cohorts. They are deliberately separate from operational teams and only visible here.": "Beskyttede grupper indeholder følsomme tarifkohorter. De er bevidst adskilt fra operationelle teams og kun synlige her.",
 		"Provide a CSV payload or upload a credential file.": "Angiv en CSV-payload, eller upload en credential-fil.",
-		"Provide this ID when ordering a license so the key can be bound to this server.": "Angiv dette ID, Når bestiller en licens, så nøglen kan knyttes til denne server.",
+		"Provide this ID when ordering a license so the key can be bound to this server.": "Angiv dette ID, når du afgiver en licensordre, så nøglen kan knyttes til denne server.",
 		"Public Holiday": "Helligdag",
 		"Public holiday": "Helligdag",
 		"Public holiday deleted": "Helligdag slettet",
@@ -5662,7 +5656,6 @@
 		"Walk to the selected tablet (or ask a colleague there).": "Gå til den valgte tablet (eller bed en kollega dér).",
 		"Walking": "Til fods",
 		"Warning": "Advarsel",
-		"Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Advarsel: %d række(r) slettes permanent, derefter indlæses fildataene.",
 		"Warning: 6-month average weekly working hours (%.2f h/week) exceeds 48 hours/week (ArbZG §3).": "Advarsel: 6-måneders gennemsnitlig ugentlig arbejdstid (%.2f t/uge) overstiger 48 timer/uge (ArbZG §3).",
 		"Warning: 6-month average working hours (%.2f h/day) exceeds 8 hours/day. 10-hour days are only allowed if the average does not exceed 8 hours (ArbZG §3).": "Advarsel: 6-måneders gennemsnitlig arbejdstid (%.2f h/dag) overstiger 8 timer/dag. 10-timersdage er kun tilladt, hvis gennemsnittet ikke overstiger 8 timer (ArbZG §3).",
 		"Warning: average weekly working hours over %1$d weeks (%2$.2f h/week) exceed %3$d hours/week (%4$s).": "Advarsel: gennemsnitlig ugentlig arbejdstid over %1$d uger (%2$.2f t/uge) overstiger %3$d timer/uge (%4$s).",
@@ -6450,8 +6443,8 @@
 		"terminal": "Tidsregistreringsterminal",
 		"territory": "territorium",
 		"testing": "afprøvning",
-		"the companion apps": "companion-apps",
 		"the Mobile and Terminal apps": "Mobile- og Terminal-apps",
+		"the companion apps": "companion-apps",
 		"the mobile companion app": "mobil-companion-appen",
 		"third": "tredje",
 		"this work schedule": "denne arbejdsplan",
@@ -6531,7 +6524,82 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.": "»Mindst X timers fravær krediterer mindst Y timer.« Rækker kontrolleres i rækkefølge — den sidste matchende række vinder.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "«Generer feed-URL» opretter det første link for et omfang. «Tilbagekald og roter» erstatter et eksisterende link — den gamle URL virker ikke længere med det samme.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "»Placering« placerer automatiske pauser inde i vinduet. »Påkrævet« betyder, at pausen skal overlappe vinduet med det angivne antal minutter.",
-		"…": "…"
+		"…": "…",
+		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+			"1 række kræver en værdi på denne instans",
+			"%n rækker kræver en værdi på denne instans"
+		],
+		"1 row needs a value on this instance": "1 række kræver en værdi på denne instans",
+		"%n rows need a value on this instance": "%n rækker kræver en værdi på denne instans",
+		"_1 row skipped._:: _%n rows skipped._": [
+			"1 række sprunget over.",
+			"%n rækker sprunget over."
+		],
+		"1 row skipped.": "1 række sprunget over.",
+		"%n rows skipped.": "%n rækker sprunget over.",
+		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+			"1 reference uopløst — se grupperne nedenfor.",
+			"%n referencer uopløst — se grupperne nedenfor."
+		],
+		"1 reference unresolved — see the groups below.": "1 reference uopløst — se grupperne nedenfor.",
+		"%n references unresolved — see the groups below.": "%n referencer uopløst — se grupperne nedenfor.",
+		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+			"(1 instansbunden værdi tømt)",
+			"(%n instansbundne værdier tømt)"
+		],
+		"(1 env-bound value emptied)": "(1 instansbunden værdi tømt)",
+		"(%n env-bound values emptied)": "(%n instansbundne værdier tømt)",
+		"_(1 filtered)_:: _(%n filtered)_": [
+			"(1 filtreret)",
+			"(%n filtrerede)"
+		],
+		"(1 filtered)": "(1 filtreret)",
+		"(%n filtered)": "(%n filtrerede)",
+		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+			"(1 hemmelighed sløret)",
+			"(%n hemmeligheder sløret)"
+		],
+		"(1 secret redacted)": "(1 hemmelighed sløret)",
+		"(%n secrets redacted)": "(%n hemmeligheder sløret)",
+		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+			"(1 uopløst reference)",
+			"(%n uopløste referencer)"
+		],
+		"(1 unresolved ref)": "(1 uopløst reference)",
+		"(%n unresolved refs)": "(%n uopløste referencer)",
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+			"Advarsel: 1 række slettes permanent, derefter indlæses fildataene.",
+			"Advarsel: %n rækker slettes permanent, derefter indlæses fildataene."
+		],
+		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "Advarsel: 1 række slettes permanent, derefter indlæses fildataene.",
+		"Warning: %n rows will be permanently deleted, then the file data is loaded.": "Advarsel: %n rækker slettes permanent, derefter indlæses fildataene.",
+		"Clock out?": "Stem ud?",
+		"Complete paused session": "Afslut pauseret session",
+		"Complete this paused session? The end time will be set to when it was paused, and any required breaks will be added automatically. This finalises the entry; you can still edit it afterwards.": "Afslut denne pauserede session? Sluttiden sættes til, da den blev pauseret, og eventuelle påkrævede pauser tilføjes automatisk. Dette afslutter posten; du kan stadig redigere den bagefter.",
+		"Could not complete the paused session. Please try again.": "Den pauserede session kunne ikke afsluttes. Prøv igen.",
+		"Could not initialize the month list. Please reload the page.": "Månedslisten kunne ikke initialiseres. Genindlæs siden.",
+		"Delete?": "Slet?",
+		"Finalize": "Afslut",
+		"Optional description": "Valgfri beskrivelse",
+		"Request absence for this day.": "Anmod om fravær denne dag.",
+		"Cannot activate an incomplete tariff rule set": "Et ufuldstændigt tarifregelsæt kan ikke aktiveres",
+		"individualRule": "Individuel regel",
+		"teamPolicy": "Teampolitik",
+		"organisationDefault": "Organisation standard",
+		"defaultFallback": "Standard fallback",
+		"partialHistoryHint": "(teammedlemskab for tidligere datoer er den bedste indsats)",
+		"degradedBanner": "Din berettigelse blev løst med en sikkerhedsstandard. kontakt din HR-administrator, hvis dette ser forkert ud.",
+		"clampedBanner": "Din beregnede ret var uden for det tilladte 0-366 dages interval og er blevet justeret. Kontakt HR, Hvis der forventede en anden værdi.",
+		"summaryTitle": "Din årlige ferieret",
+		"daysPerYear": "dage om året",
+		"asOfDate": "Beregnet fra %s",
+		"prorationNoteTwelfths": "Reduceret for din ansættelsesperiode i år: {prorated} af {full} dage (ansat {months} af 12 måneder).",
+		"prorationNoteDaily": "Reduceret for din ansættelsesperiode i år: {prorated} af {full} dage.",
+		"prorationNoteNone": "var ikke ansat i dette kalenderår, så der tildeles ingen ferie for det.",
+		"chainTitle": "Hvordan systemet kontrollerede hvert lag",
+		"layerDeterminedLead": "Bestemt af:",
+		"hintContactHr": "Hvis der mener, at resultatet er forkert, bedes kontakte din HR-administrator.",
+		"loadError": "Forklaringen kunne ikke indlæses. Prøv igen senere."
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

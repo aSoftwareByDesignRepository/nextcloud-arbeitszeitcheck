@@ -65,6 +65,15 @@
     return fallback || key;
   }
 
+  /** Plural-aware translate (Nextcloud window.n replaces %n). */
+  function n(singular, plural, count) {
+    const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+    if (typeof window.n === 'function') {
+      return window.n('arbeitszeitcheck', singular, plural, c);
+    }
+    return String(c === 1 ? singular : plural).replace('%n', String(c));
+  }
+
   const AMOUNT_COL_LABEL = t('Days', 'Days');
 
   function fmtHoursFromDays(days) {
@@ -330,15 +339,12 @@
    * Update the "Count" chips in every layer card header. Purely cosmetic
    * — gives admins a glanceable overview without expanding the history.
    */
-  function setLayerCount(elId, count, singularKey, pluralKey) {
+  function setLayerCount(elId, count) {
     const el = document.getElementById(elId);
     if (!el) return;
-    const n = Number(count) || 0;
-    const label = n === 1
-      ? (t(singularKey, singularKey) || singularKey).replace('{n}', String(n))
-      : (t(pluralKey, pluralKey) || pluralKey).replace('{n}', String(n));
-    el.textContent = label;
-    el.setAttribute('data-count', String(n));
+    const c = Number(count) || 0;
+    el.textContent = n('1 entry', '%n entries', c);
+    el.setAttribute('data-count', String(c));
   }
 
   /** Enable/disable Add buttons based on prerequisites in `state`. */
@@ -413,8 +419,7 @@
         ]));
       }
     }
-    setLayerCount('l0-count', state.org.history.length,
-      '{n} entry', '{n} entries');
+    setLayerCount('l0-count', state.org.history.length);
     const tbody = document.getElementById('l0-history-rows');
     if (!tbody) return;
     if (state.org.history.length === 0) {
@@ -438,8 +443,7 @@
   }
 
   function renderL1() {
-    setLayerCount('l1-count', state.model.defaults.length,
-      '{n} entry', '{n} entries');
+    setLayerCount('l1-count', state.model.defaults.length);
     const tbody = document.getElementById('l1-rows');
     if (!tbody) return;
     if (state.model.defaults.length === 0) {
@@ -464,8 +468,7 @@
   }
 
   function renderL2() {
-    setLayerCount('l2-count', state.team.policies.length,
-      '{n} entry', '{n} entries');
+    setLayerCount('l2-count', state.team.policies.length);
     const tbody = document.getElementById('l2-rows');
     if (!tbody) return;
     if (state.team.policies.length === 0) {

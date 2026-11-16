@@ -40,8 +40,6 @@
 		"%1$s: %2$s (%3$s h)": "%1$s: %2$s (%3$s h)",
 		"%d minutes": "%d minutos",
 		"%d of %d steps done.": "%d de %d pasos completados.",
-		"%d row(s) need a value on this instance": "%d fila(s) necesitan un valor en esta instancia",
-		"%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d fila(s) omitida(s) y %d referencia(s) sin resolver — consulta los grupos siguientes.",
 		"%n Nextcloud accounts without app access are hidden.": "%n cuentas de Nextcloud sin acceso a la app están ocultas.",
 		"%n absence request": "%n solicitud de ausencia",
 		"%n absence requests": "%n solicitudes de ausencia",
@@ -128,10 +126,6 @@
 		"%s working days": "%s días laborables",
 		"%s/page": "%s/página",
 		"(%1$s employees in scope)": "(%1$s empleados en el ámbito)",
-		"(%d env-bound value(s) emptied)": "(%d valor(es) ligados a la instancia vaciados)",
-		"(%d filtered)": "(%d filtrada(s))",
-		"(%d secret(s) redacted)": "(%d secreto(s) ocultado(s))",
-		"(%d unresolved ref)": "(%d referencia(s) sin resolver)",
 		"(Mon–Fri)": "(lun–vie)",
 		"(all Nextcloud accounts)": "(todas las cuentas de Nextcloud)",
 		"(estimated)": "(estimated)",
@@ -2248,7 +2242,7 @@
 		"Forgot to clock out? Request a retroactive clock-out for manager approval from your time entries list.": "¿Olvidó fichar la salida? Solicite una salida retroactiva para aprobación por su responsable desde su lista de registros horarios.",
 		"Form actions": "Acciones del formulario",
 		"Form initialization failed. Please refresh the page.": "La inicialización del formulario falló. Actualice la página.",
-		"Format: %1$s followed by a signed payload. One key per organisation.": "Formato: %1$s seguido de una carga firmada. Una clave por organización.",
+		"Format: %1$s followed by a signed payload. One key per organisation.": "Formato: %1$s seguido de una carga útil firmada. Una clave por organización.",
 		"Format: AZC2 followed by a signed payload. One key per organisation.": "Formato: AZC2 seguido de una carga firmada. Una clave por organización.",
 		"Format: dd.mm.yyyy": "Formato: dd.mm.aaaa",
 		"Formula: 30 × (work days per week ÷ 5).": "Fórmula: 30 × (días laborables por semana ÷ 5).",
@@ -5662,7 +5656,6 @@
 		"Walk to the selected tablet (or ask a colleague there).": "Vaya a la tableta seleccionada (o pida a un colega allí).",
 		"Walking": "A pie",
 		"Warning": "Advertencia",
-		"Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Advertencia: %d fila(s) se eliminarán permanentemente y después se cargarán los datos del archivo.",
 		"Warning: 6-month average weekly working hours (%.2f h/week) exceeds 48 hours/week (ArbZG §3).": "Advertencia: el promedio semanal de 6 meses (%.2f h/semana) supera las 48 horas/semana (ArbZG §3).",
 		"Warning: 6-month average working hours (%.2f h/day) exceeds 8 hours/day. 10-hour days are only allowed if the average does not exceed 8 hours (ArbZG §3).": "Advertencia: el promedio de 6 meses (%.2f h/día) supera las 8 horas/día. Los días de 10 horas solo están permitidos si el promedio no supera las 8 horas (ArbZG §3).",
 		"Warning: average weekly working hours over %1$d weeks (%2$.2f h/week) exceed %3$d hours/week (%4$s).": "Aviso: el promedio semanal de horas de trabajo en %1$d semanas (%2$.2f h/semana) supera %3$d horas/semana (%4$s).",
@@ -6450,8 +6443,8 @@
 		"terminal": "Terminal",
 		"territory": "territorio",
 		"testing": "pruebas",
-		"the companion apps": "las apps complementarias",
 		"the Mobile and Terminal apps": "las aplicaciones móvil y terminal",
+		"the companion apps": "las apps complementarias",
 		"the mobile companion app": "la app complementaria móvil",
 		"third": "tercero",
 		"this work schedule": "este horario de trabajo",
@@ -6531,7 +6524,82 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.": "«Al menos X horas de ausencia acreditan al menos Y horas.» Las filas se comprueban en orden — gana la última fila coincidente.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "«Generar URL del feed» crea el primer enlace de un ámbito. «Revocar y renovar» sustituye un enlace existente — la URL antigua deja de funcionar al instante.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "«Ubicación» coloca las pausas automáticas dentro de la franja. «Obligatorio» significa que la pausa debe solaparse con la franja en los minutos indicados.",
-		"…": "…"
+		"…": "…",
+		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+			"1 fila necesita un valor en esta instancia",
+			"%n filas necesitan un valor en esta instancia"
+		],
+		"1 row needs a value on this instance": "1 fila necesita un valor en esta instancia",
+		"%n rows need a value on this instance": "%n filas necesitan un valor en esta instancia",
+		"_1 row skipped._:: _%n rows skipped._": [
+			"1 fila omitida.",
+			"%n filas omitidas."
+		],
+		"1 row skipped.": "1 fila omitida.",
+		"%n rows skipped.": "%n filas omitidas.",
+		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+			"1 referencia sin resolver — consulta los grupos siguientes.",
+			"%n referencias sin resolver — consulta los grupos siguientes."
+		],
+		"1 reference unresolved — see the groups below.": "1 referencia sin resolver — consulta los grupos siguientes.",
+		"%n references unresolved — see the groups below.": "%n referencias sin resolver — consulta los grupos siguientes.",
+		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+			"(1 valor ligado a la instancia vaciado)",
+			"(%n valores ligados a la instancia vaciados)"
+		],
+		"(1 env-bound value emptied)": "(1 valor ligado a la instancia vaciado)",
+		"(%n env-bound values emptied)": "(%n valores ligados a la instancia vaciados)",
+		"_(1 filtered)_:: _(%n filtered)_": [
+			"(1 filtrada)",
+			"(%n filtradas)"
+		],
+		"(1 filtered)": "(1 filtrada)",
+		"(%n filtered)": "(%n filtradas)",
+		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+			"(1 secreto ocultado)",
+			"(%n secretos ocultados)"
+		],
+		"(1 secret redacted)": "(1 secreto ocultado)",
+		"(%n secrets redacted)": "(%n secretos ocultados)",
+		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+			"(1 referencia sin resolver)",
+			"(%n referencias sin resolver)"
+		],
+		"(1 unresolved ref)": "(1 referencia sin resolver)",
+		"(%n unresolved refs)": "(%n referencias sin resolver)",
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+			"Advertencia: 1 fila se eliminará permanentemente y después se cargarán los datos del archivo.",
+			"Advertencia: %n filas se eliminarán permanentemente y después se cargarán los datos del archivo."
+		],
+		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "Advertencia: 1 fila se eliminará permanentemente y después se cargarán los datos del archivo.",
+		"Warning: %n rows will be permanently deleted, then the file data is loaded.": "Advertencia: %n filas se eliminarán permanentemente y después se cargarán los datos del archivo.",
+		"Clock out?": "¿Fichar salida?",
+		"Complete paused session": "Completar sesión en pausa",
+		"Complete this paused session? The end time will be set to when it was paused, and any required breaks will be added automatically. This finalises the entry; you can still edit it afterwards.": "¿Completar esta sesión en pausa? La hora de fin será la de la pausa y las pausas obligatorias se añadirán automáticamente. Esto finaliza el registro; puede editarlo después.",
+		"Could not complete the paused session. Please try again.": "No se pudo completar la sesión en pausa. Inténtelo de nuevo.",
+		"Could not initialize the month list. Please reload the page.": "No se pudo inicializar la lista de meses. Recargue la página.",
+		"Delete?": "¿Eliminar?",
+		"Finalize": "Finalizar",
+		"Optional description": "Descripción opcional",
+		"Request absence for this day.": "Solicitar ausencia para este día.",
+		"Cannot activate an incomplete tariff rule set": "No se puede activar un conjunto de reglas de tarifa incompleto",
+		"individualRule": "Regla individual",
+		"teamPolicy": "Política del equipo",
+		"organisationDefault": "Valor predeterminado de la organización",
+		"defaultFallback": "Respaldo predeterminado",
+		"partialHistoryHint": "(la pertenencia al equipo para fechas pasadas es aproximada)",
+		"degradedBanner": "Su derecho se determinó con un valor predeterminado de seguridad. Contacte con su administrador de RR. HH. si parece incorrecto.",
+		"clampedBanner": "Su derecho calculado estaba fuera del rango permitido de 0 a 366 días y se ha ajustado. Contacte con RR. HH. si esperaba otro valor.",
+		"summaryTitle": "Su derecho anual a vacaciones",
+		"daysPerYear": "días por año",
+		"asOfDate": "Calculado a fecha de %s",
+		"prorationNoteTwelfths": "Reducido por su periodo de empleo este año: {prorated} de {full} días (empleado {months} de 12 meses).",
+		"prorationNoteDaily": "Reducido por su periodo de empleo este año: {prorated} de {full} días.",
+		"prorationNoteNone": "No estuvo empleado durante este año natural, por lo que no se conceden vacaciones para él.",
+		"chainTitle": "Cómo el sistema comprobó cada nivel",
+		"layerDeterminedLead": "Determinado por:",
+		"hintContactHr": "Si cree que el resultado es incorrecto, contacte con su departamento de RR. HH.",
+		"loadError": "No se pudo cargar la explicación. Inténtelo más tarde."
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

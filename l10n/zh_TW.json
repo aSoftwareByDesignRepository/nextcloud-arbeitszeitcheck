@@ -40,8 +40,6 @@
 		"%1$s: %2$s (%3$s h)": "%1$s：%2$s（%3$s 小時）",
 		"%d minutes": "%d 分鐘",
 		"%d of %d steps done.": "已完成 %d / %d 步。",
-		"%d row(s) need a value on this instance": "%d 列需要在此實例上填寫值",
-		"%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "已略過 %d 列，%d 個參照未能解析——請查看下方群組。",
 		"%n Nextcloud accounts without app access are hidden.": "%n 個無應用訪問授權的 Nextcloud 帳戶已隱藏。",
 		"%n absence request": "%n 條請假申請",
 		"%n absence requests": "%n 條請假申請",
@@ -128,10 +126,6 @@
 		"%s working days": "%s 個工作日",
 		"%s/page": "%s/頁",
 		"(%1$s employees in scope)": "（%1$s 名員工在範圍內）",
-		"(%d env-bound value(s) emptied)": "（已清空 %d 個實例綁定值）",
-		"(%d filtered)": "（已篩選 %d 項）",
-		"(%d secret(s) redacted)": "（已遮蔽 %d 個密鑰）",
-		"(%d unresolved ref)": "（%d 個參照未解析）",
 		"(Mon–Fri)": "（週一至週五）",
 		"(all Nextcloud accounts)": "（全部 Nextcloud 帳戶）",
 		"(estimated)": "（預估）",
@@ -5662,7 +5656,6 @@
 		"Walk to the selected tablet (or ask a colleague there).": "走到所選平板處（或請那裡的同事幫忙）。",
 		"Walking": "步行",
 		"Warning": "警告",
-		"Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "警告：%d 列將被永久刪除，然後載入檔案資料。",
 		"Warning: 6-month average weekly working hours (%.2f h/week) exceeds 48 hours/week (ArbZG §3).": "警告：6 個月平均每週工時（%.2f 小時/周）超過 48 小時/周（ArbZG §3）。",
 		"Warning: 6-month average working hours (%.2f h/day) exceeds 8 hours/day. 10-hour days are only allowed if the average does not exceed 8 hours (ArbZG §3).": "警告：6 個月平均工時（%.2f 小時/天）超過 8 小時/天。只有平均不超過 8 小時時才允許 10 小時工作日（ArbZG §3）。",
 		"Warning: average weekly working hours over %1$d weeks (%2$.2f h/week) exceed %3$d hours/week (%4$s).": "警告：%1$d 周平均每週工時（%2$.2f 小時/周）超過 %3$d 小時/周（%4$s）。",
@@ -6523,7 +6516,74 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.": "“至少 X 小時請假計入至少 Y 小時。”按順序檢查各行——最後匹配的行生效。",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "“生成訂閱 URL”為一個範圍建立首個連結。“吊銷並輪換”替換現有連結——舊 URL 立即失效。",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "“放置”把自動休息安排在時段內。“要求”表示休息必須與該時段重疊指定分鐘數。",
-		"…": "…"
+		"…": "…",
+		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+			"%n 列需要在此實例上填寫值"
+		],
+		"1 row needs a value on this instance": "%n 列需要在此實例上填寫值",
+		"%n rows need a value on this instance": "%n 列需要在此實例上填寫值",
+		"_1 row skipped._:: _%n rows skipped._": [
+			"已略過 %n 列。"
+		],
+		"1 row skipped.": "已略過 %n 列。",
+		"%n rows skipped.": "已略過 %n 列。",
+		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+			"%n 個參照未能解析——請查看下方群組。"
+		],
+		"1 reference unresolved — see the groups below.": "%n 個參照未能解析——請查看下方群組。",
+		"%n references unresolved — see the groups below.": "%n 個參照未能解析——請查看下方群組。",
+		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+			"（已清空 %n 個實例綁定值）"
+		],
+		"(1 env-bound value emptied)": "（已清空 %n 個實例綁定值）",
+		"(%n env-bound values emptied)": "（已清空 %n 個實例綁定值）",
+		"_(1 filtered)_:: _(%n filtered)_": [
+			"（已篩選 %n 項）"
+		],
+		"(1 filtered)": "（已篩選 %n 項）",
+		"(%n filtered)": "（已篩選 %n 項）",
+		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+			"（已遮蔽 %n 個密鑰）"
+		],
+		"(1 secret redacted)": "（已遮蔽 %n 個密鑰）",
+		"(%n secrets redacted)": "（已遮蔽 %n 個密鑰）",
+		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+			"（%n 個參照未解析）"
+		],
+		"(1 unresolved ref)": "（%n 個參照未解析）",
+		"(%n unresolved refs)": "（%n 個參照未解析）",
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+			"警告：%n 列將被永久刪除，然後載入檔案資料。"
+		],
+		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "警告：%n 列將被永久刪除，然後載入檔案資料。",
+		"Warning: %n rows will be permanently deleted, then the file data is loaded.": "警告：%n 列將被永久刪除，然後載入檔案資料。",
+		"Clock out?": "簽退？",
+		"Complete paused session": "完成已暫停的工作階段",
+		"Complete this paused session? The end time will be set to when it was paused, and any required breaks will be added automatically. This finalises the entry; you can still edit it afterwards.": "完成此暫停的工作階段？結束時間將設定為暫停時的時間，所需的休息將自動加入。這將完成該筆記錄；之後您仍可編輯。",
+		"Could not complete the paused session. Please try again.": "無法完成已暫停的工作階段。請重試。",
+		"Could not initialize the month list. Please reload the page.": "無法初始化月份清單。請重新載入頁面。",
+		"Delete?": "刪除？",
+		"Finalize": "結算",
+		"Optional description": "選填說明",
+		"Request absence for this day.": "為當天申請請假。",
+		"Cannot activate an incomplete tariff rule set": "無法啟用不完整的費率規則集",
+		"individualRule": "個人規則",
+		"teamPolicy": "團隊策略",
+		"organisationDefault": "組織預設",
+		"defaultFallback": "預設兜底",
+		"partialHistoryHint": "（過去日期的團隊歸屬為盡力而為）",
+		"degradedBanner": "您的額度使用了安全預設值解析。如有疑問請聯絡人事管理員。",
+		"clampedBanner": "您計算出的額度超出允許的 0–366 天範圍，已調整。如果您預期不同的值，請聯絡人事。",
+		"summaryTitle": "您的年度年假額度",
+		"daysPerYear": "天/年",
+		"asOfDate": "截至 %s 計算",
+		"prorationNoteTwelfths": "按您今年在職期間折算：{prorated} 天，全年 {full} 天（在職 12 個月中的 {months} 個月）。",
+		"prorationNoteDaily": "按您今年在職期間折算：{prorated} 天，全年 {full} 天。",
+		"prorationNoteNone": "您在此行事曆年沒有在職，因此無年假額度。",
+		"chainTitle": "系統如何逐層檢查",
+		"layerDeterminedLead": "確定依據：",
+		"hintContactHr": "如您認為結果有誤，請聯絡人事管理員。",
+		"loadError": "無法載入說明。請稍後重試。"
 	},
 	"pluralForm": "nplurals=1; plural=0;"
 }

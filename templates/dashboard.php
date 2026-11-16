@@ -659,7 +659,16 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                         </div>
                     </header>
                     <div class="azc-card__body">
-                    <div class="azc-dashboard-metrics" role="list" aria-label="<?php p($l->t('Hours at a glance')); ?>">
+                    <?php
+                        $metricsHasCredit = false;
+                        foreach ($hoursGlance as $glanceCreditRow) {
+                            if ((float)($glanceCreditRow['credit'] ?? 0) >= 0.01) {
+                                $metricsHasCredit = true;
+                                break;
+                            }
+                        }
+                    ?>
+                    <div class="azc-dashboard-metrics<?php p($metricsHasCredit ? ' azc-dashboard-metrics--has-credit' : ''); ?>" role="list" aria-label="<?php p($l->t('Hours at a glance')); ?>">
                     <?php if ($hoursGlance === []): ?>
                     <div class="azc-dashboard-metric" role="listitem">
                         <span class="azc-dashboard-metric__label"><?php p($l->t('Worked today')); ?></span>

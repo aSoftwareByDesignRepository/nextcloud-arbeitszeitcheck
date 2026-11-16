@@ -40,8 +40,6 @@
 		"%1$s: %2$s (%3$s h)": "%1$s: %2$s (%3$s sa)",
 		"%d minutes": "%d dakika",
 		"%d of %d steps done.": "%d / %d adım tamamlandı.",
-		"%d row(s) need a value on this instance": "%d satırın bu örnekte bir değere ihtiyacı var",
-		"%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d satır atlandı ve %d başvuru çözümlenemedi — aşağıdaki gruplara bakın.",
 		"%n Nextcloud accounts without app access are hidden.": "Uygulama erişimi olmayan %n Nextcloud hesabı gizlendi.",
 		"%n absence request": "%n devamsızlık talebi",
 		"%n absence requests": "%n devamsızlık talebi",
@@ -128,10 +126,6 @@
 		"%s working days": "%s çalışma günü",
 		"%s/page": "%s/sayfa",
 		"(%1$s employees in scope)": "(kapsamdaki %1$s çalışan)",
-		"(%d env-bound value(s) emptied)": "(%d örneğe bağlı değer boşaltıldı)",
-		"(%d filtered)": "(%d filtrelendi)",
-		"(%d secret(s) redacted)": "(%d sır gizlendi)",
-		"(%d unresolved ref)": "(%d çözümlenemeyen başvuru)",
 		"(Mon–Fri)": "(Pzt–Cum)",
 		"(all Nextcloud accounts)": "(tüm Nextcloud hesapları)",
 		"(estimated)": "(estimated)",
@@ -5662,7 +5656,6 @@
 		"Walk to the selected tablet (or ask a colleague there).": "Seçilen tablete gidin (veya oradaki bir iş arkadaşınıza sorun).",
 		"Walking": "Yürüyerek",
 		"Warning": "Uyarı",
-		"Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Uyarı: %d satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek.",
 		"Warning: 6-month average weekly working hours (%.2f h/week) exceeds 48 hours/week (ArbZG §3).": "Uyarı: 6 aylık ortalama haftalık çalışma saati (%.2f sa/hafta) 48 saat/haftayı aşıyor (ArbZG §3).",
 		"Warning: 6-month average working hours (%.2f h/day) exceeds 8 hours/day. 10-hour days are only allowed if the average does not exceed 8 hours (ArbZG §3).": "Uyarı: 6 aylık ortalama çalışma saati (%.2f sa/gün) 8 saat/günü aşıyor. 10 saatlik günler yalnızca ortalama 8 saati aşmadığında izinlidir (ArbZG §3).",
 		"Warning: average weekly working hours over %1$d weeks (%2$.2f h/week) exceed %3$d hours/week (%4$s).": "Uyarı: %1$d haftada ortalama haftalık çalışma saati (%2$.2f sa/hafta) haftada %3$d saati aşıyor (%4$s).",
@@ -6531,7 +6524,82 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.": "“En az X saat devamsızlık en az Y saat olarak değerlenir.” Satırlar sırayla denetlenir — son eşleşen satır kazanır.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "“Akış URL'si oluştur” bir kapsam için ilk bağlantıyı oluşturur. “İptal et ve döndür” mevcut bir bağlantıyı değiştirir — eski URL hemen çalışmayı durdurur.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "“Yerleşim” otomatik molaları pencere içine yerleştirir. “Zorunlu”, molanın verilen dakikalar boyunca pencereyle çakışması gerektiği anlamına gelir.",
-		"…": "…"
+		"…": "…",
+		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+			"1 satırın bu örnekte bir değere ihtiyacı var",
+			"%n satırın bu örnekte bir değere ihtiyacı var"
+		],
+		"1 row needs a value on this instance": "1 satırın bu örnekte bir değere ihtiyacı var",
+		"%n rows need a value on this instance": "%n satırın bu örnekte bir değere ihtiyacı var",
+		"_1 row skipped._:: _%n rows skipped._": [
+			"1 satır atlandı.",
+			"%n satır atlandı."
+		],
+		"1 row skipped.": "1 satır atlandı.",
+		"%n rows skipped.": "%n satır atlandı.",
+		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+			"1 başvuru çözümlenemedi — aşağıdaki gruplara bakın.",
+			"%n başvuru çözümlenemedi — aşağıdaki gruplara bakın."
+		],
+		"1 reference unresolved — see the groups below.": "1 başvuru çözümlenemedi — aşağıdaki gruplara bakın.",
+		"%n references unresolved — see the groups below.": "%n başvuru çözümlenemedi — aşağıdaki gruplara bakın.",
+		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+			"(1 örneğe bağlı değer boşaltıldı)",
+			"(%n örneğe bağlı değer boşaltıldı)"
+		],
+		"(1 env-bound value emptied)": "(1 örneğe bağlı değer boşaltıldı)",
+		"(%n env-bound values emptied)": "(%n örneğe bağlı değer boşaltıldı)",
+		"_(1 filtered)_:: _(%n filtered)_": [
+			"(1 filtrelendi)",
+			"(%n filtrelendi)"
+		],
+		"(1 filtered)": "(1 filtrelendi)",
+		"(%n filtered)": "(%n filtrelendi)",
+		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+			"(1 sır gizlendi)",
+			"(%n sır gizlendi)"
+		],
+		"(1 secret redacted)": "(1 sır gizlendi)",
+		"(%n secrets redacted)": "(%n sır gizlendi)",
+		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+			"(1 çözümlenemeyen başvuru)",
+			"(%n çözümlenemeyen başvuru)"
+		],
+		"(1 unresolved ref)": "(1 çözümlenemeyen başvuru)",
+		"(%n unresolved refs)": "(%n çözümlenemeyen başvuru)",
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+			"Uyarı: 1 satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek.",
+			"Uyarı: %n satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek."
+		],
+		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "Uyarı: 1 satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek.",
+		"Warning: %n rows will be permanently deleted, then the file data is loaded.": "Uyarı: %n satır kalıcı olarak silinecek, ardından dosya verileri yüklenecek.",
+		"Clock out?": "Mesaiyi bitir?",
+		"Complete paused session": "Duraklatılmış oturumu tamamla",
+		"Complete this paused session? The end time will be set to when it was paused, and any required breaks will be added automatically. This finalises the entry; you can still edit it afterwards.": "Bu duraklatılmış oturum tamamlansın mı? Bitiş saati duraklatıldığı ana ayarlanır ve gerekli molalar otomatik olarak eklenir. Bu, kaydı sonlandırır; daha sonra yine de düzenleyebilirsiniz.",
+		"Could not complete the paused session. Please try again.": "Duraklatılmış oturum tamamlanamadı. Lütfen tekrar deneyin.",
+		"Could not initialize the month list. Please reload the page.": "Ay listesi başlatılamadı. Lütfen sayfayı yenileyin.",
+		"Delete?": "Silinsin mi?",
+		"Finalize": "Kapat",
+		"Optional description": "İsteğe bağlı açıklama",
+		"Request absence for this day.": "Bu gün için devamsızlık talep et.",
+		"Cannot activate an incomplete tariff rule set": "Eksik bir tarife kural seti etkinleştirilemez",
+		"individualRule": "Bireysel kural",
+		"teamPolicy": "Ekip politikası",
+		"organisationDefault": "Kurum varsayılanı",
+		"defaultFallback": "Varsayılan geri dönüş",
+		"partialHistoryHint": "(geçmiş tarihlerde ekip üyeliği bilgisi yaklaşıktır)",
+		"degradedBanner": "Hakkınız güvenli bir varsayılanla belirlendi. Yanlış görünüyorsa lütfen İK yöneticinize başvurun.",
+		"clampedBanner": "Hesaplanan hakkınız izin verilen 0–366 gün aralığının dışındaydı ve düzeltildi. Farklı bir değer bekliyorduysanız lütfen İK ile iletişime geçin.",
+		"summaryTitle": "Yıllık izin hakkınız",
+		"daysPerYear": "yılda gün",
+		"asOfDate": "%s itibarıyla hesaplandı",
+		"prorationNoteTwelfths": "Bu yılki çalışma döneminiz için kısaltılmış: {full} günden {prorated} (12 ayın {months} ayı çalışıldı).",
+		"prorationNoteDaily": "Bu yılki çalışma döneminiz için kısaltılmış: {full} günden {prorated}.",
+		"prorationNoteNone": "Bu takvim yılında çalışan olarak görev yapmadığınız için bu yıl için izin hakkı verilmez.",
+		"chainTitle": "Sistemin her katmanı nasıl denetlediği",
+		"layerDeterminedLead": "Belirleyen:",
+		"hintContactHr": "Sonucun yanlış olduğunu düşünüyorsanız lütfen İK yöneticinizle iletişime geçin.",
+		"loadError": "Açıklama yüklenemedi. Lütfen daha sonra yeniden deneyin."
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

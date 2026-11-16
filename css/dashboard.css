@@ -692,6 +692,13 @@
         height: auto;
     }
 
+    /* Credit-bearing grids get a 4th subgrid track: the optional
+       __credit child would otherwise auto-place onto the delta track and
+       paint text-on-text. All tiles span 4 so row heights stay aligned. */
+    #app-content.azc-app--dashboard .azc-dashboard-metrics--has-credit .azc-dashboard-metric {
+        grid-row: span 4;
+    }
+
     #app-content.azc-app--dashboard .azc-dashboard-metric__delta {
         margin-top: 0;
     }

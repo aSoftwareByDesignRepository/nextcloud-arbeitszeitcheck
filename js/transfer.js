@@ -22,6 +22,17 @@
 			return (v === undefined || v === null) ? '' : String(v);
 		});
 	};
+	// Plural-aware translate — window.n resolves the _sg_::_pl_ combined
+	// catalog key and substitutes %n. Singular msgids carry the literal '1'
+	// (catalog convention), plurals carry %n. Never '(s)'-hack a count into a
+	// single msgid — lazy_plural_paren class.
+	const n = (singular, plural, count) => {
+		const c = Number.isFinite(Number(count)) ? Number(count) : 0;
+		if (typeof window.n === 'function') {
+			return window.n('arbeitszeitcheck', singular, plural, c);
+		}
+		return String(c === 1 ? singular : plural).replace('%n', String(c));
+	};
 	const P = 'azc';
 	const $ = (id) => document.getElementById(P + '-' + id);
 
@@ -215,7 +226,7 @@
 		groups.textContent = '';
 		const c = r.counts || {};
 		if (pendingMode === 'replace') {
-			verdict.textContent = t('Warning: %d row(s) will be permanently deleted, then the file data is loaded.', [c.rowsDeleted || 0]);
+			verdict.textContent = n('Warning: 1 row will be permanently deleted, then the file data is loaded.', 'Warning: %n rows will be permanently deleted, then the file data is loaded.', c.rowsDeleted || 0);
 			verdict.className = P + '-transfer-report__verdict is-danger';
 		} else {
 			verdict.textContent = t('This will update %d settings and %d rows — nothing is deleted.', [(c.configApplied || 0), ((c.rowsInserted || 0) + (c.rowsUpdated || 0))]);
@@ -225,7 +236,14 @@
 		if ((c.rowsSkipped || 0) > 0 || (c.refsUnresolved || 0) > 0) {
 			const skipped = document.createElement('p');
 			skipped.className = P + '-callout ' + P + '-callout--warning';
-			skipped.textContent = t('%d row(s) skipped and %d reference(s) unresolved — see the groups below.', [c.rowsSkipped || 0, c.refsUnresolved || 0]);
+			const skippedParts = [];
+			if ((c.rowsSkipped || 0) > 0) {
+				skippedParts.push(n('1 row skipped.', '%n rows skipped.', c.rowsSkipped || 0));
+			}
+			if ((c.refsUnresolved || 0) > 0) {
+				skippedParts.push(n('1 reference unresolved — see the groups below.', '%n references unresolved — see the groups below.', c.refsUnresolved || 0));
+			}
+			skipped.textContent = skippedParts.join(' ');
 			groups.appendChild(skipped);
 		}
 
@@ -242,14 +260,14 @@
 		if ((r.unresolved || []).length) groups.appendChild(group(t('Unresolved users / groups'), r.unresolved, (u) =>
 			u.value + ' (' + u.type + ') → ' + (u.action === 'keep' ? t('kept as-is') : u.action === 'filtered' ? t('removed from the list') : t('will be skipped')) + (u.table ? ' · ' + u.table : '')));
 		if ((r.secrets || []).length) groups.appendChild(group(t('Secrets not transferred'), r.secrets, (s) => s.key + ' — ' + t('set it on this instance')));
-		if ((r.envBound || []).length) groups.appendChild(group(t('Instance-bound columns left empty'), r.envBound, (e) => e.table + '.' + e.column + ' — ' + t('%d row(s) need a value on this instance', [e.rows || 0])));
+		if ((r.envBound || []).length) groups.appendChild(group(t('Instance-bound columns left empty'), r.envBound, (e) => e.table + '.' + e.column + ' — ' + n('1 row needs a value on this instance', '%n rows need a value on this instance', e.rows || 0)));
 		const tableRows = Object.keys(r.tables || {}).map((k) => [k, r.tables[k]]);
 		if (tableRows.length) groups.appendChild(group(t('Data changes'), tableRows, ([k, v]) =>
 			k + ': +' + (v.insert || 0) + ' ~' + (v.update || 0) + ' −' + (v.delete || 0) + ' ✕' + (v.skip || 0)
-				+ (v.filtered ? ' ' + t('(%d filtered)', [v.filtered]) : '')
-				+ (v.unresolved ? ' ' + t('(%d unresolved ref)', [v.unresolved]) : '')
-				+ (v.envDropped ? ' ' + t('(%d env-bound value(s) emptied)', [v.envDropped]) : '')
-				+ (v.secretsRedacted ? ' ' + t('(%d secret(s) redacted)', [v.secretsRedacted]) : '')
+				+ (v.filtered ? ' ' + n('(1 filtered)', '(%n filtered)', v.filtered) : '')
+				+ (v.unresolved ? ' ' + n('(1 unresolved ref)', '(%n unresolved refs)', v.unresolved) : '')
+				+ (v.envDropped ? ' ' + n('(1 env-bound value emptied)', '(%n env-bound values emptied)', v.envDropped) : '')
+				+ (v.secretsRedacted ? ' ' + n('(1 secret redacted)', '(%n secrets redacted)', v.secretsRedacted) : '')
 				+ (v.skipped ? ' (' + (v.skipReason || '') + ')' : '')));
 		if ((r.tablesUnknown || []).length) groups.appendChild(group(t('Unknown tables skipped'), r.tablesUnknown, (x) => x));
 		const cc = r.config || {};

@@ -40,8 +40,6 @@
 		"%1$s: %2$s (%3$s h)": "%1$s : %2$s (%3$s h)",
 		"%d minutes": "%d minutes",
 		"%d of %d steps done.": "%d étapes sur %d terminées.",
-		"%d row(s) need a value on this instance": "%d ligne(s) nécessitent une valeur sur cette instance",
-		"%d row(s) skipped and %d reference(s) unresolved — see the groups below.": "%d ligne(s) ignorée(s) et %d référence(s) non résolue(s) — voir les groupes ci-dessous.",
 		"%n Nextcloud accounts without app access are hidden.": "%n comptes Nextcloud sans accès à l’app sont masqués.",
 		"%n absence request": "%n demande d'absence",
 		"%n absence requests": "%n demandes d'absence",
@@ -128,10 +126,6 @@
 		"%s working days": "%s jours ouvrés",
 		"%s/page": "%s/page",
 		"(%1$s employees in scope)": "(%1$s employés dans le périmètre)",
-		"(%d env-bound value(s) emptied)": "(%d valeur(s) liées à l’instance vidée(s))",
-		"(%d filtered)": "(%d filtrée(s))",
-		"(%d secret(s) redacted)": "(%d secret(s) masqué(s))",
-		"(%d unresolved ref)": "(%d référence(s) non résolue(s))",
 		"(Mon–Fri)": "(lun–ven)",
 		"(all Nextcloud accounts)": "(tous les comptes Nextcloud)",
 		"(estimated)": "(estimated)",
@@ -5662,7 +5656,6 @@
 		"Walk to the selected tablet (or ask a colleague there).": "Allez à la tablette sélectionnée (ou demandez à un collègue sur place).",
 		"Walking": "À pied",
 		"Warning": "Avertissement",
-		"Warning: %d row(s) will be permanently deleted, then the file data is loaded.": "Avertissement : %d ligne(s) seront définitivement supprimées, puis les données du fichier seront chargées.",
 		"Warning: 6-month average weekly working hours (%.2f h/week) exceeds 48 hours/week (ArbZG §3).": "Avertissement : la moyenne hebdomadaire sur 6 mois (%.2f h/semaine) dépasse 48 heures/semaine (ArbZG §3).",
 		"Warning: 6-month average working hours (%.2f h/day) exceeds 8 hours/day. 10-hour days are only allowed if the average does not exceed 8 hours (ArbZG §3).": "Avertissement : la moyenne sur 6 mois (%.2f h/jour) dépasse 8 heures/jour. Les journées de 10 heures ne sont autorisées que si la moyenne ne dépasse pas 8 heures (ArbZG §3).",
 		"Warning: average weekly working hours over %1$d weeks (%2$.2f h/week) exceed %3$d hours/week (%4$s).": "Avertissement : la moyenne hebdomadaire d’heures de travail sur %1$d semaines (%2$.2f h/semaine) dépasse %3$d heures/semaine (%4$s).",
@@ -6531,7 +6524,82 @@
 		"“At least X hours absence credits at least Y hours.” Rows are checked in order — the last matching row wins.": "« Au moins X heures d'absence créditent au moins Y heures. » Les lignes sont vérifiées dans l'ordre — la dernière ligne correspondante l'emporte.",
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "« Générer l’URL du flux » crée le premier lien pour un périmètre. « Révoquer et renouveler » remplace un lien existant — l’ancienne URL cesse immédiatement de fonctionner.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "« Positionnement » place les pauses automatiques dans la plage. « Obligatoire » signifie que la pause doit chevaucher la plage du nombre de minutes indiqué.",
-		"…": "…"
+		"…": "…",
+		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+			"1 ligne nécessite une valeur sur cette instance",
+			"%n lignes nécessitent une valeur sur cette instance"
+		],
+		"1 row needs a value on this instance": "1 ligne nécessite une valeur sur cette instance",
+		"%n rows need a value on this instance": "%n lignes nécessitent une valeur sur cette instance",
+		"_1 row skipped._:: _%n rows skipped._": [
+			"1 ligne ignorée.",
+			"%n lignes ignorées."
+		],
+		"1 row skipped.": "1 ligne ignorée.",
+		"%n rows skipped.": "%n lignes ignorées.",
+		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+			"1 référence non résolue — voir les groupes ci-dessous.",
+			"%n références non résolues — voir les groupes ci-dessous."
+		],
+		"1 reference unresolved — see the groups below.": "1 référence non résolue — voir les groupes ci-dessous.",
+		"%n references unresolved — see the groups below.": "%n références non résolues — voir les groupes ci-dessous.",
+		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+			"(1 valeur liée à l’instance vidée)",
+			"(%n valeurs liées à l’instance vidées)"
+		],
+		"(1 env-bound value emptied)": "(1 valeur liée à l’instance vidée)",
+		"(%n env-bound values emptied)": "(%n valeurs liées à l’instance vidées)",
+		"_(1 filtered)_:: _(%n filtered)_": [
+			"(1 filtrée)",
+			"(%n filtrées)"
+		],
+		"(1 filtered)": "(1 filtrée)",
+		"(%n filtered)": "(%n filtrées)",
+		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+			"(1 secret masqué)",
+			"(%n secrets masqués)"
+		],
+		"(1 secret redacted)": "(1 secret masqué)",
+		"(%n secrets redacted)": "(%n secrets masqués)",
+		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+			"(1 référence non résolue)",
+			"(%n références non résolues)"
+		],
+		"(1 unresolved ref)": "(1 référence non résolue)",
+		"(%n unresolved refs)": "(%n références non résolues)",
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+			"Avertissement : 1 ligne sera définitivement supprimée, puis les données du fichier seront chargées.",
+			"Avertissement : %n lignes seront définitivement supprimées, puis les données du fichier seront chargées."
+		],
+		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "Avertissement : 1 ligne sera définitivement supprimée, puis les données du fichier seront chargées.",
+		"Warning: %n rows will be permanently deleted, then the file data is loaded.": "Avertissement : %n lignes seront définitivement supprimées, puis les données du fichier seront chargées.",
+		"Clock out?": "Pointer la sortie ?",
+		"Complete paused session": "Terminer la session en pause",
+		"Complete this paused session? The end time will be set to when it was paused, and any required breaks will be added automatically. This finalises the entry; you can still edit it afterwards.": "Terminer cette session en pause ? L’heure de fin sera celle de la pause et les pauses requises seront ajoutées automatiquement. Cela finalise l’entrée ; vous pourrez toujours la modifier ensuite.",
+		"Could not complete the paused session. Please try again.": "Impossible de terminer la session en pause. Veuillez réessayer.",
+		"Could not initialize the month list. Please reload the page.": "Impossible d’initialiser la liste des mois. Veuillez recharger la page.",
+		"Delete?": "Supprimer ?",
+		"Finalize": "Finaliser",
+		"Optional description": "Description facultative",
+		"Request absence for this day.": "Demander une absence pour ce jour.",
+		"Cannot activate an incomplete tariff rule set": "Impossible d’activer un ensemble de règles tarifaires incomplet",
+		"individualRule": "Règle individuelle",
+		"teamPolicy": "Politique d'équipe",
+		"organisationDefault": "Valeur par défaut de l'organisation",
+		"defaultFallback": "Repli par défaut",
+		"partialHistoryHint": "(l'appartenance à l'équipe pour les dates passées est approximative)",
+		"degradedBanner": "Votre droit a été déterminé avec une valeur par défaut de sécurité. Contactez votre administrateur RH si cela semble incorrect.",
+		"clampedBanner": "Votre droit calculé était en dehors de la plage autorisée de 0 à 366 jours et a été ajusté. Contactez les RH si vous attendiez une autre valeur.",
+		"summaryTitle": "Votre droit annuel aux congés",
+		"daysPerYear": "jours par an",
+		"asOfDate": "Calculé au %s",
+		"prorationNoteTwelfths": "Réduit pour votre période d’emploi cette année : {prorated} sur {full} jours (employé {months} mois sur 12).",
+		"prorationNoteDaily": "Réduit pour votre période d’emploi cette année : {prorated} sur {full} jours.",
+		"prorationNoteNone": "Vous n’étiez pas employé durant cette année civile, donc aucun congé n’est accordé pour celle-ci.",
+		"chainTitle": "Comment le système a vérifié chaque niveau",
+		"layerDeterminedLead": "Déterminé par :",
+		"hintContactHr": "Si vous pensez que le résultat est incorrect, contactez votre service RH.",
+		"loadError": "Impossible de charger l'explication. Veuillez réessayer plus tard."
 	},
 	"pluralForm": "nplurals=2; plural=(n > 1);"
 }

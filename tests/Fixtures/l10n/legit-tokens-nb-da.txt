@@ -587,6 +587,7 @@ inaktiv
 individuelle
 individuelt
 ingen
+initialisere
 inkluder
 inkludere
 inkluderer
@@ -594,6 +595,7 @@ inkluderes
 inklusive
 installer
 instans
+instansbundet
 instansbundne
 instansen
 instansens
@@ -876,6 +878,7 @@ månedlig
 månedlige
 måneds
 månedsformat
+månedslisten
 månedslukning
 månedsrapport
 månedsvisning
@@ -922,15 +925,15 @@ obligatoriske
 offentlig
 offentlige
 oktober
-omregner
-omregnes
-omregnet
 omfang
 omfanget
 omfatte
 omfattede
 omfattende
 omfatter
+omregner
+omregnes
+omregnet
 område
 området
 omskriver

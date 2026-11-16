@@ -41,9 +41,30 @@ function stageDom() {
 			</div>
 			<div class="azc-table-pager" id="employee-absences-pager" data-mode="remote" data-per-page="25" hidden></div>
 			<form id="manager-absence-record-form" novalidate>
-				<input type="hidden" id="manager-absence-record-employee" value="">
+				<input type="hidden" id="manager-absence-record-employee-id" value="">
+				<input type="text" id="manager-absence-record-employee-search" value="">
+				<select id="manager-absence-record-type">
+					<option value="vacation">Vacation</option>
+					<option value="sick">Sick leave</option>
+				</select>
 				<input id="manager-absence-record-start">
 				<input id="manager-absence-record-end">
+				<div id="manager-absence-record-day-fraction-field" hidden>
+					<input type="radio" name="record_day_fraction" id="manager-absence-day-fraction-full" value="1" checked>
+					<input type="radio" name="record_day_fraction" id="manager-absence-day-fraction-half" value="0.5">
+					<p id="manager-absence-day-fraction-live" class="sr-only"></p>
+				</div>
+				<div id="manager-absence-record-hours-field" hidden>
+					<input id="manager-absence-record-hours" type="number">
+				</div>
+				<div class="manager-scope-page__reason-field">
+					<textarea id="manager-absence-record-reason"></textarea>
+				</div>
+				<div class="manager-scope-page__record-preview">
+					<p id="manager-absence-day-fraction-preview" role="status" aria-live="polite" hidden></p>
+					<p id="manager-absence-record-days-consumption" role="status" aria-live="polite" hidden></p>
+					<p id="manager-absence-record-hours-preview" role="status" aria-live="polite" hidden></p>
+				</div>
 				<button type="submit" id="manager-absence-record-submit">Save</button>
 			</form>
 		</section>
@@ -69,7 +90,7 @@ function stubGlobals() {
 		badgeVariantForAbsenceStatus: () => 'secondary',
 		renderBadgeHtml: (label, variant) => `<span class="badge badge--${variant}">${label}</span>`,
 	}
-	window.ArbeitszeitCheckMessaging = { showError: vi.fn(), showInfo: vi.fn() }
+	window.ArbeitszeitCheckMessaging = { showError: vi.fn(), showInfo: vi.fn(), showSuccess: vi.fn() }
 	window.ArbeitszeitCheckTime = {
 		todayYmd: () => '2026-02-15',
 		parseYmd: (s) => {
@@ -84,11 +105,16 @@ function stubGlobals() {
 		vacationUnit: 'days',
 		maxManagerListDateRangeDays: 365,
 		l10n: {},
-		initManagerScopedEmployeePicker: () => ({
-			getUserId: () => selectedUid,
-			setSelection: (uid) => { selectedUid = uid },
-			clear: () => { selectedUid = '' },
-		}),
+		initManagerScopedEmployeePicker: (opts) => {
+			const picker = {
+				getUserId: () => selectedUid,
+				setSelection: (uid) => { selectedUid = uid },
+				clear: () => { selectedUid = '' },
+			}
+			window.__lastEmployeePicker = picker
+			window.__lastEmployeePickerOpts = opts || {}
+			return picker
+		},
 		validateManagerFilterEmployeeSelection: (picker, searchSelector, hiddenSelector) => {
 			const query = document.querySelector(searchSelector)?.value.trim() || ''
 			const uid = picker?.getUserId?.() || document.querySelector(hiddenSelector)?.value.trim() || ''
@@ -100,6 +126,12 @@ function stubGlobals() {
 	}
 	window.AzcTablePager = { SIZES: [10, 25, 50, 100], update: pagerUpdate }
 	window.AzcCatalog = { render: () => '<svg></svg>' }
+	window.ArbeitszeitCheckDatepicker = {
+		convertEuropeanToISO: (value) => {
+			const parts = String(value || '').split('.')
+			return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : String(value || '')
+		},
+	}
 }
 
 function respond(index, data) {
@@ -309,5 +341,333 @@ describe('manager absences error handling', () => {
 		expect(document.getElementById('employee-absences-filter-error').hidden).toBe(false)
 		expect(document.getElementById('employee-absences-filter-error').textContent).toContain('boom')
 		expect(window.ArbeitszeitCheckMessaging.showError).toHaveBeenCalled()
+	})
+})
+
+describe('record approved absence form', () => {
+	function fillRecordForm({ uid = 'alice', type = 'vacation', start = '16.02.2026', end = '20.02.2026', reason = '' } = {}) {
+		window.__lastEmployeePicker.setSelection(uid)
+		document.getElementById('manager-absence-record-type').value = type
+		document.getElementById('manager-absence-record-start').value = start
+		document.getElementById('manager-absence-record-end').value = end
+		document.getElementById('manager-absence-record-reason').value = reason
+	}
+
+	async function bootWithInitialLoad() {
+		await boot()
+		respond(0, OK([], 0))
+		await flush()
+	}
+
+	it('posts the record payload and shows a design-system success toast', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm({ reason: 'Approved by HR' })
+		document.getElementById('manager-absence-record-form').requestSubmit()
+		expect(ajax).toHaveBeenCalledTimes(2)
+		const post = pendingResponses[1]
+		expect(post.url).toBe('/apps/arbeitszeitcheck/api/manager/employee-absences')
+		expect(post.opts.method).toBe('POST')
+		expect(post.opts.data.userId).toBe('alice')
+		expect(post.opts.data.type).toBe('vacation')
+		expect(post.opts.data.startDate).toBe('2026-02-16')
+		expect(post.opts.data.endDate).toBe('2026-02-20')
+		expect(post.opts.data.reason).toBe('Approved by HR')
+		respond(1, { success: true })
+		await flush()
+		expect(window.ArbeitszeitCheckMessaging.showSuccess).toHaveBeenCalledWith('Absence recorded and approved.')
+		expect(document.getElementById('manager-absence-record-submit').disabled).toBe(false)
+		expect(document.getElementById('manager-absence-record-reason').value).toBe('')
+		// Success triggers a fresh list load.
+		expect(ajax).toHaveBeenCalledTimes(3)
+		expect(pendingResponses[2].url).toContain('/api/manager/employee-absences?')
+	})
+
+	it('clears all record fields back to the initial state after a save', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm({ type: 'sick', start: '10.02.2026', end: '12.02.2026', reason: 'Notes' })
+		document.getElementById('manager-absence-day-fraction-half').checked = true
+		document.getElementById('manager-absence-record-form').requestSubmit()
+		respond(1, { success: true })
+		await flush()
+		// Employee picker, hidden field and search box are empty again.
+		expect(window.__lastEmployeePicker.getUserId()).toBe('')
+		expect(document.getElementById('manager-absence-record-employee-id').value).toBe('')
+		expect(document.getElementById('manager-absence-record-employee-search').value).toBe('')
+		// Type falls back to the first option, dates to the today default,
+		// reason is empty and the day length is back on full day.
+		expect(document.getElementById('manager-absence-record-type').selectedIndex).toBe(0)
+		expect(document.getElementById('manager-absence-record-start').value).toBe('15.02.2026')
+		expect(document.getElementById('manager-absence-record-end').value).toBe('15.02.2026')
+		expect(document.getElementById('manager-absence-record-reason').value).toBe('')
+		expect(document.getElementById('manager-absence-day-fraction-full').checked).toBe(true)
+		expect(document.getElementById('manager-absence-day-fraction-half').checked).toBe(false)
+	})
+
+	it('shows the server error message when saving fails', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm()
+		document.getElementById('manager-absence-record-form').requestSubmit()
+		respondError(1, { error: 'This calendar month is finalized. Contact an administrator if a correction must be made.' })
+		await flush()
+		expect(window.ArbeitszeitCheckMessaging.showError).toHaveBeenCalledWith(
+			'This calendar month is finalized. Contact an administrator if a correction must be made.'
+		)
+		expect(document.getElementById('manager-absence-record-submit').disabled).toBe(false)
+		expect(window.ArbeitszeitCheckMessaging.showSuccess).not.toHaveBeenCalled()
+	})
+
+	it('maps raw HTTP failure text to the translated generic error', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm()
+		document.getElementById('manager-absence-record-form').requestSubmit()
+		respondError(1, { error: 'HTTP error! status: 500' })
+		await flush()
+		expect(window.ArbeitszeitCheckMessaging.showError).toHaveBeenCalledWith('Could not save absence.')
+	})
+
+	it('renders the self-target inline notice instead of a toast', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm()
+		const form = document.getElementById('manager-absence-record-form')
+		form.requestSubmit()
+		respondError(1, { error: 'Record your own absence via Absences.', data: { selfTarget: true, selfServiceArea: 'absences' } })
+		await flush()
+		expect(form.querySelector('.azc-self-target-notice')).toBeTruthy()
+		expect(window.ArbeitszeitCheckMessaging.showError).not.toHaveBeenCalled()
+	})
+
+	it('rejects submit without an employee and shows the error via Messaging', async () => {
+		await bootWithInitialLoad()
+		fillRecordForm()
+		window.__lastEmployeePicker.clear()
+		document.getElementById('manager-absence-record-form').requestSubmit()
+		expect(ajax).toHaveBeenCalledTimes(1)
+		expect(window.ArbeitszeitCheckMessaging.showError).toHaveBeenCalledWith('Select an employee')
+	})
+
+	it('reveals the day-usage preview below the reason field for a single half-day-capable day', async () => {
+		window.ArbeitszeitCheck.halfDayEnabledTypes = ['vacation']
+		await bootWithInitialLoad()
+		const end = document.getElementById('manager-absence-record-end')
+		const preview = document.getElementById('manager-absence-day-fraction-preview')
+		// Record dates default to today (FA-RECDATE) — a single day — so the
+		// preview is already visible after boot.
+		expect(preview.hidden).toBe(false)
+		expect(preview.textContent).toContain('vacation day')
+		// The preview must sit below the reason textarea in DOM order.
+		const reasonField = document.querySelector('.manager-scope-page__reason-field')
+		const position = reasonField.compareDocumentPosition(preview)
+		expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+		// Widening to a multi-day range hides it again…
+		end.value = '17.02.2026'
+		end.dispatchEvent(new Event('input'))
+		expect(preview.hidden).toBe(true)
+		// …and shrinking back to one day reveals it once more.
+		end.value = '15.02.2026'
+		end.dispatchEvent(new Event('input'))
+		expect(preview.hidden).toBe(false)
+	})
+
+	it('reads the employee id from the picker hidden field for the server estimate', async () => {
+		window.ArbeitszeitCheck.vacationUnit = 'hours'
+		window.ArbeitszeitCheck.estimateEmployeeVacationHoursUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-hours'
+		window.fetch = vi.fn().mockResolvedValue({ json: async () => ({ success: true, hours: 16 }) })
+		await bootWithInitialLoad()
+		document.getElementById('manager-absence-record-employee-id').value = 'alice'
+		const start = document.getElementById('manager-absence-record-start')
+		const end = document.getElementById('manager-absence-record-end')
+		start.value = '16.02.2026'
+		end.value = '17.02.2026'
+		start.dispatchEvent(new Event('input'))
+		end.dispatchEvent(new Event('input'))
+		await new Promise((resolve) => setTimeout(resolve, 300))
+		expect(window.fetch).toHaveBeenCalled()
+		expect(String(window.fetch.mock.calls[0][0])).toContain('userId=alice')
+	})
+
+	describe('vacation-days consumption badge', () => {
+		const consumption = () => document.getElementById('manager-absence-record-days-consumption')
+		const setRange = (start, end) => {
+			const startEl = document.getElementById('manager-absence-record-start')
+			const endEl = document.getElementById('manager-absence-record-end')
+			startEl.value = start
+			endEl.value = end
+			endEl.dispatchEvent(new Event('input'))
+		}
+		const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+		it('shows the local Mon–Fri count for a multi-day vacation range', async () => {
+			await bootWithInitialLoad()
+			// Today is Sunday 15.02.2026 — a single-day vacation consumes 0
+			// weekdays, so the badge is already up with an honest 0.
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 0 vacation days')
+			// 16.02–20.02.2026 is Mon–Fri → 5 weekdays.
+			setRange('16.02.2026', '20.02.2026')
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 5 vacation days')
+			expect(consumption().textContent).not.toContain('(Mon–Fri)')
+		})
+
+		it('updates the count when the range changes instead of disappearing', async () => {
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '20.02.2026')
+			expect(consumption().textContent).toContain('uses 5 vacation days')
+			// Extending to the following Monday adds a weekday — badge stays visible.
+			setRange('16.02.2026', '23.02.2026')
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 6 vacation days')
+		})
+
+		it('refines the count via the manager estimate endpoint once an employee is picked', async () => {
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			window.fetch = vi.fn().mockResolvedValue({
+				json: async () => ({ success: true, days: 4, basis: 'weekday_schedule' }),
+			})
+			await bootWithInitialLoad()
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('16.02.2026', '20.02.2026')
+			await sleep(300)
+			expect(window.fetch).toHaveBeenCalledTimes(1)
+			const url = String(window.fetch.mock.calls[0][0])
+			expect(url).toContain('userId=alice')
+			expect(url).toContain('startDate=2026-02-16')
+			expect(url).toContain('endDate=2026-02-20')
+			await flush()
+			expect(consumption().textContent).toContain('uses 4 vacation days')
+			expect(consumption().textContent).toContain('(per work model)')
+		})
+
+		it('keeps the local count when the estimate request fails', async () => {
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			window.fetch = vi.fn().mockRejectedValue(new Error('network'))
+			await bootWithInitialLoad()
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('16.02.2026', '20.02.2026')
+			await sleep(300)
+			await flush()
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 5 vacation days')
+		})
+
+		it('ignores a stale estimate response after the range changes again', async () => {
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			const resolvers = []
+			window.fetch = vi.fn().mockImplementation(() => new Promise((res) => resolvers.push(res)))
+			await bootWithInitialLoad()
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('16.02.2026', '20.02.2026')
+			await sleep(300)
+			setRange('16.02.2026', '23.02.2026')
+			await sleep(300)
+			expect(resolvers.length).toBe(2)
+			// Newest response wins …
+			resolvers[1]({ json: async () => ({ success: true, days: 6, basis: 'weekday_schedule' }) })
+			await flush()
+			expect(consumption().textContent).toContain('uses 6 vacation days')
+			// … and the stale earlier response cannot overwrite it.
+			resolvers[0]({ json: async () => ({ success: true, days: 4, basis: 'weekday_schedule' }) })
+			await flush()
+			expect(consumption().textContent).toContain('uses 6 vacation days')
+		})
+
+		it('re-estimates when the selected employee changes', async () => {
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			window.fetch = vi.fn().mockResolvedValue({
+				json: async () => ({ success: true, days: 3, basis: 'weekday_schedule' }),
+			})
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '20.02.2026')
+			window.__lastEmployeePicker.setSelection('bob')
+			window.__lastEmployeePickerOpts.onChange('bob', {})
+			await sleep(300)
+			expect(String(window.fetch.mock.calls[0][0])).toContain('userId=bob')
+		})
+
+		it('hides for non-vacation types, invalid and reversed ranges', async () => {
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '20.02.2026')
+			expect(consumption().hidden).toBe(false)
+			document.getElementById('manager-absence-record-type').value = 'sick'
+			document.getElementById('manager-absence-record-type').dispatchEvent(new Event('change'))
+			expect(consumption().hidden).toBe(true)
+			document.getElementById('manager-absence-record-type').value = 'vacation'
+			document.getElementById('manager-absence-record-type').dispatchEvent(new Event('change'))
+			setRange('20.02.2026', '16.02.2026')
+			expect(consumption().hidden).toBe(true)
+		})
+
+		it('yields to the day-fraction preview on a single day', async () => {
+			window.ArbeitszeitCheck.halfDayEnabledTypes = ['vacation']
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '16.02.2026')
+			expect(consumption().hidden).toBe(true)
+		})
+
+		it('covers the single day itself with singular grammar when no fraction control exists', async () => {
+			// halfDayEnabledTypes is unset → the fraction preview never shows,
+			// so the consumption badge owns single-day vacation counts.
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '16.02.2026')
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 1 vacation day')
+			expect(consumption().textContent).not.toContain('vacation days')
+		})
+
+		it('shows an honest 0 count for a weekend-only range and still refines via the server', async () => {
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			window.fetch = vi.fn().mockResolvedValue({
+				json: async () => ({ success: true, days: 2, basis: 'weekday_schedule' }),
+			})
+			await bootWithInitialLoad()
+			// 21.02–22.02.2026 is Sat–Sun → 0 Mon–Fri days locally, but a
+			// weekend-scheduled employee may still consume days — fetch anyway.
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('21.02.2026', '22.02.2026')
+			expect(consumption().hidden).toBe(false)
+			expect(consumption().textContent).toContain('uses 0 vacation days')
+			await sleep(300)
+			expect(window.fetch).toHaveBeenCalled()
+			await flush()
+			expect(consumption().textContent).toContain('uses 2 vacation days')
+		})
+
+		it('formats fractional counts with the app locale decimal separator', async () => {
+			window.ArbeitszeitCheck.dateLocale = 'de-DE'
+			window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = '/apps/arbeitszeitcheck/api/manager/employee-absences/estimate-days'
+			window.fetch = vi.fn().mockResolvedValue({
+				json: async () => ({ success: true, days: 2.5, basis: 'weekday_schedule' }),
+			})
+			await bootWithInitialLoad()
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('16.02.2026', '20.02.2026')
+			await sleep(300)
+			await flush()
+			expect(consumption().textContent).toContain('uses 2,5 vacation days')
+		})
+
+		it('does not re-autofill cleared fields when the reset clears the picker', async () => {
+			window.ArbeitszeitCheck.vacationUnit = 'hours'
+			await bootWithInitialLoad()
+			const initialHours = document.getElementById('manager-absence-record-hours').value
+			window.__lastEmployeePicker.setSelection('alice')
+			setRange('16.02.2026', '20.02.2026')
+			document.getElementById('manager-absence-record-form').requestSubmit()
+			respond(1, { success: true })
+			await flush()
+			// picker.clear() inside the reset fires onChange — the hook must stay
+			// inert during reset or it could blend a stale estimate into the
+			// freshly reset autofill value.
+			await sleep(300)
+			expect(document.getElementById('manager-absence-record-hours').value).toBe(initialHours)
+		})
+
+		it('does not double-badge in hours orgs', async () => {
+			window.ArbeitszeitCheck.vacationUnit = 'hours'
+			await bootWithInitialLoad()
+			setRange('16.02.2026', '20.02.2026')
+			expect(consumption().hidden).toBe(true)
+			expect(document.getElementById('manager-absence-record-hours-field').hidden).toBe(false)
+		})
 	})
 })

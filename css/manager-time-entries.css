@@ -85,6 +85,13 @@
 	justify-content: flex-end;
 }
 
+/* Usage previews (vacation days / vacation hours debit) render below the
+   reason textarea. Spacing lives on the callout itself so a hidden
+   sibling adds no gap before the save action. */
+#app-content.azc-app--manager-absences .manager-scope-page__record-preview .azc-callout {
+	margin-top: var(--azc-space-4, 1rem);
+}
+
 #app-content.azc-app--manager-absences .manager-scope-page__reason-field .form-textarea {
 	width: 100%;
 	min-width: 0;

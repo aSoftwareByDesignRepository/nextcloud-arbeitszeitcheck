@@ -268,7 +268,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								</div>
 							</fieldset>
 							<p id="manager-absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date. Morning or afternoon is not tracked.')); ?></p>
-							<p id="manager-absence-day-fraction-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite"></p>
 							<p id="manager-absence-day-fraction-live" class="sr-only" aria-live="polite"></p>
 						</div>
 						<div class="azc-filter-field" id="manager-absence-record-hours-field" hidden>
@@ -277,7 +276,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								<input id="manager-absence-record-hours" name="record_duration_hours" type="number" class="form-input" min="0.25" max="744" step="0.25" inputmode="decimal" placeholder="<?php p($l->t('e.g. 4')); ?>" aria-describedby="manager-absence-record-hours-help" />
 							</div>
 							<p id="manager-absence-record-hours-help" class="form-help"><?php p($l->t('Total vacation hours for the whole request (not per day). Full range uses the employee’s work model (schedule), not a fixed 8 hours.')); ?></p>
-							<p id="manager-absence-record-hours-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></p>
 							<div class="absence-hours-presets" role="group" aria-label="<?php p($l->t('Quick hours')); ?>">
 								<button type="button" class="azc-btn azc-btn--secondary manager-absence-hours-preset" data-hours="4"><?php p($l->t('4 hours')); ?></button>
 								<button type="button" class="azc-btn azc-btn--secondary manager-absence-hours-preset" data-hours-half="1"><?php p($l->t('Half day')); ?></button>
@@ -289,6 +287,11 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 					<div class="manager-scope-page__reason-field">
 						<label for="manager-absence-record-reason" class="azc-filter-field__label"><?php p($l->t('Reason')); ?></label>
 						<textarea id="manager-absence-record-reason" name="record_reason" class="form-textarea form-input" rows="3" maxlength="8000" placeholder="<?php p($l->t('Optional reason or notes for your absence request')); ?>"></textarea>
+					</div>
+					<div class="manager-scope-page__record-preview">
+						<p id="manager-absence-day-fraction-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></p>
+						<p id="manager-absence-record-days-consumption" class="azc-callout azc-callout--info absence-days-consumption" role="status" aria-live="polite" hidden></p>
+						<p id="manager-absence-record-hours-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite" hidden></p>
 					</div>
 					<div class="azc-filter-actions manager-scope-page__record-actions">
 						<button type="submit" class="azc-btn azc-btn--primary" id="manager-absence-record-submit"><?php p($l->t('Save as approved')); ?></button>
@@ -308,6 +311,7 @@ window.ArbeitszeitCheck.vacationHoursPerDay = <?php echo json_encode((float)($_[
 window.ArbeitszeitCheck.halfDayEnabledTypes = <?php echo json_encode(array_values(is_array($_['halfDayEnabledTypes'] ?? null) ? $_['halfDayEnabledTypes'] : []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'; ?>;
 window.ArbeitszeitCheck.halfDayCreditTypes = <?php echo json_encode(array_values(is_array($_['halfDayCreditTypes'] ?? null) ? $_['halfDayCreditTypes'] : []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]'; ?>;
 window.ArbeitszeitCheck.estimateEmployeeVacationHoursUrl = <?php echo json_encode(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.manager.estimateEmployeeVacationHours'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.ArbeitszeitCheck.estimateEmployeeAbsenceDaysUrl = <?php echo json_encode(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('arbeitszeitcheck.manager.estimateEmployeeAbsenceDays'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 
 <?php include __DIR__ . '/common/page-end.php'; ?>

@@ -257,6 +257,143 @@
 		return norm(a) === norm(b);
 	}
 
+	/* ------------------------------------------------------------------ *
+	 * Split-day correction (spec split-day §9.7): the `splitOverride`
+	 * proposal block. Only entries carrying `accounting` get the section;
+	 * legacy entries never send the field.
+	 * ------------------------------------------------------------------ */
+
+	const MAX_WORKED_PORTIONS = 8;
+
+	/** The additive §9.8 accounting block, or null for legacy entries. */
+	function splitAccountingOf(summary) {
+		const a = summary && summary.accounting;
+		return (a && typeof a === 'object' && !Array.isArray(a)) ? a : null;
+	}
+
+	/**
+	 * The decision currently recorded on the entry, mapped from
+	 * `accounting.reason`: `auto` for engine-made decisions.
+	 */
+	function initialSplitDecision(accounting) {
+		const reason = accounting && accounting.reason;
+		if (reason === 'override_split') {
+			return 'force_split';
+		}
+		if (reason === 'override_continuous') {
+			return 'force_continuous';
+		}
+		return 'auto';
+	}
+
+	const VALID_SPLIT_DECISIONS = ['auto', 'force_split', 'force_continuous'];
+
+	/** 'HH:mm' → milliseconds since day start, or NaN. */
+	function hmToDayMs(hm) {
+		const m = /^(\d{2}):(\d{2})$/.exec(String(hm || ''));
+		if (!m) {
+			return NaN;
+		}
+		return (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) * 60000;
+	}
+
+	function apiParseInstantMs(iso) {
+		const api = window.ArbeitszeitCheckTime;
+		const d = api && typeof api.parseInstant === 'function' ? api.parseInstant(iso) : null;
+		return d ? d.getTime() : NaN;
+	}
+
+	/**
+	 * Resolve a picked display-TZ 'HH:mm' inside an interruption to an epoch ms:
+	 * anchored on the interruption start instant so the display timezone and the
+	 * frozen context offset never mix. A picked time displayed *before* the
+	 * interruption start means the next calendar day.
+	 */
+	function pickedMsInInterruption(interruptionStartMs, displayStartHm, pickedHm) {
+		const delta = hmToDayMs(pickedHm) - hmToDayMs(displayStartHm);
+		if (Number.isNaN(delta)) {
+			return NaN;
+		}
+		return interruptionStartMs + (delta < 0 ? delta + 86400000 : delta);
+	}
+
+	/**
+	 * Build the `splitOverride` proposal block (spec §9.7).
+	 * Returns null unless the user actually changed a split control or added
+	 * worked portions — the field is never emitted untouched.
+	 * `worked` travels only with a decision that can produce a split
+	 * (auto|force_split), never with force_continuous.
+	 */
+	function buildSplitOverride(initialDecision, selectedDecision, workedIsoPairs, baseRevision) {
+		const decision = VALID_SPLIT_DECISIONS.indexOf(selectedDecision) >= 0
+			? selectedDecision
+			: 'auto';
+		const worked = Array.isArray(workedIsoPairs) ? workedIsoPairs : [];
+		const touched = decision !== initialDecision || (decision !== 'force_continuous' && worked.length > 0);
+		if (!touched) {
+			return null;
+		}
+		const out = { decision: decision };
+		if (decision !== 'force_continuous' && worked.length > 0) {
+			out.worked = worked;
+		}
+		if (baseRevision) {
+			out.baseEntryRevision = baseRevision;
+		}
+		return out;
+	}
+
+	/** l10n key for the muted not-split hint, or null for unknown reasons. */
+	function notSplitHintKey(reason) {
+		switch (reason) {
+			case 'not_after_cutoff': return 'correctionSplitHintNotAfterCutoff';
+			case 'clock_in_during_interruption': return 'correctionSplitHintClockInInterruption';
+			case 'no_interruption_today': return 'correctionSplitHintNoInterruption';
+			case 'crosses_midnight': return 'correctionSplitHintCrossesMidnight';
+			case 'dst_review': return 'correctionSplitHintDstReview';
+			default: return null;
+		}
+	}
+
+	/** Compact one-line text for the "Currently stored" snapshot. */
+	function formatAccountingCompact(accounting) {
+		if (!accounting) {
+			return '';
+		}
+		const lines = [];
+		const fmt = (iso) => formatIsoDisplay(iso, 'time');
+		if (accounting.split === true && Array.isArray(accounting.segments)) {
+			const merged = [];
+			accounting.segments.forEach((seg) => {
+				const ms = apiParseInstantMs(seg && seg.start);
+				if (!Number.isNaN(ms)) {
+					merged.push({ ms, kind: 'segment', data: seg });
+				}
+			});
+			(accounting.interruptions || []).forEach((gap) => {
+				const ms = apiParseInstantMs(gap && gap.start);
+				if (!Number.isNaN(ms)) {
+					merged.push({ ms, kind: 'interruption', data: gap });
+				}
+			});
+			merged.sort((a, b) => a.ms - b.ms);
+			merged.forEach((item) => {
+				const range = fmt(item.data.start) + '–' + fmt(item.data.end);
+				if (item.kind === 'segment') {
+					const no = Number.isFinite(Number(item.data.no)) ? Number(item.data.no) : '';
+					lines.push(t('correctionLabelPartialService', 'Partial service {number}')
+						.replace('{number}', String(no)) + ' ' + range);
+				} else {
+					lines.push(t('correctionInterruptionLabel', 'Interruption {start}–{end}')
+						.replace('{start}', fmt(item.data.start)).replace('{end}', fmt(item.data.end)));
+				}
+			});
+			return lines.join(' · ');
+		}
+		const hintKey = notSplitHintKey(accounting.reason);
+		return hintKey ? t(hintKey, '') : '';
+	}
+
 	function getModalRoot() {
 		return document.getElementById(MODAL_ID);
 	}
@@ -376,6 +513,7 @@
 		}
 		setStatus(wizardState.statusEl, '', false);
 		wizardState.originalSummary = null;
+		wizardState.splitInitialDecision = 'auto';
 	}
 
 	function initDatepicker(modal) {
@@ -416,6 +554,11 @@
 		const justificationCount = modal.querySelector('#correction-justification-count');
 		const workLocationSelect = modal.querySelector('#correction-work-location');
 		const entryIdInput = modal.querySelector('#correction-entry-id');
+		const splitFieldset = modal.querySelector('#correction-split-fieldset');
+		const splitCurrent = modal.querySelector('#correction-split-current');
+		const splitRadios = modal.querySelectorAll('input[name="correctionSplitDecision"]');
+		const workedRegion = modal.querySelector('#correction-worked-region');
+		const workedContainer = modal.querySelector('#correction-worked-container');
 
 		addTimeOptions(startHour, startMinute, false);
 		addTimeOptions(endHour, endMinute, false);
@@ -482,6 +625,13 @@
 				[t('correctionLabelWorkLocation'), formatWorkLocationLabel(summary.workLocation)],
 				[t('correctionLabelDescription'), summary.description || '–'],
 			];
+			const accSnapshot = splitAccountingOf(summary);
+			if (accSnapshot) {
+				const compact = formatAccountingCompact(accSnapshot);
+				if (compact !== '') {
+					rows.push([t('correctionLabelSplit'), compact]);
+				}
+			}
 			currentSummary.innerHTML = rows.map(([label, val]) => {
 				return '<tr><th scope="row">' + escapeHtml(label) + '</th><td>' + escapeHtml(val) + '</td></tr>';
 			}).join('');
@@ -591,6 +741,251 @@
 			return partial;
 		}
 
+		/* ---------- Split-day section (spec §9.7) ---------- */
+
+		function selectedSplitDecision() {
+			let value = 'auto';
+			splitRadios.forEach((radio) => {
+				if (radio.checked) {
+					value = radio.value;
+				}
+			});
+			return value;
+		}
+
+		function updateWorkedRegionVisibility() {
+			if (workedRegion) {
+				workedRegion.hidden = selectedSplitDecision() === 'force_continuous';
+			}
+		}
+
+		function createWorkedRow(groupEl) {
+			const intIndex = groupEl.getAttribute('data-int-index') || '0';
+			const rowsEl = groupEl.querySelector('.correction-worked-rows');
+			const rowIndex = rowsEl ? rowsEl.querySelectorAll('.correction-worked-row').length : 0;
+			const gapStartIso = groupEl.getAttribute('data-int-start') || '';
+			const gapEndIso = groupEl.getAttribute('data-int-end') || '';
+			const rowId = 'correction-worked-' + intIndex + '-' + rowIndex;
+			const portionLabel = t('correctionWorkedPortion', 'Worked portion {number}').replace('{number}', String(rowIndex + 1));
+			const entry = document.createElement('div');
+			entry.className = 'break-entry correction-worked-row';
+			entry.setAttribute('data-worked-index', String(rowIndex));
+			entry.innerHTML = [
+				'<div class="time-pair-matrix__grid time-pair-matrix__grid--row">',
+				'<div class="form-group">',
+				'<label class="form-label" id="' + rowId + '-start-label">',
+				escapeHtml(portionLabel) + ' — ' + escapeHtml(t('correctionLabelStart')),
+				'</label>',
+				'<div class="time-input-group correction-worked-start-group" role="group" aria-labelledby="' + rowId + '-start-label">',
+				'<select class="form-input time-hour correction-worked-start-hour" aria-label="' + escapeHtml(t('correctionWorkedStartHour')) + '"></select>',
+				'<span class="time-separator" aria-hidden="true">:</span>',
+				'<select class="form-input time-minute correction-worked-start-minute" aria-label="' + escapeHtml(t('correctionWorkedStartMinute')) + '"></select>',
+				'<input type="hidden" class="correction-worked-start-hidden" value="">',
+				'</div>',
+				'</div>',
+				'<div class="form-group">',
+				'<label class="form-label" id="' + rowId + '-end-label">',
+				escapeHtml(portionLabel) + ' — ' + escapeHtml(t('correctionLabelEnd')),
+				'</label>',
+				'<div class="time-input-group correction-worked-end-group" role="group" aria-labelledby="' + rowId + '-end-label">',
+				'<select class="form-input time-hour correction-worked-end-hour" aria-label="' + escapeHtml(t('correctionWorkedEndHour')) + '"></select>',
+				'<span class="time-separator" aria-hidden="true">:</span>',
+				'<select class="form-input time-minute correction-worked-end-minute" aria-label="' + escapeHtml(t('correctionWorkedEndMinute')) + '"></select>',
+				'<input type="hidden" class="correction-worked-end-hidden" value="">',
+				'</div>',
+				'</div>',
+				'<div class="time-pair-matrix__action">',
+				'<button type="button" class="btn btn--sm btn--danger correction-worked-remove" aria-label="' + escapeHtml(t('correctionWorkedRemove')) + '">',
+				escapeHtml(t('correctionRemove')),
+				'</button>',
+				'</div>',
+				'</div>',
+			].join('');
+
+			const sh = entry.querySelector('.correction-worked-start-hour');
+			const sm = entry.querySelector('.correction-worked-start-minute');
+			const eh = entry.querySelector('.correction-worked-end-hour');
+			const em = entry.querySelector('.correction-worked-end-minute');
+			const shHidden = entry.querySelector('.correction-worked-start-hidden');
+			const ehHidden = entry.querySelector('.correction-worked-end-hidden');
+			addTimeOptions(sh, sm, true);
+			addTimeOptions(eh, em, true);
+			bindTimeInputs(sh, sm, shHidden);
+			bindTimeInputs(eh, em, ehHidden);
+			// Prefill to the interruption bounds — the smallest valid portion range.
+			setSelectHm(sh, sm, isoToHm(gapStartIso));
+			setSelectHm(eh, em, isoToHm(gapEndIso));
+			return entry;
+		}
+
+		function createInterruptionGroup(gap, index) {
+			const group = document.createElement('div');
+			group.className = 'correction-worked-interruption';
+			group.setAttribute('data-int-index', String(index));
+			group.setAttribute('data-int-start', gap.start || '');
+			group.setAttribute('data-int-end', gap.end || '');
+			const rangeText = t('correctionInterruptionLabel', 'Interruption {start}–{end}')
+				.replace('{start}', formatIsoDisplay(gap.start, 'time'))
+				.replace('{end}', formatIsoDisplay(gap.end, 'time'));
+			group.innerHTML = [
+				'<div class="form-group correction-worked-interruption__toggle">',
+				'<label class="form-label correction-worked-enable-label" for="correction-worked-enable-' + index + '">',
+				'<input type="checkbox" id="correction-worked-enable-' + index + '" class="correction-worked-enable" data-int-index="' + index + '"> ',
+				escapeHtml(t('correctionWorkedMark')),
+				'</label>',
+				'<p class="form-help">' + escapeHtml(rangeText) + '</p>',
+				'</div>',
+				'<div class="correction-worked-rows" hidden></div>',
+				'<button type="button" class="btn btn--secondary btn--sm correction-worked-add" hidden>',
+				escapeHtml(t('correctionWorkedAddAnother')),
+				'</button>',
+			].join('');
+			return group;
+		}
+
+		function renderSplitSection(summary) {
+			if (!splitFieldset) {
+				return;
+			}
+			const acc = splitAccountingOf(summary);
+			if (!acc) {
+				splitFieldset.hidden = true;
+				if (splitCurrent) {
+					splitCurrent.textContent = '';
+				}
+				if (workedContainer) {
+					workedContainer.innerHTML = '';
+				}
+				if (wizardState) {
+					wizardState.splitInitialDecision = 'auto';
+				}
+				return;
+			}
+			splitFieldset.hidden = false;
+			const initial = initialSplitDecision(acc);
+			wizardState.splitInitialDecision = initial;
+			splitRadios.forEach((radio) => {
+				radio.checked = radio.value === initial;
+			});
+			updateWorkedRegionVisibility();
+			if (splitCurrent) {
+				const hintKey = acc.split === true ? null : notSplitHintKey(acc.reason);
+				splitCurrent.textContent = acc.split === true
+					? t('correctionSplitCurrentSplit')
+					: (hintKey ? t(hintKey, '') : '');
+			}
+			if (workedContainer) {
+				workedContainer.innerHTML = '';
+				(Array.isArray(acc.interruptions) ? acc.interruptions : []).forEach((gap, i) => {
+					if (gap && gap.start && gap.end) {
+						workedContainer.appendChild(createInterruptionGroup(gap, i));
+					}
+				});
+			}
+		}
+
+		/**
+		 * Collect proposed worked portions. Each row resolves its picked
+		 * display-TZ times against its own interruption bounds; portions stay
+		 * inside the interruption, inside R and never overlap (spec §9.7).
+		 *
+		 * @returns {{ error: string|null, worked: Array<[string, string]> }}
+		 */
+		function collectWorkedPortions() {
+			const result = { error: null, worked: [] };
+			if (!workedContainer) {
+				return result;
+			}
+			const groups = workedContainer.querySelectorAll('.correction-worked-interruption');
+			const portions = [];
+			let error = null;
+			groups.forEach((group) => {
+				const enabled = group.querySelector('.correction-worked-enable');
+				if (!enabled || !enabled.checked || error) {
+					return;
+				}
+				const intStartMs = apiParseInstantMs(group.getAttribute('data-int-start'));
+				const intEndMs = apiParseInstantMs(group.getAttribute('data-int-end'));
+				const dispStart = isoToHm(group.getAttribute('data-int-start'));
+				const dispStartHm = dispStart.hour ? dispStart.hour + ':' + dispStart.minute : '';
+				const rangeText = t('correctionInterruptionLabel', 'Interruption {start}–{end}')
+					.replace('{start}', formatIsoDisplay(group.getAttribute('data-int-start'), 'time'))
+					.replace('{end}', formatIsoDisplay(group.getAttribute('data-int-end'), 'time'));
+				group.querySelectorAll('.correction-worked-row').forEach((row) => {
+					if (error) {
+						return;
+					}
+					const shHidden = row.querySelector('.correction-worked-start-hidden');
+					const ehHidden = row.querySelector('.correction-worked-end-hidden');
+					const startHm = shHidden ? shHidden.value : '';
+					const endHm = ehHidden ? ehHidden.value : '';
+					const hasStart = /^\d{2}:\d{2}$/.test(startHm);
+					const hasEnd = /^\d{2}:\d{2}$/.test(endHm);
+					if (!hasStart && !hasEnd) {
+						return; // untouched extra row — ignored like an empty break row
+					}
+					if (!hasStart || !hasEnd) {
+						error = t('correctionErrorWorkedPartial');
+						return;
+					}
+					const startMs = pickedMsInInterruption(intStartMs, dispStartHm, startHm);
+					const endMs = pickedMsInInterruption(intStartMs, dispStartHm, endHm);
+					if (Number.isNaN(startMs) || Number.isNaN(endMs) || Number.isNaN(intStartMs) || Number.isNaN(intEndMs)) {
+						error = t('correctionErrorWorkedPartial');
+						return;
+					}
+					if (endMs <= startMs) {
+						error = t('correctionErrorWorkedEndAfterStart');
+						return;
+					}
+					if (startMs < intStartMs || endMs > intEndMs) {
+						error = t('correctionErrorWorkedBounds').replace('{start}', formatIsoDisplay(group.getAttribute('data-int-start'), 'time'))
+							.replace('{end}', formatIsoDisplay(group.getAttribute('data-int-end'), 'time'));
+						return;
+					}
+					portions.push({ startMs, endMs });
+				});
+			});
+			if (!error && portions.length > MAX_WORKED_PORTIONS) {
+				error = t('correctionErrorWorkedTooMany').replace('{max}', String(MAX_WORKED_PORTIONS));
+			}
+			if (!error) {
+				portions.sort((a, b) => a.startMs - b.startMs);
+				for (let i = 1; i < portions.length; i++) {
+					if (portions[i].startMs < portions[i - 1].endMs) {
+						error = t('correctionErrorWorkedOverlap');
+						break;
+					}
+				}
+			}
+			result.error = error;
+			if (!error) {
+				result.worked = portions.map((p) => [new Date(p.startMs).toISOString(), new Date(p.endMs).toISOString()]);
+			}
+			return result;
+		}
+
+		function collectedWorkedForSubmit() {
+			if (selectedSplitDecision() === 'force_continuous') {
+				return [];
+			}
+			return collectWorkedPortions().worked;
+		}
+
+		/** Whether the user touched a split control or added worked portions. */
+		function splitChanged() {
+			if (!wizardState || !splitAccountingOf(wizardState.originalSummary)) {
+				return false;
+			}
+			const decision = selectedSplitDecision();
+			if (decision !== (wizardState.splitInitialDecision || 'auto')) {
+				return true;
+			}
+			return collectedWorkedForSubmit().length > 0;
+		}
+
+		/* ---------- /Split-day section ---------- */
+
 		function updateHiddenTimes() {
 			if (startHour && startMinute && startHidden) {
 				startHidden.value = (startHour.value && startMinute.value) ? startHour.value + ':' + startMinute.value : '';
@@ -605,6 +1000,20 @@
 				const em = entry.querySelector('.correction-break-end-minute');
 				const shH = entry.querySelector('.correction-break-start-hidden');
 				const ehH = entry.querySelector('.correction-break-end-hidden');
+				if (sh && sm && shH) {
+					shH.value = (sh.value && sm.value) ? sh.value + ':' + sm.value : '';
+				}
+				if (eh && em && ehH) {
+					ehH.value = (eh.value && em.value) ? eh.value + ':' + em.value : '';
+				}
+			});
+			workedContainer && workedContainer.querySelectorAll('.correction-worked-row').forEach((entry) => {
+				const sh = entry.querySelector('.correction-worked-start-hour');
+				const sm = entry.querySelector('.correction-worked-start-minute');
+				const eh = entry.querySelector('.correction-worked-end-hour');
+				const em = entry.querySelector('.correction-worked-end-minute');
+				const shH = entry.querySelector('.correction-worked-start-hidden');
+				const ehH = entry.querySelector('.correction-worked-end-hidden');
 				if (sh && sm && shH) {
 					shH.value = (sh.value && sm.value) ? sh.value + ':' + sm.value : '';
 				}
@@ -664,7 +1073,13 @@
 			}
 
 			const Validation = window.ArbeitszeitCheckValidation || window.ArbeitszeitCheck?.Validation;
-			if (Validation && typeof Validation.evaluateBreakCompliance === 'function') {
+			// Spec §9.9: for entries with a split-service accounting context the
+			// gross (end − start − breaks) basis is wrong — the engine excludes
+			// interruption time. The server recomputes authoritatively, so the
+			// client-side compliance hint is skipped entirely for context entries
+			// rather than risk blocking a valid proposal on gross math.
+			const hasSplitContext = splitAccountingOf(wizardState && wizardState.originalSummary) !== null;
+			if (!hasSplitContext && Validation && typeof Validation.evaluateBreakCompliance === 'function') {
 				const portions = intervals.map((iv) => Math.round((iv.end - iv.start) / 60000));
 				const netWorkingHours = Math.max(0, (endMs - startMs) / 3600000
 					- portions.reduce((s, m) => s + m, 0) / 60);
@@ -706,7 +1121,7 @@
 				? origLocation !== null
 				: (proposedLocation !== '' && proposedLocation !== origLocation);
 
-			return workChanged || breaksChanged || locationChanged;
+			return workChanged || breaksChanged || locationChanged || splitChanged();
 		}
 
 		function validateForm() {
@@ -752,6 +1167,20 @@
 				return false;
 			}
 
+			// Split-day worked portions (spec §9.7) — only validated while the
+			// region is in play; force_continuous drops portions silently.
+			if (splitFieldset && !splitFieldset.hidden && selectedSplitDecision() !== 'force_continuous') {
+				const workedResult = collectWorkedPortions();
+				if (workedResult.error) {
+					setStatus(statusEl, workedResult.error, true);
+					const firstWorked = workedContainer && workedContainer.querySelector('.correction-worked-start-hour');
+					if (firstWorked) {
+						firstWorked.focus();
+					}
+					return false;
+				}
+			}
+
 			if (!hasProposedChanges(wizardState && wizardState.originalSummary)) {
 				setStatus(statusEl, t('correctionErrorNoChanges'), true);
 				if (dateInput) {
@@ -791,12 +1220,26 @@
 			}
 			breakIndex = 0;
 			updateBreaksEmptyState();
+			if (splitFieldset) {
+				splitFieldset.hidden = true;
+			}
+			if (splitCurrent) {
+				splitCurrent.textContent = '';
+			}
+			if (workedContainer) {
+				workedContainer.innerHTML = '';
+			}
+			splitRadios.forEach((radio) => {
+				radio.checked = radio.value === 'auto';
+			});
+			updateWorkedRegionVisibility();
 		}
 
 		wizardState = {
 			statusEl,
 			originalSummary: null,
 			minBreakMinutes: undefined,
+			splitInitialDecision: 'auto',
 			resetForm: resetFormFields,
 			openWizard(summary) {
 				const modalEl = ensureCorrectionModal();
@@ -821,6 +1264,7 @@
 				setSelectHm(startHour, startMinute, isoToHm(summary.startTime));
 				setSelectHm(endHour, endMinute, isoToHm(summary.endTime));
 				renderBreaks(summary.breaks);
+				renderSplitSection(summary);
 				if (justification) {
 					justification.value = '';
 				}
@@ -883,6 +1327,89 @@
 			});
 		}
 
+		// Split-day section events (spec §9.7) — delegated so rows survive
+		// re-opens without re-binding.
+		splitRadios.forEach((radio) => {
+			radio.addEventListener('change', updateWorkedRegionVisibility);
+		});
+		if (workedContainer) {
+			workedContainer.addEventListener('change', (e) => {
+				const cb = e.target;
+				if (!cb || !cb.classList.contains('correction-worked-enable')) {
+					return;
+				}
+				const group = cb.closest('.correction-worked-interruption');
+				if (!group) {
+					return;
+				}
+				const rowsEl = group.querySelector('.correction-worked-rows');
+				const addBtn = group.querySelector('.correction-worked-add');
+				if (cb.checked) {
+					if (rowsEl && rowsEl.querySelectorAll('.correction-worked-row').length === 0) {
+						rowsEl.appendChild(createWorkedRow(group));
+					}
+					if (rowsEl) {
+						rowsEl.hidden = false;
+					}
+					if (addBtn) {
+						addBtn.hidden = false;
+					}
+					const firstHour = rowsEl && rowsEl.querySelector('.correction-worked-start-hour');
+					if (firstHour) {
+						firstHour.focus();
+					}
+				} else {
+					if (rowsEl) {
+						rowsEl.innerHTML = '';
+						rowsEl.hidden = true;
+					}
+					if (addBtn) {
+						addBtn.hidden = true;
+					}
+				}
+			});
+			workedContainer.addEventListener('click', (e) => {
+				const removeBtn = e.target && e.target.closest ? e.target.closest('.correction-worked-remove') : null;
+				if (removeBtn) {
+					const row = removeBtn.closest('.correction-worked-row');
+					const rowsEl = removeBtn.closest('.correction-worked-rows');
+					if (row) {
+						row.remove();
+					}
+					if (rowsEl && rowsEl.querySelectorAll('.correction-worked-row').length === 0) {
+						const group = rowsEl.closest('.correction-worked-interruption');
+						const cb = group && group.querySelector('.correction-worked-enable');
+						if (cb) {
+							cb.checked = false;
+						}
+						rowsEl.hidden = true;
+						const addBtn = group && group.querySelector('.correction-worked-add');
+						if (addBtn) {
+							addBtn.hidden = true;
+						}
+					}
+					return;
+				}
+				const addBtn = e.target && e.target.closest ? e.target.closest('.correction-worked-add') : null;
+				if (addBtn) {
+					if (workedContainer.querySelectorAll('.correction-worked-row').length >= MAX_WORKED_PORTIONS) {
+						setStatus(statusEl, t('correctionErrorWorkedTooMany').replace('{max}', String(MAX_WORKED_PORTIONS)), true);
+						return;
+					}
+					const group = addBtn.closest('.correction-worked-interruption');
+					const rowsEl = group && group.querySelector('.correction-worked-rows');
+					if (rowsEl) {
+						const row = createWorkedRow(group);
+						rowsEl.appendChild(row);
+						const firstHour = row.querySelector('.correction-worked-start-hour');
+						if (firstHour) {
+							firstHour.focus();
+						}
+					}
+				}
+			});
+		}
+
 		function submitCorrectionRequest(e) {
 			e.preventDefault();
 			if (!validateForm()) {
@@ -915,6 +1442,25 @@
 				: [];
 			if (breaks.length > 0 && !breaksPayloadEqual(breaks, originalBreaks)) {
 				body.breaks = breaks;
+			}
+			// Spec §9.7: `splitOverride` travels only when the user changed a
+			// split control or added worked portions, and only on entries that
+			// already carry an `accounting` context.
+			const accForSubmit = splitAccountingOf(wizardState.originalSummary);
+			if (accForSubmit) {
+				const workedIso = collectedWorkedForSubmit();
+				const baseRevision = wizardState.originalSummary && wizardState.originalSummary.updatedAt
+					? String(wizardState.originalSummary.updatedAt)
+					: null;
+				const splitOverride = buildSplitOverride(
+					wizardState.splitInitialDecision || 'auto',
+					selectedSplitDecision(),
+					workedIso,
+					baseRevision
+				);
+				if (splitOverride) {
+					body.splitOverride = splitOverride;
+				}
 			}
 			if (btnSubmit) {
 				btnSubmit.disabled = true;
@@ -1060,6 +1606,26 @@
 			});
 		});
 	}
+
+	// Pure helpers exposed for unit tests (split-day §9.7 contract).
+	window.__ArbeitszeitCheckTimeEntryCorrectionTestables = {
+		splitAccountingOf: splitAccountingOf,
+		initialSplitDecision: initialSplitDecision,
+		buildSplitOverride: buildSplitOverride,
+		hmToDayMs: hmToDayMs,
+		pickedMsInInterruption: pickedMsInInterruption,
+		notSplitHintKey: notSplitHintKey,
+		MAX_WORKED_PORTIONS: MAX_WORKED_PORTIONS,
+		/** Open the correction dialog for a summary (same path as the button). */
+		open: function (summary) {
+			const m = ensureCorrectionModal();
+			if (!m || !wizardState) {
+				return null;
+			}
+			wizardState.openWizard(summary);
+			return m;
+		},
+	};
 
 	document.addEventListener('DOMContentLoaded', init);
 })();

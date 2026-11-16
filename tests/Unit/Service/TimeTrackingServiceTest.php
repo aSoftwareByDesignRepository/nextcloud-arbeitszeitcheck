@@ -30,6 +30,9 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
 use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
+use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
+use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IDateTimeZone;
@@ -1692,7 +1695,7 @@ class TimeTrackingServiceTest extends TestCase {
 	 *
 	 * @return array{0: TimeTrackingService, 1: BreakPolicyResolver}
 	 */
-	private function serviceWithPolicy(array $appValuesExtra = []): array
+	private function serviceWithPolicy(array $appValuesExtra = [], ?TimeCaptureMethodService $timeCaptureMethodService = null): array
 	{
 		$appValues = array_merge([
 			'max_daily_hours' => '10',
@@ -1721,6 +1724,17 @@ class TimeTrackingServiceTest extends TestCase {
 			$this->timeZoneService,
 			$l10n,
 		);
+		// Real split orchestrator on the mocked mappers — deterministic,
+		// independent of Server::get availability inside the test process.
+		$splitService = new \OCA\ArbeitszeitCheck\Service\SplitServiceAccountingService(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$this->timeEntryMapper,
+			$resolver,
+			$lawProfileFactory,
+			$this->timeZoneService,
+			new NullLogger(),
+		);
 		$complianceService = $this->createMock(ComplianceService::class);
 		$service = new TimeTrackingService(
 			$this->timeEntryMapper,
@@ -1739,11 +1753,13 @@ class TimeTrackingServiceTest extends TestCase {
 			$this->timeZoneService,
 			$this->dailyHoursCalculator,
 			null,
-			null,
+			$timeCaptureMethodService,
 			$lawProfileFactory,
 			$resolver,
+			null,
+			$splitService,
 		);
-		return [$service, $resolver];
+		return [$service, $resolver, $splitService];
 	}
 
 	private function completedEntry(string $start, string $end): TimeEntry
@@ -1898,5 +1914,242 @@ class TimeTrackingServiceTest extends TestCase {
 		$this->assertFalse($service->calculateAndSetAutomaticBreak($entry),
 			'no manual break + covered target → no second insertion');
 		$this->assertSame($before, $entry->getBreaks());
+	}
+
+	// ------------------------------------------------------------------
+	// Split-service days — clock-in pinning + clock-out recompute (§9.5/§9.6)
+	// ------------------------------------------------------------------
+
+	private static function v2SplitScheduleDoc(array $split = []): array
+	{
+		$days = [];
+		foreach (['mon', 'tue', 'wed', 'thu', 'fri'] as $d) {
+			$days[$d] = ['work' => true, 'blocks' => [['start' => '06:00', 'end' => '10:00'], ['start' => '13:30', 'end' => '16:30']], 'breaks' => []];
+		}
+		$days['sat'] = ['work' => false];
+		$days['sun'] = ['work' => false];
+		return [
+			'version' => 2,
+			'interruption_mode' => 'recorded_only',
+			'split_service' => array_merge([
+				'automatic_split' => true,
+				'split_when_clock_out_after' => '16:00',
+				'interruption_counts_as_break' => true,
+			], $split),
+			'days' => $days,
+		];
+	}
+
+	private function assignV2SplitModel(array $split = []): void
+	{
+		$assignment = new UserWorkingTimeModel();
+		$assignment->setWorkingTimeModelId(7);
+		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($assignment);
+		$model = new WorkingTimeModel();
+		$model->setId(7);
+		$model->setBreakRules(json_encode([WeekdaySchedule::KEY => self::v2SplitScheduleDoc($split)]));
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+	}
+
+	private function splitActiveEntry(string $start, ?string $contextJson = null): TimeEntry
+	{
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId('alice');
+		$entry->setStatus(TimeEntry::STATUS_ACTIVE);
+		$entry->setStartTime(new \DateTime($start, new \DateTimeZone('Europe/Berlin')));
+		if ($contextJson !== null) {
+			$entry->setWorkContextJson($contextJson);
+		}
+		return $entry;
+	}
+
+	private function wireClockOutMocks(TimeEntry $entry): void
+	{
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+	}
+
+	public function testClockInPinsSplitContextWhenModelIsV2Split(): void
+	{
+		$timeCapture = $this->createMock(TimeCaptureMethodService::class);
+		$timeCapture->method('assertClockStampingAllowed')->willReturnCallback(static function (): void {
+		});
+		[$service] = $this->serviceWithPolicy([], $timeCapture);
+		$this->assignV2SplitModel();
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('insert')->willReturnArgument(0);
+
+		$result = $service->clockIn('alice', null, null, new \DateTime('2026-11-16 06:00:00', new \DateTimeZone('Europe/Berlin')));
+
+		$context = $result->getWorkContext();
+		$this->assertNotNull($context, 'v2 split model → frozen context pinned at clock-in');
+		$this->assertSame(1, $context['v']);
+		$this->assertSame(7, $context['model_id']);
+		$this->assertSame('Europe/Berlin', $context['timezone']);
+		$this->assertSame([['06:00', '10:00'], ['13:30', '16:30']], $context['day']['blocks']);
+		$this->assertSame('active', $context['result']['state']);
+		$this->assertFalse($context['result']['split']);
+	}
+
+	public function testClockInLeavesContextNullForLegacyAssignment(): void
+	{
+		$timeCapture = $this->createMock(TimeCaptureMethodService::class);
+		$timeCapture->method('assertClockStampingAllowed')->willReturnCallback(static function (): void {
+		});
+		[$service] = $this->serviceWithPolicy([], $timeCapture);
+		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn(null);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findPausedOrUnfinishedTodayByUser')->willReturn(null);
+		$this->timeEntryMapper->method('insert')->willReturnArgument(0);
+
+		$result = $service->clockIn('alice', null, null, new \DateTime('2026-11-16 06:00:00', new \DateTimeZone('Europe/Berlin')));
+
+		$this->assertNull($result->getWorkContextJson(), 'no v2 split model → NULL context, byte-identical legacy row');
+	}
+
+	public function testClockOutCoveredInterruptionSkipsAutoBreak(): void
+	{
+		// §9.6 step 10b/12: interruption covers the break requirement → no
+		// automatic break, entry still splits (excluded time is unpaid).
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->splitActiveEntry('2026-11-16 06:00:00');
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1, 'model_id' => 7, 'schedule_revision' => 't', 'timezone' => 'Europe/Berlin',
+			'day' => ['blocks' => [['06:00', '10:00'], ['13:30', '16:30']]],
+			'week' => [],
+			'split' => ['automatic' => true, 'cutoff' => '16:00', 'break_cover' => true],
+			'overrides' => ['decision' => 'auto', 'worked' => []],
+			'result' => ['state' => 'active', 'split' => false, 'reason' => null, 'excluded' => [], 'segments' => [], 'engine' => 1],
+		]));
+		$this->wireClockOutMocks($entry);
+
+		$result = $service->clockOut('alice', TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', new \DateTime('2026-11-16 16:30:00', new \DateTimeZone('Europe/Berlin')));
+
+		$ctxResult = $result->getWorkContext()['result'];
+		$this->assertSame('applied', $ctxResult['state']);
+		$this->assertTrue($ctxResult['split']);
+		$this->assertSame('clock_out_after_cutoff', $ctxResult['reason']);
+		$this->assertSame('covered_by_interruption', $ctxResult['break_handling']);
+		$this->assertSame(12600, $result->getExcludedWorkSeconds());
+		$this->assertNull($result->getBreaks(), 'covered → no automatic break portion');
+		// (10.5h raw − 3.5h interruption − 0 breaks) = 7h net.
+		$this->assertEqualsWithDelta(7.0, (float)$result->getDurationHours(), 0.001);
+	}
+
+	public function testClockOutSplitStandardBreakInsideSegmentsOnly(): void
+	{
+		// break_cover=false → standard masked placement: the automatic
+		// break must land inside an own-work segment, never inside the
+		// excluded interruption.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->splitActiveEntry('2026-11-16 06:00:00');
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1, 'model_id' => 7, 'schedule_revision' => 't', 'timezone' => 'Europe/Berlin',
+			'day' => ['blocks' => [['06:00', '10:00'], ['13:30', '16:30']]],
+			'week' => [],
+			'split' => ['automatic' => true, 'cutoff' => '16:00', 'break_cover' => false],
+			'overrides' => ['decision' => 'auto', 'worked' => []],
+			'result' => ['state' => 'active', 'split' => false, 'reason' => null, 'excluded' => [], 'segments' => [], 'engine' => 1],
+		]));
+		$this->wireClockOutMocks($entry);
+
+		$result = $service->clockOut('alice', TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', new \DateTime('2026-11-16 16:30:00', new \DateTimeZone('Europe/Berlin')));
+
+		$ctxResult = $result->getWorkContext()['result'];
+		$this->assertSame('applied', $ctxResult['state']);
+		$this->assertTrue($ctxResult['split']);
+		$this->assertSame('standard', $ctxResult['break_handling']);
+		$this->assertSame(12600, $result->getExcludedWorkSeconds());
+
+		$breaks = json_decode((string)$result->getBreaks(), true);
+		$this->assertIsArray($breaks);
+		$this->assertCount(1, $breaks);
+		$this->assertTrue($breaks[0]['automatic']);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$xStart = (new \DateTime('2026-11-16 10:00', $tz))->getTimestamp();
+		$xEnd = (new \DateTime('2026-11-16 13:30', $tz))->getTimestamp();
+		$overlapsX = strtotime($breaks[0]['start']) < $xEnd && strtotime($breaks[0]['end']) > $xStart;
+		$this->assertFalse($overlapsX, 'automatic break may never overlap the excluded interruption');
+		// 7h own work − 30m break = 6.5h net.
+		$this->assertEqualsWithDelta(6.5, (float)$result->getDurationHours(), 0.001);
+	}
+
+	public function testClockOutSplitStaleAutoBreakRemovedWhenCovered(): void
+	{
+		// A stale automatic portion on the current entry is derived data —
+		// covered verdict removes it (§9.6 step 12). Manual stays.
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->splitActiveEntry('2026-11-16 06:00:00');
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1, 'model_id' => 7, 'schedule_revision' => 't', 'timezone' => 'Europe/Berlin',
+			'day' => ['blocks' => [['06:00', '10:00'], ['13:30', '16:30']]],
+			'week' => [],
+			'split' => ['automatic' => true, 'cutoff' => '16:00', 'break_cover' => true],
+			'overrides' => ['decision' => 'auto', 'worked' => []],
+			'result' => ['state' => 'active', 'split' => false, 'reason' => null, 'excluded' => [], 'segments' => [], 'engine' => 1],
+		]));
+		$entry->setBreaks(json_encode([
+			['start' => '2026-11-16T14:00:00+01:00', 'end' => '2026-11-16T14:10:00+01:00'],
+			['start' => '2026-11-16T15:00:00+01:00', 'end' => '2026-11-16T15:30:00+01:00', 'automatic' => true, 'duration_minutes' => 30],
+		]));
+		$this->wireClockOutMocks($entry);
+
+		$result = $service->clockOut('alice', TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', new \DateTime('2026-11-16 16:30:00', new \DateTimeZone('Europe/Berlin')));
+
+		$ctxResult = $result->getWorkContext()['result'];
+		$this->assertSame('covered_by_interruption', $ctxResult['break_handling']);
+		$breaks = json_decode((string)$result->getBreaks(), true);
+		$this->assertCount(1, $breaks, 'stale automatic portion removed, manual portion kept');
+		$this->assertArrayNotHasKey('automatic', $breaks[0]);
+	}
+
+	public function testClockOutForceSplitWithoutGapClosesAsReview(): void
+	{
+		// The entry ends inside the candidate gap (corrected clock-out):
+		// the stored force_split override is no longer applicable → closable
+		// review entry, conservatively accounted unsplit (excluded = 0).
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->splitActiveEntry('2026-11-16 06:00:00');
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1, 'model_id' => 7, 'schedule_revision' => 't', 'timezone' => 'Europe/Berlin',
+			'day' => ['blocks' => [['06:00', '10:00'], ['13:30', '16:30']]],
+			'week' => [],
+			'split' => ['automatic' => true, 'cutoff' => '16:00', 'break_cover' => true],
+			'overrides' => ['decision' => 'force_split', 'worked' => []],
+			'result' => ['state' => 'active', 'split' => false, 'reason' => null, 'excluded' => [], 'segments' => [], 'engine' => 1],
+		]));
+		$this->wireClockOutMocks($entry);
+
+		$result = $service->clockOut('alice', TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', new \DateTime('2026-11-16 12:00:00', new \DateTimeZone('Europe/Berlin')));
+
+		$ctxResult = $result->getWorkContext()['result'];
+		$this->assertSame('review', $ctxResult['state']);
+		$this->assertFalse($ctxResult['split']);
+		$this->assertSame('not_applicable', $ctxResult['break_handling']);
+		$this->assertSame(\OCA\ArbeitszeitCheck\Support\SplitServiceAccounting::ERR_OVERRIDE_NOT_APPLICABLE, $ctxResult['error'] ?? null);
+		$this->assertSame(0, $result->getExcludedWorkSeconds());
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus(), 'review entries must still be closable');
+	}
+
+	public function testClockOutLegacyEntryKeepsNullContext(): void
+	{
+		[$service] = $this->serviceWithPolicy();
+		$entry = $this->splitActiveEntry('2026-11-16 08:00:00');
+		$this->wireClockOutMocks($entry);
+
+		$result = $service->clockOut('alice', TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'standard', new \DateTime('2026-11-16 17:05:00', new \DateTimeZone('Europe/Berlin')));
+
+		$this->assertNull($result->getWorkContextJson(), 'legacy entry → NULL context stays NULL');
+		$this->assertSame(0, $result->getExcludedWorkSeconds());
 	}
 }

@@ -1199,4 +1199,232 @@ class BreakPolicyResolverTest extends TestCase
 			$this->resolver->requiredBreakMinutes($net, 'u1') * 60
 		);
 	}
+
+	// ------------------------------------------------------------------
+	// Split-service context awareness (SPEC §9.6 steps 8–10)
+	// ------------------------------------------------------------------
+
+	private function splitEntry(
+		string $start,
+		string $end,
+		array $segmentsIso,
+		array $excludedIso,
+		?array $breaks = null,
+		?int $id = 99,
+	): TimeEntry {
+		$entry = $this->makeEntry($start, $end, $breaks, $id);
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1,
+			'timezone' => 'Europe/Berlin',
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => $excludedIso,
+				'segments' => $segmentsIso,
+				'engine' => 1,
+			],
+		]));
+		return $entry;
+	}
+
+	public function testDayWorkUsesStoredSegmentsForSplitEntry(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+		);
+		$this->overlappingEntries = [$entry];
+
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$work = $this->resolver->dayWork(
+			'u1',
+			new \DateTime('2026-11-16 00:00:00', $tz),
+			new \DateTime('2026-11-17 00:00:00', $tz),
+		);
+
+		$this->assertSame(
+			[
+				[(new \DateTime('2026-11-16 06:00', $tz))->getTimestamp(), (new \DateTime('2026-11-16 10:00', $tz))->getTimestamp()],
+				[(new \DateTime('2026-11-16 13:30', $tz))->getTimestamp(), (new \DateTime('2026-11-16 16:30', $tz))->getTimestamp()],
+			],
+			$work,
+			'W_day must be the union of frozen own-work segments, never the raw span'
+		);
+	}
+
+	public function testDayWorkLegacyEntryKeepsRawSpan(): void
+	{
+		$entry = $this->makeEntry('2026-11-16 06:00', '2026-11-16 16:30');
+		$this->overlappingEntries = [$entry];
+		$tz = new \DateTimeZone('Europe/Berlin');
+
+		$work = $this->resolver->dayWork(
+			'u1',
+			new \DateTime('2026-11-16 00:00:00', $tz),
+			new \DateTime('2026-11-17 00:00:00', $tz),
+		);
+
+		$this->assertSame(
+			[[(new \DateTime('2026-11-16 06:00', $tz))->getTimestamp(), (new \DateTime('2026-11-16 16:30', $tz))->getTimestamp()]],
+			$work,
+			'NULL context → byte-identical raw-span behaviour'
+		);
+	}
+
+	public function testEntryBreakIntervalsInsideExcludedContributeZero(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+			[
+				['start' => '2026-11-16T10:30:00+01:00', 'end' => '2026-11-16T11:00:00+01:00'],
+				['start' => '2026-11-16T14:00:00+01:00', 'end' => '2026-11-16T14:15:00+01:00'],
+			],
+		);
+
+		$pieces = $this->resolver->entryBreakIntervals($entry, 0, PHP_INT_MAX);
+
+		$this->assertCount(1, $pieces, 'a break inside the excluded interruption must not count twice');
+		$this->assertSame(
+			(new \DateTime('2026-11-16 14:00', new \DateTimeZone('Europe/Berlin')))->getTimestamp(),
+			$pieces[0]['start']
+		);
+	}
+
+	public function testEntryBreakIntervalsStraddlingExcludedIsClipped(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+			[['start' => '2026-11-16T09:30:00+01:00', 'end' => '2026-11-16T10:30:00+01:00']],
+		);
+
+		$pieces = $this->resolver->entryBreakIntervals($entry, 0, PHP_INT_MAX);
+
+		$this->assertCount(1, $pieces);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$this->assertSame((new \DateTime('2026-11-16 09:30', $tz))->getTimestamp(), $pieces[0]['start']);
+		$this->assertSame((new \DateTime('2026-11-16 10:00', $tz))->getTimestamp(), $pieces[0]['end']);
+	}
+
+	public function testEntryBreakIntervalsLegacyKeepsAllPieces(): void
+	{
+		$entry = $this->makeEntry('2026-11-16 06:00', '2026-11-16 16:30', [
+			['start' => '2026-11-16T10:30:00+01:00', 'end' => '2026-11-16T11:00:00+01:00'],
+		]);
+		$pieces = $this->resolver->entryBreakIntervals($entry, 0, PHP_INT_MAX);
+		$this->assertCount(1, $pieces, 'NULL context → break evidence untouched');
+	}
+
+	public function testPlanAutoBreakPlacesInLongestSegmentOnly(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+		);
+		$this->overlappingEntries = [$entry];
+
+		$plan = $this->resolver->planAutoBreak($entry, 30);
+
+		$this->assertNotNull($plan);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$segStart = (new \DateTime('2026-11-16 06:00', $tz))->getTimestamp();
+		$segEnd = (new \DateTime('2026-11-16 10:00', $tz))->getTimestamp();
+		$this->assertGreaterThanOrEqual($segStart, $plan['start']->getTimestamp());
+		$this->assertLessThan($segEnd, $plan['end']->getTimestamp(), 'break must end strictly before the segment end (E-23)');
+		// Never inside the excluded interruption.
+		$this->assertLessThanOrEqual(
+			(new \DateTime('2026-11-16 10:00', $tz))->getTimestamp(),
+			$plan['end']->getTimestamp()
+		);
+	}
+
+	public function testPlanAutoBreakWindowMaskedToSegments(): void
+	{
+		// A required window covering the interruption must NOT host the
+		// break — the mask clips candidates to own-work segments.
+		$this->setPolicy([
+			'windows' => [['start' => '10:00', 'end' => '13:30', 'minutes' => 30, 'mode' => 'required']],
+		]);
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+		);
+		$this->overlappingEntries = [$entry];
+
+		$plan = $this->resolver->planAutoBreak($entry, 30);
+
+		$this->assertNotNull($plan, 'a window intersecting only X must fall back to a segment placement');
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$xStart = (new \DateTime('2026-11-16 10:00', $tz))->getTimestamp();
+		$xEnd = (new \DateTime('2026-11-16 13:30', $tz))->getTimestamp();
+		$insideX = $plan['start']->getTimestamp() < $xEnd && $plan['end']->getTimestamp() > $xStart;
+		$this->assertFalse($insideX, 'break must never overlap the excluded interruption');
+	}
+
+	public function testPlanAutoBreakImpossiblePlacementReturnsNull(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T06:10:00+01:00'],
+				['2026-11-16T16:20:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T06:10:00+01:00', '2026-11-16T16:20:00+01:00']],
+		);
+		$this->overlappingEntries = [$entry];
+
+		$this->assertNull(
+			$this->resolver->planAutoBreak($entry, 45),
+			'no segment can host the break — caller marks review (§9.6 step 10a)'
+		);
+	}
+
+	public function testPlanAutoBreakCappedTailAnchorsToLastSegmentEnd(): void
+	{
+		$entry = $this->splitEntry(
+			'2026-11-16 06:00', '2026-11-16 16:30',
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+		);
+		$this->overlappingEntries = [$entry];
+
+		$plan = $this->resolver->planAutoBreak($entry, 30, true);
+
+		$this->assertNotNull($plan);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$this->assertSame(
+			(new \DateTime('2026-11-16 16:30', $tz))->getTimestamp(),
+			$plan['end']->getTimestamp(),
+			'capped tail anchors to the last segment end — never the raw shift end'
+		);
+		$this->assertSame(
+			(new \DateTime('2026-11-16 16:00', $tz))->getTimestamp(),
+			$plan['start']->getTimestamp()
+		);
+	}
 }

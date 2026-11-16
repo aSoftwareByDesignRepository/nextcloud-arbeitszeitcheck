@@ -2955,6 +2955,24 @@ class ManagerController extends Controller
 			$entry->setCreatedAt(clone $nowAt);
 			$entry->setUpdatedAt(clone $nowAt);
 
+			// Split-service days (§9.5): pin the frozen context against the
+			// proposal's start — the correction write persists context + row in
+			// one transaction. `date` wins over `startTime` here exactly like
+			// applyProposal(), so the pinned day is the persisted day.
+			$pinStartRaw = $proposal['date'] ?? $proposal['startTime'] ?? null;
+			if (is_string($pinStartRaw) && $pinStartRaw !== '') {
+				try {
+					$entry->setStartTime(AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime(
+						$pinStartRaw,
+						AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config)
+					));
+				} catch (\Throwable) {
+					// parse defects surface via validateProposal's own 400 —
+					// never let the pin pre-parse create a second error path.
+				}
+				$this->timeTrackingService->pinSplitContextForEntry($entry, $targetUserId);
+			}
+
 			try {
 				$saved = $this->correctionService->createManagerRecordedEntry($entry, $proposal, $managerId, $reason);
 			} catch (\InvalidArgumentException $e) {

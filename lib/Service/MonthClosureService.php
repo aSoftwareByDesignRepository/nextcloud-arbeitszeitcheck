@@ -633,7 +633,7 @@ class MonthClosureService
 		});
 
 		$entryRows = array_map(function (TimeEntry $e) {
-			return [
+			$row = [
 				'id' => $e->getId(),
 				'start' => $e->getStartTime() ? $e->getStartTime()->format(\DateTimeInterface::ATOM) : null,
 				'end' => $e->getEndTime() ? $e->getEndTime()->format(\DateTimeInterface::ATOM) : null,
@@ -642,6 +642,16 @@ class MonthClosureService
 				'breaks' => $e->getBreaks(),
 				'description' => $e->getDescription(),
 			];
+			// Split-day model: freeze the authoritative accounting result and the
+			// corrected net working hours so closure PDFs/audits render partial
+			// services and neutral interruption lines without re-deriving them.
+			// Legacy entries keep the pre-existing row shape exactly.
+			$accounting = $e->getAccountingResult();
+			if ($accounting !== null) {
+				$row['accounting'] = $accounting;
+				$row['net_hours'] = $e->getDurationHours();
+			}
+			return $row;
 		}, $entries);
 
 		$absenceRows = array_map(function (Absence $a) {

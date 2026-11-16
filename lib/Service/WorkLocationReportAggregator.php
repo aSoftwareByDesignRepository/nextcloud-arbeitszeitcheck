@@ -141,7 +141,14 @@ final class WorkLocationReportAggregator
 			return [];
 		}
 
-		$breaks = self::breakIntervals($entry);
+		// Non-work inside the raw span: recorded break evidence ∪ the frozen
+		// accounting exclusions X (scheduled interruptions on split days,
+		// spec FM-08). Merged into one union so overlapping intervals are
+		// never subtracted twice.
+		$nonWork = self::mergeIntervals(array_merge(
+			self::breakIntervals($entry),
+			self::accountingExcludedIntervals($entry)
+		));
 		$perDay = [];
 
 		$cursor = $startTs;
@@ -152,17 +159,80 @@ final class WorkLocationReportAggregator
 			$segmentEnd = min($endTs, $nextMidnight);
 			$gross = $segmentEnd - $cursor;
 
-			$breakOverlap = 0;
-			foreach ($breaks as [$bStart, $bEnd]) {
-				$overlap = min($segmentEnd, $bEnd) - max($cursor, $bStart);
+			$nonWorkOverlap = 0;
+			foreach ($nonWork as [$nwStart, $nwEnd]) {
+				$overlap = min($segmentEnd, $nwEnd) - max($cursor, $nwStart);
 				if ($overlap > 0) {
-					$breakOverlap += $overlap;
+					$nonWorkOverlap += $overlap;
 				}
 			}
-			$perDay[$day] = ($perDay[$day] ?? 0) + max(0, $gross - $breakOverlap);
+			$perDay[$day] = ($perDay[$day] ?? 0) + max(0, $gross - $nonWorkOverlap);
 			$cursor = $segmentEnd;
 		}
 		return $perDay;
+	}
+
+	/**
+	 * Frozen exclusion intervals X of the entry's split accounting result as
+	 * [startTs, endTs] pairs. Terminal states (`applied`, `review`) always
+	 * count; a provisional `active` result counts only while the entry is
+	 * still open (live view) — on closed entries it is a defect and stays on
+	 * the legacy path, mirroring TimeEntry::hasEffectiveSplitContext().
+	 *
+	 * @return list<array{0:int,1:int}>
+	 */
+	private static function accountingExcludedIntervals(TimeEntry $entry): array
+	{
+		$result = $entry->getAccountingResult();
+		if (!is_array($result)) {
+			return [];
+		}
+		$state = $result['state'] ?? null;
+		$isTerminal = $state === 'applied' || $state === 'review';
+		if (!$isTerminal && !($state === 'active' && $entry->getEndTime() === null)) {
+			return [];
+		}
+		$intervals = [];
+		foreach (is_array($result['excluded'] ?? null) ? $result['excluded'] : [] as $pair) {
+			if (!is_array($pair)) {
+				continue;
+			}
+			$v = array_values($pair);
+			if (count($v) < 2) {
+				continue;
+			}
+			try {
+				$s = (new \DateTime((string)$v[0]))->getTimestamp();
+				$e = (new \DateTime((string)$v[1]))->getTimestamp();
+			} catch (\Throwable) {
+				continue;
+			}
+			if ($e > $s) {
+				$intervals[] = [$s, $e];
+			}
+		}
+		return $intervals;
+	}
+
+	/**
+	 * Merge (possibly overlapping) [start,end] pairs into a sorted disjoint
+	 * union so each overlapping second is subtracted exactly once.
+	 *
+	 * @param list<array{0:int,1:int}> $intervals
+	 * @return list<array{0:int,1:int}>
+	 */
+	private static function mergeIntervals(array $intervals): array
+	{
+		usort($intervals, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+		$merged = [];
+		foreach ($intervals as [$s, $e]) {
+			if ($merged !== [] && $s <= $merged[count($merged) - 1][1]) {
+				$merged[count($merged) - 1][1] = max($merged[count($merged) - 1][1], $e);
+			} else {
+				$merged[] = [$s, $e];
+			}
+		}
+		return $merged;
 	}
 
 	/**

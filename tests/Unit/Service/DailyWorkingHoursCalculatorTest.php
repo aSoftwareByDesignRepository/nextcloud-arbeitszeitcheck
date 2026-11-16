@@ -437,4 +437,311 @@ class DailyWorkingHoursCalculatorTest extends TestCase
 		$broken->setStatus(\OCA\ArbeitszeitCheck\Db\TimeEntry::STATUS_COMPLETED);
 		$this->assertSame(0, $this->calculator->getLiveSessionSecondsOnCalendarDay($broken, $now));
 	}
+
+	// ------------------------------------------------------------------
+	// Split-service days (spec §9.9): frozen context.result.segments are
+	// the credited work intervals; result.excluded (X) is never work and a
+	// recorded break inside X is never deducted twice (NN-02).
+	// ------------------------------------------------------------------
+
+	/**
+	 * Entry carrying a frozen split context via the entity accessor. The
+	 * anonymous subclass declares the accessors the sibling change adds to
+	 * TimeEntry; when they land on the entity itself, this stays compatible.
+	 */
+	private function newContextEntry(?array $context, bool $invalidContext = false): TimeEntry
+	{
+		return new class($context, $invalidContext) extends TimeEntry {
+			public function __construct(
+				private ?array $splitContext,
+				private bool $invalidContext,
+			) {
+				parent::__construct();
+			}
+
+			public function getWorkContext(): ?array
+			{
+				return $this->splitContext;
+			}
+
+			public function hasInvalidWorkContext(): bool
+			{
+				return $this->invalidContext;
+			}
+		};
+	}
+
+	/**
+	 * Entry exposing only the raw work_context_json column — exercises the
+	 * defensive fallback used until the typed entity accessor exists.
+	 */
+	private function newRawContextEntry(?string $json): TimeEntry
+	{
+		return new class($json) extends TimeEntry {
+			public function __construct(private ?string $json)
+			{
+				parent::__construct();
+				if (property_exists($this, 'workContextJson')) {
+					$this->workContextJson = $json;
+				}
+			}
+
+			public function getWorkContextJson(): ?string
+			{
+				return $this->json;
+			}
+		};
+	}
+
+	private function fixtureF1Context(): array
+	{
+		return [
+			'v' => 1,
+			'model_id' => 123,
+			'timezone' => 'Europe/Berlin',
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+				'segments' => [
+					['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+					['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+				],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => 1,
+			],
+		];
+	}
+
+	private function fixtureF1Entry(?array $context, bool $invalidContext = false): TimeEntry
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = $this->newContextEntry($context, $invalidContext);
+		$entry->setId(60);
+		$entry->setUserId('alex');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2026-11-16 06:00:00', $tz));
+		$entry->setEndTime(new \DateTime('2026-11-16 16:30:00', $tz));
+		$entry->setBreaks(json_encode([]));
+		return $entry;
+	}
+
+	public function testSplitServiceEntryCountsFrozenSegmentsNotRawSpan(): void
+	{
+		// Contract fixture F1 (spec §9.9): 06:00–16:30 Berlin with frozen
+		// exclusion 10:00–13:30. Credited work = 06:00–10:00 + 13:30–16:30
+		// = 7:00 (25200 s), never the raw 10.5h span.
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = $this->fixtureF1Entry($this->fixtureF1Context());
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$now = new \DateTime('2026-11-16 18:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+
+		$this->assertEqualsWithDelta(7.0, $hours, 0.01, 'F1: excluded interruption must not count as work.');
+		$this->assertLessThan(8.0, $hours, 'Raw [start,end) accounting would yield ~10.5h.');
+	}
+
+	public function testSplitServiceEntryBreakInsideExclusionIsNotDoubleDeducted(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = $this->fixtureF1Entry($this->fixtureF1Context());
+		// 10:30–11:00 sits inside X (already non-work — must NOT deduct);
+		// 14:00–14:30 sits inside the afternoon segment (effective break).
+		$entry->setBreaks(json_encode([
+			['start' => '2026-11-16T10:30:00+01:00', 'end' => '2026-11-16T11:00:00+01:00'],
+			['start' => '2026-11-16T14:00:00+01:00', 'end' => '2026-11-16T14:30:00+01:00'],
+		]));
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$now = new \DateTime('2026-11-16 18:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(6.5, $hours, 0.01, 'Only the 30 min break outside X may deduct (NN-02).');
+
+		$breakMinutes = $this->calculator->getBreakMinutesForCalendarDay('alex', $dayStart, $dayEnd, $now);
+		$this->assertEqualsWithDelta(30.0, $breakMinutes, 0.01, 'Break inside X is not a countable break (B \\ X).');
+
+		$portions = $this->calculator->countableBreakPortionsOnCalendarDay('alex', $dayStart, $dayEnd, $entry, 15);
+		$this->assertSame([30], $portions, 'Only the outside-X portion is a countable break portion.');
+	}
+
+	public function testMixedDayLegacyAndSplitEntriesEachUseOwnAccounting(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$split = $this->fixtureF1Entry($this->fixtureF1Context());
+
+		$legacy = new TimeEntry();
+		$legacy->setId(61);
+		$legacy->setUserId('alex');
+		$legacy->setStatus(TimeEntry::STATUS_COMPLETED);
+		$legacy->setStartTime(new \DateTime('2026-11-16 17:00:00', $tz));
+		$legacy->setEndTime(new \DateTime('2026-11-16 19:00:00', $tz));
+		$legacy->setBreaks(json_encode([]));
+
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$split, $legacy]);
+
+		$now = new \DateTime('2026-11-16 20:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(9.0, $hours, 0.01, 'Split 7:00 + legacy 2:00 — each entry keeps its own accounting (§9.6).');
+	}
+
+	public function testLegacyEntrySameSpanWithoutContextUnchanged(): void
+	{
+		$entry = $this->fixtureF1Entry(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$now = new \DateTime('2026-11-16 18:00:00', new \DateTimeZone('Europe/Berlin'));
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(10.5, $hours, 0.01, 'NULL context keeps byte-identical legacy math.');
+	}
+
+	public function testSplitServiceEntryInvalidOrMissingContextFallsBackToLegacySpan(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$now = new \DateTime('2026-11-16 18:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$variants = [
+			'no result key' => ['v' => 1, 'timezone' => 'Europe/Berlin'],
+			'missing segments' => ['v' => 1, 'result' => ['state' => 'applied', 'excluded' => [['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']]]],
+			'empty segments' => ['v' => 1, 'result' => ['state' => 'applied', 'segments' => [], 'excluded' => []]],
+			'malformed segment pair' => ['v' => 1, 'result' => ['state' => 'applied', 'segments' => [['not-a-date', '2026-11-16T10:00:00+01:00']], 'excluded' => []]],
+			'degenerate segment' => ['v' => 1, 'result' => ['state' => 'applied', 'segments' => [['2026-11-16T16:30:00+01:00', '2026-11-16T06:00:00+01:00']], 'excluded' => []]],
+			'malformed excluded' => ['v' => 1, 'result' => ['state' => 'applied', 'segments' => [['2026-11-16T06:00:00+01:00', '2026-11-16T16:30:00+01:00']], 'excluded' => [['x', 'y']]]],
+			'unknown state' => ['v' => 1, 'result' => ['state' => 'pending', 'segments' => [['2026-11-16T06:00:00+01:00', '2026-11-16T16:30:00+01:00']], 'excluded' => []]],
+		];
+
+		$entries = [];
+		$this->timeEntryMapper->method('findOverlapping')->willReturnCallback(
+			static function () use (&$entries): array {
+				return $entries;
+			}
+		);
+
+		foreach ($variants as $label => $context) {
+			$entries = [$this->fixtureF1Entry($context)];
+
+			$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+			$this->assertEqualsWithDelta(10.5, $hours, 0.01, "Variant '$label' must keep legacy accounting.");
+		}
+
+		// Entity-flagged invalid context → legacy as well.
+		$entries = [$this->fixtureF1Entry($this->fixtureF1Context(), true)];
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(10.5, $hours, 0.01, 'hasInvalidWorkContext() must keep legacy accounting.');
+	}
+
+	public function testSplitServiceEntryEpochPairSegments(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$ts = static fn (string $local): int => (new \DateTime($local, $tz))->getTimestamp();
+		$context = [
+			'v' => 1,
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'excluded' => [[$ts('2026-11-16 10:00:00'), $ts('2026-11-16 13:30:00')]],
+				'segments' => [
+					[$ts('2026-11-16 06:00:00'), $ts('2026-11-16 10:00:00')],
+					[$ts('2026-11-16 13:30:00'), $ts('2026-11-16 16:30:00')],
+				],
+			],
+		];
+		$entry = $this->fixtureF1Entry($context);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$now = new \DateTime('2026-11-16 18:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(7.0, $hours, 0.01, 'Epoch-pair segments must be honoured identically.');
+	}
+
+	public function testSplitServiceEntryReviewStateUnsplitSegmentsMatchLegacy(): void
+	{
+		// review entries are accounted unsplit — the stored result carries a
+		// single full-span segment and no exclusion (spec §9.6 closure rule).
+		$context = $this->fixtureF1Context();
+		$context['result']['state'] = 'review';
+		$context['result']['split'] = false;
+		$context['result']['excluded'] = [];
+		$context['result']['segments'] = [['2026-11-16T06:00:00+01:00', '2026-11-16T16:30:00+01:00']];
+
+		$entry = $this->fixtureF1Entry($context);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$entry]);
+
+		$now = new \DateTime('2026-11-16 18:00:00', new \DateTimeZone('Europe/Berlin'));
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(10.5, $hours, 0.01, 'review = conservative unsplit accounting, identical to legacy.');
+	}
+
+	public function testGetEntryWorkingHoursOnCalendarDayUsesFrozenSegments(): void
+	{
+		$entry = $this->fixtureF1Entry($this->fixtureF1Context());
+		$now = new \DateTime('2026-11-16 18:00:00', new \DateTimeZone('Europe/Berlin'));
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getEntryWorkingHoursOnCalendarDay($entry, $dayStart, $dayEnd, $now);
+		$this->assertEqualsWithDelta(7.0, $hours, 0.01);
+	}
+
+	public function testSplitServiceEntryRawJsonColumnFallback(): void
+	{
+		// Until the typed entity accessor lands, the calculator reads the raw
+		// work_context_json column defensively.
+		$entry = $this->newRawContextEntry(json_encode($this->fixtureF1Context()));
+		$entry->setId(62);
+		$entry->setUserId('alex');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry->setStartTime(new \DateTime('2026-11-16 06:00:00', $tz));
+		$entry->setEndTime(new \DateTime('2026-11-16 16:30:00', $tz));
+		$entry->setBreaks(json_encode([]));
+
+		$entries = [$entry];
+		$this->timeEntryMapper->method('findOverlapping')->willReturnCallback(
+			static function () use (&$entries): array {
+				return $entries;
+			}
+		);
+		$now = new \DateTime('2026-11-16 18:00:00', $tz);
+		[$dayStart, $dayEnd] = $this->timeZoneService->dayWindowInStorage($now);
+
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(7.0, $hours, 0.01, 'Raw JSON context must drive segment accounting.');
+
+		// Unparseable JSON → legacy.
+		$broken = $this->newRawContextEntry('{not json');
+		$broken->setId(63);
+		$broken->setUserId('alex');
+		$broken->setStatus(TimeEntry::STATUS_COMPLETED);
+		$broken->setStartTime(new \DateTime('2026-11-16 06:00:00', $tz));
+		$broken->setEndTime(new \DateTime('2026-11-16 16:30:00', $tz));
+		$broken->setBreaks(json_encode([]));
+		$entries = [$broken];
+		$hours = $this->calculator->getWorkingHoursForCalendarDay('alex', $dayStart, $dayEnd, null, $now);
+		$this->assertEqualsWithDelta(10.5, $hours, 0.01, 'Unparseable context JSON must keep legacy accounting.');
+	}
+
+	public function testSplitServiceEntryPresenceTimerStaysRawSpan(): void
+	{
+		// current_session_duration is a presence timer (spec §9.9): it counts
+		// clocked-in span, not credited segment time.
+		$entry = $this->fixtureF1Entry($this->fixtureF1Context());
+		$now = new \DateTime('2026-11-16 18:00:00', new \DateTimeZone('Europe/Berlin'));
+
+		$seconds = $this->calculator->getLiveSessionSecondsOnCalendarDay($entry, $now);
+		$this->assertSame(37800, $seconds, 'Presence span 06:00–16:30 stays 10.5h for split entries.');
+	}
 }

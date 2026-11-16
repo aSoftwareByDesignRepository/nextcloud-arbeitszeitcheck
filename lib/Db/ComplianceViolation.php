@@ -60,6 +60,12 @@ class ComplianceViolation extends Entity
 	 * not covered by work ∪ approved absence. Warning-only — never a save blocker.
 	 */
 	public const TYPE_MISSING_PRESENCE = 'missing_presence';
+	/**
+	 * Informational result type for split-day entries whose scheduled
+	 * interruption covers the statutory break requirement (employer setting).
+	 * Result-only — never persisted as a violation row, hence not in TYPES.
+	 */
+	public const TYPE_BREAK_COVERED_BY_INTERRUPTION = 'break_covered_by_interruption';
 
 	/**
 	 * Every violation type the checks can produce. Single source of truth —

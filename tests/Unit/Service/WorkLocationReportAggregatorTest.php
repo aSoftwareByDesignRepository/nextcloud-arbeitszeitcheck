@@ -108,6 +108,61 @@ final class WorkLocationReportAggregatorTest extends TestCase
 		$this->assertSame(60, $r['byCategory']['other']['netMinutes']);
 	}
 
+	public function testSplitEntryNetMinutesExcludeScheduledInterruption(): void
+	{
+		// FM-08: raw span 04:00–14:30 UTC (06:00–16:30 CEST, 10.5 h) with a
+		// frozen split result excluding 10:00–13:30 local → 7.00 h net.
+		$e = $this->entry('2024-06-10 04:00:00', '2024-06-10 14:30:00', 'office');
+		$e->setWorkContextJson(json_encode([
+			'v' => 1,
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2024-06-10T10:00:00+02:00', '2024-06-10T13:30:00+02:00']],
+				'segments' => [
+					['2024-06-10T06:00:00+02:00', '2024-06-10T10:00:00+02:00'],
+					['2024-06-10T13:30:00+02:00', '2024-06-10T16:30:00+02:00'],
+				],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => 1,
+			],
+		]));
+		$e->setExcludedWorkSeconds(12600);
+
+		$r = $this->aggregator->aggregate([$e], $this->tz);
+		$this->assertSame(420, $r['byCode']['office']['netMinutes']);
+		$this->assertSame(1, $r['byCode']['office']['days']);
+	}
+
+	public function testSplitEntryBreakOverlapWithInterruptionIsNotDoubleSubtracted(): void
+	{
+		// Same F1 span, plus a recorded 15-min break inside the interruption
+		// window — merged non-work union subtracts it once, not twice.
+		$breaks = json_encode([['start' => '2024-06-10 08:15:00', 'end' => '2024-06-10 08:30:00']]);
+		$e = $this->entry('2024-06-10 04:00:00', '2024-06-10 14:30:00', 'home', $breaks);
+		$e->setWorkContextJson(json_encode([
+			'v' => 1,
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2024-06-10T10:00:00+02:00', '2024-06-10T13:30:00+02:00']],
+				'segments' => [
+					['2024-06-10T06:00:00+02:00', '2024-06-10T10:00:00+02:00'],
+					['2024-06-10T13:30:00+02:00', '2024-06-10T16:30:00+02:00'],
+				],
+				'break_handling' => 'standard',
+				'engine' => 1,
+			],
+		]));
+		$e->setExcludedWorkSeconds(12600);
+
+		// 10.5 h gross − 3.5 h interruption (recorded break inside X adds nothing) = 420 min.
+		$r = $this->aggregator->aggregate([$e], $this->tz);
+		$this->assertSame(420, $r['byCode']['home']['netMinutes']);
+	}
+
 	public function testOpenEntryUsesAsOfHorizonInLiveView(): void
 	{
 		$asOf = new \DateTimeImmutable('2026-10-01 10:00:00', new \DateTimeZone('UTC'));

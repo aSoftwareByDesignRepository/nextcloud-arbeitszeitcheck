@@ -768,6 +768,17 @@
     function buildBreakRulesPayload(form, existingBreakRules) {
         const fieldset = form.querySelector('.wtm-weekday-schedule');
         const schedule = collectWeekdaySchedule(fieldset);
+        // Split-service draft check (spec §9.3 SPLIT_CUTOFF_INVALID): an
+        // automatic split without a cut-off is an inline field error on
+        // submit, not a server round-trip.
+        if (schedule && schedule.split_service
+            && schedule.split_service.automatic_split === true
+            && !schedule.split_service.split_when_clock_out_after) {
+            return {
+                error: wtmMsg('splitCutoffRequired', 'Enter a time such as 16:00.'),
+                field: 'splitService'
+            };
+        }
         const presenceFieldset = form.querySelector('.wtm-presence-windows');
         const presence = collectPresenceWindows(presenceFieldset);
         if (presence.error) {
@@ -784,7 +795,10 @@
         if (schedule) {
             base.weekday_schedule = schedule;
         } else {
-            delete base.weekday_schedule;
+            // The schedule matrix is always rendered in this editor, so
+            // "no day checked" is an explicit clear — send null (CAS-guarded
+            // server-side), not an absent key which reads as "old client".
+            base.weekday_schedule = null;
         }
         if (presence.windows) {
             base.presence_windows = presence.windows;
@@ -970,11 +984,24 @@
         capInput.addEventListener('input', schedule);
     }
 
+    /** Inline, announced error on the split cut-off field (aria-live, no toast). */
+    function showSplitServiceError(form, message) {
+        const fieldset = form && form.querySelector('.wtm-weekday-schedule');
+        const handled = !!fieldset
+            && typeof WeekdaySchedule.showSplitCutoffError === 'function'
+            && WeekdaySchedule.showSplitCutoffError(fieldset, message);
+        if (!handled) {
+            Messaging.showError(message);
+        }
+    }
+
     function routeBreakRulesError(form, breakRules) {
         if (breakRules && breakRules.field === 'breakTiers') {
             showBreakTierError(form, breakRules.error);
         } else if (breakRules && breakRules.field === 'paidBreakCap') {
             showPaidBreakError(form, breakRules.error);
+        } else if (breakRules && breakRules.field === 'splitService') {
+            showSplitServiceError(form, breakRules.error);
         } else {
             showPresenceError(form, breakRules.error);
         }
@@ -1219,6 +1246,11 @@
 
         const form = document.getElementById('wtm-model-form');
         if (form) {
+            // Schedule CAS token: sent back as scheduleBaseRevision so the
+            // server can detect a concurrent schedule edit (stale write).
+            if (isEdit && model && model.scheduleRevision !== undefined) {
+                form.dataset.scheduleBaseRevision = String(model.scheduleRevision || '');
+            }
             bindWeekdayScheduleFieldset(form.querySelector('.wtm-weekday-schedule'));
             bindPresenceWindowsFieldset(form.querySelector('.wtm-presence-windows'));
             bindBreakTiersFieldset(form.querySelector('.wtm-break-tiers'));
@@ -1572,11 +1604,22 @@
             // flag silently survived the save).
             const cleared = { ...existingBreakRules };
             [
-                'weekday_schedule', 'presence_windows', 'allow_sunday_work',
+                'presence_windows', 'allow_sunday_work',
                 'breaks_count_as_work', 'paid_break_cap_minutes',
                 'tiers', 'min_break_minutes'
             ].forEach(function(k) { delete cleared[k]; });
+            // Explicit null = deliberate schedule clear (server CAS-guards
+            // it on v2 documents); an absent key is ambiguous.
+            cleared.weekday_schedule = null;
             data.breakRules = cleared;
+        }
+        // Schedule stale-write token (v2-capable saves only).
+        if (form.dataset && form.dataset.scheduleBaseRevision !== undefined) {
+            data.scheduleBaseRevision = form.dataset.scheduleBaseRevision;
+        }
+        // Admin confirmed successor creation after MODEL_IN_USE_REQUIRES_SUCCESSOR.
+        if (form.dataset && form.dataset.createSuccessor === '1') {
+            data.createSuccessor = true;
         }
 
         editorSaveInflight = true;
@@ -1602,9 +1645,13 @@
                     submitBtn.removeAttribute('aria-busy');
                 }
                 if (response.success) {
-                    const successMsg = window.ArbeitszeitCheck?.l10n?.modelUpdated ||
-                                        (window.t && window.t('arbeitszeitcheck', 'Model updated successfully')) ||
-                                        'Model updated successfully';
+                    const successMsg = response.createdSuccessor
+                        ? (window.ArbeitszeitCheck?.l10n?.successorCreated ||
+                           (window.t && window.t('arbeitszeitcheck', 'New model copy created — the original is unchanged.')) ||
+                           'New model copy created — the original is unchanged.')
+                        : (window.ArbeitszeitCheck?.l10n?.modelUpdated ||
+                           (window.t && window.t('arbeitszeitcheck', 'Model updated successfully')) ||
+                           'Model updated successfully');
                     Messaging.showSuccess(successMsg);
                     closeEditorPanel();
                     setTimeout(() => location.reload(), 1000);
@@ -1613,7 +1660,7 @@
                     Messaging.showError(errorMsg);
                 }
             },
-            onError: function(_error) {
+            onError: function(error) {
                 editorSaveInflight = false;
                 if (host) {
                     host.removeAttribute('aria-busy');
@@ -1622,7 +1669,53 @@
                     submitBtn.disabled = false;
                     submitBtn.removeAttribute('aria-busy');
                 }
-                const errorMsg = window.ArbeitszeitCheck?.l10n?.failedToUpdateModel || (window.t && window.t('arbeitszeitcheck', 'Failed to update model')) || 'Failed to update model';
+                const code = error && error.data && error.data.code ? error.data.code : null;
+                if (code === 'MODEL_IN_USE_REQUIRES_SUCCESSOR' || code === 'SCHEDULE_IMMUTABLE') {
+                    // Assigned model + v1→v2 schedule: offer the explicit
+                    // successor copy instead of a dead-end error.
+                    const components = window.ArbeitszeitCheckComponents;
+                    const ask = components && typeof components.showConfirmDialog === 'function'
+                        ? components.showConfirmDialog({
+                            title: wtmMsg('successorTitle', 'Model is in use'),
+                            message: error.data.error || wtmMsg('successorMessage', 'This model is assigned to employees. Save the new weekday blocks as a copy instead?'),
+                            confirmLabel: wtmMsg('successorConfirm', 'Save as copy'),
+                            cancelLabel: wtmMsg('cancel', 'Cancel'),
+                            variant: 'info',
+                        })
+                        : Promise.resolve(false);
+                    ask.then(function(accepted) {
+                        if (accepted) {
+                            form.dataset.createSuccessor = '1';
+                            handleUpdateModel(form, modelId, existingBreakRules);
+                        }
+                    });
+                    return;
+                }
+                if (code === 'SCHEDULE_DOWNGRADE' || code === 'SCHEDULE_CONFLICT') {
+                    const components = window.ArbeitszeitCheckComponents;
+                    const msg = error.data && error.data.error
+                        ? error.data.error
+                        : wtmMsg('scheduleStale', 'The schedule changed in the meantime. Reload and try again.');
+                    if (components && typeof components.showConfirmDialog === 'function') {
+                        components.showConfirmDialog({
+                            title: wtmMsg('scheduleStaleTitle', 'Schedule changed'),
+                            message: msg,
+                            confirmLabel: wtmMsg('reload', 'Reload'),
+                            cancelLabel: wtmMsg('cancel', 'Cancel'),
+                            variant: 'warning',
+                        }).then(function(accepted) {
+                            if (accepted) {
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        Messaging.showError(msg);
+                    }
+                    return;
+                }
+                const errorMsg = (error && error.error)
+                    || (window.ArbeitszeitCheck?.l10n?.failedToUpdateModel || (window.t && window.t('arbeitszeitcheck', 'Failed to update model')))
+                    || 'Failed to update model';
                 Messaging.showError(errorMsg);
             }
         });

@@ -205,10 +205,21 @@ class ExportController extends Controller
 			$layoutParam = (string)$this->request->getParam('layout', 'long');
 			$layout = in_array($layoutParam, ['long', 'wide'], true) ? $layoutParam : 'long';
 
+			// `segments=rows`: split entries emit one row per partial-service
+			// segment (extra parent_entry_id/segment_no columns); scheduled
+			// interruptions never become rows. Implies the long layout.
+			$segmentsAsRows = strtolower((string)$this->request->getParam('segments', '')) === 'rows';
+			if ($segmentsAsRows) {
+				$layout = 'long';
+			}
+
 			$data = [];
 			foreach ($entries as $entry) {
 				try {
-					foreach ($this->timeEntryExportTransformer->entryToExportRows($entry, $enableMidnightSplit) as $row) {
+					$entryRows = $segmentsAsRows
+						? $this->timeEntryExportTransformer->entryToSegmentRows($entry, $enableMidnightSplit)
+						: $this->timeEntryExportTransformer->entryToExportRows($entry, $enableMidnightSplit);
+					foreach ($entryRows as $row) {
 						$data[] = $row;
 					}
 				} catch (\Throwable $e) {

@@ -703,6 +703,12 @@ class ReportController extends Controller
 			$variant = in_array($variantParam, ['summary', 'time_entries'], true) ? $variantParam : 'summary';
 			$layoutParam = (string)$this->request->getParam('layout', 'long');
 			$layout = in_array($layoutParam, ['long', 'wide'], true) ? $layoutParam : 'long';
+			// `segments=rows`: split entries emit one row per partial-service
+			// segment (parent_entry_id/segment_no); implies the long layout.
+			$segmentsAsRows = strtolower((string)$this->request->getParam('segments', '')) === 'rows';
+			if ($segmentsAsRows) {
+				$layout = 'long';
+			}
 
 			if ($variant === 'time_entries') {
 				$enableMidnightSplit = $this->config->getAppValue('arbeitszeitcheck', 'export_midnight_split_enabled', '1') === '1';
@@ -710,7 +716,10 @@ class ReportController extends Controller
 				foreach ($teamUserIds as $uid) {
 					$entries = $this->timeEntryMapper->findByUserAndDateRange($uid, $start, $endExclusive);
 						$displayName = $this->getUserDisplayName($uid);
-						foreach ($this->timeEntryExportTransformer->entriesToExportRows($entries, $enableMidnightSplit) as $row) {
+						$transformed = $segmentsAsRows
+							? $this->timeEntryExportTransformer->entriesToSegmentRows($entries, $enableMidnightSplit)
+							: $this->timeEntryExportTransformer->entriesToExportRows($entries, $enableMidnightSplit);
+						foreach ($transformed as $row) {
 							$row['user_id'] = $uid;
 							$row['display_name'] = $displayName;
 							$longRows[] = $row;
@@ -758,6 +767,10 @@ class ReportController extends Controller
 								'status' => $row['status'] ?? '',
 								'is_manual_entry' => $row['is_manual_entry'] ?? '',
 								'project_id' => $row['project_id'] ?? '',
+								'excluded_minutes' => $row['excluded_minutes'] ?? '',
+								'partial_services' => $row['partial_services'] ?? '',
+								'parent_entry_id' => $row['parent_entry_id'] ?? '',
+								'segment_no' => $row['segment_no'] ?? '',
 							];
 						}, $longRows);
 					}

@@ -166,7 +166,32 @@ final class TimeEntryClockPayloadBuilder
 			$proposal['breaks'] = $params['breaks'];
 		}
 
+		$splitOverride = self::splitOverrideFromParams($params);
+		if ($splitOverride !== null) {
+			$proposal['splitOverride'] = $splitOverride;
+		}
+
 		return $proposal;
+	}
+
+	/**
+	 * Extract a split-service override from request params. Accepts the JSON
+	 * object form (JSON clients) and its string-encoded equivalent
+	 * (form-encoded posts). Shape/applicability validation happens upstream
+	 * in {@see \OCA\ArbeitszeitCheck\Service\TimeEntryCorrectionService} —
+	 * this helper only normalizes the transport representation.
+	 *
+	 * @param array<string, mixed> $params
+	 * @return array<string, mixed>|null
+	 */
+	private static function splitOverrideFromParams(array $params): ?array
+	{
+		$raw = $params['splitOverride'] ?? null;
+		if (is_string($raw) && $raw !== '') {
+			$decoded = json_decode($raw, true);
+			$raw = is_array($decoded) ? $decoded : null;
+		}
+		return is_array($raw) && !array_is_list($raw) ? $raw : null;
 	}
 
 	private static function isPlainTime(string $value): bool

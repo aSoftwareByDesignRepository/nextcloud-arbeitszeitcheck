@@ -62,6 +62,30 @@ $correctionL10n = [
 	'correctionBreakWarning' => $l->t('The saved times do not fully meet the break rules.'),
 	'correctionClose' => $l->t('Close'),
 	'correctionWithdrawTitle' => $l->t('Withdraw correction'),
+	// Split-day correction section (split-day spec §9.7) — rendered only when
+	// the entry carries a split-service `accounting` context.
+	'correctionLabelSplit' => $l->t('Split day'),
+	'correctionLabelPartialService' => $l->t('Partial service {number}'),
+	'correctionSplitCurrentSplit' => $l->t('This day was split at the scheduled interruption.'),
+	'correctionSplitHintNotAfterCutoff' => $l->t('Not split: clock-out was not after the cut-off time'),
+	'correctionSplitHintClockInInterruption' => $l->t('Not split: clock-in during interruption'),
+	'correctionSplitHintNoInterruption' => $l->t('Not split: no interruption today'),
+	'correctionSplitHintCrossesMidnight' => $l->t('Not split: crosses midnight'),
+	'correctionSplitHintDstReview' => $l->t('Needs review: time change (DST)'),
+	'correctionInterruptionLabel' => $l->t('Interruption {start}–{end}'),
+	'correctionWorkedMark' => $l->t('I worked part of this interruption'),
+	'correctionWorkedPortion' => $l->t('Worked portion {number}'),
+	'correctionWorkedAddAnother' => $l->t('Add another worked portion'),
+	'correctionWorkedStartHour' => $l->t('Worked portion start hour'),
+	'correctionWorkedStartMinute' => $l->t('Worked portion start minute'),
+	'correctionWorkedEndHour' => $l->t('Worked portion end hour'),
+	'correctionWorkedEndMinute' => $l->t('Worked portion end minute'),
+	'correctionWorkedRemove' => $l->t('Remove worked portion'),
+	'correctionErrorWorkedPartial' => $l->t('Each worked portion needs both a start and end time, or remove the row.'),
+	'correctionErrorWorkedBounds' => $l->t('Worked portions must stay inside their interruption ({start}–{end}).'),
+	'correctionErrorWorkedEndAfterStart' => $l->t('Each worked portion must end after it starts.'),
+	'correctionErrorWorkedOverlap' => $l->t('Worked portions must not overlap.'),
+	'correctionErrorWorkedTooMany' => $l->t('At most {max} worked portions.'),
 ];
 
 ?>

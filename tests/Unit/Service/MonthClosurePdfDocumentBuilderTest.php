@@ -218,6 +218,103 @@ class MonthClosurePdfDocumentBuilderTest extends TestCase
 	}
 
 	/**
+	 * Split-day model: a frozen split accounting result in the snapshot row
+	 * renders partial-service lines, a neutral interruption line (never a
+	 * "rest" label), and the corrected net day total.
+	 */
+	public function testPdfRendersSplitAccountingLines(): void
+	{
+		$l = $this->createMock(IL10N::class);
+		$l->method('getLanguageCode')->willReturn('en');
+		$l->method('t')->willReturnCallback(static function (string $text, array $parameters = []) {
+			if ($text === 'month_closure_pdf_title') {
+				return 'TITLE';
+			}
+			if ($text === 'month_closure_pdf_footer') {
+				return 'FOOTER';
+			}
+			if ($text === 'month_closure_pdf_integrity_note') {
+				return 'INTEGRITY';
+			}
+			if ($text === 'month_closure_pdf_partial_service') {
+				return 'Partial service ' . ($parameters[0] ?? '');
+			}
+			if ($text === 'month_closure_pdf_interruption_line') {
+				return 'Interruption — not counted as working time';
+			}
+			if ($text === 'month_closure_pdf_day_total_net') {
+				return 'Day total (net): ' . ($parameters[0] ?? '');
+			}
+			if ($text === 'month_closure_pdf_hours_suffix') {
+				return 'h';
+			}
+
+			return 'X';
+		});
+
+		$snap = [
+			'schema' => 'arbeitszeitcheck.month_closure.v1',
+			'year' => 2026,
+			'month' => 3,
+			'period' => ['start' => '2026-03-01', 'end' => '2026-03-31'],
+			'report' => ['total_hours' => 7.0, 'violations_count' => 0],
+			'time_entries' => [
+				[
+					'id' => 7,
+					'start' => '2026-03-16T06:00:00+01:00',
+					'end' => '2026-03-16T16:30:00+01:00',
+					'status' => 'completed',
+					'is_manual' => false,
+					'breaks' => null,
+					'description' => '',
+					'accounting' => [
+						'state' => 'applied',
+						'split' => true,
+						'reason' => 'clock_out_after_cutoff',
+						'excluded' => [['2026-03-16T10:00:00+01:00', '2026-03-16T13:30:00+01:00']],
+						'segments' => [
+							['2026-03-16T06:00:00+01:00', '2026-03-16T10:00:00+01:00'],
+							['2026-03-16T13:30:00+01:00', '2026-03-16T16:30:00+01:00'],
+						],
+						'break_handling' => 'covered_by_interruption',
+					],
+					'net_hours' => 7.0,
+				],
+				[
+					'id' => 8,
+					'start' => '2026-03-17T08:00:00+01:00',
+					'end' => '2026-03-17T16:00:00+01:00',
+					'status' => 'completed',
+					'is_manual' => false,
+					'breaks' => null,
+					'description' => '',
+				],
+			],
+			'absences' => [],
+		];
+		$row = new MonthClosure();
+		$row->setSnapshotHash(str_repeat('f', 64));
+		$row->setVersion(1);
+
+		$pdf = MonthClosurePdfDocumentBuilder::build($snap, $row, 'User', 'u1', $l, '');
+
+		$this->assertStringContainsString('Partial service 1', $pdf);
+		$this->assertStringContainsString('Partial service 2', $pdf);
+		// MinimalPdfBuilder renders em dashes as '-' in WinAnsi (deliberate
+		// punctuation normalisation) — the msgid keeps the em dash.
+		$this->assertStringContainsString('Interruption - not counted as', $pdf);
+		$this->assertStringContainsString('Day total (net): 7 h', $this->unescapePdf($pdf));
+		// Neutral wording only — interruptions must never be called rest.
+		$this->assertStringNotContainsString('Ruhepause', $pdf);
+		$this->assertStringNotContainsString('rest taken', $pdf);
+	}
+
+	private function unescapePdf(string $pdf): string
+	{
+		return str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $pdf);
+	}
+
+	/**
 	 * Feeds the renderer every label/branch arm: all entry statuses, both
 	 * manual/auto kinds, break payloads (array, JSON string, malformed),
 	 * invalid timestamps, and enough rows to force a continuation page.

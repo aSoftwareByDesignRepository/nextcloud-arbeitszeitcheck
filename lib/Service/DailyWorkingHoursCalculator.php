@@ -65,8 +65,7 @@ class DailyWorkingHoursCalculator
 		$periods = $this->buildClippedPeriods($overlapping, $dayStartTs, $dayEndTs, $now, $excludeEntryId, $liveEntry?->getId());
 
 		if ($liveEntry !== null) {
-			$period = $this->buildClippedPeriod($liveEntry, $dayStartTs, $dayEndTs, $now);
-			if ($period !== null) {
+			foreach ($this->buildClippedWorkPeriods($liveEntry, $dayStartTs, $dayEndTs, $now) as $period) {
 				$periods[] = $period;
 			}
 		}
@@ -97,8 +96,7 @@ class DailyWorkingHoursCalculator
 			if ($skipEntryId !== null && $entry->getId() === $skipEntryId) {
 				continue;
 			}
-			$period = $this->buildClippedPeriod($entry, $dayStartTs, $dayEndTs, $now);
-			if ($period !== null) {
+			foreach ($this->buildClippedWorkPeriods($entry, $dayStartTs, $dayEndTs, $now) as $period) {
 				$periods[] = $period;
 			}
 		}
@@ -114,16 +112,19 @@ class DailyWorkingHoursCalculator
 		\DateTime $dayEnd,
 		?\DateTime $effectiveEnd = null,
 	): float {
-		$period = $this->buildClippedPeriod(
+		$periods = $this->buildClippedWorkPeriods(
 			$entry,
 			$dayStart->getTimestamp(),
 			$dayEnd->getTimestamp(),
 			$effectiveEnd ?? $this->timeZoneService->nowInStorage(),
 		);
-		if ($period === null) {
-			return 0.0;
+		// Same-entry segment periods never overlap (segments are the maximal
+		// intervals of R \ X), so summing part measures is exact.
+		$total = 0.0;
+		foreach ($periods as $period) {
+			$total += $this->periodWorkingHours($period);
 		}
-		return $this->periodWorkingHours($period);
+		return $total;
 	}
 
 	/**
@@ -456,6 +457,56 @@ class DailyWorkingHoursCalculator
 	}
 
 	/**
+	 * Clipped accounting periods for one entry inside [dayStartTs, dayEndTs).
+	 *
+	 * Entries without a frozen split-service context produce at most one
+	 * period — the raw [start, effectiveEnd) span clipped to the day window
+	 * (byte-identical legacy behaviour). Entries carrying a valid frozen
+	 * context produce one period per `result.segments` interval, each clipped
+	 * to the entry span and the day window; a segment inside the excluded
+	 * interruption X simply does not exist here, so X is never counted as
+	 * work. Recorded breaks are counted only outside X (NN-02) — that part is
+	 * enforced inside {@see breakIntervalsInWindow()}.
+	 *
+	 * @return list<array{start: int, end: int, breakHours: float}>
+	 */
+	private function buildClippedWorkPeriods(TimeEntry $entry, int $dayStartTs, int $dayEndTs, \DateTime $now): array
+	{
+		$split = $this->splitContextIntervals($entry);
+		if ($split === null) {
+			$period = $this->buildClippedPeriod($entry, $dayStartTs, $dayEndTs, $now);
+			return $period === null ? [] : [$period];
+		}
+
+		$entryStart = $entry->getStartTime();
+		if ($entryStart === null) {
+			return [];
+		}
+		$effectiveEndTs = $this->resolveEffectiveEndTs($entry, $now);
+		if ($effectiveEndTs === null) {
+			return [];
+		}
+		$entryStartTs = $entryStart->getTimestamp();
+
+		$periods = [];
+		foreach ($split['segments'] as $segment) {
+			$clipStart = max($segment['start'], $entryStartTs, $dayStartTs);
+			$clipEnd = min($segment['end'], $effectiveEndTs, $dayEndTs);
+			if ($clipEnd <= $clipStart) {
+				continue;
+			}
+			$breakSeconds = $this->breakSecondsInWindow($entry, $clipStart, $clipEnd, $now);
+			$periods[] = [
+				'start' => $clipStart,
+				'end' => $clipEnd,
+				'breakHours' => $breakSeconds / 3600.0,
+			];
+		}
+
+		return $periods;
+	}
+
+	/**
 	 * @return array{start: int, end: int, breakHours: float}|null
 	 */
 	private function buildClippedPeriod(TimeEntry $entry, int $dayStartTs, int $dayEndTs, \DateTime $now): ?array
@@ -465,27 +516,12 @@ class DailyWorkingHoursCalculator
 			return null;
 		}
 
-		$entryStartTs = $entryStart->getTimestamp();
-		$status = $entry->getStatus();
-		$entryEnd = $entry->getEndTime();
-
-		if ($entryEnd !== null) {
-			// Never attribute work that is still in the future relative to the
-			// evaluation instant. Planned/mistaken completed rows with end_time
-			// later today must not inflate "hours today" or ArbZG §3 totals.
-			// When validating a proposed entry, callers pass that entry's end as
-			// $now so the full proposed span is still counted.
-			$effectiveEndTs = min($entryEnd->getTimestamp(), $now->getTimestamp());
-		} elseif (in_array($status, [TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK], true)) {
-			$effectiveEndTs = max($entryStartTs, $now->getTimestamp());
-		} elseif ($status === TimeEntry::STATUS_PAUSED) {
-			$pausedEnd = $entry->getUpdatedAt() ?? $now;
-			$effectiveEndTs = max($entryStartTs, min($pausedEnd->getTimestamp(), $now->getTimestamp()));
-		} else {
+		$effectiveEndTs = $this->resolveEffectiveEndTs($entry, $now);
+		if ($effectiveEndTs === null) {
 			return null;
 		}
 
-		$clipStart = max($entryStartTs, $dayStartTs);
+		$clipStart = max($entryStart->getTimestamp(), $dayStartTs);
 		$clipEnd = min($effectiveEndTs, $dayEndTs);
 		if ($clipEnd <= $clipStart) {
 			return null;
@@ -501,7 +537,206 @@ class DailyWorkingHoursCalculator
 	}
 
 	/**
+	 * Effective end timestamp of an entry for day accounting, or null when the
+	 * entry state contributes nothing (e.g. pending/rejected without end).
+	 *
+	 * Never attributes work that is still in the future relative to the
+	 * evaluation instant. Planned/mistaken completed rows with end_time later
+	 * today must not inflate "hours today" or ArbZG §3 totals. When validating
+	 * a proposed entry, callers pass that entry's end as $now so the full
+	 * proposed span is still counted.
+	 */
+	private function resolveEffectiveEndTs(TimeEntry $entry, \DateTime $now): ?int
+	{
+		$entryStart = $entry->getStartTime();
+		if ($entryStart === null) {
+			return null;
+		}
+		$entryStartTs = $entryStart->getTimestamp();
+		$status = $entry->getStatus();
+		$entryEnd = $entry->getEndTime();
+
+		if ($entryEnd !== null) {
+			return min($entryEnd->getTimestamp(), $now->getTimestamp());
+		}
+		if (in_array($status, [TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK], true)) {
+			return max($entryStartTs, $now->getTimestamp());
+		}
+		if ($status === TimeEntry::STATUS_PAUSED) {
+			$pausedEnd = $entry->getUpdatedAt() ?? $now;
+			return max($entryStartTs, min($pausedEnd->getTimestamp(), $now->getTimestamp()));
+		}
+		return null;
+	}
+
+	/**
+	 * Frozen split-service context intervals for one entry, or null when the
+	 * entry must keep legacy [start, end) day accounting.
+	 *
+	 * Defensive and log-free by contract: NULL context, an entity-flagged
+	 * invalid context, a missing/unknown `result.state`, absent
+	 * `result.segments`, or any malformed interval pair all mean "legacy
+	 * path for this entry" — this aggregator never throws on context data.
+	 *
+	 * @return array{segments: list<array{start: int, end: int}>, excluded: list<array{start: int, end: int}>}|null
+	 */
+	private function splitContextIntervals(TimeEntry $entry): ?array
+	{
+		$context = $this->readWorkContext($entry);
+		if ($context === null) {
+			return null;
+		}
+
+		$result = $context['result'] ?? null;
+		if (!is_array($result)) {
+			return null;
+		}
+		$state = $result['state'] ?? null;
+		if (!is_string($state) || !in_array($state, ['applied', 'review', 'active'], true)) {
+			return null;
+		}
+		$segments = $this->parseIntervalList($result['segments'] ?? null);
+		if ($segments === null || $segments === []) {
+			return null;
+		}
+		// `excluded` absent means "empty union"; present but malformed makes the
+		// whole context untrustworthy for accounting → legacy for this entry.
+		if (array_key_exists('excluded', $result)) {
+			$excluded = $this->parseIntervalList($result['excluded']);
+			if ($excluded === null) {
+				return null;
+			}
+		} else {
+			$excluded = [];
+		}
+
+		return ['segments' => $segments, 'excluded' => $excluded];
+	}
+
+	/**
+	 * Decoded work context for an entry, or null when absent/invalid.
+	 *
+	 * Prefers the typed entity accessors (getWorkContext / hasInvalidWorkContext).
+	 * Until those land, falls back to decoding the raw `work_context_json`
+	 * column property so this consumer is not coupled to entity timing.
+	 */
+	private function readWorkContext(TimeEntry $entry): ?array
+	{
+		try {
+			if (method_exists($entry, 'hasInvalidWorkContext') && $entry->hasInvalidWorkContext()) {
+				return null;
+			}
+			if (method_exists($entry, 'getWorkContext')) {
+				$context = $entry->getWorkContext();
+				return is_array($context) ? $context : null;
+			}
+			if (property_exists($entry, 'workContextJson') || method_exists($entry, 'getWorkContextJson')) {
+				$raw = $entry->getWorkContextJson();
+				if (is_array($raw)) {
+					return $raw;
+				}
+				if (is_string($raw) && $raw !== '') {
+					$decoded = json_decode($raw, true);
+					return is_array($decoded) ? $decoded : null;
+				}
+			}
+		} catch (\Throwable $e) {
+			return null;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Parse a list of [start, end] pairs (ISO-8601 strings or epoch numbers)
+	 * into epoch-second intervals. Strict: any malformed pair invalidates the
+	 * whole list rather than silently dropping a boundary.
+	 *
+	 * @return list<array{start: int, end: int}>|null
+	 */
+	private function parseIntervalList(mixed $list): ?array
+	{
+		if (!is_array($list) || !array_is_list($list)) {
+			return null;
+		}
+		$intervals = [];
+		foreach ($list as $pair) {
+			if (!is_array($pair) || count($pair) < 2) {
+				return null;
+			}
+			$values = array_values($pair);
+			$start = $this->intervalPointToTimestamp($values[0]);
+			$end = $this->intervalPointToTimestamp($values[1]);
+			if ($start === null || $end === null || $end <= $start) {
+				return null;
+			}
+			$intervals[] = ['start' => $start, 'end' => $end];
+		}
+		return $intervals;
+	}
+
+	private function intervalPointToTimestamp(mixed $point): ?int
+	{
+		if (is_int($point)) {
+			return $point;
+		}
+		if (is_float($point)) {
+			return (int)$point;
+		}
+		if (is_string($point)) {
+			if (preg_match('/^-?\d+$/', $point) === 1) {
+				return (int)$point;
+			}
+			try {
+				return (new \DateTime($point))->getTimestamp();
+			} catch (\Throwable $e) {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Remove the union of $holes from each interval of $intervals. Both inputs
+	 * must be sorted, non-overlapping interval lists (see mergeTimeIntervals).
+	 *
+	 * @param list<array{start: int, end: int}> $intervals
+	 * @param list<array{start: int, end: int}> $holes
+	 * @return list<array{start: int, end: int}>
+	 */
+	private function subtractIntervals(array $intervals, array $holes): array
+	{
+		$result = [];
+		foreach ($intervals as $interval) {
+			$cursor = $interval['start'];
+			foreach ($holes as $hole) {
+				if ($hole['end'] <= $cursor) {
+					continue;
+				}
+				if ($hole['start'] >= $interval['end']) {
+					break;
+				}
+				if ($hole['start'] > $cursor) {
+					$result[] = ['start' => $cursor, 'end' => min($hole['start'], $interval['end'])];
+				}
+				$cursor = max($cursor, $hole['end']);
+				if ($cursor >= $interval['end']) {
+					break;
+				}
+			}
+			if ($cursor < $interval['end']) {
+				$result[] = ['start' => $cursor, 'end' => $interval['end']];
+			}
+		}
+		return $result;
+	}
+
+	/**
 	 * Sum merged break intervals that fall inside [windowStart, windowEnd).
+	 *
+	 * For entries with a frozen split-service context these are the effective
+	 * breaks B \ X: portions inside the excluded interruption are already
+	 * non-work and must never be deducted twice (NN-02).
 	 */
 	private function breakSecondsInWindow(TimeEntry $entry, int $windowStart, int $windowEnd, \DateTime $now): int
 	{
@@ -514,6 +749,10 @@ class DailyWorkingHoursCalculator
 	}
 
 	/**
+	 * Recorded break intervals clipped to [windowStart, windowEnd). For
+	 * split-service entries the excluded interruption X is subtracted so only
+	 * effective breaks B \ X remain (NN-02: never deduct the same second twice).
+	 *
 	 * @return list<array{start: int, end: int}>
 	 */
 	private function breakIntervalsInWindow(TimeEntry $entry, int $windowStart, int $windowEnd, \DateTime $now): array
@@ -555,6 +794,15 @@ class DailyWorkingHoursCalculator
 			if ($clipEnd > $clipStart) {
 				$clipped[] = ['start' => $clipStart, 'end' => $clipEnd];
 			}
+		}
+
+		// Split-service entries: a recorded break inside the excluded
+		// interruption X is already excluded work — remove those portions so
+		// every break consumer (working hours, day break minutes, countable
+		// break portions) sees only B \ X.
+		$split = $this->splitContextIntervals($entry);
+		if ($split !== null && $split['excluded'] !== []) {
+			$clipped = $this->subtractIntervals($clipped, $this->mergeTimeIntervals($split['excluded']));
 		}
 
 		return $clipped;

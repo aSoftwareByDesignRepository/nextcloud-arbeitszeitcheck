@@ -221,6 +221,9 @@ final class MonthClosurePdfDocumentBuilder
 					$this->pausenCell($e),
 					$this->truncate((string)($e['description'] ?? ''), 320),
 				];
+				foreach ($this->splitAccountingRows($e) as $subRow) {
+					$data[] = $subRow;
+				}
 			}
 		}
 		$this->table($headers, $widths, $data);
@@ -268,6 +271,75 @@ final class MonthClosurePdfDocumentBuilder
 
 		$this->flushPage();
 		$this->applyPageFooters();
+	}
+
+	/**
+	 * Continuation table rows for a split-service entry: one line per partial
+	 * service segment, one neutral line per scheduled interruption (never
+	 * labelled as a rest/break — it is excluded working time, not taken rest),
+	 * and the corrected net day total from the frozen snapshot.
+	 *
+	 * @param array<string, mixed> $e snapshot `time_entries` row
+	 * @return list<array<int, string>>
+	 */
+	private function splitAccountingRows(array $e): array
+	{
+		$acc = $e['accounting'] ?? null;
+		if (!is_array($acc) || empty($acc['split'])) {
+			return [];
+		}
+		$rows = [];
+		$no = 0;
+		foreach ($this->intervalPairs($acc['segments'] ?? null) as [$s, $en]) {
+			$no++;
+			$rows[] = [
+				'', '', $this->fmtClock($s), $this->fmtClock($en), '', '', '',
+				$this->l->t('month_closure_pdf_partial_service', [$no]),
+			];
+		}
+		foreach ($this->intervalPairs($acc['excluded'] ?? null) as [$s, $en]) {
+			$rows[] = [
+				'', '', $this->fmtClock($s), $this->fmtClock($en), '', '', '',
+				$this->l->t('month_closure_pdf_interruption_line'),
+			];
+		}
+		if (isset($e['net_hours']) && is_numeric($e['net_hours'])) {
+			$rows[] = [
+				'', '', '', '', '', '', '',
+				$this->l->t('month_closure_pdf_day_total_net', [
+					$this->fmtNum($e['net_hours']) . ' ' . $this->l->t('month_closure_pdf_hours_suffix'),
+				]),
+			];
+		}
+		return $rows;
+	}
+
+	/**
+	 * Normalise stored interval pairs (list pairs `[start,end]` or
+	 * `{start:…,end:…}` maps) into `[start,end]` tuples for rendering.
+	 *
+	 * @return list<array{0: mixed, 1: mixed}>
+	 */
+	private function intervalPairs(mixed $raw): array
+	{
+		if (!is_array($raw)) {
+			return [];
+		}
+		$out = [];
+		foreach ($raw as $pair) {
+			if (!is_array($pair)) {
+				continue;
+			}
+			if (array_key_exists('start', $pair) && array_key_exists('end', $pair)) {
+				$out[] = [$pair['start'], $pair['end']];
+				continue;
+			}
+			$v = array_values($pair);
+			if (count($v) >= 2) {
+				$out[] = [$v[0], $v[1]];
+			}
+		}
+		return $out;
 	}
 
 	private function labelTimeEntryStatus(string $code): string

@@ -281,6 +281,10 @@ class ExternalStampService
 			$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
 			$entry->setCreatedAt($nowAt);
 			$entry->setUpdatedAt(clone $nowAt);
+			// Split-service days (§9.5): replayed worked segments pin their
+			// context by the recorded start, inside the same mutation lock —
+			// point stamps pin through clockIn() upstream.
+			$this->timeTrackingService->pinSplitContextForEntry($entry, $uid);
 			$this->timeTrackingService->calculateAndSetAutomaticBreak($entry);
 			$this->timeTrackingService->adjustEndTimeForDailyMaximum($entry);
 			$entry = $this->timeEntryMapper->insert($entry);

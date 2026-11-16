@@ -102,6 +102,91 @@
         return '';
     }
 
+    /* ------------------------------------------------------------------ *
+     * Split-service accounting display (spec: split-day §7.3, §7.6, §9.8)
+     * Additive only: entries without `accounting` render byte-identical.
+     * ------------------------------------------------------------------ */
+
+    /** Translate with {placeholder} substitution (server map or window.t). */
+    function mainTVars(msg, vars) {
+        let out = (typeof window.t === 'function')
+            ? window.t('arbeitszeitcheck', msg, vars || {})
+            : mainT(msg);
+        return String(out).replace(/\{(\w+)\}/g, function (m, key) {
+            return (vars && vars[key] !== undefined) ? String(vars[key]) : m;
+        });
+    }
+
+    /** The additive §9.8 accounting block, or null for legacy entries. */
+    function azcAccountingOf(entry) {
+        const a = entry && entry.accounting;
+        return (a && typeof a === 'object' && !Array.isArray(a)) ? a : null;
+    }
+
+    /** Seconds → 'H:MM' (e.g. 14400 → '4:00'). */
+    function azcSecondsToHm(seconds) {
+        const totalMin = Math.max(0, Math.round((Number(seconds) || 0) / 60));
+        return Math.floor(totalMin / 60) + ':' + String(totalMin % 60).padStart(2, '0');
+    }
+
+    /**
+     * Muted hint for a non-split context entry (spec §7.3). Returns null for
+     * reasons without a defined human text — raw engine codes never render.
+     */
+    function azcNotSplitHint(accounting) {
+        const reason = accounting && accounting.reason;
+        switch (reason) {
+            case 'not_after_cutoff': {
+                const cutoff = accounting.cutoff || accounting.splitCutoff || null;
+                return cutoff
+                    ? mainTVars('Not split: clock-out was not after {cutoff}', { cutoff: cutoff })
+                    : mainT('Not split: clock-out was not after the cut-off time');
+            }
+            case 'clock_in_during_interruption':
+                return mainT('Not split: clock-in during interruption');
+            case 'no_interruption_today':
+                return mainT('Not split: no interruption today');
+            case 'crosses_midnight':
+                return mainT('Not split: crosses midnight');
+            case 'dst_review':
+                return mainT('Needs review: time change (DST)');
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Plain-language reason for the "View calculation" disclosure
+     * (granny-test wording — never raw engine codes).
+     */
+    function azcAccountingReasonText(accounting) {
+        const reason = accounting && accounting.reason;
+        if (reason === 'override_split') {
+            return mainT('Split requested by an approved correction');
+        }
+        if (reason === 'override_continuous') {
+            return mainT('Counted as one continuous day by an approved correction');
+        }
+        if (reason === 'clock_out_after_cutoff') {
+            return mainT('Clock-out after the cut-off time — day split at the scheduled interruption');
+        }
+        return azcNotSplitHint(accounting);
+    }
+
+    /** Human label for the accounting engine state (§7.6). */
+    function azcAccountingStateText(state) {
+        if (state === 'applied') {
+            return mainT('Calculated');
+        }
+        if (state === 'review') {
+            return mainT('Needs review');
+        }
+        if (state === 'active') {
+            return mainT('Provisional (still clocked in)');
+        }
+        return null;
+    }
+
     // Main application object
     const ArbeitszeitCheck = {
         config: window.ArbeitszeitCheck || {},
@@ -2595,6 +2680,128 @@
         },
 
         /**
+         * Render the additive split-service accounting block for one entry
+         * (spec §7.3/§7.6): partial services, interruptions, break coverage,
+         * not-split hint, review banner, "View calculation" disclosure and
+         * the provisional label for still-open sessions.
+         *
+         * Returns '' for legacy entries (no `accounting` key) so existing
+         * renderers stay byte-identical.
+         *
+         * @param {Object} entry Entry summary (getSummary()/API shape)
+         * @param {Object} [options]
+         * @param {boolean} [options.correctionAction] Render the
+         *   "Request correction" link for review entries (default true).
+         * @returns {string} HTML fragment
+         */
+        renderEntryAccounting: function(entry, options) {
+            const accounting = azcAccountingOf(entry);
+            if (!accounting) {
+                return '';
+            }
+            const opts = options || {};
+            const state = typeof accounting.state === 'string' ? accounting.state : null;
+            const isSplit = accounting.split === true;
+
+            let html = '<div class="azc-entry-accounting">';
+
+            if (state === 'review') {
+                html += `<p class="azc-entry-accounting__review" role="status">${escapeHtml(mainT('Needs review'))}</p>`;
+            }
+
+            if (isSplit && Array.isArray(accounting.segments) && accounting.segments.length > 0) {
+                // Chronological interleave of segments + interruptions (spec §7.3 order).
+                const lines = [];
+                accounting.segments.forEach((seg) => {
+                    const start = parseApiInstant(seg && seg.start);
+                    if (!start) {
+                        return;
+                    }
+                    lines.push({ kind: 'segment', ms: start.getTime(), data: seg });
+                });
+                const interruptions = Array.isArray(accounting.interruptions) ? accounting.interruptions : [];
+                interruptions.forEach((gap) => {
+                    const start = parseApiInstant(gap && gap.start);
+                    if (!start) {
+                        return;
+                    }
+                    lines.push({ kind: 'interruption', ms: start.getTime(), data: gap });
+                });
+                lines.sort((a, b) => a.ms - b.ms);
+                html += '<ul class="azc-entry-accounting__lines">';
+                lines.forEach((line) => {
+                    const s = formatDisplayTime(line.data.start) || '–';
+                    const e = formatDisplayTime(line.data.end) || '–';
+                    if (line.kind === 'segment') {
+                        const no = Number.isFinite(Number(line.data.no)) ? Number(line.data.no) : 0;
+                        const label = mainTVars('Partial service {number}', { number: no || '' });
+                        const duration = azcSecondsToHm(line.data.workSeconds);
+                        html += `<li class="azc-entry-accounting__line azc-entry-accounting__line--segment">`
+                            + `<span class="azc-entry-accounting__label">${escapeHtml(label)}</span> `
+                            + `<span class="azc-entry-accounting__times">${escapeHtml(s)}–${escapeHtml(e)}</span> `
+                            + `<span class="azc-entry-accounting__value">${escapeHtml(duration)}</span></li>`;
+                    } else {
+                        html += `<li class="azc-entry-accounting__line azc-entry-accounting__line--interruption">`
+                            + `<span class="azc-entry-accounting__label">${escapeHtml(mainT('Interruption'))}</span> `
+                            + `<span class="azc-entry-accounting__times">${escapeHtml(s)}–${escapeHtml(e)}</span> `
+                            + `<span class="azc-entry-accounting__muted">${escapeHtml(mainT('not counted as working time'))}</span></li>`;
+                    }
+                });
+                html += '</ul>';
+
+                if (accounting.breakHandling === 'covered_by_interruption') {
+                    html += `<p class="azc-entry-accounting__covered text-muted">${escapeHtml(mainT('Break covered by interruption (employer setting)'))}</p>`;
+                }
+            } else if (!isSplit) {
+                const hint = azcNotSplitHint(accounting);
+                if (hint) {
+                    html += `<p class="azc-entry-accounting__hint text-muted">${escapeHtml(hint)}</p>`;
+                }
+            }
+
+            // "View calculation" — expandable, never a modal (spec §7.3).
+            const reasonText = azcAccountingReasonText(accounting);
+            const stateText = azcAccountingStateText(state);
+            const netSeconds = Number.isFinite(Number(accounting.netWorkSeconds)) ? Number(accounting.netWorkSeconds) : null;
+            const paidSeconds = Number.isFinite(Number(accounting.paidWorkSeconds)) ? Number(accounting.paidWorkSeconds) : null;
+            const excludedSeconds = Number.isFinite(Number(accounting.excludedSeconds)) ? Number(accounting.excludedSeconds) : 0;
+            const calcRows = [];
+            if (netSeconds !== null) {
+                calcRows.push([mainT('Counted as working time'), azcSecondsToHm(netSeconds)]);
+            }
+            if (paidSeconds !== null && paidSeconds !== netSeconds) {
+                calcRows.push([mainT('Paid working time'), azcSecondsToHm(paidSeconds)]);
+            }
+            if (excludedSeconds > 0) {
+                calcRows.push([mainT('Not counted (interruption)'), azcSecondsToHm(excludedSeconds)]);
+            }
+            if (reasonText) {
+                calcRows.push([mainT('Reason'), reasonText]);
+            }
+            if (stateText) {
+                calcRows.push([mainT('Calculation status'), stateText]);
+            }
+            if (calcRows.length > 0) {
+                html += `<details class="azc-entry-accounting__calc"><summary>${escapeHtml(mainT('View calculation'))}</summary>`
+                    + '<dl class="azc-entry-accounting__calc-list">'
+                    + calcRows.map(([k, v]) => `<div class="azc-entry-accounting__calc-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')
+                    + '</dl></details>';
+            }
+
+            if (state === 'review' && opts.correctionAction !== false && entry && entry.canRequestCorrection !== false) {
+                const url = this.resolveRequestUrl('/apps/arbeitszeitcheck/time-entries');
+                html += `<p class="azc-entry-accounting__actions"><a class="azc-btn azc-btn--secondary azc-entry-accounting__correction-link" href="${escapeHtml(url)}">${escapeHtml(mainT('Request correction'))}</a></p>`;
+            }
+
+            if (state === 'active') {
+                html += `<p class="azc-entry-accounting__provisional text-muted">${escapeHtml(mainT('provisional'))}</p>`;
+            }
+
+            html += '</div>';
+            return html;
+        },
+
+        /**
          * Render a time entry item for timeline
          */
         renderTimeEntryItem: function(entry) {
@@ -2681,6 +2888,7 @@
                         <div class="timeline-item-status">
                             <span class="badge badge--${this.getTimeEntryStatusBadgeClass(status)}">${escapeHtml(statusLabel)}</span>
                         </div>
+                        ${this.renderEntryAccounting(entry)}
                     </div>
                 </div>
             `;
@@ -3925,7 +4133,10 @@
                             const paidBreakLabel = this.config.l10n?.paidBreak || 'paid break';
                             entryHtml += `, ${paidBreakLabel}: ${Math.round(paidBreakSec / 60)}m`;
                         }
-                        entryHtml += `)</li>`;
+                        entryHtml += ')';
+                        // Split-service accounting presentation (spec §7.3) — '' for legacy entries.
+                        entryHtml += this.renderEntryAccounting(entry);
+                        entryHtml += `</li>`;
                         html += entryHtml;
                     });
                     html += `</ul></div>`;

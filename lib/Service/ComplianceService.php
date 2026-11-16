@@ -167,6 +167,12 @@ class ComplianceService
      */
     private function findViolatedBreakTier(TimeEntry $timeEntry): ?array
     {
+        // Split-day model: a frozen `covered_by_interruption` verdict means the
+        // scheduled interruption already satisfies the statutory break
+        // requirement (employer setting) — no tier can be violated.
+        if ($this->isBreakCoveredByScheduledInterruption($timeEntry)) {
+            return null;
+        }
         $userId = $timeEntry->getUserId();
         $profile = $this->profile($userId);
         $timeEntry->setCountableMinBreakMinutes($profile->minBreakMinutes);
@@ -269,6 +275,19 @@ class ComplianceService
         return $this->l10n->t(
             'This statutory minimum always applies — it cannot be switched off in the settings.'
         );
+    }
+
+    /**
+     * Whether the entry's frozen split-accounting result declares the
+     * statutory break requirement as covered by a scheduled interruption
+     * (employer working-time-model setting `break_cover`). The interruption
+     * is excluded working time — never "break taken".
+     */
+    private function isBreakCoveredByScheduledInterruption(TimeEntry $timeEntry): bool
+    {
+        $result = $timeEntry->getAccountingResult();
+        return is_array($result)
+            && ($result['break_handling'] ?? null) === 'covered_by_interruption';
     }
 
     /**
@@ -585,6 +604,25 @@ class ComplianceService
      */
     private function checkMandatoryBreaksWithResult(TimeEntry $timeEntry, bool $persistViolations = true): array
     {
+        // Split-day model: when the frozen accounting result declares the
+        // scheduled interruption as covering the statutory break requirement
+        // (employer setting), the break check reports coverage instead of a
+        // missing-break violation. The interruption is excluded working time
+        // and must never be relabelled as a "taken break". The informational
+        // result is deliberately NOT persisted as a violation row: a stored
+        // record would make the daily job's existing-violation dedupe skip
+        // the entry's other checks (daily maximum, rest period), which must
+        // continue to run unchanged.
+        if ($this->isBreakCoveredByScheduledInterruption($timeEntry)) {
+            return [[
+                'type' => ComplianceViolation::TYPE_BREAK_COVERED_BY_INTERRUPTION,
+                'severity' => ComplianceViolation::SEVERITY_INFO,
+                'message' => $this->l10n->t(
+                    'Break requirement covered by scheduled interruption (employer setting)'
+                ),
+            ]];
+        }
+
         // Break requirements per country profile (DE ArbZG §4: 9h→45min, 6h→30min;
         // AT AZG §11: 6h→30min). Highest violated tier only.
         $tier = $this->findViolatedBreakTier($timeEntry);

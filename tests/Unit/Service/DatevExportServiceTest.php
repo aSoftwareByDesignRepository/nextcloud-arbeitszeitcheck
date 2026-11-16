@@ -407,6 +407,82 @@ class DatevExportServiceTest extends TestCase
 	}
 
 	/**
+	 * Split-day regression (spec F1): an entry with a frozen applied split
+	 * context exports the corrected net hours (7.00) — the scheduled
+	 * interruption is excluded — while the DATEV record format stays
+	 * byte-identical (pipe fields, Std unit, truncated description).
+	 */
+	public function testExportTimeEntriesSplitEntryUsesCorrectedNetHours(): void
+	{
+		$userId = 'testuser';
+		$startDate = new \DateTime('2024-06-01');
+		$endDate = new \DateTime('2024-06-30');
+
+		$this->config->expects($this->exactly(4))
+			->method('getAppValue')
+			->willReturnMap([
+				['arbeitszeitcheck', 'datev_beraternummer', '', '1234567'],
+				['arbeitszeitcheck', 'datev_mandantennummer', '', '12345'],
+				['arbeitszeitcheck', 'datev_lohnart_normal', '1000', '1000'],
+				['arbeitszeitcheck', 'datev_lohnart_ueberstunden', '2000', '2000']
+			]);
+
+		$this->config->expects($this->once())
+			->method('getUserValue')
+			->with($userId, 'arbeitszeitcheck', 'datev_personalnummer', '')
+			->willReturn('12345678');
+
+		// F1: clocking 06:00–16:30 Europe/Berlin with scheduled interruption
+		// 10:00–13:30 excluded → corrected net 7.00 h.
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setId(7);
+		$entry->setUserId($userId);
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-06-10 06:00:00', $tz));
+		$entry->setEndTime(new \DateTime('2024-06-10 16:30:00', $tz));
+		$entry->setBreaks(json_encode([]));
+		$entry->setDescription('Split day');
+		$entry->setIsManualEntry(false);
+		$entry->setCreatedAt(new \DateTime());
+		$entry->setUpdatedAt(new \DateTime());
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1,
+			'model_id' => 7,
+			'timezone' => 'Europe/Berlin',
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2024-06-10T10:00:00+02:00', '2024-06-10T13:30:00+02:00']],
+				'segments' => [
+					['2024-06-10T06:00:00+02:00', '2024-06-10T10:00:00+02:00'],
+					['2024-06-10T13:30:00+02:00', '2024-06-10T16:30:00+02:00'],
+				],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => 1,
+			],
+		]));
+		$entry->setExcludedWorkSeconds(12600); // 3.5 h interruption
+
+		$this->timeEntryMapper->expects($this->once())
+			->method('findByUserAndDateRange')
+			->with($userId, $startDate, $endDate)
+			->willReturn([$entry]);
+
+		$result = $this->service->exportTimeEntries($userId, $startDate, $endDate);
+
+		$this->assertStringContainsString('1234567|12345|2024|1', $result); // header (year + version)
+		// 7.00 net hours — not the 10.50 gross presence span.
+		$this->assertStringContainsString('12345678|20240610|1000|7.00|Std|Split day', $result);
+		$this->assertStringNotContainsString('10.50', $result);
+		// Format unchanged: exactly six pipe-separated fields on the data row.
+		$lines = explode("\r\n", trim($result));
+		$this->assertCount(2, $lines);
+		$this->assertCount(6, explode('|', $lines[1]));
+	}
+
+	/**
 	 * Test exporting multiple users
 	 */
 	public function testExportMultipleUsers(): void

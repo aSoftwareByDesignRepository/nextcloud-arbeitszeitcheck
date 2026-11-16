@@ -79,6 +79,101 @@ class TimeEntryExportTransformer
 	}
 
 	/**
+	 * Variant of entriesToExportRows for the `segments=rows` export option:
+	 * entries with a frozen split accounting result emit one row per partial
+	 * service segment (columns as the default layout plus trailing
+	 * `parent_entry_id`/`segment_no`); everything else keeps the default
+	 * one-row-per-entry shape. Scheduled interruptions never become rows.
+	 *
+	 * @param iterable<TimeEntry> $entries
+	 * @return list<array<string, mixed>>
+	 */
+	public function entriesToSegmentRows(iterable $entries, bool $enableMidnightSplit): array
+	{
+		$rows = [];
+		foreach ($entries as $entry) {
+			foreach ($this->entryToSegmentRows($entry, $enableMidnightSplit) as $row) {
+				$rows[] = $row;
+			}
+		}
+		return $rows;
+	}
+
+	/**
+	 * One export row per accounting segment for split entries, or the default
+	 * rows (incl. optional midnight split) for anything else. The parent row
+	 * is not duplicated when segment rows are emitted; break evidence stays
+	 * entry-level, so segment rows carry empty break columns and a zero
+	 * paid-break component instead of an unallocatable share.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function entryToSegmentRows(TimeEntry $entry, bool $enableMidnightSplit): array
+	{
+		$segments = $this->accountingSegmentPairs($entry);
+		if ($segments === []) {
+			$rows = $this->entryToExportRows($entry, $enableMidnightSplit);
+			foreach ($rows as &$row) {
+				$row['parent_entry_id'] = '';
+				$row['segment_no'] = '';
+			}
+			unset($row);
+			return $rows;
+		}
+
+		$startTime = $entry->getStartTime();
+		if (!$startTime) {
+			return [];
+		}
+
+		$tz = new \DateTimeZone($this->timezone);
+		$rows = [];
+		$segmentNo = 0;
+		foreach ($segments as [$segStartIso, $segEndIso]) {
+			try {
+				$segStart = (new \DateTime((string)$segStartIso))->setTimezone($tz);
+				$segEnd = (new \DateTime((string)$segEndIso))->setTimezone($tz);
+			} catch (\Throwable $e) {
+				continue;
+			}
+			$segSeconds = $segEnd->getTimestamp() - $segStart->getTimestamp();
+			if ($segSeconds <= 0) {
+				continue;
+			}
+			$segmentNo++;
+			$segHours = round($segSeconds / 3600.0, self::HOUR_ROUND_PRECISION);
+			$row = $this->singleRowFromEntry(
+				$entry,
+				(clone $startTime)->setTimezone($tz),
+				$entry->getEndTime() ? (clone $entry->getEndTime())->setTimezone($tz) : null
+			);
+			$row['date'] = $segStart->format('Y-m-d');
+			$row['start_time'] = $segStart->format('H:i:s');
+			$row['end_time'] = $segEnd->format('H:i:s');
+			$row['break_start'] = '';
+			$row['break_end'] = '';
+			$row['break_periods'] = '';
+			$row['duration_hours'] = $segHours;
+			$row['break_duration_hours'] = 0.0;
+			// Segment net equals its full span (interruption spans are already
+			// carved out by the accounting result). working_hours stays the
+			// paid basis; the entry-level paid-break component is not
+			// allocatable per segment and is therefore zero here.
+			$row['working_hours'] = $segHours;
+			$row['net_working_hours'] = $segHours;
+			$row['paid_break_hours'] = 0.0;
+			$row['parent_entry_id'] = $entry->getId();
+			$row['segment_no'] = $segmentNo;
+			$rows[] = $row;
+		}
+
+		if ($rows === []) {
+			return $this->entryToExportRows($entry, $enableMidnightSplit);
+		}
+		return $rows;
+	}
+
+	/**
 	 * @param list<array<string, mixed>> $longRows Rows from entriesToExportRows with optional user_id, display_name
 	 * @return list<array<string, string>>
 	 */
@@ -245,7 +340,7 @@ class TimeEntryExportTransformer
 				'policy_applied' => $entry->getPolicyApplied() ?? '',
 				'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
 				'project_id' => $entry->getProjectCheckProjectId() ?? '',
-			];
+			] + $this->accountingExportAddon($entry);
 		}
 
 		return $rows !== [] ? $rows : [$this->singleRowFromEntry($entry, $startForExport, $endForExport)];
@@ -311,7 +406,65 @@ class TimeEntryExportTransformer
 			'policy_applied' => $entry->getPolicyApplied() ?? '',
 			'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
 			'project_id' => $entry->getProjectCheckProjectId() ?? '',
+		] + $this->accountingExportAddon($entry);
+	}
+
+	/**
+	 * Trailing additive export columns for the split-day accounting model.
+	 * Legacy entries (no decodable accounting context) get empty cells so the
+	 * pre-existing columns stay byte-identical; `excluded_minutes` is the
+	 * rounded non-work minute total, `partial_services` the semicolon-joined
+	 * HH:mm-HH:mm segment ranges in the export timezone.
+	 *
+	 * @return array{excluded_minutes: string, partial_services: string}
+	 */
+	private function accountingExportAddon(TimeEntry $entry): array
+	{
+		if ($entry->getAccountingResult() === null) {
+			return ['excluded_minutes' => '', 'partial_services' => ''];
+		}
+		$partial = [];
+		foreach ($this->accountingSegmentPairs($entry) as [$segStartIso, $segEndIso]) {
+			try {
+				$tz = new \DateTimeZone($this->timezone);
+				$segStart = (new \DateTime((string)$segStartIso))->setTimezone($tz);
+				$segEnd = (new \DateTime((string)$segEndIso))->setTimezone($tz);
+			} catch (\Throwable $e) {
+				continue;
+			}
+			$partial[] = $segStart->format('H:i') . '-' . $segEnd->format('H:i');
+		}
+		return [
+			'excluded_minutes' => (string)(int)round($entry->getExcludedWorkSeconds() / 60),
+			'partial_services' => implode('; ', $partial),
 		];
+	}
+
+	/**
+	 * Stored accounting segment bounds ([startIso, endIso] pairs) for entries
+	 * whose frozen result marks them as split; empty for legacy, unsplit, or
+	 * malformed results.
+	 *
+	 * @return list<array{0: string, 1: string}>
+	 */
+	private function accountingSegmentPairs(TimeEntry $entry): array
+	{
+		$result = $entry->getAccountingResult();
+		if ($result === null || empty($result['split']) || !is_array($result['segments'] ?? null)) {
+			return [];
+		}
+		$pairs = [];
+		foreach ($result['segments'] as $pair) {
+			if (!is_array($pair)) {
+				continue;
+			}
+			$v = array_values($pair);
+			if (count($v) < 2 || !is_string($v[0]) || !is_string($v[1])) {
+				continue;
+			}
+			$pairs[] = [$v[0], $v[1]];
+		}
+		return $pairs;
 	}
 
 	/**

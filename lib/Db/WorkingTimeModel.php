@@ -280,8 +280,23 @@ class WorkingTimeModel extends Entity
             'isDefault' => $this->getIsDefault(),
             'userId' => $this->getUserId(),
             'isPersonal' => $this->isPersonal(),
+            'scheduleRevision' => $this->getScheduleRevision(),
             'createdAt' => $createdAt ? $createdAt->format('c') : null,
             'updatedAt' => $updatedAt ? $updatedAt->format('c') : null
         ];
+    }
+
+    /**
+     * Content token of the stored weekday_schedule document (sha1 over its
+     * JSON, '' when absent). Clients send it back as `scheduleBaseRevision`
+     * for stale-write detection — changes only when the schedule changes.
+     */
+    public function getScheduleRevision(): string
+    {
+        $rules = $this->getBreakRulesArray();
+        $schedule = is_array($rules[\OCA\ArbeitszeitCheck\Support\WeekdaySchedule::KEY] ?? null)
+            ? $rules[\OCA\ArbeitszeitCheck\Support\WeekdaySchedule::KEY]
+            : null;
+        return \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf($schedule);
     }
 }

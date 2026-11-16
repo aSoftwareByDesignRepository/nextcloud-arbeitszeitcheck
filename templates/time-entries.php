@@ -861,6 +861,84 @@ if ($mode === 'list') {
                                         ENT_QUOTES,
                                         'UTF-8'
                                     );
+
+                                    // Split-service accounting block (spec §7.3/§9.8) — additive:
+                                    // NULL for legacy entries; presentation mirrors js renderEntryAccounting.
+                                    $azcAcc = is_array($entrySummary['accounting'] ?? null) ? $entrySummary['accounting'] : null;
+                                    $azcAccFmtHm = static function ($iso) use ($arbeitszeitCheckUserDisplayTz): string {
+                                        try {
+                                            $d = new \DateTime(is_string($iso) ? $iso : 'now');
+                                            $d->setTimezone($arbeitszeitCheckUserDisplayTz);
+                                            return $d->format('H:i');
+                                        } catch (\Throwable) {
+                                            return '–';
+                                        }
+                                    };
+                                    $azcAccFmtDur = static function ($seconds): string {
+                                        $totalMin = max(0, (int)round(((float)($seconds ?? 0)) / 60));
+                                        return intdiv($totalMin, 60) . ':' . str_pad((string)($totalMin % 60), 2, '0', STR_PAD_LEFT);
+                                    };
+                                    $azcAccLines = [];
+                                    if ($azcAcc !== null && !empty($azcAcc['split']) && is_array($azcAcc['segments'] ?? null)) {
+                                        foreach ($azcAcc['segments'] as $seg) {
+                                            if (!is_array($seg)) {
+                                                continue;
+                                            }
+                                            try {
+                                                $sortKey = (new \DateTime((string)($seg['start'] ?? 'now')))->getTimestamp();
+                                            } catch (\Throwable) {
+                                                continue;
+                                            }
+                                            $azcAccLines[] = [
+                                                'kind' => 'segment',
+                                                'sort' => $sortKey,
+                                                'no' => (int)($seg['no'] ?? 0),
+                                                'start' => $seg['start'] ?? null,
+                                                'end' => $seg['end'] ?? null,
+                                                'workSeconds' => $seg['workSeconds'] ?? 0,
+                                            ];
+                                        }
+                                        foreach ((array)($azcAcc['interruptions'] ?? []) as $gap) {
+                                            if (!is_array($gap)) {
+                                                continue;
+                                            }
+                                            try {
+                                                $sortKey = (new \DateTime((string)($gap['start'] ?? 'now')))->getTimestamp();
+                                            } catch (\Throwable) {
+                                                continue;
+                                            }
+                                            $azcAccLines[] = [
+                                                'kind' => 'interruption',
+                                                'sort' => $sortKey,
+                                                'start' => $gap['start'] ?? null,
+                                                'end' => $gap['end'] ?? null,
+                                            ];
+                                        }
+                                        usort($azcAccLines, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
+                                    }
+                                    // Muted not-split hint (spec §7.3) — raw engine codes never render.
+                                    $azcAccReason = is_string($azcAcc['reason'] ?? null) ? $azcAcc['reason'] : null;
+                                    $azcAccHint = match ($azcAccReason) {
+                                        'not_after_cutoff' => $l->t('Not split: clock-out was not after the cut-off time'),
+                                        'clock_in_during_interruption' => $l->t('Not split: clock-in during interruption'),
+                                        'no_interruption_today' => $l->t('Not split: no interruption today'),
+                                        'crosses_midnight' => $l->t('Not split: crosses midnight'),
+                                        'dst_review' => $l->t('Needs review: time change (DST)'),
+                                        default => null,
+                                    };
+                                    $azcAccReasonText = match ($azcAccReason) {
+                                        'override_split' => $l->t('Split requested by an approved correction'),
+                                        'override_continuous' => $l->t('Counted as one continuous day by an approved correction'),
+                                        'clock_out_after_cutoff' => $l->t('Clock-out after the cut-off time — day split at the scheduled interruption'),
+                                        default => $azcAccHint,
+                                    };
+                                    $azcAccState = is_string($azcAcc['state'] ?? null) ? $azcAcc['state'] : null;
+                                    $azcAccStateText = match ($azcAccState) {
+                                        'applied' => $l->t('Calculated'),
+                                        'review' => $l->t('Needs review'),
+                                        'active' => $l->t('Provisional (still clocked in)'),
+                                        default => null,
+                                    };
                                     ?>
                                     <tr data-azc-row data-entry-id="<?php p($entry->getId()); ?>" class="<?php echo $isPendingRow ? 'time-entry-row--pending' : ''; ?>"<?php echo $hideEntryRow ? ' hidden' : ''; ?>>
                                         <td data-label="<?php p($l->t('Date')); ?>"><?php if ($rowDisplayStart) { p($rowDisplayStart->format('d.m.Y')); } else { p('-'); } ?></td>
@@ -988,6 +1066,69 @@ if ($mode === 'list') {
                                                     <div class="text-muted"><?php p($l->t('Net: %1$.2f h · paid break: %2$d min', [round($workingHours, 2), $paidBreakMin])); ?></div>
                                                 <?php endif; ?>
                                             <?php } ?>
+                                            <?php if ($azcAcc !== null): ?>
+                                                <div class="azc-entry-accounting">
+                                                    <?php if ($azcAccState === 'review'): ?>
+                                                        <p class="azc-entry-accounting__review" role="status"><?php p($l->t('Needs review')); ?></p>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($azcAccLines)): ?>
+                                                        <ul class="azc-entry-accounting__lines">
+                                                            <?php foreach ($azcAccLines as $azcAccLine): ?>
+                                                                <?php if ($azcAccLine['kind'] === 'segment'): ?>
+                                                                    <li class="azc-entry-accounting__line azc-entry-accounting__line--segment">
+                                                                        <span class="azc-entry-accounting__label"><?php p(str_replace('{number}', (string)$azcAccLine['no'], $l->t('Partial service {number}'))); ?></span>
+                                                                        <span class="azc-entry-accounting__times"><?php p($azcAccFmtHm($azcAccLine['start']) . '–' . $azcAccFmtHm($azcAccLine['end'])); ?></span>
+                                                                        <span class="azc-entry-accounting__value"><?php p($azcAccFmtDur($azcAccLine['workSeconds'])); ?></span>
+                                                                    </li>
+                                                                <?php else: ?>
+                                                                    <li class="azc-entry-accounting__line azc-entry-accounting__line--interruption">
+                                                                        <span class="azc-entry-accounting__label"><?php p($l->t('Interruption')); ?></span>
+                                                                        <span class="azc-entry-accounting__times"><?php p($azcAccFmtHm($azcAccLine['start']) . '–' . $azcAccFmtHm($azcAccLine['end'])); ?></span>
+                                                                        <span class="azc-entry-accounting__muted"><?php p($l->t('not counted as working time')); ?></span>
+                                                                    </li>
+                                                                <?php endif; ?>
+                                                            <?php endforeach; ?>
+                                                        </ul>
+                                                        <?php if (($azcAcc['breakHandling'] ?? null) === 'covered_by_interruption'): ?>
+                                                            <p class="azc-entry-accounting__covered text-muted"><?php p($l->t('Break covered by interruption (employer setting)')); ?></p>
+                                                        <?php endif; ?>
+                                                    <?php elseif (empty($azcAcc['split']) && $azcAccHint !== null): ?>
+                                                        <p class="azc-entry-accounting__hint text-muted"><?php p($azcAccHint); ?></p>
+                                                    <?php endif; ?>
+                                                    <?php
+                                                    $azcAccCalcRows = [];
+                                                    if (is_numeric($azcAcc['netWorkSeconds'] ?? null)) {
+                                                        $azcAccCalcRows[] = [$l->t('Counted as working time'), $azcAccFmtDur($azcAcc['netWorkSeconds'])];
+                                                    }
+                                                    if (is_numeric($azcAcc['paidWorkSeconds'] ?? null)
+                                                        && (float)$azcAcc['paidWorkSeconds'] !== (float)($azcAcc['netWorkSeconds'] ?? 0)) {
+                                                        $azcAccCalcRows[] = [$l->t('Paid working time'), $azcAccFmtDur($azcAcc['paidWorkSeconds'])];
+                                                    }
+                                                    if ((float)($azcAcc['excludedSeconds'] ?? 0) > 0) {
+                                                        $azcAccCalcRows[] = [$l->t('Not counted (interruption)'), $azcAccFmtDur($azcAcc['excludedSeconds'])];
+                                                    }
+                                                    if ($azcAccReasonText !== null) {
+                                                        $azcAccCalcRows[] = [$l->t('Reason'), $azcAccReasonText];
+                                                    }
+                                                    if ($azcAccStateText !== null) {
+                                                        $azcAccCalcRows[] = [$l->t('Calculation status'), $azcAccStateText];
+                                                    }
+                                                    ?>
+                                                    <?php if (!empty($azcAccCalcRows)): ?>
+                                                        <details class="azc-entry-accounting__calc">
+                                                            <summary><?php p($l->t('View calculation')); ?></summary>
+                                                            <dl class="azc-entry-accounting__calc-list">
+                                                                <?php foreach ($azcAccCalcRows as [$azcAccCalcKey, $azcAccCalcVal]): ?>
+                                                                    <div class="azc-entry-accounting__calc-row"><dt><?php p($azcAccCalcKey); ?></dt><dd><?php p($azcAccCalcVal); ?></dd></div>
+                                                                <?php endforeach; ?>
+                                                            </dl>
+                                                        </details>
+                                                    <?php endif; ?>
+                                                    <?php if ($azcAccState === 'active'): ?>
+                                                        <p class="azc-entry-accounting__provisional text-muted"><?php p($l->t('provisional')); ?></p>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="description-cell" data-label="<?php p($l->t('Description')); ?>">
                                             <?php p($entry->getDescription() ? substr($entry->getDescription(), 0, 50) : '-'); ?>
@@ -1461,6 +1602,32 @@ if ($mode === 'list') {
                                 <div id="correction-breaks-container"></div>
                             </div>
                         <button type="button" class="btn btn--secondary btn--sm" id="correction-add-break"><?php p($l->t('Add break')); ?></button>
+                    </fieldset>
+
+                    <?php /* Split-day correction (spec split-day §9.7): only shown by JS when
+                             the entry carries a split-service `accounting` context. */ ?>
+                    <fieldset class="correction-fieldset correction-fieldset--split" id="correction-split-fieldset" aria-labelledby="correction-split-heading" hidden>
+                        <legend id="correction-split-heading" class="correction-dialog__section-title"><?php p($l->t('Split day')); ?></legend>
+                        <p class="correction-dialog__block-hint" id="correction-split-current"></p>
+                        <p class="correction-dialog__block-hint"><?php p($l->t('Only change this if the day should be counted differently at the scheduled interruption.')); ?></p>
+                        <div class="correction-split-decisions" role="radiogroup" aria-labelledby="correction-split-heading">
+                            <label class="correction-split-choice" for="correction-split-auto">
+                                <input type="radio" id="correction-split-auto" name="correctionSplitDecision" value="auto" checked>
+                                <?php p($l->t('Restore automatic split')); ?>
+                            </label>
+                            <label class="correction-split-choice" for="correction-split-split">
+                                <input type="radio" id="correction-split-split" name="correctionSplitDecision" value="force_split">
+                                <?php p($l->t('Split this day at the interruption')); ?>
+                            </label>
+                            <label class="correction-split-choice" for="correction-split-continuous">
+                                <input type="radio" id="correction-split-continuous" name="correctionSplitDecision" value="force_continuous">
+                                <?php p($l->t('Count as one continuous day (no split)')); ?>
+                            </label>
+                        </div>
+                        <div id="correction-worked-region">
+                            <p class="correction-dialog__block-hint" id="correction-worked-intro"><?php p($l->t('If you worked during part of an interruption, mark the portion here.')); ?></p>
+                            <div id="correction-worked-container"></div>
+                        </div>
                     </fieldset>
 
                     <fieldset class="correction-fieldset correction-fieldset--work-location" aria-labelledby="correction-work-location-heading">

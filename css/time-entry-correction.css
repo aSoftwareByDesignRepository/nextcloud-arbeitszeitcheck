@@ -397,3 +397,70 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+/* ── Split-day section (split-day spec §9.7) ───────────────────────────────
+   Employee correction dialog only; rendered when the entry carries a
+   split-service accounting context. */
+#time-entry-correction-modal .correction-fieldset--split {
+	padding: var(--space-4, 1rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 8px);
+	background: var(--color-background-hover);
+}
+
+#time-entry-correction-modal .correction-split-decisions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2, 0.5rem);
+	margin: 0 0 var(--space-4, 1rem);
+}
+
+#time-entry-correction-modal .correction-split-choice {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2, 0.5rem);
+	min-height: var(--azc-touch, 44px);
+	font-weight: 500;
+	cursor: pointer;
+}
+
+#time-entry-correction-modal .correction-split-choice input[type='radio'] {
+	margin-top: 0.35em;
+	inline-size: 1.1rem;
+	block-size: 1.1rem;
+	accent-color: var(--azc-accent, var(--color-primary-element));
+}
+
+#time-entry-correction-modal .correction-worked-interruption {
+	margin-block-end: var(--space-3, 0.75rem);
+	padding: var(--space-3, 0.75rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius, 6px);
+	background: var(--color-main-background);
+}
+
+#time-entry-correction-modal .correction-worked-interruption__toggle {
+	margin-bottom: var(--space-2, 0.5rem);
+}
+
+#time-entry-correction-modal .correction-worked-enable-label {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2, 0.5rem);
+	min-height: var(--azc-touch, 44px);
+	font-weight: 500;
+	cursor: pointer;
+}
+
+#time-entry-correction-modal .correction-worked-enable-label input[type='checkbox'] {
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+	accent-color: var(--azc-accent, var(--color-primary-element));
+}
+
+#time-entry-correction-modal .correction-worked-rows {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3, 0.75rem);
+	margin-block-end: var(--space-2, 0.5rem);
+}

@@ -982,6 +982,9 @@ class TimeEntryController extends Controller
 						$line .= '  ·  ' . mb_substr($desc, 0, 120);
 					}
 					$lines[] = $line;
+					foreach ($this->splitAccountingPdfLines($entry, $appTz) as $subLine) {
+						$lines[] = $subLine;
+					}
 				}
 			}
 
@@ -1006,6 +1009,72 @@ class TimeEntryController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Sub-lines for a split-service entry in the timesheet PDF: one line per
+	 * partial service segment, one neutral line per scheduled interruption
+	 * (excluded working time — never labelled as a rest/break), and the
+	 * corrected net day total. Empty for legacy or unsplit entries.
+	 *
+	 * @return list<string>
+	 */
+	private function splitAccountingPdfLines(TimeEntry $entry, \DateTimeZone $appTz): array
+	{
+		$result = $entry->getAccountingResult();
+		if ($result === null || empty($result['split']) || !is_array($result['segments'] ?? null)) {
+			return [];
+		}
+		$lines = [];
+		$no = 0;
+		foreach ($result['segments'] as $pair) {
+			$times = $this->pdfIntervalTimes($pair, $appTz);
+			if ($times === null) {
+				continue;
+			}
+			$no++;
+			$lines[] = '    ' . $this->l10n->t('Partial service %1$d', [$no]) . '  ' . $times[0] . '–' . $times[1];
+		}
+		foreach (is_array($result['excluded'] ?? null) ? $result['excluded'] : [] as $pair) {
+			$times = $this->pdfIntervalTimes($pair, $appTz);
+			if ($times === null) {
+				continue;
+			}
+			$lines[] = '    ' . $times[0] . '–' . $times[1] . '  '
+				. $this->l10n->t('Interruption — not counted as working time');
+		}
+		$net = $entry->getDurationHours();
+		if ($net !== null) {
+			$lines[] = '    ' . $this->l10n->t('Day total (net): %1$s', [
+				number_format($net, 2, ',', '') . ' ' . $this->l10n->t('h'),
+			]);
+		}
+		return $lines;
+	}
+
+	/**
+	 * @return array{0: string, 1: string}|null
+	 */
+	private function pdfIntervalTimes(mixed $pair, \DateTimeZone $appTz): ?array
+	{
+		if (!is_array($pair)) {
+			return null;
+		}
+		if (array_key_exists('start', $pair) && array_key_exists('end', $pair)) {
+			$v = [$pair['start'], $pair['end']];
+		} else {
+			$v = array_values($pair);
+		}
+		if (count($v) < 2) {
+			return null;
+		}
+		try {
+			$start = (new \DateTimeImmutable((string)$v[0]))->setTimezone($appTz);
+			$end = (new \DateTimeImmutable((string)$v[1]))->setTimezone($appTz);
+		} catch (\Throwable) {
+			return null;
+		}
+		return [$start->format('H:i'), $end->format('H:i')];
 	}
 
 	/**
@@ -1401,6 +1470,11 @@ class TimeEntryController extends Controller
 							], Http::STATUS_BAD_REQUEST);
 						}
 					}
+
+					// Split-service days (§9.5): freeze the context on the manual
+					// entry before it is evaluated/persisted — same hook as
+					// clock-in; legacy (NULL context) unaffected.
+					$this->timeTrackingService->pinSplitContextForEntry($timeEntry, $userId);
 
 					// CRITICAL: First calculate automatic breaks (ArbZG §4)
 					// This must happen BEFORE adjusting end time, because breaks affect the working duration
@@ -2371,6 +2445,16 @@ class TimeEntryController extends Controller
 				}
 			}
 
+			// Split-service overrides ride the correction envelope — the
+			// correction service validates shape and applicability server-side.
+			$splitOverrideRaw = $params['splitOverride'] ?? null;
+			if (is_string($splitOverrideRaw) && $splitOverrideRaw !== '') {
+				$splitOverrideRaw = json_decode($splitOverrideRaw, true);
+			}
+			if (is_array($splitOverrideRaw) && !array_is_list($splitOverrideRaw)) {
+				$proposedData['splitOverride'] = $splitOverrideRaw;
+			}
+
 			$correctionData = [
 				'justification' => $justification,
 				'original' => $originalData,
@@ -2469,7 +2553,20 @@ class TimeEntryController extends Controller
 
 			// Auto-approve when no assignable manager exists (same rule as absences)
 			if (!$this->teamResolver->hasAssignableManagerForEmployee($userId)) {
-				$updatedEntry = $this->correctionService->autoApprove($updatedEntry);
+				try {
+					$updatedEntry = $this->correctionService->autoApprove($updatedEntry);
+				} catch (\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException $e) {
+					// A split override that no longer applies after the proposed
+					// times is a conflict, not a validation error (spec §9.7).
+					return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+				} catch (\InvalidArgumentException $e) {
+					// autoApprove re-validates the proposal before applying; a
+					// validation error is a client error, not a 500.
+					return new JSONResponse([
+						'success' => false,
+						'error' => $e->getMessage(),
+					], Http::STATUS_BAD_REQUEST);
+				}
 				$this->auditLogMapper->logAction($userId, 'time_entry_correction_auto_approved', 'time_entry', $updatedEntry->getId(), null, ['approved_by' => 'system'], 'system');
 				try {
 					$this->notificationService->notifyTimeEntryCorrectionApproved($userId, $updatedEntry->getSummary());
@@ -3317,6 +3414,11 @@ class TimeEntryController extends Controller
 						], Http::STATUS_BAD_REQUEST);
 					}
 				}
+
+				// Split-service days (§9.5): freeze the context on the manual
+				// entry before it is evaluated/persisted — same hook as
+				// clock-in; legacy (NULL context) unaffected.
+				$this->timeTrackingService->pinSplitContextForEntry($timeEntry, $userId);
 
 				// Adjust end time to comply with daily maximum working hours (ArbZG §3: max 10 hours per day)
 				if ($timeEntry->getEndTime() && $timeEntry->getStartTime()) {

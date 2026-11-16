@@ -168,6 +168,26 @@ class TimeEntry extends Entity
 	protected $paidBreakSeconds = 0;
 
 	/**
+	 * Frozen split-service context JSON (split-day-working-model spec §9.5).
+	 *
+	 * Written exclusively by the server-side accounting transaction — never
+	 * accepted from client payloads. NULL = legacy entry: every duration and
+	 * summary getter keeps the byte-identical pre-feature behaviour.
+	 *
+	 * @var string|null
+	 */
+	protected $workContextJson;
+
+	/**
+	 * Σ excluded interruption seconds for this entry (`result.excluded`).
+	 * Server-only writer; must equal the frozen context. Stays 0 on legacy
+	 * rows and on entries whose context is NULL.
+	 *
+	 * @var int
+	 */
+	protected $excludedWorkSeconds = 0;
+
+	/**
 	 * Not persisted. Profile floor for countable breaks (DE/CH 15, AT 10).
 	 * When null, {@see resolveCountableMinBreakMinutes()} uses the profile
 	 * for this entry's user when the container is available, else 15.
@@ -218,6 +238,8 @@ class TimeEntry extends Entity
 		$this->addType('liveUserId', 'string');
 		$this->addType('workLocation', 'string');
 		$this->addType('paidBreakSeconds', 'integer');
+		$this->addType('workContextJson', 'string');
+		$this->addType('excludedWorkSeconds', 'integer');
 	}
 
 	/**
@@ -278,6 +300,12 @@ class TimeEntry extends Entity
 	/**
 	 * Get net working duration in hours (total duration minus breaks).
 	 *
+	 * With an effective split-service context (state `applied`/`review`) this
+	 * is `(|R| − excludedSeconds − |Be|) / 3600` per spec §9.6 step 11, where
+	 * Be = recorded countable breaks minus their overlap with the excluded
+	 * intervals. NULL, `active` or invalid context → byte-identical legacy
+	 * result (end − start − countable breaks).
+	 *
 	 * @return float|null
 	 */
 	public function getDurationHours(): ?float
@@ -288,6 +316,14 @@ class TimeEntry extends Entity
 
 		$start = $this->startTime;
 		$end = $this->endTime;
+
+		if ($this->hasEffectiveSplitContext()) {
+			$effectiveBreakDuration = $this->getEffectiveBreakDurationHours();
+			$excludedDuration = $this->getExcludedWorkSeconds() / 3600;
+
+			$totalDuration = ($end->getTimestamp() - $start->getTimestamp()) / 3600;
+			return max(0, $totalDuration - $excludedDuration - $effectiveBreakDuration);
+		}
 
 		// Calculate total break duration using getBreakDurationHours()
 		// This method correctly handles overlapping breaks by merging them
@@ -323,6 +359,64 @@ class TimeEntry extends Entity
 	 * @return float
 	 */
 	public function getBreakDurationHours(bool $countOnlyValidBreaks = true, ?int $minBreakMinutes = null): float
+	{
+		$mergedPeriods = $this->mergedBreakPeriods($countOnlyValidBreaks, $minBreakMinutes);
+
+		// Calculate total duration from merged periods
+		$totalBreakHours = 0.0;
+		foreach ($mergedPeriods as $period) {
+			$totalBreakHours += ($period['end'] - $period['start']) / 3600;
+		}
+
+		return $totalBreakHours;
+	}
+
+	/**
+	 * Get the effective break duration in hours: recorded countable breaks
+	 * minus their overlap with the excluded interruption intervals (B \ X;
+	 * spec §9.6 step 9 — break portions inside X deduct nothing extra).
+	 *
+	 * On the legacy path (NULL / `active` / invalid context) this is
+	 * identical to {@see getBreakDurationHours()}.
+	 *
+	 * @param bool $countOnlyValidBreaks If true, apply the profile countable floor. Default: true.
+	 * @param int|null $minBreakMinutes Explicit floor; null uses the resolved profile floor.
+	 * @return float
+	 */
+	public function getEffectiveBreakDurationHours(bool $countOnlyValidBreaks = true, ?int $minBreakMinutes = null): float
+	{
+		if (!$this->hasEffectiveSplitContext()) {
+			return $this->getBreakDurationHours($countOnlyValidBreaks, $minBreakMinutes);
+		}
+
+		$excluded = $this->excludedIntervals();
+		$totalBreakHours = 0.0;
+
+		foreach ($this->mergedBreakPeriods($countOnlyValidBreaks, $minBreakMinutes) as $period) {
+			$coveredSeconds = 0;
+			foreach ($excluded as [$excludedStart, $excludedEnd]) {
+				$overlapStart = max($period['start'], $excludedStart);
+				$overlapEnd = min($period['end'], $excludedEnd);
+				if ($overlapEnd > $overlapStart) {
+					$coveredSeconds += $overlapEnd - $overlapStart;
+				}
+			}
+			$totalBreakHours += max(0, ($period['end'] - $period['start']) - $coveredSeconds) / 3600;
+		}
+
+		return $totalBreakHours;
+	}
+
+	/**
+	 * Merged, non-overlapping recorded break periods in epoch seconds.
+	 *
+	 * Extracted verbatim from {@see getBreakDurationHours()} so the split
+	 * path can subtract excluded-interval overlap (B \ X) without a second,
+	 * divergent copy of the collect/sort/merge rules.
+	 *
+	 * @return list<array{start:int,end:int}>
+	 */
+	private function mergedBreakPeriods(bool $countOnlyValidBreaks = true, ?int $minBreakMinutes = null): array
 	{
 		$breakPeriods = [];
 
@@ -370,9 +464,9 @@ class TimeEntry extends Entity
 			}
 		}
 
-		// If no breaks, return 0
+		// If no breaks, return empty list
 		if (empty($breakPeriods)) {
-			return 0.0;
+			return [];
 		}
 
 		// Sort breaks by start time
@@ -399,13 +493,82 @@ class TimeEntry extends Entity
 		}
 		$mergedPeriods[] = $currentPeriod;
 
-		// Calculate total duration from merged periods
-		$totalBreakHours = 0.0;
-		foreach ($mergedPeriods as $period) {
-			$totalBreakHours += ($period['end'] - $period['start']) / 3600;
+		return $mergedPeriods;
+	}
+
+	/**
+	 * Excluded interruption intervals from the frozen accounting result as
+	 * merged, disjoint [startTs, endTs) epoch pairs.
+	 *
+	 * Malformed entries are skipped: the write path validates the payload, so
+	 * a corrupt interval is a defect — the conservative outcome is a smaller
+	 * exclusion here, never fabricated exclusion and never lost break
+	 * evidence.
+	 *
+	 * @return list<array{0:int,1:int}>
+	 */
+	private function excludedIntervals(): array
+	{
+		$result = $this->getAccountingResult();
+		$raw = is_array($result) ? ($result['excluded'] ?? []) : [];
+		if (!is_array($raw)) {
+			return [];
 		}
 
-		return $totalBreakHours;
+		$intervals = [];
+		foreach ($raw as $pair) {
+			[$start, $end] = $this->intervalBounds($pair);
+			if ($start === null || $end === null || $end <= $start) {
+				continue;
+			}
+			$intervals[] = [$start, $end];
+		}
+
+		usort($intervals, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+		$merged = [];
+		foreach ($intervals as $interval) {
+			$last = count($merged) - 1;
+			if ($last >= 0 && $interval[0] <= $merged[$last][1]) {
+				$merged[$last][1] = max($merged[$last][1], $interval[1]);
+			} else {
+				$merged[] = $interval;
+			}
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * Normalise one stored interval — canonical ["isoStart","isoEnd"] pair or
+	 * a {start,end} map — into epoch bounds.
+	 *
+	 * @return array{0:?int,1:?int}
+	 */
+	private function intervalBounds(mixed $pair): array
+	{
+		if (!is_array($pair)) {
+			return [null, null];
+		}
+		$rawStart = $pair['start'] ?? $pair[0] ?? null;
+		$rawEnd = $pair['end'] ?? $pair[1] ?? null;
+		return [$this->intervalBoundToTimestamp($rawStart), $this->intervalBoundToTimestamp($rawEnd)];
+	}
+
+	/**
+	 * Best-effort epoch conversion for one stored interval bound. Accepts
+	 * ISO-8601 strings (canonical frozen form) and integer timestamps.
+	 */
+	private function intervalBoundToTimestamp(mixed $value): ?int
+	{
+		if (is_int($value)) {
+			return $value;
+		}
+		if (is_string($value) && $value !== '') {
+			$timestamp = strtotime($value);
+			return $timestamp === false ? null : $timestamp;
+		}
+		return null;
 	}
 
 	/**
@@ -449,6 +612,114 @@ class TimeEntry extends Entity
 	public function getPaidBreakHours(): float
 	{
 		return $this->getPaidBreakSeconds() / 3600;
+	}
+
+	/**
+	 * Raw stored split-service context JSON (column `work_context_json`).
+	 * NULL means legacy entry — no split accounting ever applies.
+	 */
+	public function getWorkContextJson(): ?string
+	{
+		return $this->workContextJson;
+	}
+
+	/**
+	 * Server-side writer for the frozen split-service context. Passing null
+	 * keeps (or returns) the entry on the legacy accounting path.
+	 */
+	public function setWorkContextJson(?string $json): void
+	{
+		if ($this->workContextJson !== $json) {
+			$this->workContextJson = $json;
+			$this->markFieldUpdated('workContextJson');
+		}
+	}
+
+	/**
+	 * Σ excluded interruption seconds (column `excluded_work_seconds`).
+	 * Server-only writer; must equal the frozen context. 0 on legacy rows.
+	 */
+	public function getExcludedWorkSeconds(): int
+	{
+		return (int)($this->excludedWorkSeconds ?? 0);
+	}
+
+	/**
+	 * Allocator-style writer, matching {@see setPaidBreakSeconds()}: negative
+	 * values are clamped — an excluded duration can never be below zero.
+	 */
+	public function setExcludedWorkSeconds(int $seconds): void
+	{
+		$seconds = max(0, $seconds);
+		if ($this->excludedWorkSeconds !== $seconds) {
+			$this->excludedWorkSeconds = $seconds;
+			$this->markFieldUpdated('excludedWorkSeconds');
+		}
+	}
+
+	/**
+	 * Decoded split-service context as an associative array, or null.
+	 *
+	 * NULL column (or empty string) = legacy entry → null. A non-NULL column
+	 * that fails to decode also returns null here, but then
+	 * {@see hasInvalidWorkContext()} reports true — callers must never treat
+	 * that case as a silent legacy fallback (spec FM-11: invalid context on a
+	 * non-NULL column is a defect, not a legacy row).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function getWorkContext(): ?array
+	{
+		if ($this->workContextJson === null || $this->workContextJson === '') {
+			return null;
+		}
+		$decoded = json_decode($this->workContextJson, true);
+		return is_array($decoded) ? $decoded : null;
+	}
+
+	/**
+	 * True when the column holds non-NULL content that does not decode to an
+	 * array — corrupt context. Read paths keep the conservative legacy result
+	 * but surface this flag so the defect is never silent (spec FM-11).
+	 */
+	public function hasInvalidWorkContext(): bool
+	{
+		if ($this->workContextJson === null || $this->workContextJson === '') {
+			return false;
+		}
+		return !is_array(json_decode($this->workContextJson, true));
+	}
+
+	/**
+	 * The `result` sub-document of the frozen context (state, split, reason,
+	 * excluded, segments, break_handling, engine) or null when absent.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function getAccountingResult(): ?array
+	{
+		$context = $this->getWorkContext();
+		if ($context === null) {
+			return null;
+		}
+		$result = $context['result'] ?? null;
+		return is_array($result) ? $result : null;
+	}
+
+	/**
+	 * Whether the stored context participates in split accounting on reads:
+	 * decodable context whose accounting result reached a terminal state
+	 * (`applied` or `review`; spec §9.5). `active` contexts are provisional,
+	 * invalid contexts are defects — both stay on the legacy path.
+	 */
+	private function hasEffectiveSplitContext(): bool
+	{
+		$result = $this->getAccountingResult();
+		if ($result === null) {
+			return false;
+		}
+		$state = $result['state'] ?? null;
+		return $state === 'applied' || $state === 'review';
 	}
 
 	/**
@@ -795,7 +1066,7 @@ class TimeEntry extends Entity
 		$pendingProposal = $this->resolvePendingProposal();
 		$hasPendingProposal = $pendingProposal !== null;
 
-		return [
+		$summary = [
 			'id' => $this->getId(),
 			'userId' => $this->getUserId(),
 			'startTime' => $startTime ? $startTime->format('c') : null,
@@ -842,6 +1113,97 @@ class TimeEntry extends Entity
 			'canRequestCorrection' => $this->canRequestCorrection(),
 			'isLockedForEmployeeEdit' => $this->isLockedForEmployeeEdit(),
 		];
+
+		// Split-service accounting block (spec §9.8) — additive, only when a
+		// valid non-NULL context exists. NULL and invalid-JSON contexts get no
+		// key at all; every existing field above keeps its meaning.
+		$accounting = $this->buildAccountingSummary();
+		if ($accounting !== null) {
+			$summary['accounting'] = $accounting;
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * §9.8 `accounting` serialization block, or null on the legacy path
+	 * (NULL column) and on undecodable context (never a silent fake block;
+	 * {@see hasInvalidWorkContext()} flags the defect instead).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function buildAccountingSummary(): ?array
+	{
+		if ($this->getWorkContext() === null) {
+			return null;
+		}
+
+		$result = $this->getAccountingResult() ?? [];
+
+		$segments = [];
+		$rawSegments = $result['segments'] ?? [];
+		if (is_array($rawSegments)) {
+			$no = 1;
+			foreach ($rawSegments as $pair) {
+				[$start, $end] = $this->intervalBounds($pair);
+				if ($start === null || $end === null) {
+					continue;
+				}
+				$segments[] = [
+					'no' => $no++,
+					'start' => $this->intervalBoundForOutput($pair, 'start', 0, $start),
+					'end' => $this->intervalBoundForOutput($pair, 'end', 1, $end),
+					'workSeconds' => max(0, $end - $start),
+				];
+			}
+		}
+
+		$interruptions = [];
+		$rawExcluded = $result['excluded'] ?? [];
+		if (is_array($rawExcluded)) {
+			foreach ($rawExcluded as $pair) {
+				[$start, $end] = $this->intervalBounds($pair);
+				if ($start === null || $end === null) {
+					continue;
+				}
+				$interruptions[] = [
+					'start' => $this->intervalBoundForOutput($pair, 'start', 0, $start),
+					'end' => $this->intervalBoundForOutput($pair, 'end', 1, $end),
+					'seconds' => max(0, $end - $start),
+				];
+			}
+		}
+
+		$net = $this->getDurationHours();
+		$paid = $this->getPaidDurationHours();
+
+		return [
+			'contractVersion' => 2,
+			'state' => $result['state'] ?? null,
+			'split' => (bool)($result['split'] ?? false),
+			'reason' => $result['reason'] ?? null,
+			'segments' => $segments,
+			'interruptions' => $interruptions,
+			'excludedSeconds' => $this->getExcludedWorkSeconds(),
+			'breakHandling' => $result['break_handling'] ?? 'not_applicable',
+			'netWorkSeconds' => $net === null ? null : (int)round($net * 3600),
+			'paidWorkSeconds' => $paid === null ? null : (int)round($paid * 3600),
+		];
+	}
+
+	/**
+	 * Serialize one interval bound for the summary: echo the canonical stored
+	 * string verbatim; fall back to ISO-8601 for numeric bounds.
+	 */
+	private function intervalBoundForOutput(mixed $pair, string $key, int $index, int $timestamp): mixed
+	{
+		if (is_array($pair)) {
+			$raw = $pair[$key] ?? $pair[$index] ?? null;
+			if (is_string($raw) && $raw !== '') {
+				return $raw;
+			}
+		}
+		return date('c', $timestamp);
 	}
 
 	/**

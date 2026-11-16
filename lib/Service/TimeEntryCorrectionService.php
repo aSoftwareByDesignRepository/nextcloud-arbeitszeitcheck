@@ -9,8 +9,10 @@ use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
+use OCA\ArbeitszeitCheck\Exception\SplitOverrideStaleException;
 use OCA\ArbeitszeitCheck\Service\AppLocalNaiveDateTimeNormalizer;
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
+use OCA\ArbeitszeitCheck\Support\SplitServiceAccounting;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCA\ArbeitszeitCheck\Support\WorkLocation;
 use OCP\IConfig;
@@ -34,8 +36,31 @@ class TimeEntryCorrectionService
 		private readonly ProjectCheckLaborTimeSyncService $projectCheckLaborSync,
 		private readonly ?LaborLawProfileFactory $lawProfileFactory = null,
 		private readonly ?UserWorkLocationService $userWorkLocationService = null,
+		private readonly ?SplitServiceAccountingService $splitServiceAccounting = null,
 	) {
 	}
+
+	/**
+	 * Proposal keys that name server-owned accounting surfaces (spec §9.8).
+	 * A client payload naming any of these is a mutation attempt on frozen
+	 * accounting state — an explicit `SERVER_OWNED_FIELD` rejection (400),
+	 * never a silent allow-list skip like the paid-break snapshot fields.
+	 */
+	private const SERVER_OWNED_PROPOSAL_FIELDS = [
+		'accounting',
+		'work_context_json',
+		'workContextJson',
+		'excluded_work_seconds',
+		'excludedWorkSeconds',
+		'excludedMinutes',
+		'excluded_minutes',
+	];
+
+	/** ISO-8601 with mandatory offset — same grammar the engine applies to overrides.worked. */
+	private const WORKED_ISO_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/';
+
+	/** sha256 hex — format check for splitOverride.baseEntryRevision CAS tokens. */
+	private const REVISION_TOKEN_PATTERN = '/^[0-9a-fA-F]{64}$/';
 
 	/**
 	 * Exclusive month-closure lock keys (month_closure tier — last in
@@ -105,6 +130,14 @@ class TimeEntryCorrectionService
 
 	public function applyProposal(TimeEntry $entry, array $proposal): void
 	{
+		// §9.8: server-owned accounting fields are a hard reject (400
+		// SERVER_OWNED_FIELD) — distinct from the silent paid-break unset below.
+		foreach (self::SERVER_OWNED_PROPOSAL_FIELDS as $field) {
+			if (\array_key_exists($field, $proposal)) {
+				throw new \InvalidArgumentException('SERVER_OWNED_FIELD');
+			}
+		}
+
 		// MH-11: client payloads must never write the allocator-owned paid-break
 		// snapshot. applyProposal() already uses an explicit key allow-list, so
 		// this is defense-in-depth for every future field that might loop keys.
@@ -165,6 +198,115 @@ class TimeEntryCorrectionService
 			$endTime = clone $entry->getStartTime();
 			$endTime->modify('+' . round(((float)$proposal['hours']) * 3600) . ' seconds');
 			$entry->setEndTime($endTime);
+		}
+
+		if (isset($proposal['splitOverride']) && is_array($proposal['splitOverride'])) {
+			$this->applySplitOverride($entry, $proposal['splitOverride']);
+		}
+	}
+
+	/**
+	 * Write a §9.7 split override into the entry's in-memory frozen context
+	 * (`overrides.decision` / `overrides.worked`). The accounting result is NOT
+	 * derived here — {@see recomputeSplitAccounting()} recomputes it from the
+	 * final corrected times before the approval transaction persists, and a
+	 * stale result left behind on an un-recomputed path is a defect the
+	 * `verify-split-accounting` audit surfaces rather than a silent wrong
+	 * number (so the stale `result`/`excluded_work_seconds` are deliberately
+	 * left untouched until the engine re-runs).
+	 *
+	 * Normalisation: `worked` is stored as overlap-merged ISO pairs in the
+	 * context timezone; decision `auto` clears `worked` (an explicit return to
+	 * automatic decision carries no worked evidence); `force_continuous`
+	 * stores none either (worked portions only exist on a split). Validation
+	 * rejects the malformed/impossible inputs upstream — anything still
+	 * malformed here throws `SPLIT_OVERRIDE_INVALID` (fail closed, never write
+	 * garbage into the audit-grade context).
+	 *
+	 * @param array<string, mixed> $splitOverride
+	 */
+	private function applySplitOverride(TimeEntry $entry, array $splitOverride): void
+	{
+		$context = $entry->getWorkContext();
+		if ($context === null) {
+			return; // validateProposal rejects NULL/invalid contexts — defensive no-op
+		}
+		$decision = $splitOverride['decision'] ?? null;
+		if (!\in_array($decision, [
+			SplitServiceAccounting::DECISION_AUTO,
+			SplitServiceAccounting::DECISION_FORCE_SPLIT,
+			SplitServiceAccounting::DECISION_FORCE_CONTINUOUS,
+		], true)) {
+			throw new \InvalidArgumentException('SPLIT_OVERRIDE_INVALID');
+		}
+
+		$workedIso = [];
+		if ($decision === SplitServiceAccounting::DECISION_FORCE_SPLIT) {
+			$tz = $this->contextTimeZone($context);
+			foreach (SplitServiceAccounting::union($this->workedEpochPairs($splitOverride['worked'] ?? [])) as [$ws, $we]) {
+				$workedIso[] = [
+					(new \DateTimeImmutable('@' . $ws))->setTimezone($tz)->format('c'),
+					(new \DateTimeImmutable('@' . $we))->setTimezone($tz)->format('c'),
+				];
+			}
+		}
+
+		$overrides = is_array($context['overrides'] ?? null) ? $context['overrides'] : [];
+		$overrides['decision'] = $decision;
+		$overrides['worked'] = $workedIso;
+		$context['overrides'] = $overrides;
+		$entry->setWorkContextJson(json_encode($context, JSON_THROW_ON_ERROR));
+	}
+
+	/**
+	 * Timezone of the frozen context (validated by the engine at resolve time;
+	 * UTC fallback only keeps a corrupt context from fatalling before the
+	 * engine gets to reject it).
+	 */
+	private function contextTimeZone(array $context): \DateTimeZone
+	{
+		try {
+			return new \DateTimeZone((string)($context['timezone'] ?? 'UTC'));
+		} catch (\Throwable) {
+			return new \DateTimeZone('UTC');
+		}
+	}
+
+	/**
+	 * Normalise the raw `worked` proposal value into epoch pairs.
+	 *
+	 * @return list<array{0:int,1:int}>
+	 * @throws \InvalidArgumentException 'SPLIT_OVERRIDE_INVALID' on any malformed item
+	 */
+	private function workedEpochPairs(mixed $raw): array
+	{
+		if (!\is_array($raw) || !array_is_list($raw)) {
+			throw new \InvalidArgumentException('SPLIT_OVERRIDE_INVALID');
+		}
+		$pairs = [];
+		foreach ($raw as $pair) {
+			if (!\is_array($pair) || !array_is_list($pair) || \count($pair) !== 2) {
+				throw new \InvalidArgumentException('SPLIT_OVERRIDE_INVALID');
+			}
+			$s = $this->isoToEpochOrNull($pair[0]);
+			$e = $this->isoToEpochOrNull($pair[1]);
+			if ($s === null || $e === null || $e <= $s) {
+				throw new \InvalidArgumentException('SPLIT_OVERRIDE_INVALID');
+			}
+			$pairs[] = [$s, $e];
+		}
+		return $pairs;
+	}
+
+	private function isoToEpochOrNull(mixed $value): ?int
+	{
+		if (!\is_string($value) || preg_match(self::WORKED_ISO_PATTERN, $value) !== 1) {
+			return null;
+		}
+		try {
+			return (new \DateTimeImmutable($value))->getTimestamp();
+		} catch (\Throwable) {
+			return null;
 		}
 	}
 
@@ -239,6 +381,12 @@ class TimeEntryCorrectionService
 
 	public function validateProposal(TimeEntry $entry, array $proposal, ?string $actingManagerUserId = null): ?string
 	{
+		foreach (self::SERVER_OWNED_PROPOSAL_FIELDS as $field) {
+			if (\array_key_exists($field, $proposal)) {
+				return 'SERVER_OWNED_FIELD';
+			}
+		}
+
 		$candidate = clone $entry;
 		try {
 			$this->applyProposal($candidate, $proposal);
@@ -246,6 +394,16 @@ class TimeEntryCorrectionService
 			return $e->getMessage();
 		}
 		$this->ensureCandidateStatusForValidation($candidate);
+
+		if (\array_key_exists('splitOverride', $proposal)) {
+			if (!\is_array($proposal['splitOverride'])) {
+				return 'SPLIT_OVERRIDE_INVALID';
+			}
+			$splitError = $this->validateSplitOverride($entry, $candidate, $proposal['splitOverride']);
+			if ($splitError !== null) {
+				return $splitError;
+			}
+		}
 
 		try {
 			$this->monthClosureGuard->assertTimeEntryMutable($candidate);
@@ -315,6 +473,192 @@ class TimeEntryCorrectionService
 		}
 
 		return null;
+	}
+
+	/**
+	 * §9.7 split-override proposal validation. Returns the normative error
+	 * code or null. Runs against the post-proposal candidate so the corrected
+	 * times (R, candidate gaps) are what the override is checked against.
+	 *
+	 * `SPLIT_OVERRIDE_NOT_APPLICABLE` — the entry has no usable frozen context
+	 * (NULL column, undecodable JSON, or context the engine cannot resolve),
+	 * or the day's geometry is DST-unresolvable: the override simply cannot
+	 * apply to this entry.
+	 *
+	 * `SPLIT_OVERRIDE_INVALID` — malformed payload: unknown decision, worked
+	 * intervals that are unparseable / reversed / outside R / outside every
+	 * candidate gap / more than 8 (before or after overlap-merge), worked on a
+	 * `force_continuous` decision, or a malformed baseEntryRevision token.
+	 *
+	 * Deliberately NOT checked here: whether a `force_split` still applies
+	 * after the new times (corrected clock-out reaching the last candidate gap
+	 * end). That is the approval-time `SPLIT_OVERRIDE_STALE` contract — the
+	 * engine decides it on the final persisted times, and a premature reject
+	 * would turn the spec's 409 into a 400.
+	 *
+	 * @param array<string, mixed> $splitOverride
+	 */
+	private function validateSplitOverride(TimeEntry $entry, TimeEntry $candidate, array $splitOverride): ?string
+	{
+		$context = $entry->getWorkContext();
+		if ($context === null) {
+			return 'SPLIT_OVERRIDE_NOT_APPLICABLE';
+		}
+
+		$decision = $splitOverride['decision'] ?? null;
+		if (!\in_array($decision, [
+			SplitServiceAccounting::DECISION_AUTO,
+			SplitServiceAccounting::DECISION_FORCE_SPLIT,
+			SplitServiceAccounting::DECISION_FORCE_CONTINUOUS,
+		], true)) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+
+		if (\array_key_exists('baseEntryRevision', $splitOverride)) {
+			$rev = $splitOverride['baseEntryRevision'];
+			if (!\is_string($rev) || preg_match(self::REVISION_TOKEN_PATTERN, $rev) !== 1) {
+				return 'SPLIT_OVERRIDE_INVALID';
+			}
+		}
+
+		$workedRaw = $splitOverride['worked'] ?? [];
+		if ($workedRaw === null) {
+			$workedRaw = [];
+		}
+		if ($decision === SplitServiceAccounting::DECISION_FORCE_CONTINUOUS && $workedRaw !== []) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+		if ($workedRaw === []) {
+			return null;
+		}
+		if (!\is_array($workedRaw) || \count($workedRaw) > SplitServiceAccounting::MAX_WORKED_OVERRIDES) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+		try {
+			$pairs = $this->workedEpochPairs($workedRaw);
+		} catch (\InvalidArgumentException) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+		if (\count(SplitServiceAccounting::union($pairs)) > SplitServiceAccounting::MAX_WORKED_OVERRIDES) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+
+		$startTs = $candidate->getStartTime()?->getTimestamp();
+		if ($startTs === null) {
+			return 'SPLIT_OVERRIDE_INVALID';
+		}
+		$endTs = $candidate->getEndTime()?->getTimestamp();
+		try {
+			$gaps = SplitServiceAccounting::localGapEpochs($context, $startTs);
+		} catch (\Throwable) {
+			// Context decodes but the engine cannot normalise it — the
+			// override cannot apply to this entry, period.
+			return 'SPLIT_OVERRIDE_NOT_APPLICABLE';
+		}
+		if ($gaps === null) {
+			return 'SPLIT_OVERRIDE_NOT_APPLICABLE';
+		}
+		// Candidate gaps = scheduled interruptions the entry did NOT start
+		// inside (engine step 4: entry start at/before the gap start).
+		$candidateGaps = [];
+		foreach ($gaps as $gap) {
+			if ($startTs <= $gap[0]) {
+				$candidateGaps[] = $gap;
+			}
+		}
+		foreach ($pairs as [$ws, $we]) {
+			if ($ws < $startTs || ($endTs !== null && $we > $endTs)) {
+				return 'SPLIT_OVERRIDE_INVALID';
+			}
+			if (SplitServiceAccounting::subtract([[$ws, $we]], $candidateGaps) !== []) {
+				return 'SPLIT_OVERRIDE_INVALID';
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Recompute the frozen-context accounting result for entries that carry a
+	 * work context. The sibling-owned SplitServiceAccountingService mutates
+	 * the entity in-memory (context.result + excluded_work_seconds); the
+	 * caller's persist writes them in the same update. NULL-context (legacy)
+	 * entries keep the byte-identical legacy path.
+	 *
+	 * @throws SplitOverrideStaleException when the engine reports the applied
+	 *         override inapplicable on the corrected times (§9.7 → 409
+	 *         SPLIT_OVERRIDE_STALE through the ConcurrentDecisionException seam).
+	 */
+	protected function recomputeSplitAccounting(TimeEntry $entry): void
+	{
+		if ($entry->getWorkContext() === null) {
+			return;
+		}
+		$this->runSplitRecompute($entry);
+		$result = $entry->getAccountingResult();
+		if (\is_array($result) && ($result['error'] ?? null) === SplitServiceAccounting::ERR_OVERRIDE_NOT_APPLICABLE) {
+			throw new SplitOverrideStaleException(
+				$this->l10n->t('The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction.')
+			);
+		}
+	}
+
+	/**
+	 * The engine invocation itself — the sibling-owned
+	 * SplitServiceAccountingService mutates context.result +
+	 * excluded_work_seconds in-memory. Kept as a protected seam so tests can
+	 * substitute the engine while still exercising the stale-check above.
+	 */
+	protected function runSplitRecompute(TimeEntry $entry): void
+	{
+		$service = $this->splitServiceAccounting ?? \OCP\Server::get(SplitServiceAccountingService::class);
+		$service->recomputeAccounting($entry);
+	}
+
+	/**
+	 * §9.7 audit hook: when a proposal carries a split override, the
+	 * justification record must keep the ORIGINAL frozen context so the
+	 * approved decision can be reconstructed ("proposal stores original
+	 * context"). Captured before applyProposal mutates the in-memory context.
+	 *
+	 * @param array<string, mixed> $justificationData
+	 * @param array<string, mixed> $proposal
+	 */
+	private function stashOriginalWorkContext(array &$justificationData, TimeEntry $entry, array $proposal): void
+	{
+		if (!\array_key_exists('splitOverride', $proposal)) {
+			return;
+		}
+		$raw = $entry->getWorkContextJson();
+		if ($raw === null || $raw === '') {
+			return;
+		}
+		$decoded = json_decode($raw, true);
+		$justificationData['original_work_context'] = \is_array($decoded) ? $decoded : $raw;
+	}
+
+	/**
+	 * Override summary for the service-owned audit payload — null when the
+	 * entry carries no explicit (non-auto) decision.
+	 *
+	 * @return array{decision: string, worked: list<array{0:string,1:string}>}|null
+	 */
+	private function splitOverrideAuditInfo(TimeEntry $entry): ?array
+	{
+		$overrides = $entry->getWorkContext()['overrides'] ?? null;
+		if (!\is_array($overrides)) {
+			return null;
+		}
+		$decision = $overrides['decision'] ?? null;
+		if (!\in_array($decision, [
+			SplitServiceAccounting::DECISION_FORCE_SPLIT,
+			SplitServiceAccounting::DECISION_FORCE_CONTINUOUS,
+		], true)) {
+			return null;
+		}
+		return [
+			'decision' => $decision,
+			'worked' => \is_array($overrides['worked'] ?? null) ? $overrides['worked'] : [],
+		];
 	}
 
 	/**
@@ -395,9 +739,11 @@ class TimeEntryCorrectionService
 		if ($error !== null) {
 			throw new \InvalidArgumentException($error);
 		}
+		$this->stashOriginalWorkContext($justificationData, $entry, $adjustedProposal);
 		$this->applyProposal($entry, $adjustedProposal);
 		$this->applyComplianceAdjustments($entry);
 		$this->assertCompletableDecision($entry, $justificationData);
+		$this->recomputeSplitAccounting($entry);
 
 		$requestedProposal = is_array($justificationData['proposed'] ?? null) ? $justificationData['proposed'] : null;
 		if ($requestedProposal !== null) {
@@ -447,10 +793,12 @@ class TimeEntryCorrectionService
 			if ($error !== null) {
 				throw new \InvalidArgumentException($error);
 			}
+			$this->stashOriginalWorkContext($justificationData, $entry, $proposal);
 			$this->applyProposal($entry, $proposal);
 			$this->applyComplianceAdjustments($entry);
 		}
 		$this->assertCompletableDecision($entry, $justificationData);
+		$this->recomputeSplitAccounting($entry);
 
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$entry->setApprovedByUserId($managerId);
@@ -492,6 +840,7 @@ class TimeEntryCorrectionService
 				if ($error !== null) {
 					throw new \InvalidArgumentException($error);
 				}
+				$this->stashOriginalWorkContext($justificationData, $entry, $proposal);
 				$this->applyProposal($entry, $proposal);
 				$this->applyComplianceAdjustments($entry);
 			}
@@ -499,6 +848,7 @@ class TimeEntryCorrectionService
 		if (is_array($justificationData)) {
 			$this->assertCompletableDecision($entry, $justificationData);
 		}
+		$this->recomputeSplitAccounting($entry);
 
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$entry->setApprovedByUserId(null);
@@ -526,18 +876,23 @@ class TimeEntryCorrectionService
 		// approvers the predicate counted (method_exists: upgrade repair paths
 		// may hold a stale TeamResolverService).
 		try {
+			$auditPayload = array_merge($updated->getSummary(), [
+				'auto_approve' => [
+					'reason' => 'no_assignable_approver',
+					'predicate' => $this->approverPredicateSnapshotSafe($updated->getUserId()),
+				],
+			]);
+			$splitOverride = $this->splitOverrideAuditInfo($updated);
+			if ($splitOverride !== null) {
+				$auditPayload['split_override'] = $splitOverride;
+			}
 			$this->auditLogMapper->logAction(
 				$updated->getUserId(),
 				'time_entry_auto_approved',
 				'time_entry',
 				$updated->getId(),
 				null,
-				array_merge($updated->getSummary(), [
-					'auto_approve' => [
-						'reason' => 'no_assignable_approver',
-						'predicate' => $this->approverPredicateSnapshotSafe($updated->getUserId()),
-					],
-				]),
+				$auditPayload,
 				'system'
 			);
 		} catch (\Throwable $e) {
@@ -722,6 +1077,17 @@ class TimeEntryCorrectionService
 			}
 		}
 
+		// §9.7: capture the original frozen context BEFORE the override writes
+		// into it — the manager-correction justification keeps it for audit.
+		$originalWorkContext = null;
+		if (\array_key_exists('splitOverride', $proposal)) {
+			$raw = $entry->getWorkContextJson();
+			if ($raw !== null && $raw !== '') {
+				$decoded = json_decode($raw, true);
+				$originalWorkContext = \is_array($decoded) ? $decoded : $raw;
+			}
+		}
+
 		$this->applyProposal($entry, $proposal);
 		// A still-open break interval must be archived when the correction
 		// finalises the session — otherwise the row keeps a dangling breakStart.
@@ -749,6 +1115,7 @@ class TimeEntryCorrectionService
 				$this->l10n->t('A clock-out time is required to complete this session.')
 			);
 		}
+		$this->recomputeSplitAccounting($entry);
 		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
 		$entry->setApprovedByUserId($managerId);
 		$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
@@ -761,6 +1128,12 @@ class TimeEntryCorrectionService
 			'corrected_at' => date('c'),
 			'corrected_by' => $managerId,
 		];
+		if (\is_array($proposal['splitOverride'] ?? null)) {
+			$justification['split_override'] = $proposal['splitOverride'];
+			if ($originalWorkContext !== null) {
+				$justification['original_work_context'] = $originalWorkContext;
+			}
+		}
 		if ($previousJustification !== null) {
 			$justification['previous_justification'] = $previousJustification;
 		}
@@ -806,6 +1179,7 @@ class TimeEntryCorrectionService
 			);
 		}
 		$this->applyComplianceAdjustments($entry);
+		$this->recomputeSplitAccounting($entry);
 		$entry->setApprovedByUserId($managerId);
 		$nowAt = AppLocalNaiveDateTimeNormalizer::nowMutableInAppStorage($this->config);
 		$entry->setApprovedAt(clone $nowAt);

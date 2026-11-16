@@ -57,6 +57,7 @@ class TimeTrackingService
 	private \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory;
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver;
 	private ?UserWorkLocationService $userWorkLocationService;
+	private ?SplitServiceAccountingService $splitAccountingService = null;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -79,6 +80,7 @@ class TimeTrackingService
 		?\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory $lawProfileFactory = null,
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null,
 		?UserWorkLocationService $userWorkLocationService = null,
+		?SplitServiceAccountingService $splitServiceAccountingService = null,
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->violationMapper = $violationMapper;
@@ -106,6 +108,7 @@ class TimeTrackingService
 			?? new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper);
 		$this->breakPolicyResolver = $breakPolicyResolver;
 		$this->userWorkLocationService = $userWorkLocationService;
+		$this->splitAccountingService = $splitServiceAccountingService;
 	}
 
 	private ?UserWorkLocationService $lazyUserWorkLocationService = null;
@@ -141,6 +144,51 @@ class TimeTrackingService
 			}
 		}
 		return $this->breakPolicyResolver;
+	}
+
+	/**
+	 * Lazily resolved split-service accounting orchestrator (SPEC §9.5/§9.6).
+	 * Kept out of the constructor so existing call sites keep working —
+	 * same convention as {@see breakPolicyResolver()}.
+	 */
+	private function splitAccounting(): ?SplitServiceAccountingService
+	{
+		if ($this->splitAccountingService === null) {
+			try {
+				$resolved = \OCP\Server::get(SplitServiceAccountingService::class);
+				$this->splitAccountingService = $resolved instanceof SplitServiceAccountingService
+					? $resolved
+					: null;
+			} catch (\Throwable) {
+				$this->splitAccountingService = new SplitServiceAccountingService(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper,
+					$this->timeEntryMapper,
+					$this->breakPolicyResolver(),
+					$this->lawProfileFactory,
+					$this->timeZoneService,
+					\OCP\Log\logger('arbeitszeitcheck'),
+				);
+			}
+		}
+		return $this->splitAccountingService;
+	}
+
+	/**
+	 * Pin the frozen split-service context on a not-yet-inserted entry
+	 * (SPEC §9.5). Best-effort for legacy and non-split models — a defect
+	 * here never rejects a legitimate stamp; it is logged instead.
+	 */
+	public function pinSplitContextForEntry(TimeEntry $entry, string $userId): void
+	{
+		try {
+			$this->splitAccounting()?->pinContextForEntry($entry, $userId);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Split context pinning failed; entry continues on the legacy path: ' . $e->getMessage(),
+				['exception' => $e, 'user_id' => $userId, 'entry_id' => $entry->getId()]
+			);
+		}
 	}
 
 	/**
@@ -553,6 +601,11 @@ class TimeTrackingService
 					$timeEntry->setWorkLocation($resolvedWorkLocation);
 					$timeEntry->setCreatedAt($now);
 					$timeEntry->setUpdatedAt($now);
+
+					// Split-service days (§9.5): freeze the context inside the
+					// same transaction, before the row exists — legacy entries
+					// (NULL context) do no extra mapper work.
+					$this->pinSplitContextForEntry($timeEntry, $userId);
 
 					$savedEntry = $this->timeEntryMapper->insert($timeEntry);
 					$this->auditLogMapper->logAction(
@@ -1469,6 +1522,29 @@ class TimeTrackingService
 			return false;
 		}
 
+		// Split-service days (§9.6): recompute the frozen-context accounting
+		// for every completion path that funnels through here (clock-out,
+		// retro clock-out, paused completion, manual/ replayed entries). A
+		// NULL-context entry returns immediately — no extra mapper work.
+		// When the scheduled interruption covers the statutory break
+		// requirement, no automatic break is inserted at all.
+		$splitResult = null;
+		try {
+			$splitResult = $this->splitAccounting()?->recomputeAccounting($timeEntry);
+		} catch (\Throwable $e) {
+			// recompute writes its own conservative review fallback; a residual
+			// failure must never block the standard flow or roll back the stamp.
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Split accounting recompute failed before automatic break: ' . $e->getMessage(),
+				['exception' => $e, 'user_id' => $userId, 'entry_id' => $timeEntry->getId()]
+			);
+		}
+		if (is_array($splitResult)
+			&& ($splitResult['break_handling'] ?? null) === \OCA\ArbeitszeitCheck\Support\SplitServiceAccounting::BREAK_COVERED_BY_INTERRUPTION
+		) {
+			return false;
+		}
+
 		$autoBreakEnabled = $this->isAutoBreakCalculationEnabled($userId);
 		$entryCarriesAutomatic = $this->entryHasAutomaticBreakPortion($timeEntry);
 		if (!$autoBreakEnabled && !$entryCarriesAutomatic) {
@@ -1548,6 +1624,14 @@ class TimeTrackingService
 			$summary
 		);
 		if ($plan === null) {
+			// Placement inside the frozen own-work segments proved impossible
+			// (every segment too short / no window fit) — a split entry must
+			// surface that as review instead of silently keeping no break
+			// (§9.6 step 10a). E-25 suppression by a manual break is not a
+			// failure and never reviews.
+			if (!$summary['has_manual']) {
+				$this->markSplitReviewForFailedPlacement($timeEntry);
+			}
 			return $changed;
 		}
 
@@ -1616,6 +1700,28 @@ class TimeTrackingService
 		\OCP\Log\logger('arbeitszeitcheck')->info('Automatic break added to time entry', $logFields);
 
 		return true;
+	}
+
+	/**
+	 * Flag a split entry for review when the masked break placement found no
+	 * segment able to host the required break. Only `split === true` results
+	 * review — an unsplit applied result keeps the byte-identical legacy
+	 * "no space → no break" semantics.
+	 */
+	private function markSplitReviewForFailedPlacement(TimeEntry $entry): void
+	{
+		$result = $entry->getAccountingResult();
+		if (!is_array($result) || ($result['split'] ?? false) !== true) {
+			return;
+		}
+		try {
+			$this->splitAccounting()?->markReviewForFailedPlacement($entry);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Split review flagging after failed break placement failed: ' . $e->getMessage(),
+				['exception' => $e, 'user_id' => $entry->getUserId(), 'entry_id' => $entry->getId()]
+			);
+		}
 	}
 
 	/**

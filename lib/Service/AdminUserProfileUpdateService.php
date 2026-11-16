@@ -1462,6 +1462,23 @@ class AdminUserProfileUpdateService
 			}
 		}
 
+		// Schedule version guard (same invariant as the model endpoint): an
+		// older-format weekday_schedule must never silently overwrite a newer
+		// stored one — a stale editor build would otherwise destroy v2 blocks.
+		if (!$isNew && $schedule !== null) {
+			$storedRaw = ($model->getBreakRulesArray() ?? [])[WeekdaySchedule::KEY] ?? null;
+			$storedVersion = is_array($storedRaw)
+				? (WeekdaySchedule::versionOf($storedRaw) ?? PHP_INT_MAX)
+				: 0;
+			if ($schedule->getVersion() < $storedVersion) {
+				throw new AdminUserProfileUpdateException(
+					$this->l10n->t('This schedule uses a newer format that this client cannot write. Reload the model.'),
+					409,
+					['customWeekdaySchedule' => $this->l10n->t('This schedule uses a newer format that this client cannot write. Reload the model.')]
+				);
+			}
+		}
+
 		// Snapshot before mutation: the no-op check and the audit oldValues both
 		// need the pre-change state (schedule compare included — setBreakRulesArray
 		// below would overwrite it before the comparison ran).

@@ -1082,4 +1082,471 @@ class TimeEntryCorrectionServiceTest extends TestCase
 
 		$this->assertNotNull($result->getBillingSyncWarning());
 	}
+
+	/* ------------------------------------------------------------------
+	 * Split-day overrides (spec §9.7 / §9.8; A17/A18 semantics)
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * F1-shaped frozen context (spec §8 A04): blocks 06:00–10:00 + 13:30–16:30,
+	 * scheduled interruption 10:00–13:30, cut-off 16:00, Europe/Berlin.
+	 */
+	private function splitContextArray(): array
+	{
+		return [
+			'v' => 1,
+			'model_id' => 1,
+			'schedule_revision' => 'rev1',
+			'timezone' => 'Europe/Berlin',
+			'day' => ['blocks' => [['06:00', '10:00'], ['13:30', '16:30']]],
+			'week' => [
+				'mon' => [['06:00', '10:00'], ['13:30', '16:30']],
+			],
+			'split' => ['automatic' => true, 'cutoff' => '16:00', 'break_cover' => true],
+			'overrides' => ['decision' => 'auto', 'worked' => []],
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2026-11-16T10:00:00+01:00', '2026-11-16T13:30:00+01:00']],
+				'segments' => [
+					['2026-11-16T06:00:00+01:00', '2026-11-16T10:00:00+01:00'],
+					['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+				],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => 1,
+			],
+		];
+	}
+
+	/** F1 entry: 2026-11-16 06:00–16:30 Europe/Berlin with the frozen context. */
+	private function splitEntry(): TimeEntry
+	{
+		$entry = new TimeEntry();
+		$entry->setId(77);
+		$entry->setUserId('alice');
+		$entry->setStartTime(new \DateTime('2026-11-16T06:00:00+01:00'));
+		$entry->setEndTime(new \DateTime('2026-11-16T16:30:00+01:00'));
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setWorkContextJson(json_encode($this->splitContextArray()));
+		$entry->setExcludedWorkSeconds(12600);
+		return $entry;
+	}
+
+	/**
+	 * Correction service whose split-recompute seam runs the REAL pure engine
+	 * ({@see SplitServiceAccounting::resolveSplit}) — the same contract the
+	 * sibling SplitServiceAccountingService implements.
+	 */
+	private function splitAwareService(?callable $recomputeFn = null): SplitOverrideCorrectionServiceDouble
+	{
+		$service = new SplitOverrideCorrectionServiceDouble(
+			$this->timeEntryMapper,
+			$this->monthClosureGuard,
+			$this->complianceService,
+			$this->timeTrackingService,
+			$this->notificationService,
+			$this->auditLogMapper,
+			$this->config,
+			$this->l10n,
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckIntegrationService::class),
+			$this->createMock(\OCA\ArbeitszeitCheck\Service\ProjectCheckLaborTimeSyncService::class),
+		);
+		$service->recomputeFn = $recomputeFn ?? $this->engineRecompute();
+		return $service;
+	}
+
+	private function engineRecompute(): callable
+	{
+		return static function (TimeEntry $e): void {
+			$ctx = $e->getWorkContext();
+			$r = \OCA\ArbeitszeitCheck\Support\SplitServiceAccounting::resolveSplit(
+				$ctx,
+				$e->getStartTime()->getTimestamp(),
+				$e->getEndTime()->getTimestamp()
+			);
+			$ctx['result'] = [
+				'state' => $r['state'],
+				'split' => $r['split'],
+				'reason' => $r['reason'],
+				'error' => $r['error'],
+				'excluded' => $r['excluded'],
+				'segments' => $r['segments'],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => $r['engine'],
+			];
+			$e->setWorkContextJson(json_encode($ctx));
+			$e->setExcludedWorkSeconds($r['excludedSeconds']);
+		};
+	}
+
+	private function pendingSplitEntry(array $proposed): TimeEntry
+	{
+		$entry = $this->splitEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode([
+			'justification' => 'Please correct my split day.',
+			'original' => [
+				'startTime' => '2026-11-16T06:00:00+01:00',
+				'endTime' => '2026-11-16T16:30:00+01:00',
+				'status' => TimeEntry::STATUS_COMPLETED,
+			],
+			'proposed' => $proposed,
+		]));
+		return $entry;
+	}
+
+	public function testValidateProposalSplitOverrideNotApplicableWithoutContext(): void
+	{
+		$entry = $this->buildEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'force_split'],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_NOT_APPLICABLE', $error);
+	}
+
+	public function testValidateProposalSplitOverrideNotApplicableOnCorruptContext(): void
+	{
+		$entry = $this->splitEntry();
+		$entry->setWorkContextJson('{"v":1,');
+		$this->assertTrue($entry->hasInvalidWorkContext());
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'force_split'],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_NOT_APPLICABLE', $error);
+	}
+
+	public function testValidateProposalSplitOverrideInvalidDecision(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'splitify'],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideWorkedOutsideGap(): void
+	{
+		$entry = $this->splitEntry();
+		// 07:00–08:00 is inside R but inside a work block, not the interruption.
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['2026-11-16T07:00:00+01:00', '2026-11-16T08:00:00+01:00']],
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideWorkedOutsideR(): void
+	{
+		$entry = $this->splitEntry();
+		// Corrected clock-out 12:00, but the worked portion runs 12:30–13:00 —
+		// inside the candidate gap yet outside the corrected range R.
+		$error = $this->service->validateProposal($entry, [
+			'endTime' => '2026-11-16T12:00:00+01:00',
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['2026-11-16T12:30:00+01:00', '2026-11-16T13:00:00+01:00']],
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideMoreThanEightIntervals(): void
+	{
+		$entry = $this->splitEntry();
+		// 9 disjoint 10-minute intervals inside the 3.5h gap
+		$worked = [];
+		for ($i = 0; $i < 9; $i++) {
+			$s = new \DateTimeImmutable('2026-11-16T10:00:00+01:00');
+			$s = $s->modify('+' . ($i * 20) . ' minutes');
+			$e = $s->modify('+10 minutes');
+			$worked[] = [$s->format('c'), $e->format('c')];
+		}
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'force_split', 'worked' => $worked],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideUnparseableWorked(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['not-a-date', '2026-11-16T11:00:00+01:00']],
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideWorkedEndNotAfterStart(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['2026-11-16T11:00:00+01:00', '2026-11-16T10:30:00+01:00']],
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideOverlappingWorkedMerges(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [
+					['2026-11-16T10:00:00+01:00', '2026-11-16T10:45:00+01:00'],
+					['2026-11-16T10:30:00+01:00', '2026-11-16T11:00:00+01:00'],
+				],
+			],
+		]);
+		$this->assertNull($error);
+	}
+
+	public function testValidateProposalSplitOverrideForceContinuousRejectsWorked(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_continuous',
+				'worked' => [['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+	}
+
+	public function testValidateProposalSplitOverrideForceContinuousOk(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'force_continuous'],
+		]);
+		$this->assertNull($error);
+	}
+
+	public function testValidateProposalSplitOverrideBaseRevisionFormat(): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => ['decision' => 'force_split', 'baseEntryRevision' => 'not-sha'],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
+
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'baseEntryRevision' => str_repeat('a', 64),
+			],
+		]);
+		$this->assertNull($error);
+	}
+
+	/**
+	 * @dataProvider serverOwnedFieldProvider
+	 */
+	public function testValidateProposalRejectsServerOwnedFields(string $field): void
+	{
+		$entry = $this->splitEntry();
+		$error = $this->service->validateProposal($entry, [$field => 'x']);
+		$this->assertSame('SERVER_OWNED_FIELD', $error);
+	}
+
+	public static function serverOwnedFieldProvider(): array
+	{
+		return [
+			'accounting' => ['accounting'],
+			'work_context_json' => ['work_context_json'],
+			'workContextJson' => ['workContextJson'],
+			'excluded_work_seconds' => ['excluded_work_seconds'],
+			'excludedWorkSeconds' => ['excludedWorkSeconds'],
+			'excludedMinutes' => ['excludedMinutes'],
+			'excluded_minutes' => ['excluded_minutes'],
+		];
+	}
+
+	public function testApplyProposalThrowsOnServerOwnedField(): void
+	{
+		$entry = $this->splitEntry();
+		$this->expectException(\InvalidArgumentException::class);
+		$this->expectExceptionMessage('SERVER_OWNED_FIELD');
+		$this->service->applyProposal($entry, ['excluded_work_seconds' => 42]);
+	}
+
+	public function testApplyProposalAutoDecisionClearsWorked(): void
+	{
+		$entry = $this->splitEntry();
+		$this->service->applyProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'auto',
+				'worked' => [['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			],
+		]);
+		$overrides = $entry->getWorkContext()['overrides'];
+		$this->assertSame('auto', $overrides['decision']);
+		$this->assertSame([], $overrides['worked'], 'auto clears worked evidence');
+	}
+
+	public function testApplyProposalForceSplitNormalizesWorked(): void
+	{
+		$entry = $this->splitEntry();
+		$this->service->applyProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [
+					['2026-11-16T10:30:00+01:00', '2026-11-16T11:00:00+01:00'],
+					['2026-11-16T10:00:00+01:00', '2026-11-16T10:45:00+01:00'],
+				],
+			],
+		]);
+		$overrides = $entry->getWorkContext()['overrides'];
+		$this->assertSame('force_split', $overrides['decision']);
+		// Overlapping portions merged into one canonical ISO pair, context tz.
+		$this->assertSame(
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			$overrides['worked']
+		);
+	}
+
+	/**
+	 * A17: F1 + approved override worked 10:00–11:00 → excluded 9,000 s,
+	 * segments 06:00–11:00 + 13:30–16:30.
+	 */
+	public function testApproveForceSplitOverrideRecomputesAccounting(): void
+	{
+		$entry = $this->pendingSplitEntry([
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			],
+		]);
+		$service = $this->splitAwareService();
+
+		$result = $service->approve($entry, 'manager1', 'ok');
+
+		$this->assertSame(1, $service->recomputeCalls, 'approval must recompute server-side');
+		$this->assertSame(9000, $result->getExcludedWorkSeconds(), 'A17: X = 11:00–13:30 = 9,000 s');
+
+		$ctx = $result->getWorkContext();
+		$this->assertSame('force_split', $ctx['overrides']['decision']);
+		$this->assertSame(
+			[['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			$ctx['overrides']['worked']
+		);
+		$this->assertSame('override_split', $ctx['result']['reason']);
+		$this->assertSame(
+			[
+				['2026-11-16T06:00:00+01:00', '2026-11-16T11:00:00+01:00'],
+				['2026-11-16T13:30:00+01:00', '2026-11-16T16:30:00+01:00'],
+			],
+			$ctx['result']['segments']
+		);
+
+		// §9.7 audit: the justification stores the ORIGINAL context for
+		// reconstruction alongside the proposed override.
+		$just = json_decode($result->getJustification(), true);
+		$this->assertArrayHasKey('original_work_context', $just);
+		$this->assertSame(1, $just['original_work_context']['v']);
+		$this->assertSame('auto', $just['original_work_context']['overrides']['decision']);
+		$this->assertSame('force_split', $just['proposed']['splitOverride']['decision']);
+	}
+
+	/**
+	 * §9.7 stale: the engine reports the override inapplicable after the new
+	 * times → approval fails with the 409 seam exception, wire code
+	 * SPLIT_OVERRIDE_STALE.
+	 */
+	public function testApproveThrowsSplitOverrideStale(): void
+	{
+		$entry = $this->pendingSplitEntry([
+			'splitOverride' => ['decision' => 'force_split'],
+		]);
+		$service = $this->splitAwareService(static function (TimeEntry $e): void {
+			$ctx = $e->getWorkContext();
+			$ctx['result'] = [
+				'state' => 'applied',
+				'split' => false,
+				'reason' => null,
+				'error' => 'SPLIT_OVERRIDE_NOT_APPLICABLE',
+				'excluded' => [],
+				'segments' => [],
+				'break_handling' => 'standard',
+				'engine' => 1,
+			];
+			$e->setWorkContextJson(json_encode($ctx));
+		});
+
+		try {
+			$service->approve($entry, 'manager1', null);
+			$this->fail('expected SplitOverrideStaleException');
+		} catch (\OCA\ArbeitszeitCheck\Exception\SplitOverrideStaleException $e) {
+			$this->assertInstanceOf(
+				\OCA\ArbeitszeitCheck\Exception\ConcurrentDecisionException::class,
+				$e,
+				'must ride the existing 409 approval seam'
+			);
+			$this->assertSame('SPLIT_OVERRIDE_STALE', $e->getReasonCode());
+			$this->assertSame('SPLIT_OVERRIDE_STALE', $e->toHttpPayload()['error_code']);
+		}
+	}
+
+	public function testApproveSkipsRecomputeForLegacyEntry(): void
+	{
+		$entry = $this->buildEntry();
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode([
+			'justification' => 'x',
+			'proposed' => ['description' => 'plain correction'],
+		]));
+		$service = $this->splitAwareService();
+
+		$service->approve($entry, 'manager1', null);
+
+		$this->assertSame(0, $service->recomputeCalls, 'NULL context must keep the byte-identical legacy path');
+	}
+
+	public function testApproveWithAdjustmentRecomputesAndStoresOverride(): void
+	{
+		$entry = $this->pendingSplitEntry([
+			'splitOverride' => ['decision' => 'auto'],
+		]);
+		$service = $this->splitAwareService();
+
+		$result = $service->approveWithAdjustment($entry, 'manager1', 'adjusted', [
+			'splitOverride' => ['decision' => 'force_continuous'],
+		]);
+
+		$this->assertSame(1, $service->recomputeCalls);
+		$ctx = $result->getWorkContext();
+		$this->assertSame('force_continuous', $ctx['overrides']['decision']);
+		$this->assertSame('override_continuous', $ctx['result']['reason']);
+		$just = json_decode($result->getJustification(), true);
+		$this->assertArrayHasKey('original_work_context', $just);
+	}
+}
+
+/**
+ * Test double: exposes the sibling-service recompute seam so tests can drive
+ * the real pure engine (or a fault injection) while the parent's stale-check
+ * orchestration stays under test.
+ */
+class SplitOverrideCorrectionServiceDouble extends TimeEntryCorrectionService
+{
+	/** @var callable|null */
+	public $recomputeFn = null;
+
+	public int $recomputeCalls = 0;
+
+	protected function runSplitRecompute(TimeEntry $entry): void
+	{
+		$this->recomputeCalls++;
+		if ($this->recomputeFn !== null) {
+			($this->recomputeFn)($entry);
+		}
+	}
 }

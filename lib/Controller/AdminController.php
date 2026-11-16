@@ -14,6 +14,7 @@ namespace OCA\ArbeitszeitCheck\Controller;
 use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 
+use OCA\ArbeitszeitCheck\Support\SplitServiceAccounting;
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
@@ -393,6 +394,7 @@ class AdminController extends Controller
 	 */
 	private const BREAK_RULE_KEYS = [
 		'weekday_schedule',
+		WeekdaySchedule::SPLIT_SERVICE_KEY,
 		'presence_windows',
 		'breaks_count_as_work',
 		'paid_break_cap_minutes',
@@ -521,6 +523,323 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Apply the scalar/breakRules/overtimeRules params of a model save to the
+	 * given entity. Shared between in-place update and the successor-copy
+	 * path so both apply identical semantics.
+	 *
+	 * @param array<string, mixed> $params
+	 * @param array{0:mixed,1:mixed}|null $paidPolicyBefore out-param
+	 * @param array{0:mixed,1:mixed}|null $paidPolicyAfter out-param
+	 * @return JSONResponse|null error response
+	 */
+	private function applyWorkingTimeModelParams(
+		\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model,
+		array $params,
+		?array &$paidPolicyBefore,
+		?array &$paidPolicyAfter,
+	): ?JSONResponse {
+		if (isset($params['name'])) {
+			$model->setName($params['name']);
+		}
+		if (isset($params['description'])) {
+			$model->setDescription($params['description']);
+		}
+		if (isset($params['type'])) {
+			$model->setType($this->normalizeWorkingTimeModelType($params['type']));
+		}
+		if (isset($params['weeklyHours'])) {
+			$model->setWeeklyHours($this->parseDecimalInput($params['weeklyHours'], $model->getWeeklyHours()));
+		}
+		if (isset($params['dailyHours'])) {
+			$model->setDailyHours($this->parseDecimalInput($params['dailyHours'], $model->getDailyHours()));
+		}
+		if (isset($params['workDaysPerWeek'])) {
+			$model->setWorkDaysPerWeek($this->parseDecimalInput($params['workDaysPerWeek'], $model->getWorkDaysPerWeek()));
+		}
+		if (isset($params['isDefault'])) {
+			$model->setIsDefault(filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN));
+		}
+		// Paid-break recompute trigger (US-PB-06): only flag/cap deltas
+		// change the snapshot — other break_rules keys are irrelevant here.
+		if (isset($params['breakRules']) && is_array($params['breakRules'])) {
+			$resolverForPaid = $this->breakPolicyResolver();
+			if ($resolverForPaid !== null) {
+				$normBefore = $resolverForPaid->normalizeModelRules($model->getBreakRulesArray() ?? []);
+				$paidPolicyBefore = [$normBefore['breaks_count_as_work'], $normBefore['paid_break_cap_minutes']];
+				$normAfter = $resolverForPaid->normalizeModelRules($params['breakRules']);
+				$paidPolicyAfter = [$normAfter['breaks_count_as_work'], $normAfter['paid_break_cap_minutes']];
+			}
+			$scheduleError = $this->applyBreakRulesToWorkingTimeModel($model, $params['breakRules']);
+			if ($scheduleError !== null) {
+				return $scheduleError;
+			}
+		}
+		if (isset($params['overtimeRules'])) {
+			$overtimeError = $this->applyOvertimeRulesToWorkingTimeModel($model, $params['overtimeRules']);
+			if ($overtimeError !== null) {
+				return $overtimeError;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Weekday-schedule transition guards for model updates.
+	 *
+	 * @param array{before: array<string,mixed>|null, after: array<string,mixed>|null}|null $splitServiceChange
+	 *        out-param: set when an assigned v2 model's (mutable) split_service
+	 *        sub-tree changes — the caller audits it after a successful write.
+	 * @return JSONResponse|string|null error response, 'successor' when the
+	 *         caller must clone the model instead of updating in place, or
+	 *         null when the update may proceed.
+	 */
+	/**
+	 * break_rules keys whose change alters stored-entry accounting or
+	 * derived targets — immutable once a v2 schedule is assigned.
+	 * @var list<string>
+	 */
+	private const V2_IMMUTABLE_BREAK_RULE_KEYS = [
+		'breaks_count_as_work',
+		'paid_break_cap_minutes',
+		'tiers',
+		'min_break_minutes',
+		'break_policy',
+		'auto_fallback_minutes',
+		'deduction_mode',
+	];
+
+	private function guardWorkingTimeModelScheduleTransition(
+		\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model,
+		array $params,
+		?array &$splitServiceChange = null,
+	): JSONResponse|string|null {
+		$splitServiceChange = null;
+		if (!isset($params['breakRules']) || !is_array($params['breakRules'])) {
+			return null;
+		}
+
+		$storedRules = $model->getBreakRulesArray();
+		$stored = is_array($storedRules[WeekdaySchedule::KEY] ?? null)
+			? $storedRules[WeekdaySchedule::KEY]
+			: null;
+		// Stored version: absent → 0 (no downgrade concept); unparseable →
+		// PHP_INT_MAX so any incoming write fails closed as a downgrade.
+		$storedVersion = $stored === null
+			? 0
+			: (WeekdaySchedule::versionOf($stored) ?? PHP_INT_MAX);
+
+		// Stale-write guard: clients that know the schedule send the base
+		// revision they loaded. Checked first — it also covers clears and
+		// same-version edits.
+		if (array_key_exists('scheduleBaseRevision', $params)) {
+			$expected = WeekdaySchedule::revisionOf($stored);
+			if ((string)($params['scheduleBaseRevision'] ?? '') !== $expected) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The weekday times were changed in the meantime. Reload the model and try again.'),
+					'code' => 'SCHEDULE_CONFLICT',
+				], Http::STATUS_CONFLICT);
+			}
+		}
+
+		// breakRules replaces the whole document: an absent key CLEARS the
+		// stored schedule. On a stored v2 document that is ambiguous with
+		// "v1 client that never knew v2" — fail closed.
+		if (!array_key_exists(WeekdaySchedule::KEY, $params['breakRules'])) {
+			if ($storedVersion >= WeekdaySchedule::VERSION_V2) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This schedule uses a newer format that this client cannot write. Reload the model.'),
+					'code' => 'SCHEDULE_DOWNGRADE',
+				], Http::STATUS_CONFLICT);
+			}
+			return null;
+		}
+
+		$assigned = $model->isPersonal()
+			|| ($model->getId() !== null
+				&& $this->userWorkingTimeModelMapper->findByWorkingTimeModel($model->getId(), false) !== []);
+
+		$incoming = $params['breakRules'][WeekdaySchedule::KEY];
+		if ($incoming === null) {
+			// Explicit clear. On v2 it needs a fresh scheduleBaseRevision —
+			// an implicit delete is not distinguishable from an old client.
+			if ($storedVersion >= WeekdaySchedule::VERSION_V2) {
+				if (!array_key_exists('scheduleBaseRevision', $params)) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('This schedule uses a newer format that this client cannot write. Reload the model.'),
+						'code' => 'SCHEDULE_DOWNGRADE',
+					], Http::STATUS_CONFLICT);
+				}
+				// Clearing the schedule changes derived target hours for
+				// assignees — same impact class as a v1→v2 conversion, so it
+				// gets the same successor requirement.
+				if ($assigned) {
+					$wantsSuccessor = filter_var($params['createSuccessor'] ?? false, FILTER_VALIDATE_BOOLEAN);
+					if ($wantsSuccessor) {
+						return 'successor';
+					}
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('This model is assigned to employees. Clearing its weekday times requires saving as a new copy.'),
+						'code' => 'MODEL_IN_USE_REQUIRES_SUCCESSOR',
+					], Http::STATUS_CONFLICT);
+				}
+			}
+			return null;
+		}
+		if (!is_array($incoming)) {
+			return null; // applyBreakRules returns the shape error
+		}
+		$incomingVersion = WeekdaySchedule::versionOf($incoming);
+		if ($incomingVersion === null
+			|| !in_array($incomingVersion, [WeekdaySchedule::VERSION, WeekdaySchedule::VERSION_V2], true)) {
+			return null; // validation reports SCHEDULE_UNKNOWN_VERSION as 400
+		}
+
+		if ($incomingVersion < $storedVersion) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This schedule uses a newer format that this client cannot write. Reload the model.'),
+				'code' => 'SCHEDULE_DOWNGRADE',
+			], Http::STATUS_CONFLICT);
+		}
+
+		if ($incomingVersion === WeekdaySchedule::VERSION_V2
+			&& $storedVersion === WeekdaySchedule::VERSION
+			&& $assigned) {
+			$wantsSuccessor = filter_var($params['createSuccessor'] ?? false, FILTER_VALIDATE_BOOLEAN);
+			if ($wantsSuccessor) {
+				return 'successor';
+			}
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('This model is assigned to employees. Converting its weekday times to blocks requires saving as a new copy.'),
+				'code' => 'MODEL_IN_USE_REQUIRES_SUCCESSOR',
+			], Http::STATUS_CONFLICT);
+		}
+
+		// Assigned v2 model: accounting-relevant fields are immutable — past
+		// targets/absences derive from the model for past dates, so any change
+		// must land on a new revision (successor), never in place. Exception
+		// (§9.4): the `split_service` sub-tree stays mutable — it only affects
+		// entries whose context is pinned after the save. The documents are
+		// therefore compared with that sub-tree stripped; a diff anywhere else
+		// (days / version / interruption_mode) still forces a successor.
+		if ($storedVersion === WeekdaySchedule::VERSION_V2 && $assigned) {
+			$immutableChanged = false;
+			if ($incomingVersion === WeekdaySchedule::VERSION_V2
+				&& WeekdaySchedule::validate($incoming) === []) {
+				$incomingNormalized = WeekdaySchedule::fromValidated($incoming)->toArray();
+				$storedSansSplit = $stored;
+				unset($storedSansSplit[WeekdaySchedule::SPLIT_SERVICE_KEY]);
+				$incomingSansSplit = $incomingNormalized;
+				unset($incomingSansSplit[WeekdaySchedule::SPLIT_SERVICE_KEY]);
+				if ($incomingSansSplit != $storedSansSplit) {
+					$immutableChanged = true;
+				}
+				$incomingSplit = $incomingNormalized[WeekdaySchedule::SPLIT_SERVICE_KEY] ?? null;
+				$storedSplit = $stored[WeekdaySchedule::SPLIT_SERVICE_KEY] ?? null;
+				if ($incomingSplit != $storedSplit) {
+					$splitServiceChange = ['before' => $storedSplit, 'after' => $incomingSplit];
+				}
+			}
+			foreach (self::V2_IMMUTABLE_BREAK_RULE_KEYS as $key) {
+				if (array_key_exists($key, $params['breakRules'])
+					&& ($params['breakRules'][$key] ?? null) != ($storedRules[$key] ?? null)) {
+					$immutableChanged = true;
+					break;
+				}
+			}
+			if (!$immutableChanged
+				&& isset($params['type'])
+				&& $this->normalizeWorkingTimeModelType($params['type']) !== $model->getType()) {
+				$immutableChanged = true;
+			}
+			if ($immutableChanged) {
+				$wantsSuccessor = filter_var($params['createSuccessor'] ?? false, FILTER_VALIDATE_BOOLEAN);
+				if ($wantsSuccessor) {
+					return 'successor';
+				}
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('This model is assigned to employees. Changing its schedule or break accounting requires saving as a new copy.'),
+					'code' => 'SCHEDULE_IMMUTABLE',
+				], Http::STATUS_CONFLICT);
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * v1→v2 conversion on an assigned model: the source stays byte-identical
+	 * and a new model carrying the submitted values is created.
+	 */
+	private function createWorkingTimeModelSuccessor(
+		\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $source,
+		array $params,
+	): JSONResponse {
+		$clone = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
+		$clone->setName($source->getName());
+		$clone->setDescription($source->getDescription());
+		$clone->setType($source->getType());
+		$clone->setUserId($source->getUserId());
+		$clone->setWeeklyHours($source->getWeeklyHours());
+		$clone->setDailyHours($source->getDailyHours());
+		$clone->setWorkDaysPerWeek($source->getWorkDaysPerWeek());
+		$clone->setBreakRulesArray($source->getBreakRulesArray());
+		$clone->setOvertimeRulesArray($source->getOvertimeRulesArray());
+		$clone->setIsDefault(false);
+
+		$paidBefore = null;
+		$paidAfter = null;
+		$applyError = $this->applyWorkingTimeModelParams($clone, $params, $paidBefore, $paidAfter);
+		if ($applyError !== null) {
+			return $applyError;
+		}
+		if ($clone->getName() === $source->getName()) {
+			$clone->setName($source->getName() . ' ' . $this->l10n->t('(new)'));
+		}
+		// A successor is a separate model: never default. userId is copied so a
+		// personal model stays scoped to the same employee.
+		$clone->setIsDefault(false);
+		$clone->setUpdatedAt($this->timeZoneService()->nowInStorage());
+
+		$errors = $clone->validate();
+		if (!empty($errors)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'errors' => array_map(fn(string $m): string => $this->l10n->t($m), $errors),
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		$performedBy = $this->getPerformedBy();
+		$created = $this->atomic(function () use ($source, $clone, $performedBy) {
+			$inserted = $this->workingTimeModelMapper->insert($clone);
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'working_time_model_successor_created',
+				'working_time_model',
+				$inserted->getId(),
+				$this->workingTimeModelToAuditValues($source),
+				$this->workingTimeModelToAuditValues($inserted),
+				$performedBy
+			);
+			return $inserted;
+		}, $this->db);
+
+		return new JSONResponse([
+			'success' => true,
+			'createdSuccessor' => true,
+			'successor' => $created->getSummary(),
+			'model' => $created->getSummary(),
+		]);
+	}
+
+	/**
 	 * Apply break_rules; validate weekday_schedule and sync weekly/daily hours when present.
 	 *
 	 * @param array<string, mixed> $breakRules
@@ -562,6 +881,22 @@ class AdminController extends Controller
 					], Http::STATUS_BAD_REQUEST);
 				}
 			}
+		}
+
+		// `split_service` only exists as a sub-tree of the v2 weekday_schedule
+		// document — a top-level break_rules key is a client bug (spec §9.3),
+		// not a second place to store the same options.
+		if (array_key_exists(WeekdaySchedule::SPLIT_SERVICE_KEY, $breakRules)) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'errors' => ['breakRules' => 'SPLIT_REQUIRES_SCHEDULE_V2'],
+				'codes' => ['SPLIT_REQUIRES_SCHEDULE_V2'],
+				'fields' => [
+					'weekday_schedule' => $this->l10n->t('Split service is only available with a block-based weekday schedule.'),
+				],
+				'code' => 'SPLIT_REQUIRES_SCHEDULE_V2',
+			], Http::STATUS_BAD_REQUEST);
 		}
 
 		// presence_windows (Feature A-2): strict shape validation at the write
@@ -671,6 +1006,12 @@ class AdminController extends Controller
 			], Http::STATUS_BAD_REQUEST);
 		}
 
+		// Explicit null = deliberate clear (CAS-guarded for v2 upstream):
+		// remove the key instead of persisting a null placeholder.
+		if (array_key_exists(WeekdaySchedule::KEY, $breakRules) && $breakRules[WeekdaySchedule::KEY] === null) {
+			unset($breakRules[WeekdaySchedule::KEY]);
+		}
+
 		$scheduleRaw = $breakRules[WeekdaySchedule::KEY] ?? null;
 		if ($scheduleRaw !== null) {
 			if (!is_array($scheduleRaw)) {
@@ -688,6 +1029,7 @@ class AdminController extends Controller
 					'error' => $this->l10n->t('Validation failed'),
 					'errors' => ['breakRules' => $errors[0]],
 					'codes' => $errors,
+					'fields' => $this->scheduleValidationErrorFields($scheduleRaw, $errors),
 					'code' => $errors[0],
 				], Http::STATUS_BAD_REQUEST);
 			}
@@ -732,6 +1074,182 @@ class AdminController extends Controller
 			], Http::STATUS_BAD_REQUEST);
 		}
 		$model->setOvertimeRulesArray($overtimeRules);
+		return null;
+	}
+
+	// ------------------------------------------------------------------ //
+	// Weekday-schedule validation → field-targeted errors (spec §9.3)      //
+	// ------------------------------------------------------------------ //
+
+	/**
+	 * Map `WeekdaySchedule::validate()` codes to field-targeted, translated
+	 * messages (spec §9.3). Field names follow the submitted document path
+	 * so the model editor can attach the inline error to the exact control.
+	 * Codes without a dedicated field keep the generic `errors` surface.
+	 *
+	 * @param array<string, mixed> $raw submitted (possibly invalid) document
+	 * @param list<string> $codes
+	 * @return array<string, string> field path → translated message
+	 */
+	private function scheduleValidationErrorFields(array $raw, array $codes): array
+	{
+		$fields = [];
+		foreach ($codes as $code) {
+			switch ($code) {
+				case 'SPLIT_CONFIG_INVALID':
+					$fields['weekday_schedule.split_service'] = $this->l10n->t('Choose on or off.');
+					break;
+				case 'SPLIT_CUTOFF_INVALID':
+					$fields['weekday_schedule.split_service.split_when_clock_out_after'] =
+						$this->l10n->t('Enter a time such as 16:00.');
+					break;
+				case 'SPLIT_CUTOFF_BEFORE_INTERRUPTION_END':
+					$gapEnd = $this->scheduleLatestGapEndHm($raw);
+					$fields['weekday_schedule.split_service.split_when_clock_out_after'] = $gapEnd !== null
+						? $this->l10n->t('The time must be at or after the end of the interruption (%s).', [$gapEnd])
+						: $this->l10n->t('The time must be at or after the end of the interruption.');
+					break;
+				case 'SPLIT_NO_INTERRUPTION':
+					$fields['weekday_schedule.split_service'] =
+						$this->l10n->t('Add a second working block to at least one weekday.');
+					break;
+				case 'SPLIT_REQUIRES_SCHEDULE_V2':
+					$fields['weekday_schedule'] =
+						$this->l10n->t('Split service is only available with a block-based weekday schedule.');
+					break;
+				case 'SCHEDULE_BLOCK_TOUCHING':
+					$day = $this->scheduleFirstTouchingBlocksDay($raw);
+					$fields['weekday_schedule.days.' . ($day ?? '*') . '.blocks'] =
+						$this->l10n->t('Blocks must not touch; merge them or leave a gap.');
+					break;
+				case 'SCHEDULE_UNKNOWN_KEY':
+					$fields[$this->scheduleFirstUnknownKey($raw) ?? 'weekday_schedule'] =
+						$this->l10n->t('This option is not supported here. Remove it and try again.');
+					break;
+			}
+		}
+		return $fields;
+	}
+
+	/**
+	 * Strict HH:MM minutes-of-day (`^([01]\d|2[0-3]):[0-5]\d$`, no 24:00).
+	 */
+	private static function parseScheduleHm(mixed $hm): ?int
+	{
+		if (!is_string($hm)) {
+			return null;
+		}
+		$hm = trim($hm);
+		if (preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $hm, $m) !== 1) {
+			return null;
+		}
+		return ((int)$m[1]) * 60 + (int)$m[2];
+	}
+
+	private static function scheduleHmFromMinutes(int $minutes): string
+	{
+		return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+	}
+
+	/**
+	 * Latest interruption (gap) end over all weekdays of a raw — possibly
+	 * invalid — schedule document, formatted HH:MM. Mirrors the geometry
+	 * loop in `WeekdaySchedule::validateV2` (submission order, parseable
+	 * blocks only) so the error message names the same boundary the
+	 * validator compared the cut-off against.
+	 */
+	private function scheduleLatestGapEndHm(array $raw): ?string
+	{
+		$days = is_array($raw['days'] ?? null) ? $raw['days'] : [];
+		$latest = null;
+		foreach (WeekdaySchedule::DAYS as $day) {
+			$row = $days[$day] ?? null;
+			if (!is_array($row)) {
+				continue;
+			}
+			$intervals = [];
+			foreach ((array)($row['blocks'] ?? []) as $block) {
+				if (!is_array($block)) {
+					continue;
+				}
+				$bStart = self::parseScheduleHm($block['start'] ?? null);
+				$bEnd = self::parseScheduleHm($block['end'] ?? null);
+				if ($bStart === null || $bEnd === null || $bEnd <= $bStart) {
+					continue;
+				}
+				$intervals[] = [$bStart, $bEnd];
+			}
+			for ($i = 1, $n = count($intervals); $i < $n; $i++) {
+				if ($intervals[$i][0] > $intervals[$i - 1][1]) {
+					$latest = max($latest ?? 0, $intervals[$i][0]);
+				}
+			}
+		}
+		return $latest === null ? null : self::scheduleHmFromMinutes($latest);
+	}
+
+	/**
+	 * First weekday whose consecutive blocks share a boundary (end == next
+	 * start) — same submission-order comparison the validator applies.
+	 */
+	private function scheduleFirstTouchingBlocksDay(array $raw): ?string
+	{
+		$days = is_array($raw['days'] ?? null) ? $raw['days'] : [];
+		foreach (WeekdaySchedule::DAYS as $day) {
+			$row = $days[$day] ?? null;
+			if (!is_array($row)) {
+				continue;
+			}
+			$prevEnd = null;
+			foreach ((array)($row['blocks'] ?? []) as $block) {
+				if (!is_array($block)) {
+					continue;
+				}
+				$bStart = self::parseScheduleHm($block['start'] ?? null);
+				$bEnd = self::parseScheduleHm($block['end'] ?? null);
+				if ($bStart === null || $bEnd === null || $bEnd <= $bStart) {
+					continue;
+				}
+				if ($prevEnd !== null && $bStart === $prevEnd) {
+					return $day;
+				}
+				$prevEnd = $bEnd;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Dotted path of the first unknown key the v2 validator would reject —
+	 * top-level first (it returns early there), then split_service nested
+	 * keys, then day-level keys. Null when nothing unknown is found.
+	 */
+	private function scheduleFirstUnknownKey(array $raw): ?string
+	{
+		foreach (array_keys($raw) as $key) {
+			if (!in_array($key, ['version', 'interruption_mode', 'days', WeekdaySchedule::SPLIT_SERVICE_KEY], true)) {
+				return 'weekday_schedule.' . $key;
+			}
+		}
+		$split = $raw[WeekdaySchedule::SPLIT_SERVICE_KEY] ?? null;
+		if (is_array($split)) {
+			foreach (array_keys($split) as $key) {
+				if (!in_array($key, ['automatic_split', 'split_when_clock_out_after', 'interruption_counts_as_break'], true)) {
+					return 'weekday_schedule.split_service.' . $key;
+				}
+			}
+		}
+		$days = is_array($raw['days'] ?? null) ? $raw['days'] : [];
+		foreach ($days as $day => $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+			foreach (array_keys($row) as $key) {
+				if (!in_array($key, ['work', 'blocks', 'breaks'], true)) {
+					return 'weekday_schedule.days.' . $day . '.' . $key;
+				}
+			}
+		}
 		return null;
 	}
 
@@ -5565,7 +6083,8 @@ class AdminController extends Controller
 					'workDaysPerWeek' => $model->getWorkDaysPerWeek(),
 					'breakRules' => $model->getBreakRulesArray(),
 					'overtimeRules' => $model->getOvertimeRulesArray(),
-					'isDefault' => $model->getIsDefault()
+					'isDefault' => $model->getIsDefault(),
+					'scheduleRevision' => $model->getScheduleRevision(),
 				]
 			]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
@@ -5666,7 +6185,8 @@ class AdminController extends Controller
 					'workDaysPerWeek' => $savedModel->getWorkDaysPerWeek(),
 					'isDefault' => $savedModel->getIsDefault(),
 					'breakRules' => $savedModel->getBreakRulesArray(),
-					'overtimeRules' => $savedModel->getOvertimeRulesArray()
+					'overtimeRules' => $savedModel->getOvertimeRulesArray(),
+					'scheduleRevision' => $savedModel->getScheduleRevision(),
 				]
 			], Http::STATUS_CREATED);
 		} catch (\Throwable $e) {
@@ -5698,49 +6218,25 @@ class AdminController extends Controller
 			$oldValues = $this->workingTimeModelToAuditValues($model);
 			$params = $this->request->getParams();
 
-			if (isset($params['name'])) {
-				$model->setName($params['name']);
+			// Weekday-schedule transition guards (additive schedule v2):
+			// stale base revision → 409, version downgrade → 409, and a
+			// v1→v2 conversion on an assigned model → explicit successor copy.
+			// $splitServiceChange is set when only the (mutable) split_service
+			// sub-tree changed on an assigned v2 model → dedicated audit event.
+			$splitServiceChange = null;
+			$scheduleTransition = $this->guardWorkingTimeModelScheduleTransition($model, $params, $splitServiceChange);
+			if ($scheduleTransition instanceof JSONResponse) {
+				return $scheduleTransition;
 			}
-			if (isset($params['description'])) {
-				$model->setDescription($params['description']);
+			if ($scheduleTransition === 'successor') {
+				return $this->createWorkingTimeModelSuccessor($model, $params);
 			}
-			if (isset($params['type'])) {
-				$model->setType($this->normalizeWorkingTimeModelType($params['type']));
-			}
-			if (isset($params['weeklyHours'])) {
-				$model->setWeeklyHours($this->parseDecimalInput($params['weeklyHours'], $model->getWeeklyHours()));
-			}
-			if (isset($params['dailyHours'])) {
-				$model->setDailyHours($this->parseDecimalInput($params['dailyHours'], $model->getDailyHours()));
-			}
-			if (isset($params['workDaysPerWeek'])) {
-				$model->setWorkDaysPerWeek($this->parseDecimalInput($params['workDaysPerWeek'], $model->getWorkDaysPerWeek()));
-			}
-			if (isset($params['isDefault'])) {
-				$model->setIsDefault(filter_var($params['isDefault'], FILTER_VALIDATE_BOOLEAN));
-			}
-			// Paid-break recompute trigger (US-PB-06): only flag/cap deltas
-			// change the snapshot — other break_rules keys are irrelevant here.
+
 			$paidPolicyBefore = null;
 			$paidPolicyAfter = null;
-			if (isset($params['breakRules']) && is_array($params['breakRules'])) {
-				$resolverForPaid = $this->breakPolicyResolver();
-				if ($resolverForPaid !== null) {
-					$normBefore = $resolverForPaid->normalizeModelRules($model->getBreakRulesArray() ?? []);
-					$paidPolicyBefore = [$normBefore['breaks_count_as_work'], $normBefore['paid_break_cap_minutes']];
-					$normAfter = $resolverForPaid->normalizeModelRules($params['breakRules']);
-					$paidPolicyAfter = [$normAfter['breaks_count_as_work'], $normAfter['paid_break_cap_minutes']];
-				}
-				$scheduleError = $this->applyBreakRulesToWorkingTimeModel($model, $params['breakRules']);
-				if ($scheduleError !== null) {
-					return $scheduleError;
-				}
-			}
-			if (isset($params['overtimeRules'])) {
-				$overtimeError = $this->applyOvertimeRulesToWorkingTimeModel($model, $params['overtimeRules']);
-				if ($overtimeError !== null) {
-					return $overtimeError;
-				}
+			$applyError = $this->applyWorkingTimeModelParams($model, $params, $paidPolicyBefore, $paidPolicyAfter);
+			if ($applyError !== null) {
+				return $applyError;
 			}
 
 			$model->setUpdatedAt($this->timeZoneService()->nowInStorage());
@@ -5761,7 +6257,7 @@ class AdminController extends Controller
 			}
 
 			// Atomic: clear other defaults + update (same TOCTOU fix as create).
-			$updatedModel = $this->atomic(function () use ($model, $oldValues) {
+			$updatedModel = $this->atomic(function () use ($model, $oldValues, $splitServiceChange) {
 				if ($model->getIsDefault()) {
 					$this->workingTimeModelMapper->clearDefaults($model->getId());
 				}
@@ -5777,6 +6273,17 @@ class AdminController extends Controller
 					$newValues,
 					$performedBy
 				);
+				if ($splitServiceChange !== null) {
+					$this->auditLogMapper->logAction(
+						$performedBy,
+						'working_time_model_split_options_changed',
+						'working_time_model',
+						$updated->getId(),
+						['split_service' => $splitServiceChange['before']],
+						['split_service' => $splitServiceChange['after']],
+						$performedBy
+					);
+				}
 				return $updated;
 			}, $this->db);
 
@@ -5808,7 +6315,8 @@ class AdminController extends Controller
 					'workDaysPerWeek' => $updatedModel->getWorkDaysPerWeek(),
 					'isDefault' => $updatedModel->getIsDefault(),
 					'breakRules' => $updatedModel->getBreakRulesArray(),
-					'overtimeRules' => $updatedModel->getOvertimeRulesArray()
+					'overtimeRules' => $updatedModel->getOvertimeRulesArray(),
+					'scheduleRevision' => $updatedModel->getScheduleRevision(),
 				]
 			]);
 		} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
@@ -5930,6 +6438,443 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Split-service preview (spec §7.4 / §9.8): evaluate a draft
+	 * weekday_schedule with the organisation's law profile and return the
+	 * cut-off cliff rows. Read-only — no writes, no locks; the platform
+	 * rate limit applies as on every admin API.
+	 *
+	 * Body: {weekday_schedule: <draft doc>, sample?: {weekday, start, end}}
+	 *
+	 * @return JSONResponse
+	 */
+	#[NoAdminRequired]
+	public function workingTimeModelSplitPreview(): JSONResponse
+	{
+		try {
+			$params = $this->request->getParams();
+			$raw = $params[WeekdaySchedule::KEY] ?? null;
+			if ($raw === null && is_array($params['breakRules'] ?? null)) {
+				$raw = $params['breakRules'][WeekdaySchedule::KEY] ?? null;
+			}
+			if (is_string($raw)) {
+				$decoded = json_decode($raw, true);
+				if (is_array($decoded)) {
+					$raw = $decoded;
+				}
+			}
+			if (!is_array($raw) || $raw === [] || array_is_list($raw)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Validation failed'),
+					'errors' => ['weekday_schedule' => 'SCHEDULE_INVALID'],
+					'code' => 'SCHEDULE_INVALID',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if (strlen((string)json_encode($raw)) > self::BREAK_RULES_MAX_BYTES) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The schedule is too large to preview.'),
+					'code' => 'SCHEDULE_PAYLOAD_LIMIT',
+				], Http::STATUS_REQUEST_ENTITY_TOO_LARGE);
+			}
+			// A top-level split_service outside weekday_schedule is a client
+			// bug — same rule as the model save boundary (§9.3).
+			if (array_key_exists(WeekdaySchedule::SPLIT_SERVICE_KEY, $params)
+				|| (is_array($params['breakRules'] ?? null)
+					&& array_key_exists(WeekdaySchedule::SPLIT_SERVICE_KEY, $params['breakRules']))) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Validation failed'),
+					'errors' => ['weekday_schedule' => 'SPLIT_REQUIRES_SCHEDULE_V2'],
+					'codes' => ['SPLIT_REQUIRES_SCHEDULE_V2'],
+					'fields' => [
+						'weekday_schedule' => $this->l10n->t('Split service is only available with a block-based weekday schedule.'),
+					],
+					'code' => 'SPLIT_REQUIRES_SCHEDULE_V2',
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$errors = WeekdaySchedule::validate($raw);
+			if ($errors !== []) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Validation failed'),
+					'errors' => ['weekday_schedule' => $errors[0]],
+					'codes' => $errors,
+					'fields' => $this->scheduleValidationErrorFields($raw, $errors),
+					'code' => $errors[0],
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$sample = $params['sample'] ?? null;
+			if (is_string($sample)) {
+				$decoded = json_decode($sample, true);
+				if (is_array($decoded)) {
+					$sample = $decoded;
+				}
+			}
+			$sampleSpec = null;
+			if ($sample !== null) {
+				if (!is_array($sample)) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Validation failed'),
+						'errors' => ['sample' => 'VALIDATION_SHAPE'],
+						'code' => 'VALIDATION_SHAPE',
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$sampleWeekday = strtolower(trim((string)($sample['weekday'] ?? '')));
+				if (!in_array($sampleWeekday, WeekdaySchedule::DAYS, true)) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Validation failed'),
+						'errors' => ['sample' => 'VALIDATION'],
+						'fields' => ['sample.weekday' => $this->l10n->t('Choose a weekday.')],
+						'code' => 'VALIDATION',
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$sampleStart = self::parseScheduleHm($sample['start'] ?? null);
+				$sampleEnd = self::parseScheduleHm($sample['end'] ?? null);
+				if ($sampleStart === null || $sampleEnd === null || $sampleEnd <= $sampleStart) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Validation failed'),
+						'errors' => ['sample' => 'VALIDATION'],
+						'fields' => ['sample.end' => $this->l10n->t('Enter a clock-in and a later clock-out time such as 06:00 and 16:30.')],
+						'code' => 'VALIDATION',
+					], Http::STATUS_BAD_REQUEST);
+				}
+				$sampleSpec = [
+					'weekday' => $sampleWeekday,
+					'startMinutes' => $sampleStart,
+					'endMinutes' => $sampleEnd,
+				];
+			}
+
+			$schedule = WeekdaySchedule::fromValidated($raw);
+			$normalizedDoc = $schedule->toArray();
+			$tz = $this->timeZoneService()->storageTimeZone();
+			$tzName = $tz->getName();
+			$now = $this->timeZoneService()->nowInStorage();
+			$split = $schedule->getSplitService();
+
+			// §7.4: the first weekday with an interruption — or the sample
+			// weekday when one is given.
+			$weekday = $sampleSpec['weekday']
+				?? $this->firstMultiBlockWeekday($schedule)
+				?? $this->firstWorkWeekday($schedule)
+				?? 'mon';
+			$blocks = $schedule->blocksForWeekday($weekday);
+			$firstStartMin = $blocks[0][0] ?? 8 * 60;
+			$lastEndMin = $blocks !== [] ? $blocks[count($blocks) - 1][1] : 17 * 60;
+			$gaps = $schedule->gapsForWeekday($weekday);
+
+			// Reference cut-off: the configured one; for drafts without an
+			// automatic split (no cut-off stored) the day's latest
+			// interruption end is the boundary that matters.
+			$cutoffMin = null;
+			if ($split['cutoff'] !== null) {
+				$cutoffMin = self::parseScheduleHm($split['cutoff']);
+			}
+			if ($cutoffMin === null) {
+				$cutoffMin = $gaps !== [] ? $gaps[count($gaps) - 1][1] : $lastEndMin;
+			}
+
+			$ymd = $this->upcomingWeekdayYmd($now, $weekday);
+			$context = $this->splitPreviewContext($schedule, $normalizedDoc, $weekday, $tzName);
+			$startTs = $this->splitPreviewEpoch($tz, $ymd, $firstStartMin);
+			$cutoffTs = $this->splitPreviewEpoch($tz, $ymd, $cutoffMin);
+			$lastEndTs = $this->splitPreviewEpoch($tz, $ymd, $lastEndMin);
+
+			$rows = [];
+			$rows[] = ['key' => 'at_cutoff']
+				+ $this->computeSplitPreviewRow($context, $tz, $startTs, $cutoffTs);
+			$rows[] = ['key' => 'just_after']
+				+ $this->computeSplitPreviewRow($context, $tz, $startTs, $cutoffTs + 60);
+			$rows[] = ['key' => 'planned_day']
+				+ $this->computeSplitPreviewRow($context, $tz, $startTs, $lastEndTs);
+
+			if ($sampleSpec !== null) {
+				$sampleYmd = $this->upcomingWeekdayYmd($now, $sampleSpec['weekday']);
+				$sampleContext = $this->splitPreviewContext($schedule, $normalizedDoc, $sampleSpec['weekday'], $tzName);
+				$sampleStartTs = $this->splitPreviewEpoch($tz, $sampleYmd, $sampleSpec['startMinutes']);
+				$sampleEndTs = $this->splitPreviewEpoch($tz, $sampleYmd, $sampleSpec['endMinutes']);
+				$rows[] = ['key' => 'sample', 'weekday' => $sampleSpec['weekday']]
+					+ $this->computeSplitPreviewRow($sampleContext, $tz, $sampleStartTs, $sampleEndTs);
+			}
+
+			$cliffDelta = abs($rows[0]['creditedSeconds'] - $rows[1]['creditedSeconds']);
+
+			return new JSONResponse([
+				'success' => true,
+				'weekday' => $weekday,
+				'date' => $ymd,
+				'timezone' => $tzName,
+				'cutoff' => self::scheduleHmFromMinutes($cutoffMin),
+				'scheduleRevision' => WeekdaySchedule::revisionOf($normalizedDoc),
+				'rows' => $rows,
+				'cliffDeltaSeconds' => $cliffDelta,
+				'cliffNotice' => $cliffDelta >= 3600,
+			]);
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'code' => 'VALIDATION',
+			], Http::STATUS_BAD_REQUEST);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::workingTimeModelSplitPreview failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * First weekday carrying ≥ 2 blocks (an interruption exists), null when
+	 * no day qualifies.
+	 */
+	private function firstMultiBlockWeekday(WeekdaySchedule $schedule): ?string
+	{
+		foreach (WeekdaySchedule::DAYS as $day) {
+			if (count($schedule->blocksForWeekday($day)) >= 2) {
+				return $day;
+			}
+		}
+		return null;
+	}
+
+	private function firstWorkWeekday(WeekdaySchedule $schedule): ?string
+	{
+		foreach (WeekdaySchedule::DAYS as $day) {
+			if ($schedule->isWorkDay($day)) {
+				return $day;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The next local date (today included) falling on $weekday in the
+	 * caller's "now" — the representative date the preview evaluates.
+	 */
+	private function upcomingWeekdayYmd(\DateTimeInterface $now, string $weekday): string
+	{
+		$iso = ['mon' => 1, 'tue' => 2, 'wed' => 3, 'thu' => 4, 'fri' => 5, 'sat' => 6, 'sun' => 7][$weekday] ?? 1;
+		$date = \DateTimeImmutable::createFromInterface($now);
+		$delta = ($iso - (int)$date->format('N') + 7) % 7;
+		return $date->modify('+' . $delta . ' days')->format('Y-m-d');
+	}
+
+	/**
+	 * Epoch of wall time "$ymd + $minutesOfDay" in $tz. Block/cut-off
+	 * boundary DST ambiguity stays inside the engine (it yields state
+	 * `review`); the clock-in/out walls resolve leniently like any other
+	 * wall-clock input.
+	 */
+	private function splitPreviewEpoch(\DateTimeZone $tz, string $ymd, int $minutesOfDay): int
+	{
+		$hm = self::scheduleHmFromMinutes($minutesOfDay);
+		return (new \DateTimeImmutable($ymd . 'T' . $hm . ':00', $tz))->getTimestamp();
+	}
+
+	/**
+	 * `[start,end]` "HH:MM" block pairs for one weekday.
+	 *
+	 * @return list<array{0:string,1:string}>
+	 */
+	private function scheduleBlockPairs(WeekdaySchedule $schedule, string $day): array
+	{
+		$pairs = [];
+		foreach ($schedule->blocksForWeekday($day) as [$start, $end]) {
+			$pairs[] = [self::scheduleHmFromMinutes($start), self::scheduleHmFromMinutes($end)];
+		}
+		return $pairs;
+	}
+
+	/**
+	 * The §9.5 context a real entry would carry — built from the draft
+	 * schedule so the preview runs the identical engine inputs.
+	 *
+	 * @param array<string, mixed> $normalizedDoc stored-form schedule doc
+	 * @return array<string, mixed>
+	 */
+	private function splitPreviewContext(
+		WeekdaySchedule $schedule,
+		array $normalizedDoc,
+		string $weekday,
+		string $tzName,
+	): array {
+		$week = [];
+		foreach (WeekdaySchedule::DAYS as $day) {
+			$week[$day] = $this->scheduleBlockPairs($schedule, $day);
+		}
+		$split = $schedule->getSplitService();
+		return [
+			'v' => 1,
+			'model_id' => 0,
+			'schedule_revision' => WeekdaySchedule::revisionOf($normalizedDoc),
+			'timezone' => $tzName,
+			'day' => ['blocks' => $week[$weekday]],
+			'week' => $week,
+			'split' => [
+				'automatic' => $split['automatic'],
+				'cutoff' => $split['cutoff'],
+				'break_cover' => $split['breakCover'],
+			],
+			'overrides' => ['decision' => 'auto', 'worked' => []],
+		];
+	}
+
+	/**
+	 * One §7.4 preview row: run the split engine on R=[$startTs,$endTs) and
+	 * derive the credited seconds (own work minus statutory break; zero when
+	 * the interruption covers the break requirement).
+	 *
+	 * @return array{
+	 *   clockIn: string, clockOut: string, split: bool, state: string,
+	 *   reason: ?string, segments: list<array{0:string,1:string}>,
+	 *   interruptionSeconds: int, creditedSeconds: int, breakCovered: bool,
+	 * }
+	 */
+	private function computeSplitPreviewRow(
+		array $context,
+		\DateTimeZone $tz,
+		int $startTs,
+		int $endTs,
+	): array {
+		$result = SplitServiceAccounting::resolveSplit($context, $startTs, $endTs);
+		$excluded = (int)$result['excludedSeconds'];
+		$ownWork = max(0, ($endTs - $startTs) - $excluded);
+		$segmentsEpoch = $result['segmentsEpoch'];
+
+		$profile = $this->previewLawProfile();
+		$resolver = $this->breakPolicyResolver();
+		if ($resolver !== null) {
+			$mode = $resolver->deductionModeForUser(null);
+			$breakCalc = $resolver->minimalConsistentBreakSeconds($ownWork, 0, $mode, null);
+			$autoBreakSeconds = (int)$breakCalc['total_seconds'];
+			$requiredBreakMinutes = intdiv($autoBreakSeconds, 60);
+			$floorMinutes = $resolver->effectiveFloor(null);
+			$tiers = $resolver->effectiveTiers(null);
+		} else {
+			// No resolver (bare unit environment): law-profile-only strict
+			// fixpoint — deterministic, never laxer than the real merge.
+			$autoBreakSeconds = self::lawProfileFixpointBreakSeconds(
+				$profile->breakTiers,
+				$ownWork
+			);
+			$requiredBreakMinutes = intdiv($autoBreakSeconds, 60);
+			$floorMinutes = $profile->minBreakMinutes;
+			$tiers = $profile->breakTiers;
+		}
+
+		$maxStretchSeconds = null;
+		foreach ($tiers as $tier) {
+			$threshold = (int)round(((float)$tier['afterHours']) * 3600);
+			if ($threshold > 0) {
+				$maxStretchSeconds = $maxStretchSeconds === null
+					? $threshold
+					: min($maxStretchSeconds, $threshold);
+			}
+		}
+
+		$breakCovered = false;
+		if (($context['split']['break_cover'] ?? false) === true) {
+			// I_day = scheduled interruptions inside the presence window,
+			// minus own work (§9.6 step 10b).
+			$gapEpochs = SplitServiceAccounting::localGapEpochs($context, $startTs) ?? [];
+			$iDay = SplitServiceAccounting::subtract(
+				SplitServiceAccounting::intersect($gapEpochs, [[$startTs, $endTs]]),
+				$segmentsEpoch
+			);
+			$iDayPortions = array_map(
+				static fn (array $i): int => intdiv($i[1] - $i[0], 60),
+				$iDay
+			);
+			$stretches = array_map(
+				static fn (array $s): int => $s[1] - $s[0],
+				$segmentsEpoch
+			);
+			$coverage = SplitServiceAccounting::coverageCheck(
+				$requiredBreakMinutes,
+				$iDayPortions,
+				[],
+				$stretches,
+				$profile->allowedBreakSplitPatterns,
+				$floorMinutes,
+				$maxStretchSeconds
+			);
+			if ($coverage === SplitServiceAccounting::BREAK_COVERED_BY_INTERRUPTION) {
+				$breakCovered = true;
+				$autoBreakSeconds = 0;
+			}
+		}
+
+		$formatHm = static function (int $ts) use ($tz): string {
+			return (new \DateTimeImmutable('@' . $ts))->setTimezone($tz)->format('H:i');
+		};
+		$segments = [];
+		foreach ($segmentsEpoch as [$s, $e]) {
+			$segments[] = [$formatHm($s), $formatHm($e)];
+		}
+
+		return [
+			'clockIn' => $formatHm($startTs),
+			'clockOut' => $formatHm($endTs),
+			'split' => $result['split'],
+			'state' => $result['state'],
+			'reason' => $result['reason'],
+			'segments' => $segments,
+			'interruptionSeconds' => $excluded,
+			'creditedSeconds' => max(0, $ownWork - $autoBreakSeconds),
+			'breakCovered' => $breakCovered,
+		];
+	}
+
+	/**
+	 * Organisation/instance labour-law profile — static factory, no DI
+	 * needed, so the preview never depends on container availability.
+	 */
+	private function previewLawProfile(): \OCA\ArbeitszeitCheck\Support\LaborLawProfile
+	{
+		return LaborLawProfileFactory::profileForCountry($this->getConfiguredCountry());
+	}
+
+	/**
+	 * Strict-mode minimal consistent break deduction (seconds) from a raw
+	 * tier list — mirror of BreakPolicyResolver's fixpoint for the fallback
+	 * path when no resolver is injectable.
+	 *
+	 * @param list<array{afterHours: float, breakMinutes: int}> $tiers
+	 */
+	private static function lawProfileFixpointBreakSeconds(array $tiers, int $presenceSeconds): int
+	{
+		$candidates = [0];
+		foreach ($tiers as $tier) {
+			$candidates[] = (int)$tier['breakMinutes'] * 60;
+		}
+		$candidates = array_values(array_unique($candidates));
+		sort($candidates);
+		foreach ($candidates as $candidate) {
+			$net = max(0, $presenceSeconds - $candidate);
+			$required = 0;
+			foreach ($tiers as $tier) {
+				$threshold = (int)round(((float)$tier['afterHours']) * 3600);
+				if ($net > $threshold) {
+					$required = max($required, (int)$tier['breakMinutes'] * 60);
+				}
+			}
+			if ($required <= $candidate) {
+				return $candidate;
+			}
+		}
+		$top = end($candidates);
+		return $top === false ? 0 : (int)$top;
 	}
 
 	#[NoAdminRequired]

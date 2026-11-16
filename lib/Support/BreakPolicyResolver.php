@@ -979,14 +979,12 @@ final class BreakPolicyResolver
 			if ($liveId !== null && $entry->getId() === $liveId) {
 				continue; // live entry added below in its in-memory state
 			}
-			$span = $this->entryWorkSpan($entry, $dayStartTs, $dayEndTs);
-			if ($span !== null) {
+			foreach ($this->entryWorkSpans($entry, $dayStartTs, $dayEndTs) as $span) {
 				$intervals[] = $span;
 			}
 		}
 		if ($liveEntry !== null) {
-			$span = $this->entryWorkSpan($liveEntry, $dayStartTs, $dayEndTs);
-			if ($span !== null) {
+			foreach ($this->entryWorkSpans($liveEntry, $dayStartTs, $dayEndTs) as $span) {
 				$intervals[] = $span;
 			}
 		}
@@ -997,16 +995,82 @@ final class BreakPolicyResolver
 	/**
 	 * @return array{0:int,1:int}|null
 	 */
-	private function entryWorkSpan(TimeEntry $entry, int $clipStart, int $clipEnd): ?array
+	/**
+	 * Own-work spans of one entry clipped to [clipStart, clipEnd).
+	 *
+	 * Split-service (v2) entries with a terminal accounting result
+	 * (state `applied`/`review`) contribute their frozen `result.segments`
+	 * instead of the raw [start,end) span — the excluded interruption is
+	 * never own work (SPEC §9.6 step 8, W_day). Legacy (NULL context),
+	 * provisional (`active`) and defensively-unparseable results keep the
+	 * raw span so the legacy path stays byte-identical.
+	 *
+	 * @return list<array{0:int,1:int}>
+	 */
+	private function entryWorkSpans(TimeEntry $entry, int $clipStart, int $clipEnd): array
 	{
 		$start = $entry->getStartTime();
 		$end = $entry->getEndTime();
 		if ($start === null || $end === null) {
+			return [];
+		}
+		$segments = $this->splitResultEpochPairs($entry, 'segments');
+		if ($segments === null || $segments === []) {
+			$s = max($start->getTimestamp(), $clipStart);
+			$e = min($end->getTimestamp(), $clipEnd);
+			return $e > $s ? [[$s, $e]] : [];
+		}
+		$out = [];
+		foreach ($segments as [$ss, $se]) {
+			$s = max($ss, $clipStart);
+			$e = min($se, $clipEnd);
+			if ($e > $s) {
+				$out[] = [$s, $e];
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Stored `result.segments` / `result.excluded` ISO pairs of a
+	 * context-bearing entry as epoch pairs — or null when the entry has no
+	 * usable terminal context (legacy, provisional, or corrupt storage).
+	 * Null is always the conservative legacy fall-back: no clipping, no
+	 * subtraction.
+	 *
+	 * @return list<array{0:int,1:int}>|null
+	 */
+	private function splitResultEpochPairs(TimeEntry $entry, string $key): ?array
+	{
+		$result = $entry->getAccountingResult();
+		if (!is_array($result)) {
 			return null;
 		}
-		$s = max($start->getTimestamp(), $clipStart);
-		$e = min($end->getTimestamp(), $clipEnd);
-		return $e > $s ? [$s, $e] : null;
+		$state = $result['state'] ?? null;
+		if ($state !== 'applied' && $state !== 'review') {
+			return null;
+		}
+		$list = $result[$key] ?? null;
+		if (!is_array($list)) {
+			return null;
+		}
+		$out = [];
+		foreach ($list as $pair) {
+			if (!is_array($pair) || !isset($pair[0], $pair[1]) || !is_string($pair[0]) || !is_string($pair[1])) {
+				return null;
+			}
+			try {
+				$s = (new \DateTime($pair[0]))->getTimestamp();
+				$e = (new \DateTime($pair[1]))->getTimestamp();
+			} catch (\Throwable) {
+				return null;
+			}
+			if ($e <= $s) {
+				return null;
+			}
+			$out[] = [$s, $e];
+		}
+		return $out;
 	}
 
 	/**
@@ -1139,6 +1203,21 @@ final class BreakPolicyResolver
 			}
 		}
 
+		// v2 context: a recorded break inside the excluded interruption is
+		// already non-work — it must not deduct a second time (Be = B \ X,
+		// SPEC §9.6 step 9). Legacy/provisional results return null → the
+		// pieces stay untouched.
+		$excluded = $this->splitResultEpochPairs($entry, 'excluded');
+		if ($excluded !== null && $excluded !== [] && $out !== []) {
+			$pieces = [];
+			foreach ($out as $piece) {
+				foreach (SplitServiceAccounting::subtract([[$piece['start'], $piece['end']]], $excluded) as [$s, $e]) {
+					$pieces[] = ['start' => $s, 'end' => $e, 'automatic' => $piece['automatic']];
+				}
+			}
+			$out = $pieces;
+		}
+
 		return $out;
 	}
 
@@ -1214,6 +1293,55 @@ final class BreakPolicyResolver
 		$neededSeconds = $requiredMinutes * 60 - $daySummary['total_seconds'];
 		if ($neededSeconds <= 0) {
 			return null; // day already covered — no second auto break
+		}
+
+		// v2 context: every placement is restricted to the frozen own-work
+		// segments (mask = R \ X — a break may never land inside an excluded
+		// interruption, §9.6 step 10a). A single-segment mask is exactly the
+		// legacy span, so this path is a strict generalisation; a null/empty
+		// mask means legacy/provisional context → raw span below.
+		$mask = $this->splitResultEpochPairs($entry, 'segments');
+		if ($mask !== null && $mask !== []) {
+			// Prefer the longest segment; within each segment treat it as a
+			// mini shift span — first fit wins.
+			usort($mask, static fn (array $a, array $b): int => ($b[1] - $b[0]) <=> ($a[1] - $a[0]));
+			$tz = $this->timeZoneService->storageTimeZone();
+
+			if ($cappedTail) {
+				// Cap-overhang anchors to the chronologically last segment's
+				// end — it may end exactly AT that segment end.
+				$tail = null;
+				foreach ($mask as $seg) {
+					if ($tail === null || $seg[1] > $tail[1]) {
+						$tail = $seg;
+					}
+				}
+				$neededSeconds = (int)(ceil($neededSeconds / 60)) * 60;
+				if ($tail === null || $neededSeconds >= $tail[1] - $tail[0]) {
+					return null; // no segment can host the tail — caller marks review
+				}
+				return [
+					'start' => (new \DateTime('@' . ($tail[1] - $neededSeconds)))->setTimezone($tz),
+					'end' => (new \DateTime('@' . $tail[1]))->setTimezone($tz),
+					'seconds' => $neededSeconds,
+					'window' => null,
+				];
+			}
+
+			foreach ($mask as [$maskStart, $maskEnd]) {
+				foreach ($this->windows() as $window) {
+					$plan = $this->tryPlaceInWindow($entry, $window, $neededSeconds, $maskStart, $maskEnd);
+					if ($plan !== null) {
+						return $plan;
+					}
+				}
+				$segmentStart = (new \DateTime('@' . $maskStart))->setTimezone($tz);
+				$plan = $this->planMidpoint($segmentStart, $maskEnd, $neededSeconds);
+				if ($plan !== null) {
+					return $plan;
+				}
+			}
+			return null; // placement impossible in every segment — caller marks review
 		}
 
 		if ($cappedTail) {

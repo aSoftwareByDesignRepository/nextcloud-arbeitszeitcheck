@@ -316,6 +316,12 @@ class AdminControllerTest extends TestCase
 			null,
 			$this->buildTestBreakPolicyResolver($l10n),
 			$this->buildTestBreakPolicyStore(),
+			new \OCA\ArbeitszeitCheck\Service\TimeZoneService(
+				$this->iConfig,
+				$this->createMock(\OCP\IDateTimeZone::class),
+				$userSession,
+				new \Psr\Log\NullLogger(),
+			),
 		);
 	}
 
@@ -2275,6 +2281,301 @@ class AdminControllerTest extends TestCase
 
 		$this->assertTrue($data['success']);
 		$this->assertArrayHasKey('model', $data);
+	}
+
+	/** @return array<string, mixed> minimal valid v2 schedule (two-block Monday) */
+	private static function v2ScheduleDoc(): array
+	{
+		$day = [
+			'work' => true,
+			'blocks' => [
+				['start' => '06:00', 'end' => '10:00'],
+				['start' => '13:30', 'end' => '16:30'],
+			],
+			'breaks' => [],
+		];
+		$off = ['work' => false];
+		return [
+			'version' => 2,
+			'interruption_mode' => 'recorded_only',
+			'days' => [
+				'mon' => $day, 'tue' => $day, 'wed' => $day, 'thu' => $day,
+				'fri' => $day, 'sat' => $off, 'sun' => $off,
+			],
+		];
+	}
+
+	/** @return array<string, mixed> minimal valid v1 schedule */
+	private static function v1ScheduleDoc(): array
+	{
+		$day = ['work' => true, 'start' => '08:00', 'end' => '16:00', 'breaks' => []];
+		$off = ['work' => false];
+		return [
+			'days' => [
+				'mon' => $day, 'tue' => $day, 'wed' => $day, 'thu' => $day,
+				'fri' => $day, 'sat' => $off, 'sun' => $off,
+			],
+		];
+	}
+
+	private function storedModelWithSchedule(array $schedule): WorkingTimeModel
+	{
+		$model = new WorkingTimeModel();
+		$model->setId(1);
+		$model->setName('Stored');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(35.0);
+		$model->setDailyHours(7.0);
+		$model->setIsDefault(false);
+		$model->setBreakRulesArray(['weekday_schedule' => $schedule]);
+		$model->setUpdatedAt(new \DateTime());
+		return $model;
+	}
+
+	public function testUpdateWorkingTimeModelRejectsStaleScheduleRevision(): void
+	{
+		$stored = self::v1ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v1ScheduleDoc()],
+			'scheduleBaseRevision' => 'deadbeef-not-the-real-revision',
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('SCHEDULE_CONFLICT', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelAcceptsFreshScheduleRevision(): void
+	{
+		$stored = self::v1ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v1ScheduleDoc()],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf($stored),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->once())->method('update')->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	public function testUpdateWorkingTimeModelRejectsV1WriteOverStoredV2(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v2ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v1ScheduleDoc()],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('SCHEDULE_DOWNGRADE', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelRejectsMissingKeyOverStoredV2(): void
+	{
+		// Old client sends breakRules without weekday_schedule — the
+		// whole-document replace would silently destroy the stored v2 schedule.
+		$model = $this->storedModelWithSchedule(self::v2ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['break_policy' => 'flex'],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('SCHEDULE_DOWNGRADE', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelRejectsNullClearOnV2WithoutRevision(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v2ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => null],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertSame('SCHEDULE_DOWNGRADE', $response->getData()['code']);
+	}
+
+	public function testUpdateWorkingTimeModelAllowsExplicitNullClearWithFreshRevision(): void
+	{
+		$stored = self::v2ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => null, 'break_policy' => 'flex'],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf($stored),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(function (WorkingTimeModel $m): bool {
+				$rules = $m->getBreakRulesArray();
+				return !array_key_exists('weekday_schedule', $rules)
+					&& ($rules['break_policy'] ?? null) === 'flex';
+			}))
+			->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	public function testUpdateWorkingTimeModelClearOnAssignedV2RequiresSuccessor(): void
+	{
+		// Explicit null + fresh revision is unambiguous intent, but clearing
+		// the schedule still changes derived target hours for assignees —
+		// same successor requirement as a v1→v2 conversion.
+		$stored = self::v2ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => null],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf($stored),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('MODEL_IN_USE_REQUIRES_SUCCESSOR', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelV1ToV2OnAssignedModelRequiresSuccessor(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v2ScheduleDoc()],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('MODEL_IN_USE_REQUIRES_SUCCESSOR', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelV2EditOnAssignedIsImmutable(): void
+	{
+		// Assigned v2 model: changing the blocks would retroactively rewrite
+		// derived targets for past dates — must go through a successor copy.
+		$stored = self::v2ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$edited = self::v2ScheduleDoc();
+		$edited['days']['mon']['blocks'][1] = ['start' => '14:00', 'end' => '17:30'];
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => $edited],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('SCHEDULE_IMMUTABLE', $data['code']);
+	}
+
+	public function testUpdateWorkingTimeModelV2MutableFieldsAllowedOnAssigned(): void
+	{
+		// Name/description/schedule-identical saves stay mutable on an
+		// assigned v2 model.
+		$stored = self::v2ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Renamed model',
+			'breakRules' => ['weekday_schedule' => $stored],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->once())->method('update')->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	public function testUpdateWorkingTimeModelV1ToV2UnassignedUpdatesInPlace(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v2ScheduleDoc()],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(function (WorkingTimeModel $m): bool {
+				$rules = $m->getBreakRulesArray();
+				return ($rules['weekday_schedule']['version'] ?? null) === 2
+					// scalars are derived from the schedule, not the client
+					&& abs($m->getWeeklyHours() - 35.0) < 0.001
+					&& abs($m->getDailyHours() - 7.0) < 0.001;
+			}))
+			->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	public function testUpdateWorkingTimeModelSuccessorCloneLeavesSourceUntouched(): void
+	{
+		$source = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$sourceRulesBefore = $source->getBreakRulesArray();
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v2ScheduleDoc()],
+			'createSuccessor' => true,
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($source);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+		$inserted = null;
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->willReturnCallback(function (WorkingTimeModel $clone) use (&$inserted) {
+				$inserted = $clone;
+				$clone->setId(77);
+				return $clone;
+			});
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertTrue($data['success'], json_encode($data));
+		$this->assertTrue($data['createdSuccessor']);
+		$this->assertNotNull($inserted);
+		$rules = $inserted->getBreakRulesArray();
+		$this->assertSame(2, $rules['weekday_schedule']['version'] ?? null);
+		$this->assertFalse($inserted->getIsDefault());
+		$this->assertStringContainsString('(new)', $inserted->getName());
+		// The source entity must be byte-identical — conversion never rewrites
+		// the model that stays assigned to employees.
+		$this->assertSame($sourceRulesBefore, $source->getBreakRulesArray());
+		$this->assertSame(1, $source->getId());
 	}
 
 	public function testCreateWorkingTimeModelSyncsHoursFromWeekdaySchedule(): void
@@ -4836,5 +5137,377 @@ class AdminControllerTest extends TestCase
 		$this->assertTrue($data['success']);
 		$this->assertSame(0, $data['data']['affected_user_count']);
 		$this->assertSame(0, $data['data']['affected_entry_count']);
+	}
+
+	// ------------------------------------------------------------------ //
+	// Split-day working model: validation fields, mutability, preview     //
+	// ------------------------------------------------------------------ //
+
+	/**
+	 * Canonical split-day model M (spec §8): Mon–Fri blocks 06:00–10:00 +
+	 * 13:30–16:30, interruption 10:00–13:30, cut-off 16:00.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function splitModelMDoc(bool $breakCover = true): array
+	{
+		$doc = self::v2ScheduleDoc();
+		$doc['split_service'] = [
+			'automatic_split' => true,
+			'split_when_clock_out_after' => '16:00',
+			'interruption_counts_as_break' => $breakCover,
+		];
+		return $doc;
+	}
+
+	/** @return array<string, mixed> v2 doc with a single block per workday */
+	private static function singleBlockV2Doc(): array
+	{
+		$day = [
+			'work' => true,
+			'blocks' => [['start' => '08:00', 'end' => '16:00']],
+			'breaks' => [],
+		];
+		$off = ['work' => false];
+		return [
+			'version' => 2,
+			'interruption_mode' => 'recorded_only',
+			'days' => [
+				'mon' => $day, 'tue' => $day, 'wed' => $day, 'thu' => $day,
+				'fri' => $day, 'sat' => $off, 'sun' => $off,
+			],
+		];
+	}
+
+	private function createModelResponse(array $breakRules): JSONResponse
+	{
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Split model',
+			'type' => 'full_time',
+			'breakRules' => $breakRules,
+		]);
+		return $this->controller->createWorkingTimeModel();
+	}
+
+	public function testSplitConfigInvalidMapsToSplitServiceField(): void
+	{
+		$doc = self::v2ScheduleDoc();
+		// Form-encoded "false" is a string — strict bools only (§9.3).
+		$doc['split_service'] = [
+			'automatic_split' => 'false',
+			'split_when_clock_out_after' => null,
+			'interruption_counts_as_break' => false,
+		];
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_CONFIG_INVALID', $data['code']);
+		$this->assertSame('Choose on or off.', $data['fields']['weekday_schedule.split_service']);
+	}
+
+	public function testSplitCutoffInvalidMapsToCutoffField(): void
+	{
+		$doc = self::v2ScheduleDoc();
+		$doc['split_service'] = [
+			'automatic_split' => true,
+			'split_when_clock_out_after' => null,
+			'interruption_counts_as_break' => false,
+		];
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_CUTOFF_INVALID', $data['code']);
+		$this->assertSame(
+			'Enter a time such as 16:00.',
+			$data['fields']['weekday_schedule.split_service.split_when_clock_out_after']
+		);
+	}
+
+	public function testSplitCutoffBeforeInterruptionEndInterpolatesGapEnd(): void
+	{
+		$doc = self::splitModelMDoc();
+		// Latest interruption end is 13:30 — an earlier cut-off is invalid.
+		$doc['split_service']['split_when_clock_out_after'] = '12:00';
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_CUTOFF_BEFORE_INTERRUPTION_END', $data['code']);
+		$this->assertSame(
+			'The time must be at or after the end of the interruption (13:30).',
+			$data['fields']['weekday_schedule.split_service.split_when_clock_out_after']
+		);
+	}
+
+	public function testSplitNoInterruptionMapsToSplitSection(): void
+	{
+		$doc = self::singleBlockV2Doc();
+		$doc['split_service'] = [
+			'automatic_split' => true,
+			'split_when_clock_out_after' => '16:00',
+			'interruption_counts_as_break' => false,
+		];
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_NO_INTERRUPTION', $data['code']);
+		$this->assertSame(
+			'Add a second working block to at least one weekday.',
+			$data['fields']['weekday_schedule.split_service']
+		);
+	}
+
+	public function testSplitServiceOnV1ScheduleMapsToScheduleRoot(): void
+	{
+		$doc = self::v1ScheduleDoc();
+		$doc['split_service'] = [
+			'automatic_split' => true,
+			'split_when_clock_out_after' => '16:00',
+			'interruption_counts_as_break' => false,
+		];
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_REQUIRES_SCHEDULE_V2', $data['code']);
+		$this->assertArrayHasKey('weekday_schedule', $data['fields']);
+	}
+
+	public function testTopLevelSplitServiceKeyIsRejected(): void
+	{
+		// split_service only exists INSIDE the v2 weekday_schedule document —
+		// a top-level break_rules twin would never apply (§9.3).
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse([
+			'weekday_schedule' => self::v2ScheduleDoc(),
+			'split_service' => [
+				'automatic_split' => true,
+				'split_when_clock_out_after' => '16:00',
+				'interruption_counts_as_break' => false,
+			],
+		]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_REQUIRES_SCHEDULE_V2', $data['code']);
+		$this->assertArrayHasKey('weekday_schedule', $data['fields']);
+	}
+
+	public function testTouchingBlocksMapToWeekdayBlocksField(): void
+	{
+		$doc = self::v2ScheduleDoc();
+		$doc['days']['mon']['blocks'][1] = ['start' => '10:00', 'end' => '14:00'];
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->createModelResponse(['weekday_schedule' => $doc]);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SCHEDULE_BLOCK_TOUCHING', $data['code']);
+		$this->assertSame(
+			'Blocks must not touch; merge them or leave a gap.',
+			$data['fields']['weekday_schedule.days.mon.blocks']
+		);
+	}
+
+	public function testUpdateWorkingTimeModelSplitOnlyChangeOnAssignedV2IsAllowedAndAudited(): void
+	{
+		// §9.4: split_service stays mutable on an assigned v2 model — only
+		// entries whose context is pinned after the save see the change.
+		$stored = self::v2ScheduleDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$incoming = self::v2ScheduleDoc();
+		$incoming['split_service'] = [
+			'automatic_split' => true,
+			'split_when_clock_out_after' => '16:00',
+			'interruption_counts_as_break' => true,
+		];
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => $incoming],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->once())->method('update')->willReturnArgument(0);
+
+		$logged = [];
+		$this->auditLogMapper->method('logAction')
+			->willReturnCallback(function (...$args) use (&$logged) {
+				$logged[] = $args;
+				return new AuditLog();
+			});
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertTrue($data['success'], json_encode($data));
+
+		$splitEvents = array_values(array_filter(
+			$logged,
+			static fn (array $a): bool => $a[1] === 'working_time_model_split_options_changed'
+		));
+		$this->assertCount(1, $splitEvents);
+		[$actor, , $entityType, $entityId, $oldValues, $newValues] = $splitEvents[0];
+		$this->assertSame('working_time_model', $entityType);
+		$this->assertSame(['split_service' => null], $oldValues);
+		$this->assertSame([
+			'split_service' => [
+				'automatic_split' => true,
+				'split_when_clock_out_after' => '16:00',
+				'interruption_counts_as_break' => true,
+			],
+		], $newValues);
+	}
+
+	public function testUpdateWorkingTimeModelSplitAndDaysChangeOnAssignedV2StaysImmutable(): void
+	{
+		// Mutability is scoped to the split_service sub-tree only — a block
+		// change riding along must still force a successor copy.
+		$stored = self::splitModelMDoc();
+		$model = $this->storedModelWithSchedule($stored);
+		$incoming = self::splitModelMDoc();
+		$incoming['split_service']['split_when_clock_out_after'] = '17:00';
+		$incoming['days']['mon']['blocks'][1] = ['start' => '14:00', 'end' => '17:30'];
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => $incoming],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('SCHEDULE_IMMUTABLE', $data['code']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewComputesCutoffCliff(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'weekday_schedule' => self::splitModelMDoc(true),
+		]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], json_encode($data));
+		$this->assertSame('mon', $data['weekday']);
+		$this->assertSame('16:00', $data['cutoff']);
+
+		$rows = array_column($data['rows'], null, 'key');
+		// Clock-out exactly at the cut-off → continuous (boundary inclusive),
+		// legacy accounting: 10 h − 45 min statutory break.
+		$this->assertFalse($rows['at_cutoff']['split']);
+		$this->assertSame(0, $rows['at_cutoff']['interruptionSeconds']);
+		$this->assertSame(33300, $rows['at_cutoff']['creditedSeconds']);
+		$this->assertFalse($rows['at_cutoff']['breakCovered']);
+
+		// One minute later → split; interruption covers the break (K on).
+		$this->assertTrue($rows['just_after']['split']);
+		$this->assertSame(12600, $rows['just_after']['interruptionSeconds']);
+		$this->assertTrue($rows['just_after']['breakCovered']);
+		$this->assertSame(23460, $rows['just_after']['creditedSeconds']);
+		$this->assertSame(
+			[['06:00', '10:00'], ['13:30', '16:01']],
+			$rows['just_after']['segments']
+		);
+
+		// Planned day: split, credited = own work (interruption covers break).
+		$this->assertTrue($rows['planned_day']['split']);
+		$this->assertTrue($rows['planned_day']['breakCovered']);
+		$this->assertSame(25200, $rows['planned_day']['creditedSeconds']);
+		$this->assertSame(
+			[['06:00', '10:00'], ['13:30', '16:30']],
+			$rows['planned_day']['segments']
+		);
+
+		// The cliff is real: |33 300 − 23 460| = 9 840 s ≥ 3 600 → notice.
+		$this->assertSame(9840, $data['cliffDeltaSeconds']);
+		$this->assertTrue($data['cliffNotice']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewBreakCoverOffDeductsStatutoryBreak(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'weekday_schedule' => self::splitModelMDoc(false),
+		]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], json_encode($data));
+
+		$rows = array_column($data['rows'], null, 'key');
+		// K off: interruption is excluded but does not cover the statutory
+		// break → 30 min auto deduction on 7 h own work (spec A05).
+		$this->assertTrue($rows['planned_day']['split']);
+		$this->assertFalse($rows['planned_day']['breakCovered']);
+		$this->assertSame(23400, $rows['planned_day']['creditedSeconds']);
+		$this->assertSame(21660, $rows['just_after']['creditedSeconds']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewSampleRowOnNonWorkDay(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'weekday_schedule' => self::splitModelMDoc(true),
+			'sample' => ['weekday' => 'sat', 'start' => '06:00', 'end' => '16:30'],
+		]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], json_encode($data));
+		$this->assertSame('sat', $data['weekday']);
+
+		$rows = array_column($data['rows'], null, 'key');
+		$this->assertArrayHasKey('sample', $rows);
+		// Saturday carries no blocks — the engine reports the reason, no split.
+		$this->assertFalse($rows['sample']['split']);
+		$this->assertSame('no_interruption_today', $rows['sample']['reason']);
+		$this->assertSame(0, $rows['sample']['interruptionSeconds']);
+		$this->assertSame(35100, $rows['sample']['creditedSeconds']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewRejectsInvalidDraft(): void
+	{
+		$doc = self::v2ScheduleDoc();
+		$doc['days']['mon']['blocks'][1] = ['start' => '10:00', 'end' => '14:00'];
+		$this->request->method('getParams')->willReturn(['weekday_schedule' => $doc]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SCHEDULE_BLOCK_TOUCHING', $data['code']);
+		$this->assertArrayHasKey('weekday_schedule.days.mon.blocks', $data['fields']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewRejectsOversizePayload(): void
+	{
+		$doc = self::splitModelMDoc();
+		// Payload-size guard fires before validation — the pad key itself is
+		// never inspected.
+		$doc['pad'] = str_repeat('x', 40000);
+		$this->request->method('getParams')->willReturn(['weekday_schedule' => $doc]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_REQUEST_ENTITY_TOO_LARGE, $response->getStatus());
+		$this->assertSame('SCHEDULE_PAYLOAD_LIMIT', $data['code']);
+	}
+
+	public function testWorkingTimeModelSplitPreviewRejectsInvalidSample(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'weekday_schedule' => self::splitModelMDoc(),
+			'sample' => ['weekday' => 'mon', 'start' => '16:30', 'end' => '06:00'],
+		]);
+
+		$response = $this->controller->workingTimeModelSplitPreview();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
 	}
 }

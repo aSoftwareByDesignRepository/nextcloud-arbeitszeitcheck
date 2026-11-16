@@ -409,6 +409,27 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::updateTariffRuleSet' => ['modules' => [['moduleType' => 'base_formula', 'config' => ['reference_days' => 260, 'reference_week_days' => 5]]]],
 		// Required-key guards (missing key must not silently write the toggle).
 		'AdminController::setTeamsUseAppTeams' => ['useAppTeams' => true],
+		// Split-service preview: valid v2 draft with two Monday blocks so the
+		// happy-path probe reaches the engine instead of SCHEDULE_INVALID.
+		'AdminController::workingTimeModelSplitPreview' => [
+			'weekday_schedule' => [
+				'version' => 2,
+				'days' => [
+					'mon' => ['work' => true, 'blocks' => [['start' => '06:00', 'end' => '10:00'], ['start' => '13:30', 'end' => '16:30']], 'breaks' => []],
+					'tue' => ['work' => false, 'blocks' => [], 'breaks' => []],
+					'wed' => ['work' => false, 'blocks' => [], 'breaks' => []],
+					'thu' => ['work' => false, 'blocks' => [], 'breaks' => []],
+					'fri' => ['work' => false, 'blocks' => [], 'breaks' => []],
+					'sat' => ['work' => false, 'blocks' => [], 'breaks' => []],
+					'sun' => ['work' => false, 'blocks' => [], 'breaks' => []],
+				],
+				'split_service' => [
+					'automatic_split' => true,
+					'split_when_clock_out_after' => '16:00',
+					'interruption_counts_as_break' => true,
+				],
+			],
+		],
 		'KioskAdminController::setUserAllowed' => ['kioskAllowed' => true],
 		'KioskAdminController::importCredentials' => ['csv' => "uid,type\nbob,pin"],
 		'ManagerController::correctTimeEntry' => [

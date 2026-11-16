@@ -2008,6 +2008,61 @@ class ComplianceServiceTest extends TestCase
 		$this->service->checkComplianceForCompletedEntry($entry, true, false);
 	}
 
+	/**
+	 * Split-day model (spec §7.3/§9.6): when the frozen accounting result
+	 * declares `break_handling = covered_by_interruption`, the break check
+	 * reports coverage with the exact prescribed wording — an informational
+	 * result, never a missing-break violation and never "break taken".
+	 * Daily-max/rest-period checks are unaffected (they run independently).
+	 */
+	public function testCoveredByInterruptionReportsCoverageNotMissingBreak(): void
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$entry = new TimeEntry();
+		$entry->setUserId('user1');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		// F1: 06:00–16:30, interruption 10:00–13:30 excluded → net 7.00 h,
+		// no recorded break → would be a §4 violation without coverage.
+		$entry->setStartTime(new \DateTime('2024-06-10 06:00:00', $tz));
+		$entry->setEndTime(new \DateTime('2024-06-10 16:30:00', $tz));
+		$entry->setWorkContextJson(json_encode([
+			'v' => 1,
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'reason' => 'clock_out_after_cutoff',
+				'excluded' => [['2024-06-10T10:00:00+02:00', '2024-06-10T13:30:00+02:00']],
+				'segments' => [
+					['2024-06-10T06:00:00+02:00', '2024-06-10T10:00:00+02:00'],
+					['2024-06-10T13:30:00+02:00', '2024-06-10T16:30:00+02:00'],
+				],
+				'break_handling' => 'covered_by_interruption',
+				'engine' => 1,
+			],
+		]));
+		$entry->setExcludedWorkSeconds(12600);
+
+		$violations = $this->service->checkComplianceForCompletedEntry($entry, false, false);
+
+		$covered = array_values(array_filter(
+			$violations,
+			static fn (array $v): bool => ($v['type'] ?? null) === ComplianceViolation::TYPE_BREAK_COVERED_BY_INTERRUPTION
+		));
+		$this->assertCount(1, $covered);
+		$this->assertSame(ComplianceViolation::SEVERITY_INFO, $covered[0]['severity']);
+		$this->assertSame(
+			'Break requirement covered by scheduled interruption (employer setting)',
+			$covered[0]['message']
+		);
+
+		// No missing-break violation may be produced for a covered entry.
+		foreach ($violations as $v) {
+			$this->assertNotSame(ComplianceViolation::TYPE_MISSING_BREAK, $v['type']);
+		}
+		// The statutory save-blocker must not fire "missing break" either.
+		$this->assertSame([], $this->service->blockingIssuesForCompletedEntry($entry));
+	}
+
 	public function testRunDailyComplianceCheckCountsUsersAndHonoursAccessGate(): void
 	{
 		$allowed = $this->createMock(\OCP\IUser::class);

@@ -408,9 +408,15 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		\OCP\Server::get(IUserSession::class)->setUser($user);
 		$start = new \DateTimeImmutable($this->weekday(80));
-		$end = $start->modify('+2 days');
-		while ((int)$end->format('N') > 5) {
+		// Advance the end by two chargeable weekdays — a plain '+2 days' +
+		// weekend bump leaves no interior working day when start is a Friday
+		// (Fri–Mon gives 0.5+0.5 chargeable, not 2.0).
+		$end = $start;
+		for ($i = 0; $i < 2; $i++) {
 			$end = $end->modify('+1 day');
+			while ((int)$end->format('N') > 5) {
+				$end = $end->modify('+1 day');
+			}
 		}
 		$svc = \OCP\Server::get(AbsenceService::class);
 		$row = $svc->createAbsence([

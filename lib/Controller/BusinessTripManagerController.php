@@ -51,7 +51,7 @@ final class BusinessTripManagerController extends Controller
 		parent::__construct($appName, $request);
 	}
 
-	/** GET /api/manager/business-trips — submitted trips within scope. */
+	/** GET /api/manager/business-trips — pending reviews first, decided trips below, within scope. */
 	#[NoAdminRequired]
 	public function index(): JSONResponse
 	{
@@ -71,7 +71,7 @@ final class BusinessTripManagerController extends Controller
 			? null
 			: array_fill_keys($this->permissions->getManagedEmployeeIds($manager), true);
 		$items = [];
-		foreach ($this->tripMapper->findSubmitted(200) as $trip) {
+		foreach (array_merge($this->tripMapper->findSubmitted(200), $this->tripMapper->findDecided(500)) as $trip) {
 			if ($members === null || isset($members[(string)$trip->getUserId()])) {
 				$items[] = $this->serialize($trip);
 			}

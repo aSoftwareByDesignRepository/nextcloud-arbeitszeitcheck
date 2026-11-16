@@ -120,8 +120,11 @@ test.describe('Manager business-trip queue table (Docker dev)', () => {
 		await expect(cells.nth(0)).toHaveAttribute('data-label', 'Employee')
 		await expect(cells.nth(1)).toHaveAttribute('data-label', 'Business trip')
 		await expect(cells.nth(2)).toHaveAttribute('data-label', 'Purpose')
-		await expect(cells.nth(3)).toHaveAttribute('data-label', 'Submitted')
-		await expect(cells.nth(4)).toHaveAttribute('data-label', 'Actions')
+		await expect(cells.nth(3)).toHaveAttribute('data-label', 'Status')
+		await expect(cells.nth(4)).toHaveAttribute('data-label', 'Updated')
+		await expect(cells.nth(5)).toHaveAttribute('data-label', 'Actions')
+		// The workflow state is visible as a status chip, not bare text.
+		await expect(cells.nth(3).locator('.azc-status-chip')).toHaveAttribute('data-status', 'submitted')
 		// Employee cell carries the readable name (+ uid subline when it differs).
 		await expect(cells.nth(0).locator('.mbt-emp__name')).not.toHaveText('')
 		// The shared pager reports the queue size.

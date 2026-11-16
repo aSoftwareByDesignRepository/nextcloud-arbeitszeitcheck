@@ -23,24 +23,31 @@ const MGR_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
 
 /** Unique far-future window per call — trips persist in the dev DB, so
- * fixed dates collide with prior runs (overlap validator). */
+ * fixed dates collide with prior runs (overlap validator). Retries with
+ * a fresh window on overlap. */
 async function createTrip(page, purpose) {
-	const base = new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000
-	const start = new Date(base)
-	const end = new Date(base + 86400000)
 	const iso = (d) => d.toISOString().slice(0, 10)
-	const created = await api(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
-		data: {
-			startsAtUtc: `${iso(start)}T07:00:00Z`,
-			endsAtUtc: `${iso(end)}T16:00:00Z`,
-			originTimezone: 'Europe/Berlin',
-			destinationTimezone: 'Europe/Berlin',
-			evaluationTimezone: 'Europe/Berlin',
-			purpose,
-			requestKey: `e2e-mbt-cas-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-		},
-	})
-	return created.trip.id
+	for (let attempt = 0; attempt < 8; attempt++) {
+		const base = new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
+		const res = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
+			data: {
+				startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
+				endsAtUtc: `${iso(new Date(base + 86400000))}T16:00:00Z`,
+				originTimezone: 'Europe/Berlin',
+				destinationTimezone: 'Europe/Berlin',
+				evaluationTimezone: 'Europe/Berlin',
+				purpose,
+				requestKey: `e2e-mbt-cas-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+			},
+		})
+		if (res.ok) {
+			return res.json.trip.id
+		}
+		if (!/overlap/i.test(res.json?.error || '')) {
+			throw new Error(`trip create failed (${res.status}): ${res.json?.error || 'unknown'}`)
+		}
+	}
+	throw new Error('could not place a non-overlapping trip after 8 attempts')
 }
 
 async function submitTrip(page, tripId) {

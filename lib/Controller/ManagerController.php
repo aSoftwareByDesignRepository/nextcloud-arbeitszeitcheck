@@ -781,6 +781,7 @@ class ManagerController extends Controller
 		}
 
 		$this->registerFrontEndAssets('arbeitszeitcheck-main', 'business-trips', ['business-trips'], ['common/table-pager']);
+		Util::addScript('arbeitszeitcheck', 'common/datepicker');
 		Util::addScript('arbeitszeitcheck', 'manager-business-trips');
 
 		try {

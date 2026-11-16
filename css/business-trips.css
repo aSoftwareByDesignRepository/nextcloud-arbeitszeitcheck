@@ -1,8 +1,9 @@
 /* Business trips — employee, manager, and admin surfaces. */
 
-/* Trip list table: slightly taller rows than the shared td base
+/* Trip list + manager queue tables: slightly taller rows than the shared td base
    (space-3 = 12px → 14px = +4px row height). */
-#app-content.azc-app #bt-trip-table tbody td {
+#app-content.azc-app #bt-trip-table tbody td,
+#app-content.azc-app #mbt-queue-table tbody td {
 	padding-block: calc(var(--azc-space-3, var(--space-3, 12px)) + 2px);
 }
 
@@ -83,12 +84,14 @@
 }
 
 /* Title row and value row are explicit stacked rows — dd base styles
-   (margin-left) must not leak in, and long German labels wrap cleanly. */
+   (margin-left) must not leak in, long German labels wrap cleanly, and the
+   label aligns to the tile's start edge (shared dl dt rules align it end). */
 .bt-summary__item dt {
 	flex: 0 0 auto;
 	font-size: 0.82em;
 	color: var(--color-text-maxcontrast, #767676);
 	margin: 0;
+	text-align: start;
 	overflow-wrap: anywhere;
 }
 
@@ -120,19 +123,111 @@
 	gap: 8px;
 }
 
+/* Review detail: plain sections — no card chrome — separated by a thin
+   divider. Only lives inside the review dialog. */
 .mbt-cards {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-	gap: 16px;
-	margin-block: 16px;
+	margin-block: var(--azc-space-4, 16px);
 }
 
-.mbt-reject-group {
-	margin-block-start: 12px;
-	max-width: 560px;
+.mbt-card + .mbt-card {
+	border-top: 1px solid var(--color-border);
+	margin-top: var(--azc-space-4, 16px);
+	padding-top: var(--azc-space-4, 16px);
+}
+
+/* Section titles keep default heading styling; spacing only. */
+dialog#mbt-detail .mbt-card > h3 {
+	margin: 0 0 var(--azc-space-3, 12px);
+}
+
+/* Empty helper/status lines must not add phantom margins. */
+dialog#mbt-detail #mbt-detail-status-msg:empty,
+dialog#mbt-detail #mbt-linked-summary:empty {
+	display: none;
+}
+
+
+/* Reject dialog uses the modal-header/body/footer recipe — the loose-content
+   frame padding (dialog.azc-dialog:not(:has(.azc-dialog__body))) must not
+   double-pad it. Bare selector: dialogs render in the top layer. */
+dialog#mbt-reject-dialog,
+dialog#mbt-detail {
+	padding: 0;
+}
+
+/* Centered like the shared-pack recipe (position:fixed; inset:0; margin:auto) —
+   azc's [open] rule only sets margin:auto, which left the box at 0,0. */
+dialog#mbt-reject-dialog[open],
+dialog#mbt-detail[open] {
+	position: fixed;
+	inset: 0;
+	margin: auto;
+}
+
+/* Trip review dialog: title + subtitle take the free header space, status
+   chip and close button dock right. */
+dialog#mbt-detail .mbt-detail-heading {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+dialog#mbt-detail .mbt-detail-subtitle {
+	margin: var(--azc-space-1, 4px) 0 0;
+	font-size: 0.875em;
+	color: var(--color-text-maxcontrast);
+}
+
+/* Inside the modal the review sections stack — plain flow; the day table's
+   table-container scrolls internally on narrow widths. */
+
+/* Halved section padding (space-4 → space-2) and no footer tint — the page
+   asked for a compact confirm dialog, not the full modal chrome. The review
+   dialog keeps canonical padding but the same untinted footer. */
+dialog#mbt-reject-dialog .modal-header,
+dialog#mbt-reject-dialog .modal-body,
+dialog#mbt-reject-dialog .modal-footer {
+	padding: var(--azc-space-2, 8px);
+}
+
+dialog#mbt-reject-dialog .modal-footer,
+dialog#mbt-detail .modal-footer {
+	background-color: transparent;
+}
+
+/* Empty status line still burns a 16px flex-gap slot above the table. */
+#app-content.azc-app #mbt-queue-status:empty {
+	display: none;
+}
+
+/* Trip queue filter row: employee | status | date range | reset. Same
+   recipe as the shared .azc-filter-grid, just column proportions for this
+   field order. Scoped to ≥769px — the generic collapse owns mobile. */
+@media (min-width: 769px) {
+	#app-content.azc-app .azc-filter-grid--trips {
+		grid-template-columns:
+			minmax(0, 1.15fr)
+			minmax(0, 0.85fr)
+			minmax(0, 1.6fr)
+			auto;
+	}
+}
+
+/* datepicker.js marks hosts inside .azc-date-range__part as --flex
+   (flex: 1 1 10rem). The part is flex-direction:column, so that basis is a
+   *height* — the host balloons to ~10rem and the absolute toggle lands below
+   the input. The part owns the width; the host just wraps the input. */
+#app-content.azc-app .azc-filter-grid--trips .azc-date-range__part .azc-datepicker-host {
+	flex: 0 0 auto;
+	width: 100%;
 }
 
 /* Manager review queue: employee cell keeps name + uid on two lines. */
+#app-content.azc-app #mbt-queue-table .mbt-trip {
+	display: flex;
+	flex-direction: column;
+	white-space: nowrap;
+}
+
 #app-content.azc-app #mbt-queue-table .mbt-emp {
 	display: flex;
 	flex-direction: column;

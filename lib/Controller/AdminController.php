@@ -101,6 +101,7 @@ use OCP\Util;
  * SecurityMiddleware does not demand a system admin. AppAdminMiddleware
  * then enforces PermissionService::isAdmin() (system admin OR delegated
  * app administrator from app_admin_user_ids).
+	 * unique-conflict:ok — the only unique-table insert (tariff rule set) sits in atomic() whose enclosing catch checks isUniqueConstraintViolation and returns the duplicate response; update endpoints reject unique-column mutation (tariffCode/version forbidden); member/manager link writes go through mappers that catch REASON_UNIQUE_CONSTRAINT_VIOLATION idempotently; other flagged sites write non-unique-indexed tables or are idempotent catch-and-log migration inserts.
  */
 class AdminController extends Controller
 {

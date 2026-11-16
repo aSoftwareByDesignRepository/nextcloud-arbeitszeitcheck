@@ -33,6 +33,7 @@ use OCP\Lock\ILockingProvider;
 
 /**
  * TimeTracking service for time tracking business logic
+	 * unique-conflict:ok — all entry mutations run under acquireUserMutationLock(userId) LOCK_EXCLUSIVE plus month-closure range locks and beginTransaction; private helpers are only invoked while that lock is held.
  */
 class TimeTrackingService
 {

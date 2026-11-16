@@ -24,6 +24,7 @@ use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 
+	// unique-conflict:ok — session writes run inside the acquired LOCK_EXCLUSIVE span + transaction; the check-then-act window is closed by the lock.
 class KioskAuthService
 {
 	public function __construct(

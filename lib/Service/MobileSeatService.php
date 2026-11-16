@@ -13,6 +13,7 @@ use OCP\IDBConnection;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 
+	// unique-conflict:ok — seat writes run under DbLockGuard::acquire(DbLockKeys::mobileSeatCapacity(), LOCK_EXCLUSIVE) + enclosing transaction (assignSeat/revokeSeat); check-then-act is lock-serialised.
 class MobileSeatService
 {
 

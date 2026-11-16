@@ -16,6 +16,7 @@ use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 
+	// unique-conflict:ok — enrollment writes serialise on user+terminal enrollment locks (acquireExclusiveWithRetry, documented lock order); insert/update sites sit inside the locked spans.
 class KioskEnrollmentService
 {
 	private const SCAN_ERROR_TTL = 300;

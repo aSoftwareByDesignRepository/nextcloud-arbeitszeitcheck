@@ -31,6 +31,7 @@ use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 use Psr\Log\LoggerInterface;
 
+	// unique-conflict:ok — persistFinalizedMonth is only invoked under acquireFinalizeLock() (per user+year+month LOCK_EXCLUSIVE) and reopenMonth takes the same lock; writes are inside the lock-held transaction.
 class MonthClosureService
 {
 	/** Stored in finalized_by / audit when the daily job seals a month. */

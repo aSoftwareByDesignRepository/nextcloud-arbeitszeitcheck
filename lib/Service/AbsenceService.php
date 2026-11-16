@@ -38,6 +38,7 @@ use OCP\IUserManager;
 
 /**
  * Absence service for absence management business logic
+	 * unique-conflict:ok — mutation methods acquire the per-user mutation lock (acquireUserMutationLock) plus month-closure locks and absence-window row locks before beginTransaction; helpers (doAutoApproveDbWork) are only invoked inside those locked spans.
  */
 class AbsenceService
 {

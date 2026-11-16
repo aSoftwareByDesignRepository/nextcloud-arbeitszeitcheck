@@ -13,6 +13,7 @@ use OCP\Lock\ILockingProvider;
 
 /**
  * Commercial terminal device slots (links to kiosk terminals in Track C).
+	 * unique-conflict:ok — every write site is serialised by DbLockGuard::acquire(DbLockKeys::terminalDeviceSlot(), LOCK_EXCLUSIVE) inside its own beginTransaction/commit; the check-then-act window is closed by the lock, not by a catch.
  */
 class TerminalDeviceService
 {

@@ -15,6 +15,7 @@ use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 
+	// unique-conflict:ok — credential writes serialise per cred via KioskCredentialLockKeys/DbLockGuard LOCK_EXCLUSIVE before the mapper call; lockout counter writes hold the per-cred lock.
 class KioskCredentialService
 {
 	private const IMPORT_MAX_BYTES = 1_048_576;

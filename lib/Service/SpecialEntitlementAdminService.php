@@ -42,6 +42,7 @@ use OCP\IDBConnection;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 
+	// unique-conflict:ok — all write sites run under DbLockGuard::acquire(policyCatalog/policyCohort/absenceTypeCatalog, LOCK_EXCLUSIVE) + enclosing transactions; concurrent writers serialise on the same lock key.
 final class SpecialEntitlementAdminService
 {
 	private const LABEL_PATTERN_MAX = 80;

@@ -772,6 +772,7 @@ class LayeredVacationDefaultsService
  * Domain validation error. Carries a field => message map identical in shape
  * to `Entity::validate()` output so the admin controller can pipe it back to
  * the form unchanged.
+	 * unique-conflict:ok — upsert/delete writes run under acquireWriteLock(DbLockKeys::vacationLayered*) LOCK_EXCLUSIVE wrapping the atomic write unit; the unique-column write is lock-serialised.
  */
 class LayeredVacationValidationException extends \RuntimeException
 {

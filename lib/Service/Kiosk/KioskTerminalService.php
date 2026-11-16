@@ -15,6 +15,7 @@ use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCP\Lock\ILockingProvider;
 
+	// unique-conflict:ok — pairing/revoke/expire writes run under DbLockGuard::acquire(DbLockKeys::kioskPairing(), LOCK_EXCLUSIVE); createPendingTerminal's unique column is a generateUuid() derived key — no user-controlled collision surface.
 class KioskTerminalService
 {
 

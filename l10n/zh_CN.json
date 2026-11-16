@@ -6079,19 +6079,19 @@
 		"Zeiteinträge von Mitarbeitenden öffnen": "打开员工工时记录",
 		"Zug": "楚格州",
 		"Zurich": "苏黎世州",
-		"_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+		"_1 Nextcloud account without app access is hidden._::_%n Nextcloud accounts without app access are hidden._": [
 			"已隐藏 %n 个无应用权限的 Nextcloud 账户。"
 		],
-		"_1 employee matches your search_:: _%n employees match your search_": [
+		"_1 employee matches your search_::_%n employees match your search_": [
 			"%n 名员工匹配您的搜索"
 		],
-		"_1 employee_:: _%n employees_": [
+		"_1 employee_::_%n employees_": [
 			"%n 名员工"
 		],
-		"_1 entry_:: _%n entries_": [
+		"_1 entry_::_%n entries_": [
 			"%n 条"
 		],
-		"_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+		"_1 more character needed ({count} of {min})_::_%n more characters needed ({count} of {min})_": [
 			"还需 %n 个字符（{count} / {min}）"
 		],
 		"_{count} day ago_::_{count} days ago_": [
@@ -6517,42 +6517,42 @@
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "“生成订阅 URL”为一个范围创建首个链接。“吊销并轮换”替换现有链接——旧 URL 立即失效。",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "“放置”把自动休息安排在时段内。“要求”表示休息必须与该时段重叠指定分钟数。",
 		"…": "…",
-		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+		"_1 row needs a value on this instance_::_%n rows need a value on this instance_": [
 			"%n 行需要在此实例上填写值"
 		],
 		"1 row needs a value on this instance": "1 行需要在此实例上填写值",
 		"%n rows need a value on this instance": "%n 行需要在此实例上填写值",
-		"_1 row skipped._:: _%n rows skipped._": [
+		"_1 row skipped._::_%n rows skipped._": [
 			"已跳过 %n 行。"
 		],
 		"1 row skipped.": "已跳过 1 行。",
 		"%n rows skipped.": "已跳过 %n 行。",
-		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+		"_1 reference unresolved — see the groups below._::_%n references unresolved — see the groups below._": [
 			"%n 个引用未能解析——请查看下方分组。"
 		],
 		"1 reference unresolved — see the groups below.": "1 个引用未能解析——请查看下方分组。",
 		"%n references unresolved — see the groups below.": "%n 个引用未能解析——请查看下方分组。",
-		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+		"_(1 env-bound value emptied)_::_(%n env-bound values emptied)_": [
 			"（已清空 %n 个实例绑定值）"
 		],
 		"(1 env-bound value emptied)": "（已清空 1 个实例绑定值）",
 		"(%n env-bound values emptied)": "（已清空 %n 个实例绑定值）",
-		"_(1 filtered)_:: _(%n filtered)_": [
+		"_(1 filtered)_::_(%n filtered)_": [
 			"（已过滤 %n 项）"
 		],
 		"(1 filtered)": "（已过滤 1 项）",
 		"(%n filtered)": "（已过滤 %n 项）",
-		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+		"_(1 secret redacted)_::_(%n secrets redacted)_": [
 			"（已遮蔽 %n 个机密）"
 		],
 		"(1 secret redacted)": "（已遮蔽 1 个机密）",
 		"(%n secrets redacted)": "（已遮蔽 %n 个机密）",
-		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+		"_(1 unresolved ref)_::_(%n unresolved refs)_": [
 			"（%n 个引用未解析）"
 		],
 		"(1 unresolved ref)": "（1 个引用未解析）",
 		"(%n unresolved refs)": "（%n 个引用未解析）",
-		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._::_Warning: %n rows will be permanently deleted, then the file data is loaded._": [
 			"警告：%n 行将被永久删除，然后加载文件数据。"
 		],
 		"Warning: 1 row will be permanently deleted, then the file data is loaded.": "警告：1 行将被永久删除，然后加载文件数据。",

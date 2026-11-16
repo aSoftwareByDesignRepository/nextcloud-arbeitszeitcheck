@@ -6079,23 +6079,23 @@
 		"Zeiteinträge von Mitarbeitenden öffnen": "Ouvrir les entrées de temps des employés",
 		"Zug": "Zug",
 		"Zurich": "Zurich (canton)",
-		"_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+		"_1 Nextcloud account without app access is hidden._::_%n Nextcloud accounts without app access are hidden._": [
 			"1 compte Nextcloud sans accès à l’app est masqué.",
 			"%n comptes Nextcloud sans accès à l’app sont masqués."
 		],
-		"_1 employee matches your search_:: _%n employees match your search_": [
+		"_1 employee matches your search_::_%n employees match your search_": [
 			"1 employé correspond à votre recherche",
 			"%n employés correspondent à votre recherche"
 		],
-		"_1 employee_:: _%n employees_": [
+		"_1 employee_::_%n employees_": [
 			"1 employé",
 			"%n employés"
 		],
-		"_1 entry_:: _%n entries_": [
+		"_1 entry_::_%n entries_": [
 			"1 entrée",
 			"%n entrées"
 		],
-		"_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+		"_1 more character needed ({count} of {min})_::_%n more characters needed ({count} of {min})_": [
 			"Encore 1 caractère requis ({count} sur {min})",
 			"Encore %n caractères requis ({count} sur {min})"
 		],
@@ -6525,49 +6525,49 @@
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "« Générer l’URL du flux » crée le premier lien pour un périmètre. « Révoquer et renouveler » remplace un lien existant — l’ancienne URL cesse immédiatement de fonctionner.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "« Positionnement » place les pauses automatiques dans la plage. « Obligatoire » signifie que la pause doit chevaucher la plage du nombre de minutes indiqué.",
 		"…": "…",
-		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+		"_1 row needs a value on this instance_::_%n rows need a value on this instance_": [
 			"1 ligne nécessite une valeur sur cette instance",
 			"%n lignes nécessitent une valeur sur cette instance"
 		],
 		"1 row needs a value on this instance": "1 ligne nécessite une valeur sur cette instance",
 		"%n rows need a value on this instance": "%n lignes nécessitent une valeur sur cette instance",
-		"_1 row skipped._:: _%n rows skipped._": [
+		"_1 row skipped._::_%n rows skipped._": [
 			"1 ligne ignorée.",
 			"%n lignes ignorées."
 		],
 		"1 row skipped.": "1 ligne ignorée.",
 		"%n rows skipped.": "%n lignes ignorées.",
-		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+		"_1 reference unresolved — see the groups below._::_%n references unresolved — see the groups below._": [
 			"1 référence non résolue — voir les groupes ci-dessous.",
 			"%n références non résolues — voir les groupes ci-dessous."
 		],
 		"1 reference unresolved — see the groups below.": "1 référence non résolue — voir les groupes ci-dessous.",
 		"%n references unresolved — see the groups below.": "%n références non résolues — voir les groupes ci-dessous.",
-		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+		"_(1 env-bound value emptied)_::_(%n env-bound values emptied)_": [
 			"(1 valeur liée à l’instance vidée)",
 			"(%n valeurs liées à l’instance vidées)"
 		],
 		"(1 env-bound value emptied)": "(1 valeur liée à l’instance vidée)",
 		"(%n env-bound values emptied)": "(%n valeurs liées à l’instance vidées)",
-		"_(1 filtered)_:: _(%n filtered)_": [
+		"_(1 filtered)_::_(%n filtered)_": [
 			"(1 filtrée)",
 			"(%n filtrées)"
 		],
 		"(1 filtered)": "(1 filtrée)",
 		"(%n filtered)": "(%n filtrées)",
-		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+		"_(1 secret redacted)_::_(%n secrets redacted)_": [
 			"(1 secret masqué)",
 			"(%n secrets masqués)"
 		],
 		"(1 secret redacted)": "(1 secret masqué)",
 		"(%n secrets redacted)": "(%n secrets masqués)",
-		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+		"_(1 unresolved ref)_::_(%n unresolved refs)_": [
 			"(1 référence non résolue)",
 			"(%n références non résolues)"
 		],
 		"(1 unresolved ref)": "(1 référence non résolue)",
 		"(%n unresolved refs)": "(%n références non résolues)",
-		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._::_Warning: %n rows will be permanently deleted, then the file data is loaded._": [
 			"Avertissement : 1 ligne sera définitivement supprimée, puis les données du fichier seront chargées.",
 			"Avertissement : %n lignes seront définitivement supprimées, puis les données du fichier seront chargées."
 		],

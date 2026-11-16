@@ -6079,23 +6079,23 @@
 		"Zeiteinträge von Mitarbeitenden öffnen": "Abrir registros de tiempo de empleados",
 		"Zug": "Zug",
 		"Zurich": "Zúrich",
-		"_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+		"_1 Nextcloud account without app access is hidden._::_%n Nextcloud accounts without app access are hidden._": [
 			"1 cuenta de Nextcloud sin acceso a la app está oculta.",
 			"%n cuentas de Nextcloud sin acceso a la app están ocultas."
 		],
-		"_1 employee matches your search_:: _%n employees match your search_": [
+		"_1 employee matches your search_::_%n employees match your search_": [
 			"1 empleado coincide con su búsqueda",
 			"%n empleados coinciden con su búsqueda"
 		],
-		"_1 employee_:: _%n employees_": [
+		"_1 employee_::_%n employees_": [
 			"1 empleado",
 			"%n empleados"
 		],
-		"_1 entry_:: _%n entries_": [
+		"_1 entry_::_%n entries_": [
 			"1 entrada",
 			"%n entradas"
 		],
-		"_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+		"_1 more character needed ({count} of {min})_::_%n more characters needed ({count} of {min})_": [
 			"Falta 1 carácter más ({count} de {min})",
 			"Faltan %n caracteres más ({count} de {min})"
 		],
@@ -6525,49 +6525,49 @@
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "«Generar URL del feed» crea el primer enlace de un ámbito. «Revocar y renovar» sustituye un enlace existente — la URL antigua deja de funcionar al instante.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "«Ubicación» coloca las pausas automáticas dentro de la franja. «Obligatorio» significa que la pausa debe solaparse con la franja en los minutos indicados.",
 		"…": "…",
-		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+		"_1 row needs a value on this instance_::_%n rows need a value on this instance_": [
 			"1 fila necesita un valor en esta instancia",
 			"%n filas necesitan un valor en esta instancia"
 		],
 		"1 row needs a value on this instance": "1 fila necesita un valor en esta instancia",
 		"%n rows need a value on this instance": "%n filas necesitan un valor en esta instancia",
-		"_1 row skipped._:: _%n rows skipped._": [
+		"_1 row skipped._::_%n rows skipped._": [
 			"1 fila omitida.",
 			"%n filas omitidas."
 		],
 		"1 row skipped.": "1 fila omitida.",
 		"%n rows skipped.": "%n filas omitidas.",
-		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+		"_1 reference unresolved — see the groups below._::_%n references unresolved — see the groups below._": [
 			"1 referencia sin resolver — consulta los grupos siguientes.",
 			"%n referencias sin resolver — consulta los grupos siguientes."
 		],
 		"1 reference unresolved — see the groups below.": "1 referencia sin resolver — consulta los grupos siguientes.",
 		"%n references unresolved — see the groups below.": "%n referencias sin resolver — consulta los grupos siguientes.",
-		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+		"_(1 env-bound value emptied)_::_(%n env-bound values emptied)_": [
 			"(1 valor ligado a la instancia vaciado)",
 			"(%n valores ligados a la instancia vaciados)"
 		],
 		"(1 env-bound value emptied)": "(1 valor ligado a la instancia vaciado)",
 		"(%n env-bound values emptied)": "(%n valores ligados a la instancia vaciados)",
-		"_(1 filtered)_:: _(%n filtered)_": [
+		"_(1 filtered)_::_(%n filtered)_": [
 			"(1 filtrada)",
 			"(%n filtradas)"
 		],
 		"(1 filtered)": "(1 filtrada)",
 		"(%n filtered)": "(%n filtradas)",
-		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+		"_(1 secret redacted)_::_(%n secrets redacted)_": [
 			"(1 secreto ocultado)",
 			"(%n secretos ocultados)"
 		],
 		"(1 secret redacted)": "(1 secreto ocultado)",
 		"(%n secrets redacted)": "(%n secretos ocultados)",
-		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+		"_(1 unresolved ref)_::_(%n unresolved refs)_": [
 			"(1 referencia sin resolver)",
 			"(%n referencias sin resolver)"
 		],
 		"(1 unresolved ref)": "(1 referencia sin resolver)",
 		"(%n unresolved refs)": "(%n referencias sin resolver)",
-		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._::_Warning: %n rows will be permanently deleted, then the file data is loaded._": [
 			"Advertencia: 1 fila se eliminará permanentemente y después se cargarán los datos del archivo.",
 			"Advertencia: %n filas se eliminarán permanentemente y después se cargarán los datos del archivo."
 		],

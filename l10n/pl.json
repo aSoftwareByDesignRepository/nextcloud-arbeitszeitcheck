@@ -6079,27 +6079,27 @@
 		"Zeiteinträge von Mitarbeitenden öffnen": "Otwórz wpisy czasu pracy pracowników",
 		"Zug": "Zug",
 		"Zurich": "Zurych",
-		"_1 Nextcloud account without app access is hidden._:: _%n Nextcloud accounts without app access are hidden._": [
+		"_1 Nextcloud account without app access is hidden._::_%n Nextcloud accounts without app access are hidden._": [
 			"1 konto Nextcloud bez dostępu do aplikacji jest ukryte.",
 			"%n konta Nextcloud bez dostępu do aplikacji są ukryte.",
 			"%n kont Nextcloud bez dostępu do aplikacji jest ukrytych."
 		],
-		"_1 employee matches your search_:: _%n employees match your search_": [
+		"_1 employee matches your search_::_%n employees match your search_": [
 			"1 pracownik pasuje do wyszukiwania",
 			"%n pracownicy pasują do wyszukiwania",
 			"%n pracowników pasuje do wyszukiwania"
 		],
-		"_1 employee_:: _%n employees_": [
+		"_1 employee_::_%n employees_": [
 			"1 pracownik",
 			"%n pracownicy",
 			"%n pracowników"
 		],
-		"_1 entry_:: _%n entries_": [
+		"_1 entry_::_%n entries_": [
 			"1 wpis",
 			"%n wpisy",
 			"%n wpisów"
 		],
-		"_1 more character needed ({count} of {min})_:: _%n more characters needed ({count} of {min})_": [
+		"_1 more character needed ({count} of {min})_::_%n more characters needed ({count} of {min})_": [
 			"Potrzeba jeszcze 1 znaku ({count} z {min})",
 			"Potrzeba jeszcze %n znaki ({count} z {min})",
 			"Potrzeba jeszcze %n znaków ({count} z {min})"
@@ -6533,56 +6533,56 @@
 		"“Generate feed URL” creates the first link for a scope. “Revoke & rotate” replaces an existing link — the old URL stops working immediately.": "„Generuj URL kanału” tworzy pierwszy link dla zakresu. „Unieważnij i odśwież” zastępuje istniejący link — stary URL natychmiast przestaje działać.",
 		"“Placement” puts automatic breaks inside the window. “Required” means the break must overlap the window by the given minutes.": "„Umiejscowienie” umieszcza automatyczne przerwy wewnątrz okna. „Wymagane” oznacza, że przerwa musi pokrywać się z oknem o podaną liczbę minut.",
 		"…": "…",
-		"_1 row needs a value on this instance_:: _%n rows need a value on this instance_": [
+		"_1 row needs a value on this instance_::_%n rows need a value on this instance_": [
 			"1 wiersz wymaga wartości na tej instancji",
 			"%n wiersze wymagają wartości na tej instancji",
 			"%n wierszy wymaga wartości na tej instancji"
 		],
 		"1 row needs a value on this instance": "1 wiersz wymaga wartości na tej instancji",
 		"%n rows need a value on this instance": "%n wierszy wymaga wartości na tej instancji",
-		"_1 row skipped._:: _%n rows skipped._": [
+		"_1 row skipped._::_%n rows skipped._": [
 			"Pominięto 1 wiersz.",
 			"Pominięto %n wiersze.",
 			"Pominięto %n wierszy."
 		],
 		"1 row skipped.": "Pominięto 1 wiersz.",
 		"%n rows skipped.": "Pominięto %n wierszy.",
-		"_1 reference unresolved — see the groups below._:: _%n references unresolved — see the groups below._": [
+		"_1 reference unresolved — see the groups below._::_%n references unresolved — see the groups below._": [
 			"Nierozwiązano 1 odwołanie — zobacz grupy poniżej.",
 			"Nierozwiązano %n odwołania — zobacz grupy poniżej.",
 			"Nierozwiązano %n odwołań — zobacz grupy poniżej."
 		],
 		"1 reference unresolved — see the groups below.": "Nierozwiązano 1 odwołanie — zobacz grupy poniżej.",
 		"%n references unresolved — see the groups below.": "Nierozwiązano %n odwołań — zobacz grupy poniżej.",
-		"_(1 env-bound value emptied)_:: _(%n env-bound values emptied)_": [
+		"_(1 env-bound value emptied)_::_(%n env-bound values emptied)_": [
 			"(1 opróżniona wartość związana z instancją)",
 			"(%n opróżnione wartości związane z instancją)",
 			"(%n opróżnionych wartości związanych z instancją)"
 		],
 		"(1 env-bound value emptied)": "(1 opróżniona wartość związana z instancją)",
 		"(%n env-bound values emptied)": "(%n opróżnionych wartości związanych z instancją)",
-		"_(1 filtered)_:: _(%n filtered)_": [
+		"_(1 filtered)_::_(%n filtered)_": [
 			"(1 odfiltrowany)",
 			"(%n odfiltrowane)",
 			"(%n odfiltrowanych)"
 		],
 		"(1 filtered)": "(1 odfiltrowany)",
 		"(%n filtered)": "(%n odfiltrowanych)",
-		"_(1 secret redacted)_:: _(%n secrets redacted)_": [
+		"_(1 secret redacted)_::_(%n secrets redacted)_": [
 			"(1 ukryty sekret)",
 			"(%n ukryte sekrety)",
 			"(%n ukrytych sekretów)"
 		],
 		"(1 secret redacted)": "(1 ukryty sekret)",
 		"(%n secrets redacted)": "(%n ukrytych sekretów)",
-		"_(1 unresolved ref)_:: _(%n unresolved refs)_": [
+		"_(1 unresolved ref)_::_(%n unresolved refs)_": [
 			"(1 nierozwiązane odwołanie)",
 			"(%n nierozwiązane odwołania)",
 			"(%n nierozwiązanych odwołań)"
 		],
 		"(1 unresolved ref)": "(1 nierozwiązane odwołanie)",
 		"(%n unresolved refs)": "(%n nierozwiązanych odwołań)",
-		"_Warning: 1 row will be permanently deleted, then the file data is loaded._:: _Warning: %n rows will be permanently deleted, then the file data is loaded._": [
+		"_Warning: 1 row will be permanently deleted, then the file data is loaded._::_Warning: %n rows will be permanently deleted, then the file data is loaded._": [
 			"Ostrzeżenie: 1 wiersz zostanie trwale usunięty, a następnie dane z pliku zostaną wczytane.",
 			"Ostrzeżenie: %n wiersze zostaną trwale usunięte, a następnie dane z pliku zostaną wczytane.",
 			"Ostrzeżenie: %n wierszy zostanie trwale usuniętych, a następnie dane z pliku zostaną wczytane."

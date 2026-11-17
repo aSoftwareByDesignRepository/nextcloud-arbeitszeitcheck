@@ -88,7 +88,9 @@ class AdminTeamsBulkSearchParamContractTest extends TestCase
 	public function testDetailTabsUseTheDefaultUnderlineRow(): void
 	{
 		$tpl = (string)file_get_contents(__DIR__ . '/../../../templates/admin-teams.php');
-		$css = (string)file_get_contents(__DIR__ . '/../../../css/admin-teams.css');
+		// §3.12 default tab row lives in the shared components pack; the
+		// page stylesheet only keeps the layout hook.
+		$css = (string)file_get_contents(__DIR__ . '/../../../css/common/components.css');
 		$js = (string)file_get_contents(__DIR__ . '/../../../js/admin-teams.js');
 		$this->assertStringContainsString('class="azc-tabs admin-teams__tabs" role="tablist"', $tpl);
 		$this->assertStringContainsString('class="azc-tabs__row"', $tpl);

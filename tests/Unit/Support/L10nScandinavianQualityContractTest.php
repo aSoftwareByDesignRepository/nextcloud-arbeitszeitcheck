@@ -305,7 +305,7 @@ final class L10nScandinavianQualityContractTest extends TestCase
 	 * @var list<string>
 	 */
 	private const SHARED_DA_SV_IDENTICALS = [
-		'%1$s t', '%1$s → %2$s', '%n teammedlem', '(ingen)', '0 poster', '1 post',
+		'%1$s t', '%1$s → %2$s', '%n teammedlem', '(ingen)', '(ny)', '0 poster', '1 post',
 		'%n poster',
 		'1 hel dag', '1 medlem', 'Administration', 'Administration (panel)',
 		'Aktiv', 'Aktiv i dag', 'Aldrig', 'ArbeitszeitCheck Mobile i App Store',
@@ -861,6 +861,18 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// 'importen' — definite singular of 'import' ('Importen har
 		// tillämpats.', apply-result msgid), genuine Swedish noun.
 		'instansen', 'filens', 'importen',
+		// 2026-11-17: 'startminut' — 'minut' is the Swedish spelling
+		// ('en minut'), identical orthography in da is shared
+		// vocabulary, not bleed (msgid 'Break start minute' =>
+		// 'Rast startminut').
+		'startminut',
+		// 2026-11-17: 'delen' — Swedish definite singular of 'del'
+		// ('markera delen här', interruption-portion msgid); 'stort' —
+		// neuter of 'stor' ('för stort', too-large preview msgid);
+		// 'klienten' — Swedish definite of 'klient' (model-format
+		// msgid). All genuine Swedish, da-identical spelling is shared
+		// Scandinavian vocabulary, not bleed.
+		'delen', 'stort', 'klienten',
 		'justering', 'justeringen', 'kalenderappen', 'kalenderdag', 'kalenderformat', 'kalenderikon',
 		'kalenderinvitationer', 'kalenderkonto', 'kalendersynkronisering', 'kalenderår', 'kalenderåret',
 		'kalenderårs', 'kanton', 'kategori', 'kategorier', 'kioskadministration', 'kioskadministrationen',
@@ -987,6 +999,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// 2026-11-24: lowercase 'netto' — same legit shared form as 'Netto'
 		// (column-header casing variant); reviewed identical to nl.
 		'netto',
+		// 2026-11-17: 'blok' — correct Polish orthography for 'block';
+		// identical to nl is shared cognate vocabulary (msgid 'block').
+		'blok',
 	];
 
 	/**

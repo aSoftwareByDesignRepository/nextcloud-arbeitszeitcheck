@@ -103,6 +103,7 @@ beregning
 beregningsmodul
 beregningsmoduler
 beregningsregler
+beregningsstatus
 berettigelse
 berettiget
 berører
@@ -136,11 +137,13 @@ betalte
 bindende
 blandede
 bloker
+blokkene
 bookbar
 booke
 booker
 bookes
 booket
+bookingen
 bookinger
 bookinglinje
 bredere
@@ -170,6 +173,7 @@ dagsaldi
 dagsandel
 dagsark
 dagsdetaljer
+dagssum
 dagstimer
 dashboarddata
 dashboardet
@@ -201,6 +205,7 @@ deldag
 delegere
 delen
 deler
+deles
 deling
 delstat
 delstaten
@@ -208,6 +213,8 @@ delstaters
 delte
 deltid
 deltidsansatte
+deltjeneste
+deltjenester
 delvis
 delvise
 denne
@@ -384,6 +391,7 @@ forenklet
 foreslå
 forhold
 forhåndskontroller
+forhåndsvise
 forhåndsvisning
 forhåndsvisningen
 forklar
@@ -483,6 +491,7 @@ glemte
 globale
 globalt
 godskrevet
+godskrevne
 godskrive
 godskriver
 gratis
@@ -557,6 +566,7 @@ hvert
 hvile
 hvileloven
 hvilelovslov
+hvilepause
 hvilepauser
 hvileperiode
 hvileperioder
@@ -654,6 +664,7 @@ kladde
 klare
 klarer
 klient
+klienten
 klikke
 klikker
 knappen
@@ -814,6 +825,7 @@ mangler
 manuelle
 manuelt
 maria
+marker
 markere
 markering
 markér
@@ -949,6 +961,7 @@ optag
 orden
 organisatorisk
 organisatoriske
+originalen
 originaltekst
 orlov
 ovenfor
@@ -999,6 +1012,7 @@ papiret
 pares
 parkering
 partnertilbud
+passerer
 pause
 pauseandel
 pauseberegning
@@ -1283,6 +1297,7 @@ steder
 stedet
 stemmer
 stempeluret
+stemper
 stemple
 stemplede
 stempler
@@ -1308,6 +1323,7 @@ styrer
 styret
 større
 støtte
+støttes
 summerer
 supplerende
 supportsiden
@@ -1455,6 +1471,7 @@ typisk
 tyske
 tyskland
 tyvende
+tømme
 tømmer
 ubetalte
 udvidet

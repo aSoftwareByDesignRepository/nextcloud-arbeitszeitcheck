@@ -24,7 +24,8 @@ class ReportsExportChooserLayoutTest extends TestCase
 		$this->assertStringContainsString('premiumSurchargesEnabled', $template);
 		$this->assertStringContainsString('data-report="premium"', $template);
 		$this->assertStringContainsString('IconCatalog::render', $template);
-		$this->assertStringContainsString('azc-card__title', $template);
+		$this->assertStringContainsString('reports-section__title', $template);
+		$this->assertStringContainsString('aria-labelledby="report-type-heading"', $template);
 
 		/* Old nested button + letter abbreviation pattern must stay gone. */
 		$this->assertStringNotContainsString('report-type-icon__abbr', $template);

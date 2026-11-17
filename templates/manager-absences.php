@@ -319,7 +319,6 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 								<p class="form-help"><?php p($l->t('Take half of the first or last day — the days in between stay full.')); ?></p>
 							</fieldset>
 							<p id="manager-absence-day-fraction-help" class="form-help"><?php p($l->t('Full day or half day for this date. For a half day, choose morning or afternoon.')); ?></p>
-							<p id="manager-absence-day-fraction-preview" class="azc-callout azc-callout--info" role="status" aria-live="polite"></p>
 							<p id="manager-absence-day-fraction-live" class="sr-only" aria-live="polite"></p>
 						</div>
 						<div class="azc-filter-field" id="manager-absence-record-hours-field" hidden>

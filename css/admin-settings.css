@@ -382,6 +382,7 @@
 #admin-settings-form .checkbox,
 #admin-notifications-form .checkbox{
   display: flex;
+  align-items: flex-start;
   gap: var(--space-3, 0.75rem);
   min-height: 2.75rem; /* ~44px touch target */
   padding: var(--space-1, 0.25rem) 0;

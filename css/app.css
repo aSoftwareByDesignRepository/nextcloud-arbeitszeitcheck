@@ -2696,11 +2696,19 @@ dialog.azc-dialog .azc-dialog__actions {
 
 .azc-entry-accounting__calc-row dt {
 	color: var(--azc-muted, var(--color-text-maxcontrast));
+	/* NC core pins dl dt to 130px + nowrap + text-align:end; the calc labels
+	   are flex items and must size to content. */
+	width: auto;
+	min-width: 0;
+	white-space: normal;
+	text-align: start;
 }
 
 .azc-entry-accounting__calc-row dd {
 	margin: 0;
 	font-variant-numeric: tabular-nums;
+	/* Same core pin: dd is pinned inline next to dt at 130px. */
+	width: auto;
 }
 
 .azc-entry-accounting__actions {

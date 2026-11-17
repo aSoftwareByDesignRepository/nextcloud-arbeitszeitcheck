@@ -262,7 +262,7 @@
 
 #manager-create-time-entry-modal .auto-break-toggle__status--on {
 	border-color: color-mix(in srgb, var(--color-success-text, var(--color-success)) 50%, var(--color-border-maxcontrast));
-	background: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
+	background: color-mix(in srgb, var(--color-element-success, var(--color-success)) 15%, var(--color-main-background));
 	color: var(--color-success-text, var(--color-success));
 }
 

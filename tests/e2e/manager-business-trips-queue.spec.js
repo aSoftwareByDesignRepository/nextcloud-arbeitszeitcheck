@@ -19,21 +19,40 @@ test.use({ trace: 'off' })
 const QUEUE_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
 
-/** Draft → submit a trip as the employee; returns the trip id. */
+/** Draft → submit a trip as the employee; returns the trip id.
+ *  Retries with a fresh window on overlap — prior runs leave trips behind. */
 async function submitTrip(page, purpose) {
-	const start = '2027-01-11T07:00:00Z'
-	const end = '2027-01-12T16:00:00Z'
-	const created = await api(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
-		data: {
-			startsAtUtc: start,
-			endsAtUtc: end,
-			originTimezone: 'Europe/Berlin',
-			destinationTimezone: 'Europe/Berlin',
-			evaluationTimezone: 'Europe/Berlin',
-			purpose,
-			requestKey: `e2e-mbt-queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-		},
-	})
+	const iso = (d) => d.toISOString().slice(0, 10)
+	let created = null
+	for (let attempt = 0; attempt < 8 && !created; attempt++) {
+		const base = new Date('2028-03-01T00:00:00Z').getTime()
+			+ (Date.now() % 240) * 86400000
+			+ Math.floor(Math.random() * 60) * 86400000
+		const res = await page.request.fetch(new URL('/apps/arbeitszeitcheck/api/business-trips', page.url()).toString(), {
+			method: 'POST',
+			headers: { requesttoken: await page.evaluate(() => window.OC.requestToken), 'Content-Type': 'application/json' },
+			data: {
+				startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
+				endsAtUtc: `${iso(new Date(base + 2 * 86400000))}T16:00:00Z`,
+				originTimezone: 'Europe/Berlin',
+				destinationTimezone: 'Europe/Berlin',
+				evaluationTimezone: 'Europe/Berlin',
+				purpose,
+				requestKey: `e2e-mbt-queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+			},
+		})
+		if (res.ok()) {
+			created = await res.json()
+		} else {
+			const body = await res.json().catch(() => ({}))
+			if (!/overlap/i.test(body.error || '')) {
+				throw new Error(`trip create failed (${res.status()}): ${body.error || 'unknown'}`)
+			}
+		}
+	}
+	if (!created) {
+		throw new Error('could not place a non-overlapping trip after 8 attempts')
+	}
 	const tripId = created.trip.id
 	const detail = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
 	const submitted = await api(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {

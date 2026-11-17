@@ -523,6 +523,32 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * `split_service` only exists as a sub-tree of the v2 weekday_schedule
+	 * document — a bare top-level request key is a client bug (spec §9.3),
+	 * the same rule the split-preview boundary enforces. Reject it instead
+	 * of silently dropping the client's split configuration.
+	 *
+	 * @param array<string, mixed> $params
+	 * @return JSONResponse|null error response
+	 */
+	private function splitServiceTopLevelError(array $params): ?JSONResponse
+	{
+		if (!array_key_exists(WeekdaySchedule::SPLIT_SERVICE_KEY, $params)) {
+			return null;
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('Validation failed'),
+			'errors' => ['weekday_schedule' => 'SPLIT_REQUIRES_SCHEDULE_V2'],
+			'codes' => ['SPLIT_REQUIRES_SCHEDULE_V2'],
+			'fields' => [
+				'weekday_schedule' => $this->l10n->t('Split service is only available with a block-based weekday schedule.'),
+			],
+			'code' => 'SPLIT_REQUIRES_SCHEDULE_V2',
+		], Http::STATUS_BAD_REQUEST);
+	}
+
+	/**
 	 * Apply the scalar/breakRules/overtimeRules params of a model save to the
 	 * given entity. Shared between in-place update and the successor-copy
 	 * path so both apply identical semantics.
@@ -538,6 +564,9 @@ class AdminController extends Controller
 		?array &$paidPolicyBefore,
 		?array &$paidPolicyAfter,
 	): ?JSONResponse {
+		if (($topLevelError = $this->splitServiceTopLevelError($params)) !== null) {
+			return $topLevelError;
+		}
 		if (isset($params['name'])) {
 			$model->setName($params['name']);
 		}
@@ -6114,6 +6143,10 @@ class AdminController extends Controller
 	{
 		try {
 			$params = $this->request->getParams();
+
+			if (($topLevelError = $this->splitServiceTopLevelError($params)) !== null) {
+				return $topLevelError;
+			}
 
 			$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
 			$model->setName($params['name'] ?? '');

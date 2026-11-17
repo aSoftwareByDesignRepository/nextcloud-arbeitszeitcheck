@@ -3137,7 +3137,7 @@
 		"Needs attention": "Trenger oppmerksomhet",
 		"Needs review": "Krever gjennomgang",
 		"Needs review: time change (DST)": "Krever gjennomgang: tidsendring (sommertid)",
-		"Needs review: stored data could not be read": "Needs review: stored data could not be read",
+		"Needs review: stored data could not be read": "Krever gjennomgang: lagrede data kunne ikke leses",
 		"Net": "Netto",
 		"Net: %1$.2f h · paid break: %2$d min": "Netto: %1$.2f t · betalt pause: %2$d min",
 		"Network error occurred": "Det oppstod en nettverksfeil",

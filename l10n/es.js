@@ -3138,7 +3138,7 @@
 	"Needs attention" : "Requiere atención",
 	"Needs review" : "Requiere revisión",
 	"Needs review: time change (DST)" : "Requiere revisión: cambio de hora (horario de verano)",
-	"Needs review: stored data could not be read" : "Needs review: stored data could not be read",
+	"Needs review: stored data could not be read" : "Requiere revisión: no se pudieron leer los datos guardados",
 	"Net" : "Neto",
 	"Net: %1$.2f h · paid break: %2$d min" : "Neto: %1$.2f h · descanso remunerado: %2$d min",
 	"Network error occurred" : "Se produjo un error de red",

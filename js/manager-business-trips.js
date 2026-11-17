@@ -229,8 +229,8 @@
 			return null;
 		}
 		const iso = m[3] + '-' + m[2] + '-' + m[1];
-		const d = new Date(iso + 'T00:00:00Z');
-		return (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso) ? iso : null;
+		const d = new Date(iso + 'T00:00:00Z'); // tz-audit-ok: pure-UTC round-trip — validates the typed day is a real calendar date, not a local-day parse
+		return (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso) ? iso : null; // tz-audit-ok: same UTC epoch comparison — rejects rolled-over dates (31.02 → Mar 3 ≠ iso)
 	}
 
 	/* Invalidity display is owned by the shared datepicker (aria-invalid +

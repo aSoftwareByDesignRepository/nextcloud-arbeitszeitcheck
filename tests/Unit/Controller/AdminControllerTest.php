@@ -5301,6 +5301,47 @@ class AdminControllerTest extends TestCase
 		$this->assertArrayHasKey('weekday_schedule', $data['fields']);
 	}
 
+	public function testBareTopLevelSplitServiceParamIsRejectedOnCreate(): void
+	{
+		// §9.3 at the save boundary too: a top-level `split_service` next to
+		// breakRules is a client bug — the split-preview rejects the same
+		// shape, the save must not silently drop the configuration.
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Split model',
+			'type' => 'full_time',
+			'split_service' => [
+				'automatic_split' => true,
+				'split_when_clock_out_after' => '16:00',
+				'interruption_counts_as_break' => false,
+			],
+			'breakRules' => ['weekday_schedule' => self::v2ScheduleDoc()],
+		]);
+		$this->workingTimeModelMapper->expects($this->never())->method('insert');
+
+		$response = $this->controller->createWorkingTimeModel();
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_REQUIRES_SCHEDULE_V2', $data['code']);
+		$this->assertArrayHasKey('weekday_schedule', $data['fields']);
+	}
+
+	public function testBareTopLevelSplitServiceParamIsRejectedOnUpdate(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v2ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'split_service' => ['automatic_split' => true],
+			'breakRules' => ['weekday_schedule' => self::v2ScheduleDoc()],
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$data = $response->getData();
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('SPLIT_REQUIRES_SCHEDULE_V2', $data['code']);
+	}
+
 	public function testTouchingBlocksMapToWeekdayBlocksField(): void
 	{
 		$doc = self::v2ScheduleDoc();

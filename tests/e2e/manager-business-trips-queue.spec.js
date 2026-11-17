@@ -11,7 +11,7 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { login, credsFromEnv, skipIfMissingCreds } from './helpers/auth.js'
-import { api } from './helpers/api.js'
+import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
 
 test.use({ trace: 'off' })
@@ -20,17 +20,19 @@ const QUEUE_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
 
 /** Draft → submit a trip as the employee; returns the trip id.
- *  Retries with a fresh window on overlap — prior runs leave trips behind. */
+ *  Retries the whole draft→submit with a fresh window on overlap — prior
+ *  runs leave trips behind, and submit re-checks overlap under the
+ *  user-month locks (BusinessTripService::transition), so a sibling spec
+ *  can claim the window between our create and submit. An orphan draft
+ *  from a lost submit race is cancelled before the next attempt —
+ *  drafts count toward the overlap check. */
 async function submitTrip(page, purpose) {
 	const iso = (d) => d.toISOString().slice(0, 10)
-	let created = null
-	for (let attempt = 0; attempt < 8 && !created; attempt++) {
+	for (let attempt = 0; attempt < 8; attempt++) {
 		const base = new Date('2028-03-01T00:00:00Z').getTime()
 			+ (Date.now() % 240) * 86400000
 			+ Math.floor(Math.random() * 60) * 86400000
-		const res = await page.request.fetch(new URL('/apps/arbeitszeitcheck/api/business-trips', page.url()).toString(), {
-			method: 'POST',
-			headers: { requesttoken: await page.evaluate(() => window.OC.requestToken), 'Content-Type': 'application/json' },
+		const created = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
 			data: {
 				startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
 				endsAtUtc: `${iso(new Date(base + 2 * 86400000))}T16:00:00Z`,
@@ -41,25 +43,27 @@ async function submitTrip(page, purpose) {
 				requestKey: `e2e-mbt-queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 			},
 		})
-		if (res.ok()) {
-			created = await res.json()
-		} else {
-			const body = await res.json().catch(() => ({}))
-			if (!/overlap/i.test(body.error || '')) {
-				throw new Error(`trip create failed (${res.status()}): ${body.error || 'unknown'}`)
+		if (!created.ok) {
+			if (!/overlap/i.test(created.json?.error || '')) {
+				throw new Error(`trip create failed (${created.status}): ${created.json?.error || 'unknown'}`)
 			}
+			continue
 		}
+		const tripId = created.json.trip.id
+		const detail = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
+		const submitted = await apiAllowFailure(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {
+			data: { revision: detail.trip.revision },
+		})
+		if (submitted.ok) {
+			expect(submitted.json.trip.status).toBe('submitted')
+			return tripId
+		}
+		if (!/overlap/i.test(submitted.json?.error || '')) {
+			throw new Error(`trip submit failed (${submitted.status}): ${submitted.json?.error || 'unknown'}`)
+		}
+		await withdrawTrip(page, tripId)
 	}
-	if (!created) {
-		throw new Error('could not place a non-overlapping trip after 8 attempts')
-	}
-	const tripId = created.trip.id
-	const detail = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
-	const submitted = await api(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {
-		data: { revision: detail.trip.revision },
-	})
-	expect(submitted.trip.status).toBe('submitted')
-	return tripId
+	throw new Error('could not place a non-overlapping trip after 8 attempts')
 }
 
 /** Nextcloud's first-run wizard animates in a few seconds after first

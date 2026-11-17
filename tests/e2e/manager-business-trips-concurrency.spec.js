@@ -23,28 +23,36 @@ const MGR_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
 
 /** Unique far-future window per call — trips persist in the dev DB, so
- * fixed dates collide with prior runs (overlap validator). Retries with
- * a fresh window on overlap. */
-async function createTrip(page, purpose) {
+ * fixed dates collide with prior runs (overlap validator). One attempt;
+ * returns the trip id, or null when the window is already taken. */
+async function createTripOnce(page, purpose, attempt) {
 	const iso = (d) => d.toISOString().slice(0, 10)
+	const base = new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
+	const res = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
+		data: {
+			startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
+			endsAtUtc: `${iso(new Date(base + 86400000))}T16:00:00Z`,
+			originTimezone: 'Europe/Berlin',
+			destinationTimezone: 'Europe/Berlin',
+			evaluationTimezone: 'Europe/Berlin',
+			purpose,
+			requestKey: `e2e-mbt-cas-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+		},
+	})
+	if (res.ok) {
+		return res.json.trip.id
+	}
+	if (!/overlap/i.test(res.json?.error || '')) {
+		throw new Error(`trip create failed (${res.status}): ${res.json?.error || 'unknown'}`)
+	}
+	return null
+}
+
+async function createTrip(page, purpose) {
 	for (let attempt = 0; attempt < 8; attempt++) {
-		const base = new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
-		const res = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
-			data: {
-				startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
-				endsAtUtc: `${iso(new Date(base + 86400000))}T16:00:00Z`,
-				originTimezone: 'Europe/Berlin',
-				destinationTimezone: 'Europe/Berlin',
-				evaluationTimezone: 'Europe/Berlin',
-				purpose,
-				requestKey: `e2e-mbt-cas-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-			},
-		})
-		if (res.ok) {
-			return res.json.trip.id
-		}
-		if (!/overlap/i.test(res.json?.error || '')) {
-			throw new Error(`trip create failed (${res.status}): ${res.json?.error || 'unknown'}`)
+		const tripId = await createTripOnce(page, purpose, attempt)
+		if (tripId !== null) {
+			return tripId
 		}
 	}
 	throw new Error('could not place a non-overlapping trip after 8 attempts')
@@ -56,6 +64,36 @@ async function submitTrip(page, tripId) {
 		data: { revision: detail.trip.revision },
 	})
 	expect(submitted.trip.status).toBe('submitted')
+}
+
+/** Draft → submit, retrying the whole pair with a fresh window on
+ * overlap — submit re-checks overlap under the user-month locks
+ * (BusinessTripService::transition), so a sibling spec can claim the
+ * window between our create and submit. An orphan draft from a lost
+ * submit race is cancelled before the next attempt — drafts count
+ * toward the overlap check. */
+async function createAndSubmitTrip(page, purpose) {
+	for (let attempt = 0; attempt < 8; attempt++) {
+		const tripId = await createTripOnce(page, purpose, attempt)
+		if (tripId === null) {
+			continue
+		}
+		try {
+			await submitTrip(page, tripId)
+			return tripId
+		} catch (e) {
+			if (!/overlap/i.test(e?.message || '')) {
+				throw e
+			}
+		}
+		const fresh = await apiAllowFailure(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
+		if (fresh.ok) {
+			await apiAllowFailure(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/cancel`, {
+				data: { revision: fresh.json.trip.revision },
+			})
+		}
+	}
+	throw new Error('could not place a non-overlapping submitted trip after 8 attempts')
 }
 
 async function managerDetail(page, tripId) {
@@ -72,8 +110,7 @@ test.describe('Manager business-trip decisions — CAS + scope (Docker dev)', ()
 		await login(employeePage, credsFromEnv('EMPLOYEE'))
 		await employeePage.goto(PAGE)
 		await assertArbeitszeitcheckLoaded(employeePage)
-		const tripId = await createTrip(employeePage, purpose)
-		await submitTrip(employeePage, tripId)
+		const tripId = await createAndSubmitTrip(employeePage, purpose)
 
 		const managerPage = await browser.newPage()
 		await login(managerPage, credsFromEnv('MANAGER'))
@@ -111,8 +148,7 @@ test.describe('Manager business-trip decisions — CAS + scope (Docker dev)', ()
 		await page.goto(PAGE)
 		// The page itself redirects non-managers away; the API is the oracle.
 		const purpose = `E2E IDOR ${Date.now()}`
-		const tripId = await createTrip(page, purpose)
-		await submitTrip(page, tripId)
+		const tripId = await createAndSubmitTrip(page, purpose)
 
 		const queue = await apiAllowFailure(page, 'GET', MGR_API)
 		expect([403, 404]).toContain(queue.status)

@@ -1397,6 +1397,7 @@ if ($mode === 'list') {
 
                             <div class="month-closure-block month-closure-block--outcome">
                                 <p id="month-closure-blocked" class="month-closure-blocked form-help" role="status" aria-live="polite" hidden></p>
+                                <p id="month-closure-review-warning" class="month-closure-review-warning form-help form-help--note" role="status" aria-live="polite" hidden></p>
                                 <p id="month-closure-deadline" class="month-closure-deadline form-help form-help--note" hidden></p>
                                 <div class="month-closure-actions">
                                     <button type="button"

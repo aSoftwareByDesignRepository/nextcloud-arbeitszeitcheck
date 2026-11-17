@@ -3138,6 +3138,7 @@
 	"Needs attention" : "Needs attention",
 	"Needs review" : "Needs review",
 	"Needs review: time change (DST)" : "Needs review: time change (DST)",
+	"Needs review: stored data could not be read" : "Needs review: stored data could not be read",
 	"Net" : "Net",
 	"Net: %1$.2f h · paid break: %2$d min" : "Net: %1$.2f h · paid break: %2$d min",
 	"Network error occurred" : "Network error occurred",

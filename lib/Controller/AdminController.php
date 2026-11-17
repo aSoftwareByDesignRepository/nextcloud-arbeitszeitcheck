@@ -1520,7 +1520,9 @@ class AdminController extends Controller
 				'statistics' => [
 					'total_users' => $totalUsers,
 					'active_users_today' => $activeUsersToday,
-					'unresolved_violations' => $unresolvedCount
+					'unresolved_violations' => $unresolvedCount,
+					// §6 observability: split-day entries in state `review`.
+					'split_review_entries' => $this->timeEntryMapper->countSplitReviewStateEntries(),
 				],
 				'overtime_onboarding' => [
 					'show_banner' => $totalUsers > 0 && $withoutOvertimeTracking > 0,
@@ -5352,6 +5354,7 @@ class AdminController extends Controller
 					'unresolved_violations' => $unresolvedCount,
 					'compliance_percentage' => $compliancePercentage,
 					'compliant_users' => $compliantUsers,
+					'split_review_entries' => $this->timeEntryMapper->countSplitReviewStateEntries(),
 					'overtime_tracking' => [
 						'users_with_tracking_from' => $withOvertimeTracking,
 						'users_without_tracking_from' => $withoutOvertimeTracking,

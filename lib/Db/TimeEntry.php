@@ -317,7 +317,11 @@ class TimeEntry extends Entity
 		$start = $this->startTime;
 		$end = $this->endTime;
 
-		if ($this->hasEffectiveSplitContext()) {
+		if ($this->hasEffectiveSplitContext() || $this->hasInvalidWorkContext()) {
+			// FM-11: an undecodable non-NULL context still subtracts the stored
+			// excluded seconds so ORM reads and SQL-column sums over
+			// `excluded_work_seconds` agree (conservative: interruption time is
+			// never silently re-credited while the defect is unresolved).
 			$effectiveBreakDuration = $this->getEffectiveBreakDurationHours();
 			$excludedDuration = $this->getExcludedWorkSeconds() / 3600;
 
@@ -1114,6 +1118,12 @@ class TimeEntry extends Entity
 			'isLockedForEmployeeEdit' => $this->isLockedForEmployeeEdit(),
 		];
 
+		// CAS revision token for correction proposals (spec §9.7
+		// `baseEntryRevision`): a content hash of the correction basis. Clients
+		// echo it back so the server can detect that the entry changed between
+		// read and write instead of applying a stale decision silently.
+		$summary['revision'] = $this->getContentRevision();
+
 		// Split-service accounting block (spec §9.8) — additive, only when a
 		// valid non-NULL context exists. NULL and invalid-JSON contexts get no
 		// key at all; every existing field above keeps its meaning.
@@ -1126,6 +1136,43 @@ class TimeEntry extends Entity
 	}
 
 	/**
+	 * Content-hash revision of the correction basis (spec §9.7 entry CAS).
+	 *
+	 * sha256 over the stored fields a correction proposal — and in particular
+	 * a `splitOverride` — is decided against: the raw stamps, the stored
+	 * break data, the frozen work context (which also carries an applied
+	 * override + accounting result), the excluded-work column, and the
+	 * compliance policy label. Any write that changes the accounting outcome
+	 * changes the token.
+	 *
+	 * Deliberately NOT hashed: status, justification, updated_at and the
+	 * approval fields. Those are workflow state that legitimately changes
+	 * while a proposal is pending (submit sets pending_approval +
+	 * justification); hashing them would make every stored proposal's
+	 * revision token stale at approval time.
+	 *
+	 * The token is a format-only opaque value — it carries no information
+	 * beyond "the version the client saw" and is echoed back verbatim.
+	 */
+	public function getContentRevision(): string
+	{
+		$parts = [
+			'v1',
+			(string)($this->getStartTime()?->getTimestamp() ?? 'null'),
+			(string)($this->getEndTime()?->getTimestamp() ?? 'null'),
+			(string)($this->getBreaks() ?? 'null'),
+			(string)($this->getBreakStartTime()?->getTimestamp() ?? 'null'),
+			(string)($this->getBreakEndTime()?->getTimestamp() ?? 'null'),
+			(string)($this->getWorkContextJson() ?? 'null'),
+			(string)$this->getExcludedWorkSeconds(),
+			(string)($this->getPolicyApplied() ?? 'null'),
+		];
+		// \x1F (unit separator) cannot appear inside JSON or ISO strings, so
+		// field boundaries are unambiguous.
+		return hash('sha256', implode("\x1F", $parts));
+	}
+
+	/**
 	 * §9.8 `accounting` serialization block, or null on the legacy path
 	 * (NULL column) and on undecodable context (never a silent fake block;
 	 * {@see hasInvalidWorkContext()} flags the defect instead).
@@ -1135,6 +1182,27 @@ class TimeEntry extends Entity
 	private function buildAccountingSummary(): ?array
 	{
 		if ($this->getWorkContext() === null) {
+			if ($this->hasInvalidWorkContext()) {
+				// FM-11 / §9.5 SPLIT_CONTEXT_INVALID: a non-NULL column that
+				// does not decode is a defect, not a legacy row — surface it
+				// so web/mobile/companion consumers can flag it instead of
+				// rendering an un-splittable booking as normal.
+				$net = $this->getDurationHours();
+				$paid = $this->getPaidDurationHours();
+				return [
+					'contractVersion' => 2,
+					'state' => 'context_invalid',
+					'error' => 'SPLIT_CONTEXT_INVALID',
+					'split' => false,
+					'reason' => 'context_invalid',
+					'segments' => [],
+					'interruptions' => [],
+					'excludedSeconds' => $this->getExcludedWorkSeconds(),
+					'breakHandling' => 'not_applicable',
+					'netWorkSeconds' => $net === null ? null : (int)round($net * 3600),
+					'paidWorkSeconds' => $paid === null ? null : (int)round($paid * 3600),
+				];
+			}
 			return null;
 		}
 

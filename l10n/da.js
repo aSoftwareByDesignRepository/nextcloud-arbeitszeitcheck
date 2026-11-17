@@ -3138,6 +3138,7 @@
 	"Needs attention" : "Kræver opmærksomhed",
 	"Needs review" : "Kræver gennemgang",
 	"Needs review: time change (DST)" : "Kræver gennemgang: tidsændring (sommertid)",
+	"Needs review: stored data could not be read" : "Needs review: stored data could not be read",
 	"Net" : "Netto",
 	"Net: %1$.2f h · paid break: %2$d min" : "Netto: %1$.2f t · betalt pause: %2$d min",
 	"Network error occurred" : "Der opstod netværksfejl",

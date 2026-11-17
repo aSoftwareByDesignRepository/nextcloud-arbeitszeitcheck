@@ -54,6 +54,7 @@ const LIST_ALLOW = [
 	'.azc-timeline',
 	'.dz-grid',
 	'.azc-page-stack',
+	'.azc-entry-accounting__lines', // split-day segments/interruptions — label/times/value row chrome, not bullets
 ].join(', ');
 
 /**

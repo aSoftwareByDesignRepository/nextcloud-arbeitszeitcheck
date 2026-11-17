@@ -476,6 +476,24 @@ class TimeEntryCorrectionService
 	}
 
 	/**
+	 * Translate a {@see validateProposal()} failure into the exception that
+	 * carries the right HTTP semantics: a stale split-decision basis is a
+	 * conflict (409 SPLIT_OVERRIDE_STALE via the ConcurrentDecisionException
+	 * seam); every other validation failure stays a bad request (400).
+	 *
+	 * @throws SplitOverrideStaleException|\InvalidArgumentException always
+	 */
+	private function failProposal(string $error): never
+	{
+		if ($error === SplitOverrideStaleException::CODE) {
+			throw new SplitOverrideStaleException(
+				$this->l10n->t('This time entry was changed in the meantime. Reload it and submit the correction again.')
+			);
+		}
+		throw new \InvalidArgumentException($error);
+	}
+
+	/**
 	 * §9.7 split-override proposal validation. Returns the normative error
 	 * code or null. Runs against the post-proposal candidate so the corrected
 	 * times (R, candidate gaps) are what the override is checked against.
@@ -489,6 +507,12 @@ class TimeEntryCorrectionService
 	 * intervals that are unparseable / reversed / outside R / outside every
 	 * candidate gap / more than 8 (before or after overlap-merge), worked on a
 	 * `force_continuous` decision, or a malformed baseEntryRevision token.
+	 *
+	 * `SPLIT_OVERRIDE_STALE` — well-formed baseEntryRevision that no longer
+	 * matches the entry's current {@see TimeEntry::getContentRevision()}:
+	 * the correction basis changed since the client read it (or since the
+	 * proposal was submitted). A conflict, not a validation error — callers
+	 * must map it to HTTP 409, same as the approval-time staleness below.
 	 *
 	 * Deliberately NOT checked here: whether a `force_split` still applies
 	 * after the new times (corrected clock-out reaching the last candidate gap
@@ -518,6 +542,17 @@ class TimeEntryCorrectionService
 			$rev = $splitOverride['baseEntryRevision'];
 			if (!\is_string($rev) || preg_match(self::REVISION_TOKEN_PATTERN, $rev) !== 1) {
 				return 'SPLIT_OVERRIDE_INVALID';
+			}
+			// Entry CAS (spec §9.7 / AC-5): the token must equal the CURRENT
+			// content revision — the version of the correction basis the
+			// client built its decision on. A mismatch means the entry was
+			// written between read and submit (or between submit and
+			// approval); the decision basis is stale → 409
+			// SPLIT_OVERRIDE_STALE, never a silent apply. hash_equals keeps
+			// the comparison constant-time even though the token is not a
+			// secret.
+			if (!hash_equals($entry->getContentRevision(), $rev)) {
+				return 'SPLIT_OVERRIDE_STALE';
 			}
 		}
 
@@ -737,7 +772,7 @@ class TimeEntryCorrectionService
 
 		$error = $this->validateProposal($entry, $adjustedProposal, $managerId);
 		if ($error !== null) {
-			throw new \InvalidArgumentException($error);
+			$this->failProposal($error);
 		}
 		$this->stashOriginalWorkContext($justificationData, $entry, $adjustedProposal);
 		$this->applyProposal($entry, $adjustedProposal);
@@ -791,7 +826,7 @@ class TimeEntryCorrectionService
 		if (is_array($proposal) && $proposal !== []) {
 			$error = $this->validateProposal($entry, $proposal);
 			if ($error !== null) {
-				throw new \InvalidArgumentException($error);
+				$this->failProposal($error);
 			}
 			$this->stashOriginalWorkContext($justificationData, $entry, $proposal);
 			$this->applyProposal($entry, $proposal);
@@ -838,7 +873,7 @@ class TimeEntryCorrectionService
 				// even if a future caller forgets to validate first.
 				$error = $this->validateProposal($entry, $proposal);
 				if ($error !== null) {
-					throw new \InvalidArgumentException($error);
+					$this->failProposal($error);
 				}
 				$this->stashOriginalWorkContext($justificationData, $entry, $proposal);
 				$this->applyProposal($entry, $proposal);
@@ -1064,7 +1099,7 @@ class TimeEntryCorrectionService
 
 		$error = $this->validateProposal($entry, $proposal, $managerId);
 		if ($error !== null) {
-			throw new \InvalidArgumentException($error);
+			$this->failProposal($error);
 		}
 
 		// Preserve previous justification so the manager correction remains traceable
@@ -1167,7 +1202,7 @@ class TimeEntryCorrectionService
 
 		$error = $this->validateProposal($entry, $proposal, $managerId);
 		if ($error !== null) {
-			throw new \InvalidArgumentException($error);
+			$this->failProposal($error);
 		}
 
 		$this->applyProposal($entry, $proposal);

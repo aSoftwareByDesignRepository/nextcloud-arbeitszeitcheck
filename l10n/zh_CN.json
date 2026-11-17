@@ -3137,6 +3137,7 @@
 		"Needs attention": "需要处理",
 		"Needs review": "需要复核",
 		"Needs review: time change (DST)": "需要复核：夏令时时间变更",
+		"Needs review: stored data could not be read": "Needs review: stored data could not be read",
 		"Net": "净额",
 		"Net: %1$.2f h · paid break: %2$d min": "净工时：%1$.2f 小时 · 带薪休息：%2$d 分钟",
 		"Network error occurred": "发生网络错误",

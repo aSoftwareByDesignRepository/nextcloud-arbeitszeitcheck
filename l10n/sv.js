@@ -3138,6 +3138,7 @@
 	"Needs attention" : "Kräver uppmärksamhet",
 	"Needs review" : "Behöver granskas",
 	"Needs review: time change (DST)" : "Behöver granskas: tidsändring (sommartid)",
+	"Needs review: stored data could not be read" : "Needs review: stored data could not be read",
 	"Net" : "Netto",
 	"Net: %1$.2f h · paid break: %2$d min" : "Netto: %1$.2f h · betald rast: %2$d min",
 	"Network error occurred" : "Ett nätverksfel uppstod",

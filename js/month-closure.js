@@ -169,6 +169,7 @@
         const btn = $('month-closure-finalize');
         const deadlineEl = $('month-closure-deadline');
         const blockedEl = $('month-closure-blocked');
+        const reviewEl = $('month-closure-review-warning');
         setMonthClosureStatus(mcT('monthClosureLoading', '…'), 'neutral');
         if (deadlineEl) {
             deadlineEl.hidden = true;
@@ -177,6 +178,10 @@
         if (blockedEl) {
             blockedEl.hidden = true;
             blockedEl.textContent = '';
+        }
+        if (reviewEl) {
+            reviewEl.hidden = true;
+            reviewEl.textContent = '';
         }
         setFeedback('', false);
 
@@ -212,6 +217,22 @@
                 if (blockedEl && !isFinalized && data.finalizeBlockedMessage) {
                     blockedEl.textContent = data.finalizeBlockedMessage;
                     blockedEl.hidden = false;
+                }
+
+                // §9.6 closure rule: review-state split entries stay
+                // closable — shown as a warning, never a blocker. The
+                // affected dates are listed so HR can find and correct
+                // the entries before finalizing.
+                if (reviewEl && !isFinalized && data.reviewWarning) {
+                    var reviewDates = Array.isArray(data.reviewEntries)
+                        ? data.reviewEntries
+                            .map(function (e) { return e && e.date ? formatYmdLocal(e.date) : null; })
+                            .filter(function (d) { return d; })
+                        : [];
+                    reviewEl.textContent = reviewDates.length > 0
+                        ? data.reviewWarning + ' ' + reviewDates.join(', ')
+                        : data.reviewWarning;
+                    reviewEl.hidden = false;
                 }
 
                 if (deadlineEl && grace > 0 && deadline && !isFinalized && canFinalize) {
@@ -259,6 +280,9 @@
                 }
                 if (blockedEl) {
                     blockedEl.hidden = true;
+                }
+                if (reviewEl) {
+                    reviewEl.hidden = true;
                 }
                 if (btn) {
                     btn.disabled = true;

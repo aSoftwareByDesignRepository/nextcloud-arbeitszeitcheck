@@ -4158,6 +4158,11 @@ class ManagerController extends Controller
 			$oldValues = $entry->getSummary();
 			try {
 				$updatedEntry = $this->correctionService->applyManagerCorrection($entry, $proposal, $managerId, $reason);
+			} catch (ConcurrentDecisionException $e) {
+				// Stale split-decision basis (baseEntryRevision CAS or the
+				// approval-time override recompute): a conflict, not a bad
+				// request — same 409 seam as the approval endpoints.
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
 			} catch (\InvalidArgumentException $e) {
 				return new JSONResponse([
 					'success' => false,

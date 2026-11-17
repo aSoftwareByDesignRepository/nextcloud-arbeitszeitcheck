@@ -150,6 +150,8 @@
                 return mainT('Not split: crosses midnight');
             case 'dst_review':
                 return mainT('Needs review: time change (DST)');
+            case 'context_invalid':
+                return mainT('Needs review: stored data could not be read');
             default:
                 return null;
         }
@@ -178,7 +180,7 @@
         if (state === 'applied') {
             return mainT('Calculated');
         }
-        if (state === 'review') {
+        if (state === 'review' || state === 'context_invalid') {
             return mainT('Needs review');
         }
         if (state === 'active') {
@@ -2705,7 +2707,7 @@
 
             let html = '<div class="azc-entry-accounting">';
 
-            if (state === 'review') {
+            if (state === 'review' || state === 'context_invalid') {
                 html += `<p class="azc-entry-accounting__review" role="status">${escapeHtml(mainT('Needs review'))}</p>`;
             }
 
@@ -2788,7 +2790,7 @@
                     + '</dl></details>';
             }
 
-            if (state === 'review' && opts.correctionAction !== false && entry && entry.canRequestCorrection !== false) {
+            if ((state === 'review' || state === 'context_invalid') && opts.correctionAction !== false && entry && entry.canRequestCorrection !== false) {
                 const url = this.resolveRequestUrl('/apps/arbeitszeitcheck/time-entries');
                 html += `<p class="azc-entry-accounting__actions"><a class="azc-btn azc-btn--secondary azc-entry-accounting__correction-link" href="${escapeHtml(url)}">${escapeHtml(mainT('Request correction'))}</a></p>`;
             }

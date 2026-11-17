@@ -36,6 +36,8 @@ MUTANTS=(
 	"block-touching-drop|lib/Support/WeekdaySchedule.php|WeekdayScheduleTest|\$errors[] = 'SCHEDULE_BLOCK_TOUCHING';@@\$errors[] = 'SCHEDULE_BLOCKS_OVERLAP';"
 	"calculator-x-kept|lib/Service/DailyWorkingHoursCalculator.php|DailyWorkingHoursCalculatorTest|if (\$split !== null && \$split['excluded'] !== []) {@@if (false) {"
 	"entity-x-included|lib/Db/TimeEntry.php|TimeEntryTest|return max(0, \$totalDuration - \$excludedDuration - \$effectiveBreakDuration);@@return max(0, \$totalDuration - \$effectiveBreakDuration);"
+	"cas-comparison-drop|lib/Service/TimeEntryCorrectionService.php|TimeEntryCorrectionServiceTest|if (!hash_equals(\$entry->getContentRevision(), \$rev)) {@@if (false) {"
+	"cas-stale-code-swap|lib/Service/TimeEntryCorrectionService.php|TimeEntryCorrectionServiceTest|return 'SPLIT_OVERRIDE_STALE';@@return 'SPLIT_OVERRIDE_INVALID';"
 )
 
 run_filter() {

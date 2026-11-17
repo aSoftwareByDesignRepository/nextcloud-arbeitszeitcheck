@@ -3137,6 +3137,7 @@
 		"Needs attention": "Vereist aandacht",
 		"Needs review": "Controle nodig",
 		"Needs review: time change (DST)": "Controle nodig: tijdwijziging (zomer-/wintertijd)",
+		"Needs review: stored data could not be read": "Needs review: stored data could not be read",
 		"Net": "Netto",
 		"Net: %1$.2f h · paid break: %2$d min": "Netto: %1$.2f u · betaalde pauze: %2$d min",
 		"Network error occurred": "Netwerkfout opgetreden",

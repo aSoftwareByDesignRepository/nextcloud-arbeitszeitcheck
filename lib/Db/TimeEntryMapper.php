@@ -600,6 +600,26 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * §6 observability: entries whose frozen split context resolved to state
+	 * `review` (e.g. a DST-unresolvable day) — the admin status counter.
+	 * JSON-path extraction is not portable across the supported databases;
+	 * the context is written by PHP json_encode, so the state key serialises
+	 * verbatim as `"state":"review"` and a LIKE filter is exact.
+	 */
+	public function countSplitReviewStateEntries(): int
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from($this->getTableName())
+			->where($qb->expr()->like(
+				'work_context_json',
+				$qb->createNamedParameter('%"state":"review"%')
+			));
+
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
 	 * Per-user entry counts for a set of users — one grouped query.
 	 * Used by scoped overview surfaces to avoid N+1 counting.
 	 *

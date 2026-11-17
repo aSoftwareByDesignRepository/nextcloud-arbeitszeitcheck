@@ -3138,6 +3138,7 @@
 	"Needs attention" : "Dikkat gerektiriyor",
 	"Needs review" : "İnceleme gerekli",
 	"Needs review: time change (DST)" : "İnceleme gerekli: saat değişimi (yaz saati)",
+	"Needs review: stored data could not be read" : "Needs review: stored data could not be read",
 	"Net" : "Net",
 	"Net: %1$.2f h · paid break: %2$d min" : "Net: %1$.2f sa · ücretli mola: %2$d dk",
 	"Network error occurred" : "Ağ hatası oluştu",

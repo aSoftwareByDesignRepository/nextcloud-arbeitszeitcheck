@@ -103,6 +103,7 @@ $mainUiStringIds = [
 	'Not split: no interruption today',
 	'Not split: crosses midnight',
 	'Needs review: time change (DST)',
+	'Needs review: stored data could not be read',
 	'Counted as working time',
 	'Paid working time',
 	'Not counted (interruption)',

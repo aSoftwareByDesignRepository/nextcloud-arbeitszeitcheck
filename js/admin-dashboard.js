@@ -122,6 +122,16 @@
 				violationsTile.classList.toggle('azc-stat-tile--success', !hasOpen);
 			}
 		}
+
+		const splitReviewEl = document.querySelector('[data-stat="split_review_entries"]');
+		if (splitReviewEl) {
+			const splitReviewCount = stats.split_review_entries || 0;
+			const splitReviewNum = splitReviewEl.querySelector('.stat-number');
+			if (splitReviewNum) {
+				splitReviewNum.textContent = splitReviewCount;
+			}
+			splitReviewEl.hidden = splitReviewCount === 0;
+		}
 	}
 
 	function updateOvertimeBanner(tracking) {

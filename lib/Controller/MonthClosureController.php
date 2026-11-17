@@ -201,6 +201,24 @@ class MonthClosureController extends Controller
 				$canFinalize = true;
 			}
 
+			// Split-day §9.6: `review`-state entries stay closable but are
+			// listed as a visible warning so HR can correct them first.
+			$reviewEntries = ($featureEnabled && !$isFinalized)
+				? $this->monthClosureService->monthReviewEntries($userId, $year, $month)
+				: [];
+			$reviewWarning = null;
+			if ($reviewEntries !== []) {
+				$dates = array_values(array_filter(array_map(
+					static fn (array $e): ?string => $e['date'],
+					$reviewEntries
+				)));
+				$reviewWarning = $this->l10n->n(
+					'%n day in this month needs review before finalizing (for example because of a time change). The entry stays counted as continuous time unless you correct it.',
+					'%n days in this month need review before finalizing (for example because of a time change). The entries stay counted as continuous time unless you correct them.',
+					\count($reviewEntries)
+				);
+			}
+
 			$finalizeBlockedMessage = null;
 			if ($finalizeBlockedReason !== null) {
 				$finalizeBlockedMessage = match ($finalizeBlockedReason) {
@@ -231,6 +249,8 @@ class MonthClosureController extends Controller
 				'canFinalize' => $canFinalize,
 				'finalizeBlockedReason' => $finalizeBlockedReason,
 				'finalizeBlockedMessage' => $finalizeBlockedMessage,
+				'reviewEntries' => $reviewEntries,
+				'reviewWarning' => $reviewWarning,
 			]);
 		} catch (\RuntimeException $e) {
 			if ($e->getMessage() === 'not_logged_in') {

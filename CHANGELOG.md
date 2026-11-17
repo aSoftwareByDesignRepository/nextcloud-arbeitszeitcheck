@@ -5,7 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.10.0 - 2026-11-13
+## Unreleased
+
+### Added
+
+- **opt-in split-service working-time model** (spec split-day-working-model-2026-11):
+  one clock-in + one clock-out yields two employer-side partial services
+  when clock-out passes a configurable cut-off, with the scheduled
+  interruption excluded from credited time. WeekdaySchedule v2 block
+  schedules (1–4 blocks/day), frozen per-entry work context, deterministic
+  DST-aware accounting engine, `active`/`applied`/`review` states.
+  Fully opt-in per model — legacy v1 schedules, NULL-context entries and
+  disabled models keep the byte-identical pre-feature calculation path.
+- correction dialog split section: partial-service/worked-portion editor
+  with fail-closed `splitOverride` validation, content-revision CAS
+  (`baseEntryRevision` → 409 `SPLIT_OVERRIDE_STALE` on stale decisions,
+  400 on malformed tokens, omission stays compatible with older clients)
+- admin split-preview endpoint + model-editor split section; per-entry
+  segment/interruption display with plain-language reasons and an
+  expandable "View calculation" disclosure (web + companion app)
+- `occ arbeitszeitcheck:verify-split-accounting` replay command; exports
+  (CSV/PDF) carry split/segment/exclusion data with neutral interruption
+  wording
+- month-closure status lists `review`-state days as a visible warning
+  (with dates) without blocking finalization (spec §9.6)
+- admin status page counts split-day entries needing review (spec §6)
+
+### Fixed
+
+- **split corrections submitted from the web UI were rejected
+  unconditionally**: the dialog sent the entry's `updatedAt` timestamp as
+  `baseEntryRevision` while the server required a sha256 token — the CAS
+  token was also format-checked but never compared. Introduces
+  `TimeEntry::getContentRevision()` (content hash of the correction basis)
+  echoed back by clients; stale → 409 `SPLIT_OVERRIDE_STALE` on the
+  employee submit and manager approve paths
+- **corrupt `work_context_json` no longer masquerades as a legacy entry**:
+  undecodable non-NULL context now surfaces `state: 'context_invalid'` +
+  `SPLIT_CONTEXT_INVALID` in the API summary (web + companion render the
+  needs-review flag), and the stored `excluded_work_seconds` stays
+  subtracted so ORM reads and SQL sums agree — interruption time is never
+  silently re-credited (FM-11)
+
+### Security
+
+- correction CAS actually enforced: a split decision made against a stale
+  entry revision fails closed with 409 before any write, on employee and
+  manager paths
+
 
 
 ### Added

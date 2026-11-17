@@ -696,6 +696,40 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$this->assertSame('pending_workflow', $this->svc()->getMonthFinalizeBlockReason('alice', self::PAST_Y, self::PAST_M));
 	}
 
+	/**
+	 * §9.6 closure rule: `review`-state split entries are listed as warnings
+	 * for HR but never block finalization (they account unsplit — the
+	 * conservative legacy result).
+	 */
+	public function testMonthReviewEntriesListsOnlyReviewStateEntries(): void
+	{
+		$legacy = $this->completedEntry(1);
+
+		$applied = $this->completedEntry(2);
+		$applied->setWorkContextJson(json_encode([
+			'v' => 1,
+			'result' => ['state' => 'applied', 'split' => true],
+		]));
+
+		$review = $this->completedEntry(3);
+		$review->setStartTime(new \DateTime('2025-01-30T06:00:00+01:00'));
+		$review->setWorkContextJson(json_encode([
+			'v' => 1,
+			'result' => ['state' => 'review', 'split' => false, 'reason' => 'dst_review'],
+		]));
+
+		$this->entries = [$legacy, $applied, $review];
+
+		$list = $this->svc()->monthReviewEntries('alice', self::PAST_Y, self::PAST_M);
+		$this->assertCount(1, $list);
+		$this->assertSame(3, $list[0]['id']);
+		$this->assertSame('2025-01-30', $list[0]['date']);
+		$this->assertSame('dst_review', $list[0]['reason']);
+
+		// Same month: no block reason — review stays closable by design.
+		$this->assertNull($this->svc()->getMonthFinalizeBlockReason('alice', self::PAST_Y, self::PAST_M));
+	}
+
 	public function testEnrichSnapshotForPdfPayoutAttachesLivePayout(): void
 	{
 		$svc = $this->svc();

@@ -908,9 +908,6 @@
 				const intEndMs = apiParseInstantMs(group.getAttribute('data-int-end'));
 				const dispStart = isoToHm(group.getAttribute('data-int-start'));
 				const dispStartHm = dispStart.hour ? dispStart.hour + ':' + dispStart.minute : '';
-				const rangeText = t('correctionInterruptionLabel', 'Interruption {start}–{end}')
-					.replace('{start}', formatIsoDisplay(group.getAttribute('data-int-start'), 'time'))
-					.replace('{end}', formatIsoDisplay(group.getAttribute('data-int-end'), 'time'));
 				group.querySelectorAll('.correction-worked-row').forEach((row) => {
 					if (error) {
 						return;
@@ -1449,8 +1446,12 @@
 			const accForSubmit = splitAccountingOf(wizardState.originalSummary);
 			if (accForSubmit) {
 				const workedIso = collectedWorkedForSubmit();
-				const baseRevision = wizardState.originalSummary && wizardState.originalSummary.updatedAt
-					? String(wizardState.originalSummary.updatedAt)
+				// §9.7 entry CAS: the opaque content-hash `revision` from
+				// getSummary(), echoed verbatim. Entries loaded from a server
+				// that predates the field carry no token — omission keeps the
+				// pre-feature semantics (no CAS check) instead of breaking.
+				const baseRevision = wizardState.originalSummary && wizardState.originalSummary.revision
+					? String(wizardState.originalSummary.revision)
 					: null;
 				const splitOverride = buildSplitOverride(
 					wizardState.splitInitialDecision || 'auto',
@@ -1512,6 +1513,30 @@
 					}
 				},
 				onError: (err) => {
+					const errorCode = err?.data && typeof err.data.error_code === 'string'
+						? err.data.error_code
+						: null;
+					if (err?.status === 409 || errorCode === 'SPLIT_OVERRIDE_STALE') {
+						// Stale correction basis (spec §9.7): the entry changed
+						// between read and submit. Re-submitting the same form
+						// cannot succeed — the user must reload and re-decide.
+						// Same never-a-dead-end pattern as the save-with-warning
+						// arm: keep the dialog open, announce inline, reload on
+						// close so the fresh entry is shown.
+						const staleMsg = (err && err.error) || t('correctionStaleEntry', 'This time entry was changed in the meantime. Reload it and submit the correction again.');
+						correctionReloadOnClose = true;
+						setStatus(statusEl, staleMsg, true);
+						Messaging.showError(staleMsg);
+						if (btnSubmit) {
+							btnSubmit.disabled = true;
+							btnSubmit.removeAttribute('aria-busy');
+						}
+						if (btnCancel) {
+							btnCancel.textContent = t('correctionClose', 'Close');
+							btnCancel.focus();
+						}
+						return;
+					}
 					const errMsg = err?.error || t('correctionSubmitError');
 					setStatus(statusEl, errMsg, true);
 					Messaging.showError(errMsg);

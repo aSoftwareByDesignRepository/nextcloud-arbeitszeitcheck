@@ -444,6 +444,7 @@ class MapperSurfaceCoverageTest extends TestCase
 		$this->assertIsArray($this->invoke($m, 'findByUserAndStatus', ['alice', 'completed']));
 		$this->invoke($m, 'getTotalBreakHoursByUserAndDateRange', ['alice', $this->d(), $this->d('2026-09-30')]);
 		$this->invoke($m, 'countByUser', ['alice']);
+		$this->invoke($m, 'countSplitReviewStateEntries', []);
 		$this->invoke($m, 'count', [[]]);
 		$this->invoke($m, 'count', [['user_id' => 'alice', 'status' => 'completed']]);
 

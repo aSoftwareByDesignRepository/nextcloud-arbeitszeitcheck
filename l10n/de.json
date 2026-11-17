@@ -3137,6 +3137,7 @@
 		"Needs attention": "Handlungsbedarf",
 		"Needs review": "Prüfung erforderlich",
 		"Needs review: time change (DST)": "Prüfung erforderlich: Zeitumstellung (DST)",
+		"Needs review: stored data could not be read": "Prüfung erforderlich: Gespeicherte Daten konnten nicht gelesen werden",
 		"Net": "Netto",
 		"Net: %1$.2f h · paid break: %2$d min": "Netto: %1$.2f Std. · bezahlte Pause: %2$d Min.",
 		"Network error occurred": "Netzwerkfehler",

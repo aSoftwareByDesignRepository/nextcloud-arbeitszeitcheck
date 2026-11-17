@@ -1338,13 +1338,138 @@ class TimeEntryCorrectionServiceTest extends TestCase
 		]);
 		$this->assertSame('SPLIT_OVERRIDE_INVALID', $error);
 
+		// Well-formed sha256 hex but NOT the entry's current revision: a
+		// stale decision basis — SPLIT_OVERRIDE_STALE (409), never INVALID.
 		$error = $this->service->validateProposal($entry, [
 			'splitOverride' => [
 				'decision' => 'force_split',
 				'baseEntryRevision' => str_repeat('a', 64),
 			],
 		]);
+		$this->assertSame('SPLIT_OVERRIDE_STALE', $error);
+
+		// The token the entry itself issued → CAS passes.
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'baseEntryRevision' => $entry->getContentRevision(),
+			],
+		]);
 		$this->assertNull($error);
+	}
+
+	/**
+	 * AC-5 real-world race: the client read the entry, the basis changed
+	 * before submit (another write landed in between) → the echo'd token no
+	 * longer matches → SPLIT_OVERRIDE_STALE.
+	 */
+	public function testValidateProposalSplitOverrideStaleAfterBasisChange(): void
+	{
+		$entry = $this->splitEntry();
+		$seenRevision = $entry->getContentRevision();
+
+		// A competing write lands between the client's read and its submit.
+		$entry->setEndTime(new \DateTime('2026-11-16T17:00:00+01:00'));
+
+		$error = $this->service->validateProposal($entry, [
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'baseEntryRevision' => $seenRevision,
+			],
+		]);
+		$this->assertSame('SPLIT_OVERRIDE_STALE', $error);
+	}
+
+	/**
+	 * The revision must only hash the correction basis. Workflow fields that
+	 * legitimately change while a proposal is pending (status, justification,
+	 * updatedAt) must NOT rotate the token — otherwise every stored proposal
+	 * would be stale at approval time.
+	 */
+	public function testContentRevisionIgnoresWorkflowFields(): void
+	{
+		$entry = $this->splitEntry();
+		$rev = $entry->getContentRevision();
+
+		$entry->setStatus(TimeEntry::STATUS_PENDING_APPROVAL);
+		$entry->setJustification(json_encode(['proposed' => ['endTime' => 'x']]));
+		$entry->setUpdatedAt(new \DateTime());
+		$entry->setApprovedByUserId('manager1');
+		$entry->setApprovedAt(new \DateTime());
+		$this->assertSame(
+			$rev,
+			$entry->getContentRevision(),
+			'workflow writes must not stale a pending proposal'
+		);
+
+		$entry->setEndTime(new \DateTime('2026-11-16T17:00:00+01:00'));
+		$this->assertNotSame(
+			$rev,
+			$entry->getContentRevision(),
+			'correction-basis writes must rotate the revision'
+		);
+	}
+
+	/**
+	 * Every summary carries the opaque CAS token the client echoes back as
+	 * splitOverride.baseEntryRevision (spec §9.7).
+	 */
+	public function testGetSummaryExposesContentRevision(): void
+	{
+		$entry = $this->splitEntry();
+		$summary = $entry->getSummary();
+		$this->assertArrayHasKey('revision', $summary);
+		$this->assertSame($entry->getContentRevision(), $summary['revision']);
+		$this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $summary['revision']);
+	}
+
+	/**
+	 * Approval-time CAS: a stored proposal whose baseEntryRevision still
+	 * matches the entry's current revision approves normally (the pending
+	 * justification/status writes must not have rotated the token).
+	 */
+	public function testApproveSplitOverrideWithMatchingBaseRevision(): void
+	{
+		$entry = $this->pendingSplitEntry([
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'worked' => [['2026-11-16T10:00:00+01:00', '2026-11-16T11:00:00+01:00']],
+			],
+		]);
+		// Re-embed the submit-time token: basis fields are unchanged by the
+		// pending writes, so the entry's current revision IS the token the
+		// client would have sent at submit.
+		$just = json_decode($entry->getJustification(), true);
+		$just['proposed']['splitOverride']['baseEntryRevision'] = $entry->getContentRevision();
+		$entry->setJustification(json_encode($just));
+
+		$service = $this->splitAwareService();
+		$result = $service->approve($entry, 'manager1', null);
+
+		$this->assertSame(1, $service->recomputeCalls);
+		$this->assertSame(
+			'force_split',
+			$result->getWorkContext()['overrides']['decision']
+		);
+	}
+
+	/**
+	 * Approval-time CAS: the correction basis changed while the proposal was
+	 * pending (a second write landed after submit) → the stored token no
+	 * longer matches → SplitOverrideStaleException → 409 SPLIT_OVERRIDE_STALE.
+	 */
+	public function testApproveSplitOverrideStaleBaseRevision(): void
+	{
+		$entry = $this->pendingSplitEntry([
+			'splitOverride' => [
+				'decision' => 'force_split',
+				'baseEntryRevision' => str_repeat('b', 64),
+			],
+		]);
+		$service = $this->splitAwareService();
+
+		$this->expectException(\OCA\ArbeitszeitCheck\Exception\SplitOverrideStaleException::class);
+		$service->approve($entry, 'manager1', null);
 	}
 
 	/**

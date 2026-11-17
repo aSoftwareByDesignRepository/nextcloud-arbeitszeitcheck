@@ -622,6 +622,67 @@
 					]
 				}
 			]
+		},
+		{
+			"id": "split-override-entry-revision-cas",
+			"param": "splitOverride.baseEntryRevision, summary.revision",
+			"description": "AZC-SPLIT-REVISION-CAS: getSummary() issues an opaque sha256 content-hash `revision` over the correction basis; the correction wizard echoes it as splitOverride.baseEntryRevision. The server format-checks AND compares it to the current revision - a mismatch is a conflict (409 SPLIT_OVERRIDE_STALE), never a silent apply; omission keeps pre-feature semantics. Stale submissions lock the dialog and reload on close.",
+			"errorCodes": [
+				"SPLIT_OVERRIDE_STALE",
+				"SPLIT_OVERRIDE_INVALID"
+			],
+			"server": [
+				{
+					"file": "lib/Db/TimeEntry.php",
+					"needles": [
+						"getContentRevision",
+						"$summary['revision'] = $this->getContentRevision()",
+						"sha256"
+					]
+				},
+				{
+					"file": "lib/Service/TimeEntryCorrectionService.php",
+					"needles": [
+						"baseEntryRevision",
+						"REVISION_TOKEN_PATTERN",
+						"hash_equals($entry->getContentRevision(), $rev)",
+						"SPLIT_OVERRIDE_STALE",
+						"SplitOverrideStaleException::CODE"
+					]
+				},
+				{
+					"file": "lib/Controller/TimeEntryController.php",
+					"needles": [
+						"SplitOverrideStaleException::CODE",
+						"Http::STATUS_CONFLICT"
+					]
+				},
+				{
+					"file": "lib/Exception/SplitOverrideStaleException.php",
+					"needles": [
+						"SPLIT_OVERRIDE_STALE",
+						"ConcurrentDecisionException"
+					]
+				}
+			],
+			"web": [
+				{
+					"file": "js/time-entry-correction.js",
+					"needles": [
+						"wizardState.originalSummary.revision",
+						"baseEntryRevision",
+						"SPLIT_OVERRIDE_STALE",
+						"correctionReloadOnClose = true"
+					]
+				},
+				{
+					"file": "templates/common/time-entry-correction-l10n.php",
+					"needles": [
+						"correctionStaleEntry"
+					]
+				}
+			],
+			"mobile": []
 		}
 	]
 }

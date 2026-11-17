@@ -55,6 +55,7 @@ $correctionL10n = [
 	'correctionSubmitting' => $l->t('Submitting…'),
 	'correctionSubmitSuccess' => $l->t('Correction request submitted. Your manager will review it.'),
 	'correctionSubmitError' => $l->t('Could not submit correction.'),
+	'correctionStaleEntry' => $l->t('This time entry was changed in the meantime. Reload it and submit the correction again.'),
 	'confirmCancelCorrection' => $l->t('Withdraw this pending correction? Your original times will be restored.'),
 	'correctionWithdrawn' => $l->t('Correction withdrawn.'),
 	'correctionWithdrawError' => $l->t('Could not withdraw correction.'),

@@ -435,7 +435,7 @@ class TimeEntryTest extends TestCase
 		$this->assertSame('standard', $summary['accounting']['breakHandling']);
 	}
 
-	public function testInvalidContextJsonFlagsDefectAndKeepsLegacyResult(): void
+	public function testInvalidContextJsonFlagsDefectAndKeepsConservativeResult(): void
 	{
 		// FM-11: corrupt non-NULL context — never a silent legacy fallback:
 		// getWorkContext() is null AND hasInvalidWorkContext() flags it.
@@ -450,12 +450,26 @@ class TimeEntryTest extends TestCase
 		$this->assertNull($entry->getWorkContext());
 		$this->assertNull($entry->getAccountingResult());
 
-		// Conservative legacy result: 10.5 − 0.5 = 10.0 h; the excluded
-		// column is NOT trusted without a decodable context.
-		$this->assertEqualsWithDelta(10.0, $entry->getDurationHours(), 0.0001);
+		// Conservative result: 10.5 − 3.5 (excluded) − 0.5 (break) = 6.5 h.
+		// The excluded column stays subtracted so ORM reads and SQL sums
+		// over `excluded_work_seconds` agree — interruption time is never
+		// silently re-credited while the defect is unresolved. The recorded
+		// break floor still applies (B\X is undecidable without the context).
+		$this->assertEqualsWithDelta(6.5, $entry->getDurationHours(), 0.0001);
 		$this->assertSame($entry->getBreakDurationHours(), $entry->getEffectiveBreakDurationHours());
 
-		$this->assertArrayNotHasKey('accounting', $entry->getSummary());
+		// §9.5 SPLIT_CONTEXT_INVALID: the summary surfaces the defect —
+		// it does NOT masquerade as a legacy row by omitting `accounting`.
+		$summary = $entry->getSummary();
+		$this->assertArrayHasKey('accounting', $summary);
+		$this->assertSame('context_invalid', $summary['accounting']['state']);
+		$this->assertSame('SPLIT_CONTEXT_INVALID', $summary['accounting']['error']);
+		$this->assertFalse($summary['accounting']['split']);
+		$this->assertSame('context_invalid', $summary['accounting']['reason']);
+		$this->assertSame([], $summary['accounting']['segments']);
+		$this->assertSame([], $summary['accounting']['interruptions']);
+		$this->assertSame(12600, $summary['accounting']['excludedSeconds']);
+		$this->assertSame(23400, $summary['accounting']['netWorkSeconds']);
 	}
 
 	public function testScalarContextJsonCountsAsInvalid(): void

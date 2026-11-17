@@ -128,6 +128,17 @@ $payoutsUrl = $urlGenerator->linkToRoute('arbeitszeitcheck.overtime_payout.index
                     <span class="azc-stat-tile__value stat-number"><?php p((string)$unresolvedViolations); ?></span>
                     <span class="azc-stat-tile__meta"><?php p($l->t('Open compliance violations')); ?></span>
                 </a>
+                <?php $splitReviewCount = (int)($_['statistics']['split_review_entries'] ?? 0); ?>
+                <?php if ($splitReviewCount > 0): ?>
+                <span class="azc-stat-tile azc-stat-tile--danger"
+                   data-stat="split_review_entries"
+                   title="<?php p($l->t('Split-day entries that need review (e.g. because of a time change)')); ?>"
+                   aria-label="<?php p($l->t('Split-day entries needing review: %s.', [$splitReviewCount])); ?>">
+                    <span class="azc-stat-tile__label"><?php p($l->t('Split review')); ?></span>
+                    <span class="azc-stat-tile__value stat-number"><?php p((string)$splitReviewCount); ?></span>
+                    <span class="azc-stat-tile__meta"><?php p($l->t('Split-day entries needing review')); ?></span>
+                </span>
+                <?php endif; ?>
             </section>
 
             <section class="azc-card admin-dashboard__issues" aria-labelledby="admin-dashboard-issues-title">

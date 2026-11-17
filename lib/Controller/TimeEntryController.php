@@ -2510,6 +2510,16 @@ class TimeEntryController extends Controller
 
 			$proposalValidationError = $this->correctionService->validateProposal($entry, $proposedData);
 			if ($proposalValidationError !== null) {
+				// A stale baseEntryRevision is a conflict, not a bad request:
+				// the correction basis changed between read and submit, so the
+				// client must reload and re-decide (spec §9.7 / AC-5).
+				if ($proposalValidationError === \OCA\ArbeitszeitCheck\Exception\SplitOverrideStaleException::CODE) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('This time entry was changed in the meantime. Reload it and submit the correction again.'),
+						'error_code' => $proposalValidationError,
+					], Http::STATUS_CONFLICT);
+				}
 				return new JSONResponse([
 					'success' => false,
 					'error' => $proposalValidationError

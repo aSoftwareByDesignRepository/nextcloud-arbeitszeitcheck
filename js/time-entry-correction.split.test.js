@@ -115,6 +115,9 @@ function summaryFixture(overrides = {}) {
 		description: '',
 		workLocation: 'office',
 		updatedAt: '2026-11-16T16:30:01+01:00',
+		// Opaque CAS token issued by TimeEntry::getContentRevision() — the JS
+		// must echo THIS (not updatedAt) as splitOverride.baseEntryRevision.
+		revision: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 		...overrides,
 	}
 }
@@ -275,8 +278,9 @@ describe('pure helpers (spec §9.7 payload contract)', () => {
 
 	it('includes baseEntryRevision when the flow provides one', () => {
 		const t = window.__ArbeitszeitCheckTimeEntryCorrectionTestables
-		const out = t.buildSplitOverride('auto', 'force_split', [], '2026-11-16T16:30:01+01:00')
-		expect(out.baseEntryRevision).toBe('2026-11-16T16:30:01+01:00')
+		const rev = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+		const out = t.buildSplitOverride('auto', 'force_split', [], rev)
+		expect(out.baseEntryRevision).toBe(rev)
 	})
 
 	it('initialSplitDecision maps engine reasons, defaulting to auto', () => {
@@ -338,7 +342,7 @@ describe('correction dialog split section (DOM)', () => {
 		expect(ajaxCalls.length).toBe(1)
 		expect(ajaxCalls[0].data.splitOverride).toEqual({
 			decision: 'force_continuous',
-			baseEntryRevision: '2026-11-16T16:30:01+01:00',
+			baseEntryRevision: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 		})
 		expect(ajaxCalls[0].data.splitOverride).not.toHaveProperty('worked')
 	})
@@ -453,5 +457,29 @@ describe('correction dialog split section (DOM)', () => {
 		submitForm()
 		expect(evaluateBreakCompliance).toHaveBeenCalled()
 		expect(ajaxCalls.length).toBe(0)
+	})
+
+	it('locks the form and announces stale state on a 409 split-override conflict', async () => {
+		await openCorrectionDialog(summaryFixture({ accounting: accountingFixture() }))
+		document.getElementById('correction-date').value = '16.11.2026'
+		setHm('correction-start', '06:15')
+		setHm('correction-end', '16:30')
+		ajaxMock.mockImplementation((url, opts) => {
+			ajaxCalls.push({ url, data: opts && opts.data })
+			const err = new Error('conflict')
+			err.status = 409
+			err.error = 'This time entry was changed in the meantime. Reload it and submit the correction again.'
+			err.data = { success: false, error: err.error, error_code: 'SPLIT_OVERRIDE_STALE' }
+			if (opts && typeof opts.onError === 'function') {
+				opts.onError(err)
+			}
+		})
+		submitForm()
+		expect(ajaxCalls.length).toBe(1)
+		// Stale basis is never silently retryable — the form locks and the
+		// dialog status tells the user to reload instead of resubmitting.
+		expect(document.getElementById('correction-wizard-submit').disabled).toBe(true)
+		expect(document.getElementById('correction-dialog-status').textContent)
+			.toContain('changed in the meantime')
 	})
 })

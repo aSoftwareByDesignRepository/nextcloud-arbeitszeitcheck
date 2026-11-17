@@ -380,6 +380,36 @@ class MonthClosureService
 	}
 
 	/**
+	 * Split-day spec §9.6 closure rule: entries whose frozen split context
+	 * resolved to state `review` (e.g. a DST-unresolvable day) stay closable
+	 * — they are accounted unsplit, the conservative legacy result — but the
+	 * month status lists them so HR can correct them before finalising.
+	 *
+	 * @return list<array{id:int, date:string|null, reason:?string}>
+	 */
+	public function monthReviewEntries(string $targetUserId, int $year, int $month): array
+	{
+		$start = new \DateTime(sprintf('%04d-%02d-01', $year, $month));
+		$start->setTime(0, 0, 0);
+		$end = clone $start;
+		$end->modify('last day of this month');
+		$end->setTime(23, 59, 59);
+		$out = [];
+		foreach ($this->timeEntryMapper->findByUserAndDateRange($targetUserId, $start, $end) as $e) {
+			$result = $e->getAccountingResult();
+			if (!\is_array($result) || ($result['state'] ?? null) !== 'review') {
+				continue;
+			}
+			$out[] = [
+				'id' => (int)$e->getId(),
+				'date' => $e->getStartTime()?->format('Y-m-d'),
+				'reason' => \is_string($result['reason'] ?? null) ? $result['reason'] : null,
+			];
+		}
+		return $out;
+	}
+
+	/**
 	 * Absences that still need workflow action would produce an unstable snapshot — block finalize.
 	 */
 	private function monthHasOpenAbsenceWorkflow(string $targetUserId, int $year, int $month): bool

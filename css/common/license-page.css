@@ -22,6 +22,12 @@
 	min-width: 0;
 }
 
+/* [hidden] wins over any display rule — JS toggles el.hidden on elements
+ * whose classes declare display (callout, buttons, results list). */
+.azc-license-page [hidden] {
+	display: none !important;
+}
+
 /* ── Screen-reader-only + live regions ───────────────────────── */
 .azc-license-sr-only,
 .azc-license-page .azc-license-sr-only {
@@ -528,7 +534,9 @@ dialog .azc-license-btn--danger:active,
 	padding: var(--azc-space-3, 0.75rem);
 	border: 2px solid var(--color-border-maxcontrast, var(--color-border));
 	border-radius: var(--azc-radius-sm, 8px);
-	background: var(--color-main-background);
+	/* background-color, never bare background: — the shorthand would reset
+	 * the native chevron on <select> consumers (select-background-shorthand). */
+	background-color: var(--color-main-background);
 	color: var(--color-main-text);
 	font: inherit;
 }

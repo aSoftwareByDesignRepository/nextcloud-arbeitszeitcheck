@@ -4171,7 +4171,7 @@
 	"Remove license" : "Fjern licens",
 	"Remove manager" : "Fjern administrator",
 	"Remove member" : "Fjern medlem",
-	"Remove mobile seat" : "Fjern mobil plads",
+	"Remove mobile seat" : "Fjern mobilplads",
 	"Remove mobile seat for this employee?" : "Fjern mobilplads for denne medarbejder?",
 	"Remove mobile seat for this person?" : "Fjern mobilplads for denne person?",
 	"Remove seat" : "Fjern plads",

@@ -4171,7 +4171,7 @@
 	"Remove license" : "Ta bort licens",
 	"Remove manager" : "Ta bort chef",
 	"Remove member" : "Ta bort medlem",
-	"Remove mobile seat" : "Ta bort mobil plats",
+	"Remove mobile seat" : "Ta bort mobilplats",
 	"Remove mobile seat for this employee?" : "Ta bort mobilplats för den här medarbetaren?",
 	"Remove mobile seat for this person?" : "Ta bort mobilplatsen för den här personen?",
 	"Remove seat" : "Ta bort plats",

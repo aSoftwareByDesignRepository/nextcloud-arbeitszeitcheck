@@ -18,7 +18,10 @@ class WidgetStatusCopyTest extends TestCase {
 			static fn (string $s, array $p = []): string => $p === [] ? $s : (string)vsprintf($s, $p)
 		);
 		$l10n->method('n')->willReturnCallback(
-			static fn (string $singular, string $plural, int $count): string => $count === 1 ? $singular : str_replace('%n', (string)$count, $plural)
+			static function (string $singular, string $plural, int $count, array $parameters = []): string {
+				$base = $count === 1 ? $singular : str_replace('%n', (string)$count, $plural);
+				return $parameters === [] ? $base : vsprintf($base, $parameters);
+			}
 		);
 		$this->copy = new WidgetStatusCopy($l10n);
 	}

@@ -157,9 +157,11 @@ final class WidgetStatusCopy {
 			return $this->l10n->n('1 away', '%n away', $away);
 		}
 
-		return sprintf(
-			$this->l10n->n('1 away (%1$s)', '%n away (%1$s)', $away),
-			implode(', ', $detail)
+		return $this->l10n->n(
+			'1 away (%1$s)',
+			'%n away (%1$s)',
+			$away,
+			[implode(', ', $detail)]
 		);
 	}
 }

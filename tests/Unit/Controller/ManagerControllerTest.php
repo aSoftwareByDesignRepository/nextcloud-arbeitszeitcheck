@@ -1396,6 +1396,10 @@ class ManagerControllerTest extends TestCase
 		$absence->setStartDate(new \DateTime('2026-03-10'));
 		$absence->setEndDate(new \DateTime('2026-03-12'));
 		$absence->setDays(3.0);
+		$absence->setStartDayFraction(0.5);
+		$absence->setStartDaySlot('am');
+		$absence->setEndDayFraction(0.5);
+		$absence->setEndDaySlot('pm');
 		$absence->setReason('Family trip');
 		$absence->setStatus(Absence::STATUS_APPROVED);
 		$absence->setCreatedAt(new \DateTime('2026-03-01 09:00:00'));
@@ -1426,6 +1430,11 @@ class ManagerControllerTest extends TestCase
 		$this->assertCount(1, $data['entries']);
 		$this->assertSame('employee1', $data['entries'][0]['userId']);
 		$this->assertSame('vacation', $data['entries'][0]['type']);
+		// Day-shape columns the companion day-length label + web tooltip read.
+		$this->assertSame(0.5, $data['entries'][0]['startDayFraction']);
+		$this->assertSame('am', $data['entries'][0]['startDaySlot']);
+		$this->assertSame(0.5, $data['entries'][0]['endDayFraction']);
+		$this->assertSame('pm', $data['entries'][0]['endDaySlot']);
 	}
 
 	public function testRevisionPdfUsersForbiddenWhenNeitherAdminNorManager(): void

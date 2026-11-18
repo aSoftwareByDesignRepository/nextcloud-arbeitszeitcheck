@@ -6288,16 +6288,16 @@
 			"Warning: %n rows will be permanently deleted, then the file data is loaded."
 		],
 		"_{count} day ago_::_{count} days ago_": [
-			"{count} day ago",
-			"{count} days ago"
+			"1 day ago",
+			"%n days ago"
 		],
 		"_{count} hour ago_::_{count} hours ago_": [
-			"{count} hour ago",
-			"{count} hours ago"
+			"1 hour ago",
+			"%n hours ago"
 		],
 		"_{count} minute ago_::_{count} minutes ago_": [
-			"{count} minute ago",
-			"{count} minutes ago"
+			"1 minute ago",
+			"%n minutes ago"
 		],
 		"_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
 			"≈ %n compensatory day available",

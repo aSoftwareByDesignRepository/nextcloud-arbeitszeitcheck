@@ -6288,16 +6288,16 @@
             "Avertissement : %n lignes seront définitivement supprimées, puis les données du fichier seront chargées."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "il y a {count} jour",
-            "il y a {count} jours"
+            "il y a 1 jour",
+            "il y a %n jours"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "il y a {count} heure",
-            "il y a {count} heures"
+            "il y a 1 heure",
+            "il y a %n heures"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "il y a {count} minute",
-            "il y a {count} minutes"
+            "il y a 1 minute",
+            "il y a %n minutes"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n jour de compensation disponible",

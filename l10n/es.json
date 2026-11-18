@@ -6288,16 +6288,16 @@
             "Advertencia: %n filas se eliminarán permanentemente y después se cargarán los datos del archivo."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "hace {count} día",
-            "hace {count} días"
+            "hace 1 día",
+            "hace %n días"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "hace {count} hora",
-            "hace {count} horas"
+            "hace 1 hora",
+            "hace %n horas"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "hace {count} minuto",
-            "hace {count} minutos"
+            "hace 1 minuto",
+            "hace %n minutos"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n día de compensación disponible",

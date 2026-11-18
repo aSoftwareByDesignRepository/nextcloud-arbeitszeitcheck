@@ -6288,16 +6288,16 @@
             "Waarschuwing: %n rijen worden definitief verwijderd, daarna worden de bestandsgegevens geladen."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} dag geleden",
-            "{count} dagen geleden"
+            "1 dag geleden",
+            "%n dagen geleden"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} uur geleden",
-            "{count} uur geleden"
+            "1 uur geleden",
+            "%n uur geleden"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minuut geleden",
-            "{count} minuten geleden"
+            "1 minuut geleden",
+            "%n minuten geleden"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n compensatiedag beschikbaar",

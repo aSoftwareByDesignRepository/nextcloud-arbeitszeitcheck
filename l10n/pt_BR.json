@@ -6288,16 +6288,16 @@
             "Aviso: %n linhas serão excluídas permanentemente e, em seguida, os dados do arquivo serão carregados."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} dia atrás",
-            "{count} dias atrás"
+            "1 dia atrás",
+            "%n dias atrás"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} hora atrás",
-            "{count} horas atrás"
+            "1 hora atrás",
+            "%n horas atrás"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minuto atrás",
-            "{count} minutos atrás"
+            "1 minuto atrás",
+            "%n minutos atrás"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n dia de compensação disponível",

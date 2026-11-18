@@ -6288,16 +6288,16 @@
             "Advarsel: %n rader slettes permanent, deretter lastes fildataene inn."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} dag siden",
-            "{count} dager siden"
+            "1 dag siden",
+            "%n dager siden"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} time siden",
-            "{count} timer siden"
+            "1 time siden",
+            "%n timer siden"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minutt siden",
-            "{count} minutter siden"
+            "1 minutt siden",
+            "%n minutter siden"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n avspasseringsdag tilgjengelig",

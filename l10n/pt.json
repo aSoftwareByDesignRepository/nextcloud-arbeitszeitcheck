@@ -6288,16 +6288,16 @@
             "Aviso: %n linhas serão eliminadas permanentemente e, depois, os dados do ficheiro serão carregados."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "há {count} dia",
-            "há {count} dias"
+            "há 1 dia",
+            "há %n dias"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "há {count} hora",
-            "há {count} horas"
+            "há 1 hora",
+            "há %n horas"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "há {count} minuto",
-            "há {count} minutos"
+            "há 1 minuto",
+            "há %n minutos"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n dia de compensação disponível",

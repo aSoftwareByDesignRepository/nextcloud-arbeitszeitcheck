@@ -6288,16 +6288,16 @@
             "Attenzione: %n righe verranno eliminate definitivamente, quindi verranno caricati i dati del file."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} giorno fa",
-            "{count} giorni fa"
+            "1 giorno fa",
+            "%n giorni fa"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} ora fa",
-            "{count} ore fa"
+            "1 ora fa",
+            "%n ore fa"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minuto fa",
-            "{count} minuti fa"
+            "1 minuto fa",
+            "%n minuti fa"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n giorno di compensazione disponibile",

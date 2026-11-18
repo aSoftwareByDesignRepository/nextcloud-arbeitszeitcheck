@@ -6275,13 +6275,13 @@
             "警告：%n 列將被永久刪除，然後載入檔案資料。"
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} 天前"
+            "%n 天前"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} 小時前"
+            "%n 小時前"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} 分鐘前"
+            "%n 分鐘前"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n 個補休日可用"

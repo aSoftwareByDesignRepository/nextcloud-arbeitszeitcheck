@@ -6288,16 +6288,16 @@
 			"Warnung: %n Zeilen werden endgültig gelöscht, danach werden die Dateidaten geladen."
 		],
 		"_{count} day ago_::_{count} days ago_": [
-			"vor {count} Tag",
-			"vor {count} Tagen"
+			"vor 1 Tag",
+			"vor %n Tagen"
 		],
 		"_{count} hour ago_::_{count} hours ago_": [
-			"vor {count} Stunde",
-			"vor {count} Stunden"
+			"vor 1 Stunde",
+			"vor %n Stunden"
 		],
 		"_{count} minute ago_::_{count} minutes ago_": [
-			"vor {count} Minute",
-			"vor {count} Minuten"
+			"vor 1 Minute",
+			"vor %n Minuten"
 		],
 		"_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
 			"≈ %n Abbummeltag verfügbar",

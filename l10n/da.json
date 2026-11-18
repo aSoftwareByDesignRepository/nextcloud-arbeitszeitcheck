@@ -6288,16 +6288,16 @@
             "Advarsel: %n rækker slettes permanent, derefter indlæses fildataene."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} dag siden",
-            "{count} dage siden"
+            "1 dag siden",
+            "%n dage siden"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} time siden",
-            "{count} timer siden"
+            "1 time siden",
+            "%n timer siden"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minut siden",
-            "{count} minutter siden"
+            "1 minut siden",
+            "%n minutter siden"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n afspadseringsdag tilgængelig",

@@ -6301,19 +6301,19 @@
             "Ostrzeżenie: %n wierszy zostanie trwale usuniętych, a następnie dane z pliku zostaną wczytane."
         ],
         "_{count} day ago_::_{count} days ago_": [
-            "{count} dzień temu",
-            "{count} dni temu",
-            "{count} dni temu"
+            "1 dzień temu",
+            "%n dni temu",
+            "%n dni temu"
         ],
         "_{count} hour ago_::_{count} hours ago_": [
-            "{count} godzinę temu",
-            "{count} godziny temu",
-            "{count} godzin temu"
+            "1 godzinę temu",
+            "%n godziny temu",
+            "%n godzin temu"
         ],
         "_{count} minute ago_::_{count} minutes ago_": [
-            "{count} minutę temu",
-            "{count} minuty temu",
-            "{count} minut temu"
+            "1 minutę temu",
+            "%n minuty temu",
+            "%n minut temu"
         ],
         "_≈ %n compensatory day available_::_≈ %n compensatory days available_": [
             "≈ %n dzień odbioru nadgodzin dostępny",

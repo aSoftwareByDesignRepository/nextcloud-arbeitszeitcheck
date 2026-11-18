@@ -84,20 +84,28 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                     <div class="form-group azc-settings-step azc-settings-step--access-mode">
                         <fieldset class="azc-access-mode" aria-describedby="accessMode-help">
                             <legend class="form-label"><?php p($l->t('Access mode')); ?></legend>
-                            <label class="access-mode-option">
-                                <input type="radio"
-                                       name="accessRestrictionEnabled"
-                                       value="0"
-                                       <?php echo !$accessRestrictionEnabled ? 'checked' : ''; ?>>
-                                <span><?php p($l->t('Open — every logged-in Nextcloud user can open ArbeitszeitCheck')); ?></span>
-                            </label>
-                            <label class="access-mode-option">
-                                <input type="radio"
-                                       name="accessRestrictionEnabled"
-                                       value="1"
-                                       <?php echo $accessRestrictionEnabled ? 'checked' : ''; ?>>
-                                <span><?php p($l->t('Restricted — only allow-listed users and groups can open the app')); ?></span>
-                            </label>
+                            <div class="azc-choice-cards">
+                                <label class="form-radio azc-choice-card">
+                                    <input type="radio"
+                                           name="accessRestrictionEnabled"
+                                           value="0"
+                                           <?php echo !$accessRestrictionEnabled ? 'checked' : ''; ?>>
+                                    <span class="azc-choice-card__copy">
+                                        <span class="azc-choice-card__title"><?php p($l->t('Open')); ?></span>
+                                        <span class="azc-choice-card__hint"><?php p($l->t('Every logged-in Nextcloud user can open ArbeitszeitCheck')); ?></span>
+                                    </span>
+                                </label>
+                                <label class="form-radio azc-choice-card">
+                                    <input type="radio"
+                                           name="accessRestrictionEnabled"
+                                           value="1"
+                                           <?php echo $accessRestrictionEnabled ? 'checked' : ''; ?>>
+                                    <span class="azc-choice-card__copy">
+                                        <span class="azc-choice-card__title"><?php p($l->t('Restricted')); ?></span>
+                                        <span class="azc-choice-card__hint"><?php p($l->t('Only allow-listed users and groups can open the app')); ?></span>
+                                    </span>
+                                </label>
+                            </div>
                         </fieldset>
                         <p id="accessMode-help" class="form-help">
                             <?php p($l->t('Open shows ArbeitszeitCheck in the menu for everyone. Restricted hides it unless the person is allow-listed. System and delegated app administrators always pass the door. Employee and manager roles still apply after the door.')); ?>

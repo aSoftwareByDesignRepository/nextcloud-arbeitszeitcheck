@@ -748,8 +748,14 @@
             const restricted = checked !== null && String(checked.value) === '1';
             if (modeSummary && checked) {
                 const label = checked.closest('label');
-                const text = label ? label.textContent : '';
-                modeSummary.textContent = String(text || '').trim();
+                const titleEl = label ? label.querySelector('.azc-choice-card__title') : null;
+                const hintEl = label ? label.querySelector('.azc-choice-card__hint') : null;
+                if (titleEl && hintEl) {
+                    modeSummary.textContent = titleEl.textContent.trim() + ' — ' + hintEl.textContent.trim();
+                } else {
+                    const text = label ? label.textContent : '';
+                    modeSummary.textContent = String(text || '').trim();
+                }
             }
             panels.forEach(function(panel) {
                 panel.hidden = !restricted;

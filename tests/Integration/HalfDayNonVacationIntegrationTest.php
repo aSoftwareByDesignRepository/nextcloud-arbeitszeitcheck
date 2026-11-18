@@ -38,7 +38,8 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 			Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
 			Constants::CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT
 		);
-		$config->setAppValue(
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(
+			$config,
 			'arbeitszeitcheck',
 			Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
 			'["vacation","sick_leave"]'
@@ -86,7 +87,8 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 		$this->createdAbsenceIds = [];
 		if ($this->prevEnabled !== null) {
 			try {
-				\OCP\Server::get(IConfig::class)->setAppValue(
+				\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(
+					\OCP\Server::get(IConfig::class),
 					'arbeitszeitcheck',
 					Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
 					$this->prevEnabled
@@ -128,7 +130,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 	public function testCreateSickHalfDayRejectedWhenTypeDisabled(): void
 	{
 		$config = \OCP\Server::get(IConfig::class);
-		$config->setAppValue('arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES, '["vacation"]');
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString($config, 'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES, '["vacation"]');
 		$ymd = $this->weekday(15);
 
 		try {
@@ -297,10 +299,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 
 	public function testComplementarySlotHalvesCoexistOnSameDay(): void
 	{
-		\OCP\Server::get(IConfig::class)->setAppValue(
-			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-			'["sick_leave","personal_leave"]'
-		);
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(\OCP\Server::get(IConfig::class), 'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES, '["sick_leave","personal_leave"]');
 		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		\OCP\Server::get(IUserSession::class)->setUser($user);
 		$ymd = $this->weekday(70);
@@ -343,10 +342,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 
 	public function testSameSlotHalvesStillRejected(): void
 	{
-		\OCP\Server::get(IConfig::class)->setAppValue(
-			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-			'["sick_leave","personal_leave"]'
-		);
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(\OCP\Server::get(IConfig::class), 'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES, '["sick_leave","personal_leave"]');
 		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		\OCP\Server::get(IUserSession::class)->setUser($user);
 		$ymd = $this->weekday(71);
@@ -375,10 +371,7 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 	{
 		// Fail-closed: a legacy/slotless half cannot prove complementary
 		// coverage, so a slotted second half may not share the day.
-		\OCP\Server::get(IConfig::class)->setAppValue(
-			'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-			'["sick_leave","personal_leave"]'
-		);
+		\OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite::setString(\OCP\Server::get(IConfig::class), 'arbeitszeitcheck', Constants::CONFIG_HALF_DAY_ENABLED_TYPES, '["sick_leave","personal_leave"]');
 		$user = \OCP\Server::get(IUserManager::class)->get($this->uid);
 		\OCP\Server::get(IUserSession::class)->setUser($user);
 		$ymd = $this->weekday(72);

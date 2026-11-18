@@ -7,8 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 1.12.0 - 2026-11-18
+
 ### Added
 
+- **half-day absences for non-vacation types**: organisation setting
+  `half_day_enabled_types` (admin multiselect, custom types offered
+  per-code) lets half-day requests apply to every eligible absence type;
+  explicit day fractions with AM/PM slots, and boundary halves on
+  multi-day ranges (half first and/or last day, full days between).
+  Persisted as explicit shape columns — legacy rows without shape fields
+  stay readable, and non-vacation `days = 0.5` schedule weights are not
+  misread as half-day requests. Mobile companion parity: fraction +
+  AM/PM slot + boundary pickers on employee create and manager record,
+  capability-gated with graceful full-day degrade on older servers;
+  absence detail screens render the stored day shape ("Half day
+  (Morning)", "First day: … · Last day: …").
+- **Personalnummer in scoped manager exports** (CECILIENSTIFT):
+  payroll-mapped employee number column on manager/admin absence and
+  time exports; self-exports keep the no-identity-columns contract.
+- **absence export filters** (CECILIENSTIFT): `types`/`statuses`
+  parameters on absence exports so sickness and other reasons can be
+  separated for payroll; catalog-validated, ambiguity rejected, capped.
+- **overtime balance at a glance** (CECILIENSTIFT): fifth dashboard
+  metric shows the current balance with a compensatory-day estimate
+  (`≈ n Abbummeltage`) for compensatory-time requests; same estimate
+  feeds the mobile widget data.
 - **per-weekday cut-off overrides (NH-01)**: `split_service.weekday_cutoffs`
   maps individual weekdays to their own split cut-off while the model
   default stays the fallback; strictly validated (≥ latest interruption
@@ -25,6 +49,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paste onto any other day — copies work state, blocks and break window;
   keyboard + screen-reader accessible (`aria-pressed`, live status,
   Escape/second click disarms), no dialog.
+
+### Fixed
+
+- **half-day double-halving**: the applied fraction is derived from
+  `days/weight`, never a literal 0.5 — a quarter-day schedule weight no
+  longer halves the absence a second time.
+- **half-day over-credit**: credited hours are clamped to
+  `min(target, planned − worked)` so a half-day cannot credit more than
+  the remaining scheduled time.
+- **copy-day paste on non-workdays**: pasting onto a disabled
+  non-workday target no longer swallows the click — targets arm
+  correctly.
+
+### Security
+
+- **export rate limiting**: `UserRateLimit(10/60s)` on all four export
+  endpoints (absences and time, CSV + ODS).
 
 ## 1.11.0 - 2026-11-17
 

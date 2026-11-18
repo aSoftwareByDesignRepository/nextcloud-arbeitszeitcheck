@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Ejecutando auditoría…",
 	"Results capped at 500 entries — narrow the range." : "Resultados limitados a 500 entradas: acota el rango.",
 	"No matching entries in this range." : "No hay entradas coincidentes en este rango.",
-	"Audit failed. Check the dates and try again." : "Error en la auditoría. Revisa las fechas e inténtalo de nuevo."
+	"Audit failed. Check the dates and try again." : "Error en la auditoría. Revisa las fechas e inténtalo de nuevo.",
+	"_1 setting_::_%n settings_" : ["1 ajuste","%n ajustes"],
+	"_1 row_::_%n rows_" : ["1 fila","%n filas"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Esto actualizará %1$s y %2$s — no se eliminará nada.",
+	"Import applied. %1$s and %2$s written." : "Importación aplicada. %1$s y %2$s escritos."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

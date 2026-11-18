@@ -6714,7 +6714,11 @@
 	"Running audit…" : "稽核執行中…",
 	"Results capped at 500 entries — narrow the range." : "結果上限為 500 筆 — 請縮小範圍。",
 	"No matching entries in this range." : "此範圍內沒有符合的記錄。",
-	"Audit failed. Check the dates and try again." : "稽核失敗。請檢查日期後重試。"
+	"Audit failed. Check the dates and try again." : "稽核失敗。請檢查日期後重試。",
+	"_1 setting_::_%n settings_" : ["%n 項設定"],
+	"_1 row_::_%n rows_" : ["%n 列"],
+	"This will update %1$s and %2$s — nothing is deleted." : "這將更新 %1$s 與 %2$s——不會刪除任何內容。",
+	"Import applied. %1$s and %2$s written." : "匯入已套用。已寫入 %1$s 與 %2$s。"
 	},
 	"nplurals=1; plural=0;"
 );

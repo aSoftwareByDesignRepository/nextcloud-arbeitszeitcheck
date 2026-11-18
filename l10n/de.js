@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Prüfung läuft…",
 	"Results capped at 500 entries — narrow the range." : "Ergebnisse auf 500 Einträge begrenzt — Zeitraum eingrenzen.",
 	"No matching entries in this range." : "Keine passenden Einträge in diesem Zeitraum.",
-	"Audit failed. Check the dates and try again." : "Prüfung fehlgeschlagen. Prüfen Sie die Daten und versuchen Sie es erneut."
+	"Audit failed. Check the dates and try again." : "Prüfung fehlgeschlagen. Prüfen Sie die Daten und versuchen Sie es erneut.",
+	"_1 setting_::_%n settings_" : ["1 Einstellung","%n Einstellungen"],
+	"_1 row_::_%n rows_" : ["1 Zeile","%n Zeilen"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Dies aktualisiert %1$s und %2$s — nichts wird gelöscht.",
+	"Import applied. %1$s and %2$s written." : "Import angewendet. %1$s und %2$s geschrieben."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

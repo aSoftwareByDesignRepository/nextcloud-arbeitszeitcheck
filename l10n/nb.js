@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Revisjon kjører…",
 	"Results capped at 500 entries — narrow the range." : "Resultatene er begrenset til 500 registreringer — innsnev området.",
 	"No matching entries in this range." : "Ingen treff i dette området.",
-	"Audit failed. Check the dates and try again." : "Revisjonen mislyktes. Kontroller datoene og prøv igjen."
+	"Audit failed. Check the dates and try again." : "Revisjonen mislyktes. Kontroller datoene og prøv igjen.",
+	"_1 setting_::_%n settings_" : ["1 innstilling","%n innstillinger"],
+	"_1 row_::_%n rows_" : ["1 rad","%n rader"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Dette oppdaterer %1$s og %2$s — ingenting slettes.",
+	"Import applied. %1$s and %2$s written." : "Importert. %1$s og %2$s skrevet."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

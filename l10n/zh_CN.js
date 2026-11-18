@@ -6714,7 +6714,11 @@
 	"Running audit…" : "正在运行审计…",
 	"Results capped at 500 entries — narrow the range." : "结果上限为 500 条 — 请缩小范围。",
 	"No matching entries in this range." : "此范围内没有匹配的记录。",
-	"Audit failed. Check the dates and try again." : "审计失败。请检查日期后重试。"
+	"Audit failed. Check the dates and try again." : "审计失败。请检查日期后重试。",
+	"_1 setting_::_%n settings_" : ["%n 项设置"],
+	"_1 row_::_%n rows_" : ["%n 行"],
+	"This will update %1$s and %2$s — nothing is deleted." : "这将更新 %1$s 和 %2$s——不会删除任何内容。",
+	"Import applied. %1$s and %2$s written." : "导入已应用。已写入 %1$s 和 %2$s。"
 	},
 	"nplurals=1; plural=0;"
 );

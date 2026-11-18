@@ -6764,7 +6764,17 @@
 		"Running audit…": "Running audit…",
 		"Results capped at 500 entries — narrow the range.": "Results capped at 500 entries — narrow the range.",
 		"No matching entries in this range.": "No matching entries in this range.",
-		"Audit failed. Check the dates and try again.": "Audit failed. Check the dates and try again."
+		"Audit failed. Check the dates and try again.": "Audit failed. Check the dates and try again.",
+		"_1 setting_::_%n settings_": [
+			"1 setting",
+			"%n settings"
+		],
+		"_1 row_::_%n rows_": [
+			"1 row",
+			"%n rows"
+		],
+		"This will update %1$s and %2$s — nothing is deleted.": "This will update %1$s and %2$s — nothing is deleted.",
+		"Import applied. %1$s and %2$s written.": "Import applied. %1$s and %2$s written."
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

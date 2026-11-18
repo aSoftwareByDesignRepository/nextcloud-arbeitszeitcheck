@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Granskning körs…",
 	"Results capped at 500 entries — narrow the range." : "Resultaten begränsades till 500 registreringar — minska intervallet.",
 	"No matching entries in this range." : "Inga matchande registreringar i det här intervallet.",
-	"Audit failed. Check the dates and try again." : "Granskningen misslyckades. Kontrollera datumen och försök igen."
+	"Audit failed. Check the dates and try again." : "Granskningen misslyckades. Kontrollera datumen och försök igen.",
+	"_1 setting_::_%n settings_" : ["1 inställning","%n inställningar"],
+	"_1 row_::_%n rows_" : ["1 rad","%n rader"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Detta uppdaterar %1$s och %2$s — inget raderas.",
+	"Import applied. %1$s and %2$s written." : "Importen har tillämpats. %1$s och %2$s skrivna."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

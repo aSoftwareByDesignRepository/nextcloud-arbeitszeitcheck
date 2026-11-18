@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Denetim çalışıyor…",
 	"Results capped at 500 entries — narrow the range." : "Sonuçlar 500 kayıtla sınırlı — aralığı daraltın.",
 	"No matching entries in this range." : "Bu aralıkta eşleşen kayıt yok.",
-	"Audit failed. Check the dates and try again." : "Denetim başarısız oldu. Tarihleri kontrol edip yeniden deneyin."
+	"Audit failed. Check the dates and try again." : "Denetim başarısız oldu. Tarihleri kontrol edip yeniden deneyin.",
+	"_1 setting_::_%n settings_" : ["%n ayar"],
+	"_1 row_::_%n rows_" : ["%n satır"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Bu işlem %1$s ve %2$s güncelleyecek — hiçbir şey silinmeyecek.",
+	"Import applied. %1$s and %2$s written." : "İçe aktarma uygulandı. %1$s ve %2$s yazıldı."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

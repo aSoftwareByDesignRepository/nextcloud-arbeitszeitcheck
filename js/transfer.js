@@ -229,7 +229,9 @@
 			verdict.textContent = n('Warning: 1 row will be permanently deleted, then the file data is loaded.', 'Warning: %n rows will be permanently deleted, then the file data is loaded.', c.rowsDeleted || 0);
 			verdict.className = P + '-transfer-report__verdict is-danger';
 		} else {
-			verdict.textContent = t('This will update %d settings and %d rows — nothing is deleted.', [(c.configApplied || 0), ((c.rowsInserted || 0) + (c.rowsUpdated || 0))]);
+			verdict.textContent = t('This will update %1$s and %2$s — nothing is deleted.', [
+				n('1 setting', '%n settings', c.configApplied || 0),
+				n('1 row', '%n rows', (c.rowsInserted || 0) + (c.rowsUpdated || 0))]);
 			verdict.className = P + '-transfer-report__verdict';
 		}
 		file.textContent = t('Exported from %1$s at %2$s', [(r.file && r.file.source_instance) || '?', (r.file && r.file.exported_at) || '?']);
@@ -345,10 +347,13 @@
 					dlg.close();
 					const last = s.lastReceipt || {};
 					if (job.status === 'done') {
-						polite(t('Import applied. %d settings and %d rows written.', [
-							(last.counts && last.counts.configApplied) || 0,
-							((last.counts && (last.counts.rowsInserted + last.counts.rowsUpdated)) || 0)]));
-						location.reload();
+						polite(t('Import applied. %1$s and %2$s written.', [
+							n('1 setting', '%n settings', (last.counts && last.counts.configApplied) || 0),
+							n('1 row', '%n rows', ((last.counts && (last.counts.rowsInserted + last.counts.rowsUpdated)) || 0))]));
+						// Defer the reload so the receipt toast is actually
+						// readable — an immediate reload wipes it inside
+						// ~200ms and the user never sees the feedback.
+						setTimeout(() => { location.reload(); }, 2500);
 					} else {
 						msg(t('Import failed — nothing was changed.') + (job.errorCode ? ' (' + job.errorCode + ')' : ''));
 					}

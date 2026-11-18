@@ -1233,8 +1233,8 @@
 	"Clock out?" : "Stem ud?",
 	"Clock times are stored using the organization timezone (%1$s) and shown in your personal timezone (%2$s). Exports may follow export settings." : "Urtider gemmes ved hjælp af organisationens tidszone (%1$s) og vises i din personlige tidszone (%2$s). Eksporter kan følge eksportindstillinger.",
 	"Clock-in" : "Indstempling",
-	"Clock-in project (optional)" : "Clock-in projekt (valgfrit)",
-	"Clock-in reminders" : "Clock-in påmindelser",
+	"Clock-in project (optional)" : "Indstemplingsprojekt (valgfrit)",
+	"Clock-in reminders" : "Indstemplingspåmindelser",
 	"Clock-in reminders, vacation year, carryover, and day\/hour unit — one place for absence rules." : "Indstemplingspåmindelser, ferieår, overførsel og dag-\/timeenhed — ét sted for fraværsregler.",
 	"Clock-out" : "Udstempling",
 	"Clock-out after the cut-off time — day split at the scheduled interruption" : "Udstempling efter grænsetidspunktet — dag opdelt ved den planlagte afbrydelse",
@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Revision kører…",
 	"Results capped at 500 entries — narrow the range." : "Resultaterne er begrænset til 500 registreringer – indsnævr intervallet.",
 	"No matching entries in this range." : "Ingen matchende registreringer i dette interval.",
-	"Audit failed. Check the dates and try again." : "Revision mislykkedes. Kontrollér datoerne, og prøv igen."
+	"Audit failed. Check the dates and try again." : "Revision mislykkedes. Kontrollér datoerne, og prøv igen.",
+	"_1 setting_::_%n settings_" : ["1 indstilling","%n indstillinger"],
+	"_1 row_::_%n rows_" : ["1 række","%n rækker"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Dette opdaterer %1$s og %2$s — intet slettes.",
+	"Import applied. %1$s and %2$s written." : "Import anvendt. %1$s og %2$s skrevet."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

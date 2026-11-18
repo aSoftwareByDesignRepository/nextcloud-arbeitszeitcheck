@@ -6714,7 +6714,11 @@
 	"Running audit…" : "Audit wordt uitgevoerd…",
 	"Results capped at 500 entries — narrow the range." : "Resultaten beperkt tot 500 registraties — verklein het bereik.",
 	"No matching entries in this range." : "Geen overeenkomende registraties in dit bereik.",
-	"Audit failed. Check the dates and try again." : "Audit mislukt. Controleer de datums en probeer het opnieuw."
+	"Audit failed. Check the dates and try again." : "Audit mislukt. Controleer de datums en probeer het opnieuw.",
+	"_1 setting_::_%n settings_" : ["1 instelling","%n instellingen"],
+	"_1 row_::_%n rows_" : ["1 rij","%n rijen"],
+	"This will update %1$s and %2$s — nothing is deleted." : "Dit werkt %1$s en %2$s bij — er wordt niets verwijderd.",
+	"Import applied. %1$s and %2$s written." : "Import toegepast. %1$s en %2$s geschreven."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

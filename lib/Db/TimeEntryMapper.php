@@ -620,6 +620,33 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * NH-02 audit report candidates: entries whose frozen split context
+	 * recorded either `not_after_cutoff` (the gaming signal — clock-out
+	 * ended just before the cut-off) or `clock_in_during_interruption`.
+	 * Same LIKE strategy as countSplitReviewStateEntries — the reason key
+	 * serialises verbatim. Bounded by $limit; finer filtering (cut-off
+	 * proximity) happens in PHP against the frozen context.
+	 *
+	 * @return TimeEntry[]
+	 */
+	public function findSplitAuditCandidates(\DateTime $start, \DateTime $end, int $limit = 500): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->gte('start_time', $qb->createNamedParameter($start->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->lt('start_time', $qb->createNamedParameter($end->format('Y-m-d H:i:s'), IQueryBuilder::PARAM_STR)))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->like('work_context_json', $qb->createNamedParameter('%"reason":"not_after_cutoff"%')),
+				$qb->expr()->like('work_context_json', $qb->createNamedParameter('%"reason":"clock_in_during_interruption"%'))
+			))
+			->orderBy('start_time', 'ASC')
+			->setMaxResults($limit);
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Per-user entry counts for a set of users — one grouped query.
 	 * Used by scoped overview surfaces to avoid N+1 counting.
 	 *

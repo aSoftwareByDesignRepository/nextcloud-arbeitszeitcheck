@@ -20,6 +20,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\TTransactional;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
@@ -78,6 +79,7 @@ class GdprController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 5, period: 60)]
 	public function export(): Response
 	{
 		try {
@@ -215,6 +217,11 @@ class GdprController extends Controller
 				'export_date' => date('c'),
 				'export_reason' => 'GDPR Article 15 - Right to access',
 				'app_version' => '1.0.0'
+			],
+			// Art. 15 completeness: the payroll identifier stored per user in
+			// IConfig lives outside user_settings table — include it explicitly.
+			'profile' => [
+				'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $userId),
 			],
 			'time_entries' => $timeEntriesData,
 			'absences' => $absencesData,

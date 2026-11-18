@@ -72,6 +72,22 @@ class CapabilitiesComplianceTest extends TestCase
 		self::assertTrue($caps['features']['legacy_trip_absence_create_enabled']);
 	}
 
+	public function testCecPackFeatureAdvertisement(): void
+	{
+		// Cecilienstift pack: deterministic capability keys so companions
+		// distinguish "feature off" from "server too old" without 404-probing.
+		$mobile = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)
+			->getCapabilities()['arbeitszeitcheck']['mobile'] ?? null;
+		$this->assertIsArray($mobile);
+		$this->assertSame(
+			['available' => true, 'endpoint' => '/api/absences/types'],
+			$mobile['absenceTypes'] ?? null
+		);
+		$this->assertArrayHasKey('workLocationCatalog', $mobile);
+		$this->assertSame('/api/work-locations', $mobile['workLocationCatalog']['endpoint'] ?? null);
+		$this->assertArrayHasKey('enabled', $mobile['workLocationCatalog']);
+	}
+
 	public function testGermanComplianceBlock(): void
 	{
 		$caps = $this->buildCapabilities(RegionRegistry::COUNTRY_DE)->getCapabilities();

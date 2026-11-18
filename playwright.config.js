@@ -140,6 +140,11 @@ const STATEFUL_SPECS = [
   // Flips the shared employee's theme via OCS (light/dark) mid-probe —
   // same race class as the theme-responsive specs.
   /select-chevron-contract\.spec\.js/,
+  // Flips the GLOBAL manualTimeEntriesRequireApproval flag and seeds +
+  // mutates rows on the shared employee — parallel sibling seeders collide
+  // on its probe day ("correction overlaps existing time entries") and
+  // parallel specs observe the flipped approval flag mid-assert.
+  /atlas-split-cas-race\.spec\.js/,
 ]
 
 export default defineConfig({

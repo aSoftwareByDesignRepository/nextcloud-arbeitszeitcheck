@@ -129,6 +129,7 @@ class PageController extends Controller
 		IL10N $l10n,
 		private readonly ?\OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig $workforceSuiteConfig = null,
 		private readonly ?\OCA\ArbeitszeitCheck\Service\ExternalStampService $externalStamps = null,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\CompDaysEstimateService $compDaysEstimateService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeTrackingService = $timeTrackingService;
@@ -289,6 +290,7 @@ class PageController extends Controller
 				'needs_attention' => false,
 			],
 			'overtimePayoutHistory' => ['items' => [], 'total' => 0],
+			'compDaysEstimate' => null,
 			'error' => '',
 		];
 
@@ -298,11 +300,15 @@ class PageController extends Controller
 			$overtimePayoutHistory = $overtimeBank['enabled']
 				? $this->overtimePayoutService->listPayoutHistoryForUser($userId, 24, 0)
 				: ['items' => [], 'total' => 0];
+			// Abbummeltag estimate — same effective balance the card shows,
+			// schedule-aware day divisor. null = hide the affordance (fail-closed).
+			$compEstimate = $this->compDaysEstimateService?->estimate($userId);
 
 			return [
 				'overtimeBank' => $overtimeBank,
 				'overtimeTrafficLight' => $trafficLight,
 				'overtimePayoutHistory' => $overtimePayoutHistory,
+				'compDaysEstimate' => $compEstimate,
 				'error' => '',
 			];
 		} catch (\Throwable $e) {
@@ -489,6 +495,12 @@ class PageController extends Controller
 				'overtimeBank' => $overtimeExtras['overtimeBank'],
 				'overtimeTrafficLight' => $overtimeExtras['overtimeTrafficLight'],
 				'overtimePayoutHistory' => $overtimeExtras['overtimePayoutHistory'],
+				'compDaysEstimate' => $overtimeExtras['compDaysEstimate'],
+				// overtime_comp deep-link only when the type is creatable —
+				// never render a dead-end CTA (Bachus: hide, don't disable).
+				'absenceCreateCompUrl' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isCreatable(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_OVERTIME_COMP)
+					? $this->urlGenerator->linkToRoute('arbeitszeitcheck.absence.create') . '?type=' . \OCA\ArbeitszeitCheck\Db\Absence::TYPE_OVERTIME_COMP
+					: '',
 				'premiumSummary' => $premiumSummary,
 				'error' => $overtimeExtras['error'],
 				'recentEntries' => $recentEntries,
@@ -1117,6 +1129,10 @@ class PageController extends Controller
 				],
 				'isAdmin' => $isAdmin,
 				'isManager' => $isManager,
+				// All valid types incl. deactivated custom codes — export
+				// filtering must also reach historical rows (not just
+				// currently-creatable types).
+				'absenceTypeFilterOptions' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::labels($this->l10n),
 				'premiumSurchargesEnabled' => $this->config->getAppValue(
 					'arbeitszeitcheck',
 					\OCA\ArbeitszeitCheck\Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED,

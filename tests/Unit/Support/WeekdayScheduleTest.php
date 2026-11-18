@@ -390,7 +390,7 @@ class WeekdayScheduleTest extends TestCase
 		$this->assertSame([], WeekdaySchedule::validate($raw));
 		$schedule = WeekdaySchedule::fromValidated($raw);
 		$this->assertSame(
-			['automatic' => true, 'cutoff' => '16:00', 'breakCover' => true],
+			['automatic' => true, 'cutoff' => '16:00', 'breakCover' => true, 'weekdayCutoffs' => []],
 			$schedule->getSplitService()
 		);
 		$this->assertTrue($schedule->hasActiveSplitService());
@@ -412,12 +412,91 @@ class WeekdayScheduleTest extends TestCase
 		$this->assertSame([], WeekdaySchedule::validate($raw));
 		$schedule = WeekdaySchedule::fromValidated($raw);
 		$this->assertSame(
-			['automatic' => false, 'cutoff' => null, 'breakCover' => false],
+			['automatic' => false, 'cutoff' => null, 'breakCover' => false, 'weekdayCutoffs' => []],
 			$schedule->getSplitService()
 		);
 		$this->assertFalse($schedule->hasActiveSplitService());
 		// Absent stays absent — the group is not injected on save.
 		$this->assertArrayNotHasKey('split_service', $schedule->toArray());
+	}
+
+	public function testWeekdayCutoffsValidateAndResolve(): void
+	{
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['fri' => '14:00', 'mon' => '17:00'];
+		$this->assertSame([], WeekdaySchedule::validate($raw));
+		$schedule = WeekdaySchedule::fromValidated($raw);
+		$this->assertSame(
+			['mon' => 1020, 'fri' => 840],
+			$schedule->getSplitService()['weekdayCutoffs']
+		);
+		// Override wins on its day; the default applies elsewhere.
+		$this->assertSame(1020, $schedule->splitCutoffMinutesForWeekday('mon'));
+		$this->assertSame(960, $schedule->splitCutoffMinutesForWeekday('tue'));
+		$this->assertSame(840, $schedule->splitCutoffMinutesForWeekday('fri'));
+		$this->assertSame(960, $schedule->splitCutoffMinutesForWeekday('sat'));
+		// Resolved map covers every interruption day (audit-grade context).
+		$resolved = $schedule->splitWeekdayCutoffsHm();
+		$this->assertSame('17:00', $resolved['mon']);
+		$this->assertSame('16:00', $resolved['tue']);
+		$this->assertSame('14:00', $resolved['fri']);
+		$this->assertArrayNotHasKey('sat', $resolved);
+		// Canonical stored form carries the map in weekday order.
+		$this->assertSame(
+			['mon' => '17:00', 'fri' => '14:00'],
+			$schedule->toArray()['split_service']['weekday_cutoffs']
+		);
+	}
+
+	public function testWeekdayCutoffsValidationErrors(): void
+	{
+		// Non-HH:MM value.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['mon' => '25:00'];
+		$this->assertContains('SPLIT_CUTOFF_INVALID', WeekdaySchedule::validate($raw));
+
+		// Unknown weekday key fails closed like every other unknown key.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['noday' => '16:00'];
+		$this->assertContains('SCHEDULE_UNKNOWN_KEY', WeekdaySchedule::validate($raw));
+
+		// Per-day cut-off before that weekday's own interruption end.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['mon' => '13:00'];
+		$this->assertContains('SPLIT_CUTOFF_BEFORE_INTERRUPTION_END', WeekdaySchedule::validate($raw));
+
+		// Cut-off on a gap-less day can never fire — rejected, not a no-op.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['sat' => '16:00'];
+		$this->assertContains('SPLIT_NO_INTERRUPTION', WeekdaySchedule::validate($raw));
+
+		// Overrides with automatic split off are contradictory state.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['automatic_split'] = false;
+		$raw['split_service']['split_when_clock_out_after'] = null;
+		$raw['split_service']['weekday_cutoffs'] = ['mon' => '17:00'];
+		$this->assertContains('SPLIT_CUTOFF_INVALID', WeekdaySchedule::validate($raw));
+
+		// Non-map shape is a config error, not silently ignored.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = ['16:00'];
+		$this->assertContains('SPLIT_CONFIG_INVALID', WeekdaySchedule::validate($raw));
+	}
+
+	public function testWeekdayCutoffsOmittedWhenEmptyOrAutomaticOff(): void
+	{
+		// Empty map is dropped from the canonical stored form.
+		$raw = self::v2SplitFixture();
+		$raw['split_service']['weekday_cutoffs'] = [];
+		$this->assertSame([], WeekdaySchedule::validate($raw));
+		$schedule = WeekdaySchedule::fromValidated($raw);
+		$this->assertArrayNotHasKey('weekday_cutoffs', $schedule->toArray()['split_service']);
+
+		// Legacy document without the key resolves to the default only.
+		$schedule = WeekdaySchedule::fromValidated(self::v2SplitFixture());
+		$this->assertSame([], $schedule->getSplitService()['weekdayCutoffs']);
+		$this->assertSame(960, $schedule->splitCutoffMinutesForWeekday('mon'));
+		$this->assertSame('16:00', $schedule->splitWeekdayCutoffsHm()['wed']);
 	}
 
 	public function testSplitServicePresentButAllOffRoundTripsCanonical(): void
@@ -454,7 +533,7 @@ class WeekdayScheduleTest extends TestCase
 		$this->assertSame([], WeekdaySchedule::validate($raw));
 		$schedule = WeekdaySchedule::fromValidated($raw);
 		$this->assertSame(
-			['automatic' => false, 'cutoff' => null, 'breakCover' => true],
+			['automatic' => false, 'cutoff' => null, 'breakCover' => true, 'weekdayCutoffs' => []],
 			$schedule->getSplitService()
 		);
 		$this->assertTrue($schedule->hasActiveSplitService());
@@ -644,7 +723,7 @@ class WeekdayScheduleTest extends TestCase
 		$v1 = WeekdaySchedule::fromValidated(WeekdaySchedule::banssPreset());
 		$this->assertNull($v1->latestGapEndMinutes());
 		$this->assertSame(
-			['automatic' => false, 'cutoff' => null, 'breakCover' => false],
+			['automatic' => false, 'cutoff' => null, 'breakCover' => false, 'weekdayCutoffs' => []],
 			$v1->getSplitService()
 		);
 	}

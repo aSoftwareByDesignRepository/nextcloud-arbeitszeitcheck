@@ -118,4 +118,78 @@ describe('split-service payload', () => {
 			interruption_counts_as_break: true,
 		})
 	})
+
+	it('emits weekday_cutoffs only for days with overrides (NH-01)', () => {
+		const host = mountPanel('create', null)
+		const form = host.querySelector('#wtm-model-form')
+		const fs = fillTwoBlockMonday(form)
+
+		// Give Tuesday two blocks too so both days get a per-day input.
+		const tueWork = document.getElementById('create-wtm-tue-work')
+		tueWork.checked = true
+		document.getElementById('create-wtm-tue-start').value = '06:00'
+		document.getElementById('create-wtm-tue-end').value = '10:00'
+		tueWork.dispatchEvent(new Event('change', { bubbles: true }))
+		fs.querySelector('.wtm-add-block[data-day="tue"]').click()
+		const tueExtra = fs.querySelector('tr[data-day="tue"][data-extra-block]')
+		tueExtra.querySelector('.wtm-day-start').value = '13:30'
+		tueExtra.querySelector('.wtm-day-end').value = '16:30'
+		tueExtra.dispatchEvent(new Event('change', { bubbles: true }))
+
+		fs.querySelector('.wtm-split-auto').checked = true
+		fs.querySelector('.wtm-split-auto').dispatchEvent(new Event('change', { bubbles: true }))
+		fs.querySelector('.wtm-split-cutoff').value = '16:00'
+
+		// Per-day inputs exist for both multi-block days; override only Monday.
+		const monInput = fs.querySelector('.wtm-split-day-cutoff[data-day="mon"]')
+		const tueInput = fs.querySelector('.wtm-split-day-cutoff[data-day="tue"]')
+		expect(monInput).toBeTruthy()
+		expect(tueInput).toBeTruthy()
+		expect(fs.querySelector('.wtm-split-day-cutoff[data-day="sat"]')).toBeNull()
+		monInput.value = '17:00'
+
+		const payload = T().buildBreakRulesPayload(form, null)
+		expect(payload.error).toBeUndefined()
+		expect(payload.weekday_schedule.split_service.weekday_cutoffs).toEqual({ mon: '17:00' })
+	})
+})
+
+describe('copy-day helper (NH-03)', () => {
+	it('arms a source day then pastes its blocks and break into the target day', () => {
+		const host = mountPanel('create', null)
+		const form = host.querySelector('#wtm-model-form')
+		const fs = fillTwoBlockMonday(form)
+
+		const monCopy = fs.querySelector('.wtm-copy-day[data-day="mon"]')
+		const tueCopy = fs.querySelector('.wtm-copy-day[data-day="tue"]')
+		expect(monCopy).toBeTruthy()
+		expect(tueCopy).toBeTruthy()
+
+		// Arm Monday — Tuesday becomes a paste target.
+		monCopy.click()
+		expect(monCopy.getAttribute('aria-pressed')).toBe('true')
+		expect(fs.querySelector('.wtm-copy-status').textContent).toContain('Monday')
+
+		// Paste into Tuesday — blocks are copied and the day activates.
+		tueCopy.click()
+		expect(document.getElementById('create-wtm-tue-work').checked).toBe(true)
+		const tueRows = fs.querySelectorAll('tr[data-day="tue"]')
+		expect(tueRows.length).toBe(2)
+		expect(tueRows[0].querySelector('.wtm-day-start').value).toBe('06:00')
+		expect(tueRows[1].querySelector('.wtm-day-start').value).toBe('13:30')
+		expect(document.getElementById('create-wtm-tue-bstart').value).toBe('')
+	})
+
+	it('cancels arming on a second click of the same day', () => {
+		const host = mountPanel('create', null)
+		const form = host.querySelector('#wtm-model-form')
+		const fs = fillTwoBlockMonday(form)
+		const monCopy = fs.querySelector('.wtm-copy-day[data-day="mon"]')
+
+		monCopy.click()
+		expect(monCopy.getAttribute('aria-pressed')).toBe('true')
+		monCopy.click()
+		expect(monCopy.getAttribute('aria-pressed')).toBe('false')
+		expect(fs.querySelector('.wtm-copy-status').textContent).toBe('')
+	})
 })

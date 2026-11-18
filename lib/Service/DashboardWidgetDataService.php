@@ -32,6 +32,7 @@ class DashboardWidgetDataService {
 		private readonly VacationHoursDebitService $vacationHoursDebitService,
 		private readonly TimeEntryMapper $timeEntryMapper,
 		private readonly ?ExternalStampService $externalStamps = null,
+		private readonly ?CompDaysEstimateService $compDaysEstimateService = null,
 	) {
 	}
 
@@ -178,6 +179,13 @@ class DashboardWidgetDataService {
 			'impliedDailyHours'      => (float)($weekly['implied_daily_hours'] ?? 0.0),
 			'cumulativeBalance'      => (float)($weekly['cumulative_balance'] ?? 0.0),
 			'displayBalance'         => $this->overtimeDisplayService->getYearToDateBalanceForTrafficLight($userId),
+			// Additive — schedule-aware "≈ N Abbummeltage" estimate built from
+			// the same displayBalance; null = hide the affordance (on_demand,
+			// no usable Soll basis, or estimate failure — never fake 0 days).
+			'compDaysEstimate'       => $this->compDaysEstimateService?->estimate($userId),
+			// Companion deep-link parity with the web "Abbummeltag beantragen"
+			// CTA: tells the client whether overtime_comp is creatable at all.
+			'overtimeCompCreatable'  => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isCreatable(\OCA\ArbeitszeitCheck\Db\Absence::TYPE_OVERTIME_COMP),
 			// Additive GH #40 — YTD planned-hours credit when Entgeltausfall opt-in is on.
 			'absenceCreditHoursYtd'  => (float)($hoursGlanceBundle['absence_credit_hours_ytd'] ?? 0.0),
 			// Additive DC-06d — "today" in org storage TZ so companions can

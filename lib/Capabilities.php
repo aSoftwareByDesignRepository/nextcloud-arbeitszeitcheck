@@ -151,6 +151,19 @@ class Capabilities implements ICapability {
 					// dayFraction for vacation — clients fall back to ['vacation'],
 					// matching the stored default here.
 					'halfDayEnabledTypes' => \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::enabledTypesFromConfig($this->config),
+					// AZC-CEC-PACK: deterministic feature advertisement so
+					// clients can distinguish "feature off" from "server too
+					// old" instead of probing endpoints by 404. Absent on
+					// older servers → clients treat as unknown and keep the
+					// current fallback behaviour.
+					'absenceTypes' => [
+						'available' => true,
+						'endpoint' => '/api/absences/types',
+					],
+					'workLocationCatalog' => [
+						'enabled' => $workforceSuite->isEnabled('work_location_catalog_enabled'),
+						'endpoint' => '/api/work-locations',
+					],
 					'projectCheck' => [
 						'available' => $projectCheckAvailable,
 						'linkingEnabled' => $projectCheckAvailable

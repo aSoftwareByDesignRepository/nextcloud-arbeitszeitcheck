@@ -1423,4 +1423,143 @@ class ExportControllerTest extends TestCase
 		$response = $this->controller->compliance('csv', '2024-06-01', '2024-06-30', null, null, null, 'managed');
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 	}
+
+	public function testAbsencesScopedExportTypesListReachesMapperAsArray(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->absenceMapper->expects($this->once())
+			->method('countByUsersAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), ['approved'], ['vacation', 'special_leave'])
+			->willReturn(1);
+		$this->absenceMapper->expects($this->once())
+			->method('findByUsersAndDateRange')
+			->with(['employee1'], $this->anything(), $this->anything(), ['approved'], ['vacation', 'special_leave'])
+			->willReturn([$this->makeScopedAbsence('employee1')]);
+
+		$response = $this->controller->absences(
+			'csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed',
+			null, null, 'approved', 'vacation,special_leave'
+		);
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+	}
+
+	public function testAbsencesExportMixedTypeAndTypesIs400(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->absenceMapper->expects($this->never())->method('findByUsersAndDateRange');
+
+		$response = $this->controller->absences(
+			'csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed',
+			null, 'vacation', null, 'sick_leave'
+		);
+		$this->assertSame(400, $response->getStatus());
+		$this->assertSame('AMBIGUOUS_TYPE_FILTER', $response->getData()['error_code'] ?? null);
+	}
+
+	public function testAbsencesExportInvalidTypeInTypesIs400(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->absenceMapper->expects($this->never())->method('findByUsersAndDateRange');
+
+		$response = $this->controller->absences(
+			'csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed',
+			null, null, null, 'vacation,not_a_type'
+		);
+		$this->assertSame(400, $response->getStatus());
+	}
+
+	public function testAbsencesExportTooManyTypesIs400(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		// 51 distinct entries — the cap fires before per-item validation.
+		$types = implode(',', array_map(static fn (int $i): string => 't' . $i, range(1, 51)));
+
+		$response = $this->controller->absences(
+			'csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed',
+			null, null, null, $types
+		);
+		$this->assertSame(400, $response->getStatus());
+	}
+
+	public function testAbsencesScopedExportIncludesPersonalnummerColumn(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		$this->config->method('getUserValue')->willReturnCallback(
+			static function (string $uid, string $app, string $key, string $default = ''): string {
+				if ($uid === 'employee1' && $key === \OCA\ArbeitszeitCheck\Constants::USER_DATEV_PERSONALNUMMER) {
+					return '4711';
+				}
+				return $default;
+			}
+		);
+
+		$this->absenceMapper->method('countByUsersAndDateRange')->willReturn(1);
+		$this->absenceMapper->method('findByUsersAndDateRange')
+			->willReturn([$this->makeScopedAbsence('employee1')]);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed');
+		$this->assertInstanceOf(DataDownloadResponse::class, $response);
+		$content = (string)$response->render();
+		$this->assertStringContainsString('personalnummer', $content);
+		$this->assertStringContainsString('4711', $content);
+		// Column order contract: user_id, display_name, personalnummer.
+		// CSV starts with "# Timezone" comment rows — find the real header line.
+		$header = '';
+		foreach (explode("\n", $content) as $line) {
+			if (str_contains($line, 'user_id')) {
+				$header = $line;
+				break;
+			}
+		}
+		$this->assertStringContainsString('user_id', $header);
+		$this->assertLessThan(
+			strpos($header, 'personalnummer'),
+			strpos($header, 'display_name')
+		);
+	}
+
+	public function testAbsencesScopedExportEmptyPersonalnummerStaysEmptyCell(): void
+	{
+		$this->asUser('manager1');
+		$this->permissionService->method('canAccessManagerDashboard')->with('manager1')->willReturn(true);
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['employee1']);
+
+		// No getUserValue override → default '' → empty personalnummer cell,
+		// never a dropped row or a fabricated value.
+		$this->absenceMapper->method('countByUsersAndDateRange')->willReturn(1);
+		$this->absenceMapper->method('findByUsersAndDateRange')
+			->willReturn([$this->makeScopedAbsence('employee1')]);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30', null, null, null, null, 'managed');
+		$content = (string)$response->render();
+		$this->assertStringContainsString('personalnummer', $content);
+		$this->assertStringContainsString('employee1', $content);
+	}
+
+	public function testAbsencesSelfExportHasNoPersonalnummerColumn(): void
+	{
+		$this->asUser('selfuser');
+		$this->absenceMapper->method('findByUserAndDateRange')
+			->willReturn([$this->makeScopedAbsence('selfuser')]);
+
+		$response = $this->controller->absences('csv', '2024-06-01', '2024-06-30');
+		$content = (string)$response->render();
+		$this->assertStringNotContainsString('personalnummer', $content);
+		$this->assertStringNotContainsString('user_id', $content);
+	}
 }

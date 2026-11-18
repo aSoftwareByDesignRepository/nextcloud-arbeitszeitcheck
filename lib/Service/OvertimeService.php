@@ -449,6 +449,24 @@ class OvertimeService
 	}
 
 	/**
+	 * Average planned hours per working day for comp-day ("Abbummeltag")
+	 * estimates. Schedule-aware (weekday schedule → its daily average; plain
+	 * contract → daily/weekly÷5). `basis` mirrors resolveContractHours so
+	 * callers can distinguish on_demand/degraded from a real contract —
+	 * on_demand must NOT produce an estimate (no contractual Soll exists).
+	 *
+	 * @return array{daily_hours: float, basis: string}
+	 */
+	public function getAverageDailyPlannedHours(string $userId): array
+	{
+		[$dailyHours, $weeklyHours, $schedule, $basis] = $this->resolveContractHours($userId);
+		$daily = $dailyHours > 0.0
+			? $dailyHours
+			: ($weeklyHours > 0.0 ? round($weeklyHours / 5, 2) : 0.0);
+		return ['daily_hours' => round($daily, 2), 'basis' => $basis];
+	}
+
+	/**
 	 * True when the organisation has at least one org-level working time
 	 * model configured. Memoized per request — one cheap EXISTS-style query
 	 * total, not per user.

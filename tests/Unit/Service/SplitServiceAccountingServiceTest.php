@@ -224,13 +224,46 @@ class SplitServiceAccountingServiceTest extends TestCase
 		}
 		$this->assertSame([], $context['week']['sat']);
 		$this->assertSame(
-			['automatic' => true, 'cutoff' => '16:00', 'break_cover' => true],
+			[
+				'automatic' => true,
+				'cutoff' => '16:00',
+				'break_cover' => true,
+				'weekday_cutoffs' => [
+					'mon' => '16:00', 'tue' => '16:00', 'wed' => '16:00',
+					'thu' => '16:00', 'fri' => '16:00',
+				],
+			],
 			$context['split']
 		);
 		$this->assertSame(['decision' => 'auto', 'worked' => []], $context['overrides']);
 		$this->assertSame('active', $context['result']['state']);
 		$this->assertFalse($context['result']['split']);
 		$this->assertSame(1, $context['result']['engine']);
+	}
+
+	public function testBuildContextFreezesEffectiveWeekdayCutoff(): void
+	{
+		// Friday carries its own cut-off — the frozen split.cutoff must be the
+		// override on Friday and the default on Monday (NH-01, pin-time).
+		$v2 = self::v2Schedule();
+		$v2['split_service']['weekday_cutoffs'] = ['fri' => '14:00'];
+		$this->modelBreakRules = [WeekdaySchedule::KEY => $v2];
+
+		$fri = $this->service->buildContext(
+			$this->splitModel(),
+			new \DateTime('2026-11-20 06:00:00', new \DateTimeZone(self::TZ)),
+			self::TZ
+		);
+		$this->assertSame('14:00', $fri['split']['cutoff']);
+		$this->assertSame('14:00', $fri['split']['weekday_cutoffs']['fri']);
+
+		$mon = $this->service->buildContext(
+			$this->splitModel(),
+			new \DateTime('2026-11-23 06:00:00', new \DateTimeZone(self::TZ)),
+			self::TZ
+		);
+		$this->assertSame('16:00', $mon['split']['cutoff']);
+		$this->assertSame('14:00', $mon['split']['weekday_cutoffs']['fri']);
 	}
 
 	public function testBuildContextFreezesStartWeekdayNotPinDay(): void

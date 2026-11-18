@@ -336,7 +336,7 @@ class OvertimePayoutServiceTest extends TestCase
 
 		$csv = $service->buildPayrollCsv(2020, 6);
 		$this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
-		$this->assertStringContainsString('user_id;display_name;status', $csv);
+		$this->assertStringContainsString('user_id;display_name;personalnummer;status', $csv);
 		// formula-injection neutralized with a leading quote
 		$this->assertStringContainsString("'=cmd", $csv);
 		// semicolon in name -> field is quoted

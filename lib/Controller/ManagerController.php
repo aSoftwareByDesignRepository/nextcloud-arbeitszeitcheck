@@ -55,6 +55,7 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -3251,6 +3252,7 @@ class ManagerController extends Controller
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	public function exportTeamOvertimeCsv(?int $months = null): DataDownloadResponse|JSONResponse
 	{
 		try {
@@ -3282,11 +3284,13 @@ class ManagerController extends Controller
 				}
 			}
 
-			$header = 'user_id;display_name;balance_h;balance_type;traffic_light;bank_state;bank_fill_pct;payout_eligible_h;needs_attention';
+			$teamUserIds = $this->getTeamMemberIds($managerId);
+			// Payroll handoff: personalnummer identity column after display_name.
+			$personalnummerByUid = \OCA\ArbeitszeitCheck\Support\Personalnummer::mapForUsers($this->config, $teamUserIds);
+			$header = 'user_id;display_name;personalnummer;balance_h;balance_type;traffic_light;bank_state;bank_fill_pct;payout_eligible_h;needs_attention';
 			foreach ($monthWindows as $w) {
 				$header .= ';delta_' . $w['label'] . '_h';
 			}
-			$teamUserIds = $this->getTeamMemberIds($managerId);
 			$snapshots = $this->overtimeDisplayService->buildManagerMemberSnapshots($teamUserIds);
 			$lines = [$header . "\n"];
 			foreach ($teamUserIds as $userId) {
@@ -3294,6 +3298,7 @@ class ManagerController extends Controller
 				$row = [
 					$this->csvEscape($userId),
 					$this->csvEscape($this->getDisplayName($userId)),
+					$this->csvEscape($personalnummerByUid[$userId] ?? ''),
 					number_format((float)$snapshot['balance'], 2, '.', ''),
 					$this->csvEscape((string)($snapshot['balance_label'] ?? '')),
 					$this->csvEscape((string)($snapshot['traffic_light_state'] ?? '')),
@@ -3337,11 +3342,13 @@ class ManagerController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	public function exportTeamAbsencesCsv(
 		?string $start_date = null,
 		?string $end_date = null,
 		?string $type = null,
 		?string $status = \OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
+		?string $types = null,
 	): DataDownloadResponse|JSONResponse {
 		try {
 			$managerId = $this->getUserId();
@@ -3365,8 +3372,44 @@ class ManagerController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			// `types` = CSV multi-select counterpart of `type` (payroll handoff);
+			// mixing both is ambiguous → 400. Validated via catalog isValid so
+			// deactivated custom types remain exportable for historical rows.
+			$typeList = [];
+			if ($types !== null) {
+				$items = array_values(array_filter(array_map('trim', explode(',', $types)), static fn (string $v): bool => $v !== ''));
+				if (count($items) > 50 || count($items) !== count(array_unique($items))) {
+					$items = null;
+				}
+				if ($items === null) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid absence type.'),
+					], Http::STATUS_BAD_REQUEST);
+				}
+				foreach ($items as $item) {
+					if (!AbsenceTypeCatalog::isValid($item)) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('Invalid absence type.'),
+						], Http::STATUS_BAD_REQUEST);
+					}
+				}
+				$typeList = $items;
+			}
+			if ($type !== null && $type !== '' && $typeList !== []) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Ambiguous type filter: use either "type" or "types", not both.'),
+					'error_code' => 'AMBIGUOUS_TYPE_FILTER',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($type !== null && $type !== '') {
+				$typeList = [$type];
+			}
+
 			$teamUserIds = $this->getTeamMemberIds($managerId);
-			$absences = $this->absenceMapper->findByUsersAndDateRange($teamUserIds, $start, $end, $status, $type);
+			$absences = $this->absenceMapper->findByUsersAndDateRange($teamUserIds, $start, $end, $status, $typeList !== [] ? $typeList : null);
 
 			// Aggregate per member × type (server-side scope — never a client filter).
 			$agg = [];
@@ -3380,11 +3423,15 @@ class ManagerController extends Controller
 			}
 			uasort($agg, static fn ($a, $b) => [$a['user'], $a['type']] <=> [$b['user'], $b['type']]);
 
-			$lines = ["user_id;display_name;type;days;entries\n"];
+			// Payroll handoff: personalnummer identity column after display_name.
+			$personalnummerByUid = \OCA\ArbeitszeitCheck\Support\Personalnummer::mapForUsers($this->config, $teamUserIds);
+
+			$lines = ["user_id;display_name;personalnummer;type;days;entries\n"];
 			foreach ($agg as $row) {
 				$lines[] = implode(';', [
 					$this->csvEscape($row['user']),
 					$this->csvEscape($this->getDisplayName($row['user'])),
+					$this->csvEscape($personalnummerByUid[$row['user']] ?? ''),
 					$this->csvEscape($row['type']),
 					number_format($row['days'], 2, '.', ''),
 					(string)$row['count'],

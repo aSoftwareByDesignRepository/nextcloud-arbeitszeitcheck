@@ -31,7 +31,10 @@ test.describe('Bachus simplify: dashboard hours hierarchy', () => {
 
 		const list = panel.locator('.azc-dashboard-metrics');
 		await expect(list).toHaveCount(1);
-		await expect(list.locator('.azc-dashboard-metric')).toHaveCount(4);
+		// 4 period tiles (today/week/month/year) + the CECILIENSTIFT overtime-
+		// balance tile — all five are always-visible, disclosure-free metrics.
+		await expect(list.locator('.azc-dashboard-metric')).toHaveCount(5);
+		await expect(list.locator('.azc-dashboard-metric--balance')).toHaveCount(1);
 		await expect(panel.locator('.azc-card__lead, details, summary, button, a')).toHaveCount(0);
 	});
 

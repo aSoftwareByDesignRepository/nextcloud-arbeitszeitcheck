@@ -368,6 +368,42 @@ $useAppTeams = $config->getAppValue('arbeitszeitcheck', 'use_app_teams', '0') ==
                         <?php endif; ?>
                     </div>
 
+                    <div class="form-group" id="report-absence-filters-group" style="display: none;" aria-labelledby="report-absence-filters-label">
+                        <span id="report-absence-filters-label" class="form-label">
+                            <?php p($l->t('Filter absence export')); ?>
+                        </span>
+                        <p id="report-absence-filters-help" class="form-help">
+                            <?php p($l->t('Limit the download to the selected reasons and statuses. With nothing selected, the export contains all reasons — choose at least one to exclude sickness data from payroll handoff.')); ?>
+                        </p>
+                        <div class="azc-quick-filters" role="group"
+                             aria-label="<?php p($l->t('Absence reasons')); ?>">
+                            <span class="azc-quick-filters__label"><?php p($l->t('Reason')); ?></span>
+                            <div class="azc-filter-bar" id="report-absence-type-chips">
+                            <?php
+                            $absenceTypeFilterOptions = is_array($_['absenceTypeFilterOptions'] ?? null) ? $_['absenceTypeFilterOptions'] : [];
+                            foreach ($absenceTypeFilterOptions as $azcTypeCode => $azcTypeLabel):
+                            ?>
+                                <button type="button"
+                                        class="azc-filter"
+                                        data-absence-type="<?php p((string)$azcTypeCode); ?>"
+                                        aria-pressed="false">
+                                    <?php p((string)$azcTypeLabel); ?>
+                                </button>
+                            <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div class="azc-quick-filters" role="group"
+                             aria-label="<?php p($l->t('Absence statuses')); ?>">
+                            <span class="azc-quick-filters__label"><?php p($l->t('Status')); ?></span>
+                            <div class="azc-filter-bar" id="report-absence-status-chips">
+                                <button type="button" class="azc-filter" data-absence-status="pending" aria-pressed="false"><?php p($l->t('Pending')); ?></button>
+                                <button type="button" class="azc-filter" data-absence-status="approved" aria-pressed="false"><?php p($l->t('Approved')); ?></button>
+                                <button type="button" class="azc-filter" data-absence-status="rejected" aria-pressed="false"><?php p($l->t('Rejected')); ?></button>
+                                <button type="button" class="azc-filter" data-absence-status="cancelled" aria-pressed="false"><?php p($l->t('Cancelled')); ?></button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group" id="report-team-variant-group" style="display: none;" aria-labelledby="report-team-variant-label">
                         <label id="report-team-variant-label" for="report-team-variant" class="form-label">
                             <?php p($l->t('Team download content')); ?>

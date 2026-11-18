@@ -208,9 +208,11 @@ class TimeEntryExportTransformer
 			});
 			$weekday = $weekdayFormatter($dateStr);
 			$displayName = '';
+			$personalnummer = '';
 			foreach ($longRows as $r) {
 				if (($r['date'] ?? '') === $dateStr && (string)($r['user_id'] ?? '') === $uid) {
 					$displayName = (string)($r['display_name'] ?? '');
+					$personalnummer = (string)($r['personalnummer'] ?? '');
 					break;
 				}
 			}
@@ -225,6 +227,7 @@ class TimeEntryExportTransformer
 					'row_part' => (string)($part + 1),
 					'user_id' => $uid,
 					'display_name' => $displayName,
+					'personalnummer' => $personalnummer,
 				];
 				$n = 1;
 				foreach ($chunk as $seg) {

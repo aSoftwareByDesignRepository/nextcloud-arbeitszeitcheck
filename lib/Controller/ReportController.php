@@ -696,6 +696,18 @@ class ReportController extends Controller
 
 		$report = $this->reportingService->generateTeamReport($teamUserIds, $start, $endExclusive);
 
+		// Payroll handoff: personalnummer identity field per member — same key
+		// in JSON and CSV (right after display_name in the CSV builder).
+		$personalnummerByUid = \OCA\ArbeitszeitCheck\Support\Personalnummer::mapForUsers($this->config, $teamUserIds);
+		if (isset($report['members']) && is_array($report['members'])) {
+			foreach ($report['members'] as &$member) {
+				if (is_array($member)) {
+					$member['personalnummer'] = $personalnummerByUid[(string)($member['user_id'] ?? '')] ?? '';
+				}
+			}
+			unset($member);
+		}
+
 		$download = (string)$this->request->getParam('download', '0') === '1';
 		if ($download) {
 			$format = (string)$this->request->getParam('format', 'csv');
@@ -722,6 +734,7 @@ class ReportController extends Controller
 						foreach ($transformed as $row) {
 							$row['user_id'] = $uid;
 							$row['display_name'] = $displayName;
+							$row['personalnummer'] = $personalnummerByUid[$uid] ?? '';
 							$longRows[] = $row;
 						}
 					}
@@ -753,6 +766,7 @@ class ReportController extends Controller
 							return [
 								'user_id' => $row['user_id'] ?? '',
 								'display_name' => $row['display_name'] ?? '',
+								'personalnummer' => $row['personalnummer'] ?? '',
 								'id' => $row['id'] ?? '',
 								'date' => $row['date'] ?? '',
 								'start_time' => $row['start_time'] ?? '',
@@ -936,6 +950,7 @@ class ReportController extends Controller
 		$headers = [
 			'user_id',
 			'display_name',
+			'personalnummer',
 			'total_hours',
 			'required_hours',
 			'overtime_hours',
@@ -966,6 +981,7 @@ class ReportController extends Controller
 				$row = [
 					self::sanitizeCsvCellValue((string)($member['user_id'] ?? '')),
 					self::sanitizeCsvCellValue((string)($member['display_name'] ?? '')),
+					self::sanitizeCsvCellValue((string)($member['personalnummer'] ?? '')),
 					isset($member['total_hours']) ? (string)$member['total_hours'] : '',
 					isset($member['required_hours']) ? (string)$member['required_hours'] : '',
 					isset($member['overtime_hours']) ? (string)$member['overtime_hours'] : '',

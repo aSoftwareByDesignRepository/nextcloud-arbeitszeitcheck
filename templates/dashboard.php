@@ -677,6 +677,26 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                     <?php else: ?>
                     <?php foreach ($hoursGlance as $glanceRow) { $renderGlanceTile($glanceRow); } ?>
                     <?php endif; ?>
+                    <?php
+                    // 5th tile: live overtime balance inside "Hours at a glance"
+                    // (cecilienstift pack — balance discoverability for Abbummeltage).
+                    // Display-only: the saldo card below stays the CTA owner.
+                    $glanceBalance = $displayBalancePreview;
+                    $glanceBalancePrefix = $glanceBalance > 0.0001 ? '+' : '';
+                    $glanceComp = is_array($_['compDaysEstimate'] ?? null) ? $_['compDaysEstimate'] : null;
+                    $glanceCompDays = $glanceComp !== null ? (int)($glanceComp['days'] ?? 0) : null;
+                    ?>
+                    <div class="azc-dashboard-metric azc-dashboard-metric--balance" role="listitem">
+                        <span class="azc-dashboard-metric__label"><?php p($l->t('Overtime balance')); ?></span>
+                        <span class="azc-dashboard-metric__value <?php p($glanceBalance >= 0 ? 'azc-dashboard-metric__value--positive' : 'azc-dashboard-metric__value--negative'); ?>"
+                              aria-label="<?php p($l->t('Balance: %s hours', [$glanceBalancePrefix . number_format($glanceBalance, 2)])); ?>">
+                            <?php p($glanceBalancePrefix . $arbeitszeitCheckFormatHours($glanceBalance)); ?>
+                            <span class="azc-dashboard-metric__unit"><?php p($l->t('h')); ?></span>
+                        </span>
+                        <?php if ($glanceCompDays !== null && $glanceCompDays >= 1): ?>
+                        <span class="azc-dashboard-metric__delta"><?php p($l->t('≈ %n compensatory day available', '≈ %n compensatory days available', $glanceCompDays)); ?></span>
+                        <?php endif; ?>
+                    </div>
                     </div>
                     </div>
                 </article>
@@ -751,6 +771,18 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <p class="form-help dashboard-overtime-card__soll-reduction" id="dashboard-overtime-soll-reduction">
                                 <?php p($l->t('Excludes %s h of target time removed by unpaid or parental leave.', [number_format($sollReductionYtd, 2)])); ?>
                             </p>
+                            <?php endif; ?>
+                            <?php
+                            $absenceCreateCompUrl = (string)($_['absenceCreateCompUrl'] ?? '');
+                            if ($absenceCreateCompUrl !== ''):
+                            ?>
+                            <div class="dashboard-overtime-card__actions">
+                                <a id="dashboard-overtime-comp-request"
+                                   class="azc-btn azc-btn--primary azc-btn--sm"
+                                   href="<?php p($absenceCreateCompUrl); ?>">
+                                    <?php p($l->t('Request compensatory day')); ?>
+                                </a>
+                            </div>
                             <?php endif; ?>
                             <?php
                             $overtimeBalancePdfUrl = (string)($_['overtimeBalancePdfUrl'] ?? '');

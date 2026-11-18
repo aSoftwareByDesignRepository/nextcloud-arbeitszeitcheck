@@ -2558,8 +2558,8 @@ class ManagerControllerTest extends TestCase
 		$this->assertInstanceOf(\OCP\AppFramework\Http\DataDownloadResponse::class, $response);
 		$csv = $response->render();
 
-		$this->assertStringContainsString('employee1;\'=cmd|calc;vacation;8.00;2', $csv);
-		$this->assertStringContainsString('employee1;\'=cmd|calc;sick_leave;1.00;1', $csv);
+		$this->assertStringContainsString('employee1;\'=cmd|calc;;vacation;8.00;2', $csv);
+		$this->assertStringContainsString('employee1;\'=cmd|calc;;sick_leave;1.00;1', $csv);
 		$this->assertStringContainsString('team-absences-2024-01-01_bis_2024-12-31.csv',
 			$response->getHeaders()['Content-Disposition'] ?? '');
 	}

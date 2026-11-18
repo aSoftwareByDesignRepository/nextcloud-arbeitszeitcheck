@@ -28,6 +28,7 @@
 		const endDateInput = document.getElementById('end-date');
 		const formatSelect = document.getElementById('format');
 		const teamVariantGroup = document.getElementById('report-team-variant-group');
+		const absenceFiltersGroup = document.getElementById('report-absence-filters-group');
 		const teamVariantSelect = document.getElementById('report-team-variant');
 		const exportLayoutGroup = document.getElementById('report-export-layout-group');
 		const exportLayoutSelect = document.getElementById('report-export-layout');
@@ -284,6 +285,23 @@
 					exportLayoutSelect.disabled = !showLayout;
 				}
 			}
+
+			// Reason/status chips apply to the absence export download only.
+			if (absenceFiltersGroup) {
+				absenceFiltersGroup.style.display = reportType === 'absence' ? '' : 'none';
+			}
+		}
+
+		/** Currently selected absence-export filter chips → CSV param string ('' when none). */
+		function selectedChipValues(containerId, attr) {
+			const bar = document.getElementById(containerId);
+			if (!bar) {
+				return '';
+			}
+			return Array.from(bar.querySelectorAll('.azc-filter[aria-pressed="true"]'))
+				.map((chip) => chip.getAttribute(attr) || '')
+				.filter(Boolean)
+				.join(',');
 		}
 
 		function handleScopeChange() {
@@ -450,6 +468,23 @@
 		}
 		if (teamVariantSelect) {
 			teamVariantSelect.addEventListener('change', updateExportOptionVisibility);
+		}
+
+		// Absence-export filter chips: plain toggle buttons (recipe B pills),
+		// aria-pressed is the only state — the download URL reads it live.
+		if (absenceFiltersGroup) {
+			absenceFiltersGroup.addEventListener('click', (e) => {
+				const chip = e.target instanceof HTMLElement
+					? e.target.closest('.azc-filter')
+					: null;
+				if (!chip) {
+					return;
+				}
+				chip.setAttribute(
+					'aria-pressed',
+					chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+				);
+			});
 		}
 
 		// Build report URL with correct params per type (API expects specific param names)
@@ -1377,6 +1412,14 @@
 					}
 					if (reportType === 'absence') {
 						urlObj.searchParams.set('sort', 'type');
+						const types = selectedChipValues('report-absence-type-chips', 'data-absence-type');
+						const statuses = selectedChipValues('report-absence-status-chips', 'data-absence-status');
+						if (types) {
+							urlObj.searchParams.set('types', types);
+						}
+						if (statuses) {
+							urlObj.searchParams.set('statuses', statuses);
+						}
 					}
 					if (scope === 'organization') {
 						urlObj.searchParams.set('scope', 'organization');

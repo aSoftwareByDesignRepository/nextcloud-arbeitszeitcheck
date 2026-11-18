@@ -26,6 +26,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -53,6 +54,32 @@ class ExportController extends Controller
 	/**
 	 * Guard CSV exports against spreadsheet formula injection.
 	 */
+	/**
+	 * Parse a comma-separated multi-filter parameter into a validated value list.
+	 *
+	 * @return list<string>|null null on any invalid entry (caller maps to 400);
+	 *                          empty list when the param is unset/blank.
+	 */
+	private function parseExportCsvList(?string $raw, callable $validator): ?array
+	{
+		if ($raw === null) {
+			return [];
+		}
+		$items = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $v): bool => $v !== ''));
+		if ($items === []) {
+			return [];
+		}
+		if (count($items) > 50 || count($items) !== count(array_unique($items))) {
+			return null;
+		}
+		foreach ($items as $item) {
+			if (!$validator($item)) {
+				return null;
+			}
+		}
+		return $items;
+	}
+
 	private static function sanitizeCsvCellValue(string $value): string
 	{
 		if ($value === '') {
@@ -156,6 +183,7 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	/**
 	 * @return DataDownloadResponse|JSONResponse
 	 */
@@ -278,6 +306,7 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	/**
 	 * @return DataDownloadResponse|JSONResponse
 	 */
@@ -292,6 +321,8 @@ class ExportController extends Controller
 		?string $scope = null,
 		?string $status = null,
 		?string $type = null,
+		?string $statuses = null,
+		?string $types = null,
 	): DataDownloadResponse|JSONResponse {
 		try {
 			$user = $this->userSession->getUser();
@@ -335,15 +366,19 @@ class ExportController extends Controller
 		$scopeUserIds ??= [$actorUid];
 
 		// Optional row filters (validated strictly — unknown values are rejected).
-		$status = $status !== null ? trim($status) : '';
-		if ($status !== '' && !in_array($status, [
+		// `types`/`statuses` are CSV multi-select counterparts of `type`/`status`
+		// (payroll handoff: e.g. exclude sick_leave). Mixing singular+plural of
+		// the same dimension is ambiguous → 400 (cecilienstift pack spec §9.3).
+		$allowedStatuses = [
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_PENDING,
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_PENDING,
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_SUBSTITUTE_DECLINED,
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_APPROVED,
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_REJECTED,
 			\OCA\ArbeitszeitCheck\Db\Absence::STATUS_CANCELLED,
-		], true)) {
+		];
+		$status = $status !== null ? trim($status) : '';
+		if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
 			return new JSONResponse([
 				'success' => false,
 				'error' => $this->l10n->t('Invalid status filter.'),
@@ -357,20 +392,61 @@ class ExportController extends Controller
 			], Http::STATUS_BAD_REQUEST);
 		}
 
+		$typeList = $this->parseExportCsvList(
+			$types,
+			static fn (string $v): bool => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::isValid($v),
+		);
+		if ($typeList === null) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid absence type.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$statusList = $this->parseExportCsvList(
+			$statuses,
+			static fn (string $v): bool => in_array($v, $allowedStatuses, true),
+		);
+		if ($statusList === null) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Invalid status filter.'),
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($type !== '' && $typeList !== []) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Ambiguous type filter: use either "type" or "types", not both.'),
+				'error_code' => 'AMBIGUOUS_TYPE_FILTER',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($status !== '' && $statusList !== []) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Ambiguous status filter: use either "status" or "statuses", not both.'),
+				'error_code' => 'AMBIGUOUS_STATUS_FILTER',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($type !== '') {
+			$typeList = [$type];
+		}
+		if ($status !== '') {
+			$statusList = [$status];
+		}
+
 			// Get absences from database
 			if ($isSelfExport) {
 				// Legacy path: single-user mapper call, unchanged output columns.
 				$absences = $this->absenceMapper->findByUserAndDateRange($actorUid, $start, $end);
-				if ($status !== '' || $type !== '') {
-					$absences = array_values(array_filter($absences, static function ($a) use ($status, $type): bool {
-						return ($status === '' || $a->getStatus() === $status)
-							&& ($type === '' || $a->getType() === $type);
+				if ($statusList !== [] || $typeList !== []) {
+					$absences = array_values(array_filter($absences, static function ($a) use ($statusList, $typeList): bool {
+						return ($statusList === [] || in_array($a->getStatus(), $statusList, true))
+							&& ($typeList === [] || in_array($a->getType(), $typeList, true));
 					}));
 				}
 			} else {
 				// Scoped export: fail loud instead of silently truncating payroll data.
 				$rowCount = $this->absenceMapper->countByUsersAndDateRange(
-					$scopeUserIds, $start, $end, $status !== '' ? $status : null, $type !== '' ? $type : null
+					$scopeUserIds, $start, $end, $statusList !== [] ? $statusList : null, $typeList !== [] ? $typeList : null
 				);
 				if ($rowCount > Constants::MAX_EXPORT_ROWS) {
 					return new JSONResponse([
@@ -379,7 +455,7 @@ class ExportController extends Controller
 					], Http::STATUS_BAD_REQUEST);
 				}
 				$absences = $this->absenceMapper->findByUsersAndDateRange(
-					$scopeUserIds, $start, $end, $status !== '' ? $status : null, $type !== '' ? $type : null
+					$scopeUserIds, $start, $end, $statusList !== [] ? $statusList : null, $typeList !== [] ? $typeList : null
 				);
 			}
 
@@ -391,6 +467,13 @@ class ExportController extends Controller
 				}
 				return $displayNameByUid[$uid];
 			};
+
+			// Payroll handoff: per-uid personalnummer map, one lookup each
+			// (no N+1 per row). Scoped exports only — self exports keep the
+			// no-identity-columns contract.
+			$personalnummerByUid = $isSelfExport
+				? []
+				: \OCA\ArbeitszeitCheck\Support\Personalnummer::mapForUsers($this->config, $scopeUserIds);
 
 			// Convert to array format
 			// FA-3: carryover ("UV") attribution per vacation row — additive,
@@ -430,8 +513,14 @@ class ExportController extends Controller
 						'uv_dates' => isset($attr['uv_dates']) ? implode(',', $attr['uv_dates']) : null,
 					];
 					if (!$isSelfExport) {
-						// Scoped exports carry the employee identity columns.
-						$row = ['user_id' => $absence->getUserId(), 'display_name' => $displayName($absence->getUserId())] + $row;
+						// Scoped exports carry the employee identity columns;
+						// `personalnummer` (payroll join key) sits in the
+						// identity block right after display_name.
+						$row = [
+							'user_id' => $absence->getUserId(),
+							'display_name' => $displayName($absence->getUserId()),
+							'personalnummer' => $personalnummerByUid[$absence->getUserId()] ?? '',
+						] + $row;
 					}
 					$data[] = $row;
 				} catch (\Throwable $e) {
@@ -545,6 +634,7 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	public function compliance(
 		string $format = 'csv',
 		?string $startDate = null,
@@ -663,6 +753,11 @@ class ExportController extends Controller
 				return $displayNameByUid[$uid];
 			};
 
+			// Payroll handoff: same identity-column rule as the absence export.
+			$personalnummerByUid = $isSelfExport
+				? []
+				: \OCA\ArbeitszeitCheck\Support\Personalnummer::mapForUsers($this->config, $scopeUserIds);
+
 			// Convert to array format
 			$data = [];
 			foreach ($violations as $violation) {
@@ -682,7 +777,11 @@ class ExportController extends Controller
 						'time_entry_id' => $violation->getTimeEntryId()
 					];
 					if (!$isSelfExport) {
-						$row = ['user_id' => $violation->getUserId(), 'display_name' => $displayName($violation->getUserId())] + $row;
+						$row = [
+							'user_id' => $violation->getUserId(),
+							'display_name' => $displayName($violation->getUserId()),
+							'personalnummer' => $personalnummerByUid[$violation->getUserId()] ?? '',
+						] + $row;
 					}
 					$data[] = $row;
 				} catch (\Throwable $e) {
@@ -882,6 +981,7 @@ class ExportController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	public function datev(?string $startDate = null, ?string $endDate = null): DataDownloadResponse
 	{
 		try {

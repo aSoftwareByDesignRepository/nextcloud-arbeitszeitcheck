@@ -175,6 +175,23 @@ class SplitServiceAccountingService {
 		$storedSchedule = is_array($breakRules[WeekdaySchedule::KEY] ?? null)
 			? $breakRules[WeekdaySchedule::KEY]
 			: null;
+		// Freeze the EFFECTIVE cut-off for the pinned weekday (per-weekday
+		// override ?? model default) — the frozen `day` blocks and this
+		// resolved cut-off stay consistent forever; `weekday_cutoffs` keeps
+		// the full resolved map for audit/re-resolution.
+		$cutoffMinutes = $schedule->splitCutoffMinutesForWeekday($dayKey);
+		$effectiveCutoff = $cutoffMinutes !== null
+			? sprintf('%02d:%02d', intdiv($cutoffMinutes, 60), $cutoffMinutes % 60)
+			: $split['cutoff'];
+		$splitDoc = [
+			'automatic' => $split['automatic'],
+			'cutoff' => $effectiveCutoff,
+			'break_cover' => $split['breakCover'],
+		];
+		$weekdayCutoffs = $schedule->splitWeekdayCutoffsHm();
+		if ($weekdayCutoffs !== []) {
+			$splitDoc['weekday_cutoffs'] = $weekdayCutoffs;
+		}
 
 		return [
 			'v' => 1,
@@ -183,11 +200,7 @@ class SplitServiceAccountingService {
 			'timezone' => $timezone,
 			'day' => ['blocks' => $week[$dayKey]],
 			'week' => $week,
-			'split' => [
-				'automatic' => $split['automatic'],
-				'cutoff' => $split['cutoff'],
-				'break_cover' => $split['breakCover'],
-			],
+			'split' => $splitDoc,
 			'overrides' => ['decision' => SplitServiceAccounting::DECISION_AUTO, 'worked' => []],
 			'result' => [
 				'state' => SplitServiceAccounting::STATE_ACTIVE,

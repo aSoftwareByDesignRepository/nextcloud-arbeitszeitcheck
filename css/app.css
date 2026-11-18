@@ -2467,6 +2467,31 @@ dialog.azc-dialog .azc-dialog__actions {
 	min-block-size: var(--azc-touch, 44px);
 }
 
+/* Per-weekday cut-off overrides (NH-01): aligned with the default cut-off
+   group; rows wrap on narrow viewports. */
+.wtm-weekday-schedule .wtm-split-weekday-cutoffs {
+	margin-block-end: 0;
+	margin-inline-start: calc(3rem + var(--azc-space-3, 0.75rem));
+}
+
+.wtm-weekday-schedule .wtm-split-weekday-cutoffs__rows {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+	margin-block-start: var(--azc-space-1, 0.25rem);
+}
+
+.wtm-weekday-schedule .wtm-split-weekday-cutoff {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-1, 0.25rem);
+}
+
+.wtm-weekday-schedule .wtm-split-weekday-cutoff .wtm-split-day-cutoff {
+	max-inline-size: 8rem;
+	min-block-size: var(--azc-touch, 44px);
+}
+
 .wtm-weekday-schedule .wtm-split-preview {
 	display: flex;
 	flex-direction: column;

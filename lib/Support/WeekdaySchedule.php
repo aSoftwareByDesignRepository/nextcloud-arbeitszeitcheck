@@ -41,6 +41,7 @@ final class WeekdaySchedule
 		'automatic_split',
 		'split_when_clock_out_after',
 		'interruption_counts_as_break',
+		'weekday_cutoffs',
 	];
 
 	public const MAX_BLOCKS_PER_DAY = 4;
@@ -259,6 +260,7 @@ final class WeekdaySchedule
 			}
 		}
 		$latestGapEnd = null;
+		$gapEndByDay = [];
 		$hasMultiBlockDay = false;
 		foreach (self::DAYS as $day) {
 			if (!isset($days[$day]) || !is_array($days[$day])) {
@@ -319,6 +321,7 @@ final class WeekdaySchedule
 				for ($i = 1, $n = count($dayIntervals); $i < $n; $i++) {
 					if ($dayIntervals[$i][0] > $dayIntervals[$i - 1][1]) {
 						$latestGapEnd = max($latestGapEnd ?? 0, $dayIntervals[$i][0]);
+						$gapEndByDay[$day] = max($gapEndByDay[$day] ?? 0, $dayIntervals[$i][0]);
 					}
 				}
 			}
@@ -353,6 +356,16 @@ final class WeekdaySchedule
 			if ($splitInfo['automatic'] && $splitInfo['cutoffMinutes'] !== null
 				&& $latestGapEnd !== null && $splitInfo['cutoffMinutes'] < $latestGapEnd) {
 				$errors[] = 'SPLIT_CUTOFF_BEFORE_INTERRUPTION_END';
+			}
+			foreach ($splitInfo['weekdayCutoffs'] as $cutoffDay => $cutoffMin) {
+				if (!isset($gapEndByDay[$cutoffDay])) {
+					// A per-weekday cut-off on a day without an interruption
+					// can never fire — that is a configuration error, not a
+					// harmless no-op.
+					$errors[] = 'SPLIT_NO_INTERRUPTION';
+				} elseif ($cutoffMin < $gapEndByDay[$cutoffDay]) {
+					$errors[] = 'SPLIT_CUTOFF_BEFORE_INTERRUPTION_END';
+				}
 			}
 			if (($splitInfo['automatic'] || $splitInfo['breakCover']) && !$hasMultiBlockDay) {
 				$errors[] = 'SPLIT_NO_INTERRUPTION';
@@ -401,7 +414,34 @@ final class WeekdaySchedule
 			return [['SPLIT_CUTOFF_INVALID'], null];
 		}
 
-		return [[], ['automatic' => $automatic, 'cutoffMinutes' => $cutoffMinutes, 'breakCover' => $breakCover]];
+		$weekdayCutoffs = [];
+		$weekdayCutoffsRaw = $split['weekday_cutoffs'] ?? null;
+		if ($weekdayCutoffsRaw !== null) {
+			if (!is_array($weekdayCutoffsRaw) || array_is_list($weekdayCutoffsRaw) && $weekdayCutoffsRaw !== []) {
+				return [['SPLIT_CONFIG_INVALID'], null];
+			}
+			if (!$automatic) {
+				// Same contradiction rule as the default cut-off: overrides
+				// only exist while automatic split is on.
+				return [['SPLIT_CUTOFF_INVALID'], null];
+			}
+			foreach ($weekdayCutoffsRaw as $day => $value) {
+				if (!is_string($day) || !in_array($day, self::DAYS, true)) {
+					return [['SCHEDULE_UNKNOWN_KEY'], null];
+				}
+				if (!is_string($value) || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) !== 1) {
+					return [['SPLIT_CUTOFF_INVALID'], null];
+				}
+				$weekdayCutoffs[$day] = ((int)substr($value, 0, 2)) * 60 + (int)substr($value, 3, 2);
+			}
+		}
+
+		return [[], [
+			'automatic' => $automatic,
+			'cutoffMinutes' => $cutoffMinutes,
+			'breakCover' => $breakCover,
+			'weekdayCutoffs' => $weekdayCutoffs,
+		]];
 	}
 
 	/**
@@ -502,6 +542,20 @@ final class WeekdaySchedule
 				'split_when_clock_out_after' => $automatic && is_string($cutoffRaw) ? $cutoffRaw : null,
 				'interruption_counts_as_break' => ($splitRaw['interruption_counts_as_break'] ?? null) === true,
 			];
+			$weekdayCutoffsRaw = $automatic && is_array($splitRaw['weekday_cutoffs'] ?? null)
+				? $splitRaw['weekday_cutoffs']
+				: [];
+			if ($weekdayCutoffsRaw !== []) {
+				$ordered = [];
+				foreach (self::DAYS as $day) {
+					if (isset($weekdayCutoffsRaw[$day]) && is_string($weekdayCutoffsRaw[$day])) {
+						$ordered[$day] = $weekdayCutoffsRaw[$day];
+					}
+				}
+				if ($ordered !== []) {
+					$split['weekday_cutoffs'] = $ordered;
+				}
+			}
 		}
 
 		return new self($normalized, self::VERSION_V2, (string)$mode, $split);
@@ -696,17 +750,72 @@ final class WeekdaySchedule
 	 * is equivalent to all-off, so absent/off both yield
 	 * `{automatic: false, cutoff: null, breakCover: false}`.
 	 *
-	 * @return array{automatic: bool, cutoff: ?string, breakCover: bool}
+	 * @return array{automatic: bool, cutoff: ?string, breakCover: bool, weekdayCutoffs: array<string,int>}
 	 */
 	public function getSplitService(): array
 	{
+		$automatic = ($this->splitService['automatic_split'] ?? null) === true;
+		$weekdayCutoffs = [];
+		if ($automatic && is_array($this->splitService['weekday_cutoffs'] ?? null)) {
+			foreach ($this->splitService['weekday_cutoffs'] as $day => $hm) {
+				if (is_string($day) && is_string($hm)
+					&& preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hm) === 1) {
+					$weekdayCutoffs[$day] = ((int)substr($hm, 0, 2)) * 60 + (int)substr($hm, 3, 2);
+				}
+			}
+		}
 		return [
-			'automatic' => ($this->splitService['automatic_split'] ?? null) === true,
-			'cutoff' => $this->splitService !== null && ($this->splitService['automatic_split'] ?? null) === true
+			'automatic' => $automatic,
+			'cutoff' => $this->splitService !== null && $automatic
 				? ($this->splitService['split_when_clock_out_after'] ?? null)
 				: null,
 			'breakCover' => ($this->splitService['interruption_counts_as_break'] ?? null) === true,
+			'weekdayCutoffs' => $weekdayCutoffs,
 		];
+	}
+
+	/**
+	 * Effective cut-off for one weekday in minutes-of-day: the per-weekday
+	 * override when configured, otherwise the model default. Null when
+	 * automatic split is off.
+	 */
+	public function splitCutoffMinutesForWeekday(string $weekday): ?int
+	{
+		$split = $this->getSplitService();
+		if (!$split['automatic']) {
+			return null;
+		}
+		return $split['weekdayCutoffs'][$weekday] ?? $this->hmToMinutesNullable($split['cutoff']);
+	}
+
+	/**
+	 * Resolved effective cut-offs (override ?? default) as "HH:MM" for every
+	 * weekday that has at least one scheduled interruption. Frozen into the
+	 * entry context so the pinned rule is fully self-contained.
+	 *
+	 * @return array<string,string>
+	 */
+	public function splitWeekdayCutoffsHm(): array
+	{
+		$resolved = [];
+		foreach (self::DAYS as $day) {
+			if (count($this->blocksForWeekday($day)) < 2) {
+				continue;
+			}
+			$minutes = $this->splitCutoffMinutesForWeekday($day);
+			if ($minutes !== null) {
+				$resolved[$day] = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+			}
+		}
+		return $resolved;
+	}
+
+	private function hmToMinutesNullable(?string $hm): ?int
+	{
+		if (!is_string($hm) || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hm) !== 1) {
+			return null;
+		}
+		return ((int)substr($hm, 0, 2)) * 60 + (int)substr($hm, 3, 2);
 	}
 
 	/**

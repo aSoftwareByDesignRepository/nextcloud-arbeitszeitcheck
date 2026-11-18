@@ -1012,6 +1012,103 @@
      */
     function init() {
         bindEvents();
+        initSplitAudit();
+    }
+
+    /**
+     * NH-02 split-service audit: bounded date-range report of entries that
+     * ended just before the cut-off or clocked in during an interruption.
+     * Server-judged via frozen per-entry context; display-only.
+     */
+    function initSplitAudit() {
+        const form = document.getElementById('split-audit-form');
+        if (!form) {
+            return;
+        }
+        const status = document.getElementById('split-audit-status');
+        const errorBox = document.getElementById('split-audit-error');
+        const errorText = errorBox ? errorBox.querySelector('.azc-callout__text') : null;
+        const results = document.getElementById('split-audit-results');
+        const cutoffBody = document.getElementById('split-audit-cutoff-tbody');
+        const gapBody = document.getElementById('split-audit-gap-tbody');
+
+        const cell = function(text) {
+            const td = document.createElement('td');
+            td.textContent = text;
+            return td;
+        };
+        const fillTable = function(tbody, rows, columns, colspan) {
+            if (!tbody) {
+                return;
+            }
+            tbody.innerHTML = '';
+            if (!rows.length) {
+                const tr = document.createElement('tr');
+                const td = cell(wtmMsg('splitAuditEmpty', 'No matching entries in this range.'));
+                td.colSpan = colspan;
+                td.className = 'azc-table-empty';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+                return;
+            }
+            rows.forEach(function(row) {
+                const tr = document.createElement('tr');
+                columns.forEach(function(key) {
+                    tr.appendChild(cell(row[key] == null ? '–' : String(row[key])));
+                });
+                tbody.appendChild(tr);
+            });
+        };
+
+        form.addEventListener('submit', function(ev) {
+            ev.preventDefault();
+            const from = String(document.getElementById('split-audit-from').value || '');
+            const to = String(document.getElementById('split-audit-to').value || '');
+            const windowMin = String(document.getElementById('split-audit-window').value || '15');
+            if (errorBox) {
+                errorBox.hidden = true;
+            }
+            if (status) {
+                status.textContent = wtmMsg('splitAuditRunning', 'Running audit…');
+            }
+            Utils.ajax('/apps/arbeitszeitcheck/api/admin/working-time-models/split-audit'
+                + '?from=' + encodeURIComponent(from)
+                + '&to=' + encodeURIComponent(to)
+                + '&window=' + encodeURIComponent(windowMin), {
+                method: 'GET',
+                onSuccess: function(data) {
+                    const payload = (data && data.data) || data || {};
+                    if (status) {
+                        status.textContent = payload.truncated
+                            ? wtmMsg('splitAuditTruncated', 'Results capped at 500 entries — narrow the range.')
+                            : '';
+                    }
+                    fillTable(cutoffBody,
+                        Array.isArray(payload.endedJustBeforeCutoff) ? payload.endedJustBeforeCutoff : [],
+                        ['displayName', 'date', 'clockIn', 'clockOut', 'minutesBeforeCutoff'], 5);
+                    fillTable(gapBody,
+                        Array.isArray(payload.clockInsDuringInterruption) ? payload.clockInsDuringInterruption : [],
+                        ['displayName', 'date', 'clockIn', 'clockOut'], 4);
+                    if (results) {
+                        results.hidden = false;
+                    }
+                },
+                onError: function(xhr) {
+                    if (status) {
+                        status.textContent = '';
+                    }
+                    if (results) {
+                        results.hidden = true;
+                    }
+                    if (errorBox && errorText) {
+                        const msg = (xhr && xhr.data && (xhr.data.error || (xhr.data.fields && Object.values(xhr.data.fields)[0])))
+                            || wtmMsg('splitAuditError', 'Audit failed. Check the dates and try again.');
+                        errorText.textContent = msg;
+                        errorBox.hidden = false;
+                    }
+                }
+            });
+        });
     }
 
     /**

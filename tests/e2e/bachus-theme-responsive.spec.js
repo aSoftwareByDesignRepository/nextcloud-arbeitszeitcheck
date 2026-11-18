@@ -80,7 +80,9 @@ test.describe('Bachus theme × viewport: dashboard + calendar', () => {
 
 			const panel = page.locator('.azc-dashboard-metrics-panel')
 			await expect(panel).toBeVisible()
-			await expect(panel.locator('.azc-dashboard-metric')).toHaveCount(4)
+			// 4 period tiles + CECILIENSTIFT overtime-balance tile (display-only).
+			await expect(panel.locator('.azc-dashboard-metric')).toHaveCount(5)
+			await expect(panel.locator('.azc-dashboard-metric--balance')).toHaveCount(1)
 			await expect(panel.locator('details, summary')).toHaveCount(0)
 
 			for (const vp of viewports) {

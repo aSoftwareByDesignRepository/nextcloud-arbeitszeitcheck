@@ -86,6 +86,7 @@
         const loadedIsV2 = schedule && Number(schedule.version) === 2;
         const addBlockLabel = msg('addWorkBlock', 'Add work block');
         const removeBlockLabel = msg('removeWorkBlock', 'Remove block');
+        const copyDayLabel = msg('copyDayTo', 'Copy this day to…');
         const blockWord = msg('block', 'block');
         // Stored split_service is optional; absent ≡ every option off.
         const splitCfg = (schedule && schedule.split_service && typeof schedule.split_service === 'object')
@@ -127,6 +128,7 @@
                     <td><input type="time" class="form-input wtm-day-break-end" id="${prefix}-${day}-bend" value="${Utils.escapeHtml(br.end || '')}" ${work ? '' : 'disabled'} aria-label="${Utils.escapeHtml(labels[day] + ' ' + breakLabel + ' ' + endLabel)}"></td>
                     <td class="wtm-day-net" id="${prefix}-${day}-net"><span class="wtm-day-net-value" aria-live="polite">—</span>
                         <button type="button" class="azc-btn azc-btn--ghost azc-btn--sm wtm-add-block" data-action="add-block" data-day="${day}" ${work ? '' : 'disabled'} aria-label="${Utils.escapeHtml(labels[day] + ' ' + addBlockLabel)}" title="${Utils.escapeHtml(addBlockLabel)}">+</button>
+                        <button type="button" class="azc-btn azc-btn--ghost azc-btn--sm wtm-copy-day" data-action="copy-day" data-day="${day}" ${work ? '' : 'disabled'} aria-label="${Utils.escapeHtml(labels[day] + ' ' + copyDayLabel)}" title="${Utils.escapeHtml(copyDayLabel)}">⧉</button>
                     </td>
                 </tr>`;
             for (let bi = 1; bi < blocks.length; bi++) {
@@ -180,6 +182,7 @@
                         ${Utils.escapeHtml(msg('clearSchedule', 'Clear weekday times'))}
                     </button>
                 </p>
+                <p class="wtm-copy-status" role="status" aria-live="polite"></p>
                 <div class="table-container" role="region" aria-label="${Utils.escapeHtml(title)}">
                     <table class="table wtm-weekday-table">
                         <thead>
@@ -245,6 +248,11 @@
                         <input type="time" step="60" class="form-input wtm-split-cutoff" id="${prefix}-split-cutoff" value="${Utils.escapeHtml(ctx.cutoff || '')}"${ctx.autoOn ? '' : ' disabled'} aria-describedby="${prefix}-split-cutoff-help ${prefix}-split-cutoff-error">
                         <p id="${prefix}-split-cutoff-help" class="form-help">${Utils.escapeHtml(autoHelp)}</p>
                         <p id="${prefix}-split-cutoff-error" class="field-error wtm-split-cutoff-error" role="alert" hidden></p>
+                    </div>
+                    <div class="form-group wtm-split-weekday-cutoffs"${ctx.autoOn ? '' : ' hidden'}>
+                        <p class="form-label wtm-split-weekday-cutoffs__legend">${Utils.escapeHtml(msg('splitWeekdayCutoffsLabel', 'Different cut-off per weekday (optional)'))}</p>
+                        <p class="form-help">${Utils.escapeHtml(msg('splitWeekdayCutoffsHelp', 'Override the cut-off for individual weekdays. Leave a field empty to use the default above.'))}</p>
+                        <div class="wtm-split-weekday-cutoffs__rows"></div>
                     </div>
                     <div class="azc-switch-field">
                         <input type="hidden" name="${prefix}-split-break-cover" value="0">
@@ -473,6 +481,65 @@
         if (input) {
             input.disabled = !auto;
         }
+        const weekdayGroup = fieldset.querySelector('.wtm-split-weekday-cutoffs');
+        if (weekdayGroup) {
+            weekdayGroup.hidden = !auto;
+        }
+        fieldset.querySelectorAll('.wtm-split-day-cutoff').forEach((el) => {
+            el.disabled = !auto;
+        });
+    }
+
+    /**
+     * Per-weekday cut-off rows (NH-01): one optional <input type="time">
+     * per weekday that currently has two or more blocks. Rebuilt whenever
+     * the block geometry changes; already-typed values and values applied
+     * from a stored document are preserved by weekday.
+     */
+    function syncSplitWeekdayCutoffs(fieldset) {
+        const container = fieldset.querySelector('.wtm-split-weekday-cutoffs__rows');
+        const group = fieldset.querySelector('.wtm-split-weekday-cutoffs');
+        if (!container || !group) {
+            return;
+        }
+        const labels = {
+            mon: msg('monday', 'Monday'), tue: msg('tuesday', 'Tuesday'),
+            wed: msg('wednesday', 'Wednesday'), thu: msg('thursday', 'Thursday'),
+            fri: msg('friday', 'Friday'), sat: msg('saturday', 'Saturday'),
+            sun: msg('sunday', 'Sunday'),
+        };
+        const current = {};
+        container.querySelectorAll('.wtm-split-day-cutoff').forEach((el) => {
+            current[el.getAttribute('data-day')] = el.value;
+        });
+        let applied = {};
+        try {
+            applied = JSON.parse(fieldset.dataset.pendingSplitWeekdayCutoffs || '{}') || {};
+        } catch (e) {
+            applied = {};
+        }
+        const prefix = fieldset.getAttribute('data-schedule-prefix') || 'wtm';
+        const cutoffLabel = msg('splitWeekdayCutoffAria', 'Cut-off');
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        let html = '';
+        days.forEach((day) => {
+            const work = !!fieldset.querySelector(`#${prefix}-${day}-work`)?.checked;
+            if (!work || dayRows(fieldset, day).length < 2) {
+                return;
+            }
+            const value = Object.prototype.hasOwnProperty.call(current, day)
+                ? current[day]
+                : (typeof applied[day] === 'string' ? applied[day] : '');
+            const id = `${prefix}-split-cutoff-${day}`;
+            html += `<div class="wtm-split-weekday-cutoff">`
+                + `<label class="form-label" for="${id}">${Utils.escapeHtml(labels[day] || day)}</label>`
+                + `<input type="time" step="60" class="form-input wtm-split-day-cutoff" id="${id}" data-day="${day}"`
+                + ` value="${Utils.escapeHtml(value)}" aria-label="${Utils.escapeHtml((labels[day] || day) + ', ' + cutoffLabel)}">`
+                + `</div>`;
+        });
+        container.innerHTML = html;
+        delete fieldset.dataset.pendingSplitWeekdayCutoffs;
+        syncSplitCutoff(fieldset);
     }
 
     function clearSplitCutoffError(fieldset) {
@@ -766,6 +833,10 @@
             if (addBtn) {
                 addBtn.disabled = !work || rows.length >= MAX_BLOCKS_PER_DAY;
             }
+            const copyBtn = mainTr.querySelector('.wtm-copy-day');
+            if (copyBtn && !fieldset.dataset.copySourceDay) {
+                copyBtn.disabled = !work;
+            }
             const bStart = mainTr.querySelector('.wtm-day-break-start');
             const bEnd = mainTr.querySelector('.wtm-day-break-end');
             const netValueEl = netEl ? netEl.querySelector('.wtm-day-net-value') : null;
@@ -855,8 +926,128 @@
             return;
         }
         details.hidden = !hasWorkDayWithMultipleBlocks(fieldset);
-        // Keep the cut-off's enabled state in lockstep with its switch.
+        // Keep the cut-off's enabled state in lockstep with its switch and
+        // the per-weekday override rows in lockstep with the blocks.
+        syncSplitWeekdayCutoffs(fieldset);
         syncSplitCutoff(fieldset);
+    }
+
+    function copyDayLabels() {
+        return {
+            mon: msg('monday', 'Monday'), tue: msg('tuesday', 'Tuesday'),
+            wed: msg('wednesday', 'Wednesday'), thu: msg('thursday', 'Thursday'),
+            fri: msg('friday', 'Friday'), sat: msg('saturday', 'Saturday'),
+            sun: msg('sunday', 'Sunday'),
+        };
+    }
+
+    /**
+     * NH-03 copy-day helper: first ⧉ click "arms" the source day; the other
+     * day buttons become paste targets, a live status explains the state,
+     * and clicking the source again (or Escape) cancels. No dialog.
+     */
+    function armCopyDay(fieldset, day) {
+        fieldset.dataset.copySourceDay = day;
+        syncCopyDayButtons(fieldset);
+        const status = fieldset.querySelector('.wtm-copy-status');
+        const labels = copyDayLabels();
+        if (status) {
+            status.textContent = msg('copyDayArmed', '%s selected — choose another day to paste into.')
+                .replace('%s', labels[day] || day);
+        }
+    }
+
+    function disarmCopyDay(fieldset) {
+        delete fieldset.dataset.copySourceDay;
+        syncCopyDayButtons(fieldset);
+        const status = fieldset.querySelector('.wtm-copy-status');
+        if (status) {
+            status.textContent = '';
+        }
+    }
+
+    function syncCopyDayButtons(fieldset) {
+        const labels = copyDayLabels();
+        const source = fieldset.dataset.copySourceDay || '';
+        fieldset.querySelectorAll('.wtm-copy-day').forEach((btn) => {
+            const day = btn.getAttribute('data-day');
+            const dayName = labels[day] || day;
+            if (!source) {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.textContent = '⧉';
+                btn.setAttribute('aria-label', dayName + ' ' + msg('copyDayTo', 'Copy this day to…'));
+                return;
+            }
+            if (day === source) {
+                btn.setAttribute('aria-pressed', 'true');
+                btn.textContent = msg('copyDayCancel', 'Cancel');
+                btn.setAttribute('aria-label', msg('copyDayCancelAria', 'Cancel copying %s').replace('%s', dayName));
+            } else {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.textContent = '⇥';
+                btn.setAttribute('aria-label', msg('copyDayPasteInto', 'Paste into %s').replace('%s', dayName));
+            }
+        });
+        // Keep buttons enabled state consistent with the day's work flag.
+        // While armed every target stays enabled — pasting activates the
+        // day and is the whole point of copying onto an off day.
+        fieldset.querySelectorAll('tr[data-day]:not([data-extra-block])').forEach((mainTr) => {
+            const work = mainTr.querySelector('.wtm-day-work')?.checked;
+            const btn = mainTr.querySelector('.wtm-copy-day');
+            if (btn) {
+                btn.disabled = source ? false : !work;
+            }
+        });
+    }
+
+    function applyCopyDay(fieldset, sourceDay, targetDay) {
+        const prefix = fieldset.getAttribute('data-schedule-prefix') || 'wtm';
+        const labels = copyDayLabels();
+        const srcRows = dayRows(fieldset, sourceDay);
+        const blocks = srcRows.map(blockInputsOfRow);
+        const srcMain = fieldset.querySelector(`tr[data-day="${sourceDay}"]:not([data-extra-block])`);
+        const brStart = srcMain?.querySelector('.wtm-day-break-start')?.value || '';
+        const brEnd = srcMain?.querySelector('.wtm-day-break-end')?.value || '';
+
+        extraBlockRows(fieldset, targetDay).forEach((tr) => tr.remove());
+        for (let i = 1; i < blocks.length; i++) {
+            addBlockRow(fieldset, targetDay, prefix, null);
+        }
+        dayRows(fieldset, targetDay).forEach((tr, i) => {
+            const startEl = tr.querySelector('.wtm-day-start');
+            const endEl = tr.querySelector('.wtm-day-end');
+            if (startEl) {
+                startEl.value = blocks[i] ? blocks[i].start : '';
+            }
+            if (endEl) {
+                endEl.value = blocks[i] ? blocks[i].end : '';
+            }
+        });
+        const work = fieldset.querySelector(`#${prefix}-${targetDay}-work`);
+        if (work) {
+            work.checked = true;
+        }
+        const bStart = fieldset.querySelector(`#${prefix}-${targetDay}-bstart`);
+        const bEnd = fieldset.querySelector(`#${prefix}-${targetDay}-bend`);
+        if (bStart) {
+            bStart.value = brStart;
+        }
+        if (bEnd) {
+            bEnd.value = brEnd;
+        }
+        refreshTotals(fieldset);
+        updateSplitServiceVisibility(fieldset);
+        const status = fieldset.querySelector('.wtm-copy-status');
+        if (status) {
+            status.textContent = msg('copyDayPasted', 'Copied %s to %s.')
+                .replace('%s', labels[sourceDay] || sourceDay)
+                .replace('%s', labels[targetDay] || targetDay);
+        }
+        const targetMain = fieldset.querySelector(`tr[data-day="${targetDay}"]:not([data-extra-block])`);
+        const focusEl = targetMain?.querySelector('.wtm-day-start');
+        if (focusEl && typeof focusEl.focus === 'function') {
+            focusEl.focus();
+        }
     }
 
     function bind(fieldset) {
@@ -949,6 +1140,24 @@
             }
             if (ev.target.closest('[data-action="split-preview"]')) {
                 runSplitPreview(fieldset);
+            }
+            const copyBtn = ev.target instanceof Element ? ev.target.closest('[data-action="copy-day"]') : null;
+            if (copyBtn) {
+                const day = copyBtn.getAttribute('data-day');
+                const source = fieldset.dataset.copySourceDay || '';
+                if (source === day) {
+                    disarmCopyDay(fieldset);
+                } else if (source) {
+                    applyCopyDay(fieldset, source, day);
+                    disarmCopyDay(fieldset);
+                } else {
+                    armCopyDay(fieldset, day);
+                }
+            }
+        });
+        fieldset.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape' && fieldset.dataset.copySourceDay) {
+                disarmCopyDay(fieldset);
             }
         });
         const presetBtn = fieldset.querySelector('[data-action="apply-weekday-preset"]');
@@ -1043,6 +1252,12 @@
                 ? splitCfg.split_when_clock_out_after
                 : '';
         }
+        fieldset.dataset.pendingSplitWeekdayCutoffs = JSON.stringify(
+            (splitCfg.weekday_cutoffs && typeof splitCfg.weekday_cutoffs === 'object')
+                ? splitCfg.weekday_cutoffs
+                : {}
+        );
+        syncSplitWeekdayCutoffs(fieldset);
         syncSplitCutoff(fieldset);
     }
 
@@ -1133,11 +1348,25 @@
         const cutoff = auto
             ? String(details.querySelector('.wtm-split-cutoff')?.value || '').trim()
             : '';
-        return {
+        const doc = {
             automatic_split: auto,
             split_when_clock_out_after: cutoff !== '' ? cutoff : null,
             interruption_counts_as_break: cover,
         };
+        if (auto) {
+            const weekdayCutoffs = {};
+            details.querySelectorAll('.wtm-split-day-cutoff').forEach((el) => {
+                const day = el.getAttribute('data-day');
+                const value = String(el.value || '').trim();
+                if (day && value !== '') {
+                    weekdayCutoffs[day] = value;
+                }
+            });
+            if (Object.keys(weekdayCutoffs).length > 0) {
+                doc.weekday_cutoffs = weekdayCutoffs;
+            }
+        }
+        return doc;
     }
 
     window.ArbeitszeitCheckWeekdaySchedule = {

@@ -885,7 +885,7 @@ class ReportControllerTest extends TestCase
 		$this->assertInstanceOf(DataDownloadResponse::class, $response);
 
 		$csv = (string)$response->render();
-		$this->assertStringContainsString('user_id,display_name,total_hours,required_hours,overtime_hours,break_hours,violations_count,absence_days,entries_count', $csv);
+		$this->assertStringContainsString('user_id,display_name,personalnummer,total_hours,required_hours,overtime_hours,break_hours,violations_count,absence_days,entries_count', $csv);
 		$this->assertStringContainsString('userA,"User A"', $csv);
 	}
 

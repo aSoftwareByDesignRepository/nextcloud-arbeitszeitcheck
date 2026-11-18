@@ -231,6 +231,7 @@ class PremiumSurchargeService
 				$users[] = [
 					'user_id' => $uid,
 					'display_name' => (string)$displayNameForUser($uid),
+					'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $uid),
 					'buckets' => $summary['buckets'] ?? [],
 					'total_classified_hours' => (float)($summary['total_classified_hours'] ?? 0),
 					'total_valued_hours' => (float)($summary['total_valued_hours'] ?? 0),
@@ -277,11 +278,13 @@ class PremiumSurchargeService
 			}
 			$uid = (string)($user['user_id'] ?? '');
 			$name = (string)($user['display_name'] ?? $uid);
+			$personalnummer = (string)($user['personalnummer'] ?? '');
 			$buckets = (array)($user['buckets'] ?? []);
 			if ($buckets === []) {
 				$rows[] = [
 					'user_id' => $uid,
 					'display_name' => $name,
+					'personalnummer' => $personalnummer,
 					'period_start' => $periodStart,
 					'period_end' => $periodEnd,
 					'bucket_id' => '',
@@ -301,6 +304,7 @@ class PremiumSurchargeService
 				$rows[] = [
 					'user_id' => $uid,
 					'display_name' => $name,
+					'personalnummer' => $personalnummer,
 					'period_start' => $periodStart,
 					'period_end' => $periodEnd,
 					'bucket_id' => (string)($bucket['id'] ?? ''),

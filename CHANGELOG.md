@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- **per-weekday cut-off overrides (NH-01)**: `split_service.weekday_cutoffs`
+  maps individual weekdays to their own split cut-off while the model
+  default stays the fallback; strictly validated (≥ latest interruption
+  end, ≥2 blocks, automatic split on), resolved into the frozen per-entry
+  context at stamp time so historical accounting never re-resolves.
+  Model editor shows optional per-day inputs on multi-block days and the
+  split preview uses the effective per-day cut-off.
+- **split-service audit report (NH-02)**: admin report +
+  `GET /api/admin/working-time-models/split-audit` lists entries that
+  ended within N minutes before their frozen effective cut-off and
+  clock-ins during scheduled interruptions — gaming signals judged from
+  frozen context only; ≤92-day range, 500-row cap.
+- **copy-day helper in the weekday editor (NH-03)**: arm a source day,
+  paste onto any other day — copies work state, blocks and break window;
+  keyboard + screen-reader accessible (`aria-pressed`, live status,
+  Escape/second click disarms), no dialog.
+
 ## 1.11.0 - 2026-11-17
 
 ### Added

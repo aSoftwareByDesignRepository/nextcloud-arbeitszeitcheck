@@ -6608,13 +6608,11 @@ class AdminController extends Controller
 			$lastEndMin = $blocks !== [] ? $blocks[count($blocks) - 1][1] : 17 * 60;
 			$gaps = $schedule->gapsForWeekday($weekday);
 
-			// Reference cut-off: the configured one; for drafts without an
+			// Reference cut-off: the effective one for the preview weekday
+			// (per-weekday override ?? model default); for drafts without an
 			// automatic split (no cut-off stored) the day's latest
 			// interruption end is the boundary that matters.
-			$cutoffMin = null;
-			if ($split['cutoff'] !== null) {
-				$cutoffMin = self::parseScheduleHm($split['cutoff']);
-			}
+			$cutoffMin = $schedule->splitCutoffMinutesForWeekday($weekday);
 			if ($cutoffMin === null) {
 				$cutoffMin = $gaps !== [] ? $gaps[count($gaps) - 1][1] : $lastEndMin;
 			}
@@ -6668,6 +6666,125 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * NH-02 split-service audit: entries that ended just before the
+	 * effective cut-off (gaming signal) plus clock-ins during a scheduled
+	 * interruption, over a bounded date range. Read-only; frozen context
+	 * carries the resolved cut-off, so each row is judged by the rule that
+	 * applied at clock-in — never by the current model.
+	 *
+	 * Query: from=Y-m-d, to=Y-m-d (≤ 92 days), window=minutes (1–120,
+	 * default 15).
+	 */
+	#[NoAdminRequired]
+	public function splitServiceAudit(): JSONResponse
+	{
+		$fromRaw = trim((string)$this->request->getParam('from', ''));
+		$toRaw = trim((string)$this->request->getParam('to', ''));
+		$from = \DateTimeImmutable::createFromFormat('!Y-m-d', $fromRaw);
+		$to = \DateTimeImmutable::createFromFormat('!Y-m-d', $toRaw);
+		if ($from === false || $to === false || $from > $to) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'fields' => ['from' => $this->l10n->t('Enter a valid date range (YYYY-MM-DD).')],
+				'code' => 'VALIDATION',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		if ($to->diff($from)->days > 92) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'fields' => ['to' => $this->l10n->t('Choose a range of at most 92 days.')],
+				'code' => 'VALIDATION',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		$window = (int)$this->request->getParam('window', 15);
+		if ($window < 1 || $window > 120) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('Validation failed'),
+				'fields' => ['window' => $this->l10n->t('Choose a value between 1 and 120 minutes.')],
+				'code' => 'VALIDATION',
+			], Http::STATUS_BAD_REQUEST);
+		}
+
+		$limit = 500;
+		$start = new \DateTime($from->format('Y-m-d') . ' 00:00:00');
+		$end = new \DateTime($to->modify('+1 day')->format('Y-m-d') . ' 00:00:00');
+		$candidates = $this->timeEntryMapper->findSplitAuditCandidates($start, $end, $limit + 1);
+		$truncated = count($candidates) > $limit;
+		if ($truncated) {
+			$candidates = array_slice($candidates, 0, $limit);
+		}
+
+		$justBeforeCutoff = [];
+		$duringInterruption = [];
+		$nameCache = [];
+		foreach ($candidates as $entry) {
+			$context = $entry->getWorkContext();
+			if ($context === null) {
+				continue;
+			}
+			$reason = (string)($context['result']['reason'] ?? '');
+			$tzName = (string)($context['timezone'] ?? 'UTC');
+			try {
+				$tz = new \DateTimeZone($tzName !== '' ? $tzName : 'UTC');
+			} catch (\Throwable) {
+				$tz = new \DateTimeZone('UTC');
+			}
+			$startTs = $entry->getStartTime()?->getTimestamp();
+			$endTs = $entry->getEndTime()?->getTimestamp();
+			if ($startTs === null || $endTs === null) {
+				continue;
+			}
+			$uid = (string)$entry->getUserId();
+			if (!array_key_exists($uid, $nameCache)) {
+				$user = $this->userManager->get($uid);
+				$nameCache[$uid] = $user !== null ? (string)$user->getDisplayName() : $uid;
+			}
+			$row = [
+				'entryId' => (int)$entry->getId(),
+				'userId' => $uid,
+				'displayName' => $nameCache[$uid],
+				'date' => (new \DateTimeImmutable('@' . $startTs))->setTimezone($tz)->format('Y-m-d'),
+				'clockIn' => (new \DateTimeImmutable('@' . $startTs))->setTimezone($tz)->format('H:i'),
+				'clockOut' => (new \DateTimeImmutable('@' . $endTs))->setTimezone($tz)->format('H:i'),
+				'reason' => $reason,
+			];
+
+			if ($reason === 'clock_in_during_interruption') {
+				$duringInterruption[] = $row;
+				continue;
+			}
+			if ($reason !== 'not_after_cutoff') {
+				continue;
+			}
+			$cutoffHm = $context['split']['cutoff'] ?? null;
+			if (!is_string($cutoffHm) || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $cutoffHm) !== 1) {
+				continue;
+			}
+			$cutoffMin = ((int)substr($cutoffHm, 0, 2)) * 60 + (int)substr($cutoffHm, 3, 2);
+			$endLocal = (new \DateTimeImmutable('@' . $endTs))->setTimezone($tz);
+			$endMin = ((int)$endLocal->format('H')) * 60 + (int)$endLocal->format('i') + ((int)$endLocal->format('s') > 0 ? 1 : 0);
+			$delta = $cutoffMin - $endMin;
+			if ($delta >= 0 && $delta <= $window) {
+				$row['minutesBeforeCutoff'] = $delta;
+				$justBeforeCutoff[] = $row;
+			}
+		}
+
+		return new JSONResponse([
+			'success' => true,
+			'from' => $from->format('Y-m-d'),
+			'to' => $to->format('Y-m-d'),
+			'windowMinutes' => $window,
+			'truncated' => $truncated,
+			'endedJustBeforeCutoff' => $justBeforeCutoff,
+			'clockInsDuringInterruption' => $duringInterruption,
+		]);
 	}
 
 	/**
@@ -6750,6 +6867,18 @@ class AdminController extends Controller
 			$week[$day] = $this->scheduleBlockPairs($schedule, $day);
 		}
 		$split = $schedule->getSplitService();
+		$cutoffMinutes = $schedule->splitCutoffMinutesForWeekday($weekday);
+		$splitDoc = [
+			'automatic' => $split['automatic'],
+			'cutoff' => $cutoffMinutes !== null
+				? sprintf('%02d:%02d', intdiv($cutoffMinutes, 60), $cutoffMinutes % 60)
+				: $split['cutoff'],
+			'break_cover' => $split['breakCover'],
+		];
+		$weekdayCutoffs = $schedule->splitWeekdayCutoffsHm();
+		if ($weekdayCutoffs !== []) {
+			$splitDoc['weekday_cutoffs'] = $weekdayCutoffs;
+		}
 		return [
 			'v' => 1,
 			'model_id' => 0,
@@ -6757,11 +6886,7 @@ class AdminController extends Controller
 			'timezone' => $tzName,
 			'day' => ['blocks' => $week[$weekday]],
 			'week' => $week,
-			'split' => [
-				'automatic' => $split['automatic'],
-				'cutoff' => $split['cutoff'],
-				'break_cover' => $split['breakCover'],
-			],
+			'split' => $splitDoc,
 			'overrides' => ['decision' => 'auto', 'worked' => []],
 		];
 	}
@@ -8334,6 +8459,7 @@ class AdminController extends Controller
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
 	public function exportUsers(string $format = 'csv'): DataDownloadResponse|JSONResponse
 	{
 		try {
@@ -8372,6 +8498,7 @@ class AdminController extends Controller
 				$data[] = [
 					'user_id' => $userId,
 					'display_name' => $user->getDisplayName(),
+					'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $userId),
 					'email' => $user->getEMailAddress() ?? '',
 					'enabled' => $user->isEnabled() ? 'Yes' : 'No',
 					'working_time_model' => $workingTimeModelName ?? '',

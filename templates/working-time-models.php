@@ -134,6 +134,69 @@ $models = $_['models'] ?? [];
             </div>
             </div><!-- /.azc-card__body -->
         </section><!-- /.azc-card -->
+
+        <section class="azc-card split-audit-card" aria-labelledby="split-audit-heading">
+            <header class="azc-card__header">
+                <div class="azc-card__header-text">
+                    <h2 id="split-audit-heading" class="azc-card__title"><?php p($l->t('Split-service audit')); ?></h2>
+                    <p class="azc-card__lead"><?php p($l->t('Entries that ended just before the cut-off or started during a scheduled interruption. Useful to spot days that were not split although an interruption was taken.')); ?></p>
+                </div>
+            </header>
+            <div class="azc-card__body">
+                <form id="split-audit-form" class="split-audit-form" novalidate>
+                    <div class="form-group">
+                        <label for="split-audit-from" class="form-label"><?php p($l->t('From')); ?></label>
+                        <input type="date" class="form-input" id="split-audit-from" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="split-audit-to" class="form-label"><?php p($l->t('To')); ?></label>
+                        <input type="date" class="form-input" id="split-audit-to" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="split-audit-window" class="form-label"><?php p($l->t('Just before cut-off means within (minutes)')); ?></label>
+                        <input type="number" class="form-input" id="split-audit-window" min="1" max="120" value="15" inputmode="numeric">
+                    </div>
+                    <div class="form-group split-audit-form__actions">
+                        <button type="submit" id="split-audit-run" class="azc-btn azc-btn--primary"><?php p($l->t('Run audit')); ?></button>
+                        <span id="split-audit-status" class="split-audit-status" role="status" aria-live="polite"></span>
+                    </div>
+                </form>
+                <div id="split-audit-error" class="azc-callout azc-callout--danger" role="alert" hidden>
+                    <div class="azc-callout__body"><p class="azc-callout__text"></p></div>
+                </div>
+                <div id="split-audit-results" hidden>
+                    <h3 class="split-audit-subheading"><?php p($l->t('Clock-outs just before the cut-off')); ?></h3>
+                    <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Clock-outs just before the cut-off')); ?>">
+                        <table class="table table--hover azc-table--responsive" id="split-audit-cutoff-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><?php p($l->t('Employee')); ?></th>
+                                    <th scope="col"><?php p($l->t('Date')); ?></th>
+                                    <th scope="col"><?php p($l->t('Clock-in')); ?></th>
+                                    <th scope="col"><?php p($l->t('Clock-out')); ?></th>
+                                    <th scope="col"><?php p($l->t('Minutes before cut-off')); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody id="split-audit-cutoff-tbody"></tbody>
+                        </table>
+                    </div>
+                    <h3 class="split-audit-subheading"><?php p($l->t('Clock-ins during an interruption')); ?></h3>
+                    <div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Clock-ins during an interruption')); ?>">
+                        <table class="table table--hover azc-table--responsive" id="split-audit-gap-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><?php p($l->t('Employee')); ?></th>
+                                    <th scope="col"><?php p($l->t('Date')); ?></th>
+                                    <th scope="col"><?php p($l->t('Clock-in')); ?></th>
+                                    <th scope="col"><?php p($l->t('Clock-out')); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody id="split-audit-gap-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section><!-- /.split-audit-card -->
 <!-- Initialize JavaScript -->
 <script nonce="<?php p($_['cspNonce'] ?? ''); ?>">
     window.ArbeitszeitCheck = window.ArbeitszeitCheck || {};

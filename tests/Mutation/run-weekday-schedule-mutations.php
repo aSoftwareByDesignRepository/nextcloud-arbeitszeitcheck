@@ -86,6 +86,41 @@ $mutations = [
 			'testCorruptWeekdayScheduleFallsBackToLegacyWeeklyContract',
 		],
 	],
+	// NH-01 per-weekday cut-offs: resolution, validation, context freeze.
+	[
+		'name' => 'weekday_override_ignored_at_resolution',
+		'file' => 'lib/Support/WeekdaySchedule.php',
+		'from' => 'return $split[\'weekdayCutoffs\'][$weekday] ?? $this->hmToMinutesNullable($split[\'cutoff\']);',
+		'to' => 'return $this->hmToMinutesNullable($split[\'cutoff\']);',
+		'filters' => [
+			'WeekdayScheduleTest::testWeekdayCutoffsValidateAndResolve',
+			'SplitServiceAccountingServiceTest::testBuildContextFreezesEffectiveWeekdayCutoff',
+		],
+	],
+	[
+		'name' => 'weekday_cutoff_below_gap_end_accepted',
+		'file' => 'lib/Support/WeekdaySchedule.php',
+		'from' => '} elseif ($cutoffMin < $gapEndByDay[$cutoffDay]) {',
+		'to' => '} elseif (false) {',
+		'filters' => ['WeekdayScheduleTest::testWeekdayCutoffsValidationErrors'],
+	],
+	[
+		'name' => 'weekday_cutoff_on_gapless_day_accepted',
+		'file' => 'lib/Support/WeekdaySchedule.php',
+		'from' => 'if (!isset($gapEndByDay[$cutoffDay])) {',
+		'to' => 'if (false) {',
+		'filters' => ['WeekdayScheduleTest::testWeekdayCutoffsValidationErrors'],
+	],
+	[
+		'name' => 'weekday_cutoffs_dropped_from_frozen_context',
+		'file' => 'lib/Service/SplitServiceAccountingService.php',
+		'from' => 'if ($weekdayCutoffs !== []) {',
+		'to' => 'if (false) {',
+		'filters' => [
+			'SplitServiceAccountingServiceTest::testBuildContextPinsForV2SplitModel',
+			'SplitServiceAccountingServiceTest::testBuildContextFreezesEffectiveWeekdayCutoff',
+		],
+	],
 ];
 
 $failures = 0;

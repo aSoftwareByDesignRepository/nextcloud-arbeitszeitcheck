@@ -165,6 +165,7 @@ class OvertimePayoutService
 		$lines[] = implode(';', [
 			'user_id',
 			'display_name',
+			'personalnummer',
 			'status',
 			'payout_eligible_hours',
 			'hours_paid',
@@ -183,6 +184,7 @@ class OvertimePayoutService
 			$lines[] = implode(';', [
 				$this->csvCell((string)($row['user_id'] ?? '')),
 				$this->csvCell((string)($row['display_name'] ?? '')),
+				$this->csvCell((string)($row['personalnummer'] ?? '')),
 				$this->csvCell((string)($row['status'] ?? '')),
 				$this->csvCell(isset($row['payout_eligible_hours']) ? number_format((float)$row['payout_eligible_hours'], 2, '.', '') : ''),
 				$this->csvCell(isset($row['hours_paid']) ? number_format((float)$row['hours_paid'], 2, '.', '') : ''),
@@ -421,6 +423,7 @@ class OvertimePayoutService
 			return [
 				'user_id' => $userId,
 				'display_name' => $displayName,
+				'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $userId),
 				'status' => 'paid',
 				'payout_id' => $existing->getId(),
 				'hours_paid' => round((float)$existing->getHoursPaid(), 2),
@@ -437,6 +440,7 @@ class OvertimePayoutService
 			return [
 				'user_id' => $userId,
 				'display_name' => $displayName,
+				'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $userId),
 				'status' => 'none',
 				'payout_eligible_hours' => 0.0,
 			];
@@ -450,6 +454,7 @@ class OvertimePayoutService
 		return [
 			'user_id' => $userId,
 			'display_name' => $displayName,
+				'personalnummer' => \OCA\ArbeitszeitCheck\Support\Personalnummer::forUser($this->config, $userId),
 			'has_overtime_tracking_from' => $hasStichtag,
 			'status' => $eligible >= 0.01 ? 'pending' : 'none',
 			'payout_eligible_hours' => $eligible,

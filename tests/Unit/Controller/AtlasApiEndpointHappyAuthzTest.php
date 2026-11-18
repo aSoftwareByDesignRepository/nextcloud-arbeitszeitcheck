@@ -411,6 +411,9 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::setTeamsUseAppTeams' => ['useAppTeams' => true],
 		// Split-service preview: valid v2 draft with two Monday blocks so the
 		// happy-path probe reaches the engine instead of SCHEDULE_INVALID.
+		// Split audit caps the range at 92 days — the generic full-year
+		// fixture is a designed 400, so give the action a valid narrow range.
+		'AdminController::splitServiceAudit' => ['from' => '2026-01-01', 'to' => '2026-01-31'],
 		'AdminController::workingTimeModelSplitPreview' => [
 			'weekday_schedule' => [
 				'version' => 2,

@@ -108,12 +108,16 @@ class AbsenceMapper extends QBMapper
 	 * @param int|null $offset
 	 * @return Absence[]
 	 */
+	/**
+	 * @param string|list<string>|null $status single status or list for IN filter
+	 * @param string|list<string>|null $type single type or list for IN filter
+	 */
 	public function findByUsersAndDateRange(
 		array $userIds,
 		\DateTimeInterface $startDate,
 		\DateTimeInterface $endDate,
-		?string $status = null,
-		?string $type = null,
+		string|array|null $status = null,
+		string|array|null $type = null,
 		?int $limit = null,
 		?int $offset = null
 	): array {
@@ -130,11 +134,13 @@ class AbsenceMapper extends QBMapper
 			->orderBy('start_date', 'DESC')
 			->addOrderBy('id', 'DESC');
 
-		if ($status !== null && $status !== '') {
-			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status)));
+		$statusList = is_array($status) ? $status : ($status !== null && $status !== '' ? [$status] : []);
+		if ($statusList !== []) {
+			$qb->andWhere($qb->expr()->in('status', $qb->createNamedParameter(array_values($statusList), IQueryBuilder::PARAM_STR_ARRAY)));
 		}
-		if ($type !== null && $type !== '') {
-			$qb->andWhere($qb->expr()->eq('type', $qb->createNamedParameter($type)));
+		$typeList = is_array($type) ? $type : ($type !== null && $type !== '' ? [$type] : []);
+		if ($typeList !== []) {
+			$qb->andWhere($qb->expr()->in('type', $qb->createNamedParameter(array_values($typeList), IQueryBuilder::PARAM_STR_ARRAY)));
 		}
 		if ($limit !== null) {
 			$qb->setMaxResults($limit);
@@ -152,15 +158,15 @@ class AbsenceMapper extends QBMapper
 	 * @param string[] $userIds
 	 * @param \DateTimeInterface $startDate Inclusive
 	 * @param \DateTimeInterface $endDate Inclusive
-	 * @param string|null $status
-	 * @param string|null $type
+	 * @param string|list<string>|null $status single status or list for IN filter
+	 * @param string|list<string>|null $type single type or list for IN filter
 	 */
 	public function countByUsersAndDateRange(
 		array $userIds,
 		\DateTimeInterface $startDate,
 		\DateTimeInterface $endDate,
-		?string $status = null,
-		?string $type = null
+		string|array|null $status = null,
+		string|array|null $type = null
 	): int {
 		if (empty($userIds)) {
 			return 0;
@@ -173,11 +179,13 @@ class AbsenceMapper extends QBMapper
 			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($endDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)))
 			->andWhere($qb->expr()->gte('end_date', $qb->createNamedParameter($startDate->format('Y-m-d'), IQueryBuilder::PARAM_STR)));
 
-		if ($status !== null && $status !== '') {
-			$qb->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($status)));
+		$statusList = is_array($status) ? $status : ($status !== null && $status !== '' ? [$status] : []);
+		if ($statusList !== []) {
+			$qb->andWhere($qb->expr()->in('status', $qb->createNamedParameter(array_values($statusList), IQueryBuilder::PARAM_STR_ARRAY)));
 		}
-		if ($type !== null && $type !== '') {
-			$qb->andWhere($qb->expr()->eq('type', $qb->createNamedParameter($type)));
+		$typeList = is_array($type) ? $type : ($type !== null && $type !== '' ? [$type] : []);
+		if ($typeList !== []) {
+			$qb->andWhere($qb->expr()->in('type', $qb->createNamedParameter(array_values($typeList), IQueryBuilder::PARAM_STR_ARRAY)));
 		}
 
 		return (int)$qb->executeQuery()->fetchOne();

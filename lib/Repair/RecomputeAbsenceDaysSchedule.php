@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Repair;
 
+use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
 use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Exception\MonthFinalizedException;
@@ -113,6 +114,17 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 		if ($computed <= 0.0001) {
 			return false;
 		}
+		$singleDay = $start->format('Y-m-d') === $end->format('Y-m-d');
+		// Explicit boundary-shape columns are request input, not calendar
+		// weight (FM-02 for multi-day rows): an AM+PM boundary-halves leave
+		// legitimately debits computed - (1 - startFrac) - (1 - endFrac), so
+		// the truthful target is the shaped debit, never the full schedule
+		// weight. This also heals rows a previous version of this step
+		// already inflated past the shaped debit.
+		$target = $this->shapedDebitTarget($absence, $computed, $singleDay);
+		if ($target <= 0.0001) {
+			return false;
+		}
 		if ($stored !== null) {
 			// Fraction debits (day_fraction) are request input, not calendar
 			// weight — never re-inflate them (FM-02, generalized: ratio, not
@@ -122,7 +134,6 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 			// half-day + entitlement-bound quarters) — any OTHER under-stored
 			// ratio is corruption the repair must still fix, and a multi-day
 			// under-stored row is legit schedule expansion, not a fraction.
-			$singleDay = $start->format('Y-m-d') === $end->format('Y-m-d');
 			if ($singleDay && (float)$stored < $computed - 0.011) {
 				$ratio = (float)$stored / $computed;
 				foreach ([0.25, 0.5, 0.75] as $knownFraction) {
@@ -131,7 +142,7 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 					}
 				}
 			}
-			if (abs($computed - (float)$stored) < 0.011) {
+			if (abs($target - (float)$stored) < 0.011) {
 				return false;
 			}
 		}
@@ -152,15 +163,34 @@ class RecomputeAbsenceDaysSchedule implements IRepairStep
 				return false;
 			}
 			$old = $stored !== null ? (float)$stored : null;
-			$fresh->setDays($computed);
+			$fresh->setDays($target);
 			$this->absenceMapper->update($fresh);
 			$this->auditLogMapper->logAction(
 				'system', 'absence_days_recomputed', 'absence', $id,
-				['days' => $old], ['days' => $computed], 'system'
+				['days' => $old], ['days' => $target], 'system'
 			);
 			return true;
 		} finally {
 			$this->lockingProvider->releaseLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE);
 		}
+	}
+
+	/**
+	 * Schedule weight minus the boundary discounts carried by the stored
+	 * day-shape columns (start/end day fractions). NULL columns mean a
+	 * full boundary day; on single-day rows only the start fraction
+	 * counts (same contract as AbsenceService::entityDayShape). Rows
+	 * without explicit shape columns resolve to the full computed weight.
+	 */
+	private function shapedDebitTarget(Absence $absence, float $computed, bool $singleDay): float
+	{
+		$sF = $absence->getStartDayFraction();
+		$eF = $absence->getEndDayFraction();
+		$startFrac = ($sF !== null && is_finite((float)$sF)) ? min(max((float)$sF, 0.0), 1.0) : 1.0;
+		$endFrac = (!$singleDay && $eF !== null && is_finite((float)$eF)) ? min(max((float)$eF, 0.0), 1.0) : 1.0;
+		if ($startFrac >= 0.989 && $endFrac >= 0.989) {
+			return $computed;
+		}
+		return $computed - (1.0 - $startFrac) - (1.0 - $endFrac);
 	}
 }

@@ -176,6 +176,69 @@ final class RecomputeAbsenceDaysScheduleTest extends TestCase
 			->run($this->createMock(IOutput::class));
 	}
 
+	public function testBoundaryHalfRowIsNeverReinflated(): void
+	{
+		// Multi-day row with AM+PM boundary halves: schedule weight 4, but
+		// the explicit shape columns debit 3 — the stored shape is truth,
+		// the repair must not re-inflate it (FM-02 for multi-day rows).
+		$a = $this->absence(7, 'alice', 3.0);
+		$a->setStartDayFraction(0.5);
+		$a->setStartDaySlot('am');
+		$a->setEndDayFraction(0.5);
+		$a->setEndDaySlot('pm');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->never())->method('update');
+
+		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(4.0),
+			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
+	public function testInflatedBoundaryRowIsHealedToShapedDebit(): void
+	{
+		// A boundary-half row a prior repair run already inflated to full
+		// schedule weight (stored 4, shaped debit 3) is healed back down —
+		// repair corruption is repaired, not kept.
+		$a = $this->absence(7, 'alice', 4.0);
+		$a->setStartDayFraction(0.5);
+		$a->setStartDaySlot('am');
+		$a->setEndDayFraction(0.5);
+		$a->setEndDaySlot('pm');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->once())->method('update')
+			->with($this->callback(static fn (Absence $x) => abs($x->getDays() - 3.0) < 0.001));
+
+		$audit = $this->createMock(AuditLogMapper::class);
+		$audit->expects($this->once())->method('logAction')
+			->with('system', 'absence_days_recomputed', 'absence', 7,
+				['days' => 4.0], ['days' => 3.0], 'system');
+
+		$this->step($mapper, $audit, $this->counterReturning(4.0), $this->closureOk(),
+			$this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
+	public function testUnderStoredBoundaryRowIsHealedToShapedDebit(): void
+	{
+		// Under-stored shaped row (stored 1, shaped debit 3) is corruption —
+		// healed to the fraction-truthful 3, not the full schedule weight 4.
+		$a = $this->absence(7, 'alice', 1.0);
+		$a->setStartDayFraction(0.5);
+		$a->setStartDaySlot('am');
+		$a->setEndDayFraction(0.5);
+		$a->setEndDaySlot('pm');
+		$mapper = $this->createMock(AbsenceMapper::class);
+		$mapper->method('find')->willReturn($a);
+		$mapper->expects($this->once())->method('update')
+			->with($this->callback(static fn (Absence $x) => abs($x->getDays() - 3.0) < 0.001));
+
+		$this->step($mapper, $this->createMock(AuditLogMapper::class), $this->counterReturning(4.0),
+			$this->createMock(MonthClosureService::class), $this->locksOk(), $this->db([[7]]))
+			->run($this->createMock(IOutput::class));
+	}
+
 	public function testMultiDayUnderStoredRowIsRecomputed(): void
 	{
 		// A multi-day row stored below schedule weight is corruption/schedule

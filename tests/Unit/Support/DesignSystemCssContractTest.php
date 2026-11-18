@@ -191,24 +191,28 @@ final class DesignSystemCssContractTest extends TestCase
 
 	public function testBachusChoiceCardsAlignRadioWithLabelCopy(): void
 	{
-		self::assertStringContainsString('.azc-choice-cards', $this->policyCss);
-		self::assertStringContainsString('.azc-choice-card', $this->policyCss);
+		// The choice-card recipe lives in admin-settings.css, which every
+		// admin/policy page loads as an extra style (AdminController registers
+		// it alongside admin-notifications / admin-vacation-*).
+		$cardCss = (string) file_get_contents($this->appRoot . '/css/admin-settings.css');
+		self::assertStringContainsString('.azc-choice-cards', $cardCss);
+		self::assertStringContainsString('.azc-choice-card', $cardCss);
 		self::assertMatchesRegularExpression(
 			'/\.azc-choice-card[^{]*\{[^}]*display:\s*flex/s',
-			$this->policyCss,
+			$cardCss,
 		);
 		self::assertMatchesRegularExpression(
 			'/\.azc-choice-card[^{]*\{[^}]*align-items:\s*flex-start/s',
-			$this->policyCss,
+			$cardCss,
 		);
 		self::assertMatchesRegularExpression(
 			'/\.azc-choice-card\s*>\s*input\[type=\'radio\'\]/',
-			$this->policyCss,
+			$cardCss,
 		);
-		self::assertStringContainsString('max-height: 1.25rem', $this->policyCss);
-		self::assertStringContainsString('.azc-choice-card__copy', $this->policyCss);
-		self::assertStringContainsString('.azc-choice-card__title', $this->policyCss);
-		self::assertStringContainsString('.azc-choice-card__hint', $this->policyCss);
+		self::assertStringContainsString('max-height: 1.25rem', $cardCss);
+		self::assertStringContainsString('.azc-choice-card__copy', $cardCss);
+		self::assertStringContainsString('.azc-choice-card__title', $cardCss);
+		self::assertStringContainsString('.azc-choice-card__hint', $cardCss);
 	}
 
 	public function testNativeCheckboxRadioAlignToFirstLabelLine(): void

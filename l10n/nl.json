@@ -2060,7 +2060,7 @@
 		"Estimating impact…": "Impact inschatten…",
 		"Event titles look like “Alex (Vacation)”. Sick leave appears as a generic “Absence” — no free-text reasons are ever included.": "Titels zien eruit als « Alex (Vakantie) ». Ziekteverlof verschijnt als « Afwezigheid » — nooit vrije tekst.",
 		"Every %s minutes": "Elke %s minuten",
-		"Every logged-in Nextcloud user can open ArbeitszeitCheck": "elke ingelogde Nextcloud-gebruiker kan ArbeitszeitCheck openen",
+		"Every logged-in Nextcloud user can open ArbeitszeitCheck": "Elke ingelogde Nextcloud-gebruiker kan ArbeitszeitCheck openen",
 		"Every minute (11:51)": "Elke minuut (11:51)",
 		"Every night, the previous day's entries are re-checked and violations are recorded in the compliance overview. This only logs findings — it never changes entries.": "Elke nacht worden de invoeren van de vorige dag opnieuw gecontroleerd en overtredingen vastgelegd in het compliance-overzicht. Dit legt alleen bevindingen vast — invoeren worden nooit aangepast.",
 		"Every tier needs a “from” and a “credits” value as h:mm.": "Elke schijf heeft een „van”- en een „krediet”-waarde nodig in het formaat u:mm.",
@@ -3490,7 +3490,7 @@
 		"Only active tariff rule sets can be retired.": "Alleen actieve tariefregelsets kunnen buiten werking worden gesteld.",
 		"Only administrators can open this page while teams are off. Employees assigned as group managers cannot approve absences or corrections until you enable app teams and assign managers.": "Alleen beheerders kunnen deze pagina openen zolang teams uitgeschakeld zijn. Medewerkers toegewezen als groepsleidinggevenden kunnen geen afwezigheden of correcties goedkeuren totdat u app-teams inschakelt en leidinggevenden toewijst.",
 		"Only administrators can reopen a finalized month.": "Alleen beheerders kunnen een afgesloten maand heropenen.",
-		"Only allow-listed users and groups can open the app": "alleen toegelaten gebruikers en groepen kunnen de app openen",
+		"Only allow-listed users and groups can open the app": "Alleen toegelaten gebruikers en groepen kunnen de app openen",
 		"Only an active (paired) terminal can enroll badges.": "Alleen een actieve (gekoppelde) terminal kan passen registreren.",
 		"Only app administrators see this label. Employees and managers always see the public name.": "Alleen app-beheerders zien dit label. Medewerkers en leidinggevenden zien altijd de publieke naam.",
 		"Only applies to working time models that count breaks as working time (e.g. TVöD §6 (1) Wechselschicht) and do not set their own cap. Leave empty to credit all recorded breaks; a number caps the paid amount per day. Changing it recalculates existing entries in the background.": "Geldt alleen voor werktijdmodellen die pauzes als werktijd tellen (bijv. TVöD §6 (1) Wechselschicht) en geen eigen limiet instellen. Leeg laten om alle geregistreerde pauzes te crediteren; een getal begrenst het betaalde bedrag per dag. Wijzigen herberekent bestaande invoeren op de achtergrond.",
@@ -6778,7 +6778,11 @@
 			"%n rijen"
 		],
 		"This will update %1$s and %2$s — nothing is deleted.": "Dit werkt %1$s en %2$s bij — er wordt niets verwijderd.",
-		"Import applied. %1$s and %2$s written.": "Import toegepast. %1$s en %2$s geschreven."
+		"Import applied. %1$s and %2$s written.": "Import toegepast. %1$s en %2$s geschreven.",
+		"1 setting": "1 instelling",
+		"%n settings": "%n instellingen",
+		"1 row": "1 rij",
+		"%n rows": "%n rijen"
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

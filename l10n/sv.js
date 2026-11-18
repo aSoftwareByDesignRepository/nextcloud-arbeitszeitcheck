@@ -2061,7 +2061,7 @@
 	"Estimating impact…" : "Uppskattar effekt…",
 	"Event titles look like “Alex (Vacation)”. Sick leave appears as a generic “Absence” — no free-text reasons are ever included." : "Titlar ser ut som « Alex (Semester) ». Sjukfrånvaro visas som « Frånvaro » — aldrig fria textskäl.",
 	"Every %s minutes" : "Var %s:e minut",
-	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "varje inloggad Nextcloud-användare kan öppna ArbeitszeitCheck",
+	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "Varje inloggad Nextcloud-användare kan öppna ArbeitszeitCheck",
 	"Every minute (11:51)" : "Varje minut (11:51)",
 	"Every night, the previous day's entries are re-checked and violations are recorded in the compliance overview. This only logs findings — it never changes entries." : "Varje natt kontrolleras gårdagens poster igen och överträdelser loggas i efterlevnadsöversikten. Det loggar bara fynd — poster ändras aldrig.",
 	"Every tier needs a “from” and a “credits” value as h:mm." : "Varje steg behöver ett ”från”- och ett ”kredit”-värde i formatet h:mm.",
@@ -3491,7 +3491,7 @@
 	"Only active tariff rule sets can be retired." : "Endast aktiva tariffregelverk kan tas ur bruk.",
 	"Only administrators can open this page while teams are off. Employees assigned as group managers cannot approve absences or corrections until you enable app teams and assign managers." : "Endast administratörer kan öppna denna sida medan team är avstängda. Medarbetare som är utsedda till gruppchefer kan inte godkänna frånvaro eller korrigeringar förrän aktiverar app-team och tilldelar chefer.",
 	"Only administrators can reopen a finalized month." : "Endast administratörer kan återöppna en avslutad månad.",
-	"Only allow-listed users and groups can open the app" : "endast allow-listade användare och grupper kan öppna appen",
+	"Only allow-listed users and groups can open the app" : "Endast allow-listade användare och grupper kan öppna appen",
 	"Only an active (paired) terminal can enroll badges." : "Endast en aktiv (parkopplad) terminal kan registrera brickor.",
 	"Only app administrators see this label. Employees and managers always see the public name." : "Endast app-administratörer ser denna etikett. Anställda och chefer ser alltid det offentliga namnet.",
 	"Only applies to working time models that count breaks as working time (e.g. TVöD §6 (1) Wechselschicht) and do not set their own cap. Leave empty to credit all recorded breaks; a number caps the paid amount per day. Changing it recalculates existing entries in the background." : "Gäller endast arbetstidsmodeller som räknar ruster som arbetstid (t.ex. TVöD §6 (1) Wechselschicht) och inte sätter en egen gräns. Lämna tomt för att kreditera alla registrerade ruster; ett tal begränsar det betalda beloppet per dag. Ändras det räknas befintliga poster om i bakgrunden.",
@@ -6722,7 +6722,11 @@
 	"_1 setting_::_%n settings_" : ["1 inställning","%n inställningar"],
 	"_1 row_::_%n rows_" : ["1 rad","%n rader"],
 	"This will update %1$s and %2$s — nothing is deleted." : "Detta uppdaterar %1$s och %2$s — inget raderas.",
-	"Import applied. %1$s and %2$s written." : "Importen har tillämpats. %1$s och %2$s skrivna."
+	"Import applied. %1$s and %2$s written." : "Importen har tillämpats. %1$s och %2$s skrivna.",
+	"1 setting" : "1 inställning",
+	"%n settings" : "%n inställningar",
+	"1 row" : "1 rad",
+	"%n rows" : "%n rader"
 	},
 	"nplurals=2; plural=(n != 1);"
 );

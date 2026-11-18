@@ -2061,7 +2061,7 @@
 	"Estimating impact…" : "Etki hesaplanıyor…",
 	"Event titles look like “Alex (Vacation)”. Sick leave appears as a generic “Absence” — no free-text reasons are ever included." : "Etkinlik başlıkları “Alex (Yıllık İzin)” biçimindedir. Hastalık izni genel bir “Devamsızlık” olarak görünür — serbest metin gerekçeler asla dahil edilmez.",
 	"Every %s minutes" : "Her %s dakikada bir",
-	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "oturum açmış her Nextcloud kullanıcısı ArbeitszeitCheck'i açabilir",
+	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "Oturum açmış her Nextcloud kullanıcısı ArbeitszeitCheck'i açabilir",
 	"Every minute (11:51)" : "Her dakika (11:51)",
 	"Every night, the previous day's entries are re-checked and violations are recorded in the compliance overview. This only logs findings — it never changes entries." : "Her gece bir önceki günün kayıtları yeniden denetlenir ve ihlaller uyumluluk özetine kaydedilir. Bu yalnızca bulguları kaydeder — kayıtlar asla değiştirilmez.",
 	"Every tier needs a “from” and a “credits” value as h:mm." : "Her kademe için sa:dd biçiminde bir “başlangıç” ve bir “hak ediş” değeri gerekir.",
@@ -3491,7 +3491,7 @@
 	"Only active tariff rule sets can be retired." : "Yalnızca etkin tarife kuralı setleri kullanımdan kaldırılabilir.",
 	"Only administrators can open this page while teams are off. Employees assigned as group managers cannot approve absences or corrections until you enable app teams and assign managers." : "Ekipler kapalıyken bu sayfayı yalnızca yöneticiler açabilir. Uygulama ekiplerini etkinleştirip yönetici atayana kadar grup yöneticisi olarak atanan çalışanlar devamsızlıkları veya düzeltmeleri onaylayamaz.",
 	"Only administrators can reopen a finalized month." : "Kapatılmış bir ayı yalnızca yöneticiler yeniden açabilir.",
-	"Only allow-listed users and groups can open the app" : "yalnızca izin listesindeki kullanıcılar ve gruplar uygulamayı açabilir",
+	"Only allow-listed users and groups can open the app" : "Yalnızca izin listesindeki kullanıcılar ve gruplar uygulamayı açabilir",
 	"Only an active (paired) terminal can enroll badges." : "Yalnızca etkin (eşleştirilmiş) bir terminal kart kaydedebilir.",
 	"Only app administrators see this label. Employees and managers always see the public name." : "Bu etiketi yalnızca uygulama yöneticileri görür. Çalışanlar ve yöneticiler her zaman genel adı görür.",
 	"Only applies to working time models that count breaks as working time (e.g. TVöD §6 (1) Wechselschicht) and do not set their own cap. Leave empty to credit all recorded breaks; a number caps the paid amount per day. Changing it recalculates existing entries in the background." : "Yalnızca molaları çalışma süresi sayan (örn. TVöD §6 (1) Wechselschicht) ve kendi üst sınırını belirlemeyen çalışma süresi modelleri için geçerlidir. Tüm kayıtlı molaları saymak için boş bırakın; bir sayı günlük ücretli tutarı sınırlar. Değiştirmek, mevcut kayıtları arka planda yeniden hesaplar.",
@@ -6722,7 +6722,11 @@
 	"_1 setting_::_%n settings_" : ["%n ayar"],
 	"_1 row_::_%n rows_" : ["%n satır"],
 	"This will update %1$s and %2$s — nothing is deleted." : "Bu işlem %1$s ve %2$s güncelleyecek — hiçbir şey silinmeyecek.",
-	"Import applied. %1$s and %2$s written." : "İçe aktarma uygulandı. %1$s ve %2$s yazıldı."
+	"Import applied. %1$s and %2$s written." : "İçe aktarma uygulandı. %1$s ve %2$s yazıldı.",
+	"1 setting" : "1 ayar",
+	"%n settings" : "%n ayar",
+	"1 row" : "1 satır",
+	"%n rows" : "%n satır"
 	},
 	"nplurals=2; plural=(n != 1);"
 );

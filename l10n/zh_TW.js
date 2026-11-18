@@ -6722,7 +6722,11 @@
 	"_1 setting_::_%n settings_" : ["%n 項設定"],
 	"_1 row_::_%n rows_" : ["%n 列"],
 	"This will update %1$s and %2$s — nothing is deleted." : "這將更新 %1$s 與 %2$s——不會刪除任何內容。",
-	"Import applied. %1$s and %2$s written." : "匯入已套用。已寫入 %1$s 與 %2$s。"
+	"Import applied. %1$s and %2$s written." : "匯入已套用。已寫入 %1$s 與 %2$s。",
+	"1 setting" : "1 項設定",
+	"%n settings" : "%n 項設定",
+	"1 row" : "1 列",
+	"%n rows" : "%n 列"
 	},
 	"nplurals=1; plural=0;"
 );

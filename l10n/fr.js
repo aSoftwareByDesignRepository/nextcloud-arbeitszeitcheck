@@ -2061,7 +2061,7 @@
 	"Estimating impact…" : "Estimation de l'impact…",
 	"Event titles look like “Alex (Vacation)”. Sick leave appears as a generic “Absence” — no free-text reasons are ever included." : "Les titres ressemblent à « Alex (Congés) ». Les arrêts maladie apparaissent comme « Absence » — jamais de motif en texte libre.",
 	"Every %s minutes" : "Toutes les %s minutes",
-	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "tout utilisateur Nextcloud connecté peut ouvrir ArbeitszeitCheck",
+	"Every logged-in Nextcloud user can open ArbeitszeitCheck" : "Tout utilisateur Nextcloud connecté peut ouvrir ArbeitszeitCheck",
 	"Every minute (11:51)" : "Chaque minute (11:51)",
 	"Every night, the previous day's entries are re-checked and violations are recorded in the compliance overview. This only logs findings — it never changes entries." : "Chaque nuit, les entrées de la veille sont revérifiées et les infractions sont enregistrées dans l'aperçu de conformité. Cela ne fait que consigner les constats — les entrées ne sont jamais modifiées.",
 	"Every tier needs a “from” and a “credits” value as h:mm." : "Chaque palier nécessite une valeur « de » et « crédits » au format h:mm.",
@@ -3491,7 +3491,7 @@
 	"Only active tariff rule sets can be retired." : "Seuls les jeux de règles tarifaires actifs peuvent être retirés.",
 	"Only administrators can open this page while teams are off. Employees assigned as group managers cannot approve absences or corrections until you enable app teams and assign managers." : "Seuls les administrateurs peuvent ouvrir cette page tant que les équipes sont désactivées. Les employés assignés comme responsables de groupe ne peuvent pas approuver les absences ou corrections tant que vous n'activez pas les équipes de l'application et n'assignez pas de responsables.",
 	"Only administrators can reopen a finalized month." : "Seuls les administrateurs peuvent rouvrir un mois clôturé.",
-	"Only allow-listed users and groups can open the app" : "seuls les utilisateurs et groupes autorisés peuvent ouvrir l’application",
+	"Only allow-listed users and groups can open the app" : "Seuls les utilisateurs et groupes autorisés peuvent ouvrir l’application",
 	"Only an active (paired) terminal can enroll badges." : "Seul un terminal actif (apparié) peut enregistrer des badges.",
 	"Only app administrators see this label. Employees and managers always see the public name." : "Seuls les administrateurs de l'application voient cette étiquette. Les employés et managers voient toujours le nom public.",
 	"Only applies to working time models that count breaks as working time (e.g. TVöD §6 (1) Wechselschicht) and do not set their own cap. Leave empty to credit all recorded breaks; a number caps the paid amount per day. Changing it recalculates existing entries in the background." : "S’applique uniquement aux modèles de temps de travail qui comptent les pauses comme temps de travail (p. ex. TVöD §6 (1) Wechselschicht) et ne définissent pas leur propre plafond. Laisser vide pour créditer toutes les pauses enregistrées ; un nombre plafonne le montant rémunéré par jour. Le modifier recalcule les entrées existantes en arrière-plan.",
@@ -6722,7 +6722,11 @@
 	"_1 setting_::_%n settings_" : ["1 paramètre","%n paramètres"],
 	"_1 row_::_%n rows_" : ["1 ligne","%n lignes"],
 	"This will update %1$s and %2$s — nothing is deleted." : "Cette opération mettra à jour %1$s et %2$s — rien ne sera supprimé.",
-	"Import applied. %1$s and %2$s written." : "Import appliqué. %1$s et %2$s écrits."
+	"Import applied. %1$s and %2$s written." : "Import appliqué. %1$s et %2$s écrits.",
+	"1 setting" : "1 paramètre",
+	"%n settings" : "%n paramètres",
+	"1 row" : "1 ligne",
+	"%n rows" : "%n lignes"
 	},
 	"nplurals=2; plural=(n > 1);"
 );

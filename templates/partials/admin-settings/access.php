@@ -91,7 +91,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                                            value="0"
                                            <?php echo !$accessRestrictionEnabled ? 'checked' : ''; ?>>
                                     <span class="azc-choice-card__copy">
-                                        <span class="azc-choice-card__title"><?php p($l->t('Open')); ?></span>
+                                        <span class="azc-choice-card__title"><?php p($l->t('Open access')); ?></span>
                                         <span class="azc-choice-card__hint"><?php p($l->t('Every logged-in Nextcloud user can open ArbeitszeitCheck')); ?></span>
                                     </span>
                                 </label>
@@ -101,7 +101,7 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                                            value="1"
                                            <?php echo $accessRestrictionEnabled ? 'checked' : ''; ?>>
                                     <span class="azc-choice-card__copy">
-                                        <span class="azc-choice-card__title"><?php p($l->t('Restricted')); ?></span>
+                                        <span class="azc-choice-card__title"><?php p($l->t('Restricted access')); ?></span>
                                         <span class="azc-choice-card__hint"><?php p($l->t('Only allow-listed users and groups can open the app')); ?></span>
                                     </span>
                                 </label>

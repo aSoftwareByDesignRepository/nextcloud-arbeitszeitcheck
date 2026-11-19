@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 instelling",
 	"%n settings" : "%n instellingen",
 	"1 row" : "1 rij",
-	"%n rows" : "%n rijen"
-	},
-	"nplurals=2; plural=(n != 1);"
+	"%n rows" : "%n rijen",
+	"Absence credit breakdown" : "Uitsplitsing van de afwezigheidskredieten",
+	"Retry" : "Opnieuw proberen",
+	"The breakdown could not be loaded." : "De uitsplitsing kon niet worden geladen.",
+	"No absences in this period." : "Geen afwezigheid in deze periode.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Periode %1$s t\/m %2$s — in totaal %3$s u bijgeschreven.",
+	"Counted towards the balance" : "Meegerekend in het saldo",
+	"Reduced required hours" : "Verlaagde doeluren",
+	"Not counted" : "Niet meegerekend",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — gepland %2$s u, afwezig %3$s u, gewerkt %4$s u, bijgeschreven %5$s u",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — gepland %2$s u, afwezig %3$s u, doel verlaagd met %4$s u",
+	"One day overlapped another absence and is not listed" : "Eén dag overlapt een andere afwezigheid en is niet vermeld",
+	"%1$s days overlapped another absence and are not listed" : "%1$s dagen overlappen een andere afwezigheid en zijn niet vermeld",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "Eén dag had geen geplande werktijd (bijv. weekend of feestdag)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s dagen hadden geen geplande werktijd (bijv. weekend of feestdagen)",
+	"≈ %1$s compensatory day available" : "≈ %1$s compensatiedag beschikbaar",
+	"≈ %1$s compensatory days available" : "≈ %1$s compensatiedagen beschikbaar",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — op basis van een saldo van %2$s u ÷ %3$s u per geplande dag.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Niet goedgekeurd — afwachtende, afgewezen of geannuleerde afwezigheid beïnvloedt het saldo nooit.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "Dit type telt als productieve of neutrale tijd (bijv. zakenreizen, thuiswerken) en schrijft geen uren bij.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Zou uren bijschrijven, maar dit effect is uitgeschakeld in de organisatie-instellingen.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "Er is geen werktijd gepland op deze dagen (bijv. weekend of feestdag).",
+	"Already covered — the tracked working time reaches the planned hours." : "Al gedekt — de geregistreerde werktijd bereikt de geplande uren.",
+	"Overlaps another absence that credited these days." : "Overlapt een andere afwezigheid die deze dagen heeft bijgeschreven.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Geef een geldige begin- en einddatum op (JJJJ-MM-DD).",
+	"The selected range is too long." : "Het geselecteerde bereik is te lang.",
+	"Unknown period." : "Onbekende periode."
+	}
 );
 }});})();

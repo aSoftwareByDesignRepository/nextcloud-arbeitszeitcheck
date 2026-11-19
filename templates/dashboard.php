@@ -694,7 +694,7 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             <span class="azc-dashboard-metric__unit"><?php p($l->t('h')); ?></span>
                         </span>
                         <?php if ($glanceCompDays !== null && $glanceCompDays >= 1): ?>
-                        <span class="azc-dashboard-metric__delta"><?php p($l->t('≈ %n compensatory day available', '≈ %n compensatory days available', $glanceCompDays)); ?></span>
+                        <span class="azc-dashboard-metric__delta"><?php p($l->n('≈ %n compensatory day available', '≈ %n compensatory days available', $glanceCompDays)); ?></span>
                         <?php endif; ?>
                     </div>
                     </div>
@@ -762,6 +762,13 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             ?>
                             <p class="form-help dashboard-overtime-card__absence-credit" id="dashboard-overtime-absence-credit">
                                 <?php p($l->t('Includes %s h credited from approved absences (planned hours).', [number_format($absenceCreditYtd, 2)])); ?>
+                                <button type="button"
+                                        class="azc-btn azc-btn--ghost azc-btn--sm dashboard-overtime-card__breakdown-trigger"
+                                        id="dashboard-overtime-breakdown-trigger"
+                                        data-overtime-breakdown
+                                        data-breakdown-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.overtime_breakdown.breakdown')); ?>">
+                                    <?php p($l->t('How is this calculated?')); ?>
+                                </button>
                             </p>
                             <?php endif; ?>
                             <?php
@@ -770,6 +777,26 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
                             ?>
                             <p class="form-help dashboard-overtime-card__soll-reduction" id="dashboard-overtime-soll-reduction">
                                 <?php p($l->t('Excludes %s h of target time removed by unpaid or parental leave.', [number_format($sollReductionYtd, 2)])); ?>
+                                <?php if ($absenceCreditYtd < 0.01): ?>
+                                <button type="button"
+                                        class="azc-btn azc-btn--ghost azc-btn--sm dashboard-overtime-card__breakdown-trigger"
+                                        id="dashboard-overtime-breakdown-trigger-reduction"
+                                        data-overtime-breakdown
+                                        data-breakdown-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.overtime_breakdown.breakdown')); ?>">
+                                    <?php p($l->t('How is this calculated?')); ?>
+                                </button>
+                                <?php endif; ?>
+                            </p>
+                            <?php endif; ?>
+                            <?php if ($absenceCreditYtd < 0.01 && $sollReductionYtd < 0.01): ?>
+                            <p class="form-help dashboard-overtime-card__absence-credit" id="dashboard-overtime-breakdown-standalone">
+                                <button type="button"
+                                        class="azc-btn azc-btn--ghost azc-btn--sm dashboard-overtime-card__breakdown-trigger"
+                                        id="dashboard-overtime-breakdown-trigger-standalone"
+                                        data-overtime-breakdown
+                                        data-breakdown-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.overtime_breakdown.breakdown')); ?>">
+                                    <?php p($l->t('How is this calculated?')); ?>
+                                </button>
                             </p>
                             <?php endif; ?>
                             <?php
@@ -1289,6 +1316,37 @@ $arbeitszeitCheckFormatHours = static function (float $hours): string {
     window.ArbeitszeitCheck.l10n.startBreak = <?php echo json_encode($l->t('Start Break'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.endBreak = <?php echo json_encode($l->t('End Break'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.error = <?php echo json_encode($l->t('An error occurred'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+
+    window.ArbeitszeitCheck.l10n.breakdown = <?php echo json_encode(
+        \OCA\ArbeitszeitCheck\Util\TemplateL10n::mapFromMessageIds($l, [
+            'Absence credit breakdown',
+            'Loading…',
+            'Close',
+            'Retry',
+            'The breakdown could not be loaded.',
+            'No absences in this period.',
+            'Period %1$s to %2$s — %3$s h credited in total.',
+            'Counted towards the balance',
+            'Reduced required hours',
+            'Not counted',
+            '%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h',
+            '%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h',
+            'One day overlapped another absence and is not listed',
+            '%1$s days overlapped another absence and are not listed',
+            'One day had no planned working time (e.g. weekend or public holiday)',
+            '%1$s days had no planned working time (e.g. weekend or public holiday)',
+            '≈ %1$s compensatory day available',
+            '≈ %1$s compensatory days available',
+            '%1$s — based on a balance of %2$s h ÷ %3$s h per planned day.',
+            'Not approved — pending, declined or cancelled absences never affect the balance.',
+            'This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours.',
+            'Would credit hours, but this effect is disabled in the organization settings.',
+            'No working time is planned on these days (e.g. weekend or public holiday).',
+            'Already covered — the tracked working time reaches the planned hours.',
+            'Overlaps another absence that credited these days.',
+        ]),
+        \OCA\ArbeitszeitCheck\Util\TemplateL10n::JSON_ENCODE_FLAGS
+    ); ?>;
 
     // API URLs
     window.ArbeitszeitCheck.apiUrl = {

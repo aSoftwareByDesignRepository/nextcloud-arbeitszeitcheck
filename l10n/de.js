@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 Einstellung",
 	"%n settings" : "%n Einstellungen",
 	"1 row" : "1 Zeile",
-	"%n rows" : "%n Zeilen"
-	},
-	"nplurals=2; plural=(n != 1);"
+	"%n rows" : "%n Zeilen",
+	"Absence credit breakdown" : "Aufschlüsselung der Abwesenheitsgutschrift",
+	"Retry" : "Erneut versuchen",
+	"The breakdown could not be loaded." : "Die Aufschlüsselung konnte nicht geladen werden.",
+	"No absences in this period." : "Keine Abwesenheiten in diesem Zeitraum.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Zeitraum %1$s bis %2$s — insgesamt %3$s Std. gutgeschrieben.",
+	"Counted towards the balance" : "In den Saldo eingerechnet",
+	"Reduced required hours" : "Reduzierte Sollstunden",
+	"Not counted" : "Nicht berücksichtigt",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — geplant %2$s Std., abwesend %3$s Std., gearbeitet %4$s Std., gutgeschrieben %5$s Std.",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — geplant %2$s Std., abwesend %3$s Std., Soll reduziert um %4$s Std.",
+	"One day overlapped another absence and is not listed" : "Ein Tag überschneidet eine andere Abwesenheit und ist nicht aufgeführt",
+	"%1$s days overlapped another absence and are not listed" : "%1$s Tage überschneiden eine andere Abwesenheit und sind nicht aufgeführt",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "Ein Tag hatte keine geplante Arbeitszeit (z. B. Wochenende oder Feiertag)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s Tage hatten keine geplante Arbeitszeit (z. B. Wochenende oder Feiertage)",
+	"≈ %1$s compensatory day available" : "≈ %1$s Ausgleichstag verfügbar",
+	"≈ %1$s compensatory days available" : "≈ %1$s Ausgleichstage verfügbar",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — auf Basis eines Saldos von %2$s Std. ÷ %3$s Std. pro geplantem Tag.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Nicht genehmigt — offene, abgelehnte oder stornierte Abwesenheiten wirken nie auf den Saldo.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "Diese Art zählt als produktive oder neutrale Zeit (z. B. Dienstreisen, Homeoffice) und schreibt keine Stunden gut.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Würde Stunden gutschreiben, dieser Effekt ist aber in den Organisationseinstellungen deaktiviert.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "An diesen Tagen ist keine Arbeitszeit geplant (z. B. Wochenende oder Feiertag).",
+	"Already covered — the tracked working time reaches the planned hours." : "Bereits abgedeckt — die erfasste Arbeitszeit erreicht die geplanten Stunden.",
+	"Overlaps another absence that credited these days." : "Überschneidet eine andere Abwesenheit, die diese Tage gutgeschrieben hat.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Geben Sie ein gültiges Start- und Enddatum an (JJJJ-MM-TT).",
+	"The selected range is too long." : "Der gewählte Zeitraum ist zu lang.",
+	"Unknown period." : "Unbekannter Zeitraum."
+	}
 );
 }});})();

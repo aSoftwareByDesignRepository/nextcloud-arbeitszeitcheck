@@ -7,6 +7,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
 use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
+use OCA\ArbeitszeitCheck\Repair\HealCorruptDailyHours;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
@@ -36,6 +37,7 @@ class UpgradeRepairIntegrationTest extends TestCase
 			ReleaseStuckPendingAbsences::class,
 			RepairOrphanedPausedEntries::class,
 			CleanDanglingTariffRuleSetRefs::class,
+			HealCorruptDailyHours::class,
 			UninstallDropTables::class,
 			BackupBeforeUpdate::class,
 		] as $class) {
@@ -163,6 +165,17 @@ class UpgradeRepairIntegrationTest extends TestCase
 	{
 		/** @var CleanDanglingTariffRuleSetRefs $step */
 		$step = \OCP\Server::get(CleanDanglingTariffRuleSetRefs::class);
+		$output = $this->createMock(IOutput::class);
+		$output->method('info');
+
+		$step->run($output);
+		$this->addToAssertionCount(1);
+	}
+
+	public function testHealCorruptDailyHoursRunsWithoutFatal(): void
+	{
+		/** @var HealCorruptDailyHours $step */
+		$step = \OCP\Server::get(HealCorruptDailyHours::class);
 		$output = $this->createMock(IOutput::class);
 		$output->method('info');
 

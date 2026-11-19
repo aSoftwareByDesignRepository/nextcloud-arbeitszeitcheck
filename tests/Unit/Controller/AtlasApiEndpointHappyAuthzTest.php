@@ -38,6 +38,7 @@ use OCA\ArbeitszeitCheck\Controller\ManagerController;
 use OCA\ArbeitszeitCheck\Controller\MobileBootstrapController;
 use OCA\ArbeitszeitCheck\Controller\MonthClosureController;
 use OCA\ArbeitszeitCheck\Controller\OutlookIcalSubscriptionController;
+use OCA\ArbeitszeitCheck\Controller\OvertimeBreakdownController;
 use OCA\ArbeitszeitCheck\Controller\OvertimePayoutController;
 use OCA\ArbeitszeitCheck\Controller\PageController;
 use OCA\ArbeitszeitCheck\Controller\ReportController;
@@ -107,6 +108,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		GdprController::class,
 		HealthController::class,
 		MonthClosureController::class,
+		OvertimeBreakdownController::class,
 	];
 
 	/**
@@ -216,6 +218,10 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			// mutations are AppAdminMiddleware-gated — proven by integration tests.)
 			'migrateVacationUnit',
 		],
+		OvertimeBreakdownController::class => [
+			// canOverseeUser gate → uniform-404 deny for non-overseeable targets.
+			'breakdown',
+		],
 	];
 
 	/** @var array<string, object> */
@@ -324,6 +330,13 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'OCA\ArbeitszeitCheck\Service\Kiosk\KioskActionService::performAction' => ['ok' => true],
 			'OCA\ArbeitszeitCheck\Service\OvertimeService::getDailyOvertime' => ['overtime_hours' => 0.0],
 			'OCA\ArbeitszeitCheck\Service\OvertimeService::calculateOvertime' => ['overtime_hours' => 0.0, 'total_hours_worked' => 8.0],
+			'OCA\ArbeitszeitCheck\Service\OvertimeService::workedHoursByDayRange' => [0.0, []],
+			'OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::creditBreakdownForRange' => [
+				'credit_hours' => 0.0, 'days_credited' => 0,
+				'reduced_hours' => 0.0, 'days_reduced' => 0,
+				'credited' => [], 'reduced' => [], 'not_counted' => [],
+			],
+			'OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::resolveEffectiveYearStart' => new \DateTime('2026-01-01'),
 			'OCA\ArbeitszeitCheck\Service\ComplianceService::getComplianceStatus' => ['compliant' => true, 'score' => 100, 'warning_violations' => []],
 			'OCA\ArbeitszeitCheck\Service\TimeTrackingService::getStatus' => ['status' => 'clocked_out'],
 		];

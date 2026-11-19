@@ -80,6 +80,7 @@ return [
 		['name' => 'time_entry#getOvertime', 'url' => '/api/time-entries/overtime', 'verb' => 'GET'],
 		['name' => 'time_entry#getOvertimeBalance', 'url' => '/api/time-entries/overtime/balance', 'verb' => 'GET'],
 		['name' => 'time_entry#getOvertimeBank', 'url' => '/api/time-entries/overtime/bank', 'verb' => 'GET'],
+		['name' => 'overtime_breakdown#breakdown', 'url' => '/api/overtime/breakdown', 'verb' => 'GET'],
 
 		// API routes for time entries
 		['name' => 'time_entry#apiAssignableProjectcheckProjects', 'url' => '/api/projectcheck/assignable-projects', 'verb' => 'GET'],

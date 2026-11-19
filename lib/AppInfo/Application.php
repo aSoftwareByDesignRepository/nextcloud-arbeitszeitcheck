@@ -21,6 +21,7 @@ use OCA\ArbeitszeitCheck\Capabilities;
 use OCA\ArbeitszeitCheck\Repair\BackfillAbsenceDays;
 use OCA\ArbeitszeitCheck\Repair\SealAbsenceDayFractions;
 use OCA\ArbeitszeitCheck\Repair\EnsureArbeitszeitCheckSchema;
+use OCA\ArbeitszeitCheck\Repair\HealCorruptDailyHours;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteFreshState;
 use OCA\ArbeitszeitCheck\Repair\InitializeWorkforceSuiteUpgradeState;
 use OCA\ArbeitszeitCheck\Repair\ReleaseStuckPendingAbsences;
@@ -717,6 +718,13 @@ class Application extends App implements IBootstrap {
 
 		$context->registerService(CleanDanglingTariffRuleSetRefs::class, function ($c): CleanDanglingTariffRuleSetRefs {
 			return new CleanDanglingTariffRuleSetRefs(
+				$c->query(IDBConnection::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			);
+		});
+
+		$context->registerService(HealCorruptDailyHours::class, function ($c): HealCorruptDailyHours {
+			return new HealCorruptDailyHours(
 				$c->query(IDBConnection::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 			);

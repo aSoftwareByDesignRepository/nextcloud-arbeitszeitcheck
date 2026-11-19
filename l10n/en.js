@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 setting",
 	"%n settings" : "%n settings",
 	"1 row" : "1 row",
-	"%n rows" : "%n rows"
-	},
-	"nplurals=2; plural=(n != 1);"
+	"%n rows" : "%n rows",
+	"Absence credit breakdown" : "Absence credit breakdown",
+	"Retry" : "Retry",
+	"The breakdown could not be loaded." : "The breakdown could not be loaded.",
+	"No absences in this period." : "No absences in this period.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Period %1$s to %2$s — %3$s h credited in total.",
+	"Counted towards the balance" : "Counted towards the balance",
+	"Reduced required hours" : "Reduced required hours",
+	"Not counted" : "Not counted",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h",
+	"One day overlapped another absence and is not listed" : "One day overlapped another absence and is not listed",
+	"%1$s days overlapped another absence and are not listed" : "%1$s days overlapped another absence and are not listed",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "One day had no planned working time (e.g. weekend or public holiday)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s days had no planned working time (e.g. weekend or public holiday)",
+	"≈ %1$s compensatory day available" : "≈ %1$s compensatory day available",
+	"≈ %1$s compensatory days available" : "≈ %1$s compensatory days available",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — based on a balance of %2$s h ÷ %3$s h per planned day.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Not approved — pending, declined or cancelled absences never affect the balance.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Would credit hours, but this effect is disabled in the organization settings.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "No working time is planned on these days (e.g. weekend or public holiday).",
+	"Already covered — the tracked working time reaches the planned hours." : "Already covered — the tracked working time reaches the planned hours.",
+	"Overlaps another absence that credited these days." : "Overlaps another absence that credited these days.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Provide a valid start and end date (YYYY-MM-DD).",
+	"The selected range is too long." : "The selected range is too long.",
+	"Unknown period." : "Unknown period."
+	}
 );
 }});})();

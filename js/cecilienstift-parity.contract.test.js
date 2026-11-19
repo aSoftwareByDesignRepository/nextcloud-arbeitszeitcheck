@@ -64,6 +64,10 @@ describe('compensatory-day estimate + deep-link', () => {
 		expect(dashboardTpl).toContain('azc-dashboard-metric--balance')
 		expect(dashboardTpl).toContain('compDaysEstimate')
 		expect(dashboardTpl).toContain('dashboard-overtime-comp-request')
+		// t() silently drops the count (L10NString defaults count=1): the
+		// tile must call n() or it prints "≈ 1" for every balance — this is
+		// the exact call shape, not just feature presence.
+		expect(dashboardTpl).toContain("$l->n('≈ %n compensatory day available'")
 	})
 
 	it('controller gates the CTA on overtime_comp creatability', () => {

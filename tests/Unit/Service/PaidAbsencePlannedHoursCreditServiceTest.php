@@ -835,4 +835,41 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 		$this->assertSame(0.0, $reduction['hours']);
 		$this->assertSame(0, $reduction['days_reduced']);
 	}
+
+	/**
+	 * daily_hours > 24 is physically impossible: the column had no upper
+	 * bound until now, and a stale 78 must not credit 78 h per absence day
+	 * into the flextime balance. The day Soll derives from the weekly
+	 * contract — the same basis the required-hours formula uses.
+	 */
+	public function testCorruptDailyHoursDerivesDaySollFromWeekly(): void
+	{
+		$this->flags('0', '1'); // leave effects on: vacation credits
+		$this->rotation->method('isEnabledForOrg')->willReturn(false);
+
+		$userModel = new UserWorkingTimeModel();
+		$userModel->setWorkingTimeModelId(9);
+		$this->userModelMapper->method('findByUserAndDate')->willReturn($userModel);
+		$this->userModelMapper->method('findCurrentByUser')->willReturn($userModel);
+
+		$model = new WorkingTimeModel();
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setDailyHours(78.0);
+		$model->setWeeklyHours(39.0);
+		$this->modelMapper->method('find')->with(9)->willReturn($model);
+		$this->holidayService->method('computeWorkingDaysForUser')->willReturn(1.0);
+
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([
+			$this->approvedAbsence(Absence::TYPE_VACATION, '2026-09-09', '2026-09-09', 1.0),
+		]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(7.8, $result['hours'], 0.001);
+		$this->assertSame(1, $result['days_credited']);
+	}
 }

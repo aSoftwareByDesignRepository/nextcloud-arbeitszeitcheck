@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 項設定",
 	"%n settings" : "%n 項設定",
 	"1 row" : "1 列",
-	"%n rows" : "%n 列"
-	},
-	"nplurals=1; plural=0;"
+	"%n rows" : "%n 列",
+	"Absence credit breakdown" : "缺勤計入明細",
+	"Retry" : "重試",
+	"The breakdown could not be loaded." : "無法載入明細。",
+	"No absences in this period." : "此期間沒有缺勤。",
+	"Period %1$s to %2$s — %3$s h credited in total." : "%1$s 至 %2$s 期間——共計入 %3$s 小時。",
+	"Counted towards the balance" : "計入餘額",
+	"Reduced required hours" : "目標工時減少",
+	"Not counted" : "未計入",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s——計畫 %2$s 小時，缺勤 %3$s 小時，已工作 %4$s 小時，計入 %5$s 小時",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s——計畫 %2$s 小時，缺勤 %3$s 小時，目標減少 %4$s 小時",
+	"One day overlapped another absence and is not listed" : "一天與其他缺勤重疊，未列出",
+	"%1$s days overlapped another absence and are not listed" : "%1$s 天與其他缺勤重疊，未列出",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "一天沒有計畫的工作時間（如週末或公眾假期）",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s 天沒有計畫的工作時間（如週末或公眾假期）",
+	"≈ %1$s compensatory day available" : "≈ 可用 %1$s 個補休日",
+	"≈ %1$s compensatory days available" : "≈ 可用 %1$s 個補休日",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s——基於餘額 %2$s 小時 ÷ 每計畫日 %3$s 小時。",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "未核准——待審批、已拒絕或已取消的缺勤永遠不會影響餘額。",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "該類型計為生產性或中性時間（如出差、居家辦公），不計入小時數。",
+	"Would credit hours, but this effect is disabled in the organization settings." : "本應計入小時數，但此效果已在組織設定中停用。",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "這些日子沒有計畫的工作時間（如週末或公眾假期）。",
+	"Already covered — the tracked working time reaches the planned hours." : "已涵蓋——已記錄的工作時間達到計畫小時數。",
+	"Overlaps another absence that credited these days." : "與其他已計入這些日子的缺勤重疊。",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "請提供有效的開始與結束日期（YYYY-MM-DD）。",
+	"The selected range is too long." : "所選時間範圍過長。",
+	"Unknown period." : "未知期間。"
+	}
 );
 }});})();

@@ -390,7 +390,7 @@ class PageController extends Controller
 			'dashboard-overtime-bank',
 			'dashboard-overtime',
 			'common/projectcheck',
-		], ['external-stamps']);
+		], ['external-stamps', 'common/overtime-credit-breakdown']);
 		if ($this->workLocationCatalogEnabled()) {
 			Util::addScript('arbeitszeitcheck', 'common/work-location-catalog');
 		}

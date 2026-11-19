@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 configuração",
 	"%n settings" : "%n configurações",
 	"1 row" : "1 linha",
-	"%n rows" : "%n linhas"
-	},
-	"nplurals=2; plural=(n > 1);"
+	"%n rows" : "%n linhas",
+	"Absence credit breakdown" : "Detalhe do crédito por ausências",
+	"Retry" : "Tentar novamente",
+	"The breakdown could not be loaded." : "Não foi possível carregar o detalhe.",
+	"No absences in this period." : "Sem ausências neste período.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Período de %1$s a %2$s — %3$s h creditadas no total.",
+	"Counted towards the balance" : "Contabilizado no saldo",
+	"Reduced required hours" : "Horas previstas reduzidas",
+	"Not counted" : "Não contabilizado",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — planejado %2$s h, ausente %3$s h, trabalhado %4$s h, creditado %5$s h",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — planejado %2$s h, ausente %3$s h, objetivo reduzido em %4$s h",
+	"One day overlapped another absence and is not listed" : "Um dia sobrepõe-se a outra ausência e não está listado",
+	"%1$s days overlapped another absence and are not listed" : "%1$s dias sobrepõem-se a outra ausência e não estão listados",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "Um dia não tinha tempo de trabalho planejado (p. ex., fim de semana ou feriado)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s dias não tinham tempo de trabalho planejado (p. ex., fim de semana ou feriados)",
+	"≈ %1$s compensatory day available" : "≈ %1$s dia compensatório disponível",
+	"≈ %1$s compensatory days available" : "≈ %1$s dias compensatórios disponíveis",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — com base em um saldo de %2$s h ÷ %3$s h por dia planejado.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Não aprovado — ausências pendentes, recusadas ou canceladas nunca afetam o saldo.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "Este tipo conta como tempo produtivo ou neutro (p. ex., viagens de negócios, home office) e não credita horas.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Creditaria horas, mas este efeito está desativado nas configurações da organização.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "Não há tempo de trabalho planejado nestes dias (p. ex., fim de semana ou feriado).",
+	"Already covered — the tracked working time reaches the planned hours." : "Já coberto — o tempo de trabalho registrado atinge as horas planejadas.",
+	"Overlaps another absence that credited these days." : "Sobrepõe-se a outra ausência que creditou estes dias.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Indique uma data de início e de fim válidas (AAAA-MM-DD).",
+	"The selected range is too long." : "O período selecionado é muito longo.",
+	"Unknown period." : "Período desconhecido."
+	}
 );
 }});})();

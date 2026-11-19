@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 ustawienie",
 	"%n settings" : "%n ustawienia",
 	"1 row" : "1 wiersz",
-	"%n rows" : "%n wiersze"
-	},
-	"nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
+	"%n rows" : "%n wiersze",
+	"Absence credit breakdown" : "Rozbicie naliczenia nieobecności",
+	"Retry" : "Spróbuj ponownie",
+	"The breakdown could not be loaded." : "Nie udało się wczytać zestawienia.",
+	"No absences in this period." : "Brak nieobecności w tym okresie.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Okres od %1$s do %2$s — łącznie naliczono %3$s godz.",
+	"Counted towards the balance" : "Wliczone do salda",
+	"Reduced required hours" : "Zmniejszony wymiar godzin",
+	"Not counted" : "Nieuwzględnione",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — planowane %2$s godz., nieobecność %3$s godz., przepracowane %4$s godz., naliczone %5$s godz.",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — planowane %2$s godz., nieobecność %3$s godz., wymiar zmniejszony o %4$s godz.",
+	"One day overlapped another absence and is not listed" : "Jeden dzień nakłada się na inną nieobecność i nie jest wymieniony",
+	"%1$s days overlapped another absence and are not listed" : "%1$s dni nakłada się na inną nieobecność i nie jest wymienionych",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "Jeden dzień nie miał zaplanowanego czasu pracy (np. weekend lub święto)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s dni nie miało zaplanowanego czasu pracy (np. weekend lub święta)",
+	"≈ %1$s compensatory day available" : "≈ %1$s dzień wolny za nadgodziny dostępny",
+	"≈ %1$s compensatory days available" : "≈ %1$s dni wolne za nadgodziny dostępne",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — na podstawie salda %2$s godz. ÷ %3$s godz. na planowany dzień.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Niezatwierdzone — oczekujące, odrzucone lub anulowane nieobecności nigdy nie wpływają na saldo.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "Ten typ liczy się jako czas produktywny lub neutralny (np. podróże służbowe, praca zdalna) i nie nalicza godzin.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Naliczałoby godziny, ale ten efekt jest wyłączony w ustawieniach organizacji.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "W te dni nie ma zaplanowanego czasu pracy (np. weekend lub święto).",
+	"Already covered — the tracked working time reaches the planned hours." : "Już pokryte — zarejestrowany czas pracy osiąga planowane godziny.",
+	"Overlaps another absence that credited these days." : "Nakłada się na inną nieobecność, która naliczyła te dni.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Podaj prawidłową datę początkową i końcową (RRRR-MM-DD).",
+	"The selected range is too long." : "Wybrany zakres jest zbyt długi.",
+	"Unknown period." : "Nieznany okres."
+	}
 );
 }});})();

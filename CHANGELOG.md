@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 1.12.1 - 2026-11-19
+
+### Fixed
+
+- **compensatory-day estimate printing "≈ 1 Abbummeltag" for large
+  balances** (CECILIENSTIFT report): two chained defects. A corrupt
+  `daily_hours` on the working time model (78 instead of 7.8 — the
+  column had no upper bound) was used as the day divisor, and the
+  dashboard tile passed the count through `t()` instead of `n()` so it
+  rendered "1" for any balance. The estimate now derives the day value
+  from the weekly contract when the stored daily is outside the
+  physically possible (0, 24] range, fails closed (hides the affordance)
+  when no usable basis exists, and the tile prints the real count.
+  Rotation contracts resolve the divisor from the roster's average
+  scheduled day net, matching every other Soll consumer.
+- **working time model validation**: `daily_hours` above 24 h is now
+  rejected on write — a calendar day cannot hold more than 24 hours.
+- **absence-credit day Soll**: the same ≤ 24 bound and weekly/5
+  derivation now guard `resolveContractForDate()`, so a corrupt daily
+  can no longer inflate credited absence hours either.
+
+### Added
+
+- **absence-credit drill-down** (`GET /api/overtime/breakdown`): a
+  "Wie wird das berechnet?" affordance on the dashboard overtime card
+  opens a per-absence breakdown — credited days (planned / absent /
+  worked / credited per day), Soll reductions, and not-counted absences
+  with machine reason codes — so "where does this number come from" is
+  self-service instead of a support mail. Same bottom sheet on the
+  mobile companion.
+- **automatic data repair**: post-migration repair step
+  `HealCorruptDailyHours` heals stored `daily_hours` above 24 h (or ≤ 0
+  on non-on-demand models) to `weekly_hours / 5` — schema default 8.0
+  when underivable — on every `occ upgrade`, with a per-model audit log
+  entry (`daily_hours_healed`) and an upgrade-transcript line per healed
+  model.
+
 ## 1.12.0 - 2026-11-18
 
 ### Added

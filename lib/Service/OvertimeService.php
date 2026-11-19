@@ -135,23 +135,7 @@ class OvertimeService
 			];
 		}
 
-		$timeEntries = $this->timeEntryMapper->findByUserAndDateRange($userId, $periodStart, $endDate);
-
-		$totalHoursWorked = 0.0;
-		/** @var array<string, float> $workedByDay */
-		$workedByDay = [];
-		foreach ($timeEntries as $entry) {
-			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && $entry->getEndTime() !== null) {
-				// Overtime is tariff-facing: paid basis = net + paid-break snapshot.
-				$hours = (float)($entry->getPaidDurationHours() ?? 0.0);
-				$totalHoursWorked += $hours;
-				$start = $entry->getStartTime();
-				if ($start !== null) {
-					$key = $start->format('Y-m-d');
-					$workedByDay[$key] = ($workedByDay[$key] ?? 0.0) + $hours;
-				}
-			}
-		}
+		[$totalHoursWorked, $workedByDay] = $this->workedHoursByDayRange($userId, $periodStart, $endDate);
 
 		$absenceCreditHours = 0.0;
 		if ($this->paidAbsenceCreditService !== null) {
@@ -282,6 +266,47 @@ class OvertimeService
 		$endDate->setTime(23, 59, 59);
 
 		return $this->calculateOvertime($userId, $startDate, $endDate);
+	}
+
+	/**
+	 * Completed paid work hours for a range, bucketed by calendar day.
+	 *
+	 * Single source of truth for the `workedHoursByDate` input the paid
+	 * absence credit consumes ({@see PaidAbsencePlannedHoursCreditService}) —
+	 * {@see calculateOvertime()} and the overtime-breakdown endpoint both go
+	 * through here so the breakdown explains the exact aggregate.
+	 *
+	 * @return array{0: float, 1: array<string, float>}
+	 *   [total paid hours in range (incl. unbucketed rows), Y-m-d => paid hours]
+	 */
+	public function workedHoursByDayRange(string $userId, \DateTime $periodStart, \DateTime $endDate): array
+	{
+		// Normalize to day bounds: callers pass "the period covers these
+		// days", but the mapper query is an inclusive datetime range — a
+		// 00:00:00 end would silently drop the last day's entries.
+		$from = clone $periodStart;
+		$from->setTime(0, 0, 0);
+		$to = clone $endDate;
+		$to->setTime(23, 59, 59);
+		$timeEntries = $this->timeEntryMapper->findByUserAndDateRange($userId, $from, $to);
+
+		$totalHoursWorked = 0.0;
+		/** @var array<string, float> $workedByDay */
+		$workedByDay = [];
+		foreach ($timeEntries as $entry) {
+			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED && $entry->getEndTime() !== null) {
+				// Overtime is tariff-facing: paid basis = net + paid-break snapshot.
+				$hours = (float)($entry->getPaidDurationHours() ?? 0.0);
+				$totalHoursWorked += $hours;
+				$start = $entry->getStartTime();
+				if ($start !== null) {
+					$key = $start->format('Y-m-d');
+					$workedByDay[$key] = ($workedByDay[$key] ?? 0.0) + $hours;
+				}
+			}
+		}
+
+		return [$totalHoursWorked, $workedByDay];
 	}
 
 	/**
@@ -459,11 +484,72 @@ class OvertimeService
 	 */
 	public function getAverageDailyPlannedHours(string $userId): array
 	{
+		// Rotation (G2): the contract model is only the fallback Soll — the
+		// roster is the authority. The comp-day divisor must be the roster's
+		// average *scheduled* day net, the same quantity an overtime_comp
+		// day actually debits. Every other Soll consumer consults DutyCheck
+		// first; the estimate must too.
+		if ($this->dutyRotationSollProvider !== null && $this->dutyRotationSollProvider->isEnabledForOrg()) {
+			$rotation = $this->rotationAverageDailyPlannedHours($userId);
+			if ($rotation !== null) {
+				return $rotation;
+			}
+		}
+
 		[$dailyHours, $weeklyHours, $schedule, $basis] = $this->resolveContractHours($userId);
+		// daily_hours is only loosely trusted elsewhere: required-hours math
+		// derives Soll from weekly/5 and the vacation debit clamps the
+		// column to ≤ 24 h. A value outside (0, 24] is corrupt — derive the
+		// day value from the weekly contract instead of letting it poison
+		// the estimate.
+		if (!is_finite($dailyHours) || $dailyHours <= 0.0 || $dailyHours > 24.0) {
+			$dailyHours = $weeklyHours > 0.0 ? $weeklyHours / 5.0 : 0.0;
+		}
 		$daily = $dailyHours > 0.0
 			? $dailyHours
 			: ($weeklyHours > 0.0 ? round($weeklyHours / 5, 2) : 0.0);
 		return ['daily_hours' => round($daily, 2), 'basis' => $basis];
+	}
+
+	/**
+	 * Average planned net per *scheduled* roster day for rotation users —
+	 * the same value an overtime_comp day debits. Samples the current ISO
+	 * week (the anchor {@see DutyRotationSollProvider::getWeekTargetBasis}
+	 * uses). A null day — roster miss, sealed month, facade down, or
+	 * rotation not enabled for this user — falls back to the contract
+	 * path, matching requiredHoursForDateRange's all-or-null semantics.
+	 * A week with no scheduled days also falls back: zero tells the
+	 * estimate nothing about day value.
+	 *
+	 * @return array{daily_hours: float, basis: string}|null
+	 */
+	private function rotationAverageDailyPlannedHours(string $userId): ?array
+	{
+		$monday = new \DateTime('monday this week');
+		$sum = 0.0;
+		$scheduledDays = 0;
+		for ($i = 0; $i < 7; $i++) {
+			$net = $this->dutyRotationSollProvider->dayNetHoursForUser(
+				$userId,
+				(clone $monday)->modify("+{$i} days")
+			);
+			if ($net === null) {
+				return null;
+			}
+			if ($net > 0.0001) {
+				$sum += $net;
+				$scheduledDays++;
+			}
+		}
+		if ($scheduledDays === 0) {
+			return null;
+		}
+
+		return [
+			'daily_hours' => round($sum / $scheduledDays, 2),
+			'basis' => $this->dutyRotationSollProvider->getWeekTargetBasis($userId, $monday)
+				?? 'rotation_pattern',
+		];
 	}
 
 	/**

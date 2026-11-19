@@ -42,7 +42,11 @@ class CompDaysEstimateService
 			$planned = $this->overtimeService->getAverageDailyPlannedHours($userId);
 			$daily = (float)($planned['daily_hours'] ?? 0.0);
 			$basis = (string)($planned['basis'] ?? '');
-			if ($basis === 'on_demand' || $daily <= 0.0) {
+			// Fail closed on a physically impossible divisor: a resolved
+			// daily above 24 h is corrupt contract data, never a schedule —
+			// dividing a real balance by it printed "≈ 1 day" for a user
+			// whose balance covered ~17 days (daily_hours column held 78).
+			if ($basis === 'on_demand' || !is_finite($daily) || $daily <= 0.0 || $daily > 24.0) {
 				return null;
 			}
 

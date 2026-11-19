@@ -683,6 +683,76 @@
 				}
 			],
 			"mobile": []
+		},
+		{
+			"id": "overtime-breakdown-drilldown",
+			"param": "userId (optional scope) — period/start/end (optional range)",
+			"description": "GET /api/overtime/breakdown: per-absence overtime-credit drill-down. Same endpoint feeds the web dashboard dialog and the companion breakdown sheet; optional userId is honored only inside the actor's oversight scope (uniform 404 otherwise).",
+			"errorCodes": [
+				"NOT_FOUND",
+				"invalid_period",
+				"invalid_dates"
+			],
+			"server": [
+				{
+					"file": "appinfo/routes.php",
+					"needles": [
+						"overtime_breakdown#breakdown",
+						"/api/overtime/breakdown"
+					]
+				},
+				{
+					"file": "lib/Controller/OvertimeBreakdownController.php",
+					"needles": [
+						"canOverseeUser",
+						"creditBreakdownForRange",
+						"workedHoursByDayRange",
+						"'success' => true"
+					]
+				}
+			],
+			"web": [
+				{
+					"file": "templates/dashboard.php",
+					"needles": [
+						"data-overtime-breakdown",
+						"data-breakdown-url",
+						"overtime_breakdown.breakdown"
+					]
+				},
+				{
+					"file": "js/common/overtime-credit-breakdown.js",
+					"needles": [
+						"data-breakdown-url",
+						"comp_estimate",
+						"not_counted"
+					]
+				}
+			],
+			"mobile": [
+				{
+					"file": "src/api/client.ts",
+					"needles": [
+						"fetchOvertimeBreakdown",
+						"/api/overtime/breakdown"
+					]
+				},
+				{
+					"file": "src/ui/OvertimeBreakdownSheet.tsx",
+					"needles": [
+						"comp_estimate",
+						"not_counted",
+						"credited"
+					]
+				},
+				{
+					"file": "src/screens/DashboardScreen.tsx",
+					"needles": [
+						"OvertimeBreakdownSheet",
+						"home.overtimeBreakdownTrigger"
+					]
+				}
+			]
 		}
 	]
 }

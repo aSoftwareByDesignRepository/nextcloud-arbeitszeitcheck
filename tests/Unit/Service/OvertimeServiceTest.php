@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
+use OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService;
@@ -1059,5 +1060,147 @@ class OvertimeServiceTest extends TestCase
 
 		$this->assertSame(40.0, $result['absence_credit_hours']);
 		$this->assertSame(0.0, $result['overtime_hours']);
+	}
+
+	private function buildAssignedModel(
+		string $userId,
+		int $modelId,
+		float $dailyHours,
+		float $weeklyHours,
+		?array $schedulePreset = null,
+	): void {
+		$userModel = new UserWorkingTimeModel();
+		$userModel->setUserId($userId);
+		$userModel->setWorkingTimeModelId($modelId);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
+			->with($userId)->willReturn($userModel);
+
+		$model = new WorkingTimeModel();
+		$model->setName('Contract');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setDailyHours($dailyHours);
+		$model->setWeeklyHours($weeklyHours);
+		if ($schedulePreset !== null) {
+			$model->setBreakRulesArray(
+				\OCA\ArbeitszeitCheck\Support\WeekdaySchedule::mergeIntoBreakRules(null, $schedulePreset)
+			);
+		}
+		$this->workingTimeModelMapper->method('find')->with($modelId)->willReturn($model);
+	}
+
+	private function serviceWithRotation(DutyRotationSollProvider $rotation): OvertimeService
+	{
+		return new OvertimeService(
+			$this->timeEntryMapper,
+			$this->workingTimeModelMapper,
+			$this->userWorkingTimeModelMapper,
+			$this->l10n,
+			$this->holidayCalendarService,
+			$this->overtimeSettingsService,
+			$rotation,
+		);
+	}
+
+	/**
+	 * daily_hours is a write-mostly column: required-hours math never uses
+	 * it (weekly/5 is the Soll basis) and the vacation debit clamps it to
+	 * ≤ 24 h. A stale 78 must not reach the comp-day estimate divisor —
+	 * that is what printed "≈ 1 day" under a +133 h balance.
+	 */
+	public function testAverageDailyPlannedHoursFallsBackToWeeklyWhenDailyCorrupt(): void
+	{
+		$this->buildAssignedModel('u1', 3, 78.0, 39.0);
+
+		$planned = $this->service->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(7.8, $planned['daily_hours'], 0.001);
+	}
+
+	public function testAverageDailyPlannedHoursKeepsValidDaily(): void
+	{
+		$this->buildAssignedModel('u1', 3, 6.5, 32.5);
+
+		$planned = $this->service->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(6.5, $planned['daily_hours'], 0.001);
+	}
+
+	public function testAverageDailyPlannedHoursFallsBackToWeeklyWhenDailyNonPositive(): void
+	{
+		// Legacy row with a stored 0 contract (pre-MH-02 writes): weekly
+		// still carries the real Soll — derive from it instead of 0.
+		$this->buildAssignedModel('u1', 3, 0.0, 39.0);
+
+		$planned = $this->service->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(7.8, $planned['daily_hours'], 0.001);
+	}
+
+	public function testAverageDailyPlannedHoursUsesRotationDayNets(): void
+	{
+		$rotation = $this->createMock(DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willReturnCallback(
+			static fn (string $u, \DateTimeInterface $d): ?float =>
+				((int)$d->format('N') <= 5) ? 8.5 : 0.0
+		);
+		$rotation->method('getWeekTargetBasis')->willReturn('rotation_pattern');
+
+		// The roster is the authority for rotation users — the contract
+		// resolver must not even run for them.
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('findCurrentByUser');
+
+		$planned = $this->serviceWithRotation($rotation)->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(8.5, $planned['daily_hours'], 0.001);
+		$this->assertSame('rotation_pattern', $planned['basis']);
+	}
+
+	public function testAverageDailyPlannedHoursRotationAveragesOnlyScheduledDays(): void
+	{
+		// A 3-shift week (3 × 12.5 h) must divide by 12.5, not by a
+		// calendar-week average (39/7) and not by the contract placeholder.
+		$rotation = $this->createMock(DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willReturnCallback(
+			static fn (string $u, \DateTimeInterface $d): ?float =>
+				((int)$d->format('N') <= 3) ? 12.5 : 0.0
+		);
+		$rotation->method('getWeekTargetBasis')->willReturn('published_roster');
+
+		$planned = $this->serviceWithRotation($rotation)->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(12.5, $planned['daily_hours'], 0.001);
+		$this->assertSame('published_roster', $planned['basis']);
+	}
+
+	public function testAverageDailyPlannedHoursFallsBackToContractOnRotationMiss(): void
+	{
+		// Roster miss (sealed month / facade down / user not on rotation):
+		// the contract path stays the fallback, same as required-hours math.
+		$rotation = $this->createMock(DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willReturn(null);
+
+		$this->buildAssignedModel('u1', 3, 7.8, 39.0);
+
+		$planned = $this->serviceWithRotation($rotation)->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(7.8, $planned['daily_hours'], 0.001);
+	}
+
+	public function testAverageDailyPlannedHoursFallsBackToContractWhenWeekAllFree(): void
+	{
+		// Roster resolves but schedules nothing this week — 0 h tells the
+		// estimate nothing about day value, so the contract answers.
+		$rotation = $this->createMock(DutyRotationSollProvider::class);
+		$rotation->method('isEnabledForOrg')->willReturn(true);
+		$rotation->method('dayNetHoursForUser')->willReturn(0.0);
+
+		$this->buildAssignedModel('u1', 3, 7.8, 39.0);
+
+		$planned = $this->serviceWithRotation($rotation)->getAverageDailyPlannedHours('u1');
+
+		$this->assertEqualsWithDelta(7.8, $planned['daily_hours'], 0.001);
 	}
 }

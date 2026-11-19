@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 项设置",
 	"%n settings" : "%n 项设置",
 	"1 row" : "1 行",
-	"%n rows" : "%n 行"
-	},
-	"nplurals=1; plural=0;"
+	"%n rows" : "%n 行",
+	"Absence credit breakdown" : "缺勤计入明细",
+	"Retry" : "重试",
+	"The breakdown could not be loaded." : "无法加载明细。",
+	"No absences in this period." : "该期间没有缺勤。",
+	"Period %1$s to %2$s — %3$s h credited in total." : "%1$s 至 %2$s 期间——共计入 %3$s 小时。",
+	"Counted towards the balance" : "计入余额",
+	"Reduced required hours" : "目标工时减少",
+	"Not counted" : "未计入",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s——计划 %2$s 小时，缺勤 %3$s 小时，已工作 %4$s 小时，计入 %5$s 小时",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s——计划 %2$s 小时，缺勤 %3$s 小时，目标减少 %4$s 小时",
+	"One day overlapped another absence and is not listed" : "一天与其他缺勤重叠，未列出",
+	"%1$s days overlapped another absence and are not listed" : "%1$s 天与其他缺勤重叠，未列出",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "一天没有计划的工作时间（如周末或公共假日）",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s 天没有计划的工作时间（如周末或公共假日）",
+	"≈ %1$s compensatory day available" : "≈ 可用 %1$s 个补休日",
+	"≈ %1$s compensatory days available" : "≈ 可用 %1$s 个补休日",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s——基于余额 %2$s 小时 ÷ 每计划日 %3$s 小时。",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "未批准——待审批、已拒绝或已取消的缺勤永远不会影响余额。",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "该类型计为生产性或中性时间（如出差、居家办公），不计入小时数。",
+	"Would credit hours, but this effect is disabled in the organization settings." : "本应计入小时数，但此效果已在组织设置中禁用。",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "这些日子没有计划的工作时间（如周末或公共假日）。",
+	"Already covered — the tracked working time reaches the planned hours." : "已覆盖——已记录的工作时间达到计划小时数。",
+	"Overlaps another absence that credited these days." : "与其他已计入这些日子的缺勤重叠。",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "请提供有效的开始和结束日期（YYYY-MM-DD）。",
+	"The selected range is too long." : "所选时间范围过长。",
+	"Unknown period." : "未知周期。"
+	}
 );
 }});})();

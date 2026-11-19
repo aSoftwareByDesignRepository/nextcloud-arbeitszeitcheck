@@ -61,6 +61,25 @@ class CompDaysEstimateServiceTest extends TestCase
 		$this->assertNull($this->makeService(0.0, 'degraded', 40.0)->estimate('u1'));
 	}
 
+	public function testImpossibleDailyHoursFailsClosedToNull(): void
+	{
+		// A resolved divisor above 24 h/day is corrupt contract data, never a
+		// real schedule — dividing a true balance by it printed "≈ 1 day" for
+		// a +133 h user (daily_hours column held 78). Fail closed: hide the
+		// affordance instead of lying.
+		$this->assertNull($this->makeService(78.0, 'weekly_contract', 133.0)->estimate('u1'));
+		$this->assertNull($this->makeService(24.01, 'weekday_schedule', 133.0)->estimate('u1'));
+		$this->assertNull($this->makeService(INF, 'weekly_contract', 133.0)->estimate('u1'));
+	}
+
+	public function testUpperBoundaryDailyHoursStillEstimates(): void
+	{
+		// 24 h/day is the physical ceiling, not a corruption marker.
+		$estimate = $this->makeService(24.0, 'weekly_contract', 133.0)->estimate('u1');
+		$this->assertNotNull($estimate);
+		$this->assertSame(5, $estimate['days']);
+	}
+
 	public function testServiceFailureFailsClosedToNull(): void
 	{
 		$overtimeService = $this->createMock(OvertimeService::class);

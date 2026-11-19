@@ -100,12 +100,23 @@ final class HalfDayNonVacationIntegrationTest extends TestCase
 
 	private function weekday(int $daysAhead): string
 	{
+		// A working day, not just a weekday: holidays carry weight 0 for the
+		// counter, so e.g. "+35 days" from mid-November lands on Dec 25 and a
+		// half day there stores 0.0 instead of 0.5. Skip zero-weight days to
+		// keep the picked dates chargeable on every calendar date.
+		$counter = \OCP\Server::get(\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class);
 		$day = new \DateTimeImmutable('tomorrow');
 		$day = $day->modify('+' . $daysAhead . ' days');
-		while ((int)$day->format('N') > 5) {
+		while (true) {
+			while ((int)$day->format('N') > 5) {
+				$day = $day->modify('+1 day');
+			}
+			$weight = $counter->daysForUser($this->uid, new \DateTime($day->format('Y-m-d')), new \DateTime($day->format('Y-m-d')));
+			if ($weight > 0.0) {
+				return $day->format('Y-m-d');
+			}
 			$day = $day->modify('+1 day');
 		}
-		return $day->format('Y-m-d');
 	}
 
 	public function testCreateSickHalfDayPersistsHalfWeight(): void

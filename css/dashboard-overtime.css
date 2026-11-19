@@ -294,3 +294,106 @@
 	font-variant-numeric: tabular-nums;
 	font-weight: 600;
 }
+
+/* ---------------------------------------------------------------------------
+ * Overtime absence-credit breakdown dialog (js/common/overtime-credit-breakdown)
+ * ------------------------------------------------------------------------- */
+
+.azc-credit-breakdown {
+	width: min(44rem, calc(100vw - 2rem));
+	max-width: calc(100vw - 2rem);
+}
+
+.azc-credit-breakdown .modal-body {
+	overflow-y: auto;
+}
+
+.azc-credit-breakdown__status {
+	margin: 0 0 var(--azc-space-3, 0.75rem);
+	font-size: 0.9375rem;
+}
+
+.azc-credit-breakdown__section-title {
+	margin: var(--azc-space-4, 1rem) 0 var(--azc-space-2, 0.5rem);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--color-text-maxcontrast);
+}
+
+.azc-credit-breakdown__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-2, 0.5rem);
+}
+
+.azc-credit-breakdown__item {
+	padding: var(--azc-space-3, 0.75rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--azc-radius-md, var(--border-radius, 8px));
+	background: var(--color-main-background);
+}
+
+.azc-credit-breakdown__item-head {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: var(--azc-space-1, 0.25rem) var(--azc-space-3, 0.75rem);
+	font-weight: 600;
+	font-size: 0.9375rem;
+}
+
+.azc-credit-breakdown__item-label {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.azc-credit-breakdown__item-hours {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.azc-credit-breakdown__days {
+	margin: var(--azc-space-2, 0.5rem) 0 0;
+	padding: 0 0 0 var(--azc-space-4, 1rem);
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	color: var(--color-text-maxcontrast);
+	font-variant-numeric: tabular-nums;
+}
+
+.azc-credit-breakdown__days li {
+	margin: 0;
+	padding: var(--azc-space-1, 0.25rem) 0;
+	list-style: disc;
+}
+
+.azc-credit-breakdown__overlap,
+.azc-credit-breakdown__reason,
+.azc-credit-breakdown__estimate {
+	margin: var(--azc-space-2, 0.5rem) 0 0;
+	font-size: 0.8125rem;
+	line-height: 1.45;
+}
+
+.azc-credit-breakdown__item--muted {
+	opacity: 0.85;
+	border-style: dashed;
+}
+
+.azc-credit-breakdown__estimate {
+	padding-top: var(--azc-space-3, 0.75rem);
+	border-top: 1px solid var(--color-border);
+	margin-top: var(--azc-space-4, 1rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.azc-credit-breakdown__item {
+		transition: border-color 0.15s ease;
+	}
+}

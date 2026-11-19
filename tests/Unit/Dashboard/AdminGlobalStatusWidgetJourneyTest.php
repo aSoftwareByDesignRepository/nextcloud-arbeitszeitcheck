@@ -23,7 +23,13 @@ class AdminGlobalStatusWidgetJourneyTest extends TestCase {
 			static fn (string $s, array $p = []): string => $p === [] ? $s : (string)vsprintf($s, $p)
 		);
 		$l10n->method('n')->willReturnCallback(
-			static fn (string $singular, string $plural, int $count): string => $count === 1 ? $singular : str_replace('%n', (string)$count, $plural)
+			// Mirrors real l10n: pick singular/plural, replace %n with the
+			// count, then run the $parameters array through vsprintf so
+			// placeholders like %1$s resolve ('%n away (%1$s)').
+			static function (string $singular, string $plural, int $count, array $p = []): string {
+				$text = $count === 1 ? $singular : str_replace('%n', (string)$count, $plural);
+				return $p === [] ? $text : (string)vsprintf($text, $p);
+			}
 		);
 
 		$urlGenerator = $this->createMock(IURLGenerator::class);

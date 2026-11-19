@@ -29,7 +29,10 @@ class AdminGlobalStatusWidgetTest extends TestCase {
 			static fn (string $s, array $p = []): string => $p === [] ? $s : (string)vsprintf($s, $p)
 		);
 		$this->l10n->method('n')->willReturnCallback(
-			static fn (string $singular, string $plural, int $count): string => $count === 1 ? $singular : str_replace('%n', (string)$count, $plural)
+			static function (string $singular, string $plural, int $count, array $p = []): string {
+				$text = $count === 1 ? $singular : str_replace('%n', (string)$count, $plural);
+				return $p === [] ? $text : (string)vsprintf($text, $p);
+			}
 		);
 
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);

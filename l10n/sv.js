@@ -6726,8 +6726,33 @@
 	"1 setting" : "1 inställning",
 	"%n settings" : "%n inställningar",
 	"1 row" : "1 rad",
-	"%n rows" : "%n rader"
-	},
-	"nplurals=2; plural=(n != 1);"
+	"%n rows" : "%n rader",
+	"Absence credit breakdown" : "Uppdelning av frånvarokreditering",
+	"Retry" : "Försök igen",
+	"The breakdown could not be loaded." : "Uppdelningen kunde inte laddas.",
+	"No absences in this period." : "Ingen frånvaro under den här perioden.",
+	"Period %1$s to %2$s — %3$s h credited in total." : "Period %1$s till %2$s — totalt %3$s h krediterade.",
+	"Counted towards the balance" : "Räknat in i saldot",
+	"Reduced required hours" : "Reducerade arbetstimmar",
+	"Not counted" : "Ej medräknat",
+	"%1$s — planned %2$s h, absent %3$s h, worked %4$s h, credited %5$s h" : "%1$s — planerat %2$s h, frånvaro %3$s h, arbetat %4$s h, krediterat %5$s h",
+	"%1$s — planned %2$s h, absent %3$s h, target reduced by %4$s h" : "%1$s — planerat %2$s h, frånvaro %3$s h, mål minskat med %4$s h",
+	"One day overlapped another absence and is not listed" : "En dag överlappar en annan frånvaro och visas inte",
+	"%1$s days overlapped another absence and are not listed" : "%1$s dagar överlappar en annan frånvaro och visas inte",
+	"One day had no planned working time (e.g. weekend or public holiday)" : "En dag hade ingen planerad arbetstid (t.ex. helg eller helgdag)",
+	"%1$s days had no planned working time (e.g. weekend or public holiday)" : "%1$s dagar hade ingen planerad arbetstid (t.ex. helg eller helgdagar)",
+	"≈ %1$s compensatory day available" : "≈ %1$s kompensationsdag tillgänglig",
+	"≈ %1$s compensatory days available" : "≈ %1$s kompensationsdagar tillgängliga",
+	"%1$s — based on a balance of %2$s h ÷ %3$s h per planned day." : "%1$s — baserat på ett saldo på %2$s h ÷ %3$s h per planerad dag.",
+	"Not approved — pending, declined or cancelled absences never affect the balance." : "Ej godkänd — väntande, avslagna eller avbrutna frånvaron påverkar aldrig saldot.",
+	"This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours." : "Den här typen räknas som produktiv eller neutral tid (t.ex. tjänsteresor, distansarbete) och krediterar inte timmar.",
+	"Would credit hours, but this effect is disabled in the organization settings." : "Skulle kreditera timmar, men den här effekten är avstängd i organisationsinställningarna.",
+	"No working time is planned on these days (e.g. weekend or public holiday)." : "Ingen arbetstid är planerad dessa dagar (t.ex. helg eller helgdag).",
+	"Already covered — the tracked working time reaches the planned hours." : "Redan täckt — den registrerade arbetstiden når de planerade timmarna.",
+	"Overlaps another absence that credited these days." : "Överlappar en annan frånvaro som krediterade dessa dagar.",
+	"Provide a valid start and end date (YYYY-MM-DD)." : "Ange ett giltigt start- och slutdatum (ÅÅÅÅ-MM-DD).",
+	"The selected range is too long." : "Det valda intervallet är för långt.",
+	"Unknown period." : "Okänd period."
+	}
 );
 }});})();

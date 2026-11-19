@@ -895,6 +895,11 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'parkering', 'passiv', 'pausen', 'pausens', 'pauser', 'pendling', 'perfekt', 'perioder',
 		'personen', 'personens', 'personer', 'personlig', 'personligt', 'personpris', 'persons',
 		'placering', 'positivt', 'posten', 'poster', 'posttyper', 'prioritet', 'privat', 'privatliv',
+		// 2026-11-19: 'produktiv' — genuine Swedish adjective
+		// ('produktiv tid'), identical orthography in da and nb is shared
+		// Scandinavian vocabulary, not bleed (msgid 'This type counts as
+		// productive or neutral time …').
+		'produktiv',
 		'problemet', 'procent', 'produktion', 'profil', 'projekt', 'projektet', 'projektteam',
 		'projektteamet', 'punkt', 'rapport', 'rapporten', 'rapportens', 'rapporter', 'rapportering',
 		'rapportperioden', 'realtid', 'receptions', 'redigering', 'reduktionen', 'reformationsdagen', 'regel',

@@ -233,6 +233,13 @@ class WorkingTimeModel extends Entity
             $errors['weeklyHours'] = 'Weekly hours cannot exceed 80';
         }
 
+        // A calendar day cannot hold more than 24 hours — anything above is
+        // data corruption (weekly/monthly figures typed into the daily
+        // field, stale imports) that poisons every consumer trusting it.
+        if ($this->dailyHours > 24) {
+            $errors['dailyHours'] = 'Daily hours cannot exceed 24';
+        }
+
         if ($this->isPersonal() && $this->isDefault) {
             $errors['isDefault'] = 'A personal working time model cannot be the default model';
         }

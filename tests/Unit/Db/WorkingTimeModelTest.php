@@ -190,6 +190,38 @@ class WorkingTimeModelTest extends TestCase
 		self::assertArrayHasKey('weeklyHours', $errors);
 	}
 
+	/**
+	 * daily_hours had no upper bound while weekly (80) and workdays (7) had
+	 * one — a physically impossible "day" (78 h) passed validation, and the
+	 * comp-day estimate divided a real balance by it ("+133 h → ≈ 1 day").
+	 * A day cannot hold more than 24 h.
+	 */
+	public function testDailyHoursAboveTwentyFourRejected(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Model');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(39.0);
+		$model->setDailyHours(78.0);
+		$model->setWorkDaysPerWeek(5.0);
+
+		$errors = $model->validate();
+		self::assertArrayHasKey('dailyHours', $errors);
+	}
+
+	public function testDailyHoursAtTwentyFourAccepted(): void
+	{
+		$model = new WorkingTimeModel();
+		$model->setName('Model');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(24.0);
+		$model->setWorkDaysPerWeek(5.0);
+
+		$errors = $model->validate();
+		self::assertArrayNotHasKey('dailyHours', $errors);
+	}
+
 	/** Upper bounds keep applying to on_demand too (G-03). */
 	public function testOnDemandStillHonoursUpperBounds(): void
 	{

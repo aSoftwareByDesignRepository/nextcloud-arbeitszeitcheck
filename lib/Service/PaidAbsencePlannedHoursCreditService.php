@@ -188,6 +188,297 @@ class PaidAbsencePlannedHoursCreditService
 	}
 
 	/**
+	 * Explainability breakdown: decomposes the credited/reduced hours into
+	 * per-absence (and per-day) contributions plus the reasons absences did
+	 * NOT count. Totals are computed from the same merged day maps as
+	 * {@see creditHoursForRange()} / {@see sollReductionHoursForRange()} with
+	 * the identical formula and rounding, so `credit_hours` / `reduced_hours`
+	 * / `days_*` reconcile exactly with the dashboard aggregate — the
+	 * breakdown can never disagree with the number the tile shows.
+	 *
+	 * `not_counted` reason codes (stable wire contract for web + companion):
+	 *  - not_approved     — pending/declined/cancelled absences never count
+	 *  - effect_none      — type is worked/neutral by design (business trip,
+	 *                       home office, overtime compensation)
+	 *  - gate_disabled    — type would count but the org policy gate is off
+	 *  - no_planned_hours — creditable, but no planned work time on those
+	 *                       days (weekend, holiday, on-demand contract)
+	 *  - fully_worked     — creditable days, but clocked time already
+	 *                       covered the planned target everywhere
+	 *  - overlap          — another absence won the per-day merge for every
+	 *                       produced day (legacy/imported overlaps)
+	 *
+	 * @param array<string, float> $workedHoursByDate Y-m-d => completed worked hours that day
+	 * @return array{
+	 *   credit_hours: float,
+	 *   days_credited: int,
+	 *   reduced_hours: float,
+	 *   days_reduced: int,
+	 *   credited: list<array{absence_id: int|null, type: string, status: string, start: string, end: string, credit_hours: float, overlap_days: int, unplanned_days: int, days: list<array{date: string, planned: float, absent: float, worked: float, credited: float}>}>,
+	 *   reduced: list<array{absence_id: int|null, type: string, status: string, start: string, end: string, reduced_hours: float, overlap_days: int, unplanned_days: int, days: list<array{date: string, planned: float, absent: float, reduced: float}>}>,
+	 *   not_counted: list<array{absence_id: int|null, type: string, status: string, start: string, end: string, reason: string, overlap_days: int, unplanned_days?: int}>
+	 * }
+	 */
+	public function creditBreakdownForRange(
+		string $userId,
+		\DateTimeInterface $periodStart,
+		\DateTimeInterface $periodEnd,
+		array $workedHoursByDate = [],
+	): array {
+		$result = [
+			'credit_hours' => 0.0,
+			'days_credited' => 0,
+			'reduced_hours' => 0.0,
+			'days_reduced' => 0,
+			'credited' => [],
+			'reduced' => [],
+			'not_counted' => [],
+		];
+		if ($userId === '') {
+			return $result;
+		}
+
+		$rangeStart = $this->asDay($periodStart);
+		$rangeEnd = $this->asDay($periodEnd);
+		if ($rangeEnd < $rangeStart) {
+			return $result;
+		}
+
+		$absences = $this->absenceMapper->findByUserAndDateRange($userId, $rangeStart, $rangeEnd);
+		$leaveEffectsOn = $this->isLeaveEffectsEnabled();
+		/** @var array<string, array<int, array{absence: Absence, produced: array<string, array{0: float, 1: float}>}>> */
+		$candidates = [
+			AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST => [],
+			AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL => [],
+		];
+
+		foreach ($absences as $absence) {
+			if (!$absence instanceof Absence) {
+				continue;
+			}
+			if ($absence->getStatus() !== Absence::STATUS_APPROVED) {
+				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'not_approved');
+				continue;
+			}
+			$effect = AbsenceTypeCatalog::sollEffect($absence->getType());
+			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_NONE) {
+				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'effect_none');
+				continue;
+			}
+			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST && !$this->creditGateAllows($absence->getType())) {
+				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'gate_disabled');
+				continue;
+			}
+			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL && !$leaveEffectsOn) {
+				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'gate_disabled');
+				continue;
+			}
+
+			$dayStart = $this->asDay($absence->getStartDate());
+			$dayEnd = $this->asDay($absence->getEndDate());
+			$dayStart = $dayStart > $rangeStart ? $dayStart : clone $rangeStart;
+			$dayEnd = $dayEnd < $rangeEnd ? $dayEnd : clone $rangeEnd;
+			if ($dayEnd < $dayStart) {
+				continue;
+			}
+			$produced = $this->absenceDayTargets($userId, $absence, $dayStart, $dayEnd);
+			if ($produced === []) {
+				$item = $this->breakdownNotCounted($absence, 'no_planned_hours');
+				$item['unplanned_days'] = $this->daysInSpan($dayStart, $dayEnd);
+				$result['not_counted'][] = $item;
+				continue;
+			}
+			$candidates[$effect][$this->breakdownKey($absence)] = [
+				'absence' => $absence,
+				'produced' => $produced,
+				'span_days' => $this->daysInSpan($dayStart, $dayEnd),
+			];
+		}
+
+		// Merge the candidates' own produced day maps — identical rule as the
+		// aggregate (per-day max wins) but single-fetch and single-compute:
+		// no second DB round-trip can make the headline drift from the items,
+		// and winning rows carry the *same* Absence instance as the candidate,
+		// so attribution cannot drift either.
+		$creditWin = $this->mergeDayTargets($candidates[AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST]);
+		$reduceWin = $this->mergeDayTargets($candidates[AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL]);
+
+		/** @var array<int|string, array<string, array{target: float, planned: float, absence: Absence}>> */
+		$wonCredit = [];
+		foreach ($creditWin as $key => $row) {
+			$wonCredit[$this->breakdownKey($row['absence'])][$key] = $row;
+			$worked = max(0.0, (float)($workedHoursByDate[$key] ?? 0.0));
+			$credit = max(0.0, min($row['target'], $row['planned'] - $worked));
+			if ($credit > 0.0001) {
+				// Sub-epsilon dust is excluded exactly like the aggregate —
+				// identical filter, identical headline.
+				$result['credit_hours'] += $credit;
+				$result['days_credited']++;
+			}
+		}
+		$result['credit_hours'] = round($result['credit_hours'], 4);
+
+		/** @var array<int|string, array<string, array{target: float, planned: float, absence: Absence}>> */
+		$wonReduce = [];
+		foreach ($reduceWin as $key => $row) {
+			$wonReduce[$this->breakdownKey($row['absence'])][$key] = $row;
+			$result['reduced_hours'] += $row['target'];
+		}
+		$result['reduced_hours'] = round($result['reduced_hours'], 4);
+		$result['days_reduced'] = count($reduceWin);
+
+		foreach ($candidates[AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST] as $oid => $cand) {
+			$won = $wonCredit[$oid] ?? [];
+			$unplanned = $cand['span_days'] - count($cand['produced']);
+			if ($won === []) {
+				$item = $this->breakdownNotCounted($cand['absence'], 'overlap');
+				$item['overlap_days'] = count($cand['produced']);
+				$item['unplanned_days'] = $unplanned;
+				$result['not_counted'][] = $item;
+				continue;
+			}
+			$rows = [];
+			$itemTotal = 0.0;
+			foreach ($won as $key => $row) {
+				$worked = max(0.0, (float)($workedHoursByDate[$key] ?? 0.0));
+				$credit = max(0.0, min($row['target'], $row['planned'] - $worked));
+				if ($credit > 0.0001) {
+					// Same sub-epsilon filter as the headline — sum(items)
+					// must equal credit_hours, day rows stay for context.
+					$itemTotal += $credit;
+				}
+				$rows[] = [
+					'date' => $key,
+					'planned' => round($row['planned'], 4),
+					'absent' => round($row['target'], 4),
+					'worked' => round($worked, 4),
+					'credited' => round($credit, 4),
+				];
+			}
+			usort($rows, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+			if ($itemTotal <= 0.0001) {
+				$item = $this->breakdownNotCounted($cand['absence'], 'fully_worked');
+				$item['overlap_days'] = count($cand['produced']) - count($won);
+				$item['unplanned_days'] = $unplanned;
+				$result['not_counted'][] = $item;
+				continue;
+			}
+			$item = $this->breakdownItemBase($cand['absence']);
+			$item['credit_hours'] = round($itemTotal, 4);
+			$item['overlap_days'] = count($cand['produced']) - count($won);
+			$item['unplanned_days'] = $unplanned;
+			$item['days'] = $rows;
+			$result['credited'][] = $item;
+		}
+
+		foreach ($candidates[AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL] as $oid => $cand) {
+			$won = $wonReduce[$oid] ?? [];
+			$unplanned = $cand['span_days'] - count($cand['produced']);
+			if ($won === []) {
+				$item = $this->breakdownNotCounted($cand['absence'], 'overlap');
+				$item['overlap_days'] = count($cand['produced']);
+				$item['unplanned_days'] = $unplanned;
+				$result['not_counted'][] = $item;
+				continue;
+			}
+			$rows = [];
+			$itemTotal = 0.0;
+			foreach ($won as $key => $row) {
+				$itemTotal += $row['target'];
+				$rows[] = [
+					'date' => $key,
+					'planned' => round($row['planned'], 4),
+					'absent' => round($row['target'], 4),
+					'reduced' => round($row['target'], 4),
+				];
+			}
+			usort($rows, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+			$item = $this->breakdownItemBase($cand['absence']);
+			$item['reduced_hours'] = round($itemTotal, 4);
+			$item['overlap_days'] = count($cand['produced']) - count($won);
+			$item['unplanned_days'] = $unplanned;
+			$item['days'] = $rows;
+			$result['reduced'][] = $item;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Attribution key stable across separate hydration rounds: the merge map
+	 * re-fetches absences from the mapper, so the winning entity is a
+	 * different PHP instance than the candidate's — identity
+	 * (spl_object_id) never matches across two DB round-trips. The row id
+	 * does. Unpersisted entities (unit fixtures) fall back to object
+	 * identity, which is stable within one request.
+	 *
+	 * @return int|string
+	 */
+	private function breakdownKey(Absence $absence): int|string
+	{
+		return $absence->getId() ?? spl_object_id($absence);
+	}
+
+	/**
+	 * Whole calendar days an in-range absence span covers — the denominator
+	 * for `unplanned_days` (span days that produced no planned target).
+	 */
+	private function daysInSpan(\DateTime $dayStart, \DateTime $dayEnd): int
+	{
+		return $dayEnd->diff($dayStart)->days + 1;
+	}
+
+	/**
+	 * Per-day max merge over already-produced day maps — THE merge rule,
+	 * shared by the aggregate ({@see detailedTargetsForEffect}) and the
+	 * breakdown so totals can never drift apart.
+	 *
+	 * @param array<int|string, array{absence: Absence, produced: array<string, array{0: float, 1: float}>}> $perAbsence
+	 * @return array<string, array{target: float, planned: float, absence: Absence}>
+	 */
+	private function mergeDayTargets(array $perAbsence): array
+	{
+		$targetByDay = [];
+		foreach ($perAbsence as $cand) {
+			foreach ($cand['produced'] as $key => $dayPlan) {
+				if (!isset($targetByDay[$key]) || $dayPlan[0] > $targetByDay[$key]['target']) {
+					$targetByDay[$key] = [
+						'target' => $dayPlan[0],
+						'planned' => $dayPlan[1],
+						'absence' => $cand['absence'],
+					];
+				}
+			}
+		}
+		return $targetByDay;
+	}
+
+	/**
+	 * Shared item shape for breakdown rows. Dates are the absence's own
+	 * span — the `days` list shows which in-range days actually counted.
+	 *
+	 * @return array{absence_id: int|null, type: string, status: string, start: string, end: string}
+	 */
+	private function breakdownItemBase(Absence $absence): array
+	{
+		return [
+			'absence_id' => $absence->getId(),
+			'type' => (string)$absence->getType(),
+			'status' => (string)$absence->getStatus(),
+			'start' => $this->asDay($absence->getStartDate())->format('Y-m-d'),
+			'end' => $this->asDay($absence->getEndDate())->format('Y-m-d'),
+		];
+	}
+
+	/**
+	 * @return array{absence_id: int|null, type: string, status: string, start: string, end: string, reason: string, overlap_days: int}
+	 */
+	private function breakdownNotCounted(Absence $absence, string $reason): array
+	{
+		return $this->breakdownItemBase($absence) + ['reason' => $reason, 'overlap_days' => 0];
+	}
+
+	/**
 	 * What the matrix *should* deliver for a range — gate-agnostic expectation
 	 * for auditing ({@see \OCA\ArbeitszeitCheck\Command\VerifyAbsenceSollCommand}).
 	 * Compare with {@see creditHoursForRange()} / {@see sollReductionHoursForRange()}:
@@ -266,6 +557,28 @@ class PaidAbsencePlannedHoursCreditService
 		bool $respectGates = true,
 	): array {
 		$targetByDay = [];
+		foreach ($this->detailedTargetsForEffect($userId, $rangeStart, $rangeEnd, $effect, $respectGates) as $key => $row) {
+			$targetByDay[$key] = [$row['target'], $row['planned']];
+		}
+		return $targetByDay;
+	}
+
+	/**
+	 * Attribution-preserving variant of {@see plannedTargetsForEffect()}:
+	 * same per-day max merge, but each winning day also carries the absence
+	 * that produced it — the single source of truth for the balance figure
+	 * AND the "where does this number come from" breakdown.
+	 *
+	 * @return array<string, array{target: float, planned: float, absence: Absence}>
+	 */
+	private function detailedTargetsForEffect(
+		string $userId,
+		\DateTime $rangeStart,
+		\DateTime $rangeEnd,
+		string $effect,
+		bool $respectGates = true,
+	): array {
+		$perAbsence = [];
 
 		foreach ($this->absenceMapper->findByUserAndDateRange($userId, $rangeStart, $rangeEnd) as $absence) {
 			if (!$absence instanceof Absence) {
@@ -290,14 +603,13 @@ class PaidAbsencePlannedHoursCreditService
 				continue;
 			}
 
-			foreach ($this->absenceDayTargets($userId, $absence, $dayStart, $dayEnd) as $key => $dayPlan) {
-				if (!isset($targetByDay[$key]) || $dayPlan[0] > $targetByDay[$key][0]) {
-					$targetByDay[$key] = $dayPlan;
-				}
-			}
+			$perAbsence[] = [
+				'absence' => $absence,
+				'produced' => $this->absenceDayTargets($userId, $absence, $dayStart, $dayEnd),
+			];
 		}
 
-		return $targetByDay;
+		return $this->mergeDayTargets($perAbsence);
 	}
 
 	/**
@@ -514,8 +826,19 @@ class PaidAbsencePlannedHoursCreditService
 				return [$schedule, $schedule->averageDailyNetHours(), false];
 			}
 			$modelDaily = (float)$model->getDailyHours();
-			if (is_finite($modelDaily) && $modelDaily > 0.0) {
+			if (is_finite($modelDaily) && $modelDaily > 0.0 && $modelDaily <= 24.0) {
 				$dailyHours = $modelDaily;
+			} else {
+				// daily_hours > 24 is physically impossible: the column had
+				// no upper bound, so legacy rows may carry garbage that
+				// would credit fantasy hours per absence day. Derive the
+				// day Soll from the weekly contract — the same basis the
+				// required-hours formula uses — before the 8 h default.
+				$modelWeekly = (float)$model->getWeeklyHours();
+				$derived = is_finite($modelWeekly) ? $modelWeekly / 5.0 : 0.0;
+				if ($derived > 0.0 && $derived <= 24.0) {
+					$dailyHours = $derived;
+				}
 			}
 		} catch (DoesNotExistException) {
 			// defaults

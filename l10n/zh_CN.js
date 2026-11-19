@@ -6768,7 +6768,6 @@
 	"Only sessions started today" : "仅今天开始的会话",
 	"All open sessions, including older days" : "所有打开的会话，包括较早的日期",
 	"Older open sessions are closed at the planned end of the day they started on." : "较早的打开会话将在其开始当天的计划结束时间关闭。"
-	},
-	"nplurals=1; plural=0;"
+	}
 );
 }});})();

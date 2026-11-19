@@ -6768,7 +6768,6 @@
 	"Only sessions started today" : "Yalnızca bugün başlatılan oturumlar",
 	"All open sessions, including older days" : "Eski günler dahil tüm açık oturumlar",
 	"Older open sessions are closed at the planned end of the day they started on." : "Eski açık oturumlar, başladıkları günün planlanan bitişinde kapatılır."
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

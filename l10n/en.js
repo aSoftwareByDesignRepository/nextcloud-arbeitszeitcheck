@@ -6768,7 +6768,6 @@
 	"Only sessions started today" : "Only sessions started today",
 	"All open sessions, including older days" : "All open sessions, including older days",
 	"Older open sessions are closed at the planned end of the day they started on." : "Older open sessions are closed at the planned end of the day they started on."
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

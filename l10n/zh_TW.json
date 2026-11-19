@@ -2455,7 +2455,7 @@
 		"Hello %s,": "%s，您好：",
 		"Hello{nameSuffix},\n\nYour kiosk PIN for ArbeitszeitCheck is: {pin}\n\nKeep this PIN private. You can change it only by asking an administrator to generate a new one.\n": "{nameSuffix}，您好：\n\n您的 ArbeitszeitCheck 自助終端 PIN 是：{pin}\n\n請保密此 PIN。只有請管理員生成新 PIN 才能更改。\n",
 		"Help": "幫助",
-		"Help & Feedback": "幫助與反饋",
+		"Help & Feedback": "幫助與回饋",
 		"Help for Thunderbird & Nextcloud Calendar": "Thunderbird 與 Nextcloud 行事曆幫助",
 		"Help texts": "幫助文字",
 		"Help texts you hid on pages stay hidden until you show them again here or use \"Show hint\" where they appear.": "您在頁面上隱藏的幫助文字會保持隱藏，直到您在此重新顯示或在原處使用“顯示提示”。",

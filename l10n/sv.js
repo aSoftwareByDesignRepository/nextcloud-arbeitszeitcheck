@@ -142,7 +142,7 @@
 	"(1 unresolved ref)" : "(1 olöst referens)",
 	"(Mon–Fri)" : "(mån–fre)",
 	"(all Nextcloud accounts)" : "(alla Nextcloud-konton)",
-	"(estimated)" : "(estimated)",
+	"(estimated)" : "(uppskattat)",
 	"(expired)" : "(utgånget)",
 	"(new)" : "(ny)",
 	"(no data yet)" : "(ingen data ännu)",
@@ -6375,7 +6375,7 @@
 	"first" : "första",
 	"floor" : "våning",
 	"for" : "för",
-	"fraction_boundary" : "fraction_boundary",
+	"fraction_boundary" : "Halvdagsgräns",
 	"free" : "gratis",
 	"from" : "från",
 	"full" : "full",
@@ -6536,7 +6536,7 @@
 	"other" : "annat",
 	"others" : "andra",
 	"outlet" : "eluttag",
-	"overlap" : "overlap",
+	"overlap" : "Överlapp",
 	"owner" : "ägare",
 	"paid break" : "betald rast",
 	"parking" : "parkering",
@@ -6560,13 +6560,13 @@
 	"prorationNoteNone" : "var inte anställd under detta kalenderår, så ingen semester beviljas för det.",
 	"prorationNoteTwelfths" : "Reducerat för din anställningsperiod i år: {prorated} av {full} dagar (anställd {months} av 12 månader).",
 	"provisional" : "preliminär",
-	"range_outside" : "range_outside",
+	"range_outside" : "Utanför intervall",
 	"recommended" : "rekommenderas",
 	"region" : "område",
 	"reminder" : "påminnelse",
 	"removed from the list" : "tas bort från listan",
 	"required" : "krävs",
-	"revision_stale" : "revision_stale",
+	"revision_stale" : "Version inaktuell",
 	"roof" : "tag",
 	"room" : "rum",
 	"save" : "Spara",
@@ -6768,7 +6768,6 @@
 	"Only sessions started today" : "Endast sessioner som startats i dag",
 	"All open sessions, including older days" : "Alla öppna sessioner, även äldre dagar",
 	"Older open sessions are closed at the planned end of the day they started on." : "Äldre öppna sessioner stängs vid det planerade slutet på den dag de startade."
-	},
-	"nplurals=2; plural=(n != 1);"
+	}
 );
 }});})();

@@ -428,12 +428,12 @@ class TimeTrackingService
 					'%n unfinished sessions from previous days were closed automatically. Please verify your time entries list.',
 					$repaired
 				);
-				$this->config->setUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', json_encode([
+				$this->recordAutoClockoutNotice($userId, [
 					'message' => $noticeMessage,
 					'reason' => TimeEntry::ENDED_REASON_STALE_PAUSED_REPAIR,
 					'count' => $repaired,
 					'at' => $this->nowForAtEntries()->format('c'),
-				]));
+				]);
 			}
 		} catch (\Throwable $e) {
 			// best-effort: the repair runs opportunistically on the request path;
@@ -1142,6 +1142,22 @@ class TimeTrackingService
 				throw new BusinessRuleException(
 					$this->l10n->t('End time must be after start time'),
 					BusinessRuleCode::INVALID_INPUT,
+				);
+			}
+
+			// The job's pre-flight overlap scan ran BEFORE this lock
+			// existed — a manual entry inserted in that gap must still
+			// veto here, or the DB gains overlapping completed rows.
+			$overlapping = $this->timeEntryMapper->findOverlapping($userId, $start, $end, (int)$entry->getId());
+			if ($overlapping !== []) {
+				$details = [];
+				foreach ($overlapping as $overlapEntry) {
+					$details[] = ($overlapEntry->getStartTime()?->format('Y-m-d H:i') ?? '?')
+						. ' - ' . ($overlapEntry->getEndTime()?->format('Y-m-d H:i') ?? '?');
+				}
+				throw new BusinessRuleException(
+					$this->l10n->t('This time entry overlaps with existing entries: %s', [implode(', ', $details)]),
+					BusinessRuleCode::OVERLAP_CONFLICT,
 				);
 			}
 
@@ -2355,12 +2371,12 @@ class TimeTrackingService
 					(string)$policy['mode'],
 				]
 			);
-			$this->config->setUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', json_encode([
+			$this->recordAutoClockoutNotice($userId, [
 				'message' => $noticeMessage,
 				'reason' => TimeEntry::ENDED_REASON_AUTO_BREAK_FALLBACK,
 				'policy' => (string)$policy['mode'],
 				'at' => $now->format('c'),
-			]));
+			]);
 			\OCP\Log\logger('arbeitszeitcheck')->info('Break auto-fallback clock-out executed', [
 				'user_id' => $userId,
 				'entry_id' => $entry->getId(),
@@ -2431,11 +2447,11 @@ class TimeTrackingService
 						$this->lawProfile($userId)->lawLabel('daily'),
 					]
 				);
-				$this->config->setUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', json_encode([
+				$this->recordAutoClockoutNotice($userId, [
 					'message' => $noticeMessage,
 					'reason' => 'daily_maximum_reached',
 					'at' => $now->format('c'),
-				]));
+				]);
 				$this->db->commit();
 
 				try {
@@ -2481,6 +2497,69 @@ class TimeTrackingService
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->warning(
 				'Self-healing daily-maximum enforcement skipped: ' . $e->getMessage(),
+				['exception' => $e, 'user_id' => $userId]
+			);
+		}
+	}
+
+	/**
+	 * Append an automatic-intervention notice for the user.
+	 *
+	 * `auto_clockout_notice` is a single config slot shared by every
+	 * automatic workflow (stale-paused repair, break fallback, daily
+	 * maximum, planned-end job). Writers MERGE into a `notices` list —
+	 * last-writer-wins would erase the evidence of an earlier same-day
+	 * intervention. Top-level `message`/`at`/`reason` mirror the joined/
+	 * newest values so existing consumers (status toast, 24h expiry)
+	 * keep working unchanged. The merge runs under the user mutation
+	 * lock so concurrent writers cannot lose each other's entry.
+	 *
+	 * Never throws: the notice is best-effort evidence and must not
+	 * fail the operation that produced it.
+	 *
+	 * @param array<string,mixed> $notice
+	 */
+	public function recordAutoClockoutNotice(string $userId, array $notice): void
+	{
+		try {
+			$lockKey = $this->acquireUserMutationLock($userId);
+			try {
+				$raw = (string)$this->config->getUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', '');
+				$decoded = $raw === '' ? null : json_decode($raw, true);
+				$existing = [];
+				if (is_array($decoded)) {
+					if (isset($decoded['notices']) && is_array($decoded['notices'])) {
+						$existing = $decoded['notices'];
+					} elseif (isset($decoded['message'])) {
+						// Legacy flat shape written before the merge existed.
+						$existing = [$decoded];
+					}
+				}
+				$existing[] = $notice;
+				// Cap the slot — interventions between clock-ins are few,
+				// the bound protects against pathological writer loops.
+				if (count($existing) > 5) {
+					$existing = array_slice($existing, -5);
+				}
+				$messages = [];
+				foreach ($existing as $n) {
+					if (is_array($n) && isset($n['message']) && is_string($n['message'])) {
+						$messages[] = $n['message'];
+					}
+				}
+				$this->config->setUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', (string)json_encode([
+					'notices' => array_values($existing),
+					'message' => implode(' ', $messages),
+					'reason' => $notice['reason'] ?? null,
+					'at' => $notice['at'] ?? $this->nowForAtEntries()->format('c'),
+					'count' => count($existing),
+				]));
+			} finally {
+				$this->releaseUserMutationLock($lockKey);
+			}
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'recordAutoClockoutNotice failed: ' . $e->getMessage(),
 				['exception' => $e, 'user_id' => $userId]
 			);
 		}

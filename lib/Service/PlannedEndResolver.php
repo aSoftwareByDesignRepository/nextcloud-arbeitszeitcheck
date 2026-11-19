@@ -75,7 +75,6 @@ final class PlannedEndResolver
 			return $this->skip(self::SKIP_MISSING_START);
 		}
 		[$dayStart] = $this->timeZoneService->dayWindowInStorage($start);
-		$dayEnd = (clone $dayStart)->modify('+1 day');
 
 		$model = $this->effectiveModel($userId, $dayStart, $modelCache);
 		if ($model === null) {
@@ -89,7 +88,10 @@ final class PlannedEndResolver
 		if ($this->holidayService->isHolidayForUser($userId, $dayStart)) {
 			return $this->skip(self::SKIP_HOLIDAY);
 		}
-		if ($this->hasApprovedAbsence($userId, $dayStart, $dayEnd)) {
+		// The absence window is the entry's calendar day only — an
+		// inclusive date-range query widened to the next midnight would
+		// let leave that merely STARTS tomorrow veto today's closure.
+		if ($this->hasApprovedAbsence($userId, $dayStart)) {
 			return $this->skip(self::SKIP_ABSENCE_DAY);
 		}
 
@@ -138,9 +140,9 @@ final class PlannedEndResolver
 		}
 	}
 
-	private function hasApprovedAbsence(string $userId, \DateTime $dayStart, \DateTime $dayEnd): bool
+	private function hasApprovedAbsence(string $userId, \DateTime $day): bool
 	{
-		foreach ($this->absenceMapper->findByUserAndDateRange($userId, $dayStart, $dayEnd) as $absence) {
+		foreach ($this->absenceMapper->findByUserAndDateRange($userId, $day, $day) as $absence) {
 			if ($absence->getStatus() === Absence::STATUS_APPROVED) {
 				return true;
 			}

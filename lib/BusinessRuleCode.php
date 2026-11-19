@@ -28,4 +28,5 @@ final class BusinessRuleCode
 	public const INVALID_WORK_LOCATION = 'invalid_work_location';
 	/** Generic validation failure for direct write endpoints. */
 	public const INVALID_INPUT = 'invalid_input';
+	public const OVERLAP_CONFLICT = 'overlap_conflict';
 }

@@ -29,6 +29,7 @@ use OCP\BackgroundJob\TimedJob;
 use OCP\IConfig;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\L10N\IFactory;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
@@ -38,8 +39,10 @@ use Psr\Log\LoggerInterface;
  *
  * Contract (SPEC auto-clock-out-planned-end):
  * - default OFF for existing installations; when off this job writes nothing
- * - runs hourly but only acts when the current hour in the APP timezone
- *   equals the configured cutover hour
+ * - runs hourly; acts on every tick at or after the configured cutover
+ *   hour in the APP timezone — a missed window catches up rather than
+ *   skipping the day, and re-runs are safe (idempotent writes, no
+ *   duplicate notifications) and useful (retries cleared vetoes)
  * - never writes "now" as end_time — only the resolved planned end
  * - every automatic closure sets ended_reason=auto_planned_end and
  *   capture_source=auto_clock_out, and always notifies the user
@@ -64,7 +67,8 @@ class AutoClockOutJob extends TimedJob
 		private LoggerInterface $logger,
 		private PermissionService $permissionService,
 		private TimeZoneService $timeZoneService,
-		private ILockingProvider $locking
+		private ILockingProvider $locking,
+		private IFactory $l10nFactory
 	) {
 		parent::__construct($timeFactory);
 		$this->setInterval(60 * 60);
@@ -108,9 +112,6 @@ class AutoClockOutJob extends TimedJob
 
 		$hour = $this->configuredHour();
 		$nowApp = $this->timeZoneService->nowInStorage();
-		if ((int)$nowApp->format('G') !== $hour) {
-			return;
-		}
 
 		$scope = $this->config->getAppValue('arbeitszeitcheck', Constants::CONFIG_AUTO_CLOCK_OUT_SCOPE, Constants::AUTO_CLOCK_OUT_SCOPE_TODAY);
 		if (!in_array($scope, [Constants::AUTO_CLOCK_OUT_SCOPE_TODAY, Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN], true)) {
@@ -128,7 +129,17 @@ class AutoClockOutJob extends TimedJob
 			$this->logger->error('ArbeitszeitCheck: auto clock-out could not build cutover instant', ['app' => 'arbeitszeitcheck']);
 			return;
 		}
+		if ($nowApp < $cutover) {
+			// Before today's cutover — no planned end has passed yet.
+			return;
+		}
 		$todayKey = $nowApp->format('Y-m-d');
+		// No once-per-day stamp: hourly re-runs after the cutover are safe
+		// by design — closed users exit on findOpenEntryByUser=null or
+		// NOT_CLOCKED_IN inside the lock, so notification can never
+		// duplicate — and they are NECESSARY: a per-user error or a veto
+		// that clears later today (pending correction approved, overlap
+		// resolved) must be retried by the next tick.
 
 		$closed = 0;
 		$errors = 0;
@@ -192,6 +203,11 @@ class AutoClockOutJob extends TimedJob
 					if ($e->getReasonCode() === BusinessRuleCode::NOT_CLOCKED_IN) {
 						// Manual clock-out raced the job — entry already closed.
 						$this->countSkip($skipped, self::SKIP_ALREADY_HANDLED);
+					} elseif ($e->getReasonCode() === BusinessRuleCode::OVERLAP_CONFLICT) {
+						// Manual entry landed between the pre-flight scan
+						// and the locked write — the service vetoed inside
+						// the lock. Same skip bucket, proven twice.
+						$this->countSkip($skipped, self::SKIP_OVERLAP_CONFLICT);
 					} else {
 						$this->countSkip($skipped, 'business_rule');
 						$this->logger->warning('ArbeitszeitCheck: auto clock-out rejected for user ' . $userId . ': ' . $e->getMessage(), ['app' => 'arbeitszeitcheck']);
@@ -264,16 +280,38 @@ class AutoClockOutJob extends TimedJob
 			$this->logger->warning('ArbeitszeitCheck: auto clock-out notification failed for user ' . $userId . ': ' . $e->getMessage(), ['app' => 'arbeitszeitcheck']);
 		}
 
+		// Banner evidence merges into the shared notice slot via the
+		// service — direct setUserValue would clobber a same-day notice
+		// from another automatic workflow.
+		$this->timeTrackingService->recordAutoClockoutNotice($userId, [
+			'message' => $this->noticeMessage($userId, $dateDisplay, $endDisplay),
+			'reason' => TimeEntry::ENDED_REASON_AUTO_PLANNED_END,
+			'count' => 1,
+			'at' => $this->timeZoneService->nowInStorage()->format('c'),
+		]);
+	}
+
+	/**
+	 * Banner text in the AFFECTED user's language — the stored string is
+	 * rendered verbatim, so it must be localized at write time (same
+	 * msgid the notification subject uses).
+	 */
+	private function noticeMessage(string $userId, ?string $dateDisplay, ?string $endDisplay): string
+	{
 		try {
-			$message = 'Your time tracking on ' . ($dateDisplay ?? '?') . ' was ended automatically at ' . ($endDisplay ?? '?') . ' (scheduled end). Please review the entry.';
-			$this->config->setUserValue($userId, 'arbeitszeitcheck', 'auto_clockout_notice', json_encode([
-				'message' => $message,
-				'reason' => TimeEntry::ENDED_REASON_AUTO_PLANNED_END,
-				'count' => 1,
-				'at' => $this->timeZoneService->nowInStorage()->format('c'),
-			]));
-		} catch (\Throwable $e) {
-			$this->logger->warning('ArbeitszeitCheck: auto clock-out notice write failed for user ' . $userId . ': ' . $e->getMessage(), ['app' => 'arbeitszeitcheck']);
+			$user = $this->userManager->get($userId);
+			$lang = $user !== null
+				? (string)$this->l10nFactory->getUserLanguage($user)
+				: '';
+			if ($lang === '') {
+				$lang = (string)$this->l10nFactory->findLanguage('arbeitszeitcheck');
+			}
+			return $this->l10nFactory->get('arbeitszeitcheck', $lang)->t(
+				'Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.',
+				[$dateDisplay ?? '?', $endDisplay ?? '?']
+			);
+		} catch (\Throwable) {
+			return 'Your time tracking on ' . ($dateDisplay ?? '?') . ' was ended automatically at ' . ($endDisplay ?? '?') . ' (scheduled end). Please review the entry.';
 		}
 	}
 }

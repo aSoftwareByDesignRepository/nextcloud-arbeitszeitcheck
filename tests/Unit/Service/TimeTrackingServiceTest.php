@@ -1815,6 +1815,113 @@ class TimeTrackingServiceTest extends TestCase {
 		}
 	}
 
+	public function testAutoClockOutRejectsOverlapInsertedUnderLock(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$entry = $this->openAutoEntry(42);
+		$concurrent = $this->openAutoEntry(77);
+		$concurrent->setStartTime(new \DateTime('2026-10-28 12:00:00', new \DateTimeZone('Europe/Berlin')));
+
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		// The job's pre-flight overlap check runs BEFORE the user mutation
+		// lock exists — a manual entry inserted in that gap must still veto
+		// the write, or the DB gains overlapping completed rows.
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([$concurrent]);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('2026-10-28 16:15:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::OVERLAP_CONFLICT, $e->getReasonCode());
+		}
+	}
+
+	// ------------------------------------------------------------------
+	// recordAutoClockoutNotice — shared-slot merge, not last-writer-wins
+	// ------------------------------------------------------------------
+
+	private function captureNoticeWrites(): void
+	{
+		$this->config->method('setUserValue')->willReturnCallback(function ($u, $a, $k, $v): void {
+			if ($k === 'auto_clockout_notice') {
+				$this->noticeJson = (string)$v;
+			}
+		});
+	}
+
+	public function testRecordAutoClockoutNoticeMergesWithExistingNotice(): void
+	{
+		$this->noticeJson = (string)json_encode([
+			'message' => 'break fallback fired',
+			'reason' => TimeEntry::ENDED_REASON_AUTO_BREAK_FALLBACK,
+			'at' => '2026-10-28T18:00:00+02:00',
+		]);
+		$this->captureNoticeWrites();
+
+		$this->service->recordAutoClockoutNotice('alice', [
+			'message' => 'planned end fired',
+			'reason' => TimeEntry::ENDED_REASON_AUTO_PLANNED_END,
+			'at' => '2026-10-28T22:00:00+02:00',
+		]);
+
+		$decoded = json_decode($this->noticeJson, true);
+		$this->assertCount(2, $decoded['notices'], 'a second workflow must not erase the first notice');
+		$this->assertSame('break fallback fired', $decoded['notices'][0]['message']);
+		$this->assertSame('planned end fired', $decoded['notices'][1]['message']);
+		$this->assertSame(TimeEntry::ENDED_REASON_AUTO_PLANNED_END, $decoded['reason']);
+		$this->assertSame('2026-10-28T22:00:00+02:00', $decoded['at']);
+		$this->assertSame(2, $decoded['count']);
+		$this->assertStringContainsString('break fallback fired', $decoded['message']);
+		$this->assertStringContainsString('planned end fired', $decoded['message']);
+	}
+
+	public function testRecordAutoClockoutNoticeMergesAcrossListPayloads(): void
+	{
+		$this->noticeJson = (string)json_encode([
+			'notices' => [['message' => 'older', 'reason' => 'a']],
+			'message' => 'older',
+			'reason' => 'a',
+		]);
+		$this->captureNoticeWrites();
+
+		$this->service->recordAutoClockoutNotice('alice', ['message' => 'newer', 'reason' => 'b']);
+		$decoded = json_decode($this->noticeJson, true);
+		$this->assertCount(2, $decoded['notices']);
+		$this->assertSame('newer', $decoded['notices'][1]['message']);
+	}
+
+	public function testRecordAutoClockoutNoticeCapsList(): void
+	{
+		$this->captureNoticeWrites();
+		for ($i = 1; $i <= 7; $i++) {
+			$this->service->recordAutoClockoutNotice('alice', ['message' => 'n' . $i, 'reason' => 'r']);
+		}
+		$decoded = json_decode($this->noticeJson, true);
+		$this->assertCount(5, $decoded['notices'], 'the slot must stay bounded');
+		$this->assertSame('n3', $decoded['notices'][0]['message'], 'oldest events drop first');
+		$this->assertSame('n7', $decoded['notices'][4]['message']);
+	}
+
+	public function testRecordAutoClockoutNoticeDiscardsCorruptSlot(): void
+	{
+		$this->noticeJson = '{not json';
+		$this->captureNoticeWrites();
+		$this->service->recordAutoClockoutNotice('alice', ['message' => 'fresh', 'reason' => 'r']);
+		$decoded = json_decode($this->noticeJson, true);
+		$this->assertCount(1, $decoded['notices']);
+		$this->assertSame('fresh', $decoded['notices'][0]['message']);
+	}
+
+	public function testRecordAutoClockoutNoticeNeverThrows(): void
+	{
+		$this->config->method('setUserValue')->willThrowException(new \RuntimeException('storage down'));
+		$this->service->recordAutoClockoutNotice('alice', ['message' => 'x', 'reason' => 'r']);
+		$this->addToAssertionCount(1, 'notice write failure must be swallowed');
+	}
+
 	// ------------------------------------------------------------------
 	// calculateAndSetAutomaticBreak — fixpoint funnel (SPEC §8 A1–A13)
 	// ------------------------------------------------------------------

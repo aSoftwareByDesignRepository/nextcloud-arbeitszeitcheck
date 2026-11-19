@@ -253,6 +253,79 @@ class PlannedEndResolverTest extends TestCase
 		$this->assertNull($result['skip']);
 	}
 
+	public function testApprovedAbsenceStartingTomorrowDoesNotVetoToday(): void
+	{
+		// The shared $this->absences stub ignores the range it is handed, so
+		// it cannot prove the lookup window is right. This stub reproduces
+		// AbsenceMapper::findByUserAndDateRange SQL semantics (date-granular
+		// inclusive overlap) — then hands the resolver a range that must be
+		// the ENTRY's day only: approved leave starting tomorrow must not
+		// veto today's closure.
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$leave = new Absence();
+		$leave->setStatus(Absence::STATUS_APPROVED);
+		$leave->setStartDate(new \DateTime('2026-11-03', new \DateTimeZone(self::TZ)));
+		$leave->setEndDate(new \DateTime('2026-11-05', new \DateTimeZone(self::TZ)));
+		$absenceMapper->method('findByUserAndDateRange')->willReturnCallback(
+			static function (string $userId, \DateTime $from, \DateTime $to) use ($leave): array {
+				return $leave->getStartDate()->format('Y-m-d') <= $to->format('Y-m-d')
+					&& $leave->getEndDate()->format('Y-m-d') >= $from->format('Y-m-d')
+					? [$leave]
+					: [];
+			}
+		);
+		$resolver = new PlannedEndResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$absenceMapper,
+			$this->holidayService,
+			$this->breakPolicyResolver,
+			$this->timeZoneService
+		);
+		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($this->assignment());
+		$this->workingTimeModelMapper->method('find')->willReturn($this->scheduleModel());
+		$this->holidayService->method('isHolidayForUser')->willReturn(false);
+
+		$cache = [];
+		$result = $resolver->resolve(self::USER, $this->entry('2026-11-02 08:00:00'), $this->cutover(), $cache);
+		$this->assertNull($result['skip']);
+		$this->assertSame('2026-11-02 16:15', $result['end']->format('Y-m-d H:i'));
+	}
+
+	public function testApprovedAbsenceEndingYesterdayDoesNotVetoToday(): void
+	{
+		// Mirror boundary on the left: leave ENDED yesterday — today is a
+		// normal work day and must resolve.
+		$absenceMapper = $this->createMock(AbsenceMapper::class);
+		$leave = new Absence();
+		$leave->setStatus(Absence::STATUS_APPROVED);
+		$leave->setStartDate(new \DateTime('2026-10-30', new \DateTimeZone(self::TZ)));
+		$leave->setEndDate(new \DateTime('2026-11-01', new \DateTimeZone(self::TZ)));
+		$absenceMapper->method('findByUserAndDateRange')->willReturnCallback(
+			static function (string $userId, \DateTime $from, \DateTime $to) use ($leave): array {
+				return $leave->getStartDate()->format('Y-m-d') <= $to->format('Y-m-d')
+					&& $leave->getEndDate()->format('Y-m-d') >= $from->format('Y-m-d')
+					? [$leave]
+					: [];
+			}
+		);
+		$resolver = new PlannedEndResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+			$absenceMapper,
+			$this->holidayService,
+			$this->breakPolicyResolver,
+			$this->timeZoneService
+		);
+		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($this->assignment());
+		$this->workingTimeModelMapper->method('find')->willReturn($this->scheduleModel());
+		$this->holidayService->method('isHolidayForUser')->willReturn(false);
+
+		$cache = [];
+		$result = $resolver->resolve(self::USER, $this->entry('2026-11-02 08:00:00'), $this->cutover(), $cache);
+		$this->assertNull($result['skip']);
+	}
+
 	public function testWeekendRowSkips(): void
 	{
 		$this->wireModel($this->scheduleModel());

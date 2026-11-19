@@ -49,8 +49,13 @@ $targets = [
 			],
 			[
 				'name' => 'approved-absence gate dropped',
-				'needle' => 'if ($this->hasApprovedAbsence($userId, $dayStart, $dayEnd)) {',
+				'needle' => 'if ($this->hasApprovedAbsence($userId, $dayStart)) {',
 				'replacement' => 'if (false) {',
+			],
+			[
+				'name' => 'absence window widened to next midnight',
+				'needle' => 'findByUserAndDateRange($userId, $day, $day)',
+				'replacement' => "findByUserAndDateRange(\$userId, \$day, (clone \$day)->modify('+1 day'))",
 			],
 			[
 				'name' => 'invalid-end boundary weakened (<= to <)',
@@ -110,9 +115,14 @@ $targets = [
 				'replacement' => "Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED, '0') === '1') {",
 			],
 			[
-				'name' => 'cutover-hour gate inverted',
-				'needle' => 'if ((int)$nowApp->format(\'G\') !== $hour) {',
-				'replacement' => 'if ((int)$nowApp->format(\'G\') === $hour) {',
+				'name' => 'before-cutover gate inverted',
+				'needle' => 'if ($nowApp < $cutover) {',
+				'replacement' => 'if ($nowApp >= $cutover) {',
+			],
+			[
+				'name' => 'overlap-conflict classification dropped',
+				'needle' => '} elseif ($e->getReasonCode() === BusinessRuleCode::OVERLAP_CONFLICT) {',
+				'replacement' => '} elseif (false) {',
 			],
 			[
 				'name' => 'disabled-user gate dropped',
@@ -159,7 +169,7 @@ $targets = [
 	[
 		'file' => 'lib/Service/TimeTrackingService.php',
 		'test' => 'tests/Unit/Service/TimeTrackingServiceTest.php',
-		'filter' => 'testAutoClockOut',
+		'filter' => 'AutoClockOut|AutoClockout',
 		'mutants' => [
 			[
 				'name' => 'scanned-entry id match inverted',
@@ -175,6 +185,16 @@ $targets = [
 				'replacement' => 'if ($start === null || $end->getTimestamp() < $start->getTimestamp()) {',
 			],
 			[
+				'name' => 'in-lock overlap check inverted',
+				'needle' => 'if ($overlapping !== []) {',
+				'replacement' => 'if ($overlapping === []) {',
+			],
+			[
+				'name' => 'overlap reason code swapped',
+				'needle' => 'BusinessRuleCode::OVERLAP_CONFLICT,',
+				'replacement' => 'BusinessRuleCode::INVALID_INPUT,',
+			],
+			[
 				'name' => 'paused branch swapped to break',
 				'needle' => 'if ($entry->getStatus() === TimeEntry::STATUS_PAUSED) {',
 				'replacement' => 'if ($entry->getStatus() === TimeEntry::STATUS_BREAK) {',
@@ -188,6 +208,21 @@ $targets = [
 				'name' => 'capture source swapped to manual on write path',
 				'needle' => "\t\t\t\tConstants::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT\n\t\t\t);",
 				'replacement' => "\t\t\t\t'manual'\n\t\t\t);",
+			],
+			[
+				'name' => 'notice merge replaced by overwrite',
+				'needle' => '$existing[] = $notice;',
+				'replacement' => '$existing = [$notice];',
+			],
+			[
+				'name' => 'notice cap dropped',
+				'needle' => 'if (count($existing) > 5) {',
+				'replacement' => 'if (false) {',
+			],
+			[
+				'name' => 'notice slice keeps oldest not newest',
+				'needle' => 'array_slice($existing, -5)',
+				'replacement' => 'array_slice($existing, 0, 5)',
 			],
 		],
 	],

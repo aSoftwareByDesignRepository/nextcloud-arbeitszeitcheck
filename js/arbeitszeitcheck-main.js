@@ -1765,13 +1765,23 @@
             return this.callApi('/apps/arbeitszeitcheck/api/clock/status', 'GET', null, false).then((response) => {
                 try {
                     const notice = response && response.status ? response.status.auto_clockout_notice : null;
-                    if (notice && notice.message) {
-                        const noticeKey = String(notice.at || notice.message);
-                        if (this._lastAutoClockoutNoticeKey !== noticeKey) {
-                            this._lastAutoClockoutNoticeKey = noticeKey;
-                            this.showSuccess(String(notice.message));
-                        }
+                    // Multi-workflow notices arrive as a `notices` list;
+                    // legacy payloads carry a single flat message.
+                    const notices = notice && Array.isArray(notice.notices) && notice.notices.length
+                        ? notice.notices
+                        : (notice ? [notice] : []);
+                    if (!this._autoClockoutNoticeKeys) {
+                        this._autoClockoutNoticeKeys = new Set();
                     }
+                    notices.forEach((n) => {
+                        if (n && n.message) {
+                            const noticeKey = String(n.at || n.message);
+                            if (!this._autoClockoutNoticeKeys.has(noticeKey)) {
+                                this._autoClockoutNoticeKeys.add(noticeKey);
+                                this.showSuccess(String(n.message));
+                            }
+                        }
+                    });
                 } catch (e) {
                     // keep status polling resilient
                 }

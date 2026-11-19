@@ -121,6 +121,50 @@ class AutoClockOutIntegrationTest extends TestCase
 		$this->assertNull($reloaded->getEndedReason());
 	}
 
+	public function testAutoClockOutVetoesOverlappingEntryUnderLock(): void
+	{
+		// A second entry that lands between the job's pre-flight overlap
+		// scan and the locked write must veto the closure — the unit suite
+		// mocks findOverlapping, this proves the real mapper wiring.
+		$entry = $this->insertOpenEntry('active');
+		$start = $entry->getStartTime();
+		$this->assertNotNull($start);
+		$plannedEnd = (clone $start)->modify('+8 hours');
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->insert('at_entries')
+			->values([
+				'user_id' => $qb->createNamedParameter(self::TEST_USER),
+				'start_time' => $qb->createNamedParameter(
+					(new \DateTime('-5 hours'))->format('Y-m-d H:i:s')
+				),
+				'end_time' => $qb->createNamedParameter(
+					(new \DateTime('-4 hours'))->format('Y-m-d H:i:s')
+				),
+				'status' => $qb->createNamedParameter('completed'),
+				'created_at' => $qb->createNamedParameter(
+					(new \DateTime('-5 hours'))->format('Y-m-d H:i:s')
+				),
+				'updated_at' => $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s')),
+			]);
+		$qb->executeStatement();
+
+		try {
+			$this->timeTracking->autoClockOutAtPlannedEnd(
+				self::TEST_USER,
+				(int)$entry->getId(),
+				$plannedEnd,
+			);
+			$this->fail('An entry overlapping the planned window must veto the write');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::OVERLAP_CONFLICT, $e->getReasonCode());
+		}
+
+		$reloaded = $this->timeEntryMapper->find((int)$entry->getId());
+		$this->assertSame(TimeEntry::STATUS_ACTIVE, $reloaded->getStatus());
+		$this->assertNull($reloaded->getEndTime());
+	}
+
 	private function insertOpenEntry(string $status): TimeEntry
 	{
 		$qb = $this->db->getQueryBuilder();

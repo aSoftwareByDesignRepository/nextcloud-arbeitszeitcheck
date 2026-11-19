@@ -94,6 +94,7 @@ class AutoClockOutJobTest extends TestCase
 			fn ($app, $key, $default) => $this->appConfig[$key] ?? $default
 		);
 
+
 		$dateTimeZone = $this->createMock(IDateTimeZone::class);
 		$dateTimeZone->method('getTimeZone')->willReturn(new \DateTimeZone(self::TZ));
 		$userSession = $this->createMock(IUserSession::class);
@@ -125,6 +126,13 @@ class AutoClockOutJobTest extends TestCase
 			$this->timeZoneService
 		);
 
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $s, array $p = []) => $s . ' ' . implode(' ', $p));
+		$l10nFactory = $this->createMock(\OCP\L10N\IFactory::class);
+		$l10nFactory->method('get')->willReturn($l10n);
+		$l10nFactory->method('getUserLanguage')->willReturn('en');
+		$l10nFactory->method('findLanguage')->willReturn('en');
+
 		$this->job = new AutoClockOutJob(
 			$this->createMock(ITimeFactory::class),
 			$this->timeEntryMapper,
@@ -136,7 +144,8 @@ class AutoClockOutJobTest extends TestCase
 			$this->logger,
 			$this->permissionService,
 			$this->timeZoneService,
-			$this->locking
+			$this->locking,
+			$l10nFactory
 		);
 	}
 
@@ -207,12 +216,41 @@ class AutoClockOutJobTest extends TestCase
 		$this->runJob();
 	}
 
-	public function testRunOutsideConfiguredHourDoesNothing(): void
+	public function testRunBeforeCutoverDoesNothing(): void
 	{
-		$hour = ((int)(new \DateTime('now', new \DateTimeZone(self::TZ)))->format('G') + 2) % 24;
-		$this->appConfig[Constants::CONFIG_AUTO_CLOCK_OUT_HOUR] = (string)$hour;
+		$nowHour = (int)(new \DateTime('now', new \DateTimeZone(self::TZ)))->format('G');
+		if ($nowHour === 23) {
+			$this->markTestSkipped('no later hour exists at 23:00 — rerunnable any other time');
+		}
+		$this->appConfig[Constants::CONFIG_AUTO_CLOCK_OUT_HOUR] = (string)($nowHour + 1);
 		$this->userManager->expects($this->never())->method('callForAllUsers');
 		$this->locking->expects($this->once())->method('releaseLock');
+		$this->runJob();
+	}
+
+	public function testRunAfterCutoverCatchesUp(): void
+	{
+		// Hour 0 already passed today: a missed hourly tick must still
+		// close (catch-up). The NEXT hourly run re-scans — by design —
+		// but finds the entry closed in prod (modelled here as
+		// findOpenEntryByUser→null) and therefore writes/notifies nothing.
+		$this->appConfig[Constants::CONFIG_AUTO_CLOCK_OUT_HOUR] = '0';
+		$this->wireEverydayModel();
+		$yesterday = (new \DateTime('now', new \DateTimeZone(self::TZ)))->modify('-1 day');
+		$entry = $this->openEntry(77, 'alice', $yesterday->format('Y-m-d') . ' 10:00:00');
+
+		$this->withUsers($this->user('alice'));
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
+		$this->timeEntryMapper->method('findOpenEntryByUser')
+			->willReturnOnConsecutiveCalls($entry, null);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeTrackingService->expects($this->once())
+			->method('autoClockOutAtPlannedEnd')
+			->willReturn($entry);
+		$this->notificationService->expects($this->once())->method('notifyAutoClockOut');
+
+		$this->runJob();
 		$this->runJob();
 	}
 
@@ -251,10 +289,14 @@ class AutoClockOutJobTest extends TestCase
 			->with('alice', $this->callback(
 				static fn (array $p) => ($p['id'] ?? null) === 55 && ($p['end_time'] ?? null) === '16:00'
 			));
-		$this->config->expects($this->once())
-			->method('setUserValue')
-			->with('alice', 'arbeitszeitcheck', 'auto_clockout_notice', $this->callback(
-				static fn (string $json) => str_contains($json, TimeEntry::ENDED_REASON_AUTO_PLANNED_END)
+		// The banner merges via the service — never a raw setUserValue
+		// that could clobber a same-day notice from another workflow.
+		$this->config->expects($this->never())->method('setUserValue');
+		$this->timeTrackingService->expects($this->once())
+			->method('recordAutoClockoutNotice')
+			->with('alice', $this->callback(
+				static fn (array $notice) => ($notice['reason'] ?? null) === TimeEntry::ENDED_REASON_AUTO_PLANNED_END
+					&& ($notice['message'] ?? '') !== ''
 			));
 		$this->locking->expects($this->once())->method('releaseLock');
 
@@ -406,6 +448,32 @@ class AutoClockOutJobTest extends TestCase
 
 		$this->timeTrackingService->expects($this->never())->method('autoClockOutAtPlannedEnd');
 		$this->notificationService->expects($this->never())->method('notifyAutoClockOut');
+		$this->runJob();
+	}
+
+	public function testOverlapRaceUnderLockCountsAsOverlapSkip(): void
+	{
+		// The service's in-lock overlap veto surfaces as OVERLAP_CONFLICT —
+		// the job must count it as the same overlap skip (quiet retryable
+		// race), not a warning-level business_rule rejection.
+		$this->wireEverydayModel();
+		$yesterday = (new \DateTime('now', new \DateTimeZone(self::TZ)))->modify('-1 day');
+		$entry = $this->openEntry(55, 'alice', $yesterday->format('Y-m-d') . ' 10:00:00');
+
+		$this->withUsers($this->user('alice'));
+		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findPendingOpenSessionByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+
+		$this->timeTrackingService->method('autoClockOutAtPlannedEnd')
+			->willThrowException(new BusinessRuleException('overlap', BusinessRuleCode::OVERLAP_CONFLICT));
+		$this->notificationService->expects($this->never())->method('notifyAutoClockOut');
+		$this->logger->expects($this->never())->method('warning');
+		$this->logger->expects($this->once())->method('info')->with(
+			$this->anything(),
+			$this->callback(static fn ($ctx) => ($ctx['skipped']['overlap_conflict'] ?? 0) === 1)
+		);
 		$this->runJob();
 	}
 

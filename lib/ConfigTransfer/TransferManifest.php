@@ -174,9 +174,6 @@ final class TransferManifest extends AbstractTransferManifest
 			'transfer_receipts' => 'internal',
 			'transfer_job_state' => 'internal',
 			'transfer_last_import_at' => 'internal',
-			// Auto clock-out job dedup stamp — per-instance runtime state,
-			// never carried to a restored instance.
-			'auto_clockout_last_run' => 'internal',
 			// Gate-artifact placeholders — NOT real keys. The manifest gate's
 			// second-argument heuristic captures the DEFAULT literals of
 			// two-argument getAppValueString(key, 'default') calls

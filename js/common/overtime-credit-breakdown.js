@@ -72,6 +72,15 @@
 		dismiss.setAttribute('aria-label', txt('Close'));
 		dismiss.textContent = '×';
 		dismiss.addEventListener('click', () => dlg.close());
+		// NC's notifications app preventDefault()s the global Escape keydown,
+		// which suppresses the native <dialog> `cancel` event — without an
+		// explicit handler the modal ignores Escape entirely.
+		dlg.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				dlg.close();
+			}
+		});
 		header.append(title, dismiss);
 		const bodyWrap = document.createElement('div');
 		bodyWrap.className = 'modal-body';

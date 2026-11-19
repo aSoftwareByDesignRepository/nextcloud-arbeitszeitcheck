@@ -145,6 +145,14 @@ const STATEFUL_SPECS = [
   // on its probe day ("correction overlaps existing time entries") and
   // parallel specs observe the flipped approval flag mid-assert.
   /atlas-split-cas-race\.spec\.js/,
+  // Plants/deletes oc_file_locks rows on the shared 'azc/wtm/catalog' key and
+  // deletes a working-time model — a parallel spec touching the model catalog
+  // or lock provider races the planted rows mid-assert.
+  /_probe-dblock\.spec\.js/,
+  // Flips instance-global auto_clockout_* settings, force-runs the job and
+  // stamps entries on dedicated users — parallel specs observe the flipped
+  // global config and job side-effects mid-assert.
+  /atlas-auto-clock-out\.spec\.js/,
 ]
 
 export default defineConfig({

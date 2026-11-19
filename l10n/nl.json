@@ -6810,7 +6810,7 @@
 		"The selected range is too long.": "Het geselecteerde bereik is te lang.",
 		"Unknown period.": "Onbekende periode.",
 		"Automatic clock-out hour must be a whole number between 0 and 23": "Het uur voor automatisch uitklokken moet een geheel getal tussen 0 en 23 zijn",
-		"Automatic clock-out scope must be \"today\" or \"all_open\"": "Het bereik van automatisch uitklokken moet \"today\" of \"all_open\" zijn",
+		"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"": "Het bereik van automatisch uitklokken moet \"%1$s\" of \"%2$s\" zijn",
 		"Session clocked out automatically": "Sessie automatisch uitgeklokt",
 		"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.": "Je tijdregistratie van %1$s is automatisch om %2$s beëindigd (gepland einde). Controleer de invoer.",
 		"Automatically clocked out at the scheduled end of day — please review": "Automatisch uitgeklokt op het geplande einde van de dag — controleer dit",

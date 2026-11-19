@@ -3516,7 +3516,10 @@ class AdminController extends Controller
 				if (!in_array($rawScope, [Constants::AUTO_CLOCK_OUT_SCOPE_TODAY, Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN], true)) {
 					return new JSONResponse([
 						'success' => false,
-						'error' => $this->l10n->t('Automatic clock-out scope must be "today" or "all_open"'),
+						'error' => $this->l10n->t('Automatic clock-out scope must be "%1$s" or "%2$s"', [
+							$this->l10n->t('Only sessions started today'),
+							$this->l10n->t('All open sessions, including older days'),
+						]),
 						'code' => 'invalid_auto_clock_out_scope',
 						'field' => 'autoClockOutScope',
 					], Http::STATUS_BAD_REQUEST);

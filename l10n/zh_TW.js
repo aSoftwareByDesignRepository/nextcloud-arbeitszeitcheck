@@ -6754,7 +6754,7 @@
 	"The selected range is too long." : "所選時間範圍過長。",
 	"Unknown period." : "未知期間。",
 	"Automatic clock-out hour must be a whole number between 0 and 23" : "自動下班時間必須是 0 到 23 之間的整數",
-	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "自動下班範圍必須是 \"today\" 或 \"all_open\"",
+	"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"" : "自動下班範圍必須是 \"%1$s\" 或 \"%2$s\"",
 	"Session clocked out automatically" : "工作階段已自動結束",
 	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "您在 %1$s 的工時記錄已於 %2$s 自動結束（計畫結束時間）。請檢查此筆記錄。",
 	"Automatically clocked out at the scheduled end of day — please review" : "已於計畫結束時間自動結束 — 請檢查",

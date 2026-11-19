@@ -6754,7 +6754,7 @@
 	"The selected range is too long." : "O período selecionado é muito longo.",
 	"Unknown period." : "Período desconhecido.",
 	"Automatic clock-out hour must be a whole number between 0 and 23" : "A hora do registro de saída automático deve ser um número inteiro entre 0 e 23",
-	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "O escopo do registro automático deve ser \"today\" ou \"all_open\"",
+	"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"" : "O escopo do registro automático deve ser \"%1$s\" ou \"%2$s\"",
 	"Session clocked out automatically" : "Sessão encerrada automaticamente",
 	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Seu registro de ponto de %1$s foi encerrado automaticamente às %2$s (fim planejado). Revise o lançamento.",
 	"Automatically clocked out at the scheduled end of day — please review" : "Encerrado automaticamente no fim planejado do dia — revise",

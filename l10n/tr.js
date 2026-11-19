@@ -6754,7 +6754,7 @@
 	"The selected range is too long." : "Seçilen aralık çok uzun.",
 	"Unknown period." : "Bilinmeyen dönem.",
 	"Automatic clock-out hour must be a whole number between 0 and 23" : "Otomatik çıkış saati 0 ile 23 arasında bir tam sayı olmalıdır",
-	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Otomatik çıkış kapsamı \"today\" veya \"all_open\" olmalıdır",
+	"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"" : "Otomatik çıkış kapsamı \"%1$s\" veya \"%2$s\" olmalıdır",
 	"Session clocked out automatically" : "Oturum otomatik olarak kapatıldı",
 	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "%1$s tarihli zaman kaydınız %2$s saatinde otomatik olarak kapatıldı (planlanan bitiş). Lütfen kaydı kontrol edin.",
 	"Automatically clocked out at the scheduled end of day — please review" : "Planlanan gün sonunda otomatik kapatıldı — lütfen kontrol edin",

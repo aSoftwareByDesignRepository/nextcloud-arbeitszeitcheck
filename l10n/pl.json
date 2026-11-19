@@ -6829,7 +6829,7 @@
 		"The selected range is too long.": "Wybrany zakres jest zbyt długi.",
 		"Unknown period.": "Nieznany okres.",
 		"Automatic clock-out hour must be a whole number between 0 and 23": "Godzina automatycznego wylogowania musi być liczbą całkowitą od 0 do 23",
-		"Automatic clock-out scope must be \"today\" or \"all_open\"": "Zakres automatycznego wylogowania musi wynosić \"today\" lub \"all_open\"",
+		"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"": "Zakres automatycznego wylogowania musi wynosić \"%1$s\" lub \"%2$s\"",
 		"Session clocked out automatically": "Sesja zamknięta automatycznie",
 		"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.": "Twoja rejestracja czasu z dnia %1$s została zakończona automatycznie o %2$s (planowany koniec). Sprawdź wpis.",
 		"Automatically clocked out at the scheduled end of day — please review": "Automatycznie wylogowano o planowanym końcu dnia — sprawdź",

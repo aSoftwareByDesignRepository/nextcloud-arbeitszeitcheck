@@ -6754,7 +6754,7 @@
 	"The selected range is too long." : "Den valgte perioden er for lang.",
 	"Unknown period." : "Ukjent periode.",
 	"Automatic clock-out hour must be a whole number between 0 and 23" : "Timen for automatisk avslutning må være et heltall mellom 0 og 23",
-	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Omfanget for automatisk avslutning må være \"today\" eller \"all_open\"",
+	"Automatic clock-out scope must be \"%1$s\" or \"%2$s\"" : "Omfanget for automatisk avslutning må være \"%1$s\" eller \"%2$s\"",
 	"Session clocked out automatically" : "Økt avsluttet automatisk",
 	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Tidsregistreringen din den %1$s ble avsluttet automatisk kl. %2$s (planlagt slutt). Se over oppføringen.",
 	"Automatically clocked out at the scheduled end of day — please review" : "Automatisk avsluttet ved planlagt dagsslutt — se over",

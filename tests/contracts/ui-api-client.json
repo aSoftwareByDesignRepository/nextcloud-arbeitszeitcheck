@@ -753,6 +753,134 @@
 					]
 				}
 			]
-		}
+		},
+	{
+		"id": "auto-clock-out-admin-settings",
+		"param": "autoClockOutEnabled / autoClockOutHour / autoClockOutScope",
+		"description": "Admin org settings for the planned-end auto clock-out. Same three keys are accepted by POST and returned by GET (parity required for the enable gate). Hour must be 0-23; scope enum is today|all_open. Admin-only surface: the companion has no admin settings screen, so mobile is null.",
+		"errorCodes": [
+			"invalid_auto_clock_out_hour",
+			"invalid_auto_clock_out_scope"
+		],
+		"server": [
+			{
+				"file": "lib/Controller/AdminController.php",
+				"needles": [
+					"autoClockOutEnabled",
+					"autoClockOutHour",
+					"autoClockOutScope",
+					"invalid_auto_clock_out_hour",
+					"invalid_auto_clock_out_scope"
+				]
+			},
+			{
+				"file": "lib/Constants.php",
+				"needles": [
+					"CONFIG_AUTO_CLOCK_OUT_ENABLED",
+					"CONFIG_AUTO_CLOCK_OUT_HOUR",
+					"CONFIG_AUTO_CLOCK_OUT_SCOPE",
+					"AUTO_CLOCK_OUT_SCOPE_ALL_OPEN"
+				]
+			},
+			{
+				"file": "lib/Service/AdminSettingsSectionCatalog.php",
+				"needles": [
+					"autoClockOutEnabled",
+					"autoClockOutHour",
+					"autoClockOutScope"
+				]
+			}
+		],
+		"web": [
+			{
+				"file": "templates/partials/admin-settings/time-recording.php",
+				"needles": [
+					"autoClockOutEnabled",
+					"autoClockOutHour",
+					"autoClockOutScope",
+					"azc-field-error"
+				]
+			},
+			{
+				"file": "js/admin-settings.js",
+				"needles": [
+					"autoClockOutEnabled",
+					"autoClockOutHour",
+					"autoClockOutScope",
+					"auto-clock-out-controls"
+				]
+			}
+		],
+		"mobile": null
+	},
+	{
+		"id": "auto-clock-out-ended-reason-marker",
+		"param": "endedReason ('auto_planned_end')",
+		"description": "Marker shown on entries the system closed at the planned end. Serialized via TimeEntry::getSummary(); both web lists and the companion detail screen render a readable badge — never the raw reason key.",
+		"server": [
+			{
+				"file": "lib/Db/TimeEntry.php",
+				"needles": [
+					"ENDED_REASON_AUTO_PLANNED_END",
+					"auto_planned_end",
+					"endedReason"
+				]
+			},
+			{
+				"file": "lib/Constants.php",
+				"needles": [
+					"AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT",
+					"auto_clock_out"
+				]
+			},
+			{
+				"file": "lib/BackgroundJob/AutoClockOutJob.php",
+				"needles": [
+					"ENDED_REASON_AUTO_PLANNED_END",
+					"autoClockOutAtPlannedEnd"
+				]
+			}
+		],
+		"web": [
+			{
+				"file": "templates/time-entries.php",
+				"needles": [
+					"ENDED_REASON_AUTO_PLANNED_END",
+					"azc-auto-clockout-badge"
+				]
+			},
+			{
+				"file": "js/manager-time-entries.js",
+				"needles": [
+					"auto_planned_end",
+					"azc-auto-clockout-badge",
+					"autoClockOutBadgeHtml"
+				]
+			}
+		],
+		"mobile": [
+			{
+				"file": "src/screens/TimeEntryDetailScreen.tsx",
+				"needles": [
+					"ENDED_REASON_MARKER_KEYS",
+					"auto_planned_end",
+					"endedReasonBadge",
+					"time.endedReasonAutoPlannedEnd"
+				]
+			},
+			{
+				"file": "src/i18n/locales/en.json",
+				"needles": [
+					"endedReasonAutoPlannedEnd"
+				]
+			},
+			{
+				"file": "src/i18n/locales/de.json",
+				"needles": [
+					"endedReasonAutoPlannedEnd"
+				]
+			}
+		]
+	}
 	]
 }

@@ -393,6 +393,39 @@ class NotificationService
 	}
 
 	/**
+	 * Notify a user that the system closed their session at the planned end.
+	 *
+	 * Deliberately NOT gated by the user's notifications_enabled setting:
+	 * an automatic clock-out changes payroll data without the user's action,
+	 * and the notification is the user-facing evidence of that system
+	 * intervention (auditability requirement).
+	 *
+	 * @param string $userId User ID to notify
+	 * @param array $timeEntryData {id, date, end_time} — entry id, formatted
+	 *   date and formatted planned end (user display TZ)
+	 * @return void
+	 */
+	public function notifyAutoClockOut(string $userId, array $timeEntryData): void
+	{
+		$notification = $this->notificationManager->createNotification();
+		$notification->setApp('arbeitszeitcheck')
+			->setUser($userId)
+			->setDateTime(new \DateTime())
+			->setObject('time_entry', (string)($timeEntryData['id'] ?? ''))
+			->setSubject('auto_clock_out', [
+				'entry_id' => $timeEntryData['id'] ?? null,
+				'date' => $timeEntryData['date'] ?? null,
+				'end_time' => $timeEntryData['end_time'] ?? null,
+			])
+			->setMessage('auto_clock_out', [
+				'date' => $timeEntryData['date'] ?? null,
+				'end_time' => $timeEntryData['end_time'] ?? null,
+			]);
+
+		$this->notificationManager->notify($notification);
+	}
+
+	/**
 	 * Send a break reminder notification
 	 *
 	 * @param string $userId User ID to notify

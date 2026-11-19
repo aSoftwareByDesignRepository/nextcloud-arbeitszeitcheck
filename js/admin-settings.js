@@ -85,6 +85,39 @@
         initOrganizationTimeCapture();
         initCountryRegionPicker();
         initBreakPolicyEditor();
+        initAutoClockOutControls();
+    }
+
+    /**
+     * Automatic clock-out: hour + scope only make sense while the feature is
+     * on — progressive disclosure keeps them disabled and un-submitted
+     * otherwise (stored values persist untouched).
+     */
+    function initAutoClockOutControls() {
+        const toggle = document.getElementById('autoClockOutEnabled');
+        const controls = document.getElementById('auto-clock-out-controls');
+        if (!toggle || !controls) {
+            return;
+        }
+        const apply = function() {
+            const on = toggle.checked;
+            controls.classList.toggle('auto-clock-out__controls--disabled', !on);
+            controls.querySelectorAll('input, select, button').forEach(function(el) {
+                el.disabled = !on;
+            });
+        };
+        Utils.on(toggle, 'change', apply);
+        controls.querySelectorAll('input').forEach(function(el) {
+            Utils.on(el, 'input', function() {
+                el.removeAttribute('aria-invalid');
+                const errorEl = document.getElementById(el.name + '-error');
+                if (errorEl) {
+                    errorEl.hidden = true;
+                    errorEl.textContent = '';
+                }
+            });
+        });
+        apply();
     }
 
     /**
@@ -348,6 +381,33 @@
             heading.focus();
         }
         return true;
+    }
+
+    /**
+     * Render a single server-side field error (`{field, error}` payloads)
+     * into the field's inline .azc-field-error slot, mirroring the shared
+     * aria-invalid contract. Falls back to the global error path when the
+     * named field is not on this page.
+     */
+    function renderNamedFieldError(fieldName, message) {
+        const input = document.getElementById(fieldName)
+            || document.querySelector('[name="' + fieldName + '"]');
+        if (!input) {
+            return;
+        }
+        input.setAttribute('aria-invalid', 'true');
+        const errorEl = document.getElementById(fieldName + '-error');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.hidden = false;
+        }
+        const describedBy = input.getAttribute('aria-describedby') || '';
+        if (errorEl && !describedBy.includes(errorEl.id)) {
+            input.setAttribute('aria-describedby', (describedBy ? describedBy + ' ' : '') + errorEl.id);
+        }
+        if (typeof input.focus === 'function') {
+            input.focus();
+        }
     }
 
     /**
@@ -974,7 +1034,13 @@
 
         // Convert checkboxes to boolean only when the control exists on this page.
         // Missing fields must not be sent as false — that would wipe sibling sections.
-        function isChecked(v) { return v === 'on' || v === '1' || v === 1 || v === true; }
+        // FormData last-wins: a hidden 0 + checkbox 1 pair arrives as ['0','1'].
+        function isChecked(v) {
+            if (Array.isArray(v)) {
+                v = v.length ? v[v.length - 1] : undefined;
+            }
+            return v === 'on' || v === '1' || v === 1 || v === true;
+        }
         function hasField(name) {
             return !!form.querySelector('[name="' + name + '"], [name="' + name + '[]"]');
         }
@@ -999,6 +1065,7 @@
             'clockStampingEnabled',
             'manualTimeEntryEnabled',
             'projectCheckIntegrationEnabled',
+            'autoClockOutEnabled',
         ].forEach(setBoolIfPresent);
 
         if (hasField('accessAllowedGroups[]') || hasField('accessAllowedGroups')) {
@@ -1117,6 +1184,16 @@
         } else {
             delete formData.retentionPeriod;
         }
+        // Disabled (feature off) controls are absent from FormData — strip
+        // them so a saved "off" never resets the stored hour/scope.
+        if (hasField('autoClockOutHour') && formData.autoClockOutHour !== undefined) {
+            formData.autoClockOutHour = int(formData.autoClockOutHour, 22);
+        } else {
+            delete formData.autoClockOutHour;
+        }
+        if (!hasField('autoClockOutScope') || formData.autoClockOutScope === undefined) {
+            delete formData.autoClockOutScope;
+        }
         const graceInput = Utils.$('#monthClosureGraceDaysAfterEom');
         if (graceInput) {
             formData.monthClosureGraceDaysAfterEom = int(graceInput.value, 0);
@@ -1214,6 +1291,9 @@
             }
             if (data && data.fields && typeof data.fields === 'object') {
                 renderBreakPolicyFieldErrors(data.fields);
+            }
+            if (data && typeof data.field === 'string' && data.field !== '') {
+                renderNamedFieldError(data.field, msg);
             }
             Messaging.showError(msg);
             setLiveMessage(liveRegion, msg, 'error');

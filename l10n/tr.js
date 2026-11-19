@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Bu günleri ekleyen başka bir devamsızlıkla çakışıyor.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Geçerli bir başlangıç ve bitiş tarihi girin (YYYY-AA-GG).",
 	"The selected range is too long." : "Seçilen aralık çok uzun.",
-	"Unknown period." : "Bilinmeyen dönem."
-	}
+	"Unknown period." : "Bilinmeyen dönem.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Otomatik çıkış saati 0 ile 23 arasında bir tam sayı olmalıdır",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Otomatik çıkış kapsamı \"today\" veya \"all_open\" olmalıdır",
+	"Session clocked out automatically" : "Oturum otomatik olarak kapatıldı",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "%1$s tarihli zaman kaydınız %2$s saatinde otomatik olarak kapatıldı (planlanan bitiş). Lütfen kaydı kontrol edin.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Planlanan gün sonunda otomatik kapatıldı — lütfen kontrol edin",
+	"Automatic" : "Otomatik",
+	"Automatic clock-out" : "Otomatik çıkış",
+	"Clock out automatically at the scheduled end of day" : "Planlanan gün sonunda otomatik çıkış yap",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Planlanan gün sonunda hâlâ açık olan oturumları kapatır ve otomatik olarak işaretler. Çalışan her zaman bilgilendirilir ve kaydı kontrol etmesi istenir. Varsayılan olarak kapalıdır.",
+	"Close open sessions at" : "Açık oturumları şu saatte kapat:",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Kontrolün çalıştığı, kurum saat dilimindeki gün saati (0–23). Bir oturum yalnızca planlanan bitişi geçmişse kapatılır.",
+	"Which open sessions are covered" : "Hangi açık oturumlar kapsanır",
+	"Only sessions started today" : "Yalnızca bugün başlatılan oturumlar",
+	"All open sessions, including older days" : "Eski günler dahil tüm açık oturumlar",
+	"Older open sessions are closed at the planned end of the day they started on." : "Eski açık oturumlar, başladıkları günün planlanan bitişinde kapatılır."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

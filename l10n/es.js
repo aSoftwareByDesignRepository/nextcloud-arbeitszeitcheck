@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Se solapa con otra ausencia que abonó estos días.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Indique una fecha de inicio y de fin válidas (AAAA-MM-DD).",
 	"The selected range is too long." : "El período seleccionado es demasiado largo.",
-	"Unknown period." : "Período desconocido."
-	}
+	"Unknown period." : "Período desconocido.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "La hora del fichaje de salida automático debe ser un número entero entre 0 y 23",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "El ámbito del fichaje automático debe ser \"today\" o \"all_open\"",
+	"Session clocked out automatically" : "Sesión cerrada automáticamente",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Tu registro de tiempo del %1$s se cerró automáticamente a las %2$s (fin planificado). Revisa la entrada.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Cerrado automáticamente al final planificado de la jornada — revísalo",
+	"Automatic" : "Automático",
+	"Automatic clock-out" : "Fichaje de salida automático",
+	"Clock out automatically at the scheduled end of day" : "Cerrar automáticamente al final planificado de la jornada",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Cierra las sesiones que sigan abiertas al final planificado de la jornada y las marca como automáticas. La persona siempre recibe una notificación y se le pide revisar la entrada. Desactivado por defecto.",
+	"Close open sessions at" : "Cerrar sesiones abiertas a las",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Hora del día (0–23) en la zona horaria de la organización en la que se ejecuta la comprobación. Una sesión solo se cierra cuando su fin planificado ya ha pasado.",
+	"Which open sessions are covered" : "Qué sesiones abiertas se cubren",
+	"Only sessions started today" : "Solo las sesiones iniciadas hoy",
+	"All open sessions, including older days" : "Todas las sesiones abiertas, incluidos días anteriores",
+	"Older open sessions are closed at the planned end of the day they started on." : "Las sesiones abiertas más antiguas se cierran al final planificado del día en que comenzaron."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

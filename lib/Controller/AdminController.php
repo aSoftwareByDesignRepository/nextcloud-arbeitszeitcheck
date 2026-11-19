@@ -1849,6 +1849,9 @@ class AdminController extends Controller
 					(string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::DEFAULT_PAST_HOURS
 				)
 			),
+			'autoClockOutEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED, '0') === '1',
+			'autoClockOutHour' => $this->autoClockOutHourFromConfig(),
+			'autoClockOutScope' => $this->autoClockOutScopeFromConfig(),
 			'accessRestrictionEnabled' => $this->isAccessRestrictionEnabledFromConfig(),
 			'accessAllowedGroups' => $this->getAllowedAccessGroupsFromConfig(),
 			'accessAllowedUserIds' => $this->getConfiguredAccessAllowedUserIds(),
@@ -2045,6 +2048,23 @@ class AdminController extends Controller
 		$country = strtoupper(trim($this->appConfig->getAppValueString('country', RegionRegistry::COUNTRY_DE)));
 
 		return RegionRegistry::isSupportedCountry($country) ? $country : RegionRegistry::COUNTRY_DE;
+	}
+
+	/** Stored auto clock-out hour normalised to 0–23 for GET payloads. */
+	private function autoClockOutHourFromConfig(): int
+	{
+		$raw = $this->appConfig->getAppValueString(Constants::CONFIG_AUTO_CLOCK_OUT_HOUR, (string)Constants::AUTO_CLOCK_OUT_DEFAULT_HOUR);
+		$hour = is_numeric($raw) ? (int)$raw : Constants::AUTO_CLOCK_OUT_DEFAULT_HOUR;
+		return max(0, min(23, $hour));
+	}
+
+	/** Stored auto clock-out scope normalised to the allowlist for GET payloads. */
+	private function autoClockOutScopeFromConfig(): string
+	{
+		$scope = $this->appConfig->getAppValueString(Constants::CONFIG_AUTO_CLOCK_OUT_SCOPE, Constants::AUTO_CLOCK_OUT_SCOPE_TODAY);
+		return in_array($scope, [Constants::AUTO_CLOCK_OUT_SCOPE_TODAY, Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN], true)
+			? $scope
+			: Constants::AUTO_CLOCK_OUT_SCOPE_TODAY;
 	}
 
 	/**
@@ -3345,6 +3365,9 @@ class AdminController extends Controller
 						(string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::DEFAULT_PAST_HOURS
 					)
 				),
+				'autoClockOutEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED, '0') === '1',
+				'autoClockOutHour' => $this->autoClockOutHourFromConfig(),
+				'autoClockOutScope' => $this->autoClockOutScopeFromConfig(),
 				'accessRestrictionEnabled' => $this->isAccessRestrictionEnabledFromConfig(),
 				'accessAllowedGroups' => $this->getAllowedAccessGroupsFromConfig(),
 				'accessAllowedUserIds' => $this->getConfiguredAccessAllowedUserIds(),
@@ -3468,7 +3491,37 @@ class AdminController extends Controller
 				'manualTimeEntriesRequireApproval' => Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL,
 				'projectCheckIntegrationEnabled' => Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED,
 				'offlineStampMaxPastHours' => Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
+				'autoClockOutEnabled' => Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED,
+				'autoClockOutHour' => Constants::CONFIG_AUTO_CLOCK_OUT_HOUR,
+				'autoClockOutScope' => Constants::CONFIG_AUTO_CLOCK_OUT_SCOPE,
 			];
+
+			// Fail-fast validation for the auto clock-out settings: reject the
+			// whole request before any key is written, so a bad hour or scope
+			// can never leave a half-saved configuration behind.
+			if ($paramAllowed('autoClockOutHour') && isset($params['autoClockOutHour'])) {
+				$rawHour = $params['autoClockOutHour'];
+				$hourValue = filter_var($rawHour, FILTER_VALIDATE_INT);
+				if ($hourValue === false || $hourValue < 0 || $hourValue > 23) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Automatic clock-out hour must be a whole number between 0 and 23'),
+						'code' => 'invalid_auto_clock_out_hour',
+						'field' => 'autoClockOutHour',
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
+			if ($paramAllowed('autoClockOutScope') && isset($params['autoClockOutScope'])) {
+				$rawScope = (string)$params['autoClockOutScope'];
+				if (!in_array($rawScope, [Constants::AUTO_CLOCK_OUT_SCOPE_TODAY, Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN], true)) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Automatic clock-out scope must be "today" or "all_open"'),
+						'code' => 'invalid_auto_clock_out_scope',
+						'field' => 'autoClockOutScope',
+					], Http::STATUS_BAD_REQUEST);
+				}
+			}
 
 			$updatedSettings = [];
 
@@ -3492,7 +3545,7 @@ class AdminController extends Controller
 						'statutoryAutoReseed',
 						'vacationRolloverEnabled', 'vacationRolloverIncludeUnusedAnnual',
 						'timeEntryChangesRequireApproval', 'manualTimeEntriesRequireApproval',
-						'projectCheckIntegrationEnabled',
+						'projectCheckIntegrationEnabled', 'autoClockOutEnabled',
 					], true)) {
 						$value = ($value === true || $value === 'true' || $value === '1') ? '1' : '0';
 						if ($paramKey === 'projectCheckIntegrationEnabled' && $value === '1' && !$this->isProjectCheckInstalledOnInstance()) {
@@ -3593,6 +3646,12 @@ class AdminController extends Controller
 							], Http::STATUS_BAD_REQUEST);
 						}
 						$value = (string)\OCA\ArbeitszeitCheck\Support\OfflineStampSkewPolicy::normalizePastHours($hours);
+					} elseif ($paramKey === 'autoClockOutHour') {
+						// Pre-validated above — here only the storage form.
+						$value = (string)(int)$value;
+					} elseif ($paramKey === 'autoClockOutScope') {
+						// Pre-validated above — allowlist already enforced.
+						$value = (string)$value;
 					} elseif ($paramKey === 'timePickerMinuteStep') {
 						$value = (string)\OCA\ArbeitszeitCheck\Support\TimePickerMinuteStep::normalize((int)$value);
 					} elseif ($paramKey === 'breakAutoFallbackFlexWindowStart') {

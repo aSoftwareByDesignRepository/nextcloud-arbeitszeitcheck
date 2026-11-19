@@ -1176,6 +1176,13 @@ if ($mode === 'list') {
                                                 p($statusLabel);
                                                 ?>
                                             </span>
+                                            <?php if ($entry->getEndedReason() === \OCA\ArbeitszeitCheck\Db\TimeEntry::ENDED_REASON_AUTO_PLANNED_END): ?>
+                                                <span class="badge badge--info azc-auto-clockout-badge"
+                                                    title="<?php p($l->t('Automatically clocked out at the scheduled end of day — please review')); ?>"
+                                                    aria-label="<?php p($l->t('Automatically clocked out at the scheduled end of day — please review')); ?>">
+                                                    <?php p($l->t('Automatic')); ?>
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                             <?php $rowActionsEntryId = $entry->getId(); ?>

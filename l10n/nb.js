@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Overlapper et annet fravær som godskrev disse dagene.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Oppgi en gyldig start- og sluttdato (ÅÅÅÅ-MM-DD).",
 	"The selected range is too long." : "Den valgte perioden er for lang.",
-	"Unknown period." : "Ukjent periode."
-	}
+	"Unknown period." : "Ukjent periode.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Timen for automatisk avslutning må være et heltall mellom 0 og 23",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Omfanget for automatisk avslutning må være \"today\" eller \"all_open\"",
+	"Session clocked out automatically" : "Økt avsluttet automatisk",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Tidsregistreringen din den %1$s ble avsluttet automatisk kl. %2$s (planlagt slutt). Se over oppføringen.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Automatisk avsluttet ved planlagt dagsslutt — se over",
+	"Automatic" : "Automatisk",
+	"Automatic clock-out" : "Automatisk avslutning",
+	"Clock out automatically at the scheduled end of day" : "Avslutt automatisk ved planlagt dagsslutt",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Avslutter økter som fortsatt er åpne ved planlagt dagsslutt og merker dem som automatiske. Den ansatte varsles alltid og blir bedt om å se over oppføringen. Av som standard.",
+	"Close open sessions at" : "Lukk åpne økter kl.",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Time på dagen (0–23) i organisasjonens tidssone der sjekken kjører. En økt avsluttes bare når den planlagte slutten allerede har passert.",
+	"Which open sessions are covered" : "Hvilke åpne økter som dekkes",
+	"Only sessions started today" : "Bare økter startet i dag",
+	"All open sessions, including older days" : "Alle åpne økter, også eldre dager",
+	"Older open sessions are closed at the planned end of the day they started on." : "Eldre åpne økter avsluttes ved den planlagte slutten på dagen de startet."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

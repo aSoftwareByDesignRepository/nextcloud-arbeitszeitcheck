@@ -776,23 +776,50 @@ class TimeTrackingService
 	 */
 	private function completePausedEntryBeforeProjectSwitch(string $userId, TimeEntry $pausedEntry, ?string $captureSource = null): void
 	{
+		$pausedAt = $pausedEntry->getUpdatedAt() ?? $this->nowForAtEntries();
+		$this->completeOpenPausedEntry(
+			$userId,
+			$pausedEntry,
+			$pausedAt,
+			TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT,
+			'project_switch',
+			$captureSource
+		);
+	}
+
+	/**
+	 * Complete an open paused entry at an explicit end instant.
+	 *
+	 * Shared by the project-switch resume path (end = pause moment) and the
+	 * planned-end auto clock-out (end = resolved planned end). Caller must
+	 * already hold the user mutation lock; transactional context is the
+	 * caller's responsibility (clockIn wraps this in its own tx, the auto
+	 * clock-out wraps it in one of its own).
+	 */
+	private function completeOpenPausedEntry(
+		string $userId,
+		TimeEntry $pausedEntry,
+		\DateTime $end,
+		string $endedReason,
+		string $policyApplied,
+		?string $captureSource = null
+	): TimeEntry {
 		$this->monthClosureGuard->assertTimeEntryMutable($pausedEntry);
 
 		$now = $this->nowForAtEntries();
-		$pausedAt = $pausedEntry->getUpdatedAt() ?? $now;
 		$oldSummary = $this->safeGetSummary($pausedEntry, $userId);
 
-		$pausedEntry->setEndTime($pausedAt);
+		$pausedEntry->setEndTime($end);
 		$pausedEntry->setStatus(TimeEntry::STATUS_COMPLETED);
-		$pausedEntry->setEndedReason(TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT);
-		$pausedEntry->setPolicyApplied('project_switch');
+		$pausedEntry->setEndedReason($endedReason);
+		$pausedEntry->setPolicyApplied($policyApplied);
 		$pausedEntry->setUpdatedAt($now);
 
 		try {
 			$this->calculateAndSetAutomaticBreak($pausedEntry);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error(
-				'calculateAndSetAutomaticBreak failed while completing paused entry for project switch: ' . $e->getMessage(),
+				'calculateAndSetAutomaticBreak failed while completing paused entry: ' . $e->getMessage(),
 				[
 					'exception' => $e,
 					'user_id' => $userId,
@@ -804,8 +831,8 @@ class TimeTrackingService
 		$updated = $this->timeEntryMapper->update($pausedEntry);
 		$this->refreshPaidBreaksAlreadyLocked(
 			$userId,
-			$updated->getStartTime() ?? $pausedAt,
-			$pausedAt
+			$updated->getStartTime() ?? $end,
+			$end
 		);
 		$updated = $this->refreshEntrySnapshot($updated);
 		$this->auditLogMapper->logAction(
@@ -822,11 +849,13 @@ class TimeTrackingService
 				$this->projectCheckLaborSync->syncFromTimeEntry($updated, $userId);
 			} catch (\Throwable $e) {
 				\OCP\Log\logger('arbeitszeitcheck')->warning(
-					'ProjectCheck billing sync after paused project-switch complete failed: ' . $e->getMessage(),
+					'ProjectCheck billing sync after paused-entry completion failed: ' . $e->getMessage(),
 					['exception' => $e]
 				);
 			}
 		}
+
+		return $updated;
 	}
 
 	/**
@@ -1054,6 +1083,108 @@ class TimeTrackingService
 		// Persist the storage-zoned $end (the value just validated), never the
 		// foreign-offset original — the naive column keeps its wall clock.
 		return $this->clockOut($userId, TimeEntry::ENDED_REASON_MANUAL_CLOCK_OUT, 'retro_clock_out', $end);
+	}
+
+	/**
+	 * Close an open session at its resolved planned end of day.
+	 *
+	 * Called only by {@see AutoClockOutJob}. Unlike clockOutAt() this holds
+	 * the user mutation lock across the identity check AND the write — the
+	 * job looks entries up minutes/seconds before calling, so the open row
+	 * could be closed or replaced between scan and write. Holding the lock
+	 * makes the "is this still the same open entry" check race-free; the
+	 * lock is reentrant so delegating to {@see clockOut()} is safe.
+	 *
+	 * Idempotent by contract: when the entry is gone, already completed, or
+	 * no longer the live open row, this throws NOT_CLOCKED_IN and writes
+	 * nothing — the job treats that as "already handled".
+	 *
+	 * @param int $entryId Open entry the job resolved the planned end for.
+	 * @param \DateTimeInterface $plannedEnd Resolved planned end instant —
+	 *   never "now"; the job must never pass the run time here.
+	 * @throws BusinessRuleException NOT_CLOCKED_IN when the row is no longer
+	 *   the user's open session; INVALID_INPUT when $plannedEnd is in the
+	 *   future or not after the session start; MonthFinalizedException when
+	 *   the entry's month is already closed.
+	 */
+	public function autoClockOutAtPlannedEnd(string $userId, int $entryId, \DateTimeInterface $plannedEnd): TimeEntry
+	{
+		$lockKey = $this->acquireUserMutationLock($userId);
+		try {
+			$entry = $this->timeEntryMapper->findOpenEntryByUser($userId);
+			if (
+				$entry === null
+				|| (int)$entry->getId() !== $entryId
+				|| !in_array(
+					$entry->getStatus(),
+					[TimeEntry::STATUS_ACTIVE, TimeEntry::STATUS_BREAK, TimeEntry::STATUS_PAUSED],
+					true
+				)
+				|| $entry->getEndTime() !== null
+				|| $entry->getEndedReason() !== null
+			) {
+				throw new BusinessRuleException(
+					$this->l10n->t('User is not currently clocked in'),
+					BusinessRuleCode::NOT_CLOCKED_IN,
+				);
+			}
+
+			$end = \DateTime::createFromInterface($plannedEnd)->setTimezone($this->getAppConfiguredTimeZone());
+			$now = $this->nowForAtEntries();
+			if ($end->getTimestamp() > $now->getTimestamp()) {
+				throw new BusinessRuleException(
+					$this->l10n->t('The clock-out time cannot be in the future.'),
+					BusinessRuleCode::INVALID_INPUT,
+				);
+			}
+			$start = $entry->getStartTime();
+			if ($start === null || $end->getTimestamp() <= $start->getTimestamp()) {
+				throw new BusinessRuleException(
+					$this->l10n->t('End time must be after start time'),
+					BusinessRuleCode::INVALID_INPUT,
+				);
+			}
+
+			if ($entry->getStatus() === TimeEntry::STATUS_PAUSED) {
+				// Paused rows never flow through clockOut() (which only
+				// closes active/break). Complete them in one transaction
+				// under the same month-closure guard as every clock-out.
+				$mcKeys = $this->monthClosureGuard->acquireMutableRangeLocks($userId, $entry->getStartTime(), $end);
+				try {
+					$this->db->beginTransaction();
+					try {
+						$updated = $this->completeOpenPausedEntry(
+							$userId,
+							$entry,
+							$end,
+							TimeEntry::ENDED_REASON_AUTO_PLANNED_END,
+							Constants::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT,
+							Constants::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT
+						);
+						$this->db->commit();
+						return $updated;
+					} catch (\Throwable $e) {
+						$this->db->rollBack();
+						throw $e;
+					}
+				} finally {
+					$this->monthClosureGuard->releaseMutableRangeLocks($mcKeys);
+				}
+			}
+
+			// Active/break rows keep the canonical clockOut() write path —
+			// break archival, automatic-break calc, paid-break snapshot,
+			// audit log, compliance and sync all stay intact.
+			return $this->clockOut(
+				$userId,
+				TimeEntry::ENDED_REASON_AUTO_PLANNED_END,
+				Constants::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT,
+				$end,
+				Constants::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT
+			);
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
 	}
 
 	/**

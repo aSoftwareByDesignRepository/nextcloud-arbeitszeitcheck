@@ -6808,7 +6808,22 @@
 		"Overlaps another absence that credited these days.": "Si sovrappone a un’altra assenza che ha accreditato questi giorni.",
 		"Provide a valid start and end date (YYYY-MM-DD).": "Indicare una data di inizio e di fine valida (AAAA-MM-GG).",
 		"The selected range is too long.": "L'intervallo selezionato è troppo lungo.",
-		"Unknown period.": "Periodo sconosciuto."
+		"Unknown period.": "Periodo sconosciuto.",
+		"Automatic clock-out hour must be a whole number between 0 and 23": "L'ora dell'uscita automatica deve essere un numero intero tra 0 e 23",
+		"Automatic clock-out scope must be \"today\" or \"all_open\"": "L'ambito dell'uscita automatica deve essere \"today\" o \"all_open\"",
+		"Session clocked out automatically": "Sessione chiusa automaticamente",
+		"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.": "La tua registrazione del %1$s è stata chiusa automaticamente alle %2$s (fine pianificata). Controlla la voce.",
+		"Automatically clocked out at the scheduled end of day — please review": "Chiuso automaticamente alla fine pianificata della giornata — controlla",
+		"Automatic": "Automatico",
+		"Automatic clock-out": "Uscita automatica",
+		"Clock out automatically at the scheduled end of day": "Esci automaticamente alla fine pianificata della giornata",
+		"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default.": "Chiude le sessioni ancora aperte alla fine pianificata della giornata e le contrassegna come automatiche. La persona viene sempre avvisata e invitata a controllare la voce. Disattivato per impostazione predefinita.",
+		"Close open sessions at": "Chiudi le sessioni aperte alle",
+		"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed.": "Ora del giorno (0–23) nel fuso orario dell'organizzazione in cui viene eseguito il controllo. Una sessione viene chiusa solo quando il suo termine pianificato è già trascorso.",
+		"Which open sessions are covered": "Quali sessioni aperte sono coperte",
+		"Only sessions started today": "Solo le sessioni iniziate oggi",
+		"All open sessions, including older days": "Tutte le sessioni aperte, anche di giorni precedenti",
+		"Older open sessions are closed at the planned end of the day they started on.": "Le sessioni aperte più vecchie vengono chiuse alla fine pianificata del giorno in cui sono iniziate."
 	},
 	"pluralForm": "nplurals=2; plural=(n != 1);"
 }

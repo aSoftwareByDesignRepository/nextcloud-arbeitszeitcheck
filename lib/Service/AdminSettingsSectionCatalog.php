@@ -152,6 +152,9 @@ final class AdminSettingsSectionCatalog
 			'clockStampingEnabled',
 			'manualTimeEntryEnabled',
 			'offlineStampMaxPastHours',
+			'autoClockOutEnabled',
+			'autoClockOutHour',
+			'autoClockOutScope',
 		],
 		self::SECTION_TIME_APPROVALS => [
 			'timeEntryChangesRequireApproval',

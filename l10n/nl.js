@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Overlapt een andere afwezigheid die deze dagen heeft bijgeschreven.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Geef een geldige begin- en einddatum op (JJJJ-MM-DD).",
 	"The selected range is too long." : "Het geselecteerde bereik is te lang.",
-	"Unknown period." : "Onbekende periode."
-	}
+	"Unknown period." : "Onbekende periode.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Het uur voor automatisch uitklokken moet een geheel getal tussen 0 en 23 zijn",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Het bereik van automatisch uitklokken moet \"today\" of \"all_open\" zijn",
+	"Session clocked out automatically" : "Sessie automatisch uitgeklokt",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Je tijdregistratie van %1$s is automatisch om %2$s beëindigd (gepland einde). Controleer de invoer.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Automatisch uitgeklokt op het geplande einde van de dag — controleer dit",
+	"Automatic" : "Automatisch",
+	"Automatic clock-out" : "Automatisch uitklokken",
+	"Clock out automatically at the scheduled end of day" : "Automatisch uitklokken aan het geplande einde van de dag",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Sluit sessies die op het geplande einde van de dag nog open zijn en markeert ze als automatisch. De medewerker wordt altijd op de hoogte gesteld en gevraagd de invoer te controleren. Standaard uit.",
+	"Close open sessions at" : "Open sessies sluiten om",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Uur van de dag (0–23) in de tijdzone van de organisatie waarop de controle draait. Een sessie wordt alleen gesloten als haar geplande einde al verstreken is.",
+	"Which open sessions are covered" : "Welke open sessies worden meegenomen",
+	"Only sessions started today" : "Alleen vandaag gestarte sessies",
+	"All open sessions, including older days" : "Alle open sessies, ook van oudere dagen",
+	"Older open sessions are closed at the planned end of the day they started on." : "Oudere open sessies worden gesloten op het geplande einde van de dag waarop ze begonnen."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

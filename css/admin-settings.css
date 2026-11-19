@@ -1976,3 +1976,17 @@
 		border-color: CanvasText;
 	}
 }
+
+/* Automatic clock-out: dependent controls dim while the feature toggle is off. */
+.auto-clock-out__controls--disabled {
+	opacity: 0.6;
+}
+.auto-clock-out__controls--disabled .form-label,
+.auto-clock-out__controls--disabled .form-help {
+	color: var(--azc-muted, var(--color-text-maxcontrast));
+}
+@media (prefers-reduced-motion: no-preference) {
+	.auto-clock-out__controls {
+		transition: opacity 120ms ease-in-out;
+	}
+}

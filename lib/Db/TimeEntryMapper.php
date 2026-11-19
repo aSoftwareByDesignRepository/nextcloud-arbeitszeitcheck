@@ -332,6 +332,41 @@ class TimeEntryMapper extends QBMapper
 	}
 
 	/**
+	 * Most recent row whose session is still open (no end_time), regardless of
+	 * the live status (active, break, paused) or a pending open-session
+	 * correction. Used by AutoClockOutJob to find the single session that a
+	 * planned-end auto clock-out could close. A completed row can never match.
+	 */
+	public function findOpenEntryByUser(string $userId): ?TimeEntry
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->isNull('end_time'))
+			->andWhere($qb->expr()->in(
+				'status',
+				$qb->createNamedParameter(
+					[
+						TimeEntry::STATUS_ACTIVE,
+						TimeEntry::STATUS_BREAK,
+						TimeEntry::STATUS_PAUSED,
+						TimeEntry::STATUS_PENDING_APPROVAL,
+					],
+					IQueryBuilder::PARAM_STR_ARRAY
+				)
+			))
+			->orderBy('start_time', 'DESC')
+			->setMaxResults(1);
+
+		try {
+			return $this->findEntity($qb);
+		} catch (DoesNotExistException $e) {
+			return null;
+		}
+	}
+
+	/**
 	 * Live punch status for many users in one query (admin/manager desklet summaries).
 	 *
 	 * Does not run getStatus side-effects. Priority when a user has multiple open

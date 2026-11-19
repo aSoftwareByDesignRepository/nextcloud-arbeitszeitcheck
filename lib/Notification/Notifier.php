@@ -215,6 +215,29 @@ class Notifier implements INotifier {
 				);
 				break;
 
+			case 'auto_clock_out':
+				$entryDate = $parameters['date'] ?? null;
+				$endTime = $parameters['end_time'] ?? null;
+				$notification->setParsedSubject(
+					$l->t('Session clocked out automatically')
+				)->setParsedMessage(
+					$l->t('Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.', [
+						$entryDate ?? '?',
+						$endTime ?? '?',
+					])
+				);
+				// Land on the time-entries list pre-filtered to the entry's
+				// day — the closest deep link the app exposes for a session.
+				if (is_string($entryDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $entryDate)) {
+					$notification->setLink($this->urlGenerator->linkToRouteAbsolute(
+						'arbeitszeitcheck.page.timeEntries',
+						['start_date' => $entryDate, 'end_date' => $entryDate]
+					));
+				} else {
+					$notification->setLink($this->urlGenerator->linkToRouteAbsolute('arbeitszeitcheck.page.timeEntries'));
+				}
+				break;
+
 			case 'reminder_break':
 				$hoursWorked = $parameters['hours_worked'] ?? 0;
 				$requiredBreak = $parameters['required_break'] ?? 30;

@@ -358,6 +358,20 @@
 		return `<span class="badge badge--${escapeHtml(variant)}">${escapeHtml(label)}</span>`;
 	}
 
+	/**
+	 * Marker for sessions the system closed at the planned end of day —
+	 * managers must see at a glance that the end was not stamped by the
+	 * employee. Unknown endedReason values render nothing (never the raw key).
+	 */
+	function autoClockOutBadgeHtml(endedReason) {
+		if (endedReason !== 'auto_planned_end') {
+			return '';
+		}
+		const title = t('Automatically clocked out at the scheduled end of day — please review', 'Automatically clocked out at the scheduled end of day — please review');
+		const label = t('Automatic', 'Automatic');
+		return ` <span class="badge badge--info azc-auto-clockout-badge" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
+	}
+
 	function renderEntries(entries) {
 		const body = document.getElementById('employee-time-entries-body');
 		const emptyEl = document.getElementById('employee-time-entries-empty');
@@ -406,7 +420,7 @@
 						: '')
 				)),
 				td(t('Break', 'Break'), escapeHtml(formatBreaks(entry))),
-				td(t('Status', 'Status'), statusBadgeHtml(entry.status)),
+				td(t('Status', 'Status'), statusBadgeHtml(entry.status) + autoClockOutBadgeHtml(entry.endedReason)),
 				td(t('Location', 'Location'), workLocationCellHtml(entry.workLocation)),
 				td(t('Description', 'Description'), escapeHtml(entry.description || t('No description', 'No description')), 'description-cell'),
 				td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${actionCell}</div>`, 'actions-cell'),

@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Nakłada się na inną nieobecność, która naliczyła te dni.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Podaj prawidłową datę początkową i końcową (RRRR-MM-DD).",
 	"The selected range is too long." : "Wybrany zakres jest zbyt długi.",
-	"Unknown period." : "Nieznany okres."
-	}
+	"Unknown period." : "Nieznany okres.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Godzina automatycznego wylogowania musi być liczbą całkowitą od 0 do 23",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Zakres automatycznego wylogowania musi wynosić \"today\" lub \"all_open\"",
+	"Session clocked out automatically" : "Sesja zamknięta automatycznie",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Twoja rejestracja czasu z dnia %1$s została zakończona automatycznie o %2$s (planowany koniec). Sprawdź wpis.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Automatycznie wylogowano o planowanym końcu dnia — sprawdź",
+	"Automatic" : "Automatyczne",
+	"Automatic clock-out" : "Automatyczne wylogowanie",
+	"Clock out automatically at the scheduled end of day" : "Wyloguj automatycznie o planowanym końcu dnia",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Zamyka sesje, które o planowanym końcu dnia są nadal otwarte, i oznacza je jako automatyczne. Pracownik zawsze otrzymuje powiadomienie i prośbę o sprawdzenie wpisu. Domyślnie wyłączone.",
+	"Close open sessions at" : "Zamykaj otwarte sesje o",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Godzina dnia (0–23) w strefie czasowej organizacji, o której uruchamiana jest kontrola. Sesja jest zamykana tylko wtedy, gdy jej planowany koniec już minął.",
+	"Which open sessions are covered" : "Które otwarte sesje są objęte",
+	"Only sessions started today" : "Tylko sesje rozpoczęte dzisiaj",
+	"All open sessions, including older days" : "Wszystkie otwarte sesje, także z wcześniejszych dni",
+	"Older open sessions are closed at the planned end of the day they started on." : "Starsze otwarte sesje są zamykane o planowanym końcu dnia, w którym się rozpoczęły."
+	},
+	"nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 );
 }});})();

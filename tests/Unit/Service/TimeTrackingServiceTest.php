@@ -1685,6 +1685,137 @@ class TimeTrackingServiceTest extends TestCase {
 	}
 
 	// ------------------------------------------------------------------
+	// autoClockOutAtPlannedEnd — AutoClockOutJob write path
+	// ------------------------------------------------------------------
+
+	private function openAutoEntry(int $id, string $status = TimeEntry::STATUS_ACTIVE): TimeEntry
+	{
+		$entry = new TimeEntry();
+		$entry->setId($id);
+		$entry->setUserId('alice');
+		$entry->setStatus($status);
+		$entry->setStartTime(new \DateTime('2026-10-28 08:00:00', new \DateTimeZone('Europe/Berlin')));
+		return $entry;
+	}
+
+	public function testAutoClockOutAtPlannedEndSetsAutoReasonAndCaptureSource(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$entry = $this->openAutoEntry(42);
+
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findActiveByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('findOnBreakByUser')->willReturn(null);
+		$this->timeEntryMapper->method('findOverlapping')->willReturn([]);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		$this->auditLogMapper->expects($this->atLeastOnce())
+			->method('logAction')
+			->with('alice', $this->anything(), 'time_entry', $this->anything(), $this->anything(), $this->callback(
+				static fn ($new) => ($new['capture_source'] ?? null) === 'auto_clock_out'
+			));
+
+		$end = new \DateTime('2026-10-28 16:15:00', new \DateTimeZone('Europe/Berlin'));
+		$result = $this->service->autoClockOutAtPlannedEnd('alice', 42, $end);
+
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		$this->assertSame(TimeEntry::ENDED_REASON_AUTO_PLANNED_END, $result->getEndedReason());
+		$this->assertSame('2026-10-28 16:15:00', $result->getEndTime()?->format('Y-m-d H:i:s'));
+	}
+
+	public function testAutoClockOutCompletesPausedEntry(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$entry = $this->openAutoEntry(43, TimeEntry::STATUS_PAUSED);
+
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($entry);
+		$this->timeEntryMapper->method('find')->willReturn($entry);
+		$this->timeEntryMapper->method('update')->willReturnArgument(0);
+
+		$end = new \DateTime('2026-10-28 16:15:00', new \DateTimeZone('Europe/Berlin'));
+		$result = $this->service->autoClockOutAtPlannedEnd('alice', 43, $end);
+
+		$this->assertSame(TimeEntry::STATUS_COMPLETED, $result->getStatus());
+		$this->assertSame(TimeEntry::ENDED_REASON_AUTO_PLANNED_END, $result->getEndedReason());
+		$this->assertSame('2026-10-28 16:15:00', $result->getEndTime()?->format('Y-m-d H:i:s'));
+	}
+
+	public function testAutoClockOutIdempotentSecondRunWritesNothing(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		// Manual clock-out raced the job: no open row left.
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn(null);
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('2026-10-28 16:15:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::NOT_CLOCKED_IN, $e->getReasonCode());
+		}
+	}
+
+	public function testAutoClockOutRejectsStaleEntryId(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		// The live open row is a DIFFERENT entry than the one the job resolved.
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($this->openAutoEntry(99));
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('2026-10-28 16:15:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::NOT_CLOCKED_IN, $e->getReasonCode());
+		}
+	}
+
+	public function testAutoClockOutRejectsFuturePlannedEnd(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($this->openAutoEntry(42));
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('tomorrow 16:15:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::INVALID_INPUT, $e->getReasonCode());
+		}
+	}
+
+	public function testAutoClockOutRejectsEndNotAfterStart(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($this->openAutoEntry(42));
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			// 07:00 is BEFORE the 08:00 start.
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('2026-10-28 07:00:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::INVALID_INPUT, $e->getReasonCode());
+		}
+	}
+
+	public function testAutoClockOutRejectsEndEqualToStart(): void
+	{
+		$this->l10n->method('t')->willReturnCallback(static fn ($s, $p = []) => $s);
+		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn($this->openAutoEntry(42));
+		$this->timeEntryMapper->expects($this->never())->method('update');
+
+		try {
+			// 08:00 is EXACTLY the start — a zero-length write must not pass.
+			$this->service->autoClockOutAtPlannedEnd('alice', 42, new \DateTime('2026-10-28 08:00:00', new \DateTimeZone('Europe/Berlin')));
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame(BusinessRuleCode::INVALID_INPUT, $e->getReasonCode());
+		}
+	}
+
+	// ------------------------------------------------------------------
 	// calculateAndSetAutomaticBreak — fixpoint funnel (SPEC §8 A1–A13)
 	// ------------------------------------------------------------------
 

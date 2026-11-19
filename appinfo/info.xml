@@ -461,5 +461,6 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\ManagerPendingApprovalDigestJob</job>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\BackfillAuditCaptureSourceJob</job>
 		<job>OCA\ArbeitszeitCheck\BackgroundJob\WorkLogPullJob</job>
+		<job>OCA\ArbeitszeitCheck\BackgroundJob\AutoClockOutJob</job>
 	</background-jobs>
 </info>

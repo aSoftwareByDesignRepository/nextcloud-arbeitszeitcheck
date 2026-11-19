@@ -130,6 +130,81 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                             </select>
                         </div>
                     </fieldset>
+                    <?php
+                    $autoClockOutEnabled = !empty($settings['autoClockOutEnabled']);
+                    $autoClockOutHour = (int)($settings['autoClockOutHour'] ?? \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_DEFAULT_HOUR);
+                    $autoClockOutHour = max(0, min(23, $autoClockOutHour));
+                    $autoClockOutScope = (string)($settings['autoClockOutScope'] ?? \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_TODAY);
+                    if (!in_array($autoClockOutScope, [\OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_TODAY, \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN], true)) {
+                        $autoClockOutScope = \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_TODAY;
+                    }
+                    ?>
+                    <fieldset class="form-fieldset" aria-labelledby="auto-clock-out-heading" aria-describedby="autoClockOutEnabled-help">
+                        <legend id="auto-clock-out-heading" class="form-legend"><?php p($l->t('Automatic clock-out')); ?></legend>
+                        <div class="form-checkbox">
+                            <input type="hidden" name="autoClockOutEnabled" value="0">
+                            <input type="checkbox"
+                                   id="autoClockOutEnabled"
+                                   name="autoClockOutEnabled"
+                                   value="1"
+                                   <?php echo $autoClockOutEnabled ? 'checked' : ''; ?>
+                                   aria-describedby="autoClockOutEnabled-help">
+                            <label for="autoClockOutEnabled" class="form-label">
+                                <?php p($l->t('Clock out automatically at the scheduled end of day')); ?>
+                            </label>
+                        </div>
+                        <p id="autoClockOutEnabled-help" class="form-help">
+                            <?php p($l->t('Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default.')); ?>
+                        </p>
+                        <div class="auto-clock-out__controls<?php echo $autoClockOutEnabled ? '' : ' auto-clock-out__controls--disabled'; ?>" id="auto-clock-out-controls">
+                            <div class="form-group">
+                                <label for="autoClockOutHour"><?php p($l->t('Close open sessions at')); ?></label>
+                                <input type="number"
+                                       id="autoClockOutHour"
+                                       name="autoClockOutHour"
+                                       class="form-input"
+                                       min="0" max="23" step="1"
+                                       value="<?php p((string)$autoClockOutHour); ?>"
+                                       <?php echo $autoClockOutEnabled ? '' : 'disabled'; ?>
+                                       aria-describedby="autoClockOutHour-help autoClockOutHour-error"
+                                       aria-invalid="false">
+                                <p id="autoClockOutHour-help" class="form-help">
+                                    <?php p($l->t('Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed.')); ?>
+                                </p>
+                                <p id="autoClockOutHour-error" class="azc-field-error" hidden></p>
+                            </div>
+                            <div class="form-group" role="radiogroup" aria-labelledby="autoClockOutScope-label">
+                                <span id="autoClockOutScope-label" class="form-label"><?php p($l->t('Which open sessions are covered')); ?></span>
+                                <div class="form-checkbox">
+                                    <input type="radio"
+                                           id="autoClockOutScopeToday"
+                                           name="autoClockOutScope"
+                                           value="<?php p(\OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_TODAY); ?>"
+                                           <?php echo $autoClockOutScope === \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_TODAY ? 'checked' : ''; ?>
+                                           <?php echo $autoClockOutEnabled ? '' : 'disabled'; ?>>
+                                    <label for="autoClockOutScopeToday" class="form-label">
+                                        <?php p($l->t('Only sessions started today')); ?>
+                                    </label>
+                                </div>
+                                <div class="form-checkbox">
+                                    <input type="radio"
+                                           id="autoClockOutScopeAllOpen"
+                                           name="autoClockOutScope"
+                                           value="<?php p(\OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN); ?>"
+                                           <?php echo $autoClockOutScope === \OCA\ArbeitszeitCheck\Constants::AUTO_CLOCK_OUT_SCOPE_ALL_OPEN ? 'checked' : ''; ?>
+                                           <?php echo $autoClockOutEnabled ? '' : 'disabled'; ?>
+                                           aria-describedby="autoClockOutScope-help">
+                                    <label for="autoClockOutScopeAllOpen" class="form-label">
+                                        <?php p($l->t('All open sessions, including older days')); ?>
+                                    </label>
+                                </div>
+                                <p id="autoClockOutScope-help" class="form-help">
+                                    <?php p($l->t('Older open sessions are closed at the planned end of the day they started on.')); ?>
+                                </p>
+                                <p id="autoClockOutScope-error" class="azc-field-error" hidden></p>
+                            </div>
+                        </div>
+                    </fieldset>
                     </div><!-- /.azc-card__body -->
                 </section>
 

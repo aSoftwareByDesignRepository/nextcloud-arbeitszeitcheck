@@ -80,6 +80,12 @@ class TimeEntry extends Entity
 	public const ENDED_REASON_STALE_PAUSED_REPAIR = 'stale_paused_repair';
 	/** Session closed by an approved retro clock-out (open-session correction) */
 	public const ENDED_REASON_APPROVED_CLOCK_OUT = 'approved_clock_out';
+	/**
+	 * Session closed automatically at the resolved planned end of day
+	 * ({@see \OCA\ArbeitszeitCheck\BackgroundJob\AutoClockOutJob}). Never set
+	 * for a manual/user-initiated clock-out.
+	 */
+	public const ENDED_REASON_AUTO_PLANNED_END = 'auto_planned_end';
 
 	/** @var string */
 	protected $userId;

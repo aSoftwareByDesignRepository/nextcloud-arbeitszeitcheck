@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "與其他已計入這些日子的缺勤重疊。",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "請提供有效的開始與結束日期（YYYY-MM-DD）。",
 	"The selected range is too long." : "所選時間範圍過長。",
-	"Unknown period." : "未知期間。"
-	}
+	"Unknown period." : "未知期間。",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "自動下班時間必須是 0 到 23 之間的整數",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "自動下班範圍必須是 \"today\" 或 \"all_open\"",
+	"Session clocked out automatically" : "工作階段已自動結束",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "您在 %1$s 的工時記錄已於 %2$s 自動結束（計畫結束時間）。請檢查此筆記錄。",
+	"Automatically clocked out at the scheduled end of day — please review" : "已於計畫結束時間自動結束 — 請檢查",
+	"Automatic" : "自動",
+	"Automatic clock-out" : "自動下班",
+	"Clock out automatically at the scheduled end of day" : "在計畫結束時間自動下班",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "在計畫結束時間關閉仍然開啟的工作階段並標記為自動。系統一律會通知員工並請其檢查該筆記錄。預設關閉。",
+	"Close open sessions at" : "在以下時間關閉開啟的工作階段",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "檢查執行時所在機構時區的當日小時（0–23）。只有當工作階段的計畫結束時間已過時才會關閉。",
+	"Which open sessions are covered" : "涵蓋哪些開啟的工作階段",
+	"Only sessions started today" : "僅今天開始的工作階段",
+	"All open sessions, including older days" : "所有開啟的工作階段，包括較早的日期",
+	"Older open sessions are closed at the planned end of the day they started on." : "較早的開啟工作階段將在其開始當天的計畫結束時間關閉。"
+	},
+	"nplurals=1; plural=0;"
 );
 }});})();

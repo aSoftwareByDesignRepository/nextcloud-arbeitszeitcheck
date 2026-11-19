@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "与其他已计入这些日子的缺勤重叠。",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "请提供有效的开始和结束日期（YYYY-MM-DD）。",
 	"The selected range is too long." : "所选时间范围过长。",
-	"Unknown period." : "未知周期。"
-	}
+	"Unknown period." : "未知周期。",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "自动下班时间必须是 0 到 23 之间的整数",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "自动下班范围必须是 \"today\" 或 \"all_open\"",
+	"Session clocked out automatically" : "会话已自动结束",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "您在 %1$s 的工时记录已于 %2$s 自动结束（计划结束时间）。请检查该条记录。",
+	"Automatically clocked out at the scheduled end of day — please review" : "已在计划结束时间自动结束 — 请检查",
+	"Automatic" : "自动",
+	"Automatic clock-out" : "自动下班",
+	"Clock out automatically at the scheduled end of day" : "在计划结束时间自动下班",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "在计划结束时间关闭仍然打开的会话并将其标记为自动。系统始终会通知员工并请其检查该条记录。默认关闭。",
+	"Close open sessions at" : "在以下时间关闭打开的会话",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "检查时所在机构时区的当天小时（0–23）。只有当会话的计划结束时间已过时才会关闭。",
+	"Which open sessions are covered" : "覆盖哪些打开的会话",
+	"Only sessions started today" : "仅今天开始的会话",
+	"All open sessions, including older days" : "所有打开的会话，包括较早的日期",
+	"Older open sessions are closed at the planned end of the day they started on." : "较早的打开会话将在其开始当天的计划结束时间关闭。"
+	},
+	"nplurals=1; plural=0;"
 );
 }});})();

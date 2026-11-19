@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace OCA\ArbeitszeitCheck\Tests\Unit\BackgroundJob;
 
+use OCA\ArbeitszeitCheck\BackgroundJob\AutoClockOutJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\BackfillAuditCaptureSourceJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\BreakReminderJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\ClockOutReminderJob;
@@ -43,6 +44,7 @@ class UpgradeBackupSharedLockTest extends TestCase
 {
 	/** Every app BackgroundJob — the whole family is wired into the contract. */
 	private const JOB_CLASSES = [
+		AutoClockOutJob::class,
 		BackfillAuditCaptureSourceJob::class,
 		BreakReminderJob::class,
 		ClockOutReminderJob::class,

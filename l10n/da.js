@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Overlapper et andet fravær, der tilskrev disse dage.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Angiv en gyldig start- og slutdato (ÅÅÅÅ-MM-DD).",
 	"The selected range is too long." : "Den valgte periode er for lang.",
-	"Unknown period." : "Ukendt periode."
-	}
+	"Unknown period." : "Ukendt periode.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Timen for automatisk udstempling skal være et heltal mellem 0 og 23",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Omfanget for automatisk udstempling skal være \"today\" eller \"all_open\"",
+	"Session clocked out automatically" : "Session automatisk udstemplet",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Din tidsregistrering den %1$s blev afsluttet automatisk kl. %2$s (planlagt slut). Gennemse posten.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Automatisk udstemplet ved planlagt arbejdsdagsslut — gennemse venligst",
+	"Automatic" : "Automatisk",
+	"Automatic clock-out" : "Automatisk udstempling",
+	"Clock out automatically at the scheduled end of day" : "Udstempl automatisk ved planlagt arbejdsdagsslut",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Lukker sessioner, der stadig er åbne ved den planlagte arbejdsdagsslut, og markerer dem som automatiske. Medarbejderen får altid besked og bedes gennemse posten. Slået fra som standard.",
+	"Close open sessions at" : "Luk åbne sessioner kl.",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Time på dagen (0–23) i organisationens tidszone, hvor kontrollen kører. En session lukkes kun, når dens planlagte slut allerede er passeret.",
+	"Which open sessions are covered" : "Hvilke åbne sessioner omfattes",
+	"Only sessions started today" : "Kun sessioner startet i dag",
+	"All open sessions, including older days" : "Alle åbne sessioner, også ældre dage",
+	"Older open sessions are closed at the planned end of the day they started on." : "Ældre åbne sessioner lukkes ved den planlagte slut på den dag, de startede."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

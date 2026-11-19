@@ -120,6 +120,13 @@ final class Constants
 	public const AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC = 'offline_sync';
 
 	/**
+	 * Audit capture_source for clock-outs applied by {@see AutoClockOutJob}
+	 * at the resolved planned end of day. Indexed provenance: an automatic
+	 * closure must be distinguishable from a live stamp in the audit log.
+	 */
+	public const AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT = 'auto_clock_out';
+
+	/**
 	 * Audit capture_source values promoted to the indexed audit_log column.
 	 * `offline_sync` marks replayed offline punches; the remaining values are
 	 * the non-default live capture channels a stamp may declare (MH-P24 —
@@ -129,11 +136,25 @@ final class Constants
 	 */
 	public const AUDIT_CAPTURE_SOURCES = [
 		self::AUDIT_CAPTURE_SOURCE_OFFLINE_SYNC,
+		self::AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT,
 		'widget',
 		'kiosk',
 		'api',
 		'sync',
 	];
+
+	/** App config: '1' enables the hourly planned-end auto clock-out job. Default off. */
+	public const CONFIG_AUTO_CLOCK_OUT_ENABLED = 'auto_clockout_enabled';
+
+	/** App config: wall-clock hour (0-23, app timezone) at which open sessions are auto-closed. */
+	public const CONFIG_AUTO_CLOCK_OUT_HOUR = 'auto_clockout_hour';
+
+	/** App config: 'today' restricts auto-close to sessions started today; 'all_open' also covers older open sessions. */
+	public const CONFIG_AUTO_CLOCK_OUT_SCOPE = 'auto_clockout_scope';
+
+	public const AUTO_CLOCK_OUT_DEFAULT_HOUR = 22;
+	public const AUTO_CLOCK_OUT_SCOPE_TODAY = 'today';
+	public const AUTO_CLOCK_OUT_SCOPE_ALL_OPEN = 'all_open';
 
 	public const TARIFF_RULE_SET_STATUS_DRAFT = 'draft';
 	public const TARIFF_RULE_SET_STATUS_ACTIVE = 'active';

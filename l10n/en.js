@@ -6752,7 +6752,23 @@
 	"Overlaps another absence that credited these days." : "Overlaps another absence that credited these days.",
 	"Provide a valid start and end date (YYYY-MM-DD)." : "Provide a valid start and end date (YYYY-MM-DD).",
 	"The selected range is too long." : "The selected range is too long.",
-	"Unknown period." : "Unknown period."
-	}
+	"Unknown period." : "Unknown period.",
+	"Automatic clock-out hour must be a whole number between 0 and 23" : "Automatic clock-out hour must be a whole number between 0 and 23",
+	"Automatic clock-out scope must be \"today\" or \"all_open\"" : "Automatic clock-out scope must be \"today\" or \"all_open\"",
+	"Session clocked out automatically" : "Session clocked out automatically",
+	"Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry." : "Your time tracking on %1$s was ended automatically at %2$s (scheduled end). Please review the entry.",
+	"Automatically clocked out at the scheduled end of day — please review" : "Automatically clocked out at the scheduled end of day — please review",
+	"Automatic" : "Automatic",
+	"Automatic clock-out" : "Automatic clock-out",
+	"Clock out automatically at the scheduled end of day" : "Clock out automatically at the scheduled end of day",
+	"Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default." : "Closes sessions that are still open at the planned end of day and marks them as automatic. The employee is always notified and asked to review the entry. Off by default.",
+	"Close open sessions at" : "Close open sessions at",
+	"Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed." : "Hour of day (0–23) in the organisation timezone at which the check runs. A session is only closed when its planned end has already passed.",
+	"Which open sessions are covered" : "Which open sessions are covered",
+	"Only sessions started today" : "Only sessions started today",
+	"All open sessions, including older days" : "All open sessions, including older days",
+	"Older open sessions are closed at the planned end of the day they started on." : "Older open sessions are closed at the planned end of the day they started on."
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

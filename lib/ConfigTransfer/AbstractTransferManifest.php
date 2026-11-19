@@ -85,7 +85,7 @@ abstract class AbstractTransferManifest
 	 * declare the key (unmanifested keys are never transferred).
 	 * Concrete in the base so apps declare only {@see keys()}.
 	 *
-	 * @return array{class:string,refs:?array,unresolved:string,section:?string,security:bool,store:?array}|null
+	 * @return array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}}|null
 	 */
 	final public function keySpec(string $key): ?array
 	{
@@ -93,7 +93,7 @@ abstract class AbstractTransferManifest
 	}
 
 	/**
-	 * @return array<string,array> key => normalised spec
+	 * @return array<string, array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}}> key => normalised spec
 	 */
 	abstract public function keys(): array;
 
@@ -109,7 +109,7 @@ abstract class AbstractTransferManifest
 	}
 
 	/**
-	 * @return array<string,array> table => normalised spec
+	 * @return array<string, array{class:string,strategy:string,natural_key:list<string>,pk:list<string>,fk:array<string,string>,fk_late:array<string,string>,uid_ref:list<string>,gid_ref:list<string>,uid_ref_nullable:list<string>,json_uid_list:list<string>,secret_columns:list<string>,env_columns:list<string>,depends_on:list<string>}> table => normalised spec
 	 */
 	abstract public function tables(): array;
 
@@ -282,8 +282,8 @@ abstract class AbstractTransferManifest
 	 * Normaliser shared by all app manifests: accepts the spec's string
 	 * shorthand (`'key' => 'plain'`) or the array form.
 	 *
-	 * @param array<string,mixed> $raw
-	 * @return array<string,array>
+	 * @param array<string, mixed> $raw
+	 * @return array<string, array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}}>
 	 */
 	final protected static function normaliseKeys(array $raw): array
 	{
@@ -335,7 +335,7 @@ abstract class AbstractTransferManifest
 
 	/**
 	 * @param array<string,mixed> $raw
-	 * @return array<string,array>
+	 * @return array<string, array{class:string,strategy:string,natural_key:list<string>,pk:list<string>,fk:array<string,string>,fk_late:array<string,string>,uid_ref:list<string>,gid_ref:list<string>,uid_ref_nullable:list<string>,json_uid_list:list<string>,secret_columns:list<string>,env_columns:list<string>,depends_on:list<string>}>
 	 */
 	final protected static function normaliseTables(array $raw): array
 	{
@@ -388,7 +388,7 @@ abstract class AbstractTransferManifest
 			static fn (string $s): bool => $s !== '',
 		));
 		$found = [];
-		$walk = function (mixed $cur, int $i, string $at) use (&$walk, &$found, $segments, $path): void {
+		$walk = function (mixed $cur, int $i, string $at) use (&$walk, &$found, $segments): void {
 			if ($i >= count($segments)) {
 				if ((is_string($cur) || is_int($cur)) && (string)$cur !== '') {
 					$found[] = ['path' => $at, 'value' => (string)$cur];

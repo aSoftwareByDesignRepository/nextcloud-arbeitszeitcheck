@@ -56,6 +56,9 @@ final class TransferManifest extends AbstractTransferManifest
 			'manual_time_entry_enabled' => ['class' => 'plain', 'section' => 'time-recording'],
 			'offline_stamp_max_past_hours' => ['class' => 'plain', 'section' => 'time-recording'],
 			'kiosk_enabled' => ['class' => 'plain', 'section' => 'time-recording'],
+			'auto_clockout_enabled' => ['class' => 'plain', 'section' => 'time-recording'],
+			'auto_clockout_hour' => ['class' => 'plain', 'section' => 'time-recording'],
+			'auto_clockout_scope' => ['class' => 'plain', 'section' => 'time-recording'],
 			'time_entry_changes_require_approval' => ['class' => 'plain', 'security' => true, 'section' => 'time-approvals'],
 			'manual_time_entries_require_approval' => ['class' => 'plain', 'security' => true, 'section' => 'time-approvals'],
 
@@ -171,6 +174,9 @@ final class TransferManifest extends AbstractTransferManifest
 			'transfer_receipts' => 'internal',
 			'transfer_job_state' => 'internal',
 			'transfer_last_import_at' => 'internal',
+			// Auto clock-out job dedup stamp — per-instance runtime state,
+			// never carried to a restored instance.
+			'auto_clockout_last_run' => 'internal',
 			// Gate-artifact placeholders — NOT real keys. The manifest gate's
 			// second-argument heuristic captures the DEFAULT literals of
 			// two-argument getAppValueString(key, 'default') calls
@@ -188,6 +194,9 @@ final class TransferManifest extends AbstractTransferManifest
 			// '180' => 'internal',
 			// '2000' => 'internal',
 			'immediate' => 'internal',
+			// Same artifact class: AUTO_CLOCK_OUT_SCOPE_TODAY constant is
+			// read as the getAppValue default in AutoClockOutJob, never a key.
+			'today' => 'internal',
 			// '["vacation"]' (CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT) is the
 			// same class of artifact — the JSON literal is read as the
 			// getAppValue default — but it cannot be expressed as an entry

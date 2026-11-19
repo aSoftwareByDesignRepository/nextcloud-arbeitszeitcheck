@@ -302,6 +302,8 @@ final class TransferService
 	/**
 	 * The atomic apply — used by web job, occ --apply, and tests.
 	 *
+	 * @param array<string,mixed> $payload
+	 * @param array<string,mixed> $header
 	 * @return array<string,mixed> receipt
 	 */
 	public function applyPayload(array $payload, array $header, string $mode, string $actor, bool $replaceConfirmed, bool $backupLockHeld = false): array
@@ -502,6 +504,8 @@ final class TransferService
 	 * Compute the full apply plan + human report. Pure w.r.t. writes: reads
 	 * target state, never mutates. Used by preview AND by applyPayload.
 	 *
+	 * @param array<string,mixed> $payload
+	 * @param array<string,mixed> $header
 	 * @return array{report:array,configWrites:array<string,string>,mirroredWrites:array<string,string>,tablePlan:array}
 	 */
 	private function buildPlan(array $payload, array $header, string $mode, string $actor): array
@@ -667,6 +671,11 @@ final class TransferService
 		$idMaps = []; // table => oldId => newTargetId (planned)
 		foreach ($this->manifest->transferableTablesSorted() as $table) {
 			$spec = $this->manifest->tableSpec($table);
+			if ($spec === null) {
+				// transferableTablesSorted only yields declared tables — a
+				// null spec can never occur, but never plan on it anyway.
+				continue;
+			}
 			$fileTable = $fileTables[$table] ?? null;
 			$entry = [
 				'strategy' => $spec['strategy'],
@@ -782,8 +791,11 @@ final class TransferService
 	 * Plan one table row: resolve uid/gid/json-list refs and FK availability,
 	 * decide insert|update|skip, produce the processed row payload.
 	 *
-	 * @param array<string,int|string> $idMaps completed maps of previous tables
-	 * @param array<int|string,int|string> $idMap  map being built for this table
+	 * @param array{class:string,strategy:string,natural_key:list<string>,pk:list<string>,fk:array<string,string>,fk_late:array<string,string>,uid_ref:list<string>,gid_ref:list<string>,uid_ref_nullable:list<string>,json_uid_list:list<string>,secret_columns:list<string>,env_columns:list<string>,depends_on:list<string>} $spec
+	 * @param array<string,mixed> $row
+	 * @param array<string,array<int|string,mixed>> $idMaps completed maps of previous tables
+	 * @param array<int|string,mixed> $idMap  map being built for this table
+	 * @param array<string,mixed> $report
 	 * @return array{action:string,sourceId:int|string,targetId:array<string,mixed>|null,row:array|null,fkFix:array<string,string>,lateFk:array,filtered:int,unresolved:int,reason:?string}
 	 */
 	private function planRow(string $table, array $spec, array $row, array $idMaps, array $idMap, string $mode, array &$report): array
@@ -906,6 +918,9 @@ final class TransferService
 
 	// ─────────────────────────── plan execution ──────────────────────────
 
+	/**
+	 * @param array<string,mixed> $plan
+	 */
 	private function applyConfigPlan(array $plan): void
 	{
 		foreach ($plan['configWrites'] as $key => $value) {
@@ -923,6 +938,9 @@ final class TransferService
 		}
 	}
 
+	/**
+	 * @param array<string,mixed> $plan
+	 */
 	private function applyTablePlan(array $plan, string $mode): void
 	{
 		$idMaps = [];
@@ -1050,6 +1068,7 @@ final class TransferService
 	// ─────────────────────────── helpers ─────────────────────────────────
 
 	/**
+	 * @param array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}} $spec
 	 * @return list<array{type:string,value:string,path:?string}>
 	 */
 	private function unresolvedConfigRefs(string $key, string $value, array $spec): array
@@ -1120,6 +1139,9 @@ final class TransferService
 	 * its pk map (spec 'pk' columns => values). Composite-pk tables without
 	 * an `id` column work identically — the pk map is the update address.
 	 *
+	 * @param list<string> $naturalKey
+	 * @param list<string> $pkCols
+	 * @param array<string,mixed> $row
 	 * @return array<string,mixed>|null
 	 */
 	private function findByNaturalKey(string $table, array $naturalKey, array $pkCols, array $row): ?array
@@ -1397,6 +1419,9 @@ final class TransferService
 		return $out;
 	}
 
+	/**
+	 * @param list<array{path:string,size:int,b64:string}> &$files
+	 */
 	private function collectFiles(\OCP\Files\Folder $folder, string $prefix, array &$files, int &$total, int $budget): void
 	{
 		foreach ($folder->getDirectoryListing() as $node) {
@@ -1439,6 +1464,9 @@ final class TransferService
 		return $node instanceof \OCP\Files\Folder ? $node : null;
 	}
 
+	/**
+	 * @param array<string,mixed> $plan
+	 */
 	private function assertPlanApplicable(array $plan): void
 	{
 		// Invalid values are never written (spec NN-08) but they do not block
@@ -1529,6 +1557,8 @@ final class TransferService
 	/**
 	 * Whether the current instance holds a value for the key — appconfig
 	 * keys via getAppKeys, store-backed keys via their backing row/field.
+	 *
+	 * @param array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}} $spec
 	 */
 	private function keyExists(string $key, array $spec): bool
 	{
@@ -1547,6 +1577,8 @@ final class TransferService
 	 *                 (non-scalar field values return as a JSON string)
 	 * Writes never use this path — store-backed keys are class 'mirrored'
 	 * and flow through the app's central validated writer (writeMirrored).
+	 *
+	 * @param array{class:string,refs:?array{kind:string,uid_paths:list<string>,gid_paths:list<string>},unresolved:string,section:?string,security:bool,store:?array{table:string,kind:string,key_col:string,value_col:string,row_id:int,json_col:string,json_key:string}} $spec
 	 */
 	private function readKeyValue(string $key, array $spec): ?string
 	{

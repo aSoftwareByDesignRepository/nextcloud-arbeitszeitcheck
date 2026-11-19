@@ -58,7 +58,8 @@ final class TransferCrypto
 	/**
 	 * Derive the AEAD key from a passphrase + KDF parameter set.
 	 *
-	 * @param array{algo:string,opslimit:int,memlimit:int,salt:string} $kdf
+	 * @param array<string,mixed> $kdf unvalidated wire shape — every field
+	 *     is range-checked inside before use (fail-closed on junk).
 	 */
 	public static function deriveKey(string $passphrase, array $kdf): string
 	{
@@ -119,7 +120,7 @@ final class TransferCrypto
 	 * wrong passphrase, truncated ciphertext) is the identical
 	 * TRANSFER_CANNOT_DECRYPT — never a distinct oracle.
 	 *
-	 * @param array{kdf:array,cipher:array,payload_b64:string} $sealed
+	 * @param array{kdf:array<string,mixed>,cipher:array<string,mixed>,payload_b64:string} $sealed
 	 */
 	public static function open(array $sealed, string $passphrase, string $aad): string
 	{

@@ -83,6 +83,9 @@ class TransferException extends \RuntimeException
 		return $this->context;
 	}
 
+	/**
+	 * @return Http::STATUS_CONFLICT|Http::STATUS_FORBIDDEN|Http::STATUS_INTERNAL_SERVER_ERROR|Http::STATUS_TOO_MANY_REQUESTS|Http::STATUS_UNPROCESSABLE_ENTITY
+	 */
 	public function getHttpStatus(): int
 	{
 		return self::CODES[$this->getMessage()] ?? Http::STATUS_INTERNAL_SERVER_ERROR;

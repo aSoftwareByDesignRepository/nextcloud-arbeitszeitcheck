@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **absence-credit day Soll**: the same ≤ 24 bound and weekly/5
   derivation now guard `resolveContractForDate()`, so a corrupt daily
   can no longer inflate credited absence hours either.
+- **localization catalog pass** (all 14 shipped locales): healed
+  dropped/inverted negations, wrong-sense translations ("disabled"
+  rendered as "handicapped", "still clocked in" as "switched on"),
+  truncated help texts and mid-sentence cuts (nb/pl `dateInvalid`,
+  badge + PIN guidance, de `Down to`/`Up to` collapse), and Russian
+  grammar/semantics — accusative case after transitive verbs,
+  gender/number agreement, splice non-words and esteem-calque phrasing
+  — verified corpus-wide against polarity, duplication and grammar
+  checks; `tr` plural metadata corrected.
 
 ### Added
 

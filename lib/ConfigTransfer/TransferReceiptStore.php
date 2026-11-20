@@ -57,6 +57,9 @@ final class TransferReceiptStore
 		return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
 	}
 
+	/**
+	 * @return array<string,mixed>|null
+	 */
 	public function lastReceipt(): ?array
 	{
 		return $this->receipts()[0] ?? null;
@@ -101,6 +104,9 @@ final class TransferReceiptStore
 		$this->config->deleteAppValue($this->appId, self::KEY_JOB_STATE);
 	}
 
+	/**
+	 * @return list<string>
+	 */
 	public function internalKeyNames(): array
 	{
 		return [self::KEY_RECEIPTS, self::KEY_JOB_STATE, self::KEY_LAST_IMPORT_AT];

@@ -103,6 +103,11 @@ final class TransferService
 				continue;
 			}
 			$spec = $this->manifest->tableSpec($table);
+			if ($spec === null) {
+				// transferableTablesSorted only yields declared tables — a
+				// null spec can never occur, but never export on it anyway.
+				continue;
+			}
 			$rows = null;
 			foreach ([true, false] as $orderById) {
 				try {
@@ -237,7 +242,7 @@ final class TransferService
 	/**
 	 * occ path: decrypt + validate + plan, without persisting a pending blob.
 	 *
-	 * @return array{header:array,payload:array,report:array}
+	 * @return array{header:array<string,mixed>,payload:array<string,mixed>,report:array<string,mixed>}
 	 */
 	public function planForFile(string $bytes, string $passphrase, string $mode, string $actor): array
 	{
@@ -487,7 +492,7 @@ final class TransferService
 	}
 
 	/**
-	 * @return array{job:?array,lastReceipt:?array,receipts:list<array>}
+	 * @return array{job:?array<string,mixed>,lastReceipt:?array<string,mixed>,receipts:list<array<string,mixed>>}
 	 */
 	public function status(): array
 	{
@@ -506,7 +511,7 @@ final class TransferService
 	 *
 	 * @param array<string,mixed> $payload
 	 * @param array<string,mixed> $header
-	 * @return array{report:array,configWrites:array<string,string>,mirroredWrites:array<string,string>,tablePlan:array}
+	 * @return array{report:array<string,mixed>,configWrites:array<string,string>,mirroredWrites:array<string,string>,tablePlan:array<string,mixed>}
 	 */
 	private function buildPlan(array $payload, array $header, string $mode, string $actor): array
 	{
@@ -796,7 +801,7 @@ final class TransferService
 	 * @param array<string,array<int|string,mixed>> $idMaps completed maps of previous tables
 	 * @param array<int|string,mixed> $idMap  map being built for this table
 	 * @param array<string,mixed> $report
-	 * @return array{action:string,sourceId:int|string,targetId:array<string,mixed>|null,row:array|null,fkFix:array<string,string>,lateFk:array,filtered:int,unresolved:int,reason:?string}
+	 * @return array{action:string,sourceId:int|string,targetId:array<string,mixed>|null,row:array<string,mixed>|null,fkFix:array<string,string>,lateFk:array<string,mixed>,filtered:int,unresolved:int,reason:?string}
 	 */
 	private function planRow(string $table, array $spec, array $row, array $idMaps, array $idMap, string $mode, array &$report): array
 	{
@@ -854,7 +859,7 @@ final class TransferService
 					$report['unresolved'][] = ['scope' => 'table', 'table' => $table, 'row' => $sourceId, 'type' => 'uid', 'value' => $uid, 'action' => 'filtered'];
 				}
 			}
-			$row[$col] = json_encode(array_values($kept), JSON_THROW_ON_ERROR);
+			$row[$col] = json_encode($kept, JSON_THROW_ON_ERROR);
 		}
 
 		// ── FK columns (pre-insert) ──
@@ -1244,6 +1249,8 @@ final class TransferService
 
 	/**
 	 * FS-8/FS-12 pre-flight. Throws on any failure — zero writes have happened.
+	 *
+	 * @param array<string,mixed> $payload
 	 */
 	private function preflight(array $payload, string $mode): void
 	{

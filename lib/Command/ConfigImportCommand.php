@@ -138,6 +138,9 @@ class ConfigImportCommand extends Command
 		}
 	}
 
+	/**
+	 * @param array<string,mixed> $payload
+	 */
 	private function emit(SymfonyStyle $io, OutputInterface $output, bool $json, array $payload): void
 	{
 		if ($json) {

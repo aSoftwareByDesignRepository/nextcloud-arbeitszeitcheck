@@ -6399,7 +6399,7 @@
 	"incomplete" : "niekompletne",
 	"individualRule" : "Indywidualna zasada",
 	"info" : "informacja",
-	"invalidFormat" : "Nieprawidłowy format",
+	"invalidFormat" : "Format jest nieprawidłowy. Sprawdź format i spróbuj ponownie.",
 	"invalidUserData" : "Nieprawidłowe dane użytkownika.",
 	"item" : "element",
 	"items" : "elementy",

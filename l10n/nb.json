@@ -6370,7 +6370,7 @@
     "corporation": "selskap",
     "custom": "skikk",
     "customer": "kunde",
-    "dateInvalid": "Skriv inn en gyldig dato. Klikk på kalenderikonet for å velge en dato, eller skriv inn den i dette formatet: ÅÅÅÅ-MM-DD. Eksempel: 2026-03-31",
+    "dateInvalid": "Skriv inn en gyldig dato. Klikk på kalenderikonet for å velge en dato, eller skriv inn den i dette formatet: ÅÅÅÅ-MM-DD. Eksempel: 2026-03-31 for 31. mars 2026.",
     "day": "dag",
     "days": "dager",
     "days per year": "dager om året",

@@ -903,7 +903,7 @@
 	"Break times must not overlap." : "Les horaires de pause ne doivent pas se chevaucher.",
 	"Break was still active after %1$d minutes. Automatic clock-out was applied at %2$s (%3$s policy)." : "La pause était encore active après %1$d minutes. Un pointage de sortie automatique a été appliqué à %2$s (politique %3$s).",
 	"Break windows" : "Plages de pause",
-	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "La pause {a} et la pause {b} se chevauchent. Veuillez ajuster les horaires de pause.",
+	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "La pause {a} et la pause {b} se chevauchent. Veuillez ajuster les horaires de pause pour qu’elles ne se chevauchent pas.",
 	"Break {number}" : "Pause {number}",
 	"Breaks" : "Pauses",
 	"Breaks (optional)" : "Pauses (facultatif)",
@@ -2462,7 +2462,7 @@
 	"Help texts you hid on pages stay hidden until you show them again here or use \"Show hint\" where they appear." : "Les textes d'aide masqués restent cachés jusqu'à ce que vous les réaffichiez ici ou utilisiez « Afficher l'indice » à leur emplacement.",
 	"Help: PIN and badge — what to do" : "Aide : PIN et badge — que faire",
 	"Help: These skip links let you jump directly to the main content or to the app navigation." : "Aide : Ces liens d'accès rapide vous permettent d'accéder directement au contenu principal ou à la navigation de l'application.",
-	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Aide : PIN et badge — que faire",
+	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Ici, sous « Badges & PIN » : autorisez l’accès, générez des PIN ou lancez « Scanner le badge sur tablette » (l’UID de la puce est lu automatiquement — vous n’avez jamais à le chercher).",
 	"Here you define additional leave entitlements and their quotas." : "Ici, vous définissez des droits à congés supplémentaires et leurs quotas.",
 	"Heute aktiv" : "Actif aujourd'hui",
 	"Hide" : "Masquer",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Restaurer la division automatique",
 	"Restricted access" : "Accès restreint",
 	"Restricted — only allow-listed users and groups can open the app" : "Restreint — seuls les utilisateurs et groupes autorisés peuvent ouvrir l’application",
-	"Resturlaub" : "Congés restants",
+	"Resturlaub" : "Congés reportés",
 	"Result" : "Résultat",
 	"Results pagination" : "Pagination des résultats",
 	"Resume after break" : "Reprendre après la pause",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Uniquement les sessions commencées aujourd'hui",
 	"All open sessions, including older days" : "Toutes les sessions ouvertes, y compris les jours précédents",
 	"Older open sessions are closed at the planned end of the day they started on." : "Les sessions ouvertes plus anciennes sont clôturées à la fin planifiée du jour où elles ont commencé."
-	}
+	},
+	"nplurals=2; plural=(n > 1);"
 );
 }});})();

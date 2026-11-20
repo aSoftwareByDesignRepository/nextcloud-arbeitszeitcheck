@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "僅今天開始的工作階段",
 	"All open sessions, including older days" : "所有開啟的工作階段，包括較早的日期",
 	"Older open sessions are closed at the planned end of the day they started on." : "較早的開啟工作階段將在其開始當天的計畫結束時間關閉。"
-	}
+	},
+	"nplurals=1; plural=0;"
 );
 }});})();

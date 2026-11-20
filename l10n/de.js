@@ -312,7 +312,7 @@
 	"Absences: Email notifications for substitution workflow" : "Abwesenheiten: E-Mail-Benachrichtigungen für Vertretungsablauf",
 	"Absences: Half-day entries" : "Abwesenheiten: Halbtägige Einträge",
 	"Absences: Manage vacation, sickness, and other absences" : "Abwesenheiten: Urlaub, Krankheits- und sonstige Abwesenheiten verwalten",
-	"Absences: Request and manage vacation days, sick leave, and other time off" : "Abwesenheiten: Urlaub, Krankheits- und sonstige Abwesenheiten verwalten",
+	"Absences: Request and manage vacation days, sick leave, and other time off" : "Abwesenheiten: Urlaubs-, Krankheits- und sonstige Zeiten beantragen und verwalten",
 	"Absences: Send iCal by email after approval" : "Abwesenheiten: iCal nach Freigabe per E-Mail senden",
 	"Absences: Send iCal via email" : "Abwesenheiten: iCal per E‑Mail versenden",
 	"Absences: Substitute required" : "Abwesenheiten: Vertretung erforderlich",
@@ -903,7 +903,7 @@
 	"Break times must not overlap." : "Pausenzeiten dürfen sich nicht überschneiden.",
 	"Break was still active after %1$d minutes. Automatic clock-out was applied at %2$s (%3$s policy)." : "Die Pause war nach %1$d Minuten noch aktiv. Um %2$s wurde automatisch ausgestempelt (Regel: %3$s).",
 	"Break windows" : "Pausenfenster",
-	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "Pause {a} und Pause {b} überschneiden sich. Bitte passen Sie die Pausenzeiten an.",
+	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "Pause {a} und Pause {b} überschneiden sich. Bitte passen Sie die Pausenzeiten so an, dass sie sich nicht überschneiden.",
 	"Break {number}" : "Pause {number}",
 	"Breaks" : "Pausen",
 	"Breaks (optional)" : "Pausen (optional)",
@@ -1803,7 +1803,7 @@
 	"Documentation" : "Dokumentation",
 	"Don't forget to clock out" : "Nicht vergessen auszustempeln",
 	"Done" : "Fertig",
-	"Down to" : "Bis zu",
+	"Down to" : "Bis auf",
 	"Download" : "Herunterladen",
 	"Download CSV" : "CSV herunterladen",
 	"Download PDF" : "PDF herunterladen",
@@ -5352,7 +5352,7 @@
 	"Tiers must be strictly increasing." : "Staffeln müssen strikt aufsteigend sein.",
 	"Time Entries" : "Zeiteinträge",
 	"Time Entries for {date}" : "Zeiteinträge für {date}",
-	"Time Entries: View, add, edit, or delete all your working time records" : "Zeiteinträge: Arbeitszeiten ansehen, erfassen und bearbeiten",
+	"Time Entries: View, add, edit, or delete all your working time records" : "Zeiteinträge: Arbeitszeiten ansehen, erfassen, bearbeiten und löschen — alle Ihre Zeiteinträge",
 	"Time Entry Details" : "Zeiteintrag-Details",
 	"Time Entry Form" : "Zeiteintragsformular",
 	"Time Tracking" : "Zeiterfassung",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Nur heute begonnene Sitzungen",
 	"All open sessions, including older days" : "Alle offenen Sitzungen, auch ältere Tage",
 	"Older open sessions are closed at the planned end of the day they started on." : "Ältere offene Sitzungen werden zum geplanten Ende des Tages geschlossen, an dem sie begonnen wurden."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

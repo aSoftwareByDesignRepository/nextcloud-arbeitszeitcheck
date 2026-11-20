@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Restaurar divisão automática",
 	"Restricted access" : "Acesso restrito",
 	"Restricted — only allow-listed users and groups can open the app" : "Restrito – apenas utilizadores e grupos permitidos podem abrir a aplicação",
-	"Resturlaub" : "Férias restantes",
+	"Resturlaub" : "Férias transitadas",
 	"Result" : "Resultado",
 	"Results pagination" : "Paginação dos resultados",
 	"Resume after break" : "Retomar após a pausa",
@@ -6514,7 +6514,7 @@
 	"numberMin" : "Introduza um número de pelo menos {min}. Introduziu {current}.",
 	"occupied" : "ocupado",
 	"of" : "de",
-	"off" : "em pausa",
+	"off" : "Desligado",
 	"office" : "escritório",
 	"offline" : "offline",
 	"on" : "ligado",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Apenas sessões iniciadas hoje",
 	"All open sessions, including older days" : "Todas as sessões abertas, incluindo dias anteriores",
 	"Older open sessions are closed at the planned end of the day they started on." : "As sessões abertas mais antigas são fechadas no fim planeado do dia em que começaram."
-	}
+	},
+	"nplurals=2; plural=(n > 1);"
 );
 }});})();

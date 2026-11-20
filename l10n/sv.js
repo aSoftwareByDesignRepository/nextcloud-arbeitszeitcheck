@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Återställ automatisk uppdelning",
 	"Restricted access" : "Begränsad åtkomst",
 	"Restricted — only allow-listed users and groups can open the app" : "Begränsad — endast allow-listade användare och grupper kan öppna appen",
-	"Resturlaub" : "Kvarvarande semester",
+	"Resturlaub" : "Överförd semester",
 	"Result" : "Resultat",
 	"Results pagination" : "Resultatsidnumrering",
 	"Resume after break" : "Återuppta efter rast",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Endast sessioner som startats i dag",
 	"All open sessions, including older days" : "Alla öppna sessioner, även äldre dagar",
 	"Older open sessions are closed at the planned end of the day they started on." : "Äldre öppna sessioner stängs vid det planerade slutet på den dag de startade."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

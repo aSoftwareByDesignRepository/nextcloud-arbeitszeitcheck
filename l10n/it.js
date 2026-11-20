@@ -2462,7 +2462,7 @@
 	"Help texts you hid on pages stay hidden until you show them again here or use \"Show hint\" where they appear." : "I testi della guida nascosti restano nascosti finché non li mostri di nuovo qui o usi «Mostra suggerimento» dove compaiono.",
 	"Help: PIN and badge — what to do" : "Aiuto: PIN e badge — cosa fare",
 	"Help: These skip links let you jump directly to the main content or to the app navigation." : "Aiuto: questi link di salto consentono di passare direttamente al contenuto principale o alla navigazione dell'app.",
-	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Aiuto: PIN e badge — cosa fare",
+	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Qui, sotto «Badge e PIN»: consenta l’accesso, generi PIN o avvii «Scansiona badge sul tablet» (l’UID del chip viene letto automaticamente — non deve mai cercarlo).",
 	"Here you define additional leave entitlements and their quotas." : "Qui definisci diritti a congedi aggiuntivi e le relative quote.",
 	"Heute aktiv" : "Attivo oggi",
 	"Hide" : "Nascondi",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Ripristina divisione automatica",
 	"Restricted access" : "Accesso limitato",
 	"Restricted — only allow-listed users and groups can open the app" : "Limitato — solo utenti e gruppi in allow-list possono aprire l’app",
-	"Resturlaub" : "Ferie residue",
+	"Resturlaub" : "Ferie riportate",
 	"Result" : "Risultato",
 	"Results pagination" : "Impaginazione dei risultati",
 	"Resume after break" : "Riprendi dopo la pausa",
@@ -6289,7 +6289,7 @@
 	"as-of" : "al",
 	"asOfDate" : "Calcolato al %s",
 	"asks you to cover" : "vi chiede di sostituirlo",
-	"assignmentHistory" : "Cronologia assegnazioni",
+	"assignmentHistory" : "Cronologia del modello di orario di lavoro",
 	"attic" : "soffitta",
 	"available" : "disponibile",
 	"awaiting approval" : "in attesa di approvazione",
@@ -6320,7 +6320,7 @@
 	"corporation" : "società",
 	"custom" : "personalizzato",
 	"customer" : "cliente",
-	"dateInvalid" : "Inserisci una data valida.",
+	"dateInvalid" : "Inserisci una data valida. Fai clic sull’icona del calendario per scegliere una data, oppure inseriscila in questo formato: AAAA-MM-GG. Esempio: 2024-01-15 per il 15 gennaio 2024.",
 	"day" : "giorno",
 	"days" : "giorni",
 	"days per year" : "giorni all'anno",
@@ -6670,7 +6670,7 @@
 	"working time model" : "modello di orario di lavoro",
 	"working time model rule" : "regola del modello di orario di lavoro",
 	"workingTimeModel" : "Modello orario di lavoro",
-	"working_time_model" : "Orario di lavoro",
+	"working_time_model" : "Modello di orario di lavoro",
 	"working_time_model_created" : "Orario di lavoro creato",
 	"working_time_model_deleted" : "Orario di lavoro eliminato",
 	"working_time_model_updated" : "Orario di lavoro aggiornato",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Solo le sessioni iniziate oggi",
 	"All open sessions, including older days" : "Tutte le sessioni aperte, anche di giorni precedenti",
 	"Older open sessions are closed at the planned end of the day they started on." : "Le sessioni aperte più vecchie vengono chiuse alla fine pianificata del giorno in cui sono iniziate."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

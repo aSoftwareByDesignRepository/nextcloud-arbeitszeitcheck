@@ -903,7 +903,7 @@
 	"Break times must not overlap." : "Los horarios de pausa no deben solaparse.",
 	"Break was still active after %1$d minutes. Automatic clock-out was applied at %2$s (%3$s policy)." : "La pausa seguía activa tras %1$d minutos. Se aplicó fichaje de salida automático a las %2$s (política %3$s).",
 	"Break windows" : "Franjas de pausa",
-	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "La pausa {a} y la pausa {b} se solapan. Ajuste los horarios de pausa.",
+	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "La pausa {a} y la pausa {b} se solapan. Ajuste los horarios de pausa para que no se solapen.",
 	"Break {number}" : "Pausa {number}",
 	"Breaks" : "Pausas",
 	"Breaks (optional)" : "Pausas (opcional)",
@@ -2462,7 +2462,7 @@
 	"Help texts you hid on pages stay hidden until you show them again here or use \"Show hint\" where they appear." : "Los textos de ayuda que ocultaste permanecen ocultos hasta que los vuelvas a mostrar aquí o uses «Mostrar indicación» donde aparecen.",
 	"Help: PIN and badge — what to do" : "Ayuda: PIN y credencial — qué hacer",
 	"Help: These skip links let you jump directly to the main content or to the app navigation." : "Ayuda: Estos enlaces de acceso rápido le permiten ir directamente al contenido principal o a la navegación de la aplicación.",
-	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Ayuda: PIN y credencial — qué hacer",
+	"Here under “Badges & PIN”: allow access, generate PINs, or start “Scan badge at tablet” (the chip UID is read automatically — you never look it up)." : "Aquí, en «Credenciales y PIN»: permita el acceso, genere PINs o inicie «Escanear credencial en tableta» (el UID del chip se lee automáticamente — nunca tendrá que consultarlo).",
 	"Here you define additional leave entitlements and their quotas." : "Aquí define derechos a permisos adicionales y sus cuotas.",
 	"Heute aktiv" : "Activo hoy",
 	"Hide" : "Ocultar",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Restaurar división automática",
 	"Restricted access" : "Acceso restringido",
 	"Restricted — only allow-listed users and groups can open the app" : "Restringida — solo usuarios y grupos en la lista de permitidos pueden abrir la app",
-	"Resturlaub" : "Vacaciones restantes",
+	"Resturlaub" : "Vacaciones arrastradas",
 	"Result" : "Resultado",
 	"Results pagination" : "Paginación de resultados",
 	"Resume after break" : "Reanudar tras la pausa",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Solo las sesiones iniciadas hoy",
 	"All open sessions, including older days" : "Todas las sesiones abiertas, incluidos días anteriores",
 	"Older open sessions are closed at the planned end of the day they started on." : "Las sesiones abiertas más antiguas se cierran al final planificado del día en que comenzaron."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Automatische splitsing herstellen",
 	"Restricted access" : "Beperkte toegang",
 	"Restricted — only allow-listed users and groups can open the app" : "Beperkt — alleen toegelaten gebruikers en groepen kunnen de app openen",
-	"Resturlaub" : "Resterend verlof",
+	"Resturlaub" : "Overgedragen verlof",
 	"Result" : "Resultaat",
 	"Results pagination" : "Paginering van resultaten",
 	"Resume after break" : "Hervatten na pauze",
@@ -6320,7 +6320,7 @@
 	"corporation" : "vennootschap",
 	"custom" : "aangepast",
 	"customer" : "klant",
-	"dateInvalid" : "Voer een geldige datum in.",
+	"dateInvalid" : "Voer een geldige datum in. Klik op het kalenderpictogram om een datum te kiezen, of voer deze in deze notatie in: JJJJ-MM-DD. Voorbeeld: 2024-01-15 voor 15 januari 2024.",
 	"day" : "dag",
 	"days" : "dagen",
 	"days per year" : "dagen per jaar",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Alleen vandaag gestarte sessies",
 	"All open sessions, including older days" : "Alle open sessies, ook van oudere dagen",
 	"Older open sessions are closed at the planned end of the day they started on." : "Oudere open sessies worden gesloten op het geplande einde van de dag waarop ze begonnen."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

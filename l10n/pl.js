@@ -903,7 +903,7 @@
 	"Break times must not overlap." : "Czasy przerw nie mogą się pokrywać.",
 	"Break was still active after %1$d minutes. Automatic clock-out was applied at %2$s (%3$s policy)." : "Pauza była nadal aktywna po %1$d minutach. Do %2$s (zasada %3$s) zastosowano automatyczny wynik wyjścia.",
 	"Break windows" : "Okna przerw",
-	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "Pauza {a} i pauza {b} nakładają się na siebie. Proszę dostosować godziny przerw.",
+	"Break {a} and Break {b} overlap. Please adjust the break times so they do not overlap." : "Pauza {a} i pauza {b} nakładają się na siebie. Proszę dostosować godziny przerw tak, aby się nie nakładały.",
 	"Break {number}" : "Pauza {number}",
 	"Breaks" : "Przerwy",
 	"Breaks (optional)" : "Przerwy (opcjonalnie)",
@@ -3065,7 +3065,7 @@
 	"Mobile seats" : "Miejsca mobilne",
 	"Mobile seats used" : "Wykorzystane miejsca mobilne",
 	"Mode" : "Tryb",
-	"Model" : "Model czasu pracy",
+	"Model" : "Model",
 	"Model based" : "Na podstawie modelu",
 	"Model change" : "Zmiana modelu",
 	"Model copied successfully" : "Model skopiowany pomyślnie",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Przywróć automatyczny podział",
 	"Restricted access" : "Ograniczony dostęp",
 	"Restricted — only allow-listed users and groups can open the app" : "Ograniczony — tylko użytkownicy i grupy z listy dozwolonych mogą otworzyć aplikację",
-	"Resturlaub" : "Pozostały urlop",
+	"Resturlaub" : "Urlop przeniesiony",
 	"Result" : "Wynik",
 	"Results pagination" : "Stronicowanie wyników",
 	"Resume after break" : "Wznów po przerwie",
@@ -6289,7 +6289,7 @@
 	"as-of" : "stan na",
 	"asOfDate" : "Obliczono przy %s",
 	"asks you to cover" : "prosi o zastąpienie",
-	"assignmentHistory" : "Historia przydziału",
+	"assignmentHistory" : "Historia modelu czasu pracy",
 	"attic" : "strych",
 	"available" : "dostępny",
 	"awaiting approval" : "oczekuje na zatwierdzenie",
@@ -6320,7 +6320,7 @@
 	"corporation" : "korporacja",
 	"custom" : "niestandardowy",
 	"customer" : "klient",
-	"dateInvalid" : "Nieprawidłowa data",
+	"dateInvalid" : "Wprowadź prawidłową datę. Kliknij ikonę kalendarza, aby wybrać datę, lub wpisz ją w tym formacie: RRRR-MM-DD. Przykład: 2024-01-15 dla 15 stycznia 2024.",
 	"day" : "dzień",
 	"days" : "dni",
 	"days per year" : "dni w roku",
@@ -6478,7 +6478,7 @@
 	"month_closure_pdf_label_work_location_days" : "Dni wg miejsca pracy",
 	"month_closure_pdf_label_work_location_entry" : "Miejsce pracy: %1$s",
 	"month_closure_pdf_label_working_days" : "Dni robocze (model)",
-	"month_closure_pdf_no_entries" : "Brak wpisów",
+	"month_closure_pdf_no_entries" : "Brak",
 	"month_closure_pdf_none_parentheses" : "(brak)",
 	"month_closure_pdf_ot_payout_none" : "Dla tego miesiąca nie zarejestrowano wypłaty",
 	"month_closure_pdf_ot_payout_recorded_after_closure" : "Zaksięgowano po zamknięciu miesiąca (uzupełniająco)",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Tylko sesje rozpoczęte dzisiaj",
 	"All open sessions, including older days" : "Wszystkie otwarte sesje, także z wcześniejszych dni",
 	"Older open sessions are closed at the planned end of the day they started on." : "Starsze otwarte sesje są zamykane o planowanym końcu dnia, w którym się rozpoczęły."
-	}
+	},
+	"nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
 );
 }});})();

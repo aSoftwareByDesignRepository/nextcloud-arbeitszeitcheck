@@ -1792,7 +1792,7 @@
 	"Direction" : "Retning",
 	"Direction: %1$s" : "Retning: %1$s",
 	"Disable entitlement for this selection" : "Deaktiver retten for dette valget",
-	"Disabled" : "Funksjonshemmet",
+	"Disabled" : "Deaktivert",
 	"Dismiss" : "Avvis",
 	"Dismiss this welcome message" : "Avvis denne velkomstmelding",
 	"Display Name" : "Vist navn",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Gjenopprett automatisk oppdeling",
 	"Restricted access" : "Begrenset tilgang",
 	"Restricted — only allow-listed users and groups can open the app" : "Begrenset — bare brukere og grupper på tillatelseslisten kan åpne appen",
-	"Resturlaub" : "Gjenstående ferie",
+	"Resturlaub" : "Overført ferie",
 	"Result" : "Resultat",
 	"Results pagination" : "Resultatsider",
 	"Resume after break" : "Gjenoppta etter pause",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Bare økter startet i dag",
 	"All open sessions, including older days" : "Alle åpne økter, også eldre dager",
 	"Older open sessions are closed at the planned end of the day they started on." : "Eldre åpne økter avsluttes ved den planlagte slutten på dagen de startet."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

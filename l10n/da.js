@@ -1792,7 +1792,7 @@
 	"Direction" : "Retning",
 	"Direction: %1$s" : "Retning: %1$s",
 	"Disable entitlement for this selection" : "Deaktivér retten for dette valg",
-	"Disabled" : "Handicappet",
+	"Disabled" : "Deaktiveret",
 	"Dismiss" : "Afvis",
 	"Dismiss this welcome message" : "Afvis denne velkomstbesked",
 	"Display Name" : "Vist navn",
@@ -4295,7 +4295,7 @@
 	"Restore automatic split" : "Gendan automatisk opdeling",
 	"Restricted access" : "Begrænset adgang",
 	"Restricted — only allow-listed users and groups can open the app" : "Begrænset — kun brugere og grupper på tilladelseslisten kan åbne appen",
-	"Resturlaub" : "Restferie",
+	"Resturlaub" : "Overført ferie",
 	"Result" : "Resultat",
 	"Results pagination" : "Resultatsideinddeling",
 	"Resume after break" : "Genoptag efter pause",
@@ -6337,7 +6337,7 @@
 	"development" : "udvikling",
 	"director" : "direktør",
 	"disable" : "deaktivere",
-	"disabled" : "handicappet",
+	"disabled" : "deaktiveret",
 	"disconnected" : "afbrudt",
 	"district" : "distrikt",
 	"division" : "afdeling",
@@ -6768,6 +6768,7 @@
 	"Only sessions started today" : "Kun sessioner startet i dag",
 	"All open sessions, including older days" : "Alle åbne sessioner, også ældre dage",
 	"Older open sessions are closed at the planned end of the day they started on." : "Ældre åbne sessioner lukkes ved den planlagte slut på den dag, de startede."
-	}
+	},
+	"nplurals=2; plural=(n != 1);"
 );
 }});})();

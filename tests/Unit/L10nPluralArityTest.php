@@ -29,7 +29,7 @@ final class L10nPluralArityTest extends TestCase
 		'en' => 2, 'de' => 2, 'fr' => 2, 'es' => 2, 'da' => 2, 'nl' => 2,
 		'it' => 2, 'sv' => 2, 'nb' => 2, 'pt' => 2, 'pt_BR' => 2,
 		'pl' => 3,
-		'tr' => 1, 'zh_CN' => 1, 'ru' => 3, 'ru' => 3, 'zh_TW' => 1, 'ru' => 3, 'ru' => 3,
+		'tr' => 1, 'zh_CN' => 1, 'ru' => 3, 'zh_TW' => 1,
 	];
 
 	private string $root;
@@ -38,6 +38,55 @@ final class L10nPluralArityTest extends TestCase
 	{
 		parent::setUp();
 		$this->root = dirname(__DIR__, 2);
+	}
+
+	/**
+	 * @return list<string> locale keys in declaration order
+	 */
+	private static function rosterKeysFromSource(string $source): array
+	{
+		self::assertMatchesRegularExpression(
+			'/private const NPLURALS = \[(.*?)\];/s',
+			$source,
+			'could not locate the NPLURALS const literal in test source',
+		);
+		preg_match('/private const NPLURALS = \[(.*?)\];/s', $source, $m);
+		preg_match_all("/'([A-Za-z_]+)'\s*=>/", $m[1], $mm);
+		return $mm[1];
+	}
+
+	/**
+	 * @return list<string> duplicated locale keys
+	 */
+	private static function rosterDuplicateKeys(string $source): array
+	{
+		$counts = array_count_values(self::rosterKeysFromSource($source));
+		return array_values(array_keys(array_filter(
+			$counts,
+			static fn (int $n): bool => $n > 1,
+		)));
+	}
+
+	public function testRosterLiteralHasNoDuplicateKeys(): void
+	{
+		$dupes = self::rosterDuplicateKeys((string) file_get_contents(__FILE__));
+		self::assertSame(
+			[],
+			$dupes,
+			'NPLURALS roster declares a locale more than once (PHP silently keeps the last write): '
+			. implode(', ', $dupes),
+		);
+	}
+
+	public function testRosterDupKeyLintDetectsMutation(): void
+	{
+		$mutant = 'private const NPLURALS'
+			. " = [\n\t\t'en' => 2, 'de' => 2, 'ru' => 3, 'ru' => 3,\n\t];\n";
+		self::assertSame(
+			['ru'],
+			self::rosterDuplicateKeys($mutant),
+			'roster dup-key lint failed to flag a duplicated locale key',
+		);
 	}
 
 	public function testRosterCoversEveryShippedCatalog(): void

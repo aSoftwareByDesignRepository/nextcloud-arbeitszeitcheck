@@ -349,7 +349,7 @@
 
 #app-content.azc-app .azc-kiosk-flow__block--muted .azc-kiosk-flow__step {
 	color: var(--color-main-text);
-	background: var(--azc-surface-2, var(--color-background-dark));
+	background: var(--azc-bg-soft, var(--color-background-dark));
 }
 
 #app-content.azc-app .azc-kiosk-flow__hint {

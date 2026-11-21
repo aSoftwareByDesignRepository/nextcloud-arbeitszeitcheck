@@ -663,7 +663,7 @@
     margin: 0;
     font-size: 0.9375rem;
     line-height: 1.55;
-    color: var(--arbeitszeitcheck-color-text-default, var(--color-main-text));
+    color: var(--azc-text, var(--color-main-text));
 }
 
 .arbeitszeit-check-tz-context__badges {

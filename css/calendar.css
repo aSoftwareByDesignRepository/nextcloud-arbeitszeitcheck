@@ -155,7 +155,7 @@
 	color: var(--arbeitszeitcheck-color-text-maxcontrast, var(--color-text-maxcontrast, var(--arbeitszeitcheck-color-text-tertiary)));
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	background: var(--arbeitszeitcheck-color-background-secondary, var(--color-background-hover, var(--arbeitszeitcheck-color-gray-50)));
+	background: var(--arbeitszeitcheck-color-background-secondary, var(--color-background-hover, var(--azc-bg-soft)));
 	border-radius: var(--radius-base, 4px);
 	display: block;
 	visibility: visible;

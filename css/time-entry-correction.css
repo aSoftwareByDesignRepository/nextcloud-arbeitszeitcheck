@@ -428,7 +428,7 @@
 	margin-top: 0.35em;
 	inline-size: 1.1rem;
 	block-size: 1.1rem;
-	accent-color: var(--azc-accent, var(--color-primary-element));
+	accent-color: var(--azc-primary, var(--color-primary-element));
 }
 
 #time-entry-correction-modal .correction-worked-interruption {
@@ -455,7 +455,7 @@
 #time-entry-correction-modal .correction-worked-enable-label input[type='checkbox'] {
 	inline-size: 1.25rem;
 	block-size: 1.25rem;
-	accent-color: var(--azc-accent, var(--color-primary-element));
+	accent-color: var(--azc-primary, var(--color-primary-element));
 }
 
 #time-entry-correction-modal .correction-worked-rows {

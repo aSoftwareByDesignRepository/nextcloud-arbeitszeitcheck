@@ -6,23 +6,24 @@
 -->
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>arbeitszeitcheck</id>
-	<name>ArbeitszeitCheck</name>
-	<summary>Track working time with DACH profiles — ArbZG / AZG / ArG on your Nextcloud</summary>
+	<name>WorkTimeCheck</name>
+	<name lang="de">ArbeitszeitCheck</name>
+	<summary>Working time tracking with configurable country profiles — clock-in, breaks, absences and reports on your Nextcloud</summary>
 	<summary lang="de">Arbeitszeit erfassen mit DACH-Profilen — ArbZG / AZG / ArG in Ihrer Nextcloud</summary>
-	<summary lang="fr">Suivi du temps avec conformité DACH (ArbZG / AZG / ArG) dans Nextcloud</summary>
-	<summary lang="da">Tidsregistrering med DACH-arbejdslovsoverholdelse (ArbZG / AZG / ArG) i Nextcloud</summary>
-	<summary lang="es">Registro de tiempo con cumplimiento laboral DACH (ArbZG / AZG / ArG) en Nextcloud</summary>
-	<summary lang="nl">Tijdregistratie met DACH-arbeidsrechtnaleving (ArbZG / AZG / ArG) en AVG-controles in Nextcloud</summary>
-	<summary lang="it">Registrazione ore con conformità DACH (ArbZG / AZG / ArG) in Nextcloud</summary>
-	<summary lang="pl">Rejestracja czasu ze zgodnością prawa pracy DACH (ArbZG / AZG / ArG) i kontrolą RODO w Nextcloud</summary>
-	<summary lang="sv">Tidsregistrering med DACH-arbetslagstiftning (ArbZG / AZG / ArG) i Nextcloud</summary>
-	<summary lang="nb">Tidsregistrering med DACH-arbeidsrett (ArbZG / AZG / ArG) i Nextcloud</summary>
+	<summary lang="fr">Suivi du temps de travail avec profils pays configurables — pointage, pauses, absences et rapports dans Nextcloud</summary>
+	<summary lang="da">Registrering af arbejdstid med konfigurerbare landeprofiler — stempling, pauser, fravær og rapporter i Nextcloud</summary>
+	<summary lang="es">Registro del tiempo de trabajo con perfiles de país configurables — fichaje, pausas, ausencias e informes en Nextcloud</summary>
+	<summary lang="nl">Werktijdregistratie met configureerbare landprofielen — klokken, pauzes, verzuim en rapporten in Nextcloud</summary>
+	<summary lang="it">Registrazione dell'orario di lavoro con profili paese configurabili — timbrature, pause, assenze e report in Nextcloud</summary>
+	<summary lang="pl">Ewidencja czasu pracy z konfigurowalnymi profilami krajowymi — przerwy, nieobecności i raporty w Nextcloud</summary>
+	<summary lang="sv">Tidrapportering med konfigurerbara landsprofiler — stämpling, pauser, frånvaro och rapporter i Nextcloud</summary>
+	<summary lang="nb">Tidsregistrering med konfigurerbare landsprofiler — stempling, pauser, fravær og rapporter i Nextcloud</summary>
 	<description><![CDATA[
 # Clock in. Stay within the rules you set.
 
 ArbeitszeitCheck records clock-in, clock-out and breaks on the Nextcloud you already host. Pick a country profile for Germany (ArbZG), Austria (AZG/ARG) or Switzerland (ArG), match holiday regions, approve absences, run reports (including DATEV) and keep an audit log.
 
-Also listed as **TimeGuard** in some App Store searches.
+Also listed as **WorkTimeCheck** in some App Store searches.
 
 **Free web app** (AGPL-3.0-or-later). Companion apps: https://nextcloud.software-by-design.de/
 
@@ -55,7 +56,7 @@ We improve this app with real-world use. Bug reports, rough edges, and ideas hel
 
 ArbeitszeitCheck erfasst Kommen, Gehen und Pausen in der Nextcloud, die Sie schon betreiben. Länderprofil für Deutschland (ArbZG), Österreich (AZG/ARG) oder die Schweiz (ArG), passende Feiertagsregionen, Abwesenheiten mit Freigabe, Berichte (inkl. DATEV) und ein Audit-Log.
 
-In manchen App-Store-Suchen auch als **TimeGuard**.
+In manchen App-Store-Suchen auch als **WorkTimeCheck**.
 
 **Kostenlose Web-App** (AGPL-3.0-or-later). Companion-Apps: https://nextcloud.software-by-design.de/
 
@@ -84,9 +85,9 @@ Wir verbessern diese App mit Rückmeldungen aus der Praxis. Fehlerberichte, Stol
 - Nextcloud 32–35 · PHP 8.1–8.5 · MySQL oder PostgreSQL
 	]]></description>
 	<description lang="fr"><![CDATA[
-# ArbeitszeitCheck
+# WorkTimeCheck
 
-Suivi du temps pour l'Allemagne, l'Autriche et la Suisse (DACH). Enregistrez les heures, appliquez pauses et repos selon ArbZG, AZG/ARG ou ArG, et surveillez la conformité — entièrement auto-hébergé dans votre instance Nextcloud.
+Suivi du temps de travail auto-hébergé dans Nextcloud. Enregistrez les heures, appliquez pauses et repos selon des profils pays configurables — aujourd'hui Allemagne (ArbZG), Autriche (AZG/ARG) et Suisse (ArG) — et surveillez la conformité.
 
 ## Fonctionnalités
 
@@ -107,9 +108,9 @@ Suivi du temps pour l'Allemagne, l'Autriche et la Suisse (DACH). Enregistrez les
 Nous améliorons cette app grâce à votre usage réel. Bugs, frottements et idées aident — ouvrez une GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) ou écrivez à info@software-by-design.de. Vos retours façonnent directement la suite.
 ]]></description>
 	<description lang="da"><![CDATA[
-# ArbeitszeitCheck
+# WorkTimeCheck
 
-Tidsregistrering for Tyskland, Østrig og Schweiz (DACH). Registrer arbejdstid, håndhæv pauser og hvile efter ArbZG, AZG/ARG eller ArG, og overvåg overholdelse — fuldt selvhostet i din Nextcloud-instans.
+Tidsregistrering af arbejdstid, selvhostet i din Nextcloud. Registrer timer, håndhæv pauser og hvile efter konfigurerbare landeprofiler — i dag Tyskland (ArbZG), Østrig (AZG/ARG) og Schweiz (ArG) — og overvåg overholdelse.
 
 ## Funktioner
 
@@ -130,9 +131,9 @@ Vi forbedrer denne app med brug i praksis. Fejlrapporter, friktioner og idéer h
 - PHP 8.1–8.5
 	]]></description>
 	<description lang="es"><![CDATA[
-# ArbeitszeitCheck
+# WorkTimeCheck
 
-Registro de tiempo para Alemania, Austria y Suiza (DACH). Registra horas de trabajo, aplica pausas y descansos según ArbZG, AZG/ARG o ArG, y supervisa el cumplimiento — totalmente autoalojado en tu instancia de Nextcloud.
+Registro del tiempo de trabajo autoalojado en tu Nextcloud. Registra horas, aplica pausas y descansos según perfiles de país configurables — hoy Alemania (ArbZG), Austria (AZG/ARG) y Suiza (ArG) — y supervisa el cumplimiento.
 
 ## Funciones
 
@@ -158,7 +159,7 @@ Mejoramos esta app con el uso real. Informes de errores, fricciones e ideas ayud
 
 ArbeitszeitCheck registreert in- en uitklokken en pauzes in de Nextcloud die u al beheert. Kies een landprofiel voor Duitsland (ArbZG), Oostenrijk (AZG/ARG) of Zwitserland (ArG), stem vakantiegebieden af, keur afwezigheden goed, voer rapporten uit (inclusief DATEV) en houd een auditlog bij.
 
-Ook bekend als **TimeGuard** in sommige App Store-zoekopdrachten.
+Ook bekend als **WorkTimeCheck** in sommige App Store-zoekopdrachten.
 
 **Gratis webapp** (AGPL-3.0-or-later). Companion apps: https://nextcloud.software-by-design.de/
 
@@ -191,7 +192,7 @@ We verbeteren deze app met gebruik in de praktijk. Bugmeldingen, struikelblokken
 
 ArbeitszeitCheck registra l’entrata, l’uscita e le pause nella Nextcloud che avete già in hosting. Scegli un profilo Paese per Germania (ArbZG), Austria (AZG/ARG) o Svizzera (ArG), abbina le aree di festività, approva le assenze, esegui i report (incluso DATEV) e conserva un audit log.
 
-Inoltre indicato come **TimeGuard** in alcune ricerche dell’App Store.
+Inoltre indicato come **WorkTimeCheck** in alcune ricerche dell’App Store.
 
 **Web app gratuita** (AGPL-3.0-or-later). App associate: https://nextcloud.software-by-design.de/
 
@@ -224,7 +225,7 @@ Miglioriamo questa app con l’uso reale. Segnalazioni di bug, punti deboli e id
 
 ArbeitszeitCheck rejestruje przyjście, wyjście i przerwy w Nextcloud, którą Państwo już hostują. Wybierz profil kraju dla Niemiec (ArbZG), Austrii (AZG/ARG) lub Szwajcarii (ArG), dopasuj regiony świąt, zatwierdzaj nieobecności, uruchamiaj raporty (w tym DATEV) i prowadź dziennik audytu.
 
-W niektórych wyszukiwaniach w App Store aplikacja jest też znana jako **TimeGuard**.
+W niektórych wyszukiwaniach w App Store aplikacja jest też znana jako **WorkTimeCheck**.
 
 **Darmowa aplikacja webowa** (AGPL-3.0-or-later). Aplikacje towarzyszące: https://nextcloud.software-by-design.de/
 
@@ -257,7 +258,7 @@ Ulepszamy tę aplikację dzięki realnemu użyciu. Zgłoszenia błędów, tarcia
 
 ArbeitszeitCheck registrerar in-, utstämplingar och pauser i den Nextcloud ni redan hostar. Välj ett landsprofil för Tyskland (ArbZG), Österrike (AZG/ARG) eller Schweiz (ArG), matcha helgdagregioner, godkänn frånvaro, kör rapporter (inklusive DATEV) och behåll en auditlogg.
 
-Appen finns också listad som **TimeGuard** i vissa App Store-sökningar.
+Appen finns också listad som **WorkTimeCheck** i vissa App Store-sökningar.
 
 **Gratis webbapp** (AGPL-3.0-or-later). Companion-appar: https://nextcloud.software-by-design.de/
 
@@ -290,7 +291,7 @@ Vi förbättrar den här appen med verklig användning. Felrapporter, friktioner
 
 ArbeitszeitCheck registrerer inn-, utstempling og pauser i Nextclouden dere allerede hoster. Velg en landsprofil for Tyskland (ArbZG), Østerrike (AZG/ARG) eller Sveits (ArG), match ferieområder, godkjenn fravær, kjør rapporter (inkludert DATEV) og hold en auditlogg.
 
-Appen står også oppført som **TimeGuard** i noen App Store-søk.
+Appen står også oppført som **WorkTimeCheck** i noen App Store-søk.
 
 **Gratis nettapp** (AGPL-3.0-or-later). Følgeapper: https://nextcloud.software-by-design.de/
 

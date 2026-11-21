@@ -1,4 +1,4 @@
-ArbeitszeitCheck (TimeGuard)
+ArbeitszeitCheck (WorkTimeCheck)
 
 [![Nextcloud](https://img.shields.io/badge/Nextcloud-32–35-0082c9?logo=nextcloud&logoColor=white)](https://nextcloud.com/)
 [![PHP](https://img.shields.io/badge/PHP-8.1–8.5-777BB4?logo=php&logoColor=white)](https://www.php.net/)
@@ -6,7 +6,7 @@ ArbeitszeitCheck (TimeGuard)
 
 **[English](#english)** · **[Deutsch](#deutsch)**
 
-Clock in. Stay within the rules you set — on your Nextcloud. Search tip: **TimeGuard**.
+Clock in. Stay within the rules you set — on your Nextcloud. Search tip: **WorkTimeCheck**.
 
 ---
 
@@ -39,7 +39,7 @@ This app is **not legal advice**. You stay responsible for working-time models, 
 
 ### Install
 
-**App Store (recommended):** Apps → search **ArbeitszeitCheck** or **TimeGuard** → download and enable.
+**App Store (recommended):** Apps → search **ArbeitszeitCheck** or **WorkTimeCheck** → download and enable.
 
 **From Git:**
 
@@ -94,7 +94,7 @@ Diese App ist **keine Rechtsberatung**. Sie bleiben verantwortlich für Arbeitsz
 
 ### Installation
 
-**App Store (empfohlen):** Apps → **ArbeitszeitCheck** oder **TimeGuard** suchen → herunterladen und aktivieren.
+**App Store (empfohlen):** Apps → **ArbeitszeitCheck** oder **WorkTimeCheck** suchen → herunterladen und aktivieren.
 
 **Aus Git:** siehe englischen Abschnitt.
 

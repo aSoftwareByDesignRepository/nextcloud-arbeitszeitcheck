@@ -5,6 +5,7 @@ namespace OCA\ArbeitszeitCheck\Public;
 
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\Absence;
+use OCA\ArbeitszeitCheck\Service\PermissionService;
 use OCA\ArbeitszeitCheck\Service\TeamResolverService;
 use OCP\IDBConnection;
 use OCP\IConfig;
@@ -38,6 +39,7 @@ class AzcOrgReadFacade
 
 	public function __construct(
 		private readonly TeamResolverService $teams,
+		private readonly PermissionService $permissions,
 		private readonly IConfig $config,
 		private readonly IDBConnection $db,
 		private readonly LoggerInterface $logger,
@@ -162,7 +164,10 @@ class AzcOrgReadFacade
 	/**
 	 * MH-22 — the AZC access-door config so sibling apps can offer a
 	 * one-click prefill of their own door lists. Read-only mirror; the door
-	 * itself stays per-app.
+	 * itself stays per-app. Groups come from the platform restriction via
+	 * {@see PermissionService::getAllowedAccessGroups()} — the stored
+	 * snapshot key is write-only (azc #46: out-of-band `occ app:enable -g`
+	 * / Apps-page edits must win, the snapshot would freeze the first list).
 	 *
 	 * @return array{mode:string,allowed_users:list<string>,allowed_groups:list<string>}
 	 */
@@ -171,11 +176,10 @@ class AzcOrgReadFacade
 		try {
 			$restricted = $this->config->getAppValue(self::APP_ID, Constants::CONFIG_ACCESS_RESTRICTION_ENABLED, '') === '1';
 			$users = json_decode((string)$this->config->getAppValue(self::APP_ID, Constants::CONFIG_ACCESS_ALLOWED_USER_IDS, '[]'), true);
-			$groups = json_decode((string)$this->config->getAppValue(self::APP_ID, Constants::CONFIG_ACCESS_ALLOWED_GROUP_IDS, '[]'), true);
 			return [
 				'mode' => $restricted ? 'restricted' : 'open',
 				'allowed_users' => is_array($users) ? array_values(array_map('strval', $users)) : [],
-				'allowed_groups' => is_array($groups) ? array_values(array_map('strval', $groups)) : [],
+				'allowed_groups' => $this->permissions->getAllowedAccessGroups(),
 			];
 		} catch (\Throwable) {
 			return ['mode' => 'open', 'allowed_users' => [], 'allowed_groups' => []];

@@ -1,7 +1,9 @@
+/* Auto-adapted from arbeitszeitcheck/css/common/tokens.css for the Check-family shell. Do not invent divergent layout rules here. */
 /*
- * ArbeitszeitCheck design tokens (--azc-*).
+ * Arbeitszeitcheck design tokens (--azc-*).
  * Colors derive from Nextcloud theme variables; no raw hex in feature CSS.
- * Spacing/typography on :root; theme colors on body (NC sets --color-* on body).
+ * Spacing/typography on :root; theme colors on body + themed app surfaces
+ * (NC sets --color-* on body [data-theme-*]).
  */
 :root {
 	--azc-space-1: 4px;
@@ -12,14 +14,34 @@
 	--azc-space-6: 32px;
 	--azc-space-7: 48px;
 	--azc-space-8: 64px;
-	/* Clear space under the last block on every page. 5rem matches 5em at the root size. */
-	--azc-page-end: 5rem;
 
-	--azc-radius-sm: 6px;
-	--azc-radius-md: 12px;
-	--azc-radius-lg: 16px;
+	/* Legacy --space-* aliases used by ported AZC layout/dialog sheets */
+	--space-1: var(--azc-space-1);
+	--space-2: var(--azc-space-2);
+	--space-3: var(--azc-space-3);
+	--space-4: var(--azc-space-4);
+	--space-5: var(--azc-space-5);
+	--space-6: var(--azc-space-6);
+	--space-7: var(--azc-space-7);
+	--space-8: var(--azc-space-8);
+	--space-10: 80px;
+	--space-12: 96px;
 
-	--azc-fs-xs: 0.75rem;
+	/* Radii — design-system scale, bound to NC --border-radius-* when present */
+	--azc-radius-sm: var(--border-radius, 6px);
+	--azc-radius-md: var(--border-radius-element, var(--border-radius-large, 12px));
+	--azc-radius-lg: var(--border-radius-large, 16px);
+	--azc-radius-pill: var(--border-radius-pill, 999px);
+
+	/* Legacy --radius-* used by ported app-layout / dialogs sheets */
+	--radius-base: var(--azc-radius-sm);
+	--radius-lg: var(--azc-radius-md);
+	--radius-xl: var(--azc-radius-lg);
+	--radius-2xl: var(--azc-radius-lg);
+	--radius-full: var(--azc-radius-pill);
+
+	/* Floor 0.875rem (14px) — no type below 14px on mobile (responsive directive) */
+	--azc-fs-xs: 0.875rem;
 	--azc-fs-sm: 0.875rem;
 	--azc-fs-md: 1rem;
 	--azc-fs-lg: 1.125rem;
@@ -41,46 +63,83 @@
 	--azc-icon-stroke: 2;
 
 	--azc-tab-num: tabular-nums;
-
-	/* Touch targets (WCAG 2.5.5 / design-system §0.4) */
+	/* Touch targets (WCAG 2.5.5 / design-system) */
 	--azc-touch: 44px;
 	--azc-touch-lg: 48px;
+
+	/*
+	 * QR / barcode canvas must stay light for scannability in every theme.
+	 * This is the only intentional non-theme surface in Arbeitszeitcheck feature CSS.
+	 */
+	--azc-qr-canvas: #ffffff;
 }
 
-/* Theme-bound tokens — must follow body [data-theme-*] where NC defines --color-* */
-body {
-	/* Fixed overlays (panels, backdrops, mobile nav) sit below NC #header, not under the profile menu */
+/*
+ * Theme-dependent tokens MUST resolve where Nextcloud sets --color-* (body /
+ * [data-theme-*]) and on themed app surfaces. Resolving color-mix only on
+ * :root can fall back to light surfaces while text inherits dark-theme ink.
+ */
+body,
+#content.app-arbeitszeitcheck,
+#app-content.azc-app,
+.azc-app,
+.azc-dialog,
+.azc-modal,
+.azc-toast-region,
+.azc-toasts,
+.azc-license-modal {
+	/* Fixed overlays (panels, backdrops, mobile nav) sit below NC #header */
 	--azc-overlay-top: var(--header-height, 50px);
 	--azc-overlay-height: calc(100dvh - var(--header-height, 50px));
 
 	--azc-bg-soft: color-mix(in srgb, var(--color-main-background) 96%, var(--color-main-text) 4%);
 	--azc-bg-card: var(--color-main-background);
+	--azc-bg-stripe: color-mix(in srgb, var(--color-main-background) 92%, var(--color-main-text) 8%);
+	--azc-bg-hover: var(--color-background-hover);
 	--azc-text: var(--color-main-text);
 	--azc-muted: var(--color-text-maxcontrast);
+	/* Muted ink on tinted surfaces (callouts/badges): main-text keeps it
+	   readable where pure maxcontrast washes out on the tint fill. */
+	--azc-muted-on-tint: color-mix(in srgb, var(--color-text-maxcontrast) 55%, var(--color-main-text));
+	/* Monospace for codes/refs (claim numbers, payment refs): NC ships no mono
+	   var, so pin a platform-native stack. */
+	--azc-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'Liberation Mono', Menlo, Consolas, monospace;
 	--azc-border: color-mix(in srgb, var(--color-main-text) 12%, transparent);
-	--azc-border-strong: color-mix(in srgb, var(--color-main-text) 24%, transparent);
+	/* Boundaries of cards/controls/callouts/dialogs need >=3:1 vs the adjacent
+	   surface (WCAG 1.4.11): NC's --color-border-maxcontrast is theme-tuned for
+	   exactly that (dark + high-contrast themes included). The faint 24% mix
+	   measured ~1.3:1 — below the floor in every theme. */
+	--azc-border-strong: var(--color-border-maxcontrast, color-mix(in srgb, var(--color-main-text) 24%, transparent));
 	/* Interactive controls need >=3:1 (WCAG 1.4.11): maxcontrast is NC's own
 	   input border; --color-border / --azc-border stay surface-only. */
 	--azc-form-border: var(--color-border-maxcontrast, var(--azc-border-strong));
+	/* Filled controls (secondary/ghost/summary buttons): the border sits on a
+	   mid-gray fill, so it must read against BOTH fill and page — maxcontrast
+	   lands ~2.9:1 on the 18%-ink secondary fill. Ink-tuned maxcontrast text
+	   token clears 3:1 against both in every theme. */
+	--azc-control-border: var(--color-text-maxcontrast, var(--color-border-maxcontrast, var(--azc-border-strong)));
 
-	/* Mix with main background — not transparent — so callouts stay visible on all NC themes.
-	   Danger chips (hours under Soll) use the solid element red, not --color-error-text.
-	   That token is asterisk and validation ink; mixing it in turns these surfaces grey. */
+	/* Primary / focus — track NC accent for custom branding */
+	--azc-primary: var(--color-primary-element);
+	--azc-primary-text: var(--color-primary-element-text);
+	/* Accent used as text/icon ink on surfaces: pure --color-primary-element
+	   drops below WCAG AA 4.5:1 on dark themes (~4.3:1); the dark override
+	   below blends it toward main-text. Fills keep --azc-primary. */
+	--azc-accent-ink: var(--color-primary-element);
+	--azc-focus: 3px solid var(--color-primary-element);
+	--azc-focus-offset: 2px;
+
+	/* Mix with main background — not transparent — so callouts stay visible on all NC themes */
 	--azc-tint-success: color-mix(in srgb, var(--color-success-text, var(--color-success)) 18%, var(--color-main-background));
 	--azc-tint-warning: color-mix(in srgb, var(--color-warning-text, var(--color-warning)) 22%, var(--color-main-background));
-	--azc-tint-danger: color-mix(in srgb, var(--color-element-error, var(--color-error)) 18%, var(--color-main-background));
+	--azc-tint-danger: color-mix(in srgb, var(--color-error-text, var(--color-error)) 18%, var(--color-main-background));
+	/* Alias used by badges/callouts/toasts — mix into main-bg (never transparent) so dark themes stay visible */
+	--azc-tint-critical: var(--azc-tint-danger);
 	--azc-tint-info: color-mix(in srgb, var(--color-primary-element) 16%, var(--color-main-background));
-
-	--azc-shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-main-text) 8%, transparent);
-	--azc-shadow-md: 0 8px 24px color-mix(in srgb, var(--color-main-text) 12%, transparent);
-
-	/* Modal / drawer scrim — theme-aware, never raw black rgba */
-	--azc-scrim: color-mix(in srgb, var(--color-main-text) 45%, transparent);
 
 	/*
 	 * Solid danger CTA fill (design-system §3.3 / WCAG 1.4.3).
 	 * NC 30+ maps --color-error to a pale tint — never put on-fill text on that.
-	 * Use --color-element-error; dark themes darken the fill so ink stays ≥ 4.5:1.
 	 */
 	--azc-danger-fill: var(--color-element-error, var(--color-error));
 	--azc-danger-on-fill: var(--color-primary-element-text, var(--color-primary-text));
@@ -94,65 +153,117 @@ body {
 	--azc-notif-fg-warning: var(--color-warning-text, var(--color-warning));
 	--azc-notif-fg-success: var(--color-success-text, var(--color-success));
 	--azc-notif-fg-danger: var(--color-error-text, var(--color-error));
+
+	--azc-shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-main-text) 8%, transparent);
+	--azc-shadow-md: 0 8px 24px color-mix(in srgb, var(--color-main-text) 12%, transparent);
+	--azc-shadow-lg: 0 1rem 3rem color-mix(in srgb, var(--color-main-text) 28%, transparent);
+
+	/* Overlay scrims — theme ink, never hardcoded #000 */
+	--azc-scrim: color-mix(in srgb, var(--color-main-text) 45%, transparent);
+	--azc-scrim-strong: color-mix(in srgb, var(--color-main-text) 55%, transparent);
+
+	/*
+	 * Legacy --arbeitszeitcheck-* aliases (shell dialogs / app-layout ported from AZC).
+	 * Feature CSS should prefer --azc-*; every alias maps to NC/--azc-* so
+	 * undefined custom properties never blank out surfaces in any theme.
+	 */
+	--arbeitszeitcheck-color-modal-background: var(--azc-bg-card);
+	--arbeitszeitcheck-color-modal-border: var(--azc-border);
+	--arbeitszeitcheck-color-modal-footer-background: var(--azc-bg-soft);
+	--arbeitszeitcheck-color-background: var(--color-main-background);
+	--arbeitszeitcheck-color-background-elevated: var(--azc-bg-card);
+	--arbeitszeitcheck-color-background-secondary: var(--azc-bg-soft);
+	--arbeitszeitcheck-color-background-tertiary: var(--azc-bg-soft);
+	--arbeitszeitcheck-color-text: var(--azc-text);
+	--arbeitszeitcheck-color-text-muted: var(--azc-muted);
+	--arbeitszeitcheck-color-text-maxcontrast: var(--azc-muted);
+	--arbeitszeitcheck-color-text-secondary: var(--azc-muted);
+	--arbeitszeitcheck-color-text-tertiary: var(--azc-muted);
+	--arbeitszeitcheck-color-primary: var(--color-primary-element);
+	--arbeitszeitcheck-color-primary-element: var(--color-primary-element);
+	--arbeitszeitcheck-color-primary-light: color-mix(in srgb, var(--color-primary-element) 28%, transparent);
+	--arbeitszeitcheck-color-border: var(--azc-border);
+	--arbeitszeitcheck-color-border-focus: var(--color-primary-element);
+	--arbeitszeitcheck-color-border-warning: var(--color-warning-text, var(--color-warning));
+	--arbeitszeitcheck-color-error: var(--azc-danger-ink);
+	--arbeitszeitcheck-color-error-light: color-mix(in srgb, var(--azc-danger-ink) 28%, transparent);
+	--arbeitszeitcheck-color-success-light: color-mix(in srgb, var(--color-success-text, var(--color-success)) 28%, transparent);
+	--arbeitszeitcheck-color-warning-light: color-mix(in srgb, var(--color-warning-text, var(--color-warning)) 28%, transparent);
+	--arbeitszeitcheck-color-form-required: var(--azc-danger-ink);
+	--arbeitszeitcheck-color-form-label: var(--azc-text);
+	--arbeitszeitcheck-color-form-background: var(--color-main-background);
+	--arbeitszeitcheck-color-form-border: var(--color-border-maxcontrast, var(--azc-border-strong));
+	--arbeitszeitcheck-color-form-border-focus: var(--color-primary-element);
+	--arbeitszeitcheck-color-form-border-error: var(--azc-danger-ink);
+	--arbeitszeitcheck-color-form-border-success: var(--color-success-text, var(--color-success));
+	--arbeitszeitcheck-color-table-border: var(--azc-border);
+	--arbeitszeitcheck-color-table-header-background: var(--color-background-dark, var(--azc-bg-stripe));
+	--arbeitszeitcheck-font-family-sans: var(--font-face, inherit);
+	--arbeitszeitcheck-font-size-sm: var(--azc-fs-sm);
+	--arbeitszeitcheck-font-size-base: var(--azc-fs-md);
+	--arbeitszeitcheck-font-size-lg: var(--azc-fs-lg);
+	--arbeitszeitcheck-font-size-xl: var(--azc-fs-xl);
+	--arbeitszeitcheck-font-size-3xl: var(--azc-fs-2xl);
+	--arbeitszeitcheck-font-weight-medium: 500;
+	--arbeitszeitcheck-font-weight-semibold: 600;
+	--arbeitszeitcheck-font-weight-bold: 700;
+	--arbeitszeitcheck-letter-spacing-tight: -0.02em;
+	--arbeitszeitcheck-line-height-tight: var(--azc-line-tight);
+	--arbeitszeitcheck-line-height-normal: var(--azc-line-base);
+	--arbeitszeitcheck-line-height-relaxed: 1.6;
 }
 
-/* Bright accent fills on dark themes fail AA with white/black ink — darken fill + use main-text. */
+/* Bright accent fills on dark themes fail AA with white ink — darken fill + use main-text. */
 body[data-theme-dark],
-body[data-theme-dark-highcontrast] {
+body[data-theme-dark-highcontrast],
+body[data-theme-dark] #content.app-arbeitszeitcheck,
+body[data-theme-dark-highcontrast] #content.app-arbeitszeitcheck {
 	--azc-danger-fill: color-mix(
 		in srgb,
 		var(--color-element-error, var(--color-error)) 40%,
 		var(--color-main-background)
 	);
-	/* primary-element-text is often black (for light CTAs) — unusable on medium red */
 	--azc-danger-on-fill: var(--color-main-text);
-}
-
-/* Aliases for refs added by sheets ported from other apps — dead names
-   silently fell back to literals. */
-body {
-	--azc-accent: var(--color-primary-element);
-	--azc-bg: var(--azc-bg-card);
-	--azc-surface: var(--azc-bg-card);
-	--azc-surface-2: var(--azc-bg-soft);
-	--azc-surface-muted: var(--azc-bg-soft);
-	--azc-fs-base: var(--azc-fs-md);
-	--azc-radius-base: var(--azc-radius-md);
-	--azc-radius-pill: var(--border-radius-pill, 999px);
-	--arbeitszeitcheck-color-border-dark: var(--color-border-dark);
-	--arbeitszeitcheck-color-gray-50: var(--azc-bg-soft);
-	--arbeitszeitcheck-color-text-default: var(--color-main-text);
-	--arbeitszeitcheck-font-size-md: var(--arbeitszeitcheck-font-size-base);
-}
-
-/* Accent ink for text-on-surface: --color-primary-element as text drops below
-   WCAG AA (~4.3:1) on dark themes — blend toward main-text there. */
-body {
-	--azc-accent-ink: var(--color-primary-element);
-}
-
-body[data-theme-dark],
-body[data-theme-dark-highcontrast] {
 	--azc-accent-ink: color-mix(in srgb, var(--color-primary-element) 70%, var(--color-main-text));
 }
 
-/*
- * Native checkboxes, radios, and other UA widgets inherit color-scheme.
- * Without this they follow the operating system, so a light Nextcloud on a
- * dark Mac paints dark boxes. Explicit light/dark themes win; "system default"
- * is left alone so it can still follow the OS.
- */
-body[data-theme-light],
+/* NC high-contrast themes: stronger borders / shadows for 3:1 UI chrome */
 body[data-theme-light-highcontrast],
-body.theme--light,
-body.theme--light-highcontrast {
-	color-scheme: light;
+body[data-theme-dark-highcontrast],
+body[data-theme-light-highcontrast] #content.app-arbeitszeitcheck,
+body[data-theme-dark-highcontrast] #content.app-arbeitszeitcheck {
+	--azc-border: color-mix(in srgb, var(--color-main-text) 32%, transparent);
+	/* HC themes push --color-border-maxcontrast to near-ink — keep it first so
+	   boundary chrome stays >=3:1 against HC surfaces. */
+	--azc-border-strong: var(--color-border-maxcontrast, color-mix(in srgb, var(--color-main-text) 48%, transparent));
+	--azc-shadow-sm: 0 0 0 1px var(--azc-border-strong);
+	--azc-shadow-md: 0 0 0 2px var(--azc-border-strong);
+	--arbeitszeitcheck-color-border: var(--azc-border);
+	--arbeitszeitcheck-color-modal-border: var(--azc-border);
 }
 
-body[data-theme-dark],
-body[data-theme-dark-highcontrast],
-body.theme--dark,
-body.theme--dark-highcontrast,
-html[data-theme="dark"] {
-	color-scheme: dark;
+@media (prefers-contrast: more) {
+	:root {
+		--azc-icon-stroke: 2.25;
+	}
+
+	body,
+	#content.app-arbeitszeitcheck,
+	#app-content.azc-app,
+	.azc-app,
+	.azc-dialog,
+	.azc-modal,
+	.azc-toast-region,
+	.azc-toasts,
+	.azc-license-modal {
+		--azc-border: color-mix(in srgb, var(--color-main-text) 28%, transparent);
+		--azc-border-strong: var(--color-border-maxcontrast, color-mix(in srgb, var(--color-main-text) 40%, transparent));
+		--azc-shadow-sm: 0 0 0 1px var(--azc-border-strong);
+		--azc-shadow-md: 0 0 0 1px var(--azc-border-strong);
+	}
+}
+
+/* Alias for dead-name ref (literal fallback masked it). */
+body {
+	--azc-bg: var(--azc-bg-card);
 }

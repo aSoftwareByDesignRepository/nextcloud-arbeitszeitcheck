@@ -5088,7 +5088,7 @@
     "The maximum duration must be a whole number between 1 and %d days.": "De maximale duur moet een geheel getal tussen 1 en %d dagen zijn.",
     "The minimum countable break of %1$d min has no effect for %2$s — the statutory floor is already %3$d min.": "De minimale meetellende pauze van %1$d min heeft geen effect voor %2$s — de wettelijke ondergrens is al %3$d min.",
     "The minimum rest period between shifts has not passed yet.": "De minimale rusttijd tussen diensten is nog niet verstreken.",
-    "The mobile app signs in via Nextcloud Login Flow — your main password is never stored in the app.": "De mobiele app logt in via Nextcloud Login Flow — uw hoofdwachtwoord wordt nooit in de app bewaard.",
+    "The mobile app signs in via Nextcloud Login Flow — your main password is never stored in the app.": "De mobiele app logt in met Nextcloud Login Flow — uw hoofdwachtwoord wordt nooit in de app bewaard.",
     "The most hours someone can work in one day. German law allows up to 8 hours normally, or 10 hours in special cases. Example: Enter 10 to allow up to 10 hours per day.": "Het maximum aantal uren dat iemand op één dag kan werken. Duitse wet staat normaal tot 8 uur toe, of 10 uur in bijzondere gevallen. Voorbeeld: voer 10 in om tot 10 uur per dag toe te staan.",
     "The name must not contain the characters < or >.": "De naam mag de tekens < of > niet bevatten.",
     "The name must not exceed %d characters.": "De naam mag niet langer zijn dan %d tekens.",

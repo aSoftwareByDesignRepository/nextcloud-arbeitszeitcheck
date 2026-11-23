@@ -59,7 +59,7 @@ $features = [
 	[
 		'icon' => 'lock',
 		'title' => $l->t('Sign in safely'),
-		'hint' => $l->t('Uses Nextcloud Login Flow — your main password is never stored in the app.'),
+		'hint' => $l->t('The mobile app signs in via Nextcloud Login Flow — your main password is never stored in the app.'),
 	],
 ];
 

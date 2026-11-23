@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.12.2 - 2026-11-23
+
+### Fixed
+
+- restore color-scheme pins and heal stale check-shell contracts
+- surface server 409 reason for entitlement-linked absence types
+- scope get-the-app Login Flow claim to the mobile companion
+- formal Sie-register cell for license signature callout (de)
+- repoint orphan token refs after check-shell tokens sync
+- doorConfig reads group door via platform restriction
+- nb/pl truncated catalog values — dropped tails + terminal punct
+- ru accusative case + esteem-calque cells (r74)
+- heal ru round-5 wart cells — splice non-word, agreement, wrong-sense (r73)
+- fr — embed localized label in Badges & PIN dep
+- heal multi-locale semantic corruption + tr pluralForm — web round 4 (r72)
+- heal Russian catalog semantic corruption — web round 3 (r71)
+- heal Russian catalog semantic corruption — web round 2 (r70)
+- heal Russian catalog semantic corruption (r69)
+- heal ru catalog gate findings + serialize shared-state e2e specs
+- auto clock-out audit hardening
+- re-sync pack + manifest auto_clockout keys
+- auto clock-out scope error names localized labels
+- breakdown dialog honors Escape despite NC notifications
+
+### Added
+
+- AzcOrgReadFacade for ExpenseCheck suite reads + config-transfer re-sync
+- add Russian (ru) catalog
+- auto clock-out at planned end-of-day
+
+### Changed
+
+- define --azc-mono + muted-on-tint tokens (check-shell sync)
+- 1.12.1 — record multi-locale catalog heal
+- re-sync config-transfer pack (docblock generics + null guard)
+- l10n(de): say Freizeitausgleich instead of Gleittag
+- l10n: formal register + identical-gap cleanup, zh_TW vocabulary flip
+- atlas auto clock-out job lifecycle probes
+- e2e guard for breakdown dialog open/load/Escape close
+
 ## Unreleased
 
 ### Fixed

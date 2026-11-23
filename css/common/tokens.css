@@ -267,3 +267,26 @@ body[data-theme-dark-highcontrast] #content.app-arbeitszeitcheck {
 body {
 	--azc-bg: var(--azc-bg-card);
 }
+
+/*
+ * Native checkboxes, radios, and other UA widgets inherit color-scheme.
+ * Without this they follow the operating system, so a light Nextcloud on a
+ * dark Mac paints dark boxes. Explicit light/dark themes win; "system default"
+ * is left alone so it can still follow the OS.
+ * (NC also emits a color-scheme meta for forced themes — this is the
+ * belt-and-suspenders CSS pin for themes/contexts where it does not reach.)
+ */
+body[data-theme-light],
+body[data-theme-light-highcontrast],
+body.theme--light,
+body.theme--light-highcontrast {
+	color-scheme: light;
+}
+
+body[data-theme-dark],
+body[data-theme-dark-highcontrast],
+body.theme--dark,
+body.theme--dark-highcontrast,
+html[data-theme="dark"] {
+	color-scheme: dark;
+}

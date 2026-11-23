@@ -6,7 +6,7 @@
  * (same ids, same data-* endpoints) and then drives the module through real
  * DOM events — no internals are stubbed.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const T = () => window.__ArbeitszeitCheckSeAdminTestables
 
@@ -209,6 +209,13 @@ beforeEach(async () => {
 	window.Element.prototype.scrollIntoView = window.Element.prototype.scrollIntoView || vi.fn()
 	await import('./admin-special-entitlements.js')
 	await flush()
+})
+
+// The module debounces its impact preview by 350ms (schedulePreview →
+// setTimeout). Any still-pending timer must fire while jsdom is alive —
+// otherwise it rejects with "document is not defined" after teardown.
+afterAll(async () => {
+	await new Promise((r) => setTimeout(r, 400))
 })
 
 describe('types table contract', () => {

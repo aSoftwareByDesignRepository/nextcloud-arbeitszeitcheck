@@ -17,7 +17,10 @@ class PageEndInsetContractTest extends TestCase
 		$app = (string)file_get_contents(dirname(__DIR__, 3) . '/css/app.css');
 		$patterns = (string)file_get_contents(dirname(__DIR__, 3) . '/css/common/page-patterns.css');
 
-		$this->assertMatchesRegularExpression('/--azc-page-end:\s*5rem;/', $tokens);
+		// --azc-page-end is an app-local token (not part of the synced
+		// check-shell pack); it lives in css/app.css next to its ::after
+		// consumer. Accept either home so a future pack adoption stays green.
+		$this->assertMatchesRegularExpression('/--azc-page-end:\s*5rem;/', $tokens . "\n" . $app);
 		$this->assertMatchesRegularExpression(
 			'/azc-shell::after\s*\{[^}]*height:\s*calc\(var\(--azc-page-end\) \+ env\(safe-area-inset-bottom, 0px\)\);/s',
 			$app

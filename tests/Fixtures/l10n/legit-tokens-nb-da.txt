@@ -969,6 +969,7 @@ overalt
 overblik
 overdreven
 overensstemmende
+overført
 overgang
 overgangen
 overholde

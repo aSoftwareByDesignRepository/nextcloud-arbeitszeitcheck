@@ -32,9 +32,12 @@ final class DesignSystemCssContractTest extends TestCase
 
 	public function testThemeTokensLiveOnBodyAndDeriveFromNextcloud(): void
 	{
+		// The themed-token block binds a selector list (body + themed app
+		// surfaces + portaled dialogs/toasts) — not a bare `body {}`.
 		self::assertMatchesRegularExpression(
-			'/body\s*\{[^}]*--azc-bg-card:\s*var\(\s*--color-main-background/s',
+			'/[^\{\}]*body[^\{\}]*\{[^}]*--azc-bg-card:\s*var\(\s*--color-main-background/s',
 			$this->tokensCss,
+			'--azc-bg-card must live in a selector block that includes body',
 		);
 		self::assertMatchesRegularExpression(
 			'/--azc-text:\s*var\(\s*--color-main-text/s',
@@ -308,7 +311,13 @@ final class DesignSystemCssContractTest extends TestCase
 			$this->tokensCss,
 		);
 		self::assertStringContainsString('body[data-theme-dark]', $this->tokensCss);
-		self::assertDoesNotMatchRegularExpression('/#[0-9a-fA-F]{3,8}\b/', $this->tokensCss, 'tokens.css must not ship raw hex');
+		// --azc-qr-canvas is the single documented raw-hex exception: the QR /
+		// barcode canvas must stay light for scannability in every theme.
+		$tokensNoQrCanvas = (string)preg_replace(
+			'/--azc-qr-canvas:[^;]+;/', '',
+			preg_replace('/\/\*.*?\*\//s', '', $this->tokensCss) ?? $this->tokensCss,
+		);
+		self::assertDoesNotMatchRegularExpression('/#[0-9a-fA-F]{3,8}\b/', $tokensNoQrCanvas, 'tokens.css must not ship raw hex (except documented --azc-qr-canvas)');
 
 		$appCss = (string) file_get_contents($this->appRoot . '/css/app.css');
 		self::assertMatchesRegularExpression(
@@ -342,14 +351,14 @@ final class DesignSystemCssContractTest extends TestCase
 			$this->tokensCss,
 			'Do not redefine --color-error-text. NC 31 --color-error is the pale tint #FFE7E7; mixing it in fails AA. The theme already ships --color-error-text as #8A0000',
 		);
+		// Shared-pack semantic: tint-danger mixes the theme-aware danger INK
+		// (--color-error-text, falling back to --color-error on older NC)
+		// into main-background. Element-error stays reserved for filled
+		// danger buttons (--azc-danger-fill).
 		self::assertMatchesRegularExpression(
-			'/--azc-tint-danger:\s*color-mix\([^;]*var\(--color-element-error/s',
+			'/--azc-tint-danger:\s*color-mix\(in srgb,\s*var\(--color-error-text[^;]*var\(--color-main-background\)/s',
 			$this->tokensCss,
-			'Under-Soll and other danger surfaces must stay on the element red, not asterisk ink',
-		);
-		self::assertDoesNotMatchRegularExpression(
-			'/--azc-tint-danger:[^;]*--color-error-text/',
-			$this->tokensCss,
+			'Under-Soll and other danger surfaces must tint from the danger ink into main-background',
 		);
 
 		$timeEntries = (string) file_get_contents($this->appRoot . '/css/time-entries.css');

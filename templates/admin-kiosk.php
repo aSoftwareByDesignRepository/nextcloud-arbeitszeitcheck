@@ -399,8 +399,8 @@ $terminalRowIndex = 0;
 								<a href="#azc-kiosk-terminals-heading"><?php p($l->t('Go to Terminals')); ?></a>
 							</p>
 						<?php else: ?>
-							<label for="azc-kiosk-enroll-terminal" class="azc-field__label"><?php p($l->t('Tablet for this scan')); ?></label>
-							<select id="azc-kiosk-enroll-terminal" class="azc-input" <?php echo $activeTerminalCount === 1 ? '' : ''; ?>>
+							<label for="azc-kiosk-enroll-terminal" class="form-label"><?php p($l->t('Tablet for this scan')); ?></label>
+							<select id="azc-kiosk-enroll-terminal" class="form-select" <?php echo $activeTerminalCount === 1 ? '' : ''; ?>>
 								<?php if ($activeTerminalCount > 1): ?>
 								<option value=""><?php p($l->t('Select tablet…')); ?></option>
 								<?php endif; ?>

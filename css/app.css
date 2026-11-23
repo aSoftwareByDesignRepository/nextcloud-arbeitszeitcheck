@@ -319,10 +319,12 @@
 	font-size: var(--azc-fs-sm);
 	line-height: var(--azc-line-base);
 }
-.azc-form-help-details {
+.azc-form-help-details,
+.azc-settings-more {
 	margin: var(--azc-space-1) 0 0;
 }
-.azc-form-help-details > summary {
+.azc-form-help-details > summary,
+.azc-settings-more > summary {
 	cursor: pointer;
 	font-size: var(--azc-fs-sm);
 	font-weight: 600;
@@ -331,7 +333,8 @@
 	display: inline-flex;
 	align-items: center;
 }
-.azc-form-help-details .form-help {
+.azc-form-help-details .form-help,
+.azc-settings-more .form-help {
 	margin-top: var(--azc-space-1);
 }
 .time-input-group--with-type {
@@ -1022,6 +1025,41 @@ dialog .button.danger:active,
 	color: var(--azc-danger-on-fill) !important;
 }
 
+/* Quiet accent action (tertiary): transparent chrome, accent-ink label —
+ * the azc-btn twin of legacy .btn--tertiary (common/components.css). Same
+ * armor as --ghost: dialogs live on document.body and the core button
+ * repaint (also on :hover) cannot be allowed to give it a pale fill. */
+#app-content.azc-app .azc-btn--tertiary,
+#app-content-wrapper .azc-btn--tertiary,
+.azc-nc-admin-settings .azc-btn--tertiary,
+.azc-nc-settings-panel .azc-btn--tertiary,
+.azc-modal-backdrop .azc-btn--tertiary,
+.azc-dialog .azc-btn--tertiary,
+dialog .azc-btn--tertiary,
+[role="dialog"] .azc-btn--tertiary,
+[role="alertdialog"] .azc-btn--tertiary,
+.day-details-panel .azc-btn--tertiary {
+	background-color: transparent !important;
+	border-color: transparent !important;
+	color: var(--azc-accent-ink, var(--color-primary-element)) !important;
+	text-decoration: none !important;
+}
+
+#app-content.azc-app .azc-btn--tertiary:hover:not(:disabled),
+#app-content-wrapper .azc-btn--tertiary:hover:not(:disabled),
+.azc-nc-admin-settings .azc-btn--tertiary:hover:not(:disabled),
+.azc-nc-settings-panel .azc-btn--tertiary:hover:not(:disabled),
+.azc-modal-backdrop .azc-btn--tertiary:hover:not(:disabled),
+.azc-dialog .azc-btn--tertiary:hover:not(:disabled),
+dialog .azc-btn--tertiary:hover:not(:disabled),
+[role="dialog"] .azc-btn--tertiary:hover:not(:disabled),
+[role="alertdialog"] .azc-btn--tertiary:hover:not(:disabled),
+.day-details-panel .azc-btn--tertiary:hover:not(:disabled) {
+	background-color: var(--azc-tint-info, color-mix(in srgb, var(--color-primary-element) 16%, var(--color-main-background))) !important;
+	border-color: transparent !important;
+	color: var(--azc-accent-ink, var(--color-primary-element)) !important;
+}
+
 /* Dialogs live on document.body — ghost needs !important so the core
  * button repaint (also on :hover) cannot give it a pale fill. */
 #app-content.azc-app .azc-btn--ghost,
@@ -1393,6 +1431,13 @@ dialog .azc-icon-btn > svg,
 .modal-backdrop .azc-callout__body .azc-callout__actions {
 	margin-top: var(--azc-space-1);
 }
+/* Policy-summary lists inside a callout body: drop the UA top/bottom margin
+ * (the flex column's gap already separates) and keep a compact bullet
+ * indent inside the callout padding. */
+#app-content.azc-app .azc-callout__body .azc-break-policy-summary__list {
+	margin: 0;
+	padding-inline-start: var(--azc-space-5);
+}
 /* Callout variant accents + icon wells: common/notification-surfaces.css (loaded after base callout rules) */
 #app-content.azc-app .azc-callout__title,
 #app-content.azc-app .azc-callout__text,
@@ -1479,7 +1524,9 @@ dialog .azc-icon-btn > svg,
 }
 
 #app-content.azc-app .azc-jump-nav__title,
-.azc-nc-admin-settings .azc-jump-nav__title {
+.azc-nc-admin-settings .azc-jump-nav__title,
+#app-content.azc-app .azc-jump-nav__label,
+.azc-nc-admin-settings .azc-jump-nav__label {
 	margin: 0 0 var(--azc-space-3);
 	font-size: var(--azc-fs-sm);
 	font-weight: 600;
@@ -1743,6 +1790,9 @@ dialog .azc-icon-btn > svg,
 	margin: 0;
 	max-width: 40ch;
 	color: var(--azc-muted);
+}
+.azc-empty-state__actions {
+	margin: 0;
 }
 
 /* ── Access denied ─────────────────────────────────────────── */

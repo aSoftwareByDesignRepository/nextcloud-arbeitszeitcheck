@@ -27,7 +27,7 @@ $monthLabels = is_array($_['monthLabels'] ?? null) ? $_['monthLabels'] : [];
         ?>
 
         <div class="admin-ot-payout-audit">
-            <p class="azc-admin-policy-layout__lead admin-ot-audit__actions-lead">
+            <p class="admin-ot-audit__actions-lead">
                 <a href="<?php p($payoutUrl); ?>" class="azc-btn azc-btn--primary azc-btn--touch">
                     <?php p($l->t('Process payouts')); ?>
                 </a>

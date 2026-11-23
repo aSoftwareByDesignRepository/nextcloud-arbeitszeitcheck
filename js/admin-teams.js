@@ -135,7 +135,7 @@
                 Messaging && Messaging.showSuccess && Messaging.showSuccess(t('Setting saved', 'Setting saved'));
                 announceStatus(t('Use app teams setting saved', 'Setting saved'));
             },
-            onError: function() {
+            onError: function(error) {
                 useAppTeamsSaving = false;
                 if (cb) {
                     cb.disabled = false;
@@ -143,7 +143,7 @@
                     cb.checked = !checked;
                     syncUseAppTeamsAria(cb);
                 }
-                Messaging && Messaging.showError && Messaging.showError(t('Failed to save setting', 'Failed to save setting'));
+                Messaging && Messaging.showError && Messaging.showError((error && error.error) || t('Failed to save setting', 'Failed to save setting'));
             }
         });
     }

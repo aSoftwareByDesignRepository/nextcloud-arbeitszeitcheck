@@ -89,10 +89,19 @@ class CustomAbsenceTypeService
 	 */
 	public function listWithUsage(?string $locale = null): array
 	{
+		// One catalog query up front — deleteOrDeactivate/update refuse linked
+		// types, so the admin list must know which rows those are (a delete
+		// button that can only fail is a dead end).
+		$linkedCodes = [];
+		foreach ($this->specialEntitlementTypes?->findAll() ?? [] as $seType) {
+			$linkedCodes[$seType->getAbsenceTypeCode()] = true;
+		}
+
 		$rows = [];
 		foreach ($this->mapper->findAll() as $type) {
 			$summary = $type->getSummary($locale);
 			$summary['absenceCount'] = $this->mapper->countAbsenceUsage($type->getCode());
+			$summary['entitlementLinked'] = isset($linkedCodes[$type->getCode()]);
 			$rows[] = $summary;
 		}
 		return $rows;
@@ -106,6 +115,7 @@ class CustomAbsenceTypeService
 		$row = $this->mapper->find($id);
 		$summary = $row->getSummary($locale);
 		$summary['absenceCount'] = $this->mapper->countAbsenceUsage($row->getCode());
+		$summary['entitlementLinked'] = $this->specialEntitlementTypes?->findByAbsenceTypeCode($row->getCode()) !== null;
 		return $summary;
 	}
 

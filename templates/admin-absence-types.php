@@ -18,6 +18,7 @@ use OCA\ArbeitszeitCheck\Service\IconCatalog;
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
 $l = $_['l'] ?? \OCP\Util::getL10N('arbeitszeitcheck');
+$urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class);
 
 $absenceTypes = $_['absenceTypes'] ?? [];
 $localeOptions = $_['localeOptions'] ?? [];
@@ -82,6 +83,9 @@ $localeOptions = $_['localeOptions'] ?? [];
 										<?php else: ?>
 											<span class="badge badge--neutral"><?php p($l->t('Inactive')); ?></span>
 										<?php endif; ?>
+										<?php if (!empty($type['entitlementLinked'])): ?>
+											<span class="badge badge--info" title="<?php p($l->t('This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.')); ?>"><?php p($l->t('Linked absence type')); ?></span>
+										<?php endif; ?>
 									</td>
 									<td data-label="<?php p($l->t('Appearance')); ?>">
 										<span class="cat-swatch cat-swatch--<?php p($type['color']); ?>" aria-hidden="true"></span>
@@ -108,6 +112,11 @@ $localeOptions = $_['localeOptions'] ?? [];
 													title="<?php p($l->t('Edit')); ?>">
 												<?php print_unescaped(IconCatalog::render('edit')); ?>
 											</button>
+											<?php if (!empty($type['entitlementLinked'])): ?>
+												<a class="azc-btn azc-btn--secondary azc-btn--sm"
+												   href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.special_entitlement_admin.page')); ?>"
+												   title="<?php p($l->t('This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.')); ?>"><?php p($l->t('Manage special leave entitlements')); ?></a>
+											<?php else: ?>
 											<button type="button"
 													class="btn btn--sm btn--secondary azc-icon-btn"
 													data-action="cat-toggle"
@@ -127,6 +136,7 @@ $localeOptions = $_['localeOptions'] ?? [];
 													title="<?php p($l->t('Delete')); ?>">
 												<?php print_unescaped(IconCatalog::render('trash')); ?>
 											</button>
+											<?php endif; ?>
 										</div>
 									</td>
 								</tr>
@@ -164,6 +174,7 @@ $localeOptions = $_['localeOptions'] ?? [];
 		'colorLabel' => $l->t('Calendar color'),
 		'iconLabel' => $l->t('Calendar icon'),
 		'activeLabel' => $l->t('Available for new requests'),
+		'entitlementLinkedHelp' => $l->t('This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.'),
 		'save' => $l->t('Save'),
 		'cancel' => $l->t('Cancel'),
 		'created' => $l->t('Absence type created'),

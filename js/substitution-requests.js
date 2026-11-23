@@ -133,8 +133,8 @@
                     Messaging.showError(data.error || t('Failed to approve.', 'Failed to approve.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to approve substitution request.', 'Failed to approve substitution request.'));
+            onError: function(error) {
+                Messaging.showError((error && error.error) || t('Failed to approve substitution request.', 'Failed to approve substitution request.'));
             }
         });
     }
@@ -191,8 +191,8 @@
                     Messaging.showError(data.error || t('Failed to decline.', 'Failed to decline.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to decline substitution request.', 'Failed to decline substitution request.'));
+            onError: function(error) {
+                Messaging.showError((error && error.error) || t('Failed to decline substitution request.', 'Failed to decline substitution request.'));
             }
         });
     }

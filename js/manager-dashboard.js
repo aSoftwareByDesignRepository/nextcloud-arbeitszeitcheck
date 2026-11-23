@@ -508,8 +508,8 @@
                     Messaging.showError(data.error || t('Failed to approve.', 'Failed to approve.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to approve absence.', 'Failed to approve absence.'));
+            onError: function(error) {
+                Messaging.showError((error && error.error) || t('Failed to approve absence.', 'Failed to approve absence.'));
             }
         });
     }
@@ -562,8 +562,8 @@
                     Messaging.showError(data.error || t('Failed to reject.', 'Failed to reject.'));
                 }
             },
-            onError: function() {
-                Messaging.showError(t('Failed to reject absence.', 'Failed to reject absence.'));
+            onError: function(error) {
+                Messaging.showError((error && error.error) || t('Failed to reject absence.', 'Failed to reject absence.'));
             }
         });
     }

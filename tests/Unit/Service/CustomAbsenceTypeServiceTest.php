@@ -323,6 +323,47 @@ final class CustomAbsenceTypeServiceTest extends TestCase
 		self::assertSame(404, $result['code']);
 	}
 
+	public function testListWithUsageFlagsEntitlementLinkedTypes(): void
+	{
+		// The admin list must know which types are owned by a special
+		// entitlement — deleteOrDeactivate refuses them, so the UI needs the
+		// flag to hide guaranteed-failing delete/toggle actions.
+		$seType = new \OCA\ArbeitszeitCheck\Db\SpecialEntitlementType();
+		$seType->setAbsenceTypeCode('custom_jubilaeum');
+		$seMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementTypeMapper::class);
+		$seMapper->expects(self::once())->method('findAll')->willReturn([$seType]);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnArgument(0);
+		$service = new CustomAbsenceTypeService(
+			$this->mapper,
+			$this->auditLogMapper,
+			$this->db,
+			$l10n,
+			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$seMapper,
+		);
+
+		$this->mapper->method('findAll')->willReturn([
+			$this->makeRow(['id' => 7, 'code' => 'custom_jubilaeum']),
+			$this->makeRow(['id' => 8, 'code' => 'custom_betriebsausflug']),
+		]);
+		$this->mapper->method('countAbsenceUsage')->willReturn(0);
+
+		$rows = $service->listWithUsage('de');
+		self::assertTrue($rows[0]['entitlementLinked']);
+		self::assertFalse($rows[1]['entitlementLinked']);
+	}
+
+	public function testListWithUsageWithoutEntitlementMapperFlagsNothing(): void
+	{
+		$this->mapper->method('findAll')->willReturn([$this->makeRow()]);
+		$this->mapper->method('countAbsenceUsage')->willReturn(0);
+
+		$rows = $this->service->listWithUsage('de');
+		self::assertFalse($rows[0]['entitlementLinked']);
+	}
+
 	public function testCatalogLockContentionReturnsRetryable409(): void
 	{
 		// Fail-fast lock contention must surface as a distinct retryable 409,

@@ -148,9 +148,11 @@
 
             + (isEdit ?
             '<div class="form-group form-group--inline"><div class="form-checkbox">'
-            + '<input type="checkbox" id="cat-active" name="active" value="true"' + (data.active ? ' checked' : '') + '>'
+            + '<input type="checkbox" id="cat-active" name="active" value="true"' + (data.active ? ' checked' : '') + (data.entitlementLinked ? ' disabled' : '') + '>'
             + '<label for="cat-active">' + esc(msg('activeLabel', 'Available for new requests')) + '</label>'
-            + '</div></div>' : '')
+            + '</div>'
+            + (data.entitlementLinked ? '<p class="form-help form-help--block">' + esc(msg('entitlementLinkedHelp', 'This absence type is linked to a special entitlement. Manage its lifecycle in the entitlement administration.')) + '</p>' : '')
+            + '</div>' : '')
 
             + '<details class="cat-i18n-details">'
             + '<summary>' + esc(msg('translationsLegend', 'Translations (optional)')) + '</summary>'
@@ -300,10 +302,15 @@
                     }
                 }
             },
-            onError: function() {
+            onError: function(error) {
                 done();
-                if (Messaging.showError) {
-                    Messaging.showError(msg(failKey, 'Save failed'));
+                // HTTP 4xx bodies carry the real reason (validation fields,
+                // entitlement-linked, catalog busy) — never mask them behind
+                // the generic failure toast.
+                if (error && error.data && typeof error.data === 'object' && error.data.fields) {
+                    showFieldErrors(host, error.data.fields, error.data.error || msg(failKey, 'Save failed'));
+                } else if (Messaging.showError) {
+                    Messaging.showError((error && error.error) || msg(failKey, 'Save failed'));
                 }
             }
         });
@@ -327,10 +334,10 @@
                     Messaging.showError((response && response.error) || msg('failedToToggle', 'Failed'));
                 }
             },
-            onError: function() {
+            onError: function(error) {
                 btn.disabled = false;
                 if (Messaging.showError) {
-                    Messaging.showError(msg('failedToToggle', 'Failed'));
+                    Messaging.showError((error && error.error) || msg('failedToToggle', 'Failed'));
                 }
             }
         });
@@ -374,10 +381,10 @@
                     Messaging.showError((response && response.error) || msg('failedToDelete', 'Failed'));
                 }
             },
-            onError: function() {
+            onError: function(error) {
                 btn.disabled = false;
                 if (Messaging.showError) {
-                    Messaging.showError(msg('failedToDelete', 'Failed'));
+                    Messaging.showError((error && error.error) || msg('failedToDelete', 'Failed'));
                 }
             }
         });
@@ -393,9 +400,9 @@
                     Messaging.showError(msg('error', 'An error occurred'));
                 }
             },
-            onError: function() {
+            onError: function(error) {
                 if (Messaging.showError) {
-                    Messaging.showError(msg('error', 'An error occurred'));
+                    Messaging.showError((error && error.error) || msg('error', 'An error occurred'));
                 }
             }
         });

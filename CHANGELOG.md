@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- **custom absence types admin showed a generic failure when deleting a
+  type linked to a special leave entitlement** (CECILIENSTIFT report):
+  the server correctly refused with 409 + a translated reason, but the
+  UI discarded it and showed only "Failed to delete the absence type".
+  Linked types are now marked in the list ("Linked absence type"), the
+  toggle/delete actions are replaced by a direct link to the entitlement
+  administration, the editor's availability checkbox is disabled with an
+  explanatory note, and every error path surfaces the server's real
+  message (including field-level validation errors on 400 bodies).
+- **masked server error reasons on manager actions (same class):**
+  approving/rejecting an absence or a substitution request, and saving
+  the "use app teams" setting, could only ever say "Failed" even when
+  the server explained why (e.g. "already decided by another manager").
+  These handlers now surface the server's message with the generic text
+  as fallback.
+- **native form controls could follow the OS theme instead of the
+  Nextcloud theme**: the shared token sync dropped the explicit
+  `color-scheme` pins, so a light Nextcloud on a dark OS could paint
+  dark checkboxes/scrollbars (and vice versa). The pins are restored in
+  the shared check-shell pack and re-synced.
+- **Russian holidays legend quoted labels that did not match the
+  rendered dropdown options**; the legend now quotes the real labels.
+- **Polish substitution copy used the formal "Państwa" register** while
+  the rest of the catalog addresses the user informally; aligned.
+- **Norwegian Bokmål cross-language lint** now recognises `overført` as a
+  legitimate shared Danish/Norwegian token instead of flagging it as
+  bleed.
+
 ## 1.12.1 - 2026-11-19
 
 ### Fixed

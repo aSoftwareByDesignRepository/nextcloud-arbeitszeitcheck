@@ -21,7 +21,7 @@
     height: calc(100dvh - var(--header-height, 50px));
 }
 
-/* Decorative overlays removed for MobilityCheck-family parity */
+/* Decorative overlays removed for the mobility app-family parity */
 #app-navigation::after,
 #app-navigation::before {
     content: none;

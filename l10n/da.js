@@ -1751,7 +1751,7 @@
 	"Decide pending legacy business-trip requests (%s)" : "Træf beslutning om ventende ældre forretningsrejseanmodninger (%s)",
 	"Decimal hours (5.5)" : "Decimaltimer (5,5)",
 	"Decimal hours are allowed (e.g. 38.7 h\/week under a collective agreement). Overtime targets use this weekly total spread across your working days." : "Decimaltimer er tilladt (f.eks. 38,7 t\/uge i henhold til en overenskomst). Mål for overarbejde bruger denne ugentlige total fordelt på dine arbejdsdage.",
-	"Decline" : "Nedgang",
+	"Decline" : "Afslå",
 	"Decline cancellation" : "Afvis annullering",
 	"Decline correction" : "Afvis rettelse",
 	"Decline substitution" : "Afvis substitution",

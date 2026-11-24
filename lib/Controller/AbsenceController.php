@@ -270,6 +270,17 @@ class AbsenceController extends Controller
 			$pageData['halfDayEnabledTypes'] = $enabled;
 			$pageData['halfDayCreditTypes'] = \OCA\ArbeitszeitCheck\Support\HalfDayTypePolicy::creditEffectTypes($enabled);
 		}
+
+		// Workforce policy surface for the form/detail UI: hourly types +
+		// past-correction affordances (SPEC optional-workforce §9).
+		try {
+			$policy = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class)->get();
+			$pageData['hourlyTypes'] = $policy->hourlyAbsenceTypes;
+			$pageData['correctionUiEnabled'] = $policy->pastCorrectionEnabled && $policy->employeeCorrectionRequests;
+		} catch (\Throwable) {
+			$pageData['hourlyTypes'] = [];
+			$pageData['correctionUiEnabled'] = false;
+		}
 		if (!isset($pageData['absenceDayFraction'])
 			&& ($pageData['absence'] ?? null) instanceof Absence) {
 			$pageData['absenceDayFraction'] = $this->absenceService->storedDayFraction($pageData['absence']);
@@ -851,6 +862,84 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * POST /api/absences/{id}/correction-request (optional workforce spec):
+	 * owner requests a correction on a COMPLETED approved absence — the
+	 * request lifecycle is shared with running cancellations, but gated by
+	 * the employee-requests policy and a UUID operation receipt.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function requestCorrection(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$data = [
+			'expectedUpdatedAt' => isset($params['expectedUpdatedAt']) ? trim((string)$params['expectedUpdatedAt']) : '',
+			'reason' => isset($params['reason']) ? trim((string)$params['reason']) : '',
+			'operation_key' => isset($params['operation_key']) ? trim((string)$params['operation_key'])
+				: (isset($params['operationKey']) ? trim((string)$params['operationKey']) : ''),
+		];
+		if ($data['expectedUpdatedAt'] === '' || $data['reason'] === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('A reason and the current absence version are required.'),
+				'error_code' => 'reason_required',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$result = $this->absenceService->requestAbsenceCorrection($id, $data, $this->getUserId());
+			return new JSONResponse($this->correctionResultPayload($result));
+		} catch (\Throwable $e) {
+			return $this->absenceMutationErrorResponse($e, 'requestCorrection');
+		}
+	}
+
+	/**
+	 * POST /api/absences/{id}/correction-request/withdraw: owner pulls back
+	 * their open correction request on a completed absence. CAS + receipt.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function withdrawCorrectionRequest(int $id): JSONResponse
+	{
+		$params = $this->request->getParams();
+		$data = [
+			'expectedUpdatedAt' => isset($params['expectedUpdatedAt']) ? trim((string)$params['expectedUpdatedAt']) : '',
+			'operation_key' => isset($params['operation_key']) ? trim((string)$params['operation_key'])
+				: (isset($params['operationKey']) ? trim((string)$params['operationKey']) : ''),
+		];
+		if ($data['expectedUpdatedAt'] === '') {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('The current absence version is required.'),
+				'error_code' => 'revision_stale',
+			], Http::STATUS_BAD_REQUEST);
+		}
+		try {
+			$result = $this->absenceService->withdrawAbsenceCorrectionRequest($id, $data, $this->getUserId());
+			return new JSONResponse($this->correctionResultPayload($result));
+		} catch (\Throwable $e) {
+			return $this->absenceMutationErrorResponse($e, 'withdrawCorrectionRequest');
+		}
+	}
+
+	/**
+	 * Uniform result envelope for correction commands — fresh writes return
+	 * the entity, receipt replays return the stored canonical result.
+	 *
+	 * @param \OCA\ArbeitszeitCheck\Db\Absence|array $result
+	 */
+	private function correctionResultPayload($result): array
+	{
+		if ($result instanceof \OCA\ArbeitszeitCheck\Db\Absence) {
+			return [
+				'success' => true,
+				'absence' => $result->getSummary() + $this->absenceService->ownerAbsenceActionFlags($result),
+			];
+		}
+		return ['success' => true] + $result;
+	}
+
+	/**
 	 * Shared error mapper for the FA-2 mutation endpoints — mirrors the
 	 * convertToSick envelope so clients can reuse one error-code surface.
 	 */
@@ -880,6 +969,12 @@ class AbsenceController extends Controller
 			'use_direct_cancel' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'use_direct_cancel', 'This absence has not started yet — you can cancel it directly.'],
 			'already_ended' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'already_ended', 'This absence has already ended.'],
 			'not_approved' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_approved', 'Only approved absences can be changed this way.'],
+			'not_completed' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_completed', 'This absence has not ended yet.'],
+			'feature_disabled' => [Http::STATUS_FORBIDDEN, 'feature_disabled', 'Your organization has not enabled this action.'],
+			'self_approval_forbidden' => [Http::STATUS_FORBIDDEN, 'self_approval_forbidden', 'Another authorized person must approve this correction.'],
+			'operation_required' => [Http::STATUS_BAD_REQUEST, 'operation_required', 'This action requires an operation identity.'],
+			'operation_conflict' => [Http::STATUS_CONFLICT, 'operation_conflict', 'This operation identity was already used for a different request.'],
+			'retry_required' => [Http::STATUS_CONFLICT, 'retry_required', 'The request outcome could not be confirmed. Please retry.'],
 			'reason_required' => [Http::STATUS_BAD_REQUEST, 'reason_required', 'Please provide a reason (max. 500 characters).'],
 		];
 		if (isset($mapped[$code])) {
@@ -1384,6 +1479,23 @@ class AbsenceController extends Controller
 				$df = $params['day_fraction'];
 				$data['day_fraction'] = is_array($df) ? (string)reset($df) : (string)$df;
 			}
+			// Hour-mode fields (optional workforce spec §9.2): forwarded as
+			// raw values — the service validates strictly.
+			foreach (['duration_mode' => ['duration_mode', 'durationMode'],
+				'duration_minutes' => ['duration_minutes', 'durationMinutes']] as $dmKey => $aliases) {
+				foreach ($aliases as $alias) {
+					if (array_key_exists($alias, $params)) {
+						$v = $params[$alias];
+						$data[$dmKey] = is_array($v) ? (string)reset($v) : ($v !== null ? (string)$v : null);
+						break;
+					}
+				}
+			}
+			if (isset($data['duration_mode']) || isset($data['duration_minutes'])) {
+				if ($resp = $this->assertAbsenceContractV2($json)) {
+					return $resp;
+				}
+			}
 			// Slot + boundary-half fields (AZC-HALF-DAY-SLOTS-BOUNDARIES),
 			// camelCase aliases accepted for JSON clients.
 			foreach ([
@@ -1538,6 +1650,26 @@ class AbsenceController extends Controller
 	}
 
 	/**
+	 * Contract gate for persisted hour-mode fields (§15.9/§16): a client
+	 * submitting duration_mode/duration_minutes must declare contract ≥2
+	 * via X-AZC-Absence-Contract — a legacy consumer unaware of the field
+	 * must not silently receive day-mode reinterpretation.
+	 */
+	private function assertAbsenceContractV2(bool $json): ?JSONResponse
+	{
+		$raw = $this->request->getHeader(Constants::ABSENCE_CONTRACT_HEADER);
+		$version = is_string($raw) && preg_match('/^\d+$/', trim($raw)) === 1 ? (int)trim($raw) : 0;
+		if ($version >= Constants::ABSENCE_CONTRACT_VERSION) {
+			return null;
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('Your app version cannot submit hour requests. Please update.'),
+			'error_code' => 'ABSENCE_CONTRACT_VERSION',
+		], Http::STATUS_BAD_REQUEST);
+	}
+
+	/**
 	 * Update absence endpoint
 	 *
 	 * When request does not expect JSON, returns redirect so the user never sees raw JSON.
@@ -1602,6 +1734,21 @@ class AbsenceController extends Controller
 			}
 			if ($duration_hours !== null && $duration_hours !== '') {
 				$data['duration_hours'] = $duration_hours;
+			}
+			foreach (['duration_mode' => ['duration_mode', 'durationMode'],
+				'duration_minutes' => ['duration_minutes', 'durationMinutes']] as $dmKey => $aliases) {
+				foreach ($aliases as $alias) {
+					if (array_key_exists($alias, $params)) {
+						$v = $params[$alias];
+						$data[$dmKey] = is_array($v) ? (string)reset($v) : ($v !== null ? (string)$v : null);
+						break;
+					}
+				}
+			}
+			if (isset($data['duration_mode']) || isset($data['duration_minutes'])) {
+				if ($resp = $this->assertAbsenceContractV2($json)) {
+					return $resp;
+				}
 			}
 			// Slot + boundary-half fields (AZC-HALF-DAY-SLOTS-BOUNDARIES):
 			// read straight from the request so every routed entry point

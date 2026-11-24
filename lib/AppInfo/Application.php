@@ -1307,6 +1307,25 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\Lock\ILockingProvider::class),
+				$c->query(\OCP\IDBConnection::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Service\WorkforcePolicyService(
+				$c->query(\OCP\AppFramework\Services\IAppConfig::class),
+				$c->query(\OCP\IGroupManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
+				$c->query(\OCP\IL10N::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class, function ($c) {
+			return new \OCA\ArbeitszeitCheck\Service\FinancialRevisionService(
+				$c->query(\OCA\ArbeitszeitCheck\Db\BalanceRevisionMapper::class),
+				$c->query(\OCP\IDBConnection::class),
 			);
 		});
 

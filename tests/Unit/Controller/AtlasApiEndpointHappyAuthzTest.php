@@ -512,6 +512,44 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
 			'comment' => 'Still needed on site',
 		],
+		// Optional-workforce corrections + year-end reset surfaces (§9).
+		'AbsenceController::requestCorrection' => [
+			'reason' => 'Recorded period was wrong',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'AbsenceController::withdrawCorrectionRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::correctEmployeeAbsence' => [
+			'reason' => 'Correcting approved record',
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+			'start_date' => '2026-09-10',
+			'end_date' => '2026-09-10',
+		],
+		'ManagerController::approveEmployeeAbsenceCorrectionRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+		],
+		'ManagerController::declineEmployeeAbsenceCorrectionRequest' => [
+			'expectedUpdatedAt' => '2026-09-10T10:00:00Z',
+			'comment' => 'Correction not justified',
+		],
+		'AdminController::yearEndPreview' => [
+			'closingYear' => 2025,
+			'userIds' => ['alice'],
+			'resetPositive' => true,
+			'reason' => 'Annual nullification run',
+			'expectedPolicyRevision' => 0,
+		],
+		'AdminController::yearEndExecute' => [
+			'previewId' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+			'operationId' => '11111111-2222-4333-8444-555555555555',
+			'expectedPolicyRevision' => 0,
+		],
+		'AdminController::yearEndResume' => [
+			'previewId' => 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+			'operationId' => '11111111-2222-4333-8444-666666666666',
+			'expectedPolicyRevision' => 0,
+		],
 	];
 
 	/**
@@ -815,6 +853,57 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			$this->stubMethod($mock, 'hasRole', $allow);
 			$this->stubMethod($mock, 'purgeUser', null);
 			$this->stubMethod($mock, 'logPermissionDenied', null);
+			$this->byType[$key] = $mock;
+			return $mock;
+		}
+
+		if ($typeName === \OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class) {
+			$mock = $this->createMock($typeName);
+			$policy = \OCA\ArbeitszeitCheck\Support\WorkforcePolicy::fromArray([
+				'pastCancellation' => [
+					'enabled' => true,
+					'employeeRequests' => true,
+					'scopedManagerApproval' => true,
+				],
+				'hourlyAbsenceTypes' => ['unpaid_leave', 'overtime_comp'],
+				'yearEnd' => [
+					'manualEnabled' => true,
+					'annualEnabled' => true,
+					'resetPositive' => true,
+					'waiveNegative' => true,
+					'targetGroupIds' => ['g1'],
+					'timezone' => 'UTC',
+				],
+			], 'UTC');
+			$this->stubMethod($mock, 'get', $policy);
+			$this->stubMethod($mock, 'revision', 0);
+			$this->stubMethod($mock, 'isYearEndManualEnabled', true);
+			$this->stubMethod($mock, 'isYearEndAnnualEnabled', true);
+			$this->stubMethod($mock, 'isPastCorrectionEnabled', true);
+			$this->stubMethod($mock, 'isEmployeeCorrectionRequestEnabled', true);
+			$this->stubMethod($mock, 'isScopedManagerCorrectionEnabled', true);
+			$this->stubMethod($mock, 'isHourlyAbsenceTypeEnabled', true);
+			$this->stubMethod($mock, 'capabilities', []);
+			$this->byType[$key] = $mock;
+			return $mock;
+		}
+
+		if ($typeName === \OCA\ArbeitszeitCheck\Service\YearEndResetService::class) {
+			$mock = $this->createMock($typeName);
+			$this->stubMethod($mock, 'createPreview', [
+				'preview_id' => 'p', 'run_id' => 1, 'closing_year' => 2025,
+				'expires_at' => '2026-01-01T00:15:00+00:00', 'targets' => [],
+				'policy_revision' => 0,
+			]);
+			$run = [
+				'id' => 1, 'closing_year' => 2025, 'origin' => 'manual',
+				'state' => 'completed', 'actor_uid' => 'admin', 'reason' => 'r',
+				'policy_revision' => 0, 'counts' => [], 'items' => [],
+			];
+			$this->stubMethod($mock, 'execute', $run);
+			$this->stubMethod($mock, 'resume', $run);
+			$this->stubMethod($mock, 'runStatus', $run);
+			$this->stubMethod($mock, 'listRuns', ['items' => [], 'total' => 0]);
 			$this->byType[$key] = $mock;
 			return $mock;
 		}

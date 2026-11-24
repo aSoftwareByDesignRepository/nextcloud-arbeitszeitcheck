@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- optional workforce features (spec optional-absence-corrections-hourly-leave-year-end-2026-11):
+  completed-absence corrections — owner request/withdraw, manager approve/decline and direct
+  correction with mandatory reason, self-approval ban (AC-37), §15.9 operation keys
+- hourly absence requests for unpaid leave / Freizeitausgleich (duration_minutes, contract
+  header X-AZC-Absence-Contract ≥2) — web + Expo companion
+- guided year-end overtime reset: preview/execute/resume runs, annual job, financial
+  revision ledger (at_balance_rev) with needs_review flagging
+- companion: hour request form, owner correction card, manager decide/direct surface,
+  workforce policy capabilities parsing, 15 locales
+- admin workforce policy section + year-end admin page
+
+### Fixed
+
+- overtime adjustment insert + audit now atomic (C-01, savepoint-safe under caller tx)
+- manager pending queue splits completed-absence requests into absence_correction_request
+  so decide calls reach the working endpoint (was a permanently stuck queue item)
+- year-end reset preview/execute used a phantom sourceRevision accessor on refs —
+  now previewSourceRevision per schema (would have fataled the whole manual reset path)
+
 ## 1.12.2 - 2026-11-23
 
 ### Fixed

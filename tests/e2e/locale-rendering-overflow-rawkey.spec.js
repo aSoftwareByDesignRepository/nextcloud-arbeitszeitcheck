@@ -30,6 +30,7 @@ const employeeRoutes = [
 const adminRoutes = [
 	{ id: 'admin-notifications', path: '/apps/arbeitszeitcheck/admin/notifications', ready: '#admin-notifications-form' },
 	{ id: 'admin-overtime', path: '/apps/arbeitszeitcheck/admin/overtime-settings', ready: '#admin-overtime-settings-form' },
+	{ id: 'admin-year-end', path: '/apps/arbeitszeitcheck/admin/year-end', ready: '#azc-year-end' },
 ]
 
 // Manager oversight surface — the quick-filter pills + sort/search labels

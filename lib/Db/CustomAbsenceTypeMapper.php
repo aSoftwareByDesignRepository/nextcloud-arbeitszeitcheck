@@ -95,4 +95,38 @@ class CustomAbsenceTypeMapper extends QBMapper
 			->where($qb->expr()->eq('type', $qb->createNamedParameter($code)));
 		return (int)$qb->executeQuery()->fetchOne();
 	}
+
+	/**
+	 * Global epoch bump (§9.6): catalog changes invalidate every watching
+	 * source-revision token. Runs inside the caller's transaction.
+	 */
+	private function bumpEpoch(): void
+	{
+		\OCP\Server::get(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class)
+			->bumpEpoch(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::EPOCH_ABSENCE_CATALOG);
+	}
+
+	/** @param \OCP\AppFramework\Db\Entity $entity */
+	public function insert(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::insert($entity);
+		$this->bumpEpoch();
+		return $saved;
+	}
+
+	/** @param \OCP\AppFramework\Db\Entity $entity */
+	public function update(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::update($entity);
+		$this->bumpEpoch();
+		return $saved;
+	}
+
+	/** @param \OCP\AppFramework\Db\Entity $entity */
+	public function delete(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::delete($entity);
+		$this->bumpEpoch();
+		return $saved;
+	}
 }

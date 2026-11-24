@@ -55,6 +55,10 @@ class SealAbsenceDayFractions implements IRepairStep
 			->from('at_absences')
 			->where($qb->expr()->isNull('start_day_fraction'))
 			->andWhere($qb->expr()->isNull('end_day_fraction'))
+			// Hour-mode rows (optional workforce): their days value is a
+			// minutes-derived share, not a legacy half-day — never seal a
+			// day-shape fraction onto them (NN-04).
+			->andWhere($qb->expr()->isNull('duration_mode'))
 			->andWhere($qb->expr()->eq('start_date', 'end_date'))
 			->orderBy('id', 'ASC');
 		$rows = $qb->executeQuery()->fetchAll();

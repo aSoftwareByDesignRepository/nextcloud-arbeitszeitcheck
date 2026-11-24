@@ -1,982 +1,1283 @@
 {
-  "schemaVersion": 1,
-  "appId": "arbeitszeitcheck",
-  "companionDir": "mobile/arbeitszeitcheck",
-  "contracts": [
+ "schemaVersion": 1,
+ "appId": "arbeitszeitcheck",
+ "companionDir": "mobile/arbeitszeitcheck",
+ "contracts": [
+  {
+   "id": "manual-time-entry-justification",
+   "param": "justification",
+   "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
+   "errorCodes": [
+    "justification_too_short"
+   ],
+   "server": [
     {
-      "id": "manual-time-entry-justification",
-      "param": "justification",
-      "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
-      "errorCodes": [
-        "justification_too_short"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "params['justification']",
-            "justification_too_short",
-            "A justification of at least 10 characters is required for manual time entries."
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "id=\"entry-justification\"",
-            "name=\"justification\"",
-            "$manualTimeEntriesRequireApproval"
-          ]
-        },
-        {
-          "file": "js/time-entry-form.js",
-          "needles": [
-            "validateJustification",
-            "data.justification = this.getJustificationValue()"
-          ]
-        },
-        {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1'"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/CreateTimeEntryScreen.tsx",
-          "needles": [
-            "testID=\"time.create.justification\"",
-            "manualTimeEntriesRequireApproval",
-            "justification.trim().length >= 10"
-          ]
-        },
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "justification?: string",
-            "requestBody.justification = justification"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "time-entry-correction-justification",
-      "param": "justification",
-      "description": "Employee correction requests require ≥10 character justification on web and mobile.",
-      "errorCodes": [
-        "justification_required",
-        "justification_too_short"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "justification_required",
-            "justification_too_short",
-            "Justification is required for correction requests"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "id=\"correction-justification\"",
-            "name=\"justification\""
-          ]
-        },
-        {
-          "file": "js/time-entry-correction.js",
-          "needles": [
-            "correction-justification",
-            "justification:"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/RequestCorrectionScreen.tsx",
-          "needles": [
-            "justification",
-            "MIN_CORRECTION_JUSTIFICATION"
-          ]
-        },
-        {
-          "file": "src/utils/correctionRequest.ts",
-          "needles": [
-            "MIN_CORRECTION_JUSTIFICATION",
-            "justification"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "manager-correction-reason",
-      "param": "reason",
-      "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
-      "errorCodes": [],
-      "server": [
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "A reason of at least 10 characters is required."
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "js/common/time-entry-clock-form.js",
-          "needles": [
-            "minlength=\"10\"",
-            "reason.trim().length < 10",
-            "reason: reason.trim()"
-          ]
-        },
-        {
-          "file": "js/manager-correction-dialog.js",
-          "needles": [
-            "reason: result.payload.reason"
-          ]
-        }
-      ],
-      "mobile": null
-    },
-    {
-      "id": "time-entry-work-location",
-      "param": "workLocation",
-      "description": "Work-location code: web + mobile submit the stored catalog code; server validates against catalog when the feature flag is on.",
-      "errorCodes": [
-        "invalid_work_location"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "params['workLocation']",
-            "work_location"
-          ]
-        },
-        {
-          "file": "lib/Controller/WorkLocationController.php",
-          "needles": [
-            "public function index()",
-            "'default' => $default"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "workLocationOptions",
-            "name=\"workLocation\""
-          ]
-        },
-        {
-          "file": "js/common/time-entry-clock-form.js",
-          "needles": [
-            "options.workLocations",
-            "-work-location"
-          ]
-        },
-        {
-          "file": "js/common/work-location-catalog.js",
-          "needles": [
-            "generateUrl",
-            "api/work-locations"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/CreateTimeEntryScreen.tsx",
-          "needles": [
-            "workLocationTouched",
-            "workLocationOptions"
-          ]
-        },
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "workLocation?: string",
-            "fetchWorkLocationCatalog",
-            "setWorkLocationDayOverride"
-          ]
-        },
-        {
-          "file": "src/offline/stampQueueDrain.ts",
-          "needles": [
-            "item.workLocation"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "special-entitlement-admin-mutations",
-      "param": "entitlementTypeId/scopeType/scopeId/operation/amount/effectiveFrom",
-      "description": "Special-entitlement admin: type+policy create, activation, period close/correction require server-validated fields; web admin page collects them; companion is employee read-only.",
-      "errorCodes": [
-        "VALIDATION_ERROR",
-        "ASSIGNMENT_OVERLAP",
-        "REVISION_CONFLICT",
-        "ENTITLEMENT_DISABLED",
-        "NOT_FOUND"
-      ],
-      "server": [
-        {
-          "file": "lib/Service/SpecialEntitlementAdminService.php",
-          "needles": [
-            "createType",
-            "createPolicy",
-            "ASSIGNMENT_OVERLAP",
-            "REVISION_CONFLICT",
-            "previewPolicy"
-          ]
-        },
-        {
-          "file": "lib/Controller/SpecialEntitlementAdminController.php",
-          "needles": [
-            "createPolicyFlat",
-            "previewPolicy",
-            "endCohortMember"
-          ]
-        },
-        {
-          "file": "appinfo/routes.php",
-          "needles": [
-            "special-entitlement-preview",
-            "special-entitlement-policies"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/admin-special-entitlements.php",
-          "needles": [
-            "data-preview-url",
-            "data-policy-create-url",
-            "se-scope",
-            "se-amount",
-            "se-from"
-          ]
-        },
-        {
-          "file": "js/admin-special-entitlements.js",
-          "needles": [
-            "scopeType: scopeSel.value",
-            "policyCreateUrl",
-            "previewUrl",
-            "cohortMembershipTemplate"
-          ]
-        }
-      ],
-      "mobile": null,
-      "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec §7.3/§7.4."
-    },
-    {
-      "id": "manager-absence-shorten-reason",
-      "param": "end_date/reason/expectedUpdatedAt",
-      "description": "FA-MSHORTEN (US-407): manager end-early on a running approved absence requires end_date + mandatory reason + CAS token; web manager dialog collects all three. Companion: EmployeeAbsenceDetailScreen renders the action only when canManagerShorten === true and updatedAt is present (NN-08/NN-09).",
-      "errorCodes": [
-        "reason_required",
-        "not_started",
-        "already_ended",
-        "end_before_start",
-        "end_not_earlier",
-        "revision_stale"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "shortenEmployeeAbsence",
-            "'end_date' => $this->requestParamString($payload, 'end_date')",
-            "reason_required"
-          ]
-        },
-        {
-          "file": "lib/Service/AbsenceService.php",
-          "needles": [
-            "managerShortenAbsence",
-            "'reason_required'",
-            "'revision_stale'"
-          ]
-        },
-        {
-          "file": "appinfo/routes.php",
-          "needles": [
-            "employee-absences/{absenceId}/shorten"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "js/manager-absences.js",
-          "needles": [
-            "data-manager-shorten",
-            "dlg-reason",
-            "expectedUpdatedAt",
-            "end_date"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/EmployeeAbsenceDetailScreen.tsx",
-          "needles": [
-            "canManagerShorten === true",
-            "expectedUpdatedAt: absence.updatedAt",
-            "useManagerShortenEmployeeAbsenceMutation"
-          ]
-        },
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "managerShortenEmployeeAbsence",
-            "/shorten",
-            "expectedUpdatedAt"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "absence-estimate-days",
-      "param": "start/end (self) — userId/startDate/endDate (manager)",
-      "description": "FA-PREVIEW/DC-02+DC-06b: server-side schedule-aware day estimate; web and mobile previews display only, never count client-side (NN-03).",
-      "errorCodes": [],
-      "server": [
-        {
-          "file": "lib/Controller/AbsenceController.php",
-          "needles": [
-            "estimateDays",
-            "/^\\d{4}-\\d{2}-\\d{2}$/"
-          ]
-        },
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "estimateEmployeeAbsenceDays",
-            "canManageEmployee"
-          ]
-        },
-        {
-          "file": "appinfo/routes.php",
-          "needles": [
-            "absences/estimate-days",
-            "employee-absences/estimate-days"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/absences.php",
-          "needles": [
-            "absence-days-consumption",
-            "estimateDays"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "fetchAbsenceDaysEstimate",
-            "fetchEmployeeAbsenceDaysEstimate",
-            "estimate-days"
-          ]
-        },
-        {
-          "file": "src/screens/CreateAbsenceScreen.tsx",
-          "needles": [
-            "fetchAbsenceDaysEstimate",
-            "consumptionDays"
-          ]
-        },
-        {
-          "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
-          "needles": [
-            "fetchEmployeeAbsenceDaysEstimate",
-            "consumptionDays"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "absence-day-fraction",
-      "param": "day_fraction (self + API) — dayFraction (manager API)",
-      "description": "AZC-HALF-DAY-NON-VACATION: opt-in half-day for enabled absence types. Server validates the org allowlist (HALF_DAY_TYPE_NOT_ENABLED), single-day range (HALF_DAY_RANGE_FORBIDDEN / VAC_HALF_DAY_RANGE_FORBIDDEN) and recomputes days = schedule weight x fraction — client day values are never trusted (SEC-02).",
-      "errorCodes": [
-        "HALF_DAY_TYPE_NOT_ENABLED",
-        "HALF_DAY_RANGE_FORBIDDEN",
-        "HALF_DAY_INVALID",
-        "VAC_HALF_DAY_RANGE_FORBIDDEN",
-        "VAC_HALF_DAY_NON_WORKING",
-        "VAC_HALF_DAY_INVALID"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/AbsenceController.php",
-          "needles": [
-            "day_fraction"
-          ]
-        },
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "day_fraction",
-            "dayFraction"
-          ]
-        },
-        {
-          "file": "lib/Service/AbsenceService.php",
-          "needles": [
-            "resolveNonVacationDaysDebit",
-            "HALF_DAY_TYPE_NOT_ENABLED",
-            "HALF_DAY_RANGE_FORBIDDEN"
-          ]
-        },
-        {
-          "file": "lib/Support/HalfDayTypePolicy.php",
-          "needles": [
-            "enabledTypesFromRaw",
-            "isEnabledForType"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/absences.php",
-          "needles": [
-            "name=\"day_fraction\"",
-            "absence-day-fraction-group",
-            "data-enabled-types"
-          ]
-        },
-        {
-          "file": "templates/manager-absences.php",
-          "needles": [
-            "record_day_fraction",
-            "halfDayEnabledTypes"
-          ]
-        },
-        {
-          "file": "js/manager-absences.js",
-          "needles": [
-            "payload.dayFraction",
-            "halfDayEnabledTypes.indexOf"
-          ]
-        },
-        {
-          "file": "templates/partials/admin-settings/compliance.php",
-          "needles": [
-            "halfDayEnabledTypes[]",
-            "half-day-enabled-legend"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/CreateAbsenceScreen.tsx",
-          "needles": [
-            "day_fraction",
-            "absence.dayFraction",
-            "halfDayEnabledTypes"
-          ]
-        },
-        {
-          "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
-          "needles": [
-            "dayFraction",
-            "manager.recordAbsence.dayFraction",
-            "halfDayEnabledTypes"
-          ]
-        },
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "day_fraction?: '1' | '0.5'",
-            "dayFraction?: '1' | '0.5'"
-          ]
-        },
-        {
-          "file": "src/utils/timeEntryEditing.ts",
-          "needles": [
-            "halfDayEnabledTypesFromCapabilities",
-            "halfDayEnabledTypes"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "absence-day-slot-boundaries",
-      "param": "day_slot, start_day_fraction, start_day_slot, end_day_fraction, end_day_slot (snake + camelCase aliases)",
-      "description": "AZC-HALF-DAY-SLOTS-BOUNDARIES: explicit AM/PM slots + boundary halves on multi-day ranges. Server canonicalizes via AbsenceDayShape (HALF_DAY_SLOT_INVALID / *_HALF_DAY_INVALID), persists explicit columns, and applies the slot-aware complementary-overlap predicate inside the lock/tx rechecks.",
-      "errorCodes": [
-        "HALF_DAY_SLOT_INVALID",
-        "HALF_DAY_INVALID",
-        "VAC_HALF_DAY_INVALID"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/AbsenceController.php",
-          "needles": [
-            "day_slot",
-            "start_day_fraction",
-            "end_day_fraction"
-          ]
-        },
-        {
-          "file": "lib/Controller/ManagerController.php",
-          "needles": [
-            "day_slot",
-            "daySlot",
-            "start_day_fraction",
-            "endDayFraction"
-          ]
-        },
-        {
-          "file": "lib/Service/AbsenceService.php",
-          "needles": [
-            "AbsenceDayShape",
-            "assertNoCoverageConflict",
-            "entityDayShape",
-            "applyDayShapeColumns"
-          ]
-        },
-        {
-          "file": "lib/Support/AbsenceDayShape.php",
-          "needles": [
-            "canonicalize",
-            "coversCompatible",
-            "columnsInheritedForRange",
-            "fractionForBoundary"
-          ]
-        },
-        {
-          "file": "lib/Migration/Version1062Date20261125090000.php",
-          "needles": [
-            "start_day_fraction",
-            "end_day_slot"
-          ]
-        },
-        {
-          "file": "lib/Repair/SealAbsenceDayFractions.php",
-          "needles": [
-            "start_day_fraction",
-            "computeWorkingDaysForUser",
-            "IDBConnection"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/absences.php",
-          "needles": [
-            "day_slot",
-            "absence-day-slot-group",
-            "absence-boundary-half-group",
-            "start_day_fraction",
-            "end_day_fraction",
-            "getAbsenceDayShape"
-          ]
-        },
-        {
-          "file": "templates/manager-absences.php",
-          "needles": [
-            "manager-absence-day-slot-group",
-            "record_day_slot"
-          ]
-        },
-        {
-          "file": "js/manager-absences.js",
-          "needles": [
-            "daySlot",
-            "record_day_slot"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "day_slot",
-            "daySlot",
-            "start_day_fraction",
-            "endDayFraction"
-          ]
-        },
-        {
-          "file": "src/screens/CreateAbsenceScreen.tsx",
-          "needles": [
-            "daySlot",
-            "absence.daySlot"
-          ]
-        },
-        {
-          "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
-          "needles": [
-            "daySlot",
-            "manager.recordAbsence.daySlot"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "split-override-entry-revision-cas",
-      "param": "splitOverride.baseEntryRevision, summary.revision",
-      "description": "AZC-SPLIT-REVISION-CAS: getSummary() issues an opaque sha256 content-hash `revision` over the correction basis; the correction wizard echoes it as splitOverride.baseEntryRevision. The server format-checks AND compares it to the current revision - a mismatch is a conflict (409 SPLIT_OVERRIDE_STALE), never a silent apply; omission keeps pre-feature semantics. Stale submissions lock the dialog and reload on close.",
-      "errorCodes": [
-        "SPLIT_OVERRIDE_STALE",
-        "SPLIT_OVERRIDE_INVALID"
-      ],
-      "server": [
-        {
-          "file": "lib/Db/TimeEntry.php",
-          "needles": [
-            "getContentRevision",
-            "$summary['revision'] = $this->getContentRevision()",
-            "sha256"
-          ]
-        },
-        {
-          "file": "lib/Service/TimeEntryCorrectionService.php",
-          "needles": [
-            "baseEntryRevision",
-            "REVISION_TOKEN_PATTERN",
-            "hash_equals($entry->getContentRevision(), $rev)",
-            "SPLIT_OVERRIDE_STALE",
-            "SplitOverrideStaleException::CODE"
-          ]
-        },
-        {
-          "file": "lib/Controller/TimeEntryController.php",
-          "needles": [
-            "SplitOverrideStaleException::CODE",
-            "Http::STATUS_CONFLICT"
-          ]
-        },
-        {
-          "file": "lib/Exception/SplitOverrideStaleException.php",
-          "needles": [
-            "SPLIT_OVERRIDE_STALE",
-            "ConcurrentDecisionException"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "js/time-entry-correction.js",
-          "needles": [
-            "wizardState.originalSummary.revision",
-            "baseEntryRevision",
-            "SPLIT_OVERRIDE_STALE",
-            "correctionReloadOnClose = true"
-          ]
-        },
-        {
-          "file": "templates/common/time-entry-correction-l10n.php",
-          "needles": [
-            "correctionStaleEntry"
-          ]
-        }
-      ],
-      "mobile": []
-    },
-    {
-      "id": "overtime-breakdown-drilldown",
-      "param": "userId (optional scope) — period/start/end (optional range)",
-      "description": "GET /api/overtime/breakdown: per-absence overtime-credit drill-down. Same endpoint feeds the web dashboard dialog and the companion breakdown sheet; optional userId is honored only inside the actor's oversight scope (uniform 404 otherwise).",
-      "errorCodes": [
-        "NOT_FOUND",
-        "invalid_period",
-        "invalid_dates"
-      ],
-      "server": [
-        {
-          "file": "appinfo/routes.php",
-          "needles": [
-            "overtime_breakdown#breakdown",
-            "/api/overtime/breakdown"
-          ]
-        },
-        {
-          "file": "lib/Controller/OvertimeBreakdownController.php",
-          "needles": [
-            "canOverseeUser",
-            "creditBreakdownForRange",
-            "workedHoursByDayRange",
-            "'success' => true"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/dashboard.php",
-          "needles": [
-            "data-overtime-breakdown",
-            "data-breakdown-url",
-            "overtime_breakdown.breakdown"
-          ]
-        },
-        {
-          "file": "js/common/overtime-credit-breakdown.js",
-          "needles": [
-            "data-breakdown-url",
-            "comp_estimate",
-            "not_counted"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/api/client.ts",
-          "needles": [
-            "fetchOvertimeBreakdown",
-            "/api/overtime/breakdown"
-          ]
-        },
-        {
-          "file": "src/ui/OvertimeBreakdownSheet.tsx",
-          "needles": [
-            "comp_estimate",
-            "not_counted",
-            "credited"
-          ]
-        },
-        {
-          "file": "src/screens/DashboardScreen.tsx",
-          "needles": [
-            "OvertimeBreakdownSheet",
-            "home.overtimeBreakdownTrigger"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "auto-clock-out-admin-settings",
-      "param": "autoClockOutEnabled / autoClockOutHour / autoClockOutScope",
-      "description": "Admin org settings for the planned-end auto clock-out. Same three keys are accepted by POST and returned by GET (parity required for the enable gate). Hour must be 0-23; scope enum is today|all_open. Admin-only surface: the companion has no admin settings screen, so mobile is null.",
-      "errorCodes": [
-        "invalid_auto_clock_out_hour",
-        "invalid_auto_clock_out_scope"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "autoClockOutEnabled",
-            "autoClockOutHour",
-            "autoClockOutScope",
-            "invalid_auto_clock_out_hour",
-            "invalid_auto_clock_out_scope"
-          ]
-        },
-        {
-          "file": "lib/Constants.php",
-          "needles": [
-            "CONFIG_AUTO_CLOCK_OUT_ENABLED",
-            "CONFIG_AUTO_CLOCK_OUT_HOUR",
-            "CONFIG_AUTO_CLOCK_OUT_SCOPE",
-            "AUTO_CLOCK_OUT_SCOPE_ALL_OPEN"
-          ]
-        },
-        {
-          "file": "lib/Service/AdminSettingsSectionCatalog.php",
-          "needles": [
-            "autoClockOutEnabled",
-            "autoClockOutHour",
-            "autoClockOutScope"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/partials/admin-settings/time-recording.php",
-          "needles": [
-            "autoClockOutEnabled",
-            "autoClockOutHour",
-            "autoClockOutScope",
-            "azc-field-error"
-          ]
-        },
-        {
-          "file": "js/admin-settings.js",
-          "needles": [
-            "autoClockOutEnabled",
-            "autoClockOutHour",
-            "autoClockOutScope",
-            "auto-clock-out-controls"
-          ]
-        }
-      ],
-      "mobile": null
-    },
-    {
-      "id": "auto-clock-out-ended-reason-marker",
-      "param": "endedReason ('auto_planned_end')",
-      "description": "Marker shown on entries the system closed at the planned end. Serialized via TimeEntry::getSummary(); both web lists and the companion detail screen render a readable badge — never the raw reason key.",
-      "server": [
-        {
-          "file": "lib/Db/TimeEntry.php",
-          "needles": [
-            "ENDED_REASON_AUTO_PLANNED_END",
-            "auto_planned_end",
-            "endedReason"
-          ]
-        },
-        {
-          "file": "lib/Constants.php",
-          "needles": [
-            "AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT",
-            "auto_clock_out"
-          ]
-        },
-        {
-          "file": "lib/BackgroundJob/AutoClockOutJob.php",
-          "needles": [
-            "ENDED_REASON_AUTO_PLANNED_END",
-            "autoClockOutAtPlannedEnd"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/time-entries.php",
-          "needles": [
-            "ENDED_REASON_AUTO_PLANNED_END",
-            "azc-auto-clockout-badge"
-          ]
-        },
-        {
-          "file": "js/manager-time-entries.js",
-          "needles": [
-            "auto_planned_end",
-            "azc-auto-clockout-badge",
-            "autoClockOutBadgeHtml"
-          ]
-        }
-      ],
-      "mobile": [
-        {
-          "file": "src/screens/TimeEntryDetailScreen.tsx",
-          "needles": [
-            "ENDED_REASON_MARKER_KEYS",
-            "auto_planned_end",
-            "endedReasonBadge",
-            "time.endedReasonAutoPlannedEnd"
-          ]
-        },
-        {
-          "file": "src/i18n/locales/en.json",
-          "needles": [
-            "endedReasonAutoPlannedEnd"
-          ]
-        },
-        {
-          "file": "src/i18n/locales/de.json",
-          "needles": [
-            "endedReasonAutoPlannedEnd"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "assignments-gap-policy",
-      "param": "assignmentsGapPolicy",
-      "description": "Org flag (BQ-01): how days outside all assignment periods resolve their Soll - 'lenient' (legacy fallback, default) | 'strict' (zero target, unassigned_gap basis). POST validates the enum, GET exposes it to clients (settings parity, contract rule §4). Admin-only surface: the companion has no admin settings screen, so mobile is null.",
-      "errorCodes": [
-        "invalid_assignments_gap_policy"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "assignmentsGapPolicy",
-            "Constants::ASSIGNMENTS_GAP_POLICIES",
-            "assignments_gap_policy_changed",
-            "private function assignmentsGapPolicy(): string"
-          ]
-        },
-        {
-          "file": "lib/Constants.php",
-          "needles": [
-            "CONFIG_ASSIGNMENTS_GAP_POLICY",
-            "CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT",
-            "ASSIGNMENTS_GAP_POLICIES"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "templates/partials/admin-settings/hours.php",
-          "needles": [
-            "name=\"assignmentsGapPolicy\"",
-            "value=\"lenient\"",
-            "value=\"strict\"",
-            "azc-choice-card"
-          ]
-        },
-        {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "'assignmentsGapPolicy' => $this->assignmentsGapPolicy()"
-          ]
-        }
-      ],
-      "mobile": null
-    },
-    {
-      "id": "admin-working-time-assignments",
-      "param": "modelId / startDate / endDate / vacationDaysPerYear / customModel",
-      "description": "Effective-dated assignment CRUD (POST/PATCH/DELETE /api/admin/users/{uid}/working-time-assignments). Server requires startDate and either modelId or a complete customModel block; endDate may be empty (open window). Web collects every field in the assignments manager dialog. Admin-only surface: mobile is null.",
-      "errorCodes": [
-        "ASSIGNMENT_OVERLAP",
-        "ASSIGNMENT_NOT_DELETABLE",
-        "ASSIGNMENT_NOT_FOUND",
-        "ASSIGNMENT_INVALID_MODEL"
-      ],
-      "server": [
-        {
-          "file": "lib/Controller/AdminController.php",
-          "needles": [
-            "createUserWorkingTimeAssignment",
-            "updateUserWorkingTimeAssignment",
-            "deleteUserWorkingTimeAssignment"
-          ]
-        },
-        {
-          "file": "lib/Service/UserWorkingTimeAssignmentService.php",
-          "needles": [
-            "params['startDate']",
-            "params['endDate']",
-            "params['vacationDaysPerYear']",
-            "params['modelId']"
-          ]
-        },
-        {
-          "file": "appinfo/routes.php",
-          "needles": [
-            "admin#createUserWorkingTimeAssignment",
-            "admin#updateUserWorkingTimeAssignment",
-            "admin#deleteUserWorkingTimeAssignment"
-          ]
-        }
-      ],
-      "web": [
-        {
-          "file": "js/admin-user-detail.js",
-          "needles": [
-            "working-time-assignments",
-            "startDate",
-            "endDate",
-            "vacationDaysPerYear",
-            "modelId"
-          ]
-        }
-      ],
-      "mobile": null
+     "file": "lib/Controller/TimeEntryController.php",
+     "needles": [
+      "params['justification']",
+      "justification_too_short",
+      "A justification of at least 10 characters is required for manual time entries."
+     ]
     }
-  ]
+   ],
+   "web": [
+    {
+     "file": "templates/time-entries.php",
+     "needles": [
+      "id=\"entry-justification\"",
+      "name=\"justification\"",
+      "$manualTimeEntriesRequireApproval"
+     ]
+    },
+    {
+     "file": "js/time-entry-form.js",
+     "needles": [
+      "validateJustification",
+      "data.justification = this.getJustificationValue()"
+     ]
+    },
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "'manualTimeEntriesRequireApproval' => $this->appConfig->getAppValueString(Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL, '0') === '1'"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/CreateTimeEntryScreen.tsx",
+     "needles": [
+      "testID=\"time.create.justification\"",
+      "manualTimeEntriesRequireApproval",
+      "justification.trim().length >= 10"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "justification?: string",
+      "requestBody.justification = justification"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "time-entry-correction-justification",
+   "param": "justification",
+   "description": "Employee correction requests require ≥10 character justification on web and mobile.",
+   "errorCodes": [
+    "justification_required",
+    "justification_too_short"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/TimeEntryController.php",
+     "needles": [
+      "justification_required",
+      "justification_too_short",
+      "Justification is required for correction requests"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/time-entries.php",
+     "needles": [
+      "id=\"correction-justification\"",
+      "name=\"justification\""
+     ]
+    },
+    {
+     "file": "js/time-entry-correction.js",
+     "needles": [
+      "correction-justification",
+      "justification:"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/RequestCorrectionScreen.tsx",
+     "needles": [
+      "justification",
+      "MIN_CORRECTION_JUSTIFICATION"
+     ]
+    },
+    {
+     "file": "src/utils/correctionRequest.ts",
+     "needles": [
+      "MIN_CORRECTION_JUSTIFICATION",
+      "justification"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "manager-correction-reason",
+   "param": "reason",
+   "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
+   "errorCodes": [],
+   "server": [
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "A reason of at least 10 characters is required."
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/common/time-entry-clock-form.js",
+     "needles": [
+      "minlength=\"10\"",
+      "reason.trim().length < 10",
+      "reason: reason.trim()"
+     ]
+    },
+    {
+     "file": "js/manager-correction-dialog.js",
+     "needles": [
+      "reason: result.payload.reason"
+     ]
+    }
+   ],
+   "mobile": null
+  },
+  {
+   "id": "time-entry-work-location",
+   "param": "workLocation",
+   "description": "Work-location code: web + mobile submit the stored catalog code; server validates against catalog when the feature flag is on.",
+   "errorCodes": [
+    "invalid_work_location"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/TimeEntryController.php",
+     "needles": [
+      "params['workLocation']",
+      "work_location"
+     ]
+    },
+    {
+     "file": "lib/Controller/WorkLocationController.php",
+     "needles": [
+      "public function index()",
+      "'default' => $default"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/time-entries.php",
+     "needles": [
+      "workLocationOptions",
+      "name=\"workLocation\""
+     ]
+    },
+    {
+     "file": "js/common/time-entry-clock-form.js",
+     "needles": [
+      "options.workLocations",
+      "-work-location"
+     ]
+    },
+    {
+     "file": "js/common/work-location-catalog.js",
+     "needles": [
+      "generateUrl",
+      "api/work-locations"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/CreateTimeEntryScreen.tsx",
+     "needles": [
+      "workLocationTouched",
+      "workLocationOptions"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "workLocation?: string",
+      "fetchWorkLocationCatalog",
+      "setWorkLocationDayOverride"
+     ]
+    },
+    {
+     "file": "src/offline/stampQueueDrain.ts",
+     "needles": [
+      "item.workLocation"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "special-entitlement-admin-mutations",
+   "param": "entitlementTypeId/scopeType/scopeId/operation/amount/effectiveFrom",
+   "description": "Special-entitlement admin: type+policy create, activation, period close/correction require server-validated fields; web admin page collects them; companion is employee read-only.",
+   "errorCodes": [
+    "VALIDATION_ERROR",
+    "ASSIGNMENT_OVERLAP",
+    "REVISION_CONFLICT",
+    "ENTITLEMENT_DISABLED",
+    "NOT_FOUND"
+   ],
+   "server": [
+    {
+     "file": "lib/Service/SpecialEntitlementAdminService.php",
+     "needles": [
+      "createType",
+      "createPolicy",
+      "ASSIGNMENT_OVERLAP",
+      "REVISION_CONFLICT",
+      "previewPolicy"
+     ]
+    },
+    {
+     "file": "lib/Controller/SpecialEntitlementAdminController.php",
+     "needles": [
+      "createPolicyFlat",
+      "previewPolicy",
+      "endCohortMember"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "special-entitlement-preview",
+      "special-entitlement-policies"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/admin-special-entitlements.php",
+     "needles": [
+      "data-preview-url",
+      "data-policy-create-url",
+      "se-scope",
+      "se-amount",
+      "se-from"
+     ]
+    },
+    {
+     "file": "js/admin-special-entitlements.js",
+     "needles": [
+      "scopeType: scopeSel.value",
+      "policyCreateUrl",
+      "previewUrl",
+      "cohortMembershipTemplate"
+     ]
+    }
+   ],
+   "mobile": null,
+   "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec §7.3/§7.4."
+  },
+  {
+   "id": "manager-absence-shorten-reason",
+   "param": "end_date/reason/expectedUpdatedAt",
+   "description": "FA-MSHORTEN (US-407): manager end-early on a running approved absence requires end_date + mandatory reason + CAS token; web manager dialog collects all three. Companion: EmployeeAbsenceDetailScreen renders the action only when canManagerShorten === true and updatedAt is present (NN-08/NN-09).",
+   "errorCodes": [
+    "reason_required",
+    "not_started",
+    "already_ended",
+    "end_before_start",
+    "end_not_earlier",
+    "revision_stale"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "shortenEmployeeAbsence",
+      "'end_date' => $this->requestParamString($payload, 'end_date')",
+      "reason_required"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "managerShortenAbsence",
+      "'reason_required'",
+      "'revision_stale'"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "employee-absences/{absenceId}/shorten"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/manager-absences.js",
+     "needles": [
+      "data-manager-shorten",
+      "dlg-reason",
+      "expectedUpdatedAt",
+      "end_date"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/EmployeeAbsenceDetailScreen.tsx",
+     "needles": [
+      "canManagerShorten === true",
+      "expectedUpdatedAt: absence.updatedAt",
+      "useManagerShortenEmployeeAbsenceMutation"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "managerShortenEmployeeAbsence",
+      "/shorten",
+      "expectedUpdatedAt"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "absence-estimate-days",
+   "param": "start/end (self) — userId/startDate/endDate (manager)",
+   "description": "FA-PREVIEW/DC-02+DC-06b: server-side schedule-aware day estimate; web and mobile previews display only, never count client-side (NN-03).",
+   "errorCodes": [],
+   "server": [
+    {
+     "file": "lib/Controller/AbsenceController.php",
+     "needles": [
+      "estimateDays",
+      "/^\\d{4}-\\d{2}-\\d{2}$/"
+     ]
+    },
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "estimateEmployeeAbsenceDays",
+      "canManageEmployee"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "absences/estimate-days",
+      "employee-absences/estimate-days"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/absences.php",
+     "needles": [
+      "absence-days-consumption",
+      "estimateDays"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "fetchAbsenceDaysEstimate",
+      "fetchEmployeeAbsenceDaysEstimate",
+      "estimate-days"
+     ]
+    },
+    {
+     "file": "src/screens/CreateAbsenceScreen.tsx",
+     "needles": [
+      "fetchAbsenceDaysEstimate",
+      "consumptionDays"
+     ]
+    },
+    {
+     "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
+     "needles": [
+      "fetchEmployeeAbsenceDaysEstimate",
+      "consumptionDays"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "absence-day-fraction",
+   "param": "day_fraction (self + API) — dayFraction (manager API)",
+   "description": "AZC-HALF-DAY-NON-VACATION: opt-in half-day for enabled absence types. Server validates the org allowlist (HALF_DAY_TYPE_NOT_ENABLED), single-day range (HALF_DAY_RANGE_FORBIDDEN / VAC_HALF_DAY_RANGE_FORBIDDEN) and recomputes days = schedule weight x fraction — client day values are never trusted (SEC-02).",
+   "errorCodes": [
+    "HALF_DAY_TYPE_NOT_ENABLED",
+    "HALF_DAY_RANGE_FORBIDDEN",
+    "HALF_DAY_INVALID",
+    "VAC_HALF_DAY_RANGE_FORBIDDEN",
+    "VAC_HALF_DAY_NON_WORKING",
+    "VAC_HALF_DAY_INVALID"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AbsenceController.php",
+     "needles": [
+      "day_fraction"
+     ]
+    },
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "day_fraction",
+      "dayFraction"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "resolveNonVacationDaysDebit",
+      "HALF_DAY_TYPE_NOT_ENABLED",
+      "HALF_DAY_RANGE_FORBIDDEN"
+     ]
+    },
+    {
+     "file": "lib/Support/HalfDayTypePolicy.php",
+     "needles": [
+      "enabledTypesFromRaw",
+      "isEnabledForType"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/absences.php",
+     "needles": [
+      "name=\"day_fraction\"",
+      "absence-day-fraction-group",
+      "data-enabled-types"
+     ]
+    },
+    {
+     "file": "templates/manager-absences.php",
+     "needles": [
+      "record_day_fraction",
+      "halfDayEnabledTypes"
+     ]
+    },
+    {
+     "file": "js/manager-absences.js",
+     "needles": [
+      "payload.dayFraction",
+      "halfDayEnabledTypes.indexOf"
+     ]
+    },
+    {
+     "file": "templates/partials/admin-settings/compliance.php",
+     "needles": [
+      "halfDayEnabledTypes[]",
+      "half-day-enabled-legend"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/CreateAbsenceScreen.tsx",
+     "needles": [
+      "day_fraction",
+      "absence.dayFraction",
+      "halfDayEnabledTypes"
+     ]
+    },
+    {
+     "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
+     "needles": [
+      "dayFraction",
+      "manager.recordAbsence.dayFraction",
+      "halfDayEnabledTypes"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "day_fraction?: '1' | '0.5'",
+      "dayFraction?: '1' | '0.5'"
+     ]
+    },
+    {
+     "file": "src/utils/timeEntryEditing.ts",
+     "needles": [
+      "halfDayEnabledTypesFromCapabilities",
+      "halfDayEnabledTypes"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "absence-day-slot-boundaries",
+   "param": "day_slot, start_day_fraction, start_day_slot, end_day_fraction, end_day_slot (snake + camelCase aliases)",
+   "description": "AZC-HALF-DAY-SLOTS-BOUNDARIES: explicit AM/PM slots + boundary halves on multi-day ranges. Server canonicalizes via AbsenceDayShape (HALF_DAY_SLOT_INVALID / *_HALF_DAY_INVALID), persists explicit columns, and applies the slot-aware complementary-overlap predicate inside the lock/tx rechecks.",
+   "errorCodes": [
+    "HALF_DAY_SLOT_INVALID",
+    "HALF_DAY_INVALID",
+    "VAC_HALF_DAY_INVALID"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AbsenceController.php",
+     "needles": [
+      "day_slot",
+      "start_day_fraction",
+      "end_day_fraction"
+     ]
+    },
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "day_slot",
+      "daySlot",
+      "start_day_fraction",
+      "endDayFraction"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "AbsenceDayShape",
+      "assertNoCoverageConflict",
+      "entityDayShape",
+      "applyDayShapeColumns"
+     ]
+    },
+    {
+     "file": "lib/Support/AbsenceDayShape.php",
+     "needles": [
+      "canonicalize",
+      "coversCompatible",
+      "columnsInheritedForRange",
+      "fractionForBoundary"
+     ]
+    },
+    {
+     "file": "lib/Migration/Version1062Date20261125090000.php",
+     "needles": [
+      "start_day_fraction",
+      "end_day_slot"
+     ]
+    },
+    {
+     "file": "lib/Repair/SealAbsenceDayFractions.php",
+     "needles": [
+      "start_day_fraction",
+      "computeWorkingDaysForUser",
+      "IDBConnection"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/absences.php",
+     "needles": [
+      "day_slot",
+      "absence-day-slot-group",
+      "absence-boundary-half-group",
+      "start_day_fraction",
+      "end_day_fraction",
+      "getAbsenceDayShape"
+     ]
+    },
+    {
+     "file": "templates/manager-absences.php",
+     "needles": [
+      "manager-absence-day-slot-group",
+      "record_day_slot"
+     ]
+    },
+    {
+     "file": "js/manager-absences.js",
+     "needles": [
+      "daySlot",
+      "record_day_slot"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "day_slot",
+      "daySlot",
+      "start_day_fraction",
+      "endDayFraction"
+     ]
+    },
+    {
+     "file": "src/screens/CreateAbsenceScreen.tsx",
+     "needles": [
+      "daySlot",
+      "absence.daySlot"
+     ]
+    },
+    {
+     "file": "src/screens/ManagerAbsenceRecordScreen.tsx",
+     "needles": [
+      "daySlot",
+      "manager.recordAbsence.daySlot"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "split-override-entry-revision-cas",
+   "param": "splitOverride.baseEntryRevision, summary.revision",
+   "description": "AZC-SPLIT-REVISION-CAS: getSummary() issues an opaque sha256 content-hash `revision` over the correction basis; the correction wizard echoes it as splitOverride.baseEntryRevision. The server format-checks AND compares it to the current revision - a mismatch is a conflict (409 SPLIT_OVERRIDE_STALE), never a silent apply; omission keeps pre-feature semantics. Stale submissions lock the dialog and reload on close.",
+   "errorCodes": [
+    "SPLIT_OVERRIDE_STALE",
+    "SPLIT_OVERRIDE_INVALID"
+   ],
+   "server": [
+    {
+     "file": "lib/Db/TimeEntry.php",
+     "needles": [
+      "getContentRevision",
+      "$summary['revision'] = $this->getContentRevision()",
+      "sha256"
+     ]
+    },
+    {
+     "file": "lib/Service/TimeEntryCorrectionService.php",
+     "needles": [
+      "baseEntryRevision",
+      "REVISION_TOKEN_PATTERN",
+      "hash_equals($entry->getContentRevision(), $rev)",
+      "SPLIT_OVERRIDE_STALE",
+      "SplitOverrideStaleException::CODE"
+     ]
+    },
+    {
+     "file": "lib/Controller/TimeEntryController.php",
+     "needles": [
+      "SplitOverrideStaleException::CODE",
+      "Http::STATUS_CONFLICT"
+     ]
+    },
+    {
+     "file": "lib/Exception/SplitOverrideStaleException.php",
+     "needles": [
+      "SPLIT_OVERRIDE_STALE",
+      "ConcurrentDecisionException"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/time-entry-correction.js",
+     "needles": [
+      "wizardState.originalSummary.revision",
+      "baseEntryRevision",
+      "SPLIT_OVERRIDE_STALE",
+      "correctionReloadOnClose = true"
+     ]
+    },
+    {
+     "file": "templates/common/time-entry-correction-l10n.php",
+     "needles": [
+      "correctionStaleEntry"
+     ]
+    }
+   ],
+   "mobile": []
+  },
+  {
+   "id": "overtime-breakdown-drilldown",
+   "param": "userId (optional scope) — period/start/end (optional range)",
+   "description": "GET /api/overtime/breakdown: per-absence overtime-credit drill-down. Same endpoint feeds the web dashboard dialog and the companion breakdown sheet; optional userId is honored only inside the actor's oversight scope (uniform 404 otherwise).",
+   "errorCodes": [
+    "NOT_FOUND",
+    "invalid_period",
+    "invalid_dates"
+   ],
+   "server": [
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "overtime_breakdown#breakdown",
+      "/api/overtime/breakdown"
+     ]
+    },
+    {
+     "file": "lib/Controller/OvertimeBreakdownController.php",
+     "needles": [
+      "canOverseeUser",
+      "creditBreakdownForRange",
+      "workedHoursByDayRange",
+      "'success' => true"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/dashboard.php",
+     "needles": [
+      "data-overtime-breakdown",
+      "data-breakdown-url",
+      "overtime_breakdown.breakdown"
+     ]
+    },
+    {
+     "file": "js/common/overtime-credit-breakdown.js",
+     "needles": [
+      "data-breakdown-url",
+      "comp_estimate",
+      "not_counted"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "fetchOvertimeBreakdown",
+      "/api/overtime/breakdown"
+     ]
+    },
+    {
+     "file": "src/ui/OvertimeBreakdownSheet.tsx",
+     "needles": [
+      "comp_estimate",
+      "not_counted",
+      "credited"
+     ]
+    },
+    {
+     "file": "src/screens/DashboardScreen.tsx",
+     "needles": [
+      "OvertimeBreakdownSheet",
+      "home.overtimeBreakdownTrigger"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "auto-clock-out-admin-settings",
+   "param": "autoClockOutEnabled / autoClockOutHour / autoClockOutScope",
+   "description": "Admin org settings for the planned-end auto clock-out. Same three keys are accepted by POST and returned by GET (parity required for the enable gate). Hour must be 0-23; scope enum is today|all_open. Admin-only surface: the companion has no admin settings screen, so mobile is null.",
+   "errorCodes": [
+    "invalid_auto_clock_out_hour",
+    "invalid_auto_clock_out_scope"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "autoClockOutEnabled",
+      "autoClockOutHour",
+      "autoClockOutScope",
+      "invalid_auto_clock_out_hour",
+      "invalid_auto_clock_out_scope"
+     ]
+    },
+    {
+     "file": "lib/Constants.php",
+     "needles": [
+      "CONFIG_AUTO_CLOCK_OUT_ENABLED",
+      "CONFIG_AUTO_CLOCK_OUT_HOUR",
+      "CONFIG_AUTO_CLOCK_OUT_SCOPE",
+      "AUTO_CLOCK_OUT_SCOPE_ALL_OPEN"
+     ]
+    },
+    {
+     "file": "lib/Service/AdminSettingsSectionCatalog.php",
+     "needles": [
+      "autoClockOutEnabled",
+      "autoClockOutHour",
+      "autoClockOutScope"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/partials/admin-settings/time-recording.php",
+     "needles": [
+      "autoClockOutEnabled",
+      "autoClockOutHour",
+      "autoClockOutScope",
+      "azc-field-error"
+     ]
+    },
+    {
+     "file": "js/admin-settings.js",
+     "needles": [
+      "autoClockOutEnabled",
+      "autoClockOutHour",
+      "autoClockOutScope",
+      "auto-clock-out-controls"
+     ]
+    }
+   ],
+   "mobile": null
+  },
+  {
+   "id": "auto-clock-out-ended-reason-marker",
+   "param": "endedReason ('auto_planned_end')",
+   "description": "Marker shown on entries the system closed at the planned end. Serialized via TimeEntry::getSummary(); both web lists and the companion detail screen render a readable badge — never the raw reason key.",
+   "server": [
+    {
+     "file": "lib/Db/TimeEntry.php",
+     "needles": [
+      "ENDED_REASON_AUTO_PLANNED_END",
+      "auto_planned_end",
+      "endedReason"
+     ]
+    },
+    {
+     "file": "lib/Constants.php",
+     "needles": [
+      "AUDIT_CAPTURE_SOURCE_AUTO_CLOCK_OUT",
+      "auto_clock_out"
+     ]
+    },
+    {
+     "file": "lib/BackgroundJob/AutoClockOutJob.php",
+     "needles": [
+      "ENDED_REASON_AUTO_PLANNED_END",
+      "autoClockOutAtPlannedEnd"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/time-entries.php",
+     "needles": [
+      "ENDED_REASON_AUTO_PLANNED_END",
+      "azc-auto-clockout-badge"
+     ]
+    },
+    {
+     "file": "js/manager-time-entries.js",
+     "needles": [
+      "auto_planned_end",
+      "azc-auto-clockout-badge",
+      "autoClockOutBadgeHtml"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/TimeEntryDetailScreen.tsx",
+     "needles": [
+      "ENDED_REASON_MARKER_KEYS",
+      "auto_planned_end",
+      "endedReasonBadge",
+      "time.endedReasonAutoPlannedEnd"
+     ]
+    },
+    {
+     "file": "src/i18n/locales/en.json",
+     "needles": [
+      "endedReasonAutoPlannedEnd"
+     ]
+    },
+    {
+     "file": "src/i18n/locales/de.json",
+     "needles": [
+      "endedReasonAutoPlannedEnd"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "assignments-gap-policy",
+   "param": "assignmentsGapPolicy",
+   "description": "Org flag (BQ-01): how days outside all assignment periods resolve their Soll - 'lenient' (legacy fallback, default) | 'strict' (zero target, unassigned_gap basis). POST validates the enum, GET exposes it to clients (settings parity, contract rule §4). Admin-only surface: the companion has no admin settings screen, so mobile is null.",
+   "errorCodes": [
+    "invalid_assignments_gap_policy"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "assignmentsGapPolicy",
+      "Constants::ASSIGNMENTS_GAP_POLICIES",
+      "assignments_gap_policy_changed",
+      "private function assignmentsGapPolicy(): string"
+     ]
+    },
+    {
+     "file": "lib/Constants.php",
+     "needles": [
+      "CONFIG_ASSIGNMENTS_GAP_POLICY",
+      "CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT",
+      "ASSIGNMENTS_GAP_POLICIES"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/partials/admin-settings/hours.php",
+     "needles": [
+      "name=\"assignmentsGapPolicy\"",
+      "value=\"lenient\"",
+      "value=\"strict\"",
+      "azc-choice-card"
+     ]
+    },
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "'assignmentsGapPolicy' => $this->assignmentsGapPolicy()"
+     ]
+    }
+   ],
+   "mobile": null
+  },
+  {
+   "id": "admin-working-time-assignments",
+   "param": "modelId / startDate / endDate / vacationDaysPerYear / customModel",
+   "description": "Effective-dated assignment CRUD (POST/PATCH/DELETE /api/admin/users/{uid}/working-time-assignments). Server requires startDate and either modelId or a complete customModel block; endDate may be empty (open window). Web collects every field in the assignments manager dialog. Admin-only surface: mobile is null.",
+   "errorCodes": [
+    "ASSIGNMENT_OVERLAP",
+    "ASSIGNMENT_NOT_DELETABLE",
+    "ASSIGNMENT_NOT_FOUND",
+    "ASSIGNMENT_INVALID_MODEL"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "createUserWorkingTimeAssignment",
+      "updateUserWorkingTimeAssignment",
+      "deleteUserWorkingTimeAssignment"
+     ]
+    },
+    {
+     "file": "lib/Service/UserWorkingTimeAssignmentService.php",
+     "needles": [
+      "params['startDate']",
+      "params['endDate']",
+      "params['vacationDaysPerYear']",
+      "params['modelId']"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "admin#createUserWorkingTimeAssignment",
+      "admin#updateUserWorkingTimeAssignment",
+      "admin#deleteUserWorkingTimeAssignment"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/admin-user-detail.js",
+     "needles": [
+      "working-time-assignments",
+      "startDate",
+      "endDate",
+      "vacationDaysPerYear",
+      "modelId"
+     ]
+    }
+   ],
+   "mobile": null
+  },
+  {
+   "id": "absence-duration-minutes",
+   "param": "duration_mode / duration_minutes",
+   "description": "Hour-mode absence request (§9.1): server accepts duration_mode='hours' + duration_minutes (1-1440, same-day, no day-shape fields) only for policy-enabled built-in types, and only when the client sends X-AZC-Absence-Contract: 2. Web renders the minutes field for hourly types; mobile collects minutes gated on workforcePolicy.hourlyAbsenceTypes and auto-attaches the contract header.",
+   "errorCodes": [
+    "ABSENCE_CONTRACT_VERSION",
+    "HOURLY_SINGLE_DATE_REQUIRED",
+    "HOURLY_DURATION_INVALID",
+    "HOURLY_SHAPE_CONFLICT",
+    "NO_PLANNED_TIME",
+    "FEATURE_DISABLED"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AbsenceController.php",
+     "needles": [
+      "'duration_mode' => ['duration_mode', 'durationMode']",
+      "'duration_minutes' => ['duration_minutes', 'durationMinutes']",
+      "Constants::ABSENCE_CONTRACT_HEADER",
+      "ABSENCE_CONTRACT_VERSION"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "assertHourlyModeRules",
+      "HOURLY_SINGLE_DATE_REQUIRED",
+      "HOURLY_DURATION_INVALID",
+      "NO_PLANNED_TIME"
+     ]
+    },
+    {
+     "file": "lib/Constants.php",
+     "needles": [
+      "ABSENCE_CONTRACT_HEADER",
+      "ABSENCE_CONTRACT_VERSION",
+      "ABSENCE_DURATION_MODE_HOURS"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/absences.php",
+     "needles": [
+      "name=\"duration_minutes\"",
+      "data-hourly-types",
+      "hourGroup.dataset.hourlyTypes"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/CreateAbsenceScreen.tsx",
+     "needles": [
+      "absence.durationMinutes",
+      "duration_mode: 'hours'",
+      "duration_minutes",
+      "workforcePolicy?.hourlyAbsenceTypes"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "duration_mode?: 'hours'",
+      "duration_minutes?: number",
+      "X-AZC-Absence-Contract"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "absence-correction-request",
+   "param": "reason / expectedUpdatedAt / operation_key",
+   "description": "Completed-absence correction request + withdraw (§9.4): owner files POST /api/absences/{id}/correction-request (and .../withdraw) with mandatory reason, CAS token and §15.9 operation key. Web uses the shared cancel-request dialog (kind=correction attaches operation_key); mobile sends Crypto.randomUUID() as operationKey.",
+   "errorCodes": [
+    "reason_required",
+    "revision_stale",
+    "not_completed",
+    "cancel_request_pending",
+    "no_cancel_request",
+    "feature_disabled"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AbsenceController.php",
+     "needles": [
+      "correction-request",
+      "requestCorrection",
+      "withdrawCorrectionRequest"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "requestAbsenceCorrection",
+      "withdrawAbsenceCorrectionRequest",
+      "requireOperationKey"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "absence#requestCorrection",
+      "absence#withdrawCorrectionRequest"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/absences.php",
+     "needles": [
+      "data-correction-request",
+      "data-correction-withdraw"
+     ]
+    },
+    {
+     "file": "js/common/absence-cancel-request.js",
+     "needles": [
+      "correction",
+      "operation_key",
+      "operationKey()"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/AbsenceDetailScreen.tsx",
+     "needles": [
+      "absence.correctionRequest.reason",
+      "absence.correctionRequest.submit",
+      "operationKey: Crypto.randomUUID()",
+      "canRequestCorrection"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "requestAbsenceCorrection",
+      "withdrawAbsenceCorrectionRequest",
+      "/correction-request"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "absence-correction-manager",
+   "param": "expectedUpdatedAt / operation_key / reason|comment",
+   "description": "Manager correction surface (§9.4): decide an open correction request (correction-request/approve|decline, optional comment) or direct-correct a completed absence (/correct, mandatory reason). Both carry CAS + §15.9 operation key; self-approval/self-correction rejected server-side (AC-37). Web manager-absences table renders decide buttons on canDecideCorrectionRequest and a correct action on canManagerCorrect; mobile mirrors both on the employee-absence detail card.",
+   "errorCodes": [
+    "reason_required",
+    "revision_stale",
+    "not_completed",
+    "no_cancel_request",
+    "feature_disabled",
+    "self_correction_forbidden"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/ManagerController.php",
+     "needles": [
+      "correctEmployeeAbsence",
+      "approveEmployeeAbsenceCorrectionRequest",
+      "declineEmployeeAbsenceCorrectionRequest"
+     ]
+    },
+    {
+     "file": "lib/Service/AbsenceService.php",
+     "needles": [
+      "managerCorrectCompletedAbsence",
+      "approveAbsenceCorrectionRequest",
+      "declineAbsenceCorrectionRequest",
+      "canDecideCorrectionRequest",
+      "canManagerCorrect"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "manager#correctEmployeeAbsence",
+      "manager#approveEmployeeAbsenceCorrectionRequest",
+      "manager#declineEmployeeAbsenceCorrectionRequest"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/manager-absences.js",
+     "needles": [
+      "data-manager-correct",
+      "correction-request/approve",
+      "canDecideCorrectionRequest",
+      "canManagerCorrect",
+      "operation_key"
+     ]
+    },
+    {
+     "file": "js/manager-dashboard.js",
+     "needles": [
+      "absence_correction_request",
+      "correction-request",
+      "operation_key",
+      "data-request-kind"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/screens/EmployeeAbsenceDetailScreen.tsx",
+     "needles": [
+      "manager.correct.reason",
+      "manager.correctionDecide.approve",
+      "canDecideCorrectionRequest",
+      "canManagerCorrect",
+      "operationKey: Crypto.randomUUID()"
+     ]
+    },
+    {
+     "file": "src/api/client.ts",
+     "needles": [
+      "managerCorrectEmployeeAbsence",
+      "decideAbsenceCorrectionRequest",
+      "/correction-request/${decision}",
+      "/correct`"
+     ]
+    },
+    {
+     "file": "src/api/hooks.ts",
+     "needles": [
+      "absence_correction_request",
+      "decideAbsenceCorrectionRequest"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "admin-year-end-runs",
+   "param": "closingYear / userIds / resetPositive / waiveNegative / reason / expectedPolicyRevision / previewId / operationId",
+   "description": "Guided year-end overtime reset (§9.5/§9.6): preview→execute→resume run workflow under /api/admin/year-end-runs. Execute requires previewId + reason (>=10) + expectedPolicyRevision CAS + idempotent operationId; resetPositive/waiveNegative pick the scope per policy. Admin-only surface — mobile is null.",
+   "errorCodes": [
+    "feature_disabled",
+    "revision_stale",
+    "invalid_closing_year",
+    "no_users_in_scope",
+    "preview_expired",
+    "run_not_resumable"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "yearEndPreview",
+      "yearEndExecute",
+      "yearEndList",
+      "yearEndResume",
+      "closingYear",
+      "expectedPolicyRevision",
+      "previewId"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "admin#yearEndPage",
+      "admin#yearEndPreview",
+      "admin#yearEndExecute",
+      "admin#yearEndList",
+      "admin#yearEndGet",
+      "admin#yearEndResume"
+     ]
+    },
+    {
+     "file": "lib/Service/YearEndResetService.php",
+     "needles": [
+      "createPreview",
+      "execute",
+      "resume",
+      "tick"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "templates/admin-year-end.php",
+     "needles": [
+      "azc-ye-reason"
+     ]
+    },
+    {
+     "file": "js/admin-year-end.js",
+     "needles": [
+      "closingYear",
+      "resetPositive",
+      "waiveNegative",
+      "expectedPolicyRevision",
+      "operationId",
+      "previewId"
+     ]
+    }
+   ],
+   "mobile": null
+  }
+ ]
 }

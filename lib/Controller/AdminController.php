@@ -217,6 +217,8 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null,
 		?\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService $userWorkingTimeAssignmentService = null,
 		?\OCA\ArbeitszeitCheck\Service\CalculationProofExportService $calculationProofExportService = null,
+		?\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService $workforcePolicyService = null,
+		?\OCA\ArbeitszeitCheck\Service\YearEndResetService $yearEndResetService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -267,6 +269,8 @@ class AdminController extends Controller
 		$this->transferReceiptStore = $transferReceiptStore;
 		$this->userWorkingTimeAssignmentService = $userWorkingTimeAssignmentService;
 		$this->calculationProofExportService = $calculationProofExportService;
+		$this->workforcePolicyService = $workforcePolicyService;
+		$this->yearEndResetService = $yearEndResetService;
 		$this->setCspService($cspService);
 	}
 
@@ -280,6 +284,24 @@ class AdminController extends Controller
 			);
 		}
 		return $this->userWorkingTimeAssignmentService;
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService $workforcePolicyService = null;
+	private ?\OCA\ArbeitszeitCheck\Service\YearEndResetService $yearEndResetService = null;
+
+	private function workforcePolicyService(): \OCA\ArbeitszeitCheck\Service\WorkforcePolicyService
+	{
+		if ($this->workforcePolicyService === null) {
+			$this->workforcePolicyService = \OCP\Server::get(
+				\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class
+			);
+		}
+		return $this->workforcePolicyService;
+	}
+
+	private function yearEndResetService(): \OCA\ArbeitszeitCheck\Service\YearEndResetService
+	{
+		return $this->yearEndResetService ??= \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\YearEndResetService::class);
 	}
 
 	private ?\OCA\ArbeitszeitCheck\Service\CalculationProofExportService $calculationProofExportService = null;
@@ -371,6 +393,26 @@ class AdminController extends Controller
 		return in_array($raw, Constants::ASSIGNMENTS_GAP_POLICIES, true)
 			? $raw
 			: Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT;
+	}
+
+	/**
+	 * Admin-facing workforce policy payload: full normalized shape plus the
+	 * monotonic revision the settings CAS requires (§9.1 GET parity).
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function workforcePolicyPayload(): array
+	{
+		$svc = $this->workforcePolicyService();
+		try {
+			return $svc->get()->toArray() + [
+				'revision' => $svc->revision(),
+			];
+		} catch (\Throwable) {
+			// Degraded read (e.g. mid-upgrade before the migration ran): the
+			// settings surface must still render — defaults, revision 0.
+			return \OCA\ArbeitszeitCheck\Support\WorkforcePolicy::defaults('UTC')->toArray() + ['revision' => 0];
+		}
 	}
 
 	private function getPerformedBy(): string
@@ -1913,6 +1955,7 @@ class AdminController extends Controller
 		}
 		$settings = $this->halfDaySettingsPayload() + [
 			'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
+			'workforcePolicy' => $this->workforcePolicyPayload(),
 			'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
@@ -3518,6 +3561,9 @@ class AdminController extends Controller
 				// Spec §418: gap policy is an org flag clients must read (not
 				// write-only) — same contract as the admin-settings page.
 				'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
+				// Optional-workforce policy + revision (CAS token for saves)
+				// — §9.1 GET parity for web and companion clients.
+				'workforcePolicy' => $this->workforcePolicyPayload(),
 			];
 
 			return new JSONResponse([
@@ -4494,6 +4540,27 @@ class AdminController extends Controller
 					$this->toBool($params['leaveSollEffectsEnabled']) ? '1' : '0'
 				);
 			}
+			// Optional workforce policy (SPEC §9.1): any submitted workforce
+			// key routes the whole section through the service — strict
+			// boolean parse, dependency rules and revision CAS live there.
+			$workforceKeys = [
+				'pastCorrectionEnabled', 'employeeCorrectionRequestsEnabled',
+				'scopedManagerCorrectionApprovalEnabled', 'hourlyAbsenceTypes',
+				'hourlyUnpaidLeaveEnabled', 'hourlyOvertimeCompEnabled',
+				'yearEndManualEnabled', 'yearEndAnnualEnabled',
+				'yearEndResetPositive', 'yearEndWaiveNegative',
+				'yearEndTargetGroupIds', 'workforcePolicyRevision',
+			];
+			$hasWorkforceWrite = false;
+			foreach ($workforceKeys as $wk) {
+				if (array_key_exists($wk, $params)) {
+					$hasWorkforceWrite = true;
+					break;
+				}
+			}
+			if ($hasWorkforceWrite) {
+				$this->workforcePolicyService()->save($params, $this->getPerformedBy());
+			}
 			if (array_key_exists('assignmentsGapPolicy', $params)) {
 				$requestedPolicy = is_string($params['assignmentsGapPolicy'])
 					? trim($params['assignmentsGapPolicy'])
@@ -5339,6 +5406,7 @@ class AdminController extends Controller
 				Constants::CONFIG_LEAVE_SOLL_EFFECTS_DEFAULT
 			) === '1',
 			'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
+			'workforcePolicy' => $this->workforcePolicyPayload(),
 			'premiumSurchargesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '0') === '1',
 			'premiumPolicy' => $this->decodePremiumPolicyForAdmin(),
 			'premiumPolicyVersion' => (int)$this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_POLICY_VERSION, '0'),
@@ -9760,5 +9828,173 @@ class AdminController extends Controller
 		$use = $this->toBool($params['useAppTeams']);
 		$this->appConfig->setAppValueString('use_app_teams', $use ? '1' : '0');
 		return new JSONResponse(['success' => true, 'useAppTeams' => $use]);
+	}
+
+	/**
+	 * Guided year-end overtime reset wizard (SPEC §9.5).
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function yearEndPage(): TemplateResponse
+	{
+		$this->registerFrontEndAssets('admin-year-end', 'admin-year-end', ['common/datepicker']);
+		$policy = $this->workforcePolicyService()->get();
+		$users = [];
+		foreach ($this->userManager->search('', 500) as $u) {
+			if ($u->isEnabled()) {
+				$users[] = ['id' => $u->getUID(), 'name' => $u->getDisplayName()];
+			}
+		}
+		$response = new TemplateResponse('arbeitszeitcheck', 'admin-year-end', array_merge(
+			$this->buildAdminShellParams(
+				'admin-year-end',
+				$this->l10n->t('Year-end overtime reset'),
+				$this->l10n->t('Preview, confirm and track the audited reset of overtime balances.'),
+			),
+			[
+				'yearEndEnabled' => $policy->yearEndManualEnabled,
+				'yearEndDefaults' => [
+					'resetPositive' => $policy->yearEndResetPositive,
+					'waiveNegative' => $policy->yearEndWaiveNegative,
+				],
+				'policyRevision' => $this->workforcePolicyService()->revision(),
+				'workforceSettingsUrl' => $this->urlGenerator->linkToRoute(
+					'arbeitszeitcheck.admin.settingsSection',
+					['section' => \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_WORKFORCE],
+				),
+				'apiBase' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.admin.yearEndList'),
+				'users' => $users,
+				'urlGenerator' => $this->urlGenerator,
+				'l' => $this->l10n,
+			],
+		));
+		return $this->configureCSP($response, 'admin');
+	}
+
+	// ------------------------------------------------------ year-end reset ---
+
+	private function yearEndError(\Throwable $e): JSONResponse
+	{
+		$code = $e instanceof \OCA\ArbeitszeitCheck\Exception\BusinessRuleException
+			? $e->getReasonCode() : null;
+		$map = [
+			'FEATURE_DISABLED' => \OCP\AppFramework\Http::STATUS_FORBIDDEN,
+			'REVISION_CONFLICT' => \OCP\AppFramework\Http::STATUS_CONFLICT,
+			'POLICY_CHANGED' => \OCP\AppFramework\Http::STATUS_CONFLICT,
+			'OPERATION_CONFLICT' => \OCP\AppFramework\Http::STATUS_CONFLICT,
+			'PREVIEW_EXPIRED' => \OCP\AppFramework\Http::STATUS_GONE,
+			'NOT_FOUND' => \OCP\AppFramework\Http::STATUS_NOT_FOUND,
+			'REASON_REQUIRED' => \OCP\AppFramework\Http::STATUS_UNPROCESSABLE_ENTITY,
+			'POLICY_INVALID' => \OCP\AppFramework\Http::STATUS_UNPROCESSABLE_ENTITY,
+		];
+		if ($code !== null && isset($map[$code])) {
+			return new JSONResponse([
+				'success' => false, 'code' => $code,
+				'error' => $this->l10n->t($e->getMessage()),
+			], $map[$code]);
+		}
+		\OCP\Log\logger('arbeitszeitcheck')->error('year-end reset failed', ['exception' => $e]);
+		return new JSONResponse([
+			'success' => false, 'error' => $this->l10n->t('Year-end reset operation failed'),
+		], \OCP\AppFramework\Http::STATUS_INTERNAL_SERVER_ERROR);
+	}
+
+	/** POST /api/admin/year-end-runs/preview — bind a 15-minute preview handle. */
+	#[NoAdminRequired]
+	public function yearEndPreview(): JSONResponse
+	{
+		try {
+			$r = $this->request;
+			$userIds = $r->getParam('userIds', []);
+			if (!is_array($userIds)) {
+				$userIds = [];
+			}
+			$result = $this->yearEndResetService()->createPreview(
+				$this->getPerformedBy(),
+				(int)$r->getParam('closingYear', 0),
+				array_map('strval', $userIds),
+				$r->getParam('resetPositive') === true || $r->getParam('resetPositive') === 'true',
+				$r->getParam('waiveNegative') === true || $r->getParam('waiveNegative') === 'true',
+				(string)$r->getParam('reason', ''),
+				(int)$r->getParam('expectedPolicyRevision', -1),
+			);
+			return new JSONResponse(['success' => true] + $result);
+		} catch (\Throwable $e) {
+			return $this->yearEndError($e);
+		}
+	}
+
+	/** POST /api/admin/year-end-runs — consume a preview handle, execute. */
+	#[NoAdminRequired]
+	public function yearEndExecute(): JSONResponse
+	{
+		try {
+			$r = $this->request;
+			$result = $this->yearEndResetService()->execute(
+				$this->getPerformedBy(),
+				(string)$r->getParam('previewId', ''),
+				(string)$r->getParam('operationId', ''),
+				(int)$r->getParam('expectedPolicyRevision', -1),
+			);
+			return new JSONResponse(['success' => true, 'run' => $result]);
+		} catch (\Throwable $e) {
+			return $this->yearEndError($e);
+		}
+	}
+
+	/** GET /api/admin/year-end-runs — paginated run history. */
+	#[NoAdminRequired]
+	public function yearEndList(): JSONResponse
+	{
+		try {
+			if (!$this->workforcePolicyService()->isYearEndManualEnabled()
+				&& !$this->workforcePolicyService()->isYearEndAnnualEnabled()) {
+				return new JSONResponse([
+					'success' => false, 'code' => 'FEATURE_DISABLED',
+					'error' => $this->l10n->t('Year-end reset is disabled'),
+				], \OCP\AppFramework\Http::STATUS_FORBIDDEN);
+			}
+			$r = $this->request;
+			$result = $this->yearEndResetService()->listRuns(
+				(int)$r->getParam('limit', 25),
+				(int)$r->getParam('offset', 0),
+			);
+			return new JSONResponse(['success' => true] + $result);
+		} catch (\Throwable $e) {
+			return $this->yearEndError($e);
+		}
+	}
+
+	/** GET /api/admin/year-end-runs/{id} — run status poll for the admin UI. */
+	#[NoAdminRequired]
+	public function yearEndGet(int $id): JSONResponse
+	{
+		try {
+			return new JSONResponse([
+				'success' => true,
+				'run' => $this->yearEndResetService()->runStatus($id),
+			]);
+		} catch (\Throwable $e) {
+			return $this->yearEndError($e);
+		}
+	}
+
+	/** POST /api/admin/year-end-runs/{id}/resume — fresh preview re-queue. */
+	#[NoAdminRequired]
+	public function yearEndResume(int $id): JSONResponse
+	{
+		try {
+			$r = $this->request;
+			$result = $this->yearEndResetService()->resume(
+				$this->getPerformedBy(),
+				$id,
+				(string)$r->getParam('previewId', ''),
+				(string)$r->getParam('operationId', ''),
+				(int)$r->getParam('expectedPolicyRevision', -1),
+			);
+			return new JSONResponse(['success' => true, 'run' => $result]);
+		} catch (\Throwable $e) {
+			return $this->yearEndError($e);
+		}
 	}
 }

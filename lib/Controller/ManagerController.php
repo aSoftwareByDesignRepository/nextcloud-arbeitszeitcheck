@@ -2641,6 +2641,12 @@ class ManagerController extends Controller
 			'not_started' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_started', 'This absence has not started yet.'],
 			'end_before_start' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'end_before_start', 'The new end date cannot be before the start date.'],
 			'end_not_earlier' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'end_not_earlier', 'The new end date must be before the current end date.'],
+			'not_completed' => [Http::STATUS_UNPROCESSABLE_ENTITY, 'not_completed', 'This absence has not ended yet.'],
+			'feature_disabled' => [Http::STATUS_FORBIDDEN, 'feature_disabled', 'Your organization has not enabled this action.'],
+			'self_approval_forbidden' => [Http::STATUS_FORBIDDEN, 'self_approval_forbidden', 'Another authorized person must approve this correction.'],
+			'operation_required' => [Http::STATUS_BAD_REQUEST, 'operation_required', 'This action requires an operation identity.'],
+			'operation_conflict' => [Http::STATUS_CONFLICT, 'operation_conflict', 'This operation identity was already used for a different request.'],
+			'retry_required' => [Http::STATUS_CONFLICT, 'retry_required', 'The request outcome could not be confirmed. Please retry.'],
 			'reason_required' => [Http::STATUS_BAD_REQUEST, 'reason_required', 'Please provide a reason (max. 500 characters).'],
 			'reason_too_long' => [Http::STATUS_BAD_REQUEST, 'reason_too_long', 'The comment is too long (max. 500 characters).'],
 		];
@@ -2816,6 +2822,140 @@ class ManagerController extends Controller
 		} catch (\Throwable $e) {
 			return $this->managerAbsenceMutationError($e, 'declineEmployeeAbsenceCancelRequest');
 		}
+	}
+
+	/**
+	 * POST /api/manager/employee-absences/{id}/correct (optional workforce):
+	 * HR/scoped-manager direct correction on a COMPLETED approved absence.
+	 * Self-targets are always refused — even for admins (AC-37).
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function correctEmployeeAbsence(int $absenceId): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'correct_employee_absence');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			[$absence, $guardError] = $this->managerAbsenceWriteGuards($absenceId, $actorUserId, 'correct_employee_absence');
+			if ($guardError !== null) {
+				return $guardError;
+			}
+			$payload = $this->request->getParams();
+			$data = [
+				'expectedUpdatedAt' => $this->requestParamString($payload, 'expectedUpdatedAt'),
+				'reason' => $this->requestParamString($payload, 'reason'),
+				'operation_key' => $this->requestParamString($payload, 'operation_key') !== ''
+					? $this->requestParamString($payload, 'operation_key')
+					: $this->requestParamString($payload, 'operationKey'),
+			];
+			if ($data['expectedUpdatedAt'] === '' || $data['reason'] === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('A reason and the current absence version are required.'),
+					'error_code' => 'reason_required',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$result = $this->absenceService->managerCorrectCompletedAbsence($absenceId, $data, $actorUserId);
+			return new JSONResponse($this->correctionResultPayload($result));
+		} catch (\Throwable $e) {
+			return $this->managerAbsenceMutationError($e, 'correctEmployeeAbsence');
+		}
+	}
+
+	/**
+	 * POST /api/manager/employee-absences/{id}/correction-request/approve:
+	 * approve an open owner correction request on a completed absence.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function approveEmployeeAbsenceCorrectionRequest(int $absenceId): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'decide_absence_correction_request');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			[$absence, $guardError] = $this->managerAbsenceWriteGuards($absenceId, $actorUserId, 'decide_absence_correction_request');
+			if ($guardError !== null) {
+				return $guardError;
+			}
+			$payload = $this->request->getParams();
+			$data = [
+				'expectedUpdatedAt' => $this->requestParamString($payload, 'expectedUpdatedAt'),
+				'operation_key' => $this->requestParamString($payload, 'operation_key') !== ''
+					? $this->requestParamString($payload, 'operation_key')
+					: $this->requestParamString($payload, 'operationKey'),
+			];
+			if ($data['expectedUpdatedAt'] === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The current absence version is required.'),
+					'error_code' => 'revision_stale',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$result = $this->absenceService->approveAbsenceCorrectionRequest($absenceId, $data, $actorUserId);
+			return new JSONResponse($this->correctionResultPayload($result));
+		} catch (\Throwable $e) {
+			return $this->managerAbsenceMutationError($e, 'approveEmployeeAbsenceCorrectionRequest');
+		}
+	}
+
+	/**
+	 * POST /api/manager/employee-absences/{id}/correction-request/decline:
+	 * decline an open owner correction request on a completed absence.
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function declineEmployeeAbsenceCorrectionRequest(int $absenceId): JSONResponse
+	{
+		try {
+			$actorUserId = $this->getUserId();
+			$accessResponse = $this->ensureManagerReadAccess($actorUserId, 'decide_absence_correction_request');
+			if ($accessResponse !== null) {
+				return $accessResponse;
+			}
+			[$absence, $guardError] = $this->managerAbsenceWriteGuards($absenceId, $actorUserId, 'decide_absence_correction_request');
+			if ($guardError !== null) {
+				return $guardError;
+			}
+			$payload = $this->request->getParams();
+			$data = [
+				'expectedUpdatedAt' => $this->requestParamString($payload, 'expectedUpdatedAt'),
+				'comment' => $this->requestParamString($payload, 'comment'),
+				'operation_key' => $this->requestParamString($payload, 'operation_key') !== ''
+					? $this->requestParamString($payload, 'operation_key')
+					: $this->requestParamString($payload, 'operationKey'),
+			];
+			if ($data['expectedUpdatedAt'] === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The current absence version is required.'),
+					'error_code' => 'revision_stale',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$result = $this->absenceService->declineAbsenceCorrectionRequest($absenceId, $data, $actorUserId);
+			return new JSONResponse($this->correctionResultPayload($result));
+		} catch (\Throwable $e) {
+			return $this->managerAbsenceMutationError($e, 'declineEmployeeAbsenceCorrectionRequest');
+		}
+	}
+
+	/**
+	 * Uniform correction result envelope — fresh writes carry the entity,
+	 * receipt replays carry the stored canonical result (§15.9).
+	 *
+	 * @param \OCA\ArbeitszeitCheck\Db\Absence|array $result
+	 */
+	private function correctionResultPayload($result): array
+	{
+		if ($result instanceof \OCA\ArbeitszeitCheck\Db\Absence) {
+			return ['success' => true, 'absence' => $result->getSummary()];
+		}
+		return ['success' => true] + $result;
 	}
 
 	/**
@@ -3106,24 +3246,34 @@ class ManagerController extends Controller
 				}
 			}
 
-			// FA-2c: open owner cancel-requests are manager decision tasks
-			// and surface in the same queue as pending approvals.
-			if ($type === null || $type === 'absence_cancel_request') {
+			// FA-2c/§9.4: open owner cancel-requests (running) and
+			// correction requests (completed) share the request columns —
+			// split by completion so managers land on the right decide
+			// endpoint (the cancel decide path rejects completed absences).
+			if ($type === null || $type === 'absence_cancel_request' || $type === 'absence_correction_request') {
+				$todayYmd = $this->timeZoneService->nowInStorage()->format('Y-m-d');
 				foreach ($this->absenceMapper->findCancelRequestedForUsers($teamUserIds) as $absence) {
 					try {
+						$endYmd = $absence->getEndDate()?->format('Y-m-d');
+						$requestType = ($endYmd !== null && $endYmd < $todayYmd)
+							? 'absence_correction_request'
+							: 'absence_cancel_request';
+						if ($type !== null && $type !== $requestType) {
+							continue;
+						}
 						$summary = $absence->getSummary();
 						$summary['typeLabel'] = $this->getAbsenceTypeLabel($absence->getType());
 						$requestedAt = $absence->getCancelRequestedAt();
 						$pendingApprovals[] = [
 							'id' => $absence->getId(),
-							'type' => 'absence_cancel_request',
+							'type' => $requestType,
 							'userId' => $absence->getUserId(),
 							'displayName' => $this->getDisplayName($absence->getUserId()),
 							'summary' => $summary,
 							'requestedAt' => $requestedAt ? $requestedAt->format('c') : null,
 						];
 					} catch (\Throwable $e) {
-						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing cancel-request ' . $absence->getId() . ': ' . $e->getMessage(), ["exception" => $e]);
+						\OCP\Log\logger('arbeitszeitcheck')->error('Error processing cancel-request ' . $absence->getId() . ' in pending approvals: ' . $e->getMessage(), ["exception" => $e]);
 						continue;
 					}
 				}

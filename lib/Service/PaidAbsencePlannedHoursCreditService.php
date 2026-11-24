@@ -644,6 +644,21 @@ class PaidAbsencePlannedHoursCreditService
 			return [];
 		}
 
+		// Hour-mode rows (optional workforce spec §9.2): integer minutes are
+		// the persisted truth — the absent target is min(M, planned) on the
+		// single day, never a days/weight ratio derivation (NN-04).
+		if ($absence->getDurationMode() === \OCA\ArbeitszeitCheck\Constants::ABSENCE_DURATION_MODE_HOURS) {
+			$minutes = $absence->getDurationMinutes();
+			if ($minutes === null || $minutes <= 0) {
+				return [];
+			}
+			$targets = [];
+			foreach ($plannedByDay as $key => $planned) {
+				$targets[$key] = [min($minutes / 60.0, $planned), $planned];
+			}
+			return $targets;
+		}
+
 		$duration = $absence->getDurationHours();
 		$plannedTotal = array_sum($plannedByDay);
 		if ($duration !== null && is_finite((float)$duration) && (float)$duration > 0.0001) {

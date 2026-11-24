@@ -275,4 +275,19 @@ describe('manager-dashboard wires summary-aware card renderer', () => {
 		expect(card).toContain('isManualCreateApproval')
 		expect(card).toContain('New manual time entry')
 	})
+
+	it('renders and decides absence_correction_request items (not silently dropped)', () => {
+		// The pending queue must not filter correction requests out of render.
+		expect(dash).toContain("item.type === 'absence_correction_request'")
+		// Correction decisions POST to the correction-request endpoint, not cancel-request.
+		expect(dash).toContain("requestPath = isCorrection ? 'correction-request' : 'cancel-request'")
+		// §15.9: correction decisions carry an idempotent operation key.
+		expect(dash).toContain('payload.operation_key = operationKey()')
+		expect(dash).toMatch(/function operationKey\(\)/)
+		// Buttons are tagged so decideCancelRequest can route by kind.
+		expect(dash).toContain("data-request-kind=\"' + requestKind + '\"")
+		expect(dash).toContain("t('Correction requested', 'Correction requested')")
+		expect(dash).toContain("t('Approve correction', 'Approve correction')")
+		expect(dash).toContain("t('Decline correction', 'Decline correction')")
+	})
 })

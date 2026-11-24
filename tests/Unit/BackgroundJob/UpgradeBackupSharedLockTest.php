@@ -30,6 +30,7 @@ use OCA\ArbeitszeitCheck\BackgroundJob\StampIdempotencyCleanupJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\TransferApplyJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\VacationRolloverJob;
 use OCA\ArbeitszeitCheck\BackgroundJob\WorkLogPullJob;
+use OCA\ArbeitszeitCheck\BackgroundJob\YearEndAnnualJob;
 use OCA\ArbeitszeitCheck\Db\KioskStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Db\MobileStampIdempotencyMapper;
 use OCA\ArbeitszeitCheck\Service\MonthClosureService;
@@ -60,6 +61,7 @@ class UpgradeBackupSharedLockTest extends TestCase
 		TransferApplyJob::class,
 		VacationRolloverJob::class,
 		WorkLogPullJob::class,
+		YearEndAnnualJob::class,
 	];
 
 	/**

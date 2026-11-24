@@ -76,6 +76,12 @@ class AuditLog extends Entity
 	/** @var string|null Indexed Offline-Sync (and future) capture channel */
 	protected $captureSource;
 
+	/** @var string|null Idempotency key for receipt-backed commands (at_audit_op_uq). */
+	protected $operationKey;
+
+	/** @var string|null SHA-256 hex digest of the canonical request body. */
+	protected $requestDigest;
+
 	/**
 	 * AuditLog constructor
 	 */
@@ -92,6 +98,8 @@ class AuditLog extends Entity
 		$this->addType('performedBy', 'string');
 		$this->addType('createdAt', 'datetime');
 		$this->addType('captureSource', 'string');
+		$this->addType('operationKey', 'string');
+		$this->addType('requestDigest', 'string');
 	}
 
 	/**

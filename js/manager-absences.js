@@ -14,6 +14,18 @@
 		dateLocale: window.ArbeitszeitCheck?.dateLocale || document.documentElement.lang || undefined,
 	};
 
+	// §15.9: idempotent-operation identity for correction commands —
+	// crypto.getRandomValues also works on plain-http instances
+	// (crypto.randomUUID needs a secure context).
+	function operationKey() {
+		const b = new Uint8Array(16);
+		(window.crypto || window.msCrypto).getRandomValues(b);
+		b[6] = (b[6] & 0x0f) | 0x40;
+		b[8] = (b[8] & 0x3f) | 0x80;
+		const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+		return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+	}
+
 	function t(key, fallback, vars) {
 		const bundle = window.ArbeitszeitCheck?.l10n || {};
 		const value = bundle[key];
@@ -301,7 +313,27 @@
 						aria-label="${escapeHtml(shortenLabel)}"
 						title="${escapeHtml(shortenLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('clock') : '⏱'}</button>`);
 			}
-			if (cancelRequested) {
+			if (cancelRequested && entry.canDecideCorrectionRequest === true) {
+				// §9.4: open request on a COMPLETED absence — correction decide
+				// endpoints (cancel-request decide would reject already_ended).
+				const approveLabel = t('Approve correction', 'Approve correction');
+				const declineLabel = t('Decline correction', 'Decline correction');
+				const requestReason = entry.cancelRequestReason || '';
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-cancel-decide="approve"
+						data-decide-url="${escapeHtml(`${base}/correction-request/approve`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-cancel-reason="${escapeHtml(requestReason)}"
+						data-correction="1"
+						aria-label="${escapeHtml(approveLabel)}"
+						title="${escapeHtml(approveLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('check') : '✓'}</button>`);
+				parts.push(`<button type="button" class="azc-btn azc-btn--secondary azc-icon-btn" data-cancel-decide="decline"
+						data-decide-url="${escapeHtml(`${base}/correction-request/decline`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						data-cancel-reason="${escapeHtml(requestReason)}"
+						data-correction="1"
+						aria-label="${escapeHtml(declineLabel)}"
+						title="${escapeHtml(declineLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('x') : '✕'}</button>`);
+			} else if (cancelRequested) {
 				const approveLabel = t('Approve cancellation', 'Approve cancellation');
 				const declineLabel = t('Decline cancellation', 'Decline cancellation');
 				const requestReason = entry.cancelRequestReason || '';
@@ -318,6 +350,14 @@
 						aria-label="${escapeHtml(declineLabel)}"
 						title="${escapeHtml(declineLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('x') : '✕'}</button>`);
 			}
+			if (entry.canManagerCorrect === true) {
+				const correctLabel = t('Correct recorded absence', 'Correct recorded absence');
+				parts.push(`<button type="button" class="azc-btn azc-btn--danger azc-icon-btn" data-manager-correct
+						data-correct-url="${escapeHtml(`${base}/correct`)}"
+						data-updated-at="${escapeHtml(entry.updatedAt || '')}"
+						aria-label="${escapeHtml(correctLabel)}"
+						title="${escapeHtml(correctLabel)}">${(window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('edit') : ''}</button>`);
+			}
 			const actionCell = parts.length ? parts.join('') : '<span class="text-muted">–</span>';
 			return [
 			'<tr>',
@@ -327,7 +367,7 @@
 			td(t('End date', 'End date'), escapeHtml(formatDate(entry.endDate))),
 			td(t('Duration', 'Duration'), durationCellHtml(entry)),
 			td(t('Status', 'Status'), statusCell),
-			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')) + (cancelRequested ? ` <span class="azc-status-chip" data-status="cancel_requested">${escapeHtml(t('Cancellation requested', 'Cancellation requested'))}</span>` : ''), 'reason-cell'),
+			td(t('Reason', 'Reason'), escapeHtml(entry.reason || t('No reason', 'No reason')) + (cancelRequested ? ` <span class="azc-status-chip" data-status="cancel_requested">${escapeHtml(entry.canDecideCorrectionRequest === true ? t('Correction requested', 'Correction requested') : t('Cancellation requested', 'Cancellation requested'))}</span>` : ''), 'reason-cell'),
 			td(t('Actions', 'Actions'), `<div class="azc-table-actions" role="group" aria-label="${escapeHtml(t('Actions', 'Actions'))}">${actionCell}</div>`, 'actions-cell'),
 			'</tr>',
 			].join('');
@@ -1786,7 +1826,7 @@
 				const api = window.AzcApi;
 				const res = await api.fetch(opts.url, {
 					method: 'POST',
-					json: Object.assign({ expectedUpdatedAt: opts.updatedAt }, opts.body ? opts.body(reason) : {}),
+					json: Object.assign({ expectedUpdatedAt: opts.updatedAt }, opts.body ? opts.body(reason) : {}, opts.opKey ? { operation_key: operationKey() } : {}),
 				});
 				if (!res.ok || !(res.data && res.data.success !== false)) {
 					throw Object.assign(new Error((res.data && res.data.error) || res.error || t('The request could not be completed.', 'The request could not be completed.')), { code: res.data && res.data.error_code });
@@ -1840,18 +1880,43 @@
 			if (decideBtn) {
 				ev.preventDefault();
 				const approve = decideBtn.dataset.cancelDecide === 'approve';
+				const isCorrection = decideBtn.dataset.correction === '1';
 				openManagerDecisionDialog({
-					title: approve ? t('Approve cancellation', 'Approve cancellation') : t('Decline cancellation', 'Decline cancellation'),
-					hint: approve
-						? t('The whole period is cancelled; days already past count as worked.', 'The whole period is cancelled; days already past count as worked.')
-						: t('The absence stays approved. The employee is notified.', 'The absence stays approved. The employee is notified.'),
+					title: approve
+						? (isCorrection ? t('Approve correction', 'Approve correction') : t('Approve cancellation', 'Approve cancellation'))
+						: (isCorrection ? t('Decline correction', 'Decline correction') : t('Decline cancellation', 'Decline cancellation')),
+					hint: isCorrection
+						? (approve
+							? t('The recorded absence is corrected (removed). The employee is notified.', 'The recorded absence is corrected (removed). The employee is notified.')
+							: t('The recorded absence stays as booked. The employee is notified.', 'The recorded absence stays as booked. The employee is notified.'))
+						: (approve
+							? t('The whole period is cancelled; days already past count as worked.', 'The whole period is cancelled; days already past count as worked.')
+							: t('The absence stays approved. The employee is notified.', 'The absence stays approved. The employee is notified.')),
 					requestReason: decideBtn.dataset.cancelReason || '',
 					reasonLabel: approve ? null : t('Comment (optional)', 'Comment (optional)'),
 					reasonRequired: false,
 					submitLabel: approve ? t('Approve', 'Approve') : t('Decline', 'Decline'),
 					url: decideBtn.dataset.decideUrl,
 					updatedAt: decideBtn.dataset.updatedAt || '',
+					opKey: isCorrection,
 					body: (text) => (approve ? {} : { comment: text }),
+				});
+				return;
+			}
+			const correctBtn = ev.target.closest && ev.target.closest('[data-manager-correct]');
+			if (correctBtn) {
+				ev.preventDefault();
+				openManagerDecisionDialog({
+					title: t('Correct recorded absence', 'Correct recorded absence'),
+					hint: t('Removes this completed absence record — e.g. when it was booked under the wrong type. The change is audited.', 'Removes this completed absence record — e.g. when it was booked under the wrong type. The change is audited.'),
+					reasonLabel: t('Reason', 'Reason'),
+					reasonRequired: true,
+					submitLabel: t('Correct absence', 'Correct absence'),
+					dangerSubmit: true,
+					url: correctBtn.dataset.correctUrl,
+					updatedAt: correctBtn.dataset.updatedAt || '',
+					opKey: true,
+					body: (reason) => ({ reason }),
 				});
 			}
 		});

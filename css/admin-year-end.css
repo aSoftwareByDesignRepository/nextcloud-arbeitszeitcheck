@@ -1,0 +1,61 @@
+/* Year-end reset wizard — DS tokens only (spec §9.5 surface). */
+.azc-year-end {
+	display: flex;
+	flex-direction: column;
+	gap: var(--azc-space-6, 24px);
+}
+
+.azc-ye-users {
+	min-height: 12rem;
+	width: 100%;
+	max-width: 42rem;
+}
+
+.azc-year-end .azc-status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--azc-space-2, 8px);
+	padding: var(--azc-space-1, 4px) var(--azc-space-3, 12px);
+	border-radius: var(--azc-radius-pill, 999px);
+	font-size: var(--azc-fs-sm, 0.875rem);
+	background: var(--color-background-dark);
+}
+
+.azc-year-end .azc-status-chip::before {
+	content: "";
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 50%;
+	background: var(--color-text-lighter);
+}
+
+.azc-year-end .azc-status-chip[data-status="done"],
+.azc-year-end .azc-status-chip[data-status="completed"],
+.azc-year-end .azc-status-chip[data-status="success"] {
+	background: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
+}
+.azc-year-end .azc-status-chip[data-status="done"]::before,
+.azc-year-end .azc-status-chip[data-status="completed"]::before,
+.azc-year-end .azc-status-chip[data-status="success"]::before {
+	background: var(--color-success);
+}
+
+.azc-year-end .azc-status-chip[data-status="failed"],
+.azc-year-end .azc-status-chip[data-status="blocked"] {
+	background: var(--color-element-error, color-mix(in srgb, var(--color-error) 15%, var(--color-main-background)));
+}
+.azc-year-end .azc-status-chip[data-status="failed"]::before,
+.azc-year-end .azc-status-chip[data-status="blocked"]::before {
+	background: var(--color-error);
+}
+
+.azc-year-end .azc-status-chip[data-status="executing"],
+.azc-year-end .azc-status-chip[data-status="in_progress"],
+.azc-year-end .azc-status-chip[data-status="pending"] {
+	background: color-mix(in srgb, var(--color-primary) 12%, var(--color-main-background));
+}
+.azc-year-end .azc-status-chip[data-status="executing"]::before,
+.azc-year-end .azc-status-chip[data-status="in_progress"]::before,
+.azc-year-end .azc-status-chip[data-status="pending"]::before {
+	background: var(--color-primary);
+}

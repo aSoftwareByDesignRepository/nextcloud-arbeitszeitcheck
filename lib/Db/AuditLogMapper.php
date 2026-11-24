@@ -41,6 +41,8 @@ class AuditLogMapper extends QBMapper
 	 * @param array|null $oldValues
 	 * @param array|null $newValues
 	 * @param string|null $performedBy
+	 * @param string|null $operationKey idempotency receipt key (unique)
+	 * @param string|null $requestDigest SHA-256 hex of canonical request body
 	 * @return AuditLog
 	 */
 	public function logAction(
@@ -50,7 +52,9 @@ class AuditLogMapper extends QBMapper
 		?int $entityId = null,
 		?array $oldValues = null,
 		?array $newValues = null,
-		?string $performedBy = null
+		?string $performedBy = null,
+		?string $operationKey = null,
+		?string $requestDigest = null
 	): AuditLog {
 		$log = new AuditLog();
 		$log->setUserId($userId);
@@ -59,6 +63,8 @@ class AuditLogMapper extends QBMapper
 		$log->setEntityId($entityId);
 		$log->setOldValues($oldValues ? json_encode($oldValues) : null);
 		$log->setNewValues($newValues ? json_encode($newValues) : null);
+		$log->setOperationKey($operationKey);
+		$log->setRequestDigest($requestDigest);
 		$log->setCaptureSource($this->extractCaptureSource($newValues));
 		$log->setPerformedBy($performedBy);
 		$log->setCreatedAt(new \DateTime());
@@ -91,6 +97,20 @@ class AuditLogMapper extends QBMapper
 		}
 
 		return null;
+	}
+
+	/**
+	 * Receipt lookup: find the audit row written for an idempotent command.
+	 *
+	 * @throws \OCP\AppFramework\Db\DoesNotExistException
+	 */
+	public function findByOperationKey(string $operationKey): AuditLog
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('operation_key', $qb->createNamedParameter($operationKey)));
+		return $this->findEntity($qb);
 	}
 
 	/**

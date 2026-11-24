@@ -127,6 +127,9 @@ class SettingsController extends Controller
 				// Spec §418 (BQ-01): org gap policy must be readable by
 				// every client — companions render gap days the same way.
 				'assignments_gap_policy' => $this->assignmentsGapPolicy(),
+				// Optional-workforce parity (§9.1): hour-request and
+				// correction affordances gate on these effective flags.
+				'workforce_policy' => $this->workforcePolicyForClient(),
 			]);
 		} catch (\Throwable $e) {
 			if ($this->isMissingTableException($e)) {
@@ -138,6 +141,32 @@ class SettingsController extends Controller
 				'success' => false,
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Employee-facing optional-workforce flags — the same effective values
+	 * the write paths enforce (§9.1 GET parity). Fail closed to all-off.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function workforcePolicyForClient(): array
+	{
+		$off = [
+			'employeeCorrectionRequests' => false,
+			'hourlyAbsenceTypes' => [],
+			'absenceContractVersion' => 1,
+		];
+		try {
+			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class);
+			$policy = $svc->get();
+			return [
+				'employeeCorrectionRequests' => $policy->pastCorrectionEnabled && $policy->employeeCorrectionRequests,
+				'hourlyAbsenceTypes' => $policy->hourlyAbsenceTypes,
+				'absenceContractVersion' => Constants::ABSENCE_CONTRACT_VERSION,
+			];
+		} catch (\Throwable) {
+			return $off;
 		}
 	}
 

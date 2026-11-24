@@ -45,6 +45,7 @@ $pageIcons = [
 	'admin-dashboard' => 'layout-grid',
 	'admin-notifications' => 'bell',
 	'admin-overtime-payouts' => 'coins',
+	'admin-year-end' => 'clock',
 	'admin-overtime-payout-audit' => 'clipboard-list',
 	'admin-users' => 'users',
 	'admin-user-detail' => 'user-check',

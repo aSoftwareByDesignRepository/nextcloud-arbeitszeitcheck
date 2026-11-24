@@ -10,6 +10,7 @@ use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
 use OCA\ArbeitszeitCheck\Service\DbLockKeys;
 use OCA\ArbeitszeitCheck\Service\OvertimeAdjustmentService;
 use OCA\ArbeitszeitCheck\Service\OvertimeBankService;
+use OCP\IDBConnection;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
@@ -17,6 +18,16 @@ use PHPUnit\Framework\TestCase;
 
 class OvertimeAdjustmentServiceTest extends TestCase
 {
+	/**
+	 * Plain IDBConnection double — TTransactional::atomic() drives
+	 * beginTransaction/commit/rollBack on it; savepoint semantics under an
+	 * outer transaction are verified on the real DB in the integration suite.
+	 */
+	private function dbMock(): IDBConnection
+	{
+		return $this->createMock(IDBConnection::class);
+	}
+
 	public function testCreateAdjustmentCreditsAndDebitsSaldoWithoutTouchingTimeEntries(): void
 	{
 		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
@@ -39,6 +50,7 @@ class OvertimeAdjustmentServiceTest extends TestCase
 
 		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users,
 			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$this->dbMock(),
 		);
 		$result = $svc->createAdjustment(
 			'alice',
@@ -71,6 +83,7 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$this->createMock(AuditLogMapper::class),
 			$users,
 			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$this->dbMock(),
 		);
 		$result = $svc->resetBalanceToZero('alice', 'admin1');
 		$this->assertSame('skipped_zero', $result['action']);
@@ -100,6 +113,7 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$this->createMock(AuditLogMapper::class),
 			$users,
 			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$this->dbMock(),
 		);
 		$result = $svc->resetBalanceToZero('alice', 'admin1');
 		$this->assertSame('reset', $result['action']);
@@ -116,6 +130,7 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			$this->createMock(AuditLogMapper::class),
 			$users,
 			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$this->dbMock(),
 		);
 		$this->expectException(\InvalidArgumentException::class);
 		$svc->createAdjustment('alice', 0.0, OvertimeAdjustment::REASON_CUSTOM, null, 'admin');
@@ -145,6 +160,7 @@ class OvertimeAdjustmentServiceTest extends TestCase
 
 		$svc = new OvertimeAdjustmentService($mapper, $bank, $audit, $users,
 			$this->createMock(\OCP\Lock\ILockingProvider::class),
+			$this->dbMock(),
 		);
 		$r = $svc->listForUser('alice', 2026);
 
@@ -210,7 +226,8 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$users->method('get')->willReturn($this->createMock(IUser::class));
 
 		$svc = new OvertimeAdjustmentService(
-			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp
+			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp,
+			$this->dbMock()
 		);
 		$svc->createAdjustment('alice', 5.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin');
 
@@ -238,7 +255,8 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$users->method('get')->willReturn($this->createMock(IUser::class));
 
 		$svc = new OvertimeAdjustmentService(
-			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp
+			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp,
+			$this->dbMock()
 		);
 		try {
 			$svc->createAdjustment('alice', 5.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin');
@@ -247,6 +265,152 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			// expected
 		}
 		$this->assertContains([DbLockKeys::overtimeBalance('alice'), ILockingProvider::LOCK_EXCLUSIVE], $released);
+	}
+
+	/**
+	 * C-01: the ledger row and its audit record are one unit of work —
+	 * both writes must happen inside the atomic transaction, in order.
+	 */
+	public function testInsertAndAuditRunInsideAtomicScope(): void
+	{
+		$order = [];
+
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$mapper->expects($this->once())
+			->method('insertAdjustment')
+			->willReturnCallback(static function (OvertimeAdjustment $e) use (&$order): OvertimeAdjustment {
+				$order[] = 'insert';
+				$e->setId(5);
+				return $e;
+			});
+
+		$audit = $this->createMock(AuditLogMapper::class);
+		$audit->expects($this->once())
+			->method('logAction')
+			->willReturnCallback(static function () use (&$order): \OCA\ArbeitszeitCheck\Db\AuditLog {
+				$order[] = 'audit';
+				return new \OCA\ArbeitszeitCheck\Db\AuditLog();
+			});
+
+		$db = $this->createMock(IDBConnection::class);
+		$db->expects($this->once())
+			->method('beginTransaction')
+			->willReturnCallback(static function () use (&$order): void {
+				$order[] = 'begin';
+			});
+		$db->expects($this->once())
+			->method('commit')
+			->willReturnCallback(static function () use (&$order): void {
+				$order[] = 'commit';
+			});
+		$db->expects($this->never())->method('rollBack');
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper, $bank, $audit, $users,
+			$this->createMock(ILockingProvider::class),
+			$db,
+		);
+		$svc->createAdjustment('alice', -10.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin1');
+
+		$this->assertSame(
+			['begin', 'insert', 'audit', 'commit'],
+			$order,
+			'insert and audit must run inside the transaction, in that order'
+		);
+	}
+
+	/**
+	 * C-01: an audit failure inside the unit of work propagates so atomic()
+	 * rolls back — the service must never report success for an unaudited
+	 * financial write. The no-row-survives proof lives in the integration
+	 * suite on the real DB.
+	 */
+	public function testAuditFailureInsideAtomicPropagatesAndNoSuccessIsReturned(): void
+	{
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$mapper->method('insertAdjustment')
+			->willReturnCallback(static function (OvertimeAdjustment $e): OvertimeAdjustment {
+				$e->setId(9);
+				return $e;
+			});
+
+		$audit = $this->createMock(AuditLogMapper::class);
+		$audit->method('logAction')->willThrowException(new \RuntimeException('audit insert failed'));
+
+		$db = $this->createMock(IDBConnection::class);
+		$db->expects($this->once())->method('rollBack');
+		$db->expects($this->never())->method('commit');
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper, $bank, $audit, $users,
+			$this->createMock(ILockingProvider::class),
+			$db,
+		);
+
+		$this->expectException(\RuntimeException::class);
+		$svc->createAdjustment('alice', -10.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin1');
+	}
+
+	/**
+	 * C-01/§13.3: the advisory ledger lock is acquired BEFORE the write
+	 * transaction opens — a lock-after-transaction mutant would let a
+	 * second writer interleave inside its own transaction.
+	 */
+	public function testLedgerLockIsAcquiredBeforeAtomicTransaction(): void
+	{
+		$order = [];
+
+		$lp = $this->createMock(ILockingProvider::class);
+		$lp->method('acquireLock')->willReturnCallback(
+			static function () use (&$order): void {
+				$order[] = 'lock';
+			}
+		);
+		$lp->method('releaseLock')->willReturnCallback(
+			static function () use (&$order): void {
+				$order[] = 'unlock';
+			}
+		);
+
+		$db = $this->createMock(IDBConnection::class);
+		$db->method('beginTransaction')->willReturnCallback(
+			static function () use (&$order): void {
+				$order[] = 'begin';
+			}
+		);
+		$db->method('commit')->willReturnCallback(
+			static function () use (&$order): void {
+				$order[] = 'commit';
+			}
+		);
+
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$mapper->method('insertAdjustment')
+			->willReturnCallback(static function (OvertimeAdjustment $e): OvertimeAdjustment {
+				$e->setId(1);
+				return $e;
+			});
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper, $bank, $this->createMock(AuditLogMapper::class), $users, $lp, $db
+		);
+		$svc->createAdjustment('alice', 5.0, OvertimeAdjustment::REASON_MANUAL_PAYOUT, null, 'admin');
+
+		$this->assertSame(['lock', 'begin', 'commit', 'unlock'], $order);
 	}
 
 }

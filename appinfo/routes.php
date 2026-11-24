@@ -133,6 +133,8 @@ return [
 		['name' => 'absence#requestCancel', 'url' => '/api/absences/{id}/cancel-request', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'absence#estimateDays', 'url' => '/api/absences/estimate-days', 'verb' => 'GET'],
 		['name' => 'absence#withdrawCancelRequest', 'url' => '/api/absences/{id}/cancel-request/withdraw', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#requestCorrection', 'url' => '/api/absences/{id}/correction-request', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'absence#withdrawCorrectionRequest', 'url' => '/api/absences/{id}/correction-request/withdraw', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
 		// Manager routes
 		['name' => 'manager#dashboard', 'url' => '/manager', 'verb' => 'GET'],
@@ -158,6 +160,9 @@ return [
 		['name' => 'manager#shortenEmployeeAbsence', 'url' => '/api/manager/employee-absences/{absenceId}/shorten', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#approveEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/approve', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#declineEmployeeAbsenceCancelRequest', 'url' => '/api/manager/employee-absences/{absenceId}/cancel-request/decline', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#correctEmployeeAbsence', 'url' => '/api/manager/employee-absences/{absenceId}/correct', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#approveEmployeeAbsenceCorrectionRequest', 'url' => '/api/manager/employee-absences/{absenceId}/correction-request/approve', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
+		['name' => 'manager#declineEmployeeAbsenceCorrectionRequest', 'url' => '/api/manager/employee-absences/{absenceId}/correction-request/decline', 'verb' => 'POST', 'requirements' => ['absenceId' => '\d+']],
 		['name' => 'manager#getPendingApprovals', 'url' => '/api/manager/pending-approvals', 'verb' => 'GET'],
 		['name' => 'manager#getTeamCompliance', 'url' => '/api/manager/team-compliance', 'verb' => 'GET'],
 		['name' => 'manager#getTeamOvertimeAlerts', 'url' => '/api/manager/team-overtime-alerts', 'verb' => 'GET'],
@@ -415,6 +420,12 @@ return [
 		['name' => 'admin#listUserOvertimeAdjustments', 'url' => '/api/admin/users/{userId}/overtime-adjustments', 'verb' => 'GET'],
 		['name' => 'admin#createUserOvertimeAdjustment', 'url' => '/api/admin/users/{userId}/overtime-adjustments', 'verb' => 'POST'],
 		['name' => 'admin#resetUserOvertimeBalance', 'url' => '/api/admin/users/{userId}/overtime-adjustments/reset', 'verb' => 'POST'],
+		['name' => 'admin#yearEndPage', 'url' => '/admin/year-end', 'verb' => 'GET'],
+		['name' => 'admin#yearEndPreview', 'url' => '/api/admin/year-end-runs/preview', 'verb' => 'POST'],
+		['name' => 'admin#yearEndExecute', 'url' => '/api/admin/year-end-runs', 'verb' => 'POST'],
+		['name' => 'admin#yearEndList', 'url' => '/api/admin/year-end-runs', 'verb' => 'GET'],
+		['name' => 'admin#yearEndGet', 'url' => '/api/admin/year-end-runs/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+		['name' => 'admin#yearEndResume', 'url' => '/api/admin/year-end-runs/{id}/resume', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'admin#updateUserTimeCaptureSettings', 'url' => '/api/admin/users/{userId}/time-capture-settings', 'verb' => 'PUT'],
 		['name' => 'admin#simulateVacationPolicy', 'url' => '/api/admin/vacation-policy/simulate', 'verb' => 'POST'],
 

@@ -1373,4 +1373,43 @@ class TimeEntryMapper extends QBMapper
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
 		return $qb->executeStatement();
 	}
+
+
+	/**
+	 * Financial revision bump (§9.6): a persisted time entry is a balance
+	 * input write. Runs inside the caller's transaction so the write and
+	 * its token advance commit together — or not at all.
+	 */
+	private function bumpRevision(TimeEntry $entry): void
+	{
+		$start = $entry->getStartTime();
+		if ($start === null) {
+			return;
+		}
+		$this->revisionService()->bumpForWriteRange(
+			$entry->getUserId(),
+			(int)$start->format('Y'),
+			(int)(new \DateTime('now'))->format('Y'),
+		);
+	}
+
+	/** @param TimeEntry $entity */
+	public function insert(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::insert($entity);
+		$this->bumpRevision($entity);
+		return $saved;
+	}
+
+	/** @param TimeEntry $entity */
+	public function update(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::update($entity);
+		$this->bumpRevision($entity);
+		return $saved;
+	}
+	private function revisionService(): \OCA\ArbeitszeitCheck\Service\FinancialRevisionService
+	{
+		return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class);
+	}
 }

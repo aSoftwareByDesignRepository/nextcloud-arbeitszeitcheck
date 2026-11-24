@@ -48,6 +48,9 @@ class AbsenceService
 	private TeamResolverService $teamResolver;
 	private UserWorkingTimeModelMapper $userWorkingTimeModelMapper;
 	private ?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null;
+	private ?\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService $workforcePolicyService = null;
+	private ?\OCA\ArbeitszeitCheck\Service\PermissionService $correctionPermissionService = null;
+	private ?\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService $paidAbsencePlannedHoursService = null;
 	private IConfig $config;
 	private IDBConnection $db;
 	private ILockingProvider $lockingProvider;
@@ -102,6 +105,7 @@ class AbsenceService
 		?PostCommitEffectQueue $postCommitEffectQueue = null,
 		?\OCP\ICacheFactory $cacheFactory = null,
 		?\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter $scheduledWorkdayCounter = null,
+		?\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService $workforcePolicyService = null,
 	) {
 		$this->absenceMapper = $absenceMapper;
 		$this->auditLogMapper = $auditLogMapper;
@@ -133,6 +137,9 @@ class AbsenceService
 		$this->postCommitEffectQueue = $postCommitEffectQueue;
 		$this->cacheFactory = $cacheFactory;
 		$this->scheduledWorkdayCounter = $scheduledWorkdayCounter ?? $this->scheduledWorkdayCounter;
+		// Policy gate for hour-mode + completed-absence corrections; optional
+		// for legacy test constructors, resolved lazily in production.
+		$this->workforcePolicyService = $workforcePolicyService;
 	}
 
 	/**
@@ -193,7 +200,10 @@ class AbsenceService
 			$data['canConvertToSick'],
 			$data['canManagerCancel'],
 			$data['canRequestCancel'],
+			$data['canRequestCorrection'],
 			$data['canDecideCancelRequest'],
+			$data['canDecideCorrectionRequest'],
+			$data['canManagerCorrect'],
 			$data['carryover_amount'],
 			$data['annual_amount'],
 			$data['uv_dates']
@@ -254,7 +264,16 @@ class AbsenceService
 			$absence->setUpdatedAt(new \DateTime());
 
 			// Calculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
-			if ($data['type'] === Absence::TYPE_VACATION) {
+			if ($this->isHourModeRequest($data)) {
+				// Hour mode: integer minutes are the persisted truth; `days`
+				// stores the covered share × schedule weight so coverage and
+				// downstream readers work without special-casing (NN-04).
+				$hourMinutes = (int)(is_string($data['duration_minutes'] ?? null) ? trim((string)$data['duration_minutes']) : ($data['duration_minutes'] ?? 0));
+				$absence->setDurationMode(Constants::ABSENCE_DURATION_MODE_HOURS);
+				$absence->setDurationMinutes($hourMinutes);
+				$absence->setDays($this->hourModeDaysDebit($userId, $absence->getStartDate(), $hourMinutes));
+				$workingDays = (float)$absence->getDays();
+			} elseif ($data['type'] === Absence::TYPE_VACATION) {
 				$workingDays = $this->resolveVacationDaysDebit(
 					$userId,
 					$absence->getStartDate(),
@@ -275,7 +294,9 @@ class AbsenceService
 			}
 			// Persist explicit fraction/slot columns (slots-boundaries spec):
 			// the stored shape, not days/weight derivation, is the truth.
-			if (!$this->isEntitlementDaysBoundType($data['type'])) {
+			// Hour-mode rows deliberately keep NULL shape columns — their
+			// coverage derives from days/weight like legacy fractional rows.
+			if (!$this->isEntitlementDaysBoundType($data['type']) && !$this->isHourModeRequest($data)) {
 				$this->applyDayShapeColumns(
 					$absence,
 					$this->canonicalDayShape($data, $absence->getStartDate(), $absence->getEndDate())
@@ -312,7 +333,7 @@ class AbsenceService
 				$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), null);
 				$this->assertNoCoverageConflict(
 					$userId, $absence->getStartDate(), $absence->getEndDate(),
-					$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+					$this->entityDayShapeForCoverage($userId, $absence), $overlappingInTx, (string)$absence->getType()
 				);
 
 				$savedAbsence = $this->absenceMapper->insert($absence);
@@ -498,7 +519,7 @@ class AbsenceService
 				$overlappingInTx = $this->absenceMapper->findOverlapping($targetUserId, $absence->getStartDate(), $absence->getEndDate(), null);
 				$this->assertNoCoverageConflict(
 					$targetUserId, $absence->getStartDate(), $absence->getEndDate(),
-					$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+					$this->entityDayShapeForCoverage($targetUserId, $absence), $overlappingInTx, (string)$absence->getType()
 				);
 				if ($absence->getType() === Absence::TYPE_VACATION) {
 					$sd = $absence->getStartDate();
@@ -664,6 +685,23 @@ class AbsenceService
 		} elseif ($absence->getDurationHours() !== null) {
 			$validateData['duration_hours'] = $absence->getDurationHours();
 		}
+
+		// Hour-mode lifecycle (NN-04): explicit duration_mode controls the
+		// switch. An hour-mode row patched without mode fields keeps its
+		// mode — reason-only edits must never morph it into a day row.
+		$hourModeInput = array_key_exists('duration_mode', $data) || array_key_exists('duration_minutes', $data);
+		if ($hourModeInput) {
+			$submittedMode = isset($data['duration_mode']) ? trim((string)$data['duration_mode']) : '';
+			if ($submittedMode === Constants::ABSENCE_DURATION_MODE_HOURS) {
+				$validateData['duration_mode'] = Constants::ABSENCE_DURATION_MODE_HOURS;
+				$validateData['duration_minutes'] = $data['duration_minutes'] ?? $absence->getDurationMinutes();
+			}
+			// '' → explicit switch back to day mode; duration_minutes without
+			// hour mode is rejected downstream as HOURLY_SHAPE_CONFLICT.
+		} elseif ($absence->getDurationMode() === Constants::ABSENCE_DURATION_MODE_HOURS) {
+			$validateData['duration_mode'] = Constants::ABSENCE_DURATION_MODE_HOURS;
+			$validateData['duration_minutes'] = $absence->getDurationMinutes();
+		}
 		// $fractionTrusted marks a server-REderived day_fraction (stored debit
 		// preservation): it bypasses the org opt-in gate — the flag gates new
 		// entry UI, not historical truth — but keeps normalize/range/integrity
@@ -760,7 +798,21 @@ class AbsenceService
 		]);
 
 		// Recalculate working days (Mon–Fri minus Feiertage inkl. Firmenfeiertage)
-		if ($absence->getType() === Absence::TYPE_VACATION) {
+		if ($this->isHourModeRequest($validateData)) {
+			$hm = $validateData['duration_minutes'];
+			$hourMinutes = is_int($hm) ? $hm : (int)trim((string)$hm);
+			$absence->setDurationMode(Constants::ABSENCE_DURATION_MODE_HOURS);
+			$absence->setDurationMinutes($hourMinutes);
+			$absence->setDurationHours(null);
+			$absence->setDays($this->hourModeDaysDebit($userId, $absence->getStartDate(), $hourMinutes));
+			$this->applyDayShapeColumns($absence, AbsenceDayShape::full());
+		} else {
+			$absence->setDurationMode(null);
+			$absence->setDurationMinutes(null);
+		}
+		if ($this->isHourModeRequest($validateData)) {
+			// handled above — days carries covered share × schedule weight
+		} elseif ($absence->getType() === Absence::TYPE_VACATION) {
 			$workingDays = $this->resolveVacationDaysDebit($userId, $absence->getStartDate(), $absence->getEndDate(), $validateData, $fractionTrusted);
 			$absence->setDays($workingDays);
 			$this->applyVacationDurationHours($absence, $validateData, $workingDays);
@@ -779,7 +831,7 @@ class AbsenceService
 		// trusted fractional shape re-seals the columns; a date move without
 		// input clears them (shape belonged to the old calendar); otherwise
 		// stored columns stay untouched.
-		if (!$this->isEntitlementDaysBoundType((string)$absence->getType())) {
+		if (!$this->isEntitlementDaysBoundType((string)$absence->getType()) && !$this->isHourModeRequest($validateData)) {
 			$finalShape = $this->canonicalDayShape($validateData, $absence->getStartDate(), $absence->getEndDate());
 			if ($shapeInput || $finalShape['fractional']) {
 				$this->applyDayShapeColumns($absence, $finalShape);
@@ -827,7 +879,7 @@ class AbsenceService
 			$overlappingInTx = $this->absenceMapper->findOverlapping($userId, $absence->getStartDate(), $absence->getEndDate(), $id);
 			$this->assertNoCoverageConflict(
 				$userId, $absence->getStartDate(), $absence->getEndDate(),
-				$this->entityDayShape($absence), $overlappingInTx, (string)$absence->getType()
+				$this->entityDayShapeForCoverage($userId, $absence), $overlappingInTx, (string)$absence->getType()
 			);
 
 			$this->specialEntitlementService?->syncForUpdatedAbsence($absence, $validateData, $oldData, $userId);
@@ -2530,11 +2582,35 @@ class AbsenceService
 		// Extract type early (needed for past-date and overlap logic)
 		$type = isset($data['type']) && !is_array($data['type']) ? (string)$data['type'] : (is_array($data['type'] ?? null) && !empty($data['type']) ? (string)reset($data['type']) : '');
 
+		// Hour-mode requests bypass the day-shape machinery entirely: the
+		// persisted truth is duration_mode + integer minutes, and any
+		// boundary/fraction field in the same payload is a shape conflict.
+		$hourModeCoverage = null;
+		if ($this->isHourModeRequest($data)) {
+			$hourModeMinutes = $this->assertHourlyModeRules($data, $userId, $startDate, $endDate, $type);
+			$plannedMin = $this->plannedMinutesForDay($userId, $startDate);
+			$hourModeCoverage = $plannedMin > 0 ? min(1.0, $hourModeMinutes / $plannedMin) : 1.0;
+			$dayShape = [
+				'single' => true,
+				'start_fraction' => $hourModeCoverage,
+				'start_slot' => 'hours',
+				'end_fraction' => 1.0,
+				'end_slot' => null,
+				'fractional' => $hourModeCoverage < 1.0 - AbsenceDayShape::EPS,
+			];
+		} elseif (isset($data['duration_minutes']) || isset($data['duration_mode'])) {
+			// Mode fields without duration_mode='hours' — a malformed or
+			// legacy-contract request must not silently morph into day-mode.
+			throw new BusinessRuleException(
+				$this->l10n->t('Hour request fields require hour mode.'),
+				'HOURLY_SHAPE_CONFLICT'
+			);
+		}
 		// Canonical day shape for the slot-aware overlap predicate.
 		// Entitlement-bound types keep their own fraction contract (EC-14):
 		// they reject the boundary/slot fields and stay full-coverage rows.
 		$isEntitlementBound = $type !== '' && $this->isEntitlementDaysBoundType($type);
-		if ($isEntitlementBound) {
+		if (!$this->isHourModeRequest($data) && $isEntitlementBound) {
 			$this->assertNoBoundaryShapeInput($data);
 			$dayShape = [
 				'single' => $startDate->format('Y-m-d') === $endDate->format('Y-m-d'),
@@ -2544,7 +2620,7 @@ class AbsenceService
 				'end_slot' => null,
 				'fractional' => false,
 			];
-		} else {
+		} elseif (!$this->isHourModeRequest($data)) {
 			$dayShape = $this->canonicalDayShape(
 				$data,
 				$startDate,
@@ -2677,6 +2753,133 @@ class AbsenceService
 	}
 
 	/**
+	 * Hour-mode (SPEC optional-workforce §9.2): a single-day request in
+	 * integer minutes for policy-enabled built-in types (unpaid_leave,
+	 * overtime_comp). Persisted via duration_mode/duration_minutes — the
+	 * stored mode is the truth, never re-derived (NN-04).
+	 */
+	private function isHourModeRequest(array $data): bool
+	{
+		return isset($data['duration_mode']) && $data['duration_mode'] === Constants::ABSENCE_DURATION_MODE_HOURS;
+	}
+
+	/** Hour-mode rows carry no clock interval — coverage is a share of the day. */
+	public function isHourModeAbsence(Absence $absence): bool
+	{
+		return $absence->getDurationMode() === Constants::ABSENCE_DURATION_MODE_HOURS;
+	}
+
+	/**
+	 * Planned net minutes of one calendar day (P in the min(M,P) contract).
+	 * Same authority as the Soll-credit path: schedule → rotation → legacy.
+	 */
+	private function plannedMinutesForDay(string $userId, \DateTimeInterface $day): int
+	{
+		$svc = $this->paidAbsencePlannedHoursService
+			??= \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+		$hours = $svc->plannedNetHoursForDay($userId, $day);
+		return max(0, (int)round($hours * 60.0));
+	}
+
+	/**
+	 * Coverage share of an hour-mode absence on its single day: min(M,P)/P
+	 * — the fraction of planned time it claims. P<=0 rows are rejected at
+	 * write time; persisted legacy-corrupt rows degrade to full coverage
+	 * (fail closed on overlap checks).
+	 */
+	public function hourModeCoverageShare(string $userId, Absence $absence): float
+	{
+		$m = $absence->getDurationMinutes();
+		$day = $absence->getStartDate();
+		if ($m === null || $m <= 0 || $day === null) {
+			return 1.0;
+		}
+		$p = $this->plannedMinutesForDay($userId, $day);
+		if ($p <= 0) {
+			return 1.0;
+		}
+		return min(1.0, $m / $p);
+	}
+
+	/**
+	 * Request-level hour-mode validation (§9.2, error catalog §16):
+	 * returns normalized minutes, throws coded BusinessRuleException.
+	 *
+	 * @return int normalized duration_minutes
+	 */
+	private function assertHourlyModeRules(array $data, string $userId, \DateTime $startDate, \DateTime $endDate, string $type): int
+	{
+		if (!in_array($type, \OCA\ArbeitszeitCheck\Support\WorkforcePolicy::HOURLY_TYPES, true)) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Hour requests are only available for the enabled built-in types.'),
+				'HOURLY_SHAPE_CONFLICT'
+			);
+		}
+		$policy = $this->workforcePolicyService ?? \OCP\Server::get(WorkforcePolicyService::class);
+		if (!$policy->isHourlyAbsenceTypeEnabled($type)) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Your organization has not enabled hour requests for this absence type.'),
+				WorkforcePolicyService::ERROR_DISABLED
+			);
+		}
+		if ($startDate->format('Y-m-d') !== $endDate->format('Y-m-d')) {
+			throw new BusinessRuleException(
+				$this->l10n->t('An hour request must start and end on the same day.'),
+				'HOURLY_SINGLE_DATE_REQUIRED'
+			);
+		}
+		// Day-shape fields are meaningless next to a minutes count — a client
+		// sending both is ambiguous and must be rejected, never guessed at.
+		foreach (['day_fraction', 'start_day_fraction', 'end_day_fraction', 'start_day_slot', 'end_day_slot', 'duration_hours', 'require_duration_hours'] as $conflicting) {
+			if (array_key_exists($conflicting, $data) && $data[$conflicting] !== null && $data[$conflicting] !== '') {
+				throw new BusinessRuleException(
+					$this->l10n->t('An hour request cannot be combined with day fractions or hour-debit fields.'),
+					'HOURLY_SHAPE_CONFLICT'
+				);
+			}
+		}
+		$raw = $data['duration_minutes'] ?? null;
+		$minutes = null;
+		if (is_int($raw)) {
+			$minutes = $raw;
+		} elseif (is_string($raw) && preg_match('/^\d+$/', trim($raw)) === 1) {
+			$minutes = (int)trim($raw);
+		}
+		if ($minutes === null || $minutes < 1 || $minutes > 24 * 60) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Enter a whole number of minutes between 1 and %d.', [24 * 60]),
+				'HOURLY_DURATION_INVALID'
+			);
+		}
+		// An hour request on a day with no planned time covers nothing — for
+		// unpaid leave there is no Soll to reduce, for comp there is no day
+		// to take off. Refuse instead of storing a zero-effect row.
+		if ($this->plannedMinutesForDay($userId, $startDate) <= 0) {
+			throw new BusinessRuleException(
+				$this->l10n->t('The selected day has no planned working time.'),
+				'NO_PLANNED_TIME'
+			);
+		}
+		return $minutes;
+	}
+
+	/**
+	 * Debit stored in `days` for an hour-mode row: covered share of the
+	 * single day × its schedule weight — identical semantics to fractional
+	 * day rows so every downstream reader (coverage, repairs, reports)
+	 * interprets the value without special-casing hour mode.
+	 */
+	private function hourModeDaysDebit(string $userId, \DateTime $day, int $minutes): float
+	{
+		$p = $this->plannedMinutesForDay($userId, $day);
+		$weight = $this->computeWorkingDaysForUser($userId, $day, $day);
+		if ($p <= 0 || $weight <= 0.0) {
+			return 0.0;
+		}
+		return round(min(1.0, $minutes / $p) * $weight, 4);
+	}
+
+	/**
 	 * Validate absence type specific rules
 	 *
 	 * @param string $type Absence type
@@ -2722,7 +2925,7 @@ class AbsenceService
 			}
 		}
 
-		if ($type === Absence::TYPE_OVERTIME_COMP) {
+		if ($type === Absence::TYPE_OVERTIME_COMP && !$this->isHourModeRequest($data)) {
 			// Freizeitausgleich debits whole planned days from the overtime balance.
 			// A partial-day balance burn needs no absence record (leaving early
 			// already yields the negative difference) and fractional accounting of
@@ -3083,6 +3286,28 @@ class AbsenceService
 	}
 
 	/**
+	 * Coverage shape for the in-transaction overlap check. Hour-mode rows
+	 * claim a share-of-day (min(M,P)/P) under the 'hours' pseudo-slot —
+	 * entityDayShape alone would flatten them to a full-day cover and
+	 * wrongly reject legal coexistence.
+	 */
+	private function entityDayShapeForCoverage(string $userId, Absence $a): array
+	{
+		if (!$this->isHourModeAbsence($a)) {
+			return $this->entityDayShape($a);
+		}
+		$coverage = $this->hourModeCoverageShare($userId, $a);
+		return [
+			'single' => true,
+			'start_fraction' => $coverage,
+			'start_slot' => 'hours',
+			'end_fraction' => 1.0,
+			'end_slot' => null,
+			'fractional' => $coverage < 1.0 - AbsenceDayShape::EPS,
+		];
+	}
+
+	/**
 	 * Persist the four fraction/slot columns from a canonical shape.
 	 * Full boundaries normalize to NULL ("nothing special stored").
 	 */
@@ -3215,11 +3440,15 @@ class AbsenceService
 					if ($c <= AbsenceDayShape::EPS) {
 						continue;
 					}
-					$sl = AbsenceDayShape::slotOn($other, $dObj);
+					// Hour-mode rows have no am/pm slot — they claim a
+					// share of the day marked by the 'hours' pseudo-slot.
+					$sl = $this->isHourModeAbsence($other)
+						? 'hours'
+						: AbsenceDayShape::slotOn($other, $dObj);
 					$covers[] = [$c, $sl];
 					$slots[] = $sl;
 				}
-				if (!AbsenceDayShape::coversCompatible($covers)) {
+				if (!AbsenceDayShape::coversCompatibleHourAware($covers)) {
 					$conflict = ['row' => $row, 'ymd' => $ymd, 'slots' => $slots];
 					break 2;
 				}
@@ -3237,7 +3466,7 @@ class AbsenceService
 		$baseMsg = $this->l10n->t('This period overlaps with an existing %1$s (%2$s – %3$s).', [$overlapTypeLabel, $overlapStart, $overlapEnd]);
 		$slot = null;
 		foreach ($conflict['slots'] as $sl) {
-			if ($sl !== null) {
+			if ($sl === AbsenceDayShape::SLOT_AM || $sl === AbsenceDayShape::SLOT_PM) {
 				$slot = $sl;
 				break;
 			}
@@ -4029,6 +4258,10 @@ class AbsenceService
 		string $reason,
 		string $expectedRevision,
 		?array $requestMeta,
+		bool $allowCompleted = false,
+		string $auditAction = 'absence_manager_cancelled',
+		?string $operationKey = null,
+		?string $requestDigest = null,
 	): Absence {
 		$ownerUserId = $absence->getUserId();
 		$today = $this->todayDateInStorage()->format('Y-m-d');
@@ -4052,10 +4285,11 @@ class AbsenceService
 					throw new \Exception('revision_stale');
 				}
 				$end = $absence->getEndDate();
-				if ($end === null || $end->format('Y-m-d') < $today) {
+				if ($end === null || (!$allowCompleted && $end->format('Y-m-d') < $today)) {
 					// The window closed while a request was open (FM-06) —
 					// refuse the decision; flags stay for audit until the
-					// owner withdraws.
+					// owner withdraws. Completed-window corrections pass
+					// $allowCompleted — the ended state IS their domain.
 					throw new \Exception('already_ended');
 				}
 				if ($requestMeta !== null && $absence->getCancelRequestedAt() === null) {
@@ -4085,12 +4319,14 @@ class AbsenceService
 				}
 				$this->auditLogMapper->logAction(
 					$ownerUserId,
-					'absence_manager_cancelled',
+					$auditAction,
 					'absence',
 					$updated->getId(),
 					$oldData,
 					$newSummary,
-					$actorUserId
+					$actorUserId,
+					$operationKey,
+					$requestDigest
 				);
 				$this->invalidateVacationStatsAfterCommit($ownerUserId);
 				$this->db->commit();
@@ -4455,6 +4691,520 @@ class AbsenceService
 		];
 	}
 
+	// ------------------------------------------------------------------
+	// Completed-absence corrections (optional workforce spec §9.1/§9.4)
+	// ------------------------------------------------------------------
+	// Same request columns/lifecycle as the running-absence cancel flow —
+	// the spec explicitly forbids a second approval queue. The delta is the
+	// domain window (completed = end < today in storage TZ), the policy
+	// gates, the self-approval ban (AC-37: never, not even for admins) and
+	// UUID operation receipts on every new command (§15.9).
+
+	private function workforcePolicy(): WorkforcePolicyService
+	{
+		if ($this->workforcePolicyService === null) {
+			$this->workforcePolicyService = \OCP\Server::get(WorkforcePolicyService::class);
+		}
+		return $this->workforcePolicyService;
+	}
+
+	/** Completed = end date strictly before today (storage-date authority). */
+	private function isCompletedAbsence(Absence $absence): bool
+	{
+		$end = $absence->getEndDate();
+		if ($end === null) {
+			return false;
+		}
+		return $end->format('Y-m-d') < $this->todayDateInStorage()->format('Y-m-d');
+	}
+
+	/**
+	 * UUID operation identity is mandatory for every new correction/hour
+	 * command (§15.9) — 8-4-4-4-12 hex, ≤64 chars.
+	 */
+	private function requireOperationKey(array $data): string
+	{
+		$key = trim((string)($data['operation_key'] ?? $data['operationKey'] ?? ''));
+		if ($key === '' || strlen($key) > 64
+			|| preg_match('/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/', $key) !== 1) {
+			throw new \Exception('operation_required');
+		}
+		return $key;
+	}
+
+	/**
+	 * SHA-256 digest over the normalized semantic request body — actor,
+	 * action, target and the fields that shape the outcome. Client noise
+	 * (timestamps, transport metadata) never enters the digest.
+	 */
+	private function correctionRequestDigest(string $action, int $targetId, array $data, string $actorUserId): string
+	{
+		$payload = [
+			'action' => $action,
+			'target' => $targetId,
+			'actor' => $actorUserId,
+			'reason' => trim((string)($data['reason'] ?? '')),
+			'comment' => trim((string)($data['comment'] ?? '')),
+			'expected' => trim((string)($data['expectedUpdatedAt'] ?? '')),
+		];
+		return hash('sha256', (string)json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
+	 * Replay lookup (§15.9): an existing receipt for this key must match
+	 * actor AND digest — the same operation returns its stored result;
+	 * a different body under a recycled key is a non-disclosing conflict.
+	 *
+	 * @return array{absence: array, replayed: true}|null stored result
+	 */
+	private function replayOperationReceipt(string $operationKey, string $digest, string $actorUserId): ?array
+	{
+		try {
+			$receipt = $this->auditLogMapper->findByOperationKey($operationKey);
+		} catch (DoesNotExistException) {
+			return null;
+		}
+		if ((string)$receipt->getPerformedBy() !== $actorUserId
+			|| (string)$receipt->getRequestDigest() !== $digest) {
+			throw new \Exception('operation_conflict');
+		}
+		$summary = json_decode((string)$receipt->getNewValues(), true);
+		return [
+			'absence' => is_array($summary) ? $summary : [],
+			'replayed' => true,
+		];
+	}
+
+	/**
+	 * After a rolled-back unique-key collision on operation_key the winning
+	 * receipt exists — re-read it (§15.9: loser rolls back before reading).
+	 */
+	private function receiptAfterCollision(string $operationKey, string $digest, string $actorUserId): array
+	{
+		$stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId);
+		if ($stored === null) {
+			// Uniqueness loser but no receipt readable — retry-required beats
+			// silently dropping the operation on the floor.
+			throw new \Exception('retry_required');
+		}
+		return $stored;
+	}
+
+	private function isUniqueViolation(\Throwable $e): bool
+	{
+		if ($e instanceof \OCP\DB\Exception) {
+			return $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION;
+		}
+		return false;
+	}
+
+	/**
+	 * Actor gate for correction decisions and direct corrections: admins
+	 * pass by role, other actors only when the scoped-manager delegation
+	 * is enabled AND the owner is inside their existing approval scope.
+	 * Uniform 404 shape — an unauthorized target is "not found" (§16).
+	 */
+	private function assertCorrectionActorAuthorized(string $actorUserId, string $ownerUserId): void
+	{
+		if ($actorUserId === $ownerUserId) {
+			throw new \Exception('self_approval_forbidden');
+		}
+		$permission = $this->correctionPermissionService
+			??= \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\PermissionService::class);
+		if ($permission->isAdmin($actorUserId)) {
+			return;
+		}
+		if ($this->workforcePolicy()->isScopedManagerCorrectionEnabled()
+			&& $permission->canDecideEntryApproval($actorUserId, $ownerUserId)) {
+			return;
+		}
+		throw new DoesNotExistException($this->l10n->t('Absence not found'));
+	}
+
+	/**
+	 * Owner files a correction request on a COMPLETED approved absence —
+	 * the request columns/lifecycle are identical to the running-absence
+	 * flow; the window check is inverted (must be ended, §9.4).
+	 *
+	 * @return Absence|array{absence:array,replayed:true}
+	 */
+	public function requestAbsenceCorrection(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->getAbsence($absenceId, $actorUserId);
+		if ($absence === null) {
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
+		}
+		if (!$this->workforcePolicy()->isEmployeeCorrectionRequestEnabled()) {
+			throw new \Exception('feature_disabled');
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
+			throw new \Exception('not_completed');
+		}
+		if ($absence->getCancelRequestedAt() !== null) {
+			throw new \Exception('cancel_request_pending');
+		}
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+		$operationKey = $this->requireOperationKey($data);
+		$digest = $this->correctionRequestDigest('correction_request', $absenceId, $data, $actorUserId);
+		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+			return $stored;
+		}
+		$start = $absence->getStartDate();
+		$end = $absence->getEndDate();
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		$monthClosureKeys = [];
+		try {
+			$lockFresh = $this->absenceMapper->find($absenceId);
+			$monthClosureKeys = $this->monthClosureLockKeys($ownerUserId, $lockFresh->getStartDate(), $lockFresh->getEndDate());
+			$this->acquireMonthClosureLocks($monthClosureKeys);
+
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $start, $end);
+				$absence = $this->absenceMapper->find($absenceId);
+				if ($absence->getStatus() !== Absence::STATUS_APPROVED
+					|| !$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() !== null) {
+					throw new \Exception('cancel_request_pending');
+				}
+				if (!$this->isCompletedAbsence($absence)) {
+					throw new \Exception('not_completed');
+				}
+				$this->assertAbsenceMutable($absence);
+				$oldData = $absence->getSummary();
+				$now = $this->nowInStorage();
+				$absence->setCancelRequestedAt($now);
+				$absence->setCancelRequestedBy($actorUserId);
+				$absence->setCancelReason($reason);
+				$absence->setUpdatedAt($now);
+				$updated = $this->absenceMapper->update($absence);
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_correction_requested',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$updated->getSummary(),
+					$actorUserId,
+					$operationKey,
+					$digest
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				if ($this->isUniqueViolation($e)) {
+					return $this->receiptAfterCollision($operationKey, $digest, $actorUserId);
+				}
+				throw $e;
+			}
+		} finally {
+			$this->releaseMonthClosureLocks($monthClosureKeys);
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$managers = array_unique($this->teamResolver->getManagerIdsForEmployee($ownerUserId));
+			$payload = $this->buildAbsenceNotificationData($updated);
+			foreach ($managers as $managerUid) {
+				$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceCancelRequested(
+					$managerUid,
+					$ownerUserId,
+					$payload,
+					$reason
+				));
+			}
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * Owner withdraws their open correction request on a completed absence.
+	 * Withdraw is a safe undo and stays available even after the org
+	 * disables the request toggle — it only restores the prior state.
+	 *
+	 * @return Absence|array{absence:array,replayed:true}
+	 */
+	public function withdrawAbsenceCorrectionRequest(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->getAbsence($absenceId, $actorUserId);
+		if ($absence === null) {
+			throw new DoesNotExistException($this->l10n->t('Absence not found'));
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getCancelRequestedAt() === null || !$this->isCompletedAbsence($absence)) {
+			throw new \Exception('no_cancel_request');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$operationKey = $this->requireOperationKey($data);
+		$digest = $this->correctionRequestDigest('correction_withdraw', $absenceId, $data, $actorUserId);
+		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+			return $stored;
+		}
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
+				$absence = $this->absenceMapper->find($absenceId);
+				if (!$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() === null) {
+					throw new \Exception('no_cancel_request');
+				}
+				$oldData = $absence->getSummary();
+				$absence->setCancelRequestedAt(null);
+				$absence->setCancelRequestedBy(null);
+				$absence->setCancelReason(null);
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_correction_withdrawn',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$updated->getSummary(),
+					$actorUserId,
+					$operationKey,
+					$digest
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				if ($this->isUniqueViolation($e)) {
+					return $this->receiptAfterCollision($operationKey, $digest, $actorUserId);
+				}
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * Manager/HR approves an open correction request on a completed
+	 * absence — same write pipeline as the running cancel decision, with
+	 * the completed window allowed and the self-approval ban enforced.
+	 *
+	 * @return Absence|array{absence:array,replayed:true}
+	 */
+	public function approveAbsenceCorrectionRequest(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		$requestMeta = $this->assertOpenCancelRequest($absence);
+		if (!$this->workforcePolicy()->isPastCorrectionEnabled()) {
+			throw new \Exception('feature_disabled');
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
+			throw new \Exception('not_completed');
+		}
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+		if ($absence->getType() === Absence::TYPE_VACATION) {
+			$this->assertVacationUnitMigrationIdle();
+		}
+		$operationKey = $this->requireOperationKey($data);
+		$digest = $this->correctionRequestDigest('correction_approve', $absenceId, $data, $actorUserId);
+		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+			return $stored;
+		}
+		$reason = (string)($absence->getCancelReason() ?? '');
+		try {
+			return $this->writeManagerCancellation(
+				$absence,
+				$actorUserId,
+				$reason,
+				$actualUpdatedAt,
+				$requestMeta,
+				true,
+				'absence_correction_approved',
+				$operationKey,
+				$digest
+			);
+		} catch (\Throwable $e) {
+			if ($this->isUniqueViolation($e)) {
+				return $this->receiptAfterCollision($operationKey, $digest, $actorUserId);
+			}
+			throw $e;
+		}
+	}
+
+	/**
+	 * Manager/HR declines an open correction request on a completed
+	 * absence — flags clear, record stays approved, owner is notified.
+	 *
+	 * @return Absence|array{absence:array,replayed:true}
+	 */
+	public function declineAbsenceCorrectionRequest(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		$this->assertOpenCancelRequest($absence);
+		if (!$this->workforcePolicy()->isPastCorrectionEnabled()) {
+			throw new \Exception('feature_disabled');
+		}
+		$ownerUserId = $absence->getUserId();
+		if (!$this->isCompletedAbsence($absence)) {
+			throw new \Exception('not_completed');
+		}
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		$comment = trim((string)($data['comment'] ?? ''));
+		if (mb_strlen($comment) > 500) {
+			throw new \Exception('reason_too_long');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$operationKey = $this->requireOperationKey($data);
+		$digest = $this->correctionRequestDigest('correction_decline', $absenceId, $data, $actorUserId);
+		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+			return $stored;
+		}
+
+		$lockKey = $this->acquireUserMutationLock($ownerUserId);
+		try {
+			$this->db->beginTransaction();
+			try {
+				$this->absenceMapper->lockUserAbsenceWindow($ownerUserId, $absence->getStartDate(), $absence->getEndDate());
+				$absence = $this->absenceMapper->find($absenceId);
+				if (!$absence->getUpdatedAt()
+					|| $absence->getUpdatedAt()->format('c') !== $actualUpdatedAt) {
+					throw new \Exception('revision_stale');
+				}
+				if ($absence->getCancelRequestedAt() === null) {
+					throw new \Exception('no_cancel_request');
+				}
+				$oldData = $absence->getSummary();
+				$absence->setCancelRequestedAt(null);
+				$absence->setCancelRequestedBy(null);
+				$absence->setCancelReason(null);
+				$absence->setUpdatedAt($this->nowInStorage());
+				$updated = $this->absenceMapper->update($absence);
+				$newSummary = $updated->getSummary();
+				if ($comment !== '') {
+					$newSummary['decline_comment'] = $comment;
+				}
+				$this->auditLogMapper->logAction(
+					$ownerUserId,
+					'absence_correction_declined',
+					'absence',
+					$updated->getId(),
+					$oldData,
+					$newSummary,
+					$actorUserId,
+					$operationKey,
+					$digest
+				);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				if ($this->isUniqueViolation($e)) {
+					return $this->receiptAfterCollision($operationKey, $digest, $actorUserId);
+				}
+				throw $e;
+			}
+		} finally {
+			$this->releaseUserMutationLock($lockKey);
+		}
+
+		if ($this->notificationService) {
+			$this->runPostCommitEffect(fn () => $this->notificationService?->notifyAbsenceCancelDeclined(
+				$ownerUserId,
+				$this->buildAbsenceNotificationData($updated),
+				$comment !== '' ? $comment : null
+			));
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * HR/scoped-manager direct correction ("Cancel recorded absence") on a
+	 * COMPLETED approved absence — no request round-trip. Self-correction
+	 * is always forbidden, even for admins (AC-37).
+	 *
+	 * @return Absence|array{absence:array,replayed:true}
+	 */
+	public function managerCorrectCompletedAbsence(int $absenceId, array $data, string $actorUserId): Absence|array
+	{
+		$absence = $this->absenceMapper->find($absenceId);
+		if (!$this->workforcePolicy()->isPastCorrectionEnabled()) {
+			throw new \Exception('feature_disabled');
+		}
+		$ownerUserId = $absence->getUserId();
+		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
+			throw new \Exception('not_completed');
+		}
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		$reason = trim((string)($data['reason'] ?? ''));
+		if ($reason === '' || mb_strlen($reason) > 500) {
+			throw new \Exception('reason_required');
+		}
+		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
+		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
+		if ($expected === '' || $expected !== $actualUpdatedAt) {
+			throw new \Exception('revision_stale');
+		}
+		$this->assertAbsenceMutable($absence);
+		if ($absence->getType() === Absence::TYPE_VACATION) {
+			$this->assertVacationUnitMigrationIdle();
+		}
+		$operationKey = $this->requireOperationKey($data);
+		$digest = $this->correctionRequestDigest('correction_direct', $absenceId, $data, $actorUserId);
+		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+			return $stored;
+		}
+		try {
+			return $this->writeManagerCancellation(
+				$absence,
+				$actorUserId,
+				$reason,
+				$actualUpdatedAt,
+				null,
+				true,
+				'absence_correction_direct',
+				$operationKey,
+				$digest
+			);
+		} catch (\Throwable $e) {
+			if ($this->isUniqueViolation($e)) {
+				return $this->receiptAfterCollision($operationKey, $digest, $actorUserId);
+			}
+			throw $e;
+		}
+	}
+
 	/**
 	 * FA-MSHORTEN (US-407): manager/HR shortens a running approved absence
 	 * (early return). Same business rules as the owner shorten, but the
@@ -4584,7 +5334,7 @@ class AbsenceService
 	 * is the single source of eligibility truth; clients render buttons
 	 * straight from these flags instead of re-deriving type logic).
 	 *
-	 * @return array{canConvertToSick: bool, canRequestCancel: bool, canShorten: bool}
+	 * @return array{canConvertToSick: bool, canRequestCancel: bool, canShorten: bool, canRequestCorrection: bool}
 	 */
 	public function ownerAbsenceActionFlags(Absence $absence): array
 	{
@@ -4593,11 +5343,16 @@ class AbsenceService
 		$end = $absence->getEndDate()?->format('Y-m-d');
 		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
 		$running = $approved && $start !== null && $end !== null && $start <= $today && $end >= $today;
+		$completed = $approved && $end !== null && $end < $today;
 		return [
 			'canConvertToSick' => $running && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canRequestCancel' => $running && $absence->getCancelRequestedAt() === null,
 			// NH-05: mirrors shortenAbsence() eligibility (approved && started && end > today).
 			'canShorten' => $running && $end > $today,
+			// §9.4: completed-absence correction request — mirrors
+			// requestAbsenceCorrection() (policy gate + no open request).
+			'canRequestCorrection' => $completed && $absence->getCancelRequestedAt() === null
+				&& $this->workforcePolicy()->isEmployeeCorrectionRequestEnabled(),
 		];
 	}
 
@@ -4605,7 +5360,7 @@ class AbsenceService
 	 * Action flags for MANAGER-scope absence payloads (ADR-04). Manager
 	 * conversions are allowed retroactively, so no running-gate here.
 	 *
-	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canManagerShorten: bool, canDecideCancelRequest: bool}
+	 * @return array{canConvertToSick: bool, canManagerCancel: bool, canManagerShorten: bool, canDecideCancelRequest: bool, canDecideCorrectionRequest: bool, canManagerCorrect: bool}
 	 */
 	public function managerAbsenceActionFlags(Absence $absence): array
 	{
@@ -4613,12 +5368,23 @@ class AbsenceService
 		$start = $absence->getStartDate()?->format('Y-m-d');
 		$end = $absence->getEndDate()?->format('Y-m-d');
 		$approved = $absence->getStatus() === Absence::STATUS_APPROVED;
+		$completed = $approved && $end !== null && $end < $today;
+		$openRequest = $absence->getCancelRequestedAt() !== null;
 		return [
 			'canConvertToSick' => $approved && AbsenceTypeCatalog::isConvertibleToSick((string)$absence->getType()),
 			'canManagerCancel' => $approved && $end !== null && $end >= $today,
 			'canManagerShorten' => $approved && $start !== null && $end !== null
 				&& $start <= $today && $end > $today,
-			'canDecideCancelRequest' => $approved && $absence->getCancelRequestedAt() !== null,
+			// An open request on a COMPLETED absence is a correction request —
+			// the cancel decide path rejects it with already_ended, so the flag
+			// must not advertise a dead action (split by completion state).
+			'canDecideCancelRequest' => $approved && !$completed && $openRequest,
+			'canDecideCorrectionRequest' => $completed && $openRequest
+				&& $this->workforcePolicy()->isPastCorrectionEnabled(),
+			// §9.4 direct correction ("Cancel recorded absence"). Actor
+			// eligibility (self-ban / scoped manager) is enforced on write.
+			'canManagerCorrect' => $completed
+				&& $this->workforcePolicy()->isPastCorrectionEnabled(),
 		];
 	}
 

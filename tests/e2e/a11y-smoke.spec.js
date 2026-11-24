@@ -45,6 +45,7 @@ const a11yRoutes = [
 	{ path: '/apps/arbeitszeitcheck/admin/vacation-layers', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/overtime-payouts', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/overtime-payout-audit', role: 'ADMIN' },
+	{ path: '/apps/arbeitszeitcheck/admin/year-end', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/settings', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/settings/access', role: 'ADMIN' },
 	{ path: '/apps/arbeitszeitcheck/admin/settings/compliance', role: 'ADMIN' },

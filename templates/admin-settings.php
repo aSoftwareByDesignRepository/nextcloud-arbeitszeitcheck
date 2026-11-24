@@ -47,6 +47,7 @@ $sectionFiles = [
 	'retention' => 'retention.php',
 	'work-locations' => 'work-locations.php',
 	'transfer' => 'transfer.php',
+	'workforce' => 'workforce.php',
 ];
 $renderAll = $isNcAdminShell || $settingsSection === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL;
 // 'transfer' is intentionally absent from $sectionFiles: the synced pack

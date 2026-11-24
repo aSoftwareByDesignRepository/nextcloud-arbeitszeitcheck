@@ -271,6 +271,48 @@ final class AbsenceDayShape
 	}
 
 	/**
+	 * Hour-mode aware variant of {@see coversCompatible()} (optional
+	 * workforce spec §9.2/§15.9). Hour-mode covers carry the pseudo-slot
+	 * 'hours': they have no clock interval, so the only provable legality
+	 * bound is the share-of-day sum — every 'hours' cover adds its fraction
+	 * while am/pm slot covers still need strict distinctness. Covers that
+	 * claim a full day (fraction ≥ 1) can never share the day.
+	 *
+	 * Day-mode callers see identical outcomes: without 'hours' covers the
+	 * rules reduce to the legacy predicate.
+	 *
+	 * @param list<array{0: float, 1: ?string}> $covers [fraction, slot]
+	 */
+	public static function coversCompatibleHourAware(array $covers): bool
+	{
+		$sum = 0.0;
+		$slots = [];
+		foreach ($covers as [$fraction, $slot]) {
+			if ($fraction >= 1.0 - self::EPS && count($covers) > 1) {
+				return false;
+			}
+			if ($slot === 'hours') {
+				// Slotless additive share — multiple hour covers may coexist
+				// as long as their combined claim stays within the day.
+				$sum += max(0.0, min(1.0, $fraction));
+				continue;
+			}
+			if ($fraction >= 1.0 - self::EPS) {
+				return false;
+			}
+			if ($slot === null || !in_array($slot, [self::SLOT_AM, self::SLOT_PM], true)) {
+				return false;
+			}
+			if (isset($slots[$slot])) {
+				return false;
+			}
+			$slots[$slot] = true;
+			$sum += $fraction;
+		}
+		return $sum <= 1.0 + self::EPS;
+	}
+
+	/**
 	 * Days debit for a canonical shape: interior weight + boundary weight ×
 	 * boundary fraction. `$vacationBoundaryGuard` requires each fractional
 	 * boundary day's weight ≥ ~1.0 (vacation absolute-0.5 semantics); the

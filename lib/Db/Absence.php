@@ -153,6 +153,17 @@ class Absence extends Entity
 	protected $endDaySlot;
 
 	/**
+	 * @var string|null 'hours' for hour-based requests (built-in unpaid_leave /
+	 * overtime_comp only); NULL keeps legacy day-mode semantics. Persisted
+	 * explicitly — never re-derived from shape heuristics (NN-04).
+	 */
+	protected $durationMode;
+
+	/** @var int|null Integer minutes for hour-mode requests (>= 1). */
+	protected $durationMinutes;
+
+
+	/**
 	 * Absence constructor
 	 */
 	public function __construct()
@@ -179,6 +190,8 @@ class Absence extends Entity
 		$this->addType('startDaySlot', 'string');
 		$this->addType('endDayFraction', 'float');
 		$this->addType('endDaySlot', 'string');
+		$this->addType('durationMode', 'string');
+		$this->addType('durationMinutes', 'integer');
 	}
 
 	/**
@@ -371,6 +384,8 @@ class Absence extends Entity
 			'endDate' => $endDate ? $endDate->format('Y-m-d') : null,
 			'days' => $this->getDays(),
 			'durationHours' => $this->getDurationHours(),
+			'durationMode' => $this->getDurationMode(),
+			'durationMinutes' => $this->getDurationMinutes(),
 			'startDayFraction' => $this->getStartDayFraction(),
 			'startDaySlot' => $this->getStartDaySlot(),
 			'endDayFraction' => $this->getEndDayFraction(),

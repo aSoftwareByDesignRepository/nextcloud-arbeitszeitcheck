@@ -146,6 +146,13 @@ class Capabilities implements ICapability {
 					// manager "record absence" surface on this flag so older
 					// servers fail closed instead of 404ing on submit.
 					'managerAbsenceRecording' => true,
+					// Optional workforce features (§9.1 parity): companions
+					// gate the hour-request form and the correction flows on
+					// these effective flags — absent = old server = off.
+					'workforcePolicy' => $this->workforcePolicyCapabilities($user !== null ? $user->getUID() : null),
+					// Contract version companions must send as
+					// X-AZC-Absence-Contract to use hour-mode fields.
+					'absenceContractVersion' => Constants::ABSENCE_CONTRACT_VERSION,
 					// AZC-HALF-DAY-NON-VACATION: org allowlist for the day-length
 					// control. Old servers without this key already accepted
 					// dayFraction for vacation — clients fall back to ['vacation'],
@@ -214,5 +221,41 @@ class Capabilities implements ICapability {
 				],
 			],
 		];
+	}
+
+	/**
+	 * Effective optional-workforce flags for the current actor — the same
+	 * booleans the write path enforces server-side (§9.1 GET parity).
+	 * Fail closed to all-off on resolver faults: a capability hiccup must
+	 * hide affordances, never fake them.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function workforcePolicyCapabilities(?string $uid): array
+	{
+		$off = [
+			'pastCorrectionEnabled' => false,
+			'employeeCorrectionRequests' => false,
+			'scopedManagerCorrectionApproval' => false,
+			'hourlyAbsenceTypes' => [],
+			'yearEndManualEnabled' => false,
+			'yearEndAnnualEnabled' => false,
+			'revision' => 0,
+		];
+		try {
+			$svc = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::class);
+			$policy = $svc->get();
+			return [
+				'pastCorrectionEnabled' => $policy->pastCorrectionEnabled,
+				'employeeCorrectionRequests' => $policy->pastCorrectionEnabled && $policy->employeeCorrectionRequests,
+				'scopedManagerCorrectionApproval' => $policy->pastCorrectionEnabled && $policy->scopedManagerCorrectionApproval,
+				'hourlyAbsenceTypes' => $policy->hourlyAbsenceTypes,
+				'yearEndManualEnabled' => $policy->yearEndManualEnabled,
+				'yearEndAnnualEnabled' => $policy->yearEndManualEnabled && $policy->yearEndAnnualEnabled,
+				'revision' => $svc->revision(),
+			];
+		} catch (\Throwable) {
+			return $off;
+		}
 	}
 }

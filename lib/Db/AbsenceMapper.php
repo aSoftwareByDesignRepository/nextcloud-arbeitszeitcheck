@@ -725,4 +725,40 @@ class AbsenceMapper extends QBMapper
 			'total_absences' => array_sum($otherAbsences)
 		];
 	}
+
+
+	private function bumpRevision(Absence $absence): void
+	{
+		$start = $absence->getStartDate();
+		if ($start === null) {
+			return;
+		}
+		$end = $absence->getEndDate();
+		$nowYear = (int)(new \DateTime('now'))->format('Y');
+		$this->revisionService()->bumpForWriteRange(
+			$absence->getUserId(),
+			(int)$start->format('Y'),
+			max($nowYear, $end !== null ? (int)$end->format('Y') : $nowYear),
+		);
+	}
+
+	/** @param Absence $entity */
+	public function insert(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::insert($entity);
+		$this->bumpRevision($entity);
+		return $saved;
+	}
+
+	/** @param Absence $entity */
+	public function update(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::update($entity);
+		$this->bumpRevision($entity);
+		return $saved;
+	}
+	private function revisionService(): \OCA\ArbeitszeitCheck\Service\FinancialRevisionService
+	{
+		return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class);
+	}
 }

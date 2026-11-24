@@ -21,7 +21,18 @@ class OvertimeAdjustmentMapper extends QBMapper
 
 	public function insertAdjustment(OvertimeAdjustment $entity): OvertimeAdjustment
 	{
-		return $this->insert($entity);
+		$saved = $this->insert($entity);
+		// Financial revision bump rides the caller's transaction: a committed
+		// adjustment must advance every watching year's token (§9.6).
+		$eff = $saved->getEffectiveOn();
+		if ($eff !== null) {
+			$this->revisionService()->bumpForWriteRange(
+				$saved->getUserId(),
+				(int)$eff->format('Y'),
+				(int)(new \DateTime('now'))->format('Y'),
+			);
+		}
+		return $saved;
 	}
 
 	/**
@@ -129,5 +140,10 @@ class OvertimeAdjustmentMapper extends QBMapper
 			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)));
 
 		return $qb->executeStatement();
+	}
+
+	private function revisionService(): \OCA\ArbeitszeitCheck\Service\FinancialRevisionService
+	{
+		return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class);
 	}
 }

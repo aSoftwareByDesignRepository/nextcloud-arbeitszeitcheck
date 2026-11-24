@@ -34,6 +34,19 @@
         return (typeof window.t === 'function' ? window.t('arbeitszeitcheck', fallback || key) : fallback || key);
     }
 
+    // §15.9: idempotent-operation identity for correction decisions —
+    // crypto.getRandomValues also works on plain-http instances
+    // (crypto.randomUUID needs a secure context).
+    function operationKey() {
+        const b = new Uint8Array(16);
+        (window.crypto || window.msCrypto).getRandomValues(b);
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+    }
+
+
     /** Plural-aware translate (Nextcloud window.n replaces %n). */
     function tn(singular, plural, count) {
         const n = typeof count === 'number' ? count : parseInt(String(count), 10) || 0;
@@ -415,7 +428,7 @@
                 loadingEl.setAttribute('aria-hidden', 'true');
                 const list = (data && data.pendingApprovals) ? data.pendingApprovals : [];
                 const absences = list.filter(function(item) { return item.type === 'absence'; });
-                const cancelRequests = list.filter(function(item) { return item.type === 'absence_cancel_request'; });
+                const cancelRequests = list.filter(function(item) { return item.type === 'absence_cancel_request' || item.type === 'absence_correction_request'; });
                 if (absences.length === 0 && cancelRequests.length === 0) {
                     emptyEl.classList.remove('visually-hidden');
                     emptyEl.textContent = t('No pending absence requests.', 'No pending absence requests.');
@@ -584,16 +597,21 @@
         const typeDisplay = escapeHtml(s.typeLabel || s.type || t('Absence', 'Absence'));
         const reason = escapeHtml(s.cancelRequestReason || '');
         const updatedAt = escapeHtml(s.updatedAt || '');
+        const isCorrection = item.type === 'absence_correction_request';
+        const chipLabel = isCorrection ? t('Correction requested', 'Correction requested') : t('Cancellation requested', 'Cancellation requested');
+        const approveLabel = isCorrection ? t('Approve correction', 'Approve correction') : t('Approve cancellation', 'Approve cancellation');
+        const declineLabel = isCorrection ? t('Decline correction', 'Decline correction') : t('Decline', 'Decline');
+        const requestKind = isCorrection ? 'correction' : 'cancel';
         return (
             '<div class="pending-approval-card pending-approval-card--absence" data-absence-id="' + escapeHtml(String(id)) + '" role="article">' +
             '  <div class="pending-approval-card__body">' +
             '    <p class="pending-approval-card__title"><strong>' + displayName + '</strong> – ' + typeDisplay +
-            '      <span class="azc-status-chip" data-status="cancel_requested">' + escapeHtml(t('Cancellation requested', 'Cancellation requested')) + '</span></p>' +
+            '      <span class="azc-status-chip" data-status="cancel_requested">' + escapeHtml(chipLabel) + '</span></p>' +
             '    <p class="pending-approval-card__meta">' + escapeHtml(start) + ' – ' + escapeHtml(end) + (days !== '' ? ' (' + escapeHtml(String(days)) + ' ' + t('days', 'days') + ')' : '') + '</p>' +
             (reason !== '' ? '    <p class="pending-approval-card__meta">' + escapeHtml(t('Reason (from employee)', 'Reason (from employee)')) + ': ' + reason + '</p>' : '') +
             '    <div class="pending-approval-card__actions">' +
-            '      <button type="button" class="azc-btn azc-btn--primary btn-approve-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" aria-label="' + t('Approve cancellation', 'Approve cancellation') + ' ' + displayName + '">' + t('Approve cancellation', 'Approve cancellation') + '</button>' +
-            '      <button type="button" class="azc-btn azc-btn--secondary btn-decline-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" aria-label="' + t('Decline cancellation', 'Decline cancellation') + ' ' + displayName + '">' + t('Decline', 'Decline') + '</button>' +
+            '      <button type="button" class="azc-btn azc-btn--primary btn-approve-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" data-request-kind="' + requestKind + '" aria-label="' + approveLabel + ' ' + displayName + '">' + approveLabel + '</button>' +
+            '      <button type="button" class="azc-btn azc-btn--secondary btn-decline-cancel-request" data-absence-id="' + escapeHtml(String(id)) + '" data-updated-at="' + updatedAt + '" data-request-kind="' + requestKind + '" aria-label="' + declineLabel + ' ' + displayName + '">' + declineLabel + '</button>' +
             '    </div>' +
             '  </div>' +
             '</div>'
@@ -630,9 +648,10 @@
             '  <button type="button" class="azc-btn azc-btn--primary btn-reject-modal-confirm">' + t('Decline', 'Decline') + '</button>',
             '</div>'
         ].join('');
+        const isCorrectionModal = (btn.getAttribute('data-request-kind') || '') === 'correction';
         const modal = Components.createModal({
             id: modalId,
-            title: t('Decline cancellation', 'Decline cancellation'),
+            title: isCorrectionModal ? t('Decline correction', 'Decline correction') : t('Decline cancellation', 'Decline cancellation'),
             content: content,
             size: 'md'
         });
@@ -650,19 +669,27 @@
     function decideCancelRequest(btn, decision, comment) {
         const absenceId = parseInt(btn.getAttribute('data-absence-id'), 10);
         const updatedAt = btn.getAttribute('data-updated-at') || '';
+        const isCorrection = (btn.getAttribute('data-request-kind') || '') === 'correction';
         btn.disabled = true;
         const payload = { expectedUpdatedAt: updatedAt };
         if (decision === 'decline' && comment) {
             payload.comment = comment;
         }
-        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/employee-absences/' + absenceId + '/cancel-request/' + decision), {
+        if (isCorrection) {
+            // §15.9: correction decisions require an idempotent operation key.
+            payload.operation_key = operationKey();
+        }
+        const requestPath = isCorrection ? 'correction-request' : 'cancel-request';
+        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/manager/employee-absences/' + absenceId + '/' + requestPath + '/' + decision), {
             method: 'POST',
             data: payload,
             onSuccess: function(data) {
                 if (data.success) {
                     Messaging.showSuccess(decision === 'approve'
                         ? t('Absence cancelled.', 'Absence cancelled.')
-                        : t('Cancellation request declined.', 'Cancellation request declined.'));
+                        : (isCorrection
+                            ? t('Correction request declined.', 'Correction request declined.')
+                            : t('Cancellation request declined.', 'Cancellation request declined.')));
                     removeAbsenceCard(absenceId);
                     loadPendingApprovals();
                 } else {

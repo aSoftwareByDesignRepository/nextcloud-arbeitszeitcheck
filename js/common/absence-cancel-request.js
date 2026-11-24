@@ -8,6 +8,17 @@
 
 	const t = (text) => (typeof window.t === 'function' ? window.t('arbeitszeitcheck', text) : text);
 
+	// §15.9: idempotent-operation identity — crypto.getRandomValues also works
+	// on plain-http dev instances (crypto.randomUUID needs a secure context).
+	function operationKey() {
+		const b = new Uint8Array(16);
+		(window.crypto || window.msCrypto).getRandomValues(b);
+		b[6] = (b[6] & 0x0f) | 0x40;
+		b[8] = (b[8] & 0x3f) | 0x80;
+		const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+		return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+	}
+
 	function call(url, json) {
 		const api = window.AzcApi;
 		if (!api || typeof api.fetch !== 'function') {
@@ -46,8 +57,11 @@
 
 	function openRequestDialog(ctx) {
 		const dlg = buildDialog();
-		dlg.querySelector('#azc-cancel-request-title').textContent = t('Request cancellation');
-		dlg.querySelector('#azc-cancel-request-hint').textContent = t('Your request must be approved by your manager — until then the absence stays approved and counts fully.');
+		const isCorrection = ctx && ctx.kind === 'correction';
+		dlg.querySelector('#azc-cancel-request-title').textContent = isCorrection ? t('Request correction') : t('Request cancellation');
+		dlg.querySelector('#azc-cancel-request-hint').textContent = isCorrection
+			? t('Describe what is wrong with this record. Your manager reviews it — nothing changes until they decide.')
+			: t('Your request must be approved by your manager — until then the absence stays approved and counts fully.');
 		dlg.querySelector('label[for="azc-cancel-request-reason"]').textContent = t('Reason');
 		dlg.querySelector('#azc-cancel-request-submit').textContent = t('Send request');
 		document.body.appendChild(dlg);
@@ -69,7 +83,7 @@
 			}
 			submit.disabled = true;
 			try {
-				await call(ctx.url, { expectedUpdatedAt: ctx.updatedAt, reason: value });
+				await call(ctx.url, { expectedUpdatedAt: ctx.updatedAt, reason: value, ...(ctx.kind === 'correction' ? { operation_key: operationKey() } : {}) });
 				window.location.reload();
 			} catch (e) {
 				error.textContent = e.message;
@@ -85,7 +99,7 @@
 	async function withdraw(ctx, button) {
 		button.disabled = true;
 		try {
-			await call(ctx.url, { expectedUpdatedAt: ctx.updatedAt });
+			await call(ctx.url, { expectedUpdatedAt: ctx.updatedAt, ...(ctx.kind === 'correction' ? { operation_key: operationKey() } : {}) });
 			window.location.reload();
 		} catch (e) {
 			button.disabled = false;
@@ -99,6 +113,22 @@
 	}
 
 	document.addEventListener('click', (ev) => {
+		const corr = ev.target.closest && ev.target.closest('[data-correction-request]');
+		if (corr) {
+			ev.preventDefault();
+			openRequestDialog({
+				url: corr.dataset.correctionRequestUrl,
+				updatedAt: corr.dataset.updatedAt || '',
+				kind: 'correction',
+			});
+			return;
+		}
+		const corrWd = ev.target.closest && ev.target.closest('[data-correction-withdraw]');
+		if (corrWd) {
+			ev.preventDefault();
+			withdraw({ url: corrWd.dataset.withdrawUrl, updatedAt: corrWd.dataset.updatedAt || '', kind: 'correction' }, corrWd);
+			return;
+		}
 		const req = ev.target.closest && ev.target.closest('[data-cancel-request]');
 		if (req) {
 			ev.preventDefault();

@@ -8,6 +8,8 @@ use OCA\ArbeitszeitCheck\Db\AuditLogMapper;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustment;
 use OCA\ArbeitszeitCheck\Db\OvertimeAdjustmentMapper;
 use OCA\ArbeitszeitCheck\Service\DbLockGuard;
+use OCP\AppFramework\Db\TTransactional;
+use OCP\IDBConnection;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 
@@ -17,6 +19,8 @@ use OCP\Lock\ILockingProvider;
  */
 class OvertimeAdjustmentService
 {
+	use TTransactional;
+
 	public const MIN_ABS_HOURS = 0.01;
 	public const MAX_ABS_HOURS = 9999.0;
 
@@ -26,6 +30,7 @@ class OvertimeAdjustmentService
 		private readonly AuditLogMapper $auditLogMapper,
 		private readonly IUserManager $userManager,
 		private readonly ILockingProvider $lockingProvider,
+		private readonly IDBConnection $db,
 	) {
 	}
 
@@ -117,18 +122,28 @@ class OvertimeAdjustmentService
 		$entity->setProcessedBy($actorUserId);
 		$entity->setCreatedAt(new \DateTime());
 
-		$saved = $this->adjustmentMapper->insertAdjustment($entity);
-		$summary = $this->toArray($saved);
+		// C-01: ledger insert + audit are one unit of work. atomic() opens a
+		// transaction — or a savepoint when the caller already owns an outer
+		// transaction (the NC connection nests with savepoints) — and rolls
+		// everything back on any failure, so an audit error can never leave
+		// an unaudited financial row behind. Callers that open their own
+		// transaction keep ownership of it; we never commit or roll back
+		// work we did not start here.
+		$summary = null;
+		$this->atomic(function () use ($entity, $userId, $balanceBefore, $actorUserId, &$summary): void {
+			$saved = $this->adjustmentMapper->insertAdjustment($entity);
+			$summary = $this->toArray($saved);
 
-		$this->auditLogMapper->logAction(
-			$userId,
-			'overtime_balance_adjustment',
-			'overtime_adjustment',
-			$saved->getId(),
-			['balance' => $balanceBefore],
-			$summary,
-			$actorUserId
-		);
+			$this->auditLogMapper->logAction(
+				$userId,
+				'overtime_balance_adjustment',
+				'overtime_adjustment',
+				$saved->getId(),
+				['balance' => $balanceBefore],
+				$summary,
+				$actorUserId
+			);
+		}, $this->db);
 
 		return [
 			'adjustment' => $summary,

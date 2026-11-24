@@ -90,6 +90,7 @@ final class AdminPolicyPagesCatalogContractTest extends TestCase
 			AdminPolicyPagesCatalog::SECTION_OVERTIME => 'admin#overtimeSettings',
 			AdminPolicyPagesCatalog::SECTION_PAYOUTS => 'overtime_payout#index',
 			AdminPolicyPagesCatalog::SECTION_PAYOUT_AUDIT => 'overtime_payout#auditIndex',
+			AdminPolicyPagesCatalog::SECTION_YEAR_END => 'admin#yearEndPage',
 			AdminPolicyPagesCatalog::SECTION_NOTIFICATIONS => 'admin#notifications',
 		];
 		$expectedUrls = [
@@ -98,6 +99,7 @@ final class AdminPolicyPagesCatalogContractTest extends TestCase
 			AdminPolicyPagesCatalog::SECTION_OVERTIME => '/admin/overtime-settings',
 			AdminPolicyPagesCatalog::SECTION_PAYOUTS => '/admin/overtime-payouts',
 			AdminPolicyPagesCatalog::SECTION_PAYOUT_AUDIT => '/admin/overtime-payout-audit',
+			AdminPolicyPagesCatalog::SECTION_YEAR_END => '/admin/year-end',
 			AdminPolicyPagesCatalog::SECTION_NOTIFICATIONS => '/admin/notifications',
 		];
 		foreach (AdminPolicyPagesCatalog::SECTIONS as $section) {

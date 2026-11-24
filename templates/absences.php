@@ -67,6 +67,8 @@ if ($mode === 'list') {
 // org enabled for half days, not only vacation. The server allowlist is the
 // authority; these template flags only decide first paint + preselect.
 $halfDayEnabledTypes = is_array($halfDayEnabledTypes ?? null) ? $halfDayEnabledTypes : [];
+$hourlyTypes = is_array($hourlyTypes ?? null) ? $hourlyTypes : [];
+$correctionUiEnabled = ($correctionUiEnabled ?? false) === true;
 $halfDayCreditTypes = is_array($halfDayCreditTypes ?? null) ? $halfDayCreditTypes : [];
 // Server-derived stored fraction for edit mode ('0.5'|'1'); '1' when absent.
 $absenceDayFraction = ($absenceDayFraction ?? '1') === '0.5' ? '0.5' : '1';
@@ -545,6 +547,30 @@ if ($mode === 'list') {
                         <input type="hidden" id="absence-require-duration-hours" name="require_duration_hours" value="1" <?php echo $isVacationHours ? '' : 'disabled'; ?>>
                     </div>
 
+                    <div id="absence-hour-mode-group"
+                         class="form-group absence-hour-mode"
+                         data-hourly-types="<?php p(implode(',', $hourlyTypes)); ?>"
+                         <?php echo 'hidden'; ?>>
+                        <label for="absence-duration-minutes" class="form-label">
+                            <?php p($l->t('Duration in minutes')); ?>
+                            <span class="form-required" aria-hidden="true">*</span>
+                        </label>
+                        <input type="number"
+                               id="absence-duration-minutes"
+                               name="duration_minutes"
+                               class="form-input form-input--hours"
+                               min="1"
+                               max="1440"
+                               step="1"
+                               inputmode="numeric"
+                               aria-describedby="absence-hour-mode-help"
+                               disabled>
+                        <input type="hidden" id="absence-duration-mode" name="duration_mode" value="hours" disabled>
+                        <p id="absence-hour-mode-help" class="form-help">
+                            <?php p($l->t('Part of a single day — enter the exact minutes (e.g. 120 for 2 hours). The request must start and end on the same day.')); ?>
+                        </p>
+                    </div>
+
                     <div id="absence-historical-hint"
                          class="azc-callout azc-callout--warning absence-historical-hint"
                          role="status"
@@ -828,6 +854,39 @@ if ($mode === 'list') {
                         <?php p($l->t('Convert to sick leave')); ?>
                     </button>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($correctionUiEnabled && $isPastAbsence && in_array($absence->getStatus(), ['approved'], true)): ?>
+                    <?php $correctionRequested = $absence->getCancelRequestedAt() !== null; ?>
+                    <div class="absence-detail-section absence-detail-cancel-request" role="region" aria-labelledby="correction-request-heading">
+                        <?php if ($correctionRequested): ?>
+                            <h3 id="correction-request-heading" class="absence-detail-section__title"><?php p($l->t('Correction requested')); ?></h3>
+                            <p class="absence-detail-cancel-request__desc">
+                                <span class="azc-status-chip" data-status="cancel_requested"><?php p($l->t('Correction requested')); ?></span>
+                                <?php p($l->t('Your manager has been notified. The absence record stays unchanged until a decision is made.')); ?>
+                                <?php if ($absence->getCancelReason()): ?>
+                                    <em><?php p($l->t('Your reason:')); ?> <?php p($absence->getCancelReason()); ?></em>
+                                <?php endif; ?>
+                            </p>
+                            <button type="button"
+                                    class="btn btn--secondary"
+                                    data-correction-withdraw
+                                    data-withdraw-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.withdrawCorrectionRequest', ['id' => $absence->getId()])); ?>"
+                                    data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
+                                <?php p($l->t('Withdraw request')); ?>
+                            </button>
+                        <?php else: ?>
+                            <h3 id="correction-request-heading" class="absence-detail-section__title"><?php p($l->t('Something wrong with this record?')); ?></h3>
+                            <p class="absence-detail-cancel-request__desc"><?php p($l->t('File a correction request — your manager reviews and adjusts the record. Nothing changes until they decide.')); ?></p>
+                            <button type="button"
+                                    class="btn btn--secondary"
+                                    data-correction-request
+                                    data-correction-request-url="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.absence.requestCorrection', ['id' => $absence->getId()])); ?>"
+                                    data-updated-at="<?php p($absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : ''); ?>">
+                                <?php p($l->t('Request correction')); ?>
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 <?php endif; ?>
 
                 <?php if ($isRunningApproved && !$isPastAbsence): ?>
@@ -2063,6 +2122,40 @@ if ($mode === 'list') {
             if (typeSelect) {
                 typeSelect.addEventListener('change', syncHoursVisibility);
             }
+
+            // Hour mode (SPEC optional-workforce §9.2): policy-enabled types
+            // switch the form to single-day + integer minutes.
+            const hourGroup = document.getElementById('absence-hour-mode-group');
+            const minutesInput = document.getElementById('absence-duration-minutes');
+            const modeInput = document.getElementById('absence-duration-mode');
+            const enabledHourly = hourGroup
+                ? String(hourGroup.dataset.hourlyTypes || '').split(',').filter(Boolean)
+                : [];
+
+            function syncHourMode() {
+                if (!hourGroup || !minutesInput || !modeInput) {
+                    return;
+                }
+                const type = typeSelect ? typeSelect.value : '';
+                const on = enabledHourly.indexOf(type) !== -1;
+                hourGroup.hidden = !on;
+                minutesInput.disabled = !on;
+                modeInput.disabled = !on;
+                if (on && endDateInput && startDateInput && startDateInput.value !== '') {
+                    endDateInput.value = startDateInput.value;
+                }
+            }
+            if (typeSelect) {
+                typeSelect.addEventListener('change', syncHourMode);
+            }
+            if (startDateInput) {
+                startDateInput.addEventListener('change', function () {
+                    if (!hourGroup.hidden && endDateInput) {
+                        endDateInput.value = startDateInput.value;
+                    }
+                });
+            }
+            syncHourMode();
             if (startDateInput) {
                 startDateInput.addEventListener('change', applyAutoRangeIfNeeded);
                 startDateInput.addEventListener('blur', applyAutoRangeIfNeeded);

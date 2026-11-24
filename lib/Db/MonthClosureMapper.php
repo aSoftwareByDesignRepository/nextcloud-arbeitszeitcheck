@@ -171,5 +171,23 @@ class MonthClosureMapper extends QBMapper
 			return null;
 		}
 	}
-}
 
+	/** @param MonthClosure $entity */
+	public function insert(\OCP\AppFramework\Db\Entity $entity): \OCP\AppFramework\Db\Entity
+	{
+		$saved = parent::insert($entity);
+		// §9.6: a finalized month is a balance-affecting write for its year
+		// and every later closing year.
+		$this->revisionService()->bumpForWriteRange(
+			$entity->getUserId(),
+			(int)$entity->getYear(),
+			(int)(new \DateTime('now'))->format('Y'),
+		);
+		return $saved;
+	}
+
+	private function revisionService(): \OCA\ArbeitszeitCheck\Service\FinancialRevisionService
+	{
+		return \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\FinancialRevisionService::class);
+	}
+}

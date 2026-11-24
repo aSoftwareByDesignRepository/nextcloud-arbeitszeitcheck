@@ -706,6 +706,33 @@ final class Constants
 	 */
 	public const AUDIT_ENTITY_BREAK_POLICY = 'break_policy';
 
+	/**
+	 * Optional workforce policy (JSON document, versioned — no schema change).
+	 * Shape: {pastCancellation:{enabled,employeeRequests,scopedManagerApproval},
+	 * hourlyAbsenceTypes[], yearEnd:{manualEnabled,annualEnabled,resetPositive,
+	 * waiveNegative,targetGroupIds[],timezone}}. All switches default off.
+	 * See {@see \OCA\ArbeitszeitCheck\Support\WorkforcePolicy}.
+	 */
+	public const CONFIG_WORKFORCE_POLICY_JSON = 'workforce_policy_json';
+
+	/** Monotonic revision of {@see CONFIG_WORKFORCE_POLICY_JSON} (CAS + preview binding). */
+	public const CONFIG_WORKFORCE_POLICY_REVISION = 'workforce_policy_revision';
+
+	/** Audit action when the optional workforce policy is saved. */
+	public const AUDIT_ACTION_WORKFORCE_POLICY_CHANGED = 'workforce_policy_changed';
+
+	/** Wire header marking clients that understand persisted hour-mode absences. */
+	public const ABSENCE_CONTRACT_HEADER = 'X-AZC-Absence-Contract';
+
+	/** Contract version that understands duration_mode/duration_minutes. */
+	public const ABSENCE_CONTRACT_VERSION = 2;
+
+	/** Stored duration_mode value for hour-based absences (built-in types only). */
+	public const ABSENCE_DURATION_MODE_HOURS = 'hours';
+
+	/** Persisted annual-automation schedule state (JSON: last_due, last_run_id). */
+	public const CONFIG_YEAR_END_SCHEDULE = 'year_end_schedule_json';
+
 
 	private function __construct()
 	{

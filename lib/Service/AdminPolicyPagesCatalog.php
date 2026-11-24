@@ -24,6 +24,7 @@ final class AdminPolicyPagesCatalog
 	public const SECTION_OVERTIME = 'overtime';
 	public const SECTION_PAYOUTS = 'overtime-payouts';
 	public const SECTION_PAYOUT_AUDIT = 'overtime-payout-audit';
+	public const SECTION_YEAR_END = 'year-end';
 	public const SECTION_NOTIFICATIONS = 'notifications';
 
 	/**
@@ -37,6 +38,7 @@ final class AdminPolicyPagesCatalog
 		self::SECTION_OVERTIME,
 		self::SECTION_PAYOUTS,
 		self::SECTION_PAYOUT_AUDIT,
+		self::SECTION_YEAR_END,
 		self::SECTION_NOTIFICATIONS,
 	];
 
@@ -76,6 +78,7 @@ final class AdminPolicyPagesCatalog
 		'admin-overtime-settings' => self::SECTION_OVERTIME,
 		'admin-overtime-payouts' => self::SECTION_PAYOUTS,
 		'admin-overtime-payout-audit' => self::SECTION_PAYOUT_AUDIT,
+		'admin-year-end' => self::SECTION_YEAR_END,
 		'admin-notifications' => self::SECTION_NOTIFICATIONS,
 	];
 
@@ -93,6 +96,7 @@ final class AdminPolicyPagesCatalog
 			self::SECTION_OVERTIME,
 			self::SECTION_PAYOUTS,
 			self::SECTION_PAYOUT_AUDIT,
+			self::SECTION_YEAR_END,
 		],
 		'alerts' => [self::SECTION_NOTIFICATIONS],
 	];
@@ -136,6 +140,7 @@ final class AdminPolicyPagesCatalog
 			self::SECTION_OVERTIME => $l->t('Overtime & premiums'),
 			self::SECTION_PAYOUTS => $l->t('Overtime payouts'),
 			self::SECTION_PAYOUT_AUDIT => $l->t('Payout audit'),
+			self::SECTION_YEAR_END => $l->t('Year-end reset'),
 			self::SECTION_NOTIFICATIONS => $l->t('Notifications'),
 			default => $l->t('Administration'),
 		};
@@ -152,6 +157,7 @@ final class AdminPolicyPagesCatalog
 			self::SECTION_OVERTIME => $l->t('Overtime'),
 			self::SECTION_PAYOUTS => $l->t('Payouts'),
 			self::SECTION_PAYOUT_AUDIT => $l->t('Payout audit'),
+			self::SECTION_YEAR_END => $l->t('Year-end'),
 			self::SECTION_NOTIFICATIONS => $l->t('Alerts'),
 			default => $l->t('Admin'),
 		};
@@ -168,6 +174,7 @@ final class AdminPolicyPagesCatalog
 			self::SECTION_OVERTIME => $urlGenerator->linkToRoute('arbeitszeitcheck.admin.overtimeSettings'),
 			self::SECTION_PAYOUTS => $urlGenerator->linkToRoute('arbeitszeitcheck.overtime_payout.index'),
 			self::SECTION_PAYOUT_AUDIT => $urlGenerator->linkToRoute('arbeitszeitcheck.overtime_payout.auditIndex'),
+			self::SECTION_YEAR_END => $urlGenerator->linkToRoute('arbeitszeitcheck.admin.yearEndPage'),
 			self::SECTION_NOTIFICATIONS => $urlGenerator->linkToRoute('arbeitszeitcheck.admin.notifications'),
 			default => $urlGenerator->linkToRoute('arbeitszeitcheck.admin.dashboard'),
 		};

@@ -756,9 +756,13 @@
 						+ reportTd(L.requiredHours || 'Required', esc(
 							u.required_hours_basis === 'on_demand'
 								? (L.requiredBasisOnDemand || 'On call — no fixed target')
-								: (u.required_hours != null
-									? u.required_hours + (u.required_hours_basis === 'degraded' ? ' ' + (L.requiredBasisEstimated || '(estimated)') : '')
-									: '-')))
+								: u.required_hours_basis === 'unassigned_gap'
+									? (L.requiredBasisUnassigned || 'No assignment — no target')
+									: (u.required_hours != null
+										? u.required_hours
+											+ (u.required_hours_basis === 'degraded' ? ' ' + (L.requiredBasisEstimated || '(estimated)') : '')
+											+ (u.required_hours_basis === 'segmented' ? ' ' + (L.requiredBasisSegmented || '(periods)') : '')
+										: '-')))
 						+ reportTd(L.periodOvertime || 'Period +', esc(u.period_overtime_hours != null ? u.period_overtime_hours : (u.overtime_hours > 0 ? u.overtime_hours : '0')))
 						+ reportTd(L.periodUndertime || 'Period −', esc(u.period_undertime_hours != null ? u.period_undertime_hours : '-'))
 						+ reportTd(bankOn ? (L.effectiveBalance || 'Effective balance') : (L.balance || 'Balance'), esc(u.effective_balance != null ? u.effective_balance : (u.cumulative_balance != null ? u.cumulative_balance : '-')))

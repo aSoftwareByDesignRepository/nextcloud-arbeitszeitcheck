@@ -8,34 +8,34 @@
 	<id>arbeitszeitcheck</id>
 	<name>WorkTimeCheck</name>
 	<name lang="de">ArbeitszeitCheck</name>
-	<summary>Working time tracking with configurable country profiles — clock-in, breaks, absences and reports on your Nextcloud</summary>
-	<summary lang="de">Arbeitszeit erfassen mit DACH-Profilen — ArbZG / AZG / ArG in Ihrer Nextcloud</summary>
-	<summary lang="fr">Suivi du temps de travail avec profils pays configurables — pointage, pauses, absences et rapports dans Nextcloud</summary>
-	<summary lang="da">Registrering af arbejdstid med konfigurerbare landeprofiler — stempling, pauser, fravær og rapporter i Nextcloud</summary>
-	<summary lang="es">Registro del tiempo de trabajo con perfiles de país configurables — fichaje, pausas, ausencias e informes en Nextcloud</summary>
-	<summary lang="nl">Werktijdregistratie met configureerbare landprofielen — klokken, pauzes, verzuim en rapporten in Nextcloud</summary>
-	<summary lang="it">Registrazione dell'orario di lavoro con profili paese configurabili — timbrature, pause, assenze e report in Nextcloud</summary>
-	<summary lang="pl">Ewidencja czasu pracy z konfigurowalnymi profilami krajowymi — przerwy, nieobecności i raporty w Nextcloud</summary>
-	<summary lang="sv">Tidrapportering med konfigurerbara landsprofiler — stämpling, pauser, frånvaro och rapporter i Nextcloud</summary>
-	<summary lang="nb">Tidsregistrering med konfigurerbare landsprofiler — stempling, pauser, fravær og rapporter i Nextcloud</summary>
+	<summary>Working time tracking with configurable country profiles: clock-in, breaks, absences and reports on your Nextcloud</summary>
+	<summary lang="de">Arbeitszeit erfassen mit DACH-Profilen: ArbZG / AZG / ArG in Ihrer Nextcloud</summary>
+	<summary lang="fr">Suivi du temps de travail avec profils pays configurables. Pointage, pauses, absences et rapports dans Nextcloud</summary>
+	<summary lang="da">Registrering af arbejdstid med konfigurerbare landeprofiler: stempling, pauser, fravær og rapporter i Nextcloud</summary>
+	<summary lang="es">Registro del tiempo de trabajo con perfiles de país configurables. Fichaje, pausas, ausencias e informes en Nextcloud</summary>
+	<summary lang="nl">Werktijdregistratie met configureerbare landprofielen: klokken, pauzes, verzuim en rapporten in Nextcloud</summary>
+	<summary lang="it">Registrazione dell'orario di lavoro con profili paese configurabili: timbrature, pause, assenze e report in Nextcloud</summary>
+	<summary lang="pl">Ewidencja czasu pracy z konfigurowalnymi profilami krajowymi: przerwy, nieobecności i raporty w Nextcloud</summary>
+	<summary lang="sv">Tidrapportering med konfigurerbara landsprofiler: stämpling, pauser, frånvaro och rapporter i Nextcloud</summary>
+	<summary lang="nb">Tidsregistrering med konfigurerbare landsprofiler: stempling, pauser, fravær og rapporter i Nextcloud</summary>
 	<description><![CDATA[
 # Clock in. Stay within the rules you set.
 
 ArbeitszeitCheck records clock-in, clock-out and breaks on the Nextcloud you already host. Pick a country profile for Germany (ArbZG), Austria (AZG/ARG) or Switzerland (ArG), match holiday regions, approve absences, run reports (including DATEV) and keep an audit log.
 
-Also listed as **WorkTimeCheck** in some App Store searches.
+Also listed as **WorkTimeCheck** in some Nextcloud App Store searches.
 
 **Free web app** (AGPL-3.0-or-later). Companion apps: https://nextcloud.software-by-design.de/
 
 ## Why teams install it
 
-- **Start and stop work cleanly** — pauses, resume, manual entries with a reason
-- **Match your country** — DE / AT / CH profiles with Länder, Bundesländer or cantons
-- **See break and rest issues early** — technical checks against the profile you configured
-- **Run absences properly** — vacation, illness, special and unpaid leave with approval; entitlement modes and CSV import via `occ`
-- **Report what happened** — employee, team and manager views; overtime and absence reports; DATEV export
-- **Lock a month when you need to** — optional finalization with snapshot, hash and PDF; admin reopen with a reason
-- **Control access** — open to all users or allow-lists; Nextcloud admins keep access
+- **Start and stop work cleanly**: pauses, resume, manual entries with a reason
+- **Match your country**: DE / AT / CH profiles with Länder, Bundesländer or cantons
+- **See break and rest issues early**: technical checks against the profile you configured
+- **Run absences properly**: vacation, illness, special and unpaid leave with approval; entitlement modes and CSV import via `occ`
+- **Report what happened**: employee, team and manager views; overtime and absence reports; DATEV export
+- **Lock a month when you need to**: optional finalization with snapshot, hash and PDF; admin reopen with a reason
+- **Control access**: open to all users or allow-lists; Nextcloud admins keep access
 
 ## Clear limits
 
@@ -45,7 +45,7 @@ Also listed as **WorkTimeCheck** in some App Store searches.
 
 ## Feedback welcome
 
-We improve this app with real-world use. Bug reports, rough edges, and ideas help — open a GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) or write to info@software-by-design.de. Your feedback directly shapes what we build next.
+We improve this app with real-world use. Bug reports, rough edges, and ideas help. Open a GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) or write to info@software-by-design.de. Your feedback directly shapes what we build next.
 
 ## Requirements
 
@@ -62,13 +62,13 @@ In manchen App-Store-Suchen auch als **WorkTimeCheck**.
 
 ## Warum Teams es einsetzen
 
-- **Sauber starten und stoppen** — Pausen, Fortsetzen, manuelle Einträge mit Begründung
-- **Zum Land passen** — Profile DE / AT / CH mit Bundesländern bzw. Kantonen
-- **Pausen- und Ruhefragen früh sehen** — technische Prüfungen am konfigurierten Profil
-- **Abwesenheiten ordentlich führen** — Urlaub, Krankheit, Sonder- und unbezahlter Urlaub mit Freigabe; Anspruch-Modi und CSV-Import per `occ`
-- **Auswerten** — Dashboards für Mitarbeitende, Teams und Führung; Überstunden- und Abwesenheitsberichte; DATEV-Export
-- **Monat bei Bedarf schließen** — optionale Finalisierung mit Snapshot, Hash und PDF; Wiederöffnen nur mit Begründung
-- **Zugriff steuern** — offen für alle oder Freigabelisten; Nextcloud-Administratoren behalten den Zugriff
+- **Sauber starten und stoppen**: Pausen, Fortsetzen, manuelle Einträge mit Begründung
+- **Zum Land passen**: Profile DE / AT / CH mit Bundesländern bzw. Kantonen
+- **Pausen- und Ruhefragen früh sehen**: technische Prüfungen am konfigurierten Profil
+- **Abwesenheiten ordentlich führen**: Urlaub, Krankheit, Sonder- und unbezahlter Urlaub mit Freigabe; Anspruch-Modi und CSV-Import per `occ`
+- **Auswerten**: Dashboards für Mitarbeitende, Teams und Führung; Überstunden- und Abwesenheitsberichte; DATEV-Export
+- **Monat bei Bedarf schließen**: optionale Finalisierung mit Snapshot, Hash und PDF; Wiederöffnen nur mit Begründung
+- **Zugriff steuern**: offen für alle oder Freigabelisten; Nextcloud-Administratoren behalten den Zugriff
 
 ## Klare Grenzen
 
@@ -78,7 +78,7 @@ In manchen App-Store-Suchen auch als **WorkTimeCheck**.
 
 ## Feedback willkommen
 
-Wir verbessern diese App mit Rückmeldungen aus der Praxis. Fehlerberichte, Stolpersteine und Ideen helfen — öffnen Sie ein GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) oder schreiben Sie an info@software-by-design.de. Ihr Feedback prägt direkt, was wir als Nächstes bauen.
+Wir verbessern diese App mit Rückmeldungen aus der Praxis. Fehlerberichte, Stolpersteine und Ideen helfen. Öffnen Sie ein GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) oder schreiben Sie an info@software-by-design.de. Ihr Feedback prägt direkt, was wir als Nächstes bauen.
 
 ## Voraussetzungen
 
@@ -87,16 +87,16 @@ Wir verbessern diese App mit Rückmeldungen aus der Praxis. Fehlerberichte, Stol
 	<description lang="fr"><![CDATA[
 # WorkTimeCheck
 
-Suivi du temps de travail auto-hébergé dans Nextcloud. Enregistrez les heures, appliquez pauses et repos selon des profils pays configurables — aujourd'hui Allemagne (ArbZG), Autriche (AZG/ARG) et Suisse (ArG) — et surveillez la conformité.
+Suivi du temps de travail auto-hébergé dans Nextcloud. Enregistrez les heures, appliquez pauses et repos selon des profils pays configurables. Aujourd'hui Allemagne (ArbZG), Autriche (AZG/ARG) et Suisse (ArG), et surveillez la conformité.
 
 ## Fonctionnalités
 
-- **Profils pays** — Allemagne (ArbZG), Autriche (AZG/ARG) ou Suisse (ArG) avec régions de jours fériés adaptées
-- **Surveillance de conformité** — détection automatique des violations et rapports
-- **Tableaux de bord self-service** — vues employé, équipe et manager
-- **Absences et congés** — workflows d'approbation et rapports
-- **Exports et journal d'audit** — p. ex. pour DATEV et audits internes
-- 100 % auto-hébergé — aucune donnée ne quitte votre serveur
+- **Profils pays**: Allemagne (ArbZG), Autriche (AZG/ARG) ou Suisse (ArG) avec régions de jours fériés adaptées
+- **Surveillance de conformité**: détection automatique des violations et rapports
+- **Tableaux de bord self-service**: vues employé, équipe et manager
+- **Absences et congés**: workflows d'approbation et rapports
+- **Exports et journal d'audit**: p. ex. pour DATEV et audits internes
+- 100 % auto-hébergé. Aucune donnée ne quitte votre serveur
 
 ## Prérequis
 
@@ -105,25 +105,25 @@ Suivi du temps de travail auto-hébergé dans Nextcloud. Enregistrez les heures,
 
 ## Retours bienvenus
 
-Nous améliorons cette app grâce à votre usage réel. Bugs, frottements et idées aident — ouvrez une GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) ou écrivez à info@software-by-design.de. Vos retours façonnent directement la suite.
+Nous améliorons cette app grâce à votre usage réel. Bugs, frottements et idées aident. Ouvrez une GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) ou écrivez à info@software-by-design.de. Vos retours façonnent directement la suite.
 ]]></description>
 	<description lang="da"><![CDATA[
 # WorkTimeCheck
 
-Tidsregistrering af arbejdstid, selvhostet i din Nextcloud. Registrer timer, håndhæv pauser og hvile efter konfigurerbare landeprofiler — i dag Tyskland (ArbZG), Østrig (AZG/ARG) og Schweiz (ArG) — og overvåg overholdelse.
+Tidsregistrering af arbejdstid, selvhostet i din Nextcloud. Registrer timer, håndhæv pauser og hvile efter konfigurerbare landeprofiler, i dag Tyskland (ArbZG), Østrig (AZG/ARG) og Schweiz (ArG), og overvåg overholdelse.
 
 ## Funktioner
 
-- **Landprofiler** — Tyskland (ArbZG), Østrig (AZG/ARG) eller Schweiz (ArG) med matchende helligdagsregioner
-- **Overholdelsesovervågning** — automatisk registrering af overtrædelser og rapporter
-- **Self-service-dashboards** — visninger for medarbejder, team og leder
-- **Fravær og orlov** — godkendelsesworkflows og rapportering
-- **Eksporter og revisionslog** — f.eks. til DATEV og interne revisioner
-- 100 % selvhostet — ingen data forlader din server
+- **Landprofiler**: Tyskland (ArbZG), Østrig (AZG/ARG) eller Schweiz (ArG) med matchende helligdagsregioner
+- **Overholdelsesovervågning**: automatisk registrering af overtrædelser og rapporter
+- **Self-service-dashboards**: visninger for medarbejder, team og leder
+- **Fravær og orlov**: godkendelsesworkflows og rapportering
+- **Eksporter og revisionslog**: f.eks. til DATEV og interne revisioner
+- 100 % selvhostet. Ingen data forlader din server
 
 ## Feedback er velkommen
 
-Vi forbedrer denne app med brug i praksis. Fejlrapporter, friktioner og idéer hjælper — åbn et GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Jeres feedback former direkte det, vi bygger næste gang.
+Vi forbedrer denne app med brug i praksis. Fejlrapporter, friktioner og idéer hjælper. Åbn et GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Jeres feedback former direkte det, vi bygger næste gang.
 
 ## Krav
 
@@ -133,20 +133,20 @@ Vi forbedrer denne app med brug i praksis. Fejlrapporter, friktioner og idéer h
 	<description lang="es"><![CDATA[
 # WorkTimeCheck
 
-Registro del tiempo de trabajo autoalojado en tu Nextcloud. Registra horas, aplica pausas y descansos según perfiles de país configurables — hoy Alemania (ArbZG), Austria (AZG/ARG) y Suiza (ArG) — y supervisa el cumplimiento.
+Registro del tiempo de trabajo autoalojado en tu Nextcloud. Registra horas, aplica pausas y descansos según perfiles de país configurables. Hoy Alemania (ArbZG), Austria (AZG/ARG) y Suiza (ArG), y supervisa el cumplimiento.
 
 ## Funciones
 
-- **Perfiles de país** — Alemania (ArbZG), Austria (AZG/ARG) o Suiza (ArG) con regiones de festivos adecuadas
-- **Supervisión de cumplimiento** — detección automática de infracciones e informes
-- **Paneles de autoservicio** — vistas de empleado, equipo y responsable
-- **Ausencias y permisos** — flujos de aprobación e informes
-- **Exportaciones y registro de auditoría** — p. ej. para DATEV y auditorías internas
-- 100 % autoalojado — ningún dato sale de tu servidor
+- **Perfiles de país**: Alemania (ArbZG), Austria (AZG/ARG) o Suiza (ArG) con regiones de festivos adecuadas
+- **Supervisión de cumplimiento**: detección automática de infracciones e informes
+- **Paneles de autoservicio**: vistas de empleado, equipo y responsable
+- **Ausencias y permisos**: flujos de aprobación e informes
+- **Exportaciones y registro de auditoría**: p. ej. para DATEV y auditorías internas
+- 100 % autoalojado. Ningún dato sale de tu servidor
 
 ## Comentarios bienvenidos
 
-Mejoramos esta app con el uso real. Informes de errores, fricciones e ideas ayudan — abra un GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o escriba a info@software-by-design.de. Su feedback da forma directa a lo que construimos después.
+Mejoramos esta app con el uso real. Informes de errores, fricciones e ideas ayudan. Abra un GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o escriba a info@software-by-design.de. Su feedback da forma directa a lo que construimos después.
 
 ## Requisitos
 
@@ -159,19 +159,19 @@ Mejoramos esta app con el uso real. Informes de errores, fricciones e ideas ayud
 
 ArbeitszeitCheck registreert in- en uitklokken en pauzes in de Nextcloud die u al beheert. Kies een landprofiel voor Duitsland (ArbZG), Oostenrijk (AZG/ARG) of Zwitserland (ArG), stem vakantiegebieden af, keur afwezigheden goed, voer rapporten uit (inclusief DATEV) en houd een auditlog bij.
 
-Ook bekend als **WorkTimeCheck** in sommige App Store-zoekopdrachten.
+Ook bekend als **WorkTimeCheck** in sommige Nextcloud App Store-zoekopdrachten.
 
 **Gratis webapp** (AGPL-3.0-or-later). Companion apps: https://nextcloud.software-by-design.de/
 
 ## Waarom teams het installeren
 
-- **Werk netjes beginnen en stoppen** — pauzes, hervatten, handmatige invoer met reden
-- **Pas uw land aan** — DE / AT / CH-profielen met Länder, Bundesländer of kantons
-- **Bekijk problemen met pauzes en rust vroeg** — technische controles op basis van het profiel dat u configureert
-- **Voer afwezigheden correct uit** — vakantie, ziekte, speciaal verlof en onbetaald verlof met goedkeuring; rechtenmodi en CSV-import via `occ`
-- **Rapporteer wat er gebeurde** — overzichten voor medewerker, team en manager; overuren- en afwezigheidsrapporten; DATEV-export
-- **Sluit een maand af wanneer u dat nodig heeft** — optionele afronding met snapshot, hash en PDF; admin heropenen met reden
-- **Beheer de toegang** — open voor alle gebruikers of allowlists; Nextcloud-beheerders behouden de toegang
+- **Werk netjes beginnen en stoppen**: pauzes, hervatten, handmatige invoer met reden
+- **Pas uw land aan**: DE / AT / CH-profielen met Länder, Bundesländer of kantons
+- **Bekijk problemen met pauzes en rust vroeg**: technische controles op basis van het profiel dat u configureert
+- **Voer afwezigheden correct uit**: vakantie, ziekte, speciaal verlof en onbetaald verlof met goedkeuring; rechtenmodi en CSV-import via `occ`
+- **Rapporteer wat er gebeurde**: overzichten voor medewerker, team en manager; overuren- en afwezigheidsrapporten; DATEV-export
+- **Sluit een maand af wanneer u dat nodig heeft**: optionele afronding met snapshot, hash en PDF; admin heropenen met reden
+- **Beheer de toegang**: open voor alle gebruikers of allowlists; Nextcloud-beheerders behouden de toegang
 
 ## Duidelijke grenzen
 
@@ -181,7 +181,7 @@ Ook bekend als **WorkTimeCheck** in sommige App Store-zoekopdrachten.
 
 ## Feedback welkom
 
-We verbeteren deze app met gebruik in de praktijk. Bugmeldingen, struikelblokken en ideeën helpen — open een GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) of mail naar info@software-by-design.de. Uw feedback bepaalt mede wat we als volgende bouwen.
+We verbeteren deze app met gebruik in de praktijk. Bugmeldingen, struikelblokken en ideeën helpen. Open een GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) of mail naar info@software-by-design.de. Uw feedback bepaalt mede wat we als volgende bouwen.
 
 ## Vereisten
 
@@ -192,19 +192,19 @@ We verbeteren deze app met gebruik in de praktijk. Bugmeldingen, struikelblokken
 
 ArbeitszeitCheck registra l’entrata, l’uscita e le pause nella Nextcloud che avete già in hosting. Scegli un profilo Paese per Germania (ArbZG), Austria (AZG/ARG) o Svizzera (ArG), abbina le aree di festività, approva le assenze, esegui i report (incluso DATEV) e conserva un audit log.
 
-Inoltre indicato come **WorkTimeCheck** in alcune ricerche dell’App Store.
+Inoltre indicato come **WorkTimeCheck** in alcune ricerche dell’Nextcloud App Store.
 
 **Web app gratuita** (AGPL-3.0-or-later). App associate: https://nextcloud.software-by-design.de/
 
 ## Perché i team lo installano
 
-- **Iniziare e terminare il lavoro in modo pulito** — pause, ripresa, inserimenti manuali con motivazione
-- **Abbina il tuo Paese** — profili DE / AT / CH con Länder, Bundesländer o cantoni
-- **Vedi presto i problemi di pause e riposo** — controlli tecnici rispetto al profilo configurato
-- **Gestisci le assenze correttamente** — ferie, malattia, permessi speciali e congedi non retribuiti con approvazione; modalità di entitlement e import CSV via `occ`
-- **Riporta cosa è successo** — viste per dipendente, team e responsabile; report su straordinari e assenze; export DATEV
-- **Blocca un mese quando serve** — finalizzazione opzionale con snapshot, hash e PDF; riapertura admin con motivazione
-- **Controlla l’accesso** — aperto a tutti gli utenti o allow-list; gli admin Nextcloud mantengono l’accesso
+- **Iniziare e terminare il lavoro in modo pulito**: pause, ripresa, inserimenti manuali con motivazione
+- **Abbina il tuo Paese**: profili DE / AT / CH con Länder, Bundesländer o cantoni
+- **Vedi presto i problemi di pause e riposo**: controlli tecnici rispetto al profilo configurato
+- **Gestisci le assenze correttamente**: ferie, malattia, permessi speciali e congedi non retribuiti con approvazione; modalità di entitlement e import CSV via `occ`
+- **Riporta cosa è successo**: viste per dipendente, team e responsabile; report su straordinari e assenze; export DATEV
+- **Blocca un mese quando serve**: finalizzazione opzionale con snapshot, hash e PDF; riapertura admin con motivazione
+- **Controlla l’accesso**: aperto a tutti gli utenti o allow-list; gli admin Nextcloud mantengono l’accesso
 
 ## Limiti chiari
 
@@ -214,7 +214,7 @@ Inoltre indicato come **WorkTimeCheck** in alcune ricerche dell’App Store.
 
 ## Feedback benvenuto
 
-Miglioriamo questa app con l’uso reale. Segnalazioni di bug, punti deboli e idee aiutano — aprite una GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o scrivete a info@software-by-design.de. Il vostro feedback guida direttamente ciò che costruiamo dopo.
+Miglioriamo questa app con l’uso reale. Segnalazioni di bug, punti deboli e idee aiutano. Aprite una GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) o scrivete a info@software-by-design.de. Il vostro feedback guida direttamente ciò che costruiamo dopo.
 
 ## Requisiti
 
@@ -225,19 +225,19 @@ Miglioriamo questa app con l’uso reale. Segnalazioni di bug, punti deboli e id
 
 ArbeitszeitCheck rejestruje przyjście, wyjście i przerwy w Nextcloud, którą Państwo już hostują. Wybierz profil kraju dla Niemiec (ArbZG), Austrii (AZG/ARG) lub Szwajcarii (ArG), dopasuj regiony świąt, zatwierdzaj nieobecności, uruchamiaj raporty (w tym DATEV) i prowadź dziennik audytu.
 
-W niektórych wyszukiwaniach w App Store aplikacja jest też znana jako **WorkTimeCheck**.
+W niektórych wyszukiwaniach w Nextcloud App Store aplikacja jest też znana jako **WorkTimeCheck**.
 
 **Darmowa aplikacja webowa** (AGPL-3.0-or-later). Aplikacje towarzyszące: https://nextcloud.software-by-design.de/
 
 ## Dlaczego zespoły ją instalują
 
-- **Zaczynaj i kończ pracę czytelnie** — przerwy, wznowienie, ręczne wpisy z uzasadnieniem
-- **Dopasuj swój kraj** — profile DE / AT / CH z Länder, Bundesländer lub kantonami
-- **Wczesne wykrywanie problemów z przerwami i odpoczynkiem** — kontrole techniczne w oparciu o skonfigurowany profil
-- **Prowadź nieobecności poprawnie** — urlop, choroba, urlop specjalny i urlop bezpłatny z akceptacją; tryby uprawnień i import CSV przez `occ`
-- **Raportuj to, co się wydarzyło** — widoki pracownika, zespołu i menedżera; raporty o nadgodzinach i nieobecnościach; eksport DATEV
-- **Zamykaj miesiąc, kiedy trzeba** — opcjonalne domknięcie z snapshotem, hashem i PDF; ponowne otwarcie przez admina z uzasadnieniem
-- **Kontroluj dostęp** — otwarte dla wszystkich użytkowników lub allow-listy; administratorzy Nextcloud zachowują dostęp
+- **Zaczynaj i kończ pracę czytelnie**: przerwy, wznowienie, ręczne wpisy z uzasadnieniem
+- **Dopasuj swój kraj**: profile DE / AT / CH z Länder, Bundesländer lub kantonami
+- **Wczesne wykrywanie problemów z przerwami i odpoczynkiem**: kontrole techniczne w oparciu o skonfigurowany profil
+- **Prowadź nieobecności poprawnie**: urlop, choroba, urlop specjalny i urlop bezpłatny z akceptacją; tryby uprawnień i import CSV przez `occ`
+- **Raportuj to, co się wydarzyło**: widoki pracownika, zespołu i menedżera; raporty o nadgodzinach i nieobecnościach; eksport DATEV
+- **Zamykaj miesiąc, kiedy trzeba**: opcjonalne domknięcie z snapshotem, hashem i PDF; ponowne otwarcie przez admina z uzasadnieniem
+- **Kontroluj dostęp**: otwarte dla wszystkich użytkowników lub allow-listy; administratorzy Nextcloud zachowują dostęp
 
 ## Jasne ograniczenia
 
@@ -247,7 +247,7 @@ W niektórych wyszukiwaniach w App Store aplikacja jest też znana jako **WorkTi
 
 ## Feedback mile widziany
 
-Ulepszamy tę aplikację dzięki realnemu użyciu. Zgłoszenia błędów, tarcia i pomysły pomagają — otwórz GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) lub napisz na info@software-by-design.de. Wasza opinia bezpośrednio kształtuje to, co budujemy dalej.
+Ulepszamy tę aplikację dzięki realnemu użyciu. Zgłoszenia błędów, tarcia i pomysły pomagają. Otwórz GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) lub napisz na info@software-by-design.de. Wasza opinia bezpośrednio kształtuje to, co budujemy dalej.
 
 ## Wymagania
 
@@ -258,19 +258,19 @@ Ulepszamy tę aplikację dzięki realnemu użyciu. Zgłoszenia błędów, tarcia
 
 ArbeitszeitCheck registrerar in-, utstämplingar och pauser i den Nextcloud ni redan hostar. Välj ett landsprofil för Tyskland (ArbZG), Österrike (AZG/ARG) eller Schweiz (ArG), matcha helgdagregioner, godkänn frånvaro, kör rapporter (inklusive DATEV) och behåll en auditlogg.
 
-Appen finns också listad som **WorkTimeCheck** i vissa App Store-sökningar.
+Appen finns också listad som **WorkTimeCheck** i vissa Nextcloud App Store-sökningar.
 
 **Gratis webbapp** (AGPL-3.0-or-later). Companion-appar: https://nextcloud.software-by-design.de/
 
 ## Varför team installerar den
 
-- **Starta och avsluta arbetet snyggt** — pauser, återuppta, manuella inmatningar med en anledning
-- **Matcha ert land** — DE / AT / CH-profiler med Länder, Bundesländer eller kantoner
-- **Se problem med pauser och vila tidigt** — tekniska kontroller mot den profil ni har konfigurerat
-- **Kör frånvaro korrekt** — semester, sjukdom, särskilt och obetalt ledigt med godkännande; entitlement-lägen och CSV-import via `occ`
-- **Rapportera vad som hände** — vyer för medarbetare, team och chef; rapporter om övertid och frånvaro; DATEV-export
-- **Lås en månad när ni behöver** — valfri finalisering med snapshot, hash och PDF; admin återöppnar med en anledning
-- **Kontrollera åtkomst** — öppen för alla användare eller allow-listor; Nextcloud-administratörer behåller åtkomst
+- **Starta och avsluta arbetet snyggt**: pauser, återuppta, manuella inmatningar med en anledning
+- **Matcha ert land**: DE / AT / CH-profiler med Länder, Bundesländer eller kantoner
+- **Se problem med pauser och vila tidigt**: tekniska kontroller mot den profil ni har konfigurerat
+- **Kör frånvaro korrekt**: semester, sjukdom, särskilt och obetalt ledigt med godkännande; entitlement-lägen och CSV-import via `occ`
+- **Rapportera vad som hände**: vyer för medarbetare, team och chef; rapporter om övertid och frånvaro; DATEV-export
+- **Lås en månad när ni behöver**: valfri finalisering med snapshot, hash och PDF; admin återöppnar med en anledning
+- **Kontrollera åtkomst**: öppen för alla användare eller allow-listor; Nextcloud-administratörer behåller åtkomst
 
 ## Tydliga gränser
 
@@ -280,7 +280,7 @@ Appen finns också listad som **WorkTimeCheck** i vissa App Store-sökningar.
 
 ## Feedback välkomnas
 
-Vi förbättrar den här appen med verklig användning. Felrapporter, friktioner och idéer hjälper — öppna en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv till info@software-by-design.de. Er feedback formar direkt det vi bygger härnäst.
+Vi förbättrar den här appen med verklig användning. Felrapporter, friktioner och idéer hjälper. Öppna en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv till info@software-by-design.de. Er feedback formar direkt det vi bygger härnäst.
 
 ## Krav
 
@@ -291,19 +291,19 @@ Vi förbättrar den här appen med verklig användning. Felrapporter, friktioner
 
 ArbeitszeitCheck registrerer inn-, utstempling og pauser i Nextclouden dere allerede hoster. Velg en landsprofil for Tyskland (ArbZG), Østerrike (AZG/ARG) eller Sveits (ArG), match ferieområder, godkjenn fravær, kjør rapporter (inkludert DATEV) og hold en auditlogg.
 
-Appen står også oppført som **WorkTimeCheck** i noen App Store-søk.
+Appen står også oppført som **WorkTimeCheck** i noen Nextcloud App Store-søk.
 
 **Gratis nettapp** (AGPL-3.0-or-later). Følgeapper: https://nextcloud.software-by-design.de/
 
 ## Hvorfor team installerer den
 
-- **Start og stopp jobben ryddig** — pauser, gjenoppta, manuelle innføringer med begrunnelse
-- **Tilpass landet deres** — DE / AT / CH-profiler med Länder, Bundesländer eller kantoner
-- **Se problemer med pauser og hvile tidlig** — tekniske sjekker mot profilen dere har konfigurert
-- **Kjør fravær riktig** — ferie, sykdom, permisjon og ubetalt permisjon med godkjenning; entitlement-moduser og CSV-import via `occ`
-- **Rapporter hva som skjedde** — visninger for ansatt, team og leder; rapporter om overtid og fravær; DATEV-eksport
-- **Lås en måned når dere trenger det** — valgfri fullføring med snapshot, hash og PDF; admin gjenåpner med en begrunnelse
-- **Kontroller tilgang** — åpen for alle brukere eller allow-lister; Nextcloud-administratorer beholder tilgang
+- **Start og stopp jobben ryddig**: pauser, gjenoppta, manuelle innføringer med begrunnelse
+- **Tilpass landet deres**: DE / AT / CH-profiler med Länder, Bundesländer eller kantoner
+- **Se problemer med pauser og hvile tidlig**: tekniske sjekker mot profilen dere har konfigurert
+- **Kjør fravær riktig**: ferie, sykdom, permisjon og ubetalt permisjon med godkjenning; entitlement-moduser og CSV-import via `occ`
+- **Rapporter hva som skjedde**: visninger for ansatt, team og leder; rapporter om overtid og fravær; DATEV-eksport
+- **Lås en måned når dere trenger det**: valgfri fullføring med snapshot, hash og PDF; admin gjenåpner med en begrunnelse
+- **Kontroller tilgang**: åpen for alle brukere eller allow-lister; Nextcloud-administratorer beholder tilgang
 
 ## Klare grenser
 
@@ -313,7 +313,7 @@ Appen står også oppført som **WorkTimeCheck** i noen App Store-søk.
 
 ## Feedback er velkommen
 
-Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer hjelper — åpne en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Tilbakemeldingen deres former direkte det vi bygger videre.
+Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer hjelper. Åpne en GitHub Issue (https://github.com/aSoftwareByDesignRepository/nextcloud-arbeitszeitcheck/issues) eller skriv til info@software-by-design.de. Tilbakemeldingen deres former direkte det vi bygger videre.
 
 ## Krav
 
@@ -376,6 +376,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 		<command>OCA\ArbeitszeitCheck\Command\ConfigExportCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\ConfigImportCommand</command>
 		<command>OCA\ArbeitszeitCheck\Command\ConfigReconcileCommand</command>
+		<command>OCA\ArbeitszeitCheck\Command\AssignmentsDeltaReportCommand</command>
 	</commands>
 
 	<!-- No <navigation> here: the menu entry is registered conditionally via
@@ -440,6 +441,7 @@ Vi forbedrer denne appen med bruk i praksis. Feilrapporter, friksjon og idéer h
 			<step>OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs</step>
 			<step>OCA\ArbeitszeitCheck\Repair\RecomputeAbsenceDaysSchedule</step>
 			<step>OCA\ArbeitszeitCheck\Repair\HealCorruptDailyHours</step>
+			<step>OCA\ArbeitszeitCheck\Repair\ReportAssignmentStateAfterUpgrade</step>
 		</post-migration>
 		<uninstall>
 			<step>OCA\ArbeitszeitCheck\Repair\UninstallDropTables</step>

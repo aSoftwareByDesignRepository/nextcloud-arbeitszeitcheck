@@ -274,19 +274,14 @@ class MissingTimeEntryJob extends TimedJob
 	{
 		try {
 			$day = \DateTime::createFromInterface($date)->setTime(0, 0, 0);
-			$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $day)
-				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($assignment === null) {
-				return false;
-			}
-			$modelId = (int)$assignment->getWorkingTimeModelId();
-			// Memoize per run: many employees share one model, so the flag
-			// lookup stays ≤1 extra assignment query per user instead of an
-			// N+1 on WorkingTimeModelMapper::find().
-			if (!array_key_exists($modelId, $this->onDemandModelFlags)) {
-				$this->onDemandModelFlags[$modelId] = $this->workingTimeModelMapper->find($modelId)->isOnDemand();
-			}
-			if ($this->onDemandModelFlags[$modelId]) {
+			// Strict money-path resolution: an unassigned-gap day has no Soll
+			// either, so it must not trigger a missing-entry reminder.
+			$contract = $this->assignmentResolver()->resolveStrict($userId, $day);
+			$noSoll = in_array($contract->basis, [
+				\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::BASIS_ON_DEMAND,
+				\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::BASIS_UNASSIGNED_GAP,
+			], true);
+			if ($noSoll) {
 				$this->skippedOnDemand++;
 				$this->logger->debug('Missing time entry reminder skipped for on-demand contract', [
 					'user_id' => $userId,
@@ -299,5 +294,22 @@ class MissingTimeEntryJob extends TimedJob
 		} catch (\Throwable) {
 			return false;
 		}
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 }

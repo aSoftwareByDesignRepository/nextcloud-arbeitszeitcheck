@@ -124,6 +124,9 @@ class SettingsController extends Controller
 				// Effective automatic-break convention (model ?? org ??
 				// 'strict'); informational only — employees cannot override it.
 				'break_policy_deduction_mode' => $this->breakDeductionMode($userId ?? null),
+				// Spec §418 (BQ-01): org gap policy must be readable by
+				// every client — companions render gap days the same way.
+				'assignments_gap_policy' => $this->assignmentsGapPolicy(),
 			]);
 		} catch (\Throwable $e) {
 			if ($this->isMissingTableException($e)) {
@@ -580,6 +583,30 @@ class SettingsController extends Controller
 	 * calculation. Fails open to false — a resolver fault must never lock
 	 * employees out of their own preferences.
 	 */
+	/**
+	 * Org gap policy (`assignments_gap_policy`), fail-open to lenient —
+	 * the install default; a config read fault must not invent a stricter
+	 * rule than the administrator configured.
+	 */
+	private function assignmentsGapPolicy(): string
+	{
+		try {
+			$value = Server::get(\OCP\AppFramework\Services\IAppConfig::class)->getAppValueString(
+				\OCA\ArbeitszeitCheck\Constants::CONFIG_ASSIGNMENTS_GAP_POLICY,
+				\OCA\ArbeitszeitCheck\Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT
+			);
+			return in_array($value, \OCA\ArbeitszeitCheck\Constants::ASSIGNMENTS_GAP_POLICIES, true)
+				? $value
+				: \OCA\ArbeitszeitCheck\Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT;
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				'Gap-policy read failed — defaulting to lenient: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return \OCA\ArbeitszeitCheck\Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT;
+		}
+	}
+
 	private function isBreakPolicyEnforced(): bool
 	{
 		try {

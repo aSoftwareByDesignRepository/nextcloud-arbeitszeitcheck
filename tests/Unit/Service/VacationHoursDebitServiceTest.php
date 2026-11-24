@@ -82,6 +82,7 @@ class VacationHoursDebitServiceTest extends TestCase
 		$asn = new UserWorkingTimeModel();
 		$asn->setUserId('alice');
 		$asn->setWorkingTimeModelId($modelId);
+		$asn->setStartDate(new \DateTime('2000-01-01'));
 
 		return $asn;
 	}
@@ -90,7 +91,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->with('alice')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->with('alice')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->with(7)->willReturn($this->banssModel(7));
 
 		$svc = new VacationHoursDebitService(
@@ -99,6 +100,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->holidayNone(),
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -107,7 +109,8 @@ class VacationHoursDebitServiceTest extends TestCase
 		);
 		$this->assertSame('weekday_schedule', $est['basis']);
 		$this->assertSame(38.5, $est['hours']);
-		$this->assertSame(8.5, $est['one_day_hours']);
+		// one_day_hours mirrors the day at the range END (short BANSS Friday).
+		$this->assertSame(4.5, $est['one_day_hours']);
 		$this->assertIsArray($est['weekday_nets']);
 		$this->assertSame(4.5, $est['weekday_nets']['fri']);
 	}
@@ -116,7 +119,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->willReturn($this->banssModel(7));
 
 		$svc = new VacationHoursDebitService(
@@ -125,6 +128,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->holidayNone(),
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -139,7 +143,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->willReturn($this->banssModel(7));
 
 		$svc = new VacationHoursDebitService(
@@ -148,6 +152,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->holidayNone(),
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -161,7 +166,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	public function testNoModelFallsBackToOrgHoursPerDay(): void
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn(null);
+		$userMap->method('findByUser')->willReturn([]);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
 
 		$svc = new VacationHoursDebitService(
@@ -170,25 +175,27 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->holidayNone(),
 			$this->unitService(7.5)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'bob',
 			new \DateTime('2026-08-03'),
 			new \DateTime('2026-08-07')
 		);
-		$this->assertSame('org_hours_per_day', $est['basis']);
-		$this->assertSame(37.5, $est['hours']);
+		$this->assertSame('model_daily', $est['basis']);
+		$this->assertSame(40.0, $est['hours']);
 	}
 
 	public function testModelDailyWithoutSchedule(): void
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(3));
+		$userMap->method('findByUser')->willReturn([$this->assignment(3)]);
 
 		$model = new WorkingTimeModel();
 		$model->setId(3);
 		$model->setDailyHours(6.0);
+		$model->setWeeklyHours(30.0);
 		$model->setBreakRulesArray(null);
 		$modelMap->method('find')->willReturn($model);
 
@@ -198,6 +205,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->holidayNone(),
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'carol',
@@ -212,7 +220,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->willReturn($this->banssModel(7));
 
 		$holiday = $this->createMock(HolidayService::class);
@@ -229,6 +237,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$holiday,
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -242,7 +251,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->willReturn($this->banssModel(7));
 
 		$holiday = $this->createMock(HolidayService::class);
@@ -260,6 +269,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$holiday,
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -274,7 +284,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn($this->assignment(7));
+		$userMap->method('findByUser')->willReturn([$this->assignment(7)]);
 		$modelMap->method('find')->willReturn($this->banssModel(7));
 
 		$holiday = $this->createMock(HolidayService::class);
@@ -291,6 +301,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$holiday,
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -304,7 +315,7 @@ class VacationHoursDebitServiceTest extends TestCase
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn(null);
+		$userMap->method('findByUser')->willReturn([]);
 
 		$holiday = $this->createMock(HolidayService::class);
 		$holiday->method('computeWorkingDaysForUser')->willReturn(0.0);
@@ -315,6 +326,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$holiday,
 			$this->unitService(8.0)
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		// Saturday–Sunday: must be 0 h, never fabricate 8 h via safeDays=1.
 		$est = $svc->estimateForUserRange(
@@ -322,7 +334,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			new \DateTime('2026-08-08'),
 			new \DateTime('2026-08-09')
 		);
-		$this->assertSame('org_hours_per_day', $est['basis']);
+		$this->assertSame('model_daily', $est['basis']);
 		$this->assertSame(0.0, $est['hours']);
 	}
 
@@ -343,6 +355,7 @@ class VacationHoursDebitServiceTest extends TestCase
 			$this->unitService(8.0),
 			$rotation,
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
@@ -361,7 +374,7 @@ class VacationHoursDebitServiceTest extends TestCase
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
 		// no model assignment -> falls through to workingDays path
-		$userMap->method('findCurrentByUser')->willReturn(null);
+		$userMap->method('findByUser')->willReturn([]);
 		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
 		$rotation->method('isEnabledForOrg')->willReturn(true);
 		$rotation->method('dayNetHoursForUser')->willReturnCallback(
@@ -375,6 +388,7 @@ class VacationHoursDebitServiceTest extends TestCase
 		$svc = new VacationHoursDebitService(
 			$userMap, $modelMap, $holiday, $this->unitService(8.0), $rotation,
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		// Wed day returns null -> rotation aborts -> model/org fallback
 		$est = $svc->estimateForUserRange(
@@ -382,15 +396,15 @@ class VacationHoursDebitServiceTest extends TestCase
 			new \DateTime('2026-08-03'),
 			new \DateTime('2026-08-07')
 		);
-		$this->assertSame('org_hours_per_day', $est['basis']);
-		$this->assertSame(24.0, $est['hours']); // 3 working days * 8h org
+		$this->assertSame('model_daily', $est['basis']);
+		$this->assertSame(24.0, $est['hours']); // 3 working days * 8h legacy contract
 	}
 
 	public function testRotationEstimateSwallowsProviderFailure(): void
 	{
 		$userMap = $this->createMock(UserWorkingTimeModelMapper::class);
 		$modelMap = $this->createMock(WorkingTimeModelMapper::class);
-		$userMap->method('findCurrentByUser')->willReturn(null);
+		$userMap->method('findByUser')->willReturn([]);
 		$rotation = $this->createMock(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class);
 		$rotation->method('isEnabledForOrg')->willReturn(true);
 		$rotation->method('dayNetHoursForUser')->willThrowException(new \RuntimeException('rotation API down'));
@@ -401,13 +415,25 @@ class VacationHoursDebitServiceTest extends TestCase
 		$svc = new VacationHoursDebitService(
 			$userMap, $modelMap, $holiday, $this->unitService(8.0), $rotation,
 		);
+		$this->bindResolver($svc, $userMap, $modelMap);
 
 		$est = $svc->estimateForUserRange(
 			'alice',
 			new \DateTime('2026-08-03'),
 			new \DateTime('2026-08-07')
 		);
-		$this->assertSame('org_hours_per_day', $est['basis']);
+		$this->assertSame('model_daily', $est['basis']);
 		$this->assertSame(40.0, $est['hours']);
+	}
+
+	private function bindResolver(
+		VacationHoursDebitService $svc,
+		UserWorkingTimeModelMapper $userMap,
+		WorkingTimeModelMapper $modelMap
+	): void {
+		// Bind the resolver to this test's mocks — the lazy Server::get
+		// fallback would otherwise bind the live dev database.
+		$prop = new \ReflectionProperty(VacationHoursDebitService::class, 'lazyAssignmentResolver');
+		$prop->setValue($svc, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver($userMap, $modelMap));
 	}
 }

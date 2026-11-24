@@ -61,7 +61,72 @@ class AdminUserProfileUpdateService
 		private readonly ?VacationUnitMigrationService $vacationUnitMigrationService = null,
 		private readonly ?\OCP\Lock\ILockingProvider $lockingProvider = null,
 		private readonly ?AbsenceService $absenceService = null,
+		private readonly ?UserProfileLockGuard $lockGuard = null,
+		private readonly ?MonthClosureService $monthClosureService = null,
+		private readonly ?MonthClosureGuard $monthClosureGuard = null,
+		private ?UserWorkingTimeAssignmentService $assignmentService = null,
 	) {
+	}
+
+	/**
+	 * The single assignment writer. Lazily built so legacy manual
+	 * constructions (tests) still work; DI injects the shared instance.
+	 */
+	private function assignmentService(): UserWorkingTimeAssignmentService
+	{
+		if ($this->assignmentService === null) {
+			$guard = $this->lockGuard;
+			if ($guard === null) {
+				try {
+					$guard = \OCP\Server::get(UserProfileLockGuard::class);
+				} catch (\Throwable) {
+					$guard = null;
+				}
+			}
+			$mcs = $this->monthClosureService;
+			if ($mcs === null) {
+				try {
+					$mcs = \OCP\Server::get(MonthClosureService::class);
+				} catch (\Throwable) {
+					$mcs = null;
+				}
+			}
+			$mcg = $this->monthClosureGuard;
+			if ($mcg === null && $mcs !== null) {
+				try {
+					$mcg = \OCP\Server::get(MonthClosureGuard::class);
+				} catch (\Throwable) {
+					$mcg = null;
+				}
+			}
+			$this->assignmentService = new UserWorkingTimeAssignmentService(
+				$this->userManager,
+				$this->userWorkingTimeModelMapper,
+				$this->workingTimeModelMapper,
+				$this->auditLogMapper,
+				$this->l10n,
+				$this->db,
+				$guard,
+				$mcs,
+				$mcg,
+				$this->vacationUnitService,
+				$this->laborLawProfileFactory,
+			);
+		}
+		return $this->assignmentService;
+	}
+
+	/** Shared request-scoped lock guard (lazily resolved for legacy constructions). */
+	private function profileLockGuard(): ?UserProfileLockGuard
+	{
+		if ($this->lockGuard !== null) {
+			return $this->lockGuard;
+		}
+		try {
+			return \OCP\Server::get(UserProfileLockGuard::class);
+		} catch (\Throwable) {
+			return null;
+		}
 	}
 
 	/** @var array<string, true> request-scoped: profile locks this instance holds. */
@@ -92,6 +157,11 @@ class AdminUserProfileUpdateService
 	 */
 	private function withUserProfileLock(string $userId, callable $callback): mixed
 	{
+		// Shared request-scoped guard: keeps the profile lock reentrant across
+		// this service AND the nested UserWorkingTimeAssignmentService writes.
+		if (($guard = $this->profileLockGuard()) !== null) {
+			return $guard->runProfileExclusive($userId, $callback);
+		}
 		if ($this->lockingProvider === null || isset($this->heldUserProfileLocks[$userId])) {
 			return $callback();
 		}
@@ -284,6 +354,9 @@ class AdminUserProfileUpdateService
 	 */
 	private function withSharedModelCatalogLock(callable $callback): mixed
 	{
+		if (($guard = $this->profileLockGuard()) !== null) {
+			return $guard->runCatalogShared($callback);
+		}
 		if ($this->lockingProvider === null) {
 			return $callback();
 		}
@@ -325,151 +398,17 @@ class AdminUserProfileUpdateService
 			$stored = $this->adminDaysToStoredAmount($daysInput);
 			$vacationDaysPerYear = (int)round($stored);
 		}
-		$startDate = $params['startDate'] ?? null;
-		$endDate = $params['endDate'] ?? null;
 		$germanState = isset($params['germanState']) ? (string)$params['germanState'] : null;
-		$customModel = is_array($params['customModel'] ?? null) ? $params['customModel'] : null;
-		// Checkbox payloads arrive as string "false" in form-encoded calls —
-		// parse explicitly; never trust truthiness (see form-encoded-bool bug).
-		$customEnabled = $customModel !== null
-			&& filter_var($customModel['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-		// Personal-model upsert + assignment write + orphan prune share one
-		// transaction: a failure anywhere must never leave a half-written
-		// model or an assignment pointing at a row that was rolled back.
-		// Nested inside updateProfile's atomic this degrades to a savepoint.
-		$assignmentChanged = false;
-		$updated = $this->atomic(function () use (
-			$userId,
-			$params,
-			$customEnabled,
-			$customModel,
-			$workingTimeModelId,
-			$vacationDaysPerYear,
-			$startDate,
-			$endDate,
-			$performedBy,
-			&$assignmentChanged
-		): ?UserWorkingTimeModel {
-			// Resolve the row this dialog edits *in place*. Using the editable
-			// resolution (active-today, else the latest assignment) instead of
-			// "active today" only is what stops a duplicate row being inserted on
-			// every save when the assignment is future-dated ("Gültig von" set ahead
-			// of time) or already ended.
-			$currentModel = $this->userWorkingTimeModelMapper->findEditableByUser($userId);
-			$oldValues = $currentModel ? $this->userWorkingTimeModelToAuditValues($currentModel) : null;
-
-			$effectiveModelId = $workingTimeModelId;
-			if ($customEnabled) {
-				$effectiveModelId = $this->upsertPersonalWorkingTimeModel(
-					$userId,
-					$customModel ?? [],
-					$currentModel,
-					$performedBy
-				);
-			}
-
-			$updated = null;
-			// Assignment "unchanged" must only skip the model-row update. Region,
-			// labour-law country, and vacation carryover live in the same payload
-			// and must still run (customer bug: carryover alone never persisted).
-			if ($currentModel && $effectiveModelId !== null && $effectiveModelId > 0) {
-				if ($this->workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate)) {
-					$updated = $currentModel;
-				} else {
-					if ($startDate) {
-						$currentModel->setStartDate(new \DateTime((string)$startDate));
-					}
-					if ($endDate !== null) {
-						$currentModel->setEndDate($endDate ? new \DateTime((string)$endDate) : null);
-					}
-					$currentModel->setWorkingTimeModelId($effectiveModelId);
-					if ($vacationDaysPerYear !== null) {
-						$currentModel->setVacationDaysPerYear($vacationDaysPerYear);
-					}
-					$currentModel->setUpdatedAt(new \DateTime());
-					$this->assertEntityValid($currentModel->validate());
-					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
-					$assignmentChanged = true;
-					$this->auditLogMapper->logAction(
-						$userId,
-						'user_working_time_model_updated',
-						'user_working_time_model',
-						$updated->getId(),
-						$oldValues,
-						$this->userWorkingTimeModelToAuditValues($updated),
-						$performedBy
-					);
-				}
-			} elseif ($effectiveModelId !== null && $effectiveModelId > 0) {
-				$newModel = new UserWorkingTimeModel();
-				$newModel->setUserId($userId);
-				$newModel->setWorkingTimeModelId($effectiveModelId);
-				$newModel->setVacationDaysPerYear($vacationDaysPerYear ?? $this->defaultVacationDaysSuggestion());
-				$newModel->setStartDate(new \DateTime($startDate ? (string)$startDate : 'now'));
-				if ($endDate) {
-					$newModel->setEndDate(new \DateTime((string)$endDate));
-				}
-				$newModel->setCreatedAt(new \DateTime());
-				$newModel->setUpdatedAt(new \DateTime());
-				$this->assertEntityValid($newModel->validate());
-				$updated = $this->userWorkingTimeModelMapper->insert($newModel);
-				$assignmentChanged = true;
-				$this->auditLogMapper->logAction(
-					$userId,
-					'user_working_time_model_created',
-					'user_working_time_model',
-					$updated->getId(),
-					null,
-					$this->userWorkingTimeModelToAuditValues($updated),
-					$performedBy
-				);
-			} elseif ($currentModel && array_key_exists('workingTimeModelId', $params)) {
-				// No model selected ("No Model Assigned"): retire the editable
-				// assignment. Requires an explicit workingTimeModelId key — a
-				// payload that only carries germanState/vacation fields must not
-				// silently end the current assignment. A not-yet-started
-				// assignment is deleted outright —
-				// ending it with today's date would produce an invalid start > end
-				// range — while an active or past one is closed with an end date.
-				$today = new \DateTime();
-				$today->setTime(0, 0, 0);
-				$startsInFuture = $currentModel->getStartDate() !== null && $currentModel->getStartDate() > $today;
-				if ($startsInFuture) {
-					$this->userWorkingTimeModelMapper->delete($currentModel);
-					$assignmentChanged = true;
-					$this->auditLogMapper->logAction(
-						$userId,
-						'user_working_time_model_ended',
-						'user_working_time_model',
-						$currentModel->getId(),
-						$oldValues,
-						null,
-						$performedBy
-					);
-				} else {
-					$endDateForRemoval = $endDate ? new \DateTime((string)$endDate) : new \DateTime();
-					$currentModel->setEndDate($endDateForRemoval);
-					$currentModel->setUpdatedAt(new \DateTime());
-					$this->assertEntityValid($currentModel->validate());
-					$updated = $this->userWorkingTimeModelMapper->update($currentModel);
-					$assignmentChanged = true;
-					$this->auditLogMapper->logAction(
-						$userId,
-						'user_working_time_model_ended',
-						'user_working_time_model',
-						$currentModel->getId(),
-						$oldValues,
-						$this->userWorkingTimeModelToAuditValues($updated),
-						$performedBy
-					);
-				}
-			}
-
-			$this->pruneOrphanedPersonalModels($userId, $performedBy);
-
-			return $updated;
-		}, $this->db);
+		// Assignment-row write is delegated to the single writer
+		// (UserWorkingTimeAssignmentService): same locks, overlap guard,
+		// finalized-month warning, audit, and orphan prune on every path
+		// (NN-10). Locks held by this method's callers are reentrant through
+		// the shared UserProfileLockGuard.
+		$legacy = $this->assignmentService()->applyLegacyAssignmentPayload($userId, $params, $performedBy);
+		$updated = $legacy['updated'];
+		$assignmentChanged = $legacy['assignment_changed'];
+		$finalizedMonthsAffected = $legacy['finalized_months_affected'];
 
 		// Assignment window changed → per-day as-of resolution may now point
 		// at a different (paid-break flagged or unflagged) model. The queued
@@ -553,6 +492,7 @@ class AdminUserProfileUpdateService
 			}
 			return [
 				'userWorkingTimeModel' => $updated !== null ? $this->presentUserModelSummary($updated->getSummary()) : null,
+				'workingTimeModelFinalizedMonthsAffected' => $finalizedMonthsAffected,
 				'vacationCarryoverDays' => $this->storedAmountToAdminDays(
 					(float)$this->vacationYearBalanceMapper->getCarryoverDays($userId, $carryoverYear)
 				),
@@ -562,6 +502,7 @@ class AdminUserProfileUpdateService
 
 		return [
 			'userWorkingTimeModel' => $updated !== null ? $this->presentUserModelSummary($updated->getSummary()) : null,
+			'workingTimeModelFinalizedMonthsAffected' => $finalizedMonthsAffected,
 		];
 	}
 

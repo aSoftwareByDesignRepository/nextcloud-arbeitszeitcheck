@@ -215,6 +215,8 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Support\BreakPolicyStore $breakPolicyStore = null,
 		?\OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService = null,
 		?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null,
+		?\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService $userWorkingTimeAssignmentService = null,
+		?\OCA\ArbeitszeitCheck\Service\CalculationProofExportService $calculationProofExportService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -263,7 +265,33 @@ class AdminController extends Controller
 		$this->breakPolicyStore = $breakPolicyStore;
 		$this->timeZoneService = $timeZoneService;
 		$this->transferReceiptStore = $transferReceiptStore;
+		$this->userWorkingTimeAssignmentService = $userWorkingTimeAssignmentService;
+		$this->calculationProofExportService = $calculationProofExportService;
 		$this->setCspService($cspService);
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService $userWorkingTimeAssignmentService = null;
+
+	private function userWorkingTimeAssignmentService(): \OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService
+	{
+		if ($this->userWorkingTimeAssignmentService === null) {
+			$this->userWorkingTimeAssignmentService = \OCP\Server::get(
+				\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService::class
+			);
+		}
+		return $this->userWorkingTimeAssignmentService;
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\CalculationProofExportService $calculationProofExportService = null;
+
+	private function calculationProofExportService(): \OCA\ArbeitszeitCheck\Service\CalculationProofExportService
+	{
+		if ($this->calculationProofExportService === null) {
+			$this->calculationProofExportService = \OCP\Server::get(
+				\OCA\ArbeitszeitCheck\Service\CalculationProofExportService::class
+			);
+		}
+		return $this->calculationProofExportService;
 	}
 
 	private ?\OCA\ArbeitszeitCheck\ConfigTransfer\TransferReceiptStore $transferReceiptStore = null;
@@ -331,6 +359,20 @@ class AdminController extends Controller
 	 * Get the current admin's user ID for audit logging (performedBy).
 	 * Falls back to 'system' if session is unavailable (e.g. CLI).
 	 */
+	/**
+	 * Org gap policy — validated allowlist read.
+	 */
+	private function assignmentsGapPolicy(): string
+	{
+		$raw = $this->appConfig->getAppValueString(
+			Constants::CONFIG_ASSIGNMENTS_GAP_POLICY,
+			Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT
+		);
+		return in_array($raw, Constants::ASSIGNMENTS_GAP_POLICIES, true)
+			? $raw
+			: Constants::CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT;
+	}
+
 	private function getPerformedBy(): string
 	{
 		$user = $this->userSession->getUser();
@@ -803,6 +845,73 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Calc-relevant projection of a working-time model (MH-14/R-16):
+	 * everything that changes stored-entry accounting or derived Soll —
+	 * hours, type, overtime + break rules, the weekday schedule. Cosmetic
+	 * fields (name, description, isDefault, timestamps) are excluded, and
+	 * the §9.4 split_service sub-tree stays mutable like everywhere else.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function workingTimeModelCalcSignature(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model): array
+	{
+		$rules = $model->getBreakRulesArray() ?? [];
+		if (isset($rules[WeekdaySchedule::KEY]) && is_array($rules[WeekdaySchedule::KEY])) {
+			unset($rules[WeekdaySchedule::KEY][WeekdaySchedule::SPLIT_SERVICE_KEY]);
+		}
+		return [
+			'type' => (string)$model->getType(),
+			'weekly_hours' => number_format((float)$model->getWeeklyHours(), 4, '.', ''),
+			'daily_hours' => number_format((float)$model->getDailyHours(), 4, '.', ''),
+			'work_days_per_week' => number_format((float)$model->getWorkDaysPerWeek(), 4, '.', ''),
+			'break_rules' => $rules,
+			'overtime_rules' => $model->getOvertimeRulesArray(),
+		];
+	}
+
+	/**
+	 * MH-14 residual net: the schedule-transition guard only watches the
+	 * breakRules payload — hours/type/overtime edits and v1 schedule writes
+	 * would otherwise mutate an assigned model in place and silently
+	 * re-write past Soll. Any calc-signature change on a model with ≥1
+	 * started assignment must land on a successor revision.
+	 *
+	 * @return JSONResponse|'successor'|null
+	 */
+	private function guardCalcInputImmutability(
+		\OCA\ArbeitszeitCheck\Db\WorkingTimeModel $model,
+		array $params,
+	): JSONResponse|string|null {
+		if ($model->getId() === null) {
+			return null;
+		}
+		$today = $this->timeZoneService()->nowInStorage()->format('Y-m-d');
+		if (!$this->userWorkingTimeModelMapper->hasNonFutureAssignment((int)$model->getId(), $today)) {
+			return null;
+		}
+
+		$probe = clone $model;
+		$paidBefore = null;
+		$paidAfter = null;
+		if ($this->applyWorkingTimeModelParams($probe, $params, $paidBefore, $paidAfter) !== null) {
+			return null; // real path will surface the same validation error
+		}
+		if ($this->workingTimeModelCalcSignature($probe) == $this->workingTimeModelCalcSignature($model)) {
+			return null;
+		}
+
+		$wantsSuccessor = filter_var($params['createSuccessor'] ?? false, FILTER_VALIDATE_BOOLEAN);
+		if ($wantsSuccessor) {
+			return 'successor';
+		}
+		return new JSONResponse([
+			'success' => false,
+			'error' => $this->l10n->t('This model is assigned to employees. Changing its contract hours or rules requires saving as a new copy.'),
+			'code' => 'MODEL_IN_USE_REQUIRES_SUCCESSOR',
+		], Http::STATUS_CONFLICT);
+	}
+
+	/**
 	 * v1→v2 conversion on an assigned model: the source stays byte-identical
 	 * and a new model carrying the submitted values is created.
 	 */
@@ -846,14 +955,21 @@ class AdminController extends Controller
 		}
 
 		$performedBy = $this->getPerformedBy();
-		$created = $this->atomic(function () use ($source, $clone, $performedBy) {
+		$sourceValues = $this->workingTimeModelToAuditValues($source);
+		$created = $this->atomic(function () use ($source, $clone, $performedBy, $sourceValues) {
 			$inserted = $this->workingTimeModelMapper->insert($clone);
+			// MH-14: pin the revision chain — the source stays byte-identical
+			// for historical resolution but leaves the assignable pool (R-12).
+			if ($source->getId() !== null && $source->getSupersededByModelId() === null) {
+				$source->setSupersededByModelId((int)$inserted->getId());
+				$this->workingTimeModelMapper->update($source);
+			}
 			$this->auditLogMapper->logAction(
 				$performedBy,
 				'working_time_model_successor_created',
 				'working_time_model',
 				$inserted->getId(),
-				$this->workingTimeModelToAuditValues($source),
+				$sourceValues,
 				$this->workingTimeModelToAuditValues($inserted),
 				$performedBy
 			);
@@ -1403,6 +1519,12 @@ class AdminController extends Controller
 		if ($e->fieldErrors !== []) {
 			$payload['errors'] = $e->fieldErrors;
 		}
+		if ($e->errorCode !== null) {
+			$payload['code'] = $e->errorCode;
+		}
+		foreach ($e->details as $key => $value) {
+			$payload[$key] = $value;
+		}
 
 		return new JSONResponse($payload, $e->httpStatus);
 	}
@@ -1790,6 +1912,7 @@ class AdminController extends Controller
 			$requireSubstituteTypes = [];
 		}
 		$settings = $this->halfDaySettingsPayload() + [
+			'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
 			'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
@@ -2159,8 +2282,24 @@ class AdminController extends Controller
 			'vacationDaysPerYear' => $currentModel ? $currentModel->getVacationDaysPerYear() : null,
 			'workingTimeModelStartDate' => $startDate ? $startDate->format('Y-m-d') : null,
 			'workingTimeModelEndDate' => $endDate ? $endDate->format('Y-m-d') : null,
+			'workingTimeModelAssignments' => $this->safeAssignmentsList($userId),
 			'overtimeTrackingFrom' => $this->userOvertimeSettingsService->getTrackingFrom($userId)?->format('Y-m-d'),
 		];
+	}
+
+	/**
+	 * Assignment list for the profile payload — fails soft so a resolver
+	 * outage never takes the whole user payload down.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private function safeAssignmentsList(string $userId): array
+	{
+		try {
+			return $this->userWorkingTimeAssignmentService()->listForUser($userId);
+		} catch (\Throwable) {
+			return [];
+		}
 	}
 
 	/**
@@ -2209,6 +2348,7 @@ class AdminController extends Controller
 				: null,
 			'workingTimeModelStartDate' => $currentModel && ($startDate = $currentModel->getStartDate()) ? $startDate->format('Y-m-d') : null,
 			'workingTimeModelEndDate' => $currentModel && ($endDate = $currentModel->getEndDate()) ? $endDate->format('Y-m-d') : null,
+			'workingTimeModelAssignments' => $this->safeAssignmentsList($userId),
 			'hasTimeEntriesToday' => $hasTimeEntriesToday,
 			'vacationCarryoverDays' => $this->presentAdminVacationDays(
 				(float)$this->vacationYearBalanceMapper->getCarryoverDays($userId, $currentYear)
@@ -3375,6 +3515,9 @@ class AdminController extends Controller
 				// Same shape the compliance page render embeds — the API must
 				// not be a write-only surface for the org break policy.
 				'breakPolicy' => $this->breakPolicyPayloadForSettings(),
+				// Spec §418: gap policy is an org flag clients must read (not
+				// write-only) — same contract as the admin-settings page.
+				'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
 			];
 
 			return new JSONResponse([
@@ -4351,6 +4494,32 @@ class AdminController extends Controller
 					$this->toBool($params['leaveSollEffectsEnabled']) ? '1' : '0'
 				);
 			}
+			if (array_key_exists('assignmentsGapPolicy', $params)) {
+				$requestedPolicy = is_string($params['assignmentsGapPolicy'])
+					? trim($params['assignmentsGapPolicy'])
+					: '';
+				if (!in_array($requestedPolicy, Constants::ASSIGNMENTS_GAP_POLICIES, true)) {
+					throw new AdminUserProfileUpdateException(
+						$this->l10n->t('Invalid gap policy. Allowed: %s', [implode(', ', Constants::ASSIGNMENTS_GAP_POLICIES)]),
+						Http::STATUS_BAD_REQUEST,
+						['assignmentsGapPolicy' => $this->l10n->t('Must be one of: %s', [implode(', ', Constants::ASSIGNMENTS_GAP_POLICIES)])],
+						'ASSIGNMENTS_GAP_POLICY_INVALID'
+					);
+				}
+				$previousPolicy = $this->assignmentsGapPolicy();
+				if ($requestedPolicy !== $previousPolicy) {
+					$this->appConfig->setAppValueString(Constants::CONFIG_ASSIGNMENTS_GAP_POLICY, $requestedPolicy);
+					$this->auditLogMapper->logAction(
+						$this->getPerformedBy(),
+						'assignments_gap_policy_changed',
+						'app_config',
+						null,
+						['value' => $previousPolicy],
+						['value' => $requestedPolicy],
+						$this->getPerformedBy()
+					);
+				}
+			}
 
 			$allowedKeys = [
 				'missingClockInRemindersEnabled' => 'missing_clock_in_reminders_enabled',
@@ -5169,6 +5338,7 @@ class AdminController extends Controller
 				Constants::CONFIG_LEAVE_SOLL_EFFECTS,
 				Constants::CONFIG_LEAVE_SOLL_EFFECTS_DEFAULT
 			) === '1',
+			'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
 			'premiumSurchargesEnabled' => $this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED, '0') === '1',
 			'premiumPolicy' => $this->decodePremiumPolicyForAdmin(),
 			'premiumPolicyVersion' => (int)$this->appConfig->getAppValueString(Constants::CONFIG_PREMIUM_POLICY_VERSION, '0'),
@@ -5982,6 +6152,7 @@ class AdminController extends Controller
 						? $userWorkLocationDefault
 						: '',
 					'userWorkingTimeModel' => $currentModel ? $this->presentUserWorkingTimeModelSummary($currentModel->getSummary()) : null,
+					'workingTimeModelAssignments' => $this->safeAssignmentsList($userId),
 					'vacationPolicy' => $policy ? [
 						'id' => $policy->getId(),
 						'vacationMode' => $policy->getVacationMode(),
@@ -6008,6 +6179,8 @@ class AdminController extends Controller
 							'weeklyHours' => $model->getWeeklyHours(),
 							'dailyHours' => $model->getDailyHours(),
 							'workDaysPerWeek' => $model->getWorkDaysPerWeek(),
+							'assignable' => !$model->isSuperseded(),
+							'superseded' => $model->isSuperseded(),
 						];
 					}, $allModels)
 				]
@@ -6107,6 +6280,218 @@ class AdminController extends Controller
 	}
 
 	/**
+	 * Effective-dated working-time-model assignment — create (POST).
+	 *
+	 * Body: {model_id|workingTimeModelId | custom_model|customModel{enabled,…},
+	 *        start_date|startDate, end_date?|endDate?,
+	 *        vacation_days_per_year?|vacationDaysPerYear?}
+	 *
+	 * Auto-ends only the immediate predecessor at start−1; every other
+	 * overlap → 409 ASSIGNMENT_OVERLAP carrying the colliding rows.
+	 */
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function createUserWorkingTimeAssignment(string $userId): JSONResponse
+	{
+		try {
+			$result = $this->userWorkingTimeAssignmentService()->createAssignment(
+				$userId,
+				$this->request->getParams(),
+				$this->getPerformedBy()
+			);
+			$this->afterAssignmentWrite($userId, (bool)$result['assignment_changed']);
+			return new JSONResponse(array_merge(['success' => true], $result));
+		} catch (AdminUserProfileUpdateException $e) {
+			return $this->profileUpdateExceptionResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::createUserWorkingTimeAssignment failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Effective-dated assignment — explicit edit (PATCH). Never auto-ends
+	 * neighbours; every overlap with another row → 409 ASSIGNMENT_OVERLAP.
+	 */
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function updateUserWorkingTimeAssignment(string $userId, int $id): JSONResponse
+	{
+		try {
+			$result = $this->userWorkingTimeAssignmentService()->updateAssignment(
+				$userId,
+				$id,
+				$this->request->getParams(),
+				$this->getPerformedBy()
+			);
+			$this->afterAssignmentWrite($userId, (bool)$result['assignment_changed']);
+			return new JSONResponse(array_merge(['success' => true], $result));
+		} catch (AdminUserProfileUpdateException $e) {
+			return $this->profileUpdateExceptionResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateUserWorkingTimeAssignment failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Effective-dated assignment — delete (DELETE). Only never-effective
+	 * windows (start > today) are deletable; a started window is ended via
+	 * PATCH instead → 409 ASSIGNMENT_NOT_DELETABLE.
+	 */
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function deleteUserWorkingTimeAssignment(string $userId, int $id): JSONResponse
+	{
+		try {
+			$result = $this->userWorkingTimeAssignmentService()->deleteAssignment(
+				$userId,
+				$id,
+				$this->getPerformedBy()
+			);
+			$this->afterAssignmentWrite($userId, (bool)$result['assignment_changed']);
+			return new JSONResponse(array_merge(['success' => true], $result));
+		} catch (AdminUserProfileUpdateException $e) {
+			return $this->profileUpdateExceptionResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteUserWorkingTimeAssignment failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * MH-17: Berechnungsnachweis — the auditor-facing calculation proof for
+	 * one user and range (assignments + model inputs, holiday context,
+	 * absences, soll_segments, balance derivation). Same resolver output as
+	 * the live calculation (NN-01).
+	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function exportUserCalculationProof(string $userId): JSONResponse|DataDownloadResponse
+	{
+		try {
+			$user = $this->userManager->get($userId);
+			if (!$user) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('User not found')
+				], Http::STATUS_NOT_FOUND);
+			}
+
+			$from = $this->parseProofDate($this->request->getParam('from')) ?? $this->timeZoneService()->nowInStorage()->modify('first day of this month');
+			$to = $this->parseProofDate($this->request->getParam('to')) ?? $this->timeZoneService()->nowInStorage()->setTime(0, 0, 0);
+			if ($to < $from) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The end date must not be before the start date.'),
+					'code' => 'PROOF_RANGE_INVALID',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			// Bound the export window — a 50-year range would build a
+			// five-figure line count and stall the request.
+			$maxEnd = (clone $from)->modify('+5 years');
+			if ($to > $maxEnd) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The selected range is too large (maximum 5 years).'),
+					'code' => 'PROOF_RANGE_TOO_LARGE',
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$format = strtolower((string)$this->request->getParam('format', 'csv'));
+			if (!in_array($format, ['csv', 'pdf', 'json'], true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Unsupported export format.'),
+					'code' => 'PROOF_FORMAT_INVALID',
+				], Http::STATUS_BAD_REQUEST);
+			}
+
+			$service = $this->calculationProofExportService();
+			$doc = $service->buildDocument($userId, $from, $to);
+			$base = sprintf('berechnungsnachweis-%s-%s-%s',
+				preg_replace('/[^A-Za-z0-9_.-]/', '_', $userId),
+				$from->format('Y-m-d'),
+				$to->format('Y-m-d'));
+
+			return match ($format) {
+				'json' => new JSONResponse(['success' => true, 'proof' => $doc]),
+				'pdf' => new DataDownloadResponse(
+					\OCA\ArbeitszeitCheck\Service\MinimalPdfBuilder::build(
+						$this->l10n->t('Calculation proof'),
+						$service->buildPdfLines($doc)
+					),
+					$base . '.pdf',
+					'application/pdf'
+				),
+				default => new DataDownloadResponse(
+					$service->buildCsv($doc),
+					$base . '.csv',
+					'text/csv; charset=utf-8'
+				),
+			};
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::exportUserCalculationProof failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	private function parseProofDate(mixed $value): ?\DateTime
+	{
+		if (!is_string($value) || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) {
+			return null;
+		}
+		$dt = \DateTime::createFromFormat('!Y-m-d', $value);
+		return ($dt !== false && $dt->format('Y-m-d') === $value) ? $dt : null;
+	}
+
+	/**
+	 * Post-commit side effects of an assignment write: stats-cache
+	 * invalidation + paid-break snapshot recompute + resolver memoization
+	 * drop so same-request readers see the new windows.
+	 */
+	private function afterAssignmentWrite(string $userId, bool $assignmentChanged): void
+	{
+		try {
+			\OCP\Server::get(\OCA\ArbeitszeitCheck\Service\AbsenceService::class)
+				->invalidateVacationStatsCache($userId);
+		} catch (\Throwable) {
+			// invalidation is best-effort post-commit
+		}
+		try {
+			\OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class)
+				->invalidateUser($userId);
+		} catch (\Throwable) {
+			// resolver may be unresolvable in test contexts — fine
+		}
+		if ($assignmentChanged) {
+			try {
+				\OCA\ArbeitszeitCheck\BackgroundJob\PaidBreakRecomputeJob::enqueueForUser(
+					\OCP\Server::get(\OCP\BackgroundJob\IJobList::class),
+					$userId
+				);
+			} catch (\Throwable $e) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'Paid-break recompute enqueue for user failed: ' . $e->getMessage(),
+					['exception' => $e, 'user_id' => $userId]
+				);
+			}
+		}
+	}
+
+	/**
 	 * Get all available working time models (admin-only by default)
 	 *
 	 * @return JSONResponse
@@ -6117,6 +6502,16 @@ class AdminController extends Controller
 	{
 		try {
 			$models = $this->workingTimeModelMapper->findAll();
+
+			// R-12: ?assignable=1 hides superseded revisions — pickers must
+			// not offer dead model versions; history keeps resolving them.
+			$assignableOnly = filter_var($this->request->getParam('assignable', false), FILTER_VALIDATE_BOOLEAN);
+			if ($assignableOnly) {
+				$models = array_values(array_filter(
+					$models,
+					static fn ($model): bool => !$model->isSuperseded()
+				));
+			}
 
 			return new JSONResponse([
 				'success' => true,
@@ -6129,7 +6524,9 @@ class AdminController extends Controller
 						'weeklyHours' => $model->getWeeklyHours(),
 						'dailyHours' => $model->getDailyHours(),
 						'workDaysPerWeek' => $model->getWorkDaysPerWeek(),
-						'isDefault' => $model->getIsDefault()
+						'isDefault' => $model->getIsDefault(),
+						'superseded' => $model->isSuperseded(),
+						'assignable' => !$model->isSuperseded(),
 					];
 				}, $models)
 			]);
@@ -6327,6 +6724,14 @@ class AdminController extends Controller
 				return $scheduleTransition;
 			}
 			if ($scheduleTransition === 'successor') {
+				return $this->createWorkingTimeModelSuccessor($model, $params);
+			}
+
+			$calcTransition = $this->guardCalcInputImmutability($model, $params);
+			if ($calcTransition instanceof JSONResponse) {
+				return $calcTransition;
+			}
+			if ($calcTransition === 'successor') {
 				return $this->createWorkingTimeModelSuccessor($model, $params);
 			}
 

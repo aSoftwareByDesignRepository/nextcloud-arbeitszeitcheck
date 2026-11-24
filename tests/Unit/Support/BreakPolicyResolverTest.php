@@ -79,11 +79,10 @@ class BreakPolicyResolverTest extends TestCase
 		$this->userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
 
 		$this->userWtmMapper = $this->createMock(UserWorkingTimeModelMapper::class);
-		$this->userWtmMapper->method('findCurrentByUser')->willReturnCallback(
-			fn (string $uid) => $uid === 'u1' ? $this->assignment : null
-		);
-		$this->userWtmMapper->method('findByUserAndDate')->willReturnCallback(
-			fn (string $uid, \DateTime $date) => $uid === 'u1' ? $this->assignment : null
+		$this->userWtmMapper->method('findByUser')->willReturnCallback(
+			fn (string $uid) => $uid === 'u1' && $this->assignment !== null
+				? [$this->assignment]
+				: []
 		);
 
 		$this->wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
@@ -119,6 +118,22 @@ class BreakPolicyResolverTest extends TestCase
 			$timeZoneService,
 			$l10n,
 		);
+		$this->freshAssignmentResolver();
+	}
+
+	/**
+	 * (Re)bind the assignment resolver to this test's mocked mappers — the
+	 * lazy Server::get fallback inside BreakPolicyResolver would otherwise
+	 * bind the live dev database. Rebuilt on every assignModel() because the
+	 * resolver memoizes models/assignments per instance.
+	 */
+	private function freshAssignmentResolver(): void
+	{
+		$prop = new \ReflectionProperty(BreakPolicyResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->resolver, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWtmMapper,
+			$this->wtmMapper,
+		));
 	}
 
 	private function setPolicy(array $policy): void
@@ -135,7 +150,9 @@ class BreakPolicyResolverTest extends TestCase
 		$this->modelBreakRules = $breakRules;
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(7);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
 		$this->assignment = $assignment;
+		$this->freshAssignmentResolver();
 		$this->resolver->clearCache();
 	}
 

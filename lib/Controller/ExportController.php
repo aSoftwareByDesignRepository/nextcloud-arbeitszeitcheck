@@ -82,17 +82,7 @@ class ExportController extends Controller
 
 	private static function sanitizeCsvCellValue(string $value): string
 	{
-		if ($value === '') {
-			return $value;
-		}
-		if (preg_match('/^[\x00-\x20]*[=+\-@]/u', $value) === 1) {
-			return "'" . $value;
-		}
-		$first = $value[0];
-		if ($first === "\t" || $first === "\r" || $first === "\n") {
-			return "'" . $value;
-		}
-		return $value;
+		return \OCA\ArbeitszeitCheck\Support\CsvCellSanitizer::sanitize($value);
 	}
 
 	private function parseDateYmd(?string $value, string $fieldName): ?\DateTime

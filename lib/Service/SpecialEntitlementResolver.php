@@ -160,9 +160,9 @@ final class SpecialEntitlementResolver
 	{
 		$modelId = null;
 		try {
-			$assignment = $this->userModels->findByUserAndDate($userId, new \DateTime($asOf->format('Y-m-d')));
-			if ($assignment !== null) {
-				$modelId = (string)(int)$assignment->getWorkingTimeModelId();
+			$contract = $this->assignmentResolver()->resolveStrict($userId, new \DateTime($asOf->format('Y-m-d')));
+			if ($contract->model !== null) {
+				$modelId = (string)(int)$contract->model->getId();
 			}
 		} catch (\Throwable) {
 			$modelId = null;
@@ -337,6 +337,23 @@ final class SpecialEntitlementResolver
 			return new \DateTimeImmutable(sprintf('%04d-02-28', $year));
 		}
 		return new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $day));
+	}
+
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userModels,
+					\OCP\Server::get(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class)
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	private function formatAmount(float $amount): float

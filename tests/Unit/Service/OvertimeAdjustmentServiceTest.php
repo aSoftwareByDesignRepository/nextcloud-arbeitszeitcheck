@@ -167,23 +167,26 @@ class OvertimeAdjustmentServiceTest extends TestCase
 	{
 		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
 		$lockHeldDuringInsert = false;
+		$lockHeld = false;
 		$acquired = [];
 		$released = [];
 
 		$lp = $this->createMock(ILockingProvider::class);
 		$lp->method('acquireLock')->willReturnCallback(
-			static function (string $key, int $type) use (&$acquired): void {
+			static function (string $key, int $type) use (&$acquired, &$lockHeld): void {
 				$acquired[] = [$key, $type];
+				$lockHeld = $key === DbLockKeys::overtimeBalance('alice') && $type === ILockingProvider::LOCK_EXCLUSIVE;
 			}
 		);
 		$lp->method('releaseLock')->willReturnCallback(
-			static function (string $key, int $type) use (&$released): void {
+			static function (string $key, int $type) use (&$released, &$lockHeld): void {
 				$released[] = [$key, $type];
+				$lockHeld = false;
 			}
 		);
 		$lp->method('isLocked')->willReturnCallback(
-			static function (string $key, int $type): bool {
-				return true; // our own exclusive lock reads as locked
+			static function (string $key, int $type) use (&$lockHeld): bool {
+				return $lockHeld && $key === DbLockKeys::overtimeBalance('alice') && $type === ILockingProvider::LOCK_EXCLUSIVE; // our own exclusive lock reads as locked
 			}
 		);
 
@@ -199,7 +202,10 @@ class OvertimeAdjustmentServiceTest extends TestCase
 			});
 
 		$bank = $this->createMock(OvertimeBankService::class);
-		$bank->method('getBankStatus')->willReturn(['effective_balance' => 20.0]);
+		$bank->method('getBankStatus')->willReturnCallback(static function () use (&$lockHeld): array {
+			self::assertTrue($lockHeld, 'balance read must run under the exclusive ledger lock');
+			return ['effective_balance' => 20.0];
+		});
 		$users = $this->createMock(IUserManager::class);
 		$users->method('get')->willReturn($this->createMock(IUser::class));
 

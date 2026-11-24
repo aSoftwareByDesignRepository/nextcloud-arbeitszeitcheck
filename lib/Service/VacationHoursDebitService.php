@@ -37,7 +37,7 @@ class VacationHoursDebitService
 	 *
 	 * @return array{
 	 *   hours: float,
-	 *   basis: 'weekday_schedule'|'model_daily'|'org_hours_per_day'|'rotation_pattern'|'published_roster'|'open_roster',
+	 *   basis: 'weekday_schedule'|'model_daily'|'org_hours_per_day'|'rotation_pattern'|'published_roster'|'open_roster'|'segmented'|'unassigned_gap',
 	 *   average_daily: float,
 	 *   weekday_nets: array<string, float>|null,
 	 *   one_day_hours: float
@@ -62,44 +62,68 @@ class VacationHoursDebitService
 		}
 
 		$orgHpd = $this->vacationUnitService->getHoursPerDay();
-		[$schedule, $modelDaily] = $this->resolveContract($userId);
 
-		if ($schedule !== null) {
-			$hours = $schedule->requiredHoursForDateRange(
-				$startDt,
-				$endDt,
-				fn (\DateTime $d): float => $this->holidayService->getHolidayWeightForUser($userId, $d)
-			);
-			$avg = $schedule->averageDailyNetHours();
-			$oneDay = $this->oneDayHoursFromSchedule($schedule, $startDt);
-			$nets = $this->weekdayNetsMap($schedule);
+		// Segmented contract resolution: each assignment window debits with
+		// its own daily Soll — a mid-range model change no longer applies the
+		// *current* contract to the whole vacation.
+		$segments = $this->assignmentResolver()->resolveRange($userId, $startDt, $endDt);
+		$endContract = $this->assignmentResolver()->resolveStrict($userId, $endDt);
+		$uniformBasis = count($segments) === 1 ? $segments[0]->contract->basis : null;
 
-			return [
-				'hours' => $this->vacationUnitService->roundAmount(max(0.0, $hours)),
-				'basis' => 'weekday_schedule',
-				'average_daily' => $this->vacationUnitService->roundAmount(max(0.25, $avg)),
-				'weekday_nets' => $nets,
-				'one_day_hours' => $this->vacationUnitService->roundAmount(max(0.25, $oneDay)),
-			];
+		$total = 0.0;
+		foreach ($segments as $seg) {
+			$c = $seg->contract;
+			if ($c->basis === WorkingTimeModelAssignmentResolver::BASIS_UNASSIGNED_GAP) {
+				// Strict gap: no contract, no Soll — nothing to debit.
+				continue;
+			}
+			if ($c->schedule !== null) {
+				$total += $c->schedule->requiredHoursForDateRange(
+					$seg->start,
+					$seg->end,
+					fn (\DateTime $d): float => $this->holidayService->getHolidayWeightForUser($userId, $d)
+				);
+				continue;
+			}
+			$daily = ($c->dailyHours >= 0.25 && $c->dailyHours <= 24.0 && is_finite($c->dailyHours))
+				? round($c->dailyHours, 2, PHP_ROUND_HALF_UP)
+				: $orgHpd;
+			// Never invent a working day for weekend/holiday-only ranges.
+			$wd = max(0.0, $this->holidayService->computeWorkingDaysForUser($userId, $seg->start, $seg->end));
+			$total += $wd * $daily;
 		}
 
-		$workingDays = $this->holidayService->computeWorkingDaysForUser($userId, $startDt, $endDt);
-		$daily = ($modelDaily !== null && $modelDaily >= 0.25 && $modelDaily <= 24.0)
-			? round($modelDaily, 2, PHP_ROUND_HALF_UP)
+		// Summary fields mirror the contract covering the range end.
+		$endDaily = ($endContract->dailyHours >= 0.25 && $endContract->dailyHours <= 24.0 && is_finite($endContract->dailyHours))
+			? round($endContract->dailyHours, 2, PHP_ROUND_HALF_UP)
 			: $orgHpd;
-		$basis = ($modelDaily !== null && $modelDaily >= 0.25 && $modelDaily <= 24.0)
-			? 'model_daily'
-			: 'org_hours_per_day';
+		if ($endContract->schedule !== null) {
+			$avg = $endContract->schedule->averageDailyNetHours();
+			$oneDay = $this->oneDayHoursFromSchedule($endContract->schedule, $endDt);
+			$nets = $this->weekdayNetsMap($endContract->schedule);
+			$avgOut = max(0.25, $avg);
+			$oneDayOut = max(0.25, $oneDay);
+		} else {
+			$nets = null;
+			$avgOut = max(0.25, $endDaily);
+			$oneDayOut = max(0.25, $endDaily);
+		}
 
-		// Never invent a working day for weekend/holiday-only ranges (was safeDays=1).
-		$safeDays = max(0.0, $workingDays);
+		$basis = match (true) {
+			$uniformBasis === 'weekday_schedule' => 'weekday_schedule',
+			$uniformBasis === WorkingTimeModelAssignmentResolver::BASIS_UNASSIGNED_GAP => 'unassigned_gap',
+			$uniformBasis !== null => ($endContract->dailyHours >= 0.25 && $endContract->dailyHours <= 24.0 && is_finite($endContract->dailyHours))
+				? 'model_daily'
+				: 'org_hours_per_day',
+			default => 'segmented',
+		};
 
 		return [
-			'hours' => $this->vacationUnitService->roundAmount($safeDays * $daily),
+			'hours' => $this->vacationUnitService->roundAmount(max(0.0, $total)),
 			'basis' => $basis,
-			'average_daily' => $this->vacationUnitService->roundAmount(max(0.25, $daily)),
-			'weekday_nets' => null,
-			'one_day_hours' => $this->vacationUnitService->roundAmount(max(0.25, $daily)),
+			'average_daily' => $this->vacationUnitService->roundAmount($avgOut),
+			'weekday_nets' => $nets,
+			'one_day_hours' => $this->vacationUnitService->roundAmount($oneDayOut),
 		];
 	}
 
@@ -107,7 +131,7 @@ class VacationHoursDebitService
 	 * Snapshot for UI / mobile companions (additive; old clients ignore).
 	 *
 	 * @return array{
-	 *   basis: 'weekday_schedule'|'model_daily'|'org_hours_per_day'|'rotation_pattern'|'published_roster'|'open_roster',
+	 *   basis: 'weekday_schedule'|'model_daily'|'org_hours_per_day'|'rotation_pattern'|'published_roster'|'open_roster'|'segmented'|'unassigned_gap',
 	 *   average_daily: float,
 	 *   weekday_nets: array<string, float>|null,
 	 *   one_day_hours: float
@@ -178,24 +202,21 @@ class VacationHoursDebitService
 		}
 	}
 
-	/**
-	 * @return array{0: ?WeekdaySchedule, 1: ?float}
-	 */
-	private function resolveContract(string $userId): array
-	{
-		try {
-			$userModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($userModel === null) {
-				return [null, null];
-			}
-			$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
-			$schedule = $model->getWeekdaySchedule();
-			$daily = (float)$model->getDailyHours();
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
 
-			return [$schedule, is_finite($daily) ? $daily : null];
-		} catch (DoesNotExistException) {
-			return [null, null];
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
 		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	/**

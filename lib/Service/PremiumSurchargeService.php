@@ -401,21 +401,34 @@ class PremiumSurchargeService
 	 */
 	private function resolveDailyTarget(string $userId): array
 	{
-		$daily = 8.0;
-		$schedule = null;
-		$userModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-		if ($userModel) {
+		try {
+			// Money path → strict resolution at today (covers the strict-gap
+			// case: no covering assignment → 0 target, no surcharges owed).
+			$contract = $this->assignmentResolver()->resolveStrict($userId, new \DateTime());
+			$daily = $contract->dailyHours;
+			if (!is_finite($daily) || $daily < 0.0) {
+				$daily = 0.0;
+			}
+			return [$contract->schedule, $daily];
+		} catch (\Throwable) {
+			return [null, 8.0];
+		}
+	}
+
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
 			try {
-				$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
-				$schedule = $model->getWeekdaySchedule();
-				$daily = $schedule !== null
-					? $schedule->averageDailyNetHours()
-					: (float)$model->getDailyHours();
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
 			} catch (\Throwable) {
-				// defaults
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
 			}
 		}
-
-		return [$schedule, $daily];
+		return $this->lazyAssignmentResolver;
 	}
 }

@@ -50,6 +50,13 @@ class OvertimeServiceTest extends TestCase
 	/** @var UserOvertimeSettingsService|\PHPUnit\Framework\MockObject\MockObject */
 	private $overtimeSettingsService;
 
+	/**
+	 * Resolver bound to the test's mocked mappers — the lazy Server::get
+	 * fallback inside OvertimeService would otherwise bind the live dev
+	 * database and bypass every mapper stub in this file.
+	 */
+	private \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver $assignmentResolver;
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -69,13 +76,21 @@ class OvertimeServiceTest extends TestCase
 			}
 		);
 
+		$this->assignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		);
+
 		$this->service = new OvertimeService(
 			$this->timeEntryMapper,
 			$this->workingTimeModelMapper,
 			$this->userWorkingTimeModelMapper,
 			$this->l10n,
 			$this->holidayCalendarService,
-			$this->overtimeSettingsService
+			$this->overtimeSettingsService,
+			null,
+			null,
+			$this->assignmentResolver,
 		);
 	}
 
@@ -90,9 +105,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model assigned
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entries - 5 working days, 8 hours each = 40 hours
 		$entries = [];
@@ -141,9 +156,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model (defaults to 40 hours/week)
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entries - 5 working days, 9 hours each = 45 hours (5 hours overtime)
 		$entries = [];
@@ -186,9 +201,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model (defaults to 40 hours/week)
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entries - 5 working days, 7 hours each = 35 hours (5 hours undertime)
 		$entries = [];
@@ -234,6 +249,7 @@ class OvertimeServiceTest extends TestCase
 		$userModel->setId(1);
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId(1);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
 		$userModel->setCreatedAt(new \DateTime());
 		$userModel->setUpdatedAt(new \DateTime());
 
@@ -246,9 +262,9 @@ class OvertimeServiceTest extends TestCase
 		$model->setUpdatedAt(new \DateTime());
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn($userModel);
+			->willReturn([$userModel]);
 
 		$this->workingTimeModelMapper->expects($this->atLeastOnce())
 			->method('find')
@@ -302,6 +318,7 @@ class OvertimeServiceTest extends TestCase
 		$userModel = new UserWorkingTimeModel();
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId(7);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
 
 		$model = new WorkingTimeModel();
 		$model->setName('Abruf');
@@ -311,9 +328,9 @@ class OvertimeServiceTest extends TestCase
 		$model->setWorkDaysPerWeek(0);
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn($userModel);
+			->willReturn([$userModel]);
 		$this->workingTimeModelMapper->expects($this->atLeastOnce())
 			->method('find')
 			->with(7)
@@ -353,6 +370,7 @@ class OvertimeServiceTest extends TestCase
 		$userModel = new UserWorkingTimeModel();
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId(9);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
 
 		$model = new WorkingTimeModel();
 		$model->setName('Corrupt legacy row');
@@ -362,9 +380,9 @@ class OvertimeServiceTest extends TestCase
 		$model->setWorkDaysPerWeek(0);
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn($userModel);
+			->willReturn([$userModel]);
 		$this->workingTimeModelMapper->expects($this->atLeastOnce())
 			->method('find')
 			->with(9)
@@ -392,9 +410,9 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07');
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('findAll')
 			->with(1)
@@ -422,9 +440,9 @@ class OvertimeServiceTest extends TestCase
 		$endDate = new \DateTime('2024-01-07');
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('findAll')
 			->with(1)
@@ -450,9 +468,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock entries: one completed, one active, one pending
 		$completedEntry = new TimeEntry();
@@ -513,9 +531,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entries for current year
 		$entries = [];
@@ -556,9 +574,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entry for the day
 		$entry = new TimeEntry();
@@ -597,9 +615,9 @@ class OvertimeServiceTest extends TestCase
 
 		// Mock no working time model
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn(null);
+			->willReturn([]);
 
 		// Mock time entries for the week (5 working days)
 		$entries = [];
@@ -640,7 +658,7 @@ class OvertimeServiceTest extends TestCase
 	{
 		$userId = 'testuser';
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
 		$result = $this->service->getWeeklyOvertime($userId);
@@ -681,10 +699,13 @@ class OvertimeServiceTest extends TestCase
 			$this->userWorkingTimeModelMapper,
 			$this->l10n,
 			$holiday,
-			$overtimeSettings
+			$overtimeSettings,
+			null,
+			null,
+			$this->assignmentResolver,
 		);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 
 		$this->timeEntryMapper->expects($this->atLeastOnce())
 			->method('findByUserAndDateRange')
@@ -726,10 +747,13 @@ class OvertimeServiceTest extends TestCase
 			$this->userWorkingTimeModelMapper,
 			$this->l10n,
 			$holiday,
-			$overtimeSettings
+			$overtimeSettings,
+			null,
+			null,
+			$this->assignmentResolver,
 		);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->expects($this->never())->method('findByUserAndDateRange');
 
 		$windowStart = (clone $today)->modify('-7 days');
@@ -753,6 +777,7 @@ class OvertimeServiceTest extends TestCase
 		$userModel->setId(1);
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId(9);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
 
 		$model = new WorkingTimeModel();
 		$model->setId(9);
@@ -766,9 +791,9 @@ class OvertimeServiceTest extends TestCase
 		]);
 
 		$this->userWorkingTimeModelMapper->expects($this->atLeastOnce())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with($userId)
-			->willReturn($userModel);
+			->willReturn([$userModel]);
 		$this->workingTimeModelMapper->expects($this->atLeastOnce())
 			->method('find')
 			->with(9)
@@ -799,6 +824,7 @@ class OvertimeServiceTest extends TestCase
 		$userModel->setId(1);
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId(3);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
 
 		$model = new WorkingTimeModel();
 		$model->setId(3);
@@ -811,7 +837,7 @@ class OvertimeServiceTest extends TestCase
 			'weekday_schedule' => ['days' => ['mon' => ['work' => true]]],
 		]);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($userModel);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$userModel]);
 		$this->workingTimeModelMapper->method('find')->with(3)->willReturn($model);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(5.0);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
@@ -830,7 +856,7 @@ class OvertimeServiceTest extends TestCase
 		$userId = 'testuser';
 		$startDate = new \DateTime('2024-01-01');
 		$endDate = new \DateTime('2024-01-01');
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(1.0);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
@@ -849,7 +875,7 @@ class OvertimeServiceTest extends TestCase
 		$startDate = new \DateTime('2026-09-12');
 		$endDate = new \DateTime('2026-09-12');
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
@@ -868,6 +894,7 @@ class OvertimeServiceTest extends TestCase
 			$this->overtimeSettingsService,
 			null,
 			$credit,
+			$this->assignmentResolver,
 		);
 
 		$result = $service->calculateOvertime($userId, $startDate, $endDate, false);
@@ -884,7 +911,7 @@ class OvertimeServiceTest extends TestCase
 
 	public function testCalculateMonthlyAndYearlyOvertimeDelegate(): void
 	{
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
 
@@ -898,7 +925,7 @@ class OvertimeServiceTest extends TestCase
 	{
 		$this->overtimeSettingsService->method('resolveEffectiveYearStart')
 			->willReturn(new \DateTime('2026-03-01'));
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 		$this->holidayCalendarService->method('computeWorkingDaysForUser')->willReturn(0.0);
 
@@ -940,6 +967,7 @@ class OvertimeServiceTest extends TestCase
 			$overtimeSettings,
 			$rotation,
 			null,
+			$this->assignmentResolver,
 		);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 		$result = $service->calculateOvertime('alice', new \DateTime('2026-06-01'), new \DateTime('2026-06-02'));
@@ -969,9 +997,10 @@ class OvertimeServiceTest extends TestCase
 			$this->overtimeSettingsService,
 			null,
 			$creditService,
+			$this->assignmentResolver,
 		);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
 		$result = $service->calculateOvertime(
@@ -1009,9 +1038,10 @@ class OvertimeServiceTest extends TestCase
 			$this->overtimeSettingsService,
 			null,
 			$creditService,
+			$this->assignmentResolver,
 		);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
 		$result = $service->calculateOvertime(
@@ -1047,9 +1077,10 @@ class OvertimeServiceTest extends TestCase
 			$this->overtimeSettingsService,
 			null,
 			$creditService,
+			$this->assignmentResolver,
 		);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$this->timeEntryMapper->method('findByUserAndDateRange')->willReturn([]);
 
 		$result = $service->calculateOvertime(
@@ -1072,8 +1103,9 @@ class OvertimeServiceTest extends TestCase
 		$userModel = new UserWorkingTimeModel();
 		$userModel->setUserId($userId);
 		$userModel->setWorkingTimeModelId($modelId);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')
-			->with($userId)->willReturn($userModel);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWorkingTimeModelMapper->method('findByUser')
+			->with($userId)->willReturn([$userModel]);
 
 		$model = new WorkingTimeModel();
 		$model->setName('Contract');
@@ -1098,6 +1130,8 @@ class OvertimeServiceTest extends TestCase
 			$this->holidayCalendarService,
 			$this->overtimeSettingsService,
 			$rotation,
+			null,
+			$this->assignmentResolver,
 		);
 	}
 
@@ -1148,7 +1182,7 @@ class OvertimeServiceTest extends TestCase
 
 		// The roster is the authority for rotation users — the contract
 		// resolver must not even run for them.
-		$this->userWorkingTimeModelMapper->expects($this->never())->method('findCurrentByUser');
+		$this->userWorkingTimeModelMapper->expects($this->never())->method('findByUser');
 
 		$planned = $this->serviceWithRotation($rotation)->getAverageDailyPlannedHours('u1');
 

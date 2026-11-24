@@ -42,6 +42,8 @@ class PaidBreakAllocatorTest extends TestCase
 	private PaidBreakAllocator $allocator;
 	private BreakPolicyResolver $resolver;
 	private TimeZoneService $timeZoneService;
+	private UserWorkingTimeModelMapper $userWtmMapper;
+	private WorkingTimeModelMapper $wtmMapper;
 
 	/** @var list<array<int, mixed>> logAction() invocations captured by the audit spy */
 	private array $auditCalls = [];
@@ -83,16 +85,14 @@ class PaidBreakAllocatorTest extends TestCase
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setUserId('u1');
 		$assignment->setWorkingTimeModelId(7);
-		$userWtmMapper = $this->createMock(UserWorkingTimeModelMapper::class);
-		$userWtmMapper->method('findCurrentByUser')->willReturnCallback(
-			fn () => $this->hasAssignment ? $assignment : null
-		);
-		$userWtmMapper->method('findByUserAndDate')->willReturnCallback(
-			fn () => $this->hasAssignment ? $assignment : null
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWtmMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$this->userWtmMapper->method('findByUser')->willReturnCallback(
+			fn () => $this->hasAssignment ? [$assignment] : []
 		);
 
-		$wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
-		$wtmMapper->method('find')->willReturnCallback(function (): WorkingTimeModel {
+		$this->wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$this->wtmMapper->method('find')->willReturnCallback(function (): WorkingTimeModel {
 			$model = new WorkingTimeModel();
 			$model->setId(7);
 			$model->setBreakRules(json_encode($this->modelBreakRules));
@@ -136,12 +136,13 @@ class PaidBreakAllocatorTest extends TestCase
 			$config,
 			new LaborLawProfileFactory($config, $userSettingsMapper),
 			$userSettingsMapper,
-			$userWtmMapper,
-			$wtmMapper,
+			$this->userWtmMapper,
+			$this->wtmMapper,
 			$this->timeEntryMapper,
 			$this->timeZoneService,
 			$l10n,
 		);
+		$this->freshAssignmentResolver();
 
 		$this->monthClosure = $this->createMock(MonthClosureService::class);
 		$this->monthClosure->method('isMonthFinalized')->willReturnCallback(
@@ -205,8 +206,25 @@ class PaidBreakAllocatorTest extends TestCase
 		);
 	}
 
+	/**
+	 * (Re)bind the assignment resolver to this test's mocked mappers — the
+	 * lazy Server::get fallback inside BreakPolicyResolver would otherwise
+	 * bind the live dev database. Rebuilt per call because the resolver
+	 * memoizes models/assignments per instance and modelBreakRules /
+	 * hasAssignment are mutated between span runs.
+	 */
+	private function freshAssignmentResolver(): void
+	{
+		$prop = new \ReflectionProperty(BreakPolicyResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->resolver, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWtmMapper,
+			$this->wtmMapper,
+		));
+	}
+
 	private function runSpan(): array
 	{
+		$this->freshAssignmentResolver();
 		return $this->allocator->recomputeSpan(
 			'u1',
 			new \DateTime('2026-03-01 00:00:00', new \DateTimeZone('Europe/Berlin')),
@@ -281,6 +299,7 @@ class PaidBreakAllocatorTest extends TestCase
 		$this->entries = [$early, $late];
 
 		// Caller span = LATE entry only — the create-time recompute path.
+		$this->freshAssignmentResolver();
 		$r = $this->allocator->recomputeSpan(
 			'u1',
 			new \DateTime('2026-03-10 13:30:00', new \DateTimeZone('Europe/Berlin')),
@@ -400,6 +419,7 @@ class PaidBreakAllocatorTest extends TestCase
 		// Shift 22:00–06:00, break 01:00–01:30 — the portion lands on day 2.
 		$this->entries = [$this->entry(1, '2026-03-10 22:00', '2026-03-11 06:00', $this->breaks([['2026-03-11T01:00:00+01:00', '2026-03-11T01:30:00+01:00']]))];
 
+		$this->freshAssignmentResolver();
 		$r = $this->allocator->recomputeSpan(
 			'u1',
 			new \DateTime('2026-03-10 00:00:00', new \DateTimeZone('Europe/Berlin')),
@@ -417,6 +437,7 @@ class PaidBreakAllocatorTest extends TestCase
 		// are followed to their full extent").
 		$this->entries = [$this->entry(1, '2026-02-28 22:00', '2026-03-01 06:00', $this->breaks([['2026-02-28T23:30:00+01:00', '2026-02-28T23:45:00+01:00']]))];
 
+		$this->freshAssignmentResolver();
 		$r = $this->allocator->recomputeSpan(
 			'u1',
 			new \DateTime('2026-03-01 00:00:00', new \DateTimeZone('Europe/Berlin')),

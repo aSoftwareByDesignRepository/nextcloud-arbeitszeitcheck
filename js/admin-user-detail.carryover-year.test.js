@@ -18,6 +18,10 @@ describe('Admin user detail — year-scoped balances', () => {
 		path.join(root, 'lib/Service/AdminUserProfileUpdateService.php'),
 		'utf8',
 	)
+	const assignmentService = readFileSync(
+		path.join(root, 'lib/Service/UserWorkingTimeAssignmentService.php'),
+		'utf8',
+	)
 	const controller = readFileSync(
 		path.join(root, 'lib/Controller/AdminController.php'),
 		'utf8',
@@ -51,12 +55,12 @@ describe('Admin user detail — year-scoped balances', () => {
 	it('service skips only assignment update on match (no early return)', () => {
 		const needle =
 			'workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate))'
-		const pos = service.indexOf(needle)
+		const pos = assignmentService.indexOf(needle)
 		expect(pos).toBeGreaterThan(-1)
-		const window = service.slice(pos, pos + 280)
+		const window = assignmentService.slice(pos, pos + 280)
 		expect(window).toContain('$updated = $currentModel;')
 		expect(window).not.toContain("'unchanged' => true")
-		expect(window).not.toMatch(/\)\s*\{\s*return\s*\[/)
+		expect(window).not.toContain('return')
 	})
 
 	it('overtime apply returns the written balance year, not always current year', () => {

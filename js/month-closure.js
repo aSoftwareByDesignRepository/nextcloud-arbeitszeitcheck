@@ -246,6 +246,7 @@
                 }
 
                 const lockNotice = $('month-closure-finalized-notice');
+                const divergedEl = $('month-closure-contract-diverged');
                 if (isFinalized) {
                     if (data.autoFinalized) {
                         setMonthClosureStatus(mcT('monthClosureStatusFinalizedAuto', 'Finalized automatically'), 'finalized');
@@ -258,6 +259,9 @@
                     if (lockNotice) {
                         lockNotice.hidden = false;
                     }
+                    if (divergedEl) {
+                        divergedEl.hidden = data.contractDiverged !== true;
+                    }
                     if (blockedEl) {
                         blockedEl.hidden = true;
                     }
@@ -265,6 +269,9 @@
                 } else {
                     if (lockNotice) {
                         lockNotice.hidden = true;
+                    }
+                    if (divergedEl) {
+                        divergedEl.hidden = true;
                     }
                     setMonthClosureStatus(mcT('monthClosureStatusOpen', 'Open (month status)'), 'open');
                     if (btn) {

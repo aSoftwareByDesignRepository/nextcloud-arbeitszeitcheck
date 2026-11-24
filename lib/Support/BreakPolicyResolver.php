@@ -266,12 +266,10 @@ final class BreakPolicyResolver
 			return $this->userModelCache[$userId];
 		}
 		try {
-			$assignment = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($assignment === null) {
-				return $this->userModelCache[$userId] = null;
-			}
+			// Lenient assist resolution: fall back to the current assignment
+			// when today is uncovered — never invent a model though.
 			return $this->userModelCache[$userId] =
-				$this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
+				$this->assignmentResolver()->resolveLenient($userId, new \DateTime())->model;
 		} catch (\Throwable) {
 			return $this->userModelCache[$userId] = null;
 		}
@@ -518,14 +516,15 @@ final class BreakPolicyResolver
 
 		try {
 			if ($asOf !== null) {
-				$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate(
+				// Strict money-path resolution at the snapshot day: a gap day
+				// has no contract → no paid-break policy ($off).
+				$model = $this->assignmentResolver()->resolveStrict(
 					$userId,
 					\DateTime::createFromInterface($asOf)
-				);
-				if ($assignment === null) {
+				)->model;
+				if ($model === null) {
 					return $off;
 				}
-				$model = $this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
 			} else {
 				$model = $this->modelForUser($userId);
 			}
@@ -2187,6 +2186,23 @@ final class BreakPolicyResolver
 			$sum += max(0, min($iv[1], $end) - max($iv[0], $start));
 		}
 		return $sum;
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	private function logWarning(string $message, ?\Throwable $e = null): void

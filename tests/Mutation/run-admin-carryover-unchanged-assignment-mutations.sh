@@ -9,9 +9,13 @@ set -euo pipefail
 
 APP_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TARGET="$APP_ROOT/lib/Service/AdminUserProfileUpdateService.php"
+# NN-10: the assignment write moved to the single-writer service — the
+# unchanged-match guard (and its early-return mutation surface) lives there.
+TARGET_ASSIGNMENT="$APP_ROOT/lib/Service/UserWorkingTimeAssignmentService.php"
 BACKUP_DIR="$APP_ROOT/tests/Mutation/.originals"
 mkdir -p "$BACKUP_DIR"
 BAK="$BACKUP_DIR/$(basename "$TARGET").carryover-unchanged.bak"
+BAK_ASSIGNMENT="$BACKUP_DIR/$(basename "$TARGET_ASSIGNMENT").carryover-unchanged.bak"
 
 CONTAINER="${NEXTCLOUD_DOCKER_CONTAINER:-nextcloud-app}"
 PHP_FILTER_CARRY='AdminUserProfileUpdateServiceTest::testApplyWorkingTimeModelPersistsCarryoverWhenAssignmentUnchanged|AdminUserProfileUpdateServiceTest::testApplyWorkingTimeModelPersistsRegionWhenAssignmentUnchanged|AdminUserProfileUpdateServiceTest::testApplyWorkingTimeModelPersistsLaborLawWhenAssignmentUnchanged|AdminUserProfileUpdateServiceTest::testApplyWorkingTimeModelSourceDoesNotEarlyReturnBeforeSideEffects'
@@ -20,6 +24,9 @@ PHP_FILTER_OT='AdminUserProfileUpdateServiceTest::testApplyOvertimeSettingsRetur
 restore() {
 	if [[ -f "$BAK" ]]; then
 		mv -f "$BAK" "$TARGET"
+	fi
+	if [[ -f "$BAK_ASSIGNMENT" ]]; then
+		mv -f "$BAK_ASSIGNMENT" "$TARGET_ASSIGNMENT"
 	fi
 }
 trap restore EXIT
@@ -44,20 +51,16 @@ echo "== baseline overtime year =="
 run_phpunit "$PHP_FILTER_OT"
 
 echo "== mutation: restore_early_return_before_carryover =="
-cp "$TARGET" "$BAK"
-python3 - "$TARGET" <<'PY'
+cp "$TARGET_ASSIGNMENT" "$BAK_ASSIGNMENT"
+python3 - "$TARGET_ASSIGNMENT" <<'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
-old = """\t\tif ($this->workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate)) {
-\t\t\t\t$updated = $currentModel;
-\t\t\t} else {"""
-new = """\t\tif ($this->workingTimeModelAssignmentMatches($currentModel, $workingTimeModelId, $vacationDaysPerYear, $startDate, $endDate)) {
-\t\t\t\treturn [
-\t\t\t\t\t'userWorkingTimeModel' => $this->presentUserModelSummary($currentModel->getSummary()),
-\t\t\t\t\t'unchanged' => true,
-\t\t\t\t];
-\t\t\t} else {"""
+old = """\t\t\t\t\t\t} else {
+\t\t\t\t\t\t\tif ($startDate) {"""
+new = """\t\t\t\t\t\t} else {
+\t\t\t\t\t\t\treturn $currentModel;
+\t\t\t\t\t\t\tif ($startDate) {"""
 if old not in text:
     raise SystemExit('anchor missing for early-return mutation')
 path.write_text(text.replace(old, new, 1))
@@ -66,7 +69,7 @@ set +e
 run_phpunit "$PHP_FILTER_CARRY"
 code=$?
 set -e
-mv -f "$BAK" "$TARGET"
+mv -f "$BAK_ASSIGNMENT" "$TARGET_ASSIGNMENT"
 if [[ $code -eq 0 ]]; then
 	echo "MUTATION SURVIVED: restore_early_return_before_carryover" >&2
 	exit 1

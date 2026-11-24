@@ -159,6 +159,14 @@ class TimeTrackingServiceTest extends TestCase {
 			null,
 			$timeCaptureMethodService,
 		);
+		// Bind the assignment resolver to this test's mocked mappers — the
+		// lazy Server::get fallback inside TimeTrackingService would
+		// otherwise bind the live dev database.
+		$prop = new \ReflectionProperty(TimeTrackingService::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->service, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		));
 
 		$this->stalePausedEntries = [];
 		$this->timeEntryMapper->method('findStalePausedAutomaticEntries')
@@ -1299,7 +1307,10 @@ class TimeTrackingServiceTest extends TestCase {
 		// over-threshold path is deterministic regardless of wall-clock time.
 		$assignment = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(7);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		// Effective from far past so the row covers today under the
+		// effective-dated resolver semantics.
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 		$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
 		$model->setType(\OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK);
 		$this->workingTimeModelMapper->method('find')->with(7)->willReturn($model);

@@ -77,6 +77,14 @@ class MissingTimeEntryJobTest extends TestCase
 			$this->userWorkingTimeModelMapper,
 			$this->workingTimeModelMapper
 		);
+		// Bind the assignment resolver to this test's mocked mappers — the
+		// lazy Server::get fallback inside the job would otherwise bind the
+		// live dev database.
+		$prop = new \ReflectionProperty(MissingTimeEntryJob::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->job, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		));
 	}
 
 	public function testRunReturnsEarlyOutsideTargetHour(): void
@@ -174,13 +182,16 @@ class MissingTimeEntryJobTest extends TestCase
 		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(5);
+		// Effective from far past so the row covers the resolved date
+		// (resolver semantics, not findCurrentByUser).
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
 		$model = new WorkingTimeModel();
 		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
 
 		$this->userWorkingTimeModelMapper->expects($this->once())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with(self::USER_ID)
-			->willReturn($assignment);
+			->willReturn([$assignment]);
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('find')
 			->with(5)
@@ -199,9 +210,9 @@ class MissingTimeEntryJobTest extends TestCase
 	{
 		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
 		$this->userWorkingTimeModelMapper->expects($this->once())
-			->method('findCurrentByUser')
+			->method('findByUser')
 			->with(self::USER_ID)
-			->willReturn(null);
+			->willReturn([]);
 		$this->holidayService->expects($this->once())
 			->method('isHolidayForUser')
 			->willReturn(false);
@@ -222,10 +233,11 @@ class MissingTimeEntryJobTest extends TestCase
 		$date = new \DateTime('2026-04-15 00:00:00');
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(5);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
 		$model = new WorkingTimeModel();
 		$model->setType(WorkingTimeModel::TYPE_ON_DEMAND);
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('find')
 			->with(5)
@@ -244,8 +256,9 @@ class MissingTimeEntryJobTest extends TestCase
 		$date = new \DateTime('2026-04-15 00:00:00'); // Wednesday
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(99);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
 
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 		$this->workingTimeModelMapper->method('find')
 			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
 		$this->holidayService->method('isHolidayForUser')->willReturn(false);

@@ -92,6 +92,25 @@ class PlannedEndResolverTest extends TestCase
 			$this->breakPolicyResolver,
 			$this->timeZoneService
 		);
+		$this->bindResolver($this->resolver);
+	}
+
+	/**
+	 * Bind the assignment resolver to this test's mocked mappers — the lazy
+	 * Server::get fallback inside PlannedEndResolver/BreakPolicyResolver
+	 * would otherwise bind the live dev database.
+	 */
+	private function bindResolver(PlannedEndResolver $resolver): void
+	{
+		$assignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		);
+		$prop = new \ReflectionProperty(PlannedEndResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($resolver, $assignmentResolver);
+
+		$policyProp = new \ReflectionProperty(BreakPolicyResolver::class, 'lazyAssignmentResolver');
+		$policyProp->setValue($this->breakPolicyResolver, $assignmentResolver);
 	}
 
 	private function entry(string $startYmdHis): TimeEntry
@@ -108,14 +127,17 @@ class PlannedEndResolverTest extends TestCase
 		$a = new UserWorkingTimeModel();
 		$a->setUserId(self::USER);
 		$a->setWorkingTimeModelId(self::MODEL_ID);
+		$a->setStartDate(new \DateTime('2000-01-01'));
 		return $a;
 	}
 
 	private function scheduleModel(): WorkingTimeModel
 	{
 		$model = new WorkingTimeModel();
+		$model->setId(self::MODEL_ID);
 		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
 		$model->setDailyHours(8.0);
+		$model->setWeeklyHours(40.0);
 		$model->setBreakRules((string)json_encode([
 			WeekdaySchedule::KEY => WeekdaySchedule::fromValidated(WeekdaySchedule::banssPreset())->toArray(),
 		]));
@@ -125,8 +147,10 @@ class PlannedEndResolverTest extends TestCase
 	private function flexibleModel(): WorkingTimeModel
 	{
 		$model = new WorkingTimeModel();
+		$model->setId(self::MODEL_ID);
 		$model->setType(WorkingTimeModel::TYPE_FLEXIBLE);
 		$model->setDailyHours(8.0);
+		$model->setWeeklyHours(40.0);
 		$model->setBreakRules(null);
 		return $model;
 	}
@@ -136,8 +160,7 @@ class PlannedEndResolverTest extends TestCase
 
 	private function wireModel(?WorkingTimeModel $model): void
 	{
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($this->assignment());
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($this->assignment());
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$this->assignment()]);
 		$this->workingTimeModelMapper->method('find')->willReturnCallback(static function () use ($model) {
 			if ($model === null) {
 				throw new \OCP\AppFramework\Db\DoesNotExistException('gone');
@@ -186,8 +209,7 @@ class PlannedEndResolverTest extends TestCase
 
 	public function testNoAssignmentSkips(): void
 	{
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn(null);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
 		$cache = [];
 		$result = $this->resolver->resolve(self::USER, $this->entry('2026-11-02 08:00:00'), $this->cutover(), $cache);
 		$this->assertSame(PlannedEndResolver::SKIP_NO_MODEL, $result['skip']);
@@ -200,9 +222,10 @@ class PlannedEndResolverTest extends TestCase
 		$cache = [];
 		$result = $this->resolver->resolve(self::USER, $this->entry('2026-11-02 08:00:00'), $this->cutover(), $cache);
 		$this->assertSame(PlannedEndResolver::SKIP_NO_MODEL, $result['skip']);
-		// The miss must be memoised for co-assignees in the same run.
-		$this->assertArrayHasKey(self::MODEL_ID, $cache);
-		$this->assertNull($cache[self::MODEL_ID]);
+		// The miss is memoised inside the resolver for co-assignees
+		// (testDeletedModelMissIsCachedForCoAssignees asserts find() once);
+		// the run-scoped modelCache only carries RESOLVED models now.
+		$this->assertSame([], $cache);
 	}
 
 	public function testOnDemandModelSkips(): void
@@ -229,6 +252,7 @@ class PlannedEndResolverTest extends TestCase
 			$this->breakPolicyResolver,
 			$this->timeZoneService
 		);
+		$this->bindResolver($resolver);
 		$cache = [];
 		$result = $resolver->resolve(self::USER, $this->entry('2026-11-02 08:00:00'), $this->cutover(), $cache);
 		$this->assertSame(PlannedEndResolver::SKIP_HOLIDAY, $result['skip']);
@@ -282,7 +306,8 @@ class PlannedEndResolverTest extends TestCase
 			$this->breakPolicyResolver,
 			$this->timeZoneService
 		);
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($this->assignment());
+		$this->bindResolver($resolver);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$this->assignment()]);
 		$this->workingTimeModelMapper->method('find')->willReturn($this->scheduleModel());
 		$this->holidayService->method('isHolidayForUser')->willReturn(false);
 
@@ -317,7 +342,8 @@ class PlannedEndResolverTest extends TestCase
 			$this->breakPolicyResolver,
 			$this->timeZoneService
 		);
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($this->assignment());
+		$this->bindResolver($resolver);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$this->assignment()]);
 		$this->workingTimeModelMapper->method('find')->willReturn($this->scheduleModel());
 		$this->holidayService->method('isHolidayForUser')->willReturn(false);
 
@@ -402,8 +428,15 @@ class PlannedEndResolverTest extends TestCase
 	{
 		// No assignment valid on the entry day, but a current one exists —
 		// the resolver falls back rather than guessing "no model".
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn(null);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($this->assignment());
+		$asn = $this->assignment();
+		if (new \DateTime('today') > new \DateTime('2026-11-02')) {
+			// Started after the entry day — active today, not on 2026-11-02.
+			$asn->setStartDate(new \DateTime('today'));
+		} else {
+			// Ended before the entry day — the same "expired" shape.
+			$asn->setEndDate(new \DateTime('2026-11-01'));
+		}
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$asn]);
 		$this->workingTimeModelMapper->method('find')->willReturn($this->scheduleModel());
 		$this->holidayService->method('isHolidayForUser')->willReturn(false);
 		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([]);

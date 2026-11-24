@@ -319,6 +319,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 			'OCA\ArbeitszeitCheck\Service\VacationEntitlementEngine::redactTraceForUser' => [],
 			'OCA\ArbeitszeitCheck\Service\TeamResolverService::getTeamMemberIds' => ['bob'],
 			'OCA\ArbeitszeitCheck\Db\WorkingTimeModel::validate' => [],
+			'OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel::validate' => [],
 			// Declared method (not __call): the generic entity fixture models a
 			// global org model — personal models 404 on global CRUD by design.
 			'OCA\ArbeitszeitCheck\Db\WorkingTimeModel::isPersonal' => false,
@@ -385,31 +386,49 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		];
 	}
 
+	/** @var array<string, array<string, mixed>>|null */
+	private ?array $actionEntityOverrides = null;
+
 	/**
 	 * Per-action entity getter overrides:
 	 * 'Controller::action' => ['getterprop' (lowercased) => value].
+	 * Lazy (not a const) so object values like \DateTime are legal.
+	 *
+	 * @return array<string, array<string, mixed>>
 	 */
-	private const ACTION_ENTITY_OVERRIDES = [
-		'TimeEntryController::cancelCorrection' => ['status' => 'pending_approval'],
-		'AbsenceController::approve' => ['status' => 'pending'],
-		'AbsenceController::reject' => ['status' => 'pending'],
-		'ManagerController::approveAbsence' => ['status' => 'pending'],
-		'ManagerController::rejectAbsence' => ['status' => 'pending'],
-		'ManagerController::approveTimeEntryCorrection' => ['status' => 'pending_approval'],
-		'ManagerController::rejectTimeEntryCorrection' => ['status' => 'pending_approval'],
-		'AdminController::deleteWorkingTimeModel' => ['isdefault' => false, 'default' => false],
-		'AdminController::deleteTariffRuleSet' => ['status' => 'draft'],
-		// Manager correcting a subordinate's entry — self-targets legitimately 403.
-		'ManagerController::correctTimeEntry' => ['userid' => 'bob'],
-		'ManagerController::convertEmployeeAbsenceToSick' => ['userid' => 'bob'],
-		'AdminController::updateTariffRuleSet' => ['status' => 'draft'],
-		'AdminController::activateTariffRuleSet' => [
-			'status' => 'draft',
-			'moduletype' => 'base_formula',
-			'config' => ['reference_days' => 260, 'reference_week_days' => 5],
-		],
-		'AdminController::retireTariffRuleSet' => ['status' => 'active'],
-	];
+	private function actionEntityOverrides(): array
+	{
+		return $this->actionEntityOverrides ??= [
+			'TimeEntryController::cancelCorrection' => ['status' => 'pending_approval'],
+			'AbsenceController::approve' => ['status' => 'pending'],
+			'AbsenceController::reject' => ['status' => 'pending'],
+			'ManagerController::approveAbsence' => ['status' => 'pending'],
+			'ManagerController::rejectAbsence' => ['status' => 'pending'],
+			'ManagerController::approveTimeEntryCorrection' => ['status' => 'pending_approval'],
+			'ManagerController::rejectTimeEntryCorrection' => ['status' => 'pending_approval'],
+			'AdminController::deleteWorkingTimeModel' => ['isdefault' => false, 'default' => false],
+			'AdminController::deleteTariffRuleSet' => ['status' => 'draft'],
+			// Manager correcting a subordinate's entry — self-targets legitimately 403.
+			'ManagerController::correctTimeEntry' => ['userid' => 'bob'],
+			'ManagerController::convertEmployeeAbsenceToSick' => ['userid' => 'bob'],
+			'AdminController::updateTariffRuleSet' => ['status' => 'draft'],
+			// Effective-dated assignments: the swept row must belong to the
+			// route user 'bob' (uniform-404 on foreign ids). DELETE additionally
+			// requires a never-effective window (start_date > today) — a started
+			// row is correctly 409 ASSIGNMENT_NOT_DELETABLE, not a happy path.
+			'AdminController::updateUserWorkingTimeAssignment' => ['userid' => 'bob'],
+			'AdminController::deleteUserWorkingTimeAssignment' => [
+				'userid' => 'bob',
+				'startdate' => new \DateTime('2099-01-01'),
+			],
+			'AdminController::activateTariffRuleSet' => [
+				'status' => 'draft',
+				'moduletype' => 'base_formula',
+				'config' => ['reference_days' => 260, 'reference_week_days' => 5],
+			],
+			'AdminController::retireTariffRuleSet' => ['status' => 'active'],
+		];
+	}
 
 	/**
 	 * Per-action request params: 'Controller::action' => ['param' => value].
@@ -1387,7 +1406,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 					$n = strtolower($name);
 					if (str_starts_with($n, 'get')) {
 						$prop = substr($n, 3);
-						$actOv = self::ACTION_ENTITY_OVERRIDES[$this->currentAction] ?? null;
+						$actOv = $this->actionEntityOverrides()[$this->currentAction] ?? null;
 						if ($actOv !== null && array_key_exists($prop, $actOv)) {
 							$v = $actOv[$prop];
 							return $v instanceof \Closure ? $v($name, $args) : $v;
@@ -1412,7 +1431,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 					}
 					if (str_starts_with($n, 'is')) {
 						$prop = substr($n, 2);
-						$actOv = self::ACTION_ENTITY_OVERRIDES[$this->currentAction] ?? null;
+						$actOv = $this->actionEntityOverrides()[$this->currentAction] ?? null;
 						if ($actOv !== null && array_key_exists($prop, $actOv)) {
 							$v = $actOv[$prop];
 							return $v instanceof \Closure ? $v($name, $args) : $v;

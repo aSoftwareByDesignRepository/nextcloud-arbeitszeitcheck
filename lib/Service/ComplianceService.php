@@ -1925,6 +1925,23 @@ class ComplianceService
         }
     }
 
+    private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+    private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+    {
+        if ($this->lazyAssignmentResolver === null) {
+            try {
+                $this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+            } catch (\Throwable) {
+                $this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+                    $this->userWorkingTimeModelMapper,
+                    $this->workingTimeModelMapper
+                );
+            }
+        }
+        return $this->lazyAssignmentResolver;
+    }
+
     /**
      * True when the user's assigned working-time model opts into Sunday work
      * (explicit allow_sunday_work or weekday_schedule Sunday work day).
@@ -1933,14 +1950,10 @@ class ComplianceService
     {
         try {
             $date = \DateTime::createFromInterface($onDate);
-            $assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $date);
-            if ($assignment === null) {
-                $assignment = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-            }
-            if ($assignment === null) {
+            $model = $this->assignmentResolver()->resolveStrict($userId, $date)->model;
+            if ($model === null) {
                 return false;
             }
-            $model = $this->workingTimeModelMapper->find((int)$assignment->getWorkingTimeModelId());
             $rules = $model->getBreakRulesArray();
             if (is_array($rules)
                 && array_key_exists(SundayWorkPolicy::KEY, $rules)

@@ -697,6 +697,10 @@ class MonthClosureService
 
 		$payload = [
 			'schema' => MonthClosureCanonical::SCHEMA_V1,
+			// MH-16: the algorithm stand is part of the evidence — a sealed
+			// month states which app + contract-schema version computed it.
+			'app_version' => (string)$this->config->getAppValue('arbeitszeitcheck', 'installed_version', ''),
+			'contract_schema_version' => WorkingTimeContractClosureContributor::CONTRACT_SCHEMA_VERSION,
 			'user_id' => $userId,
 			'year' => $year,
 			'month' => $month,
@@ -741,11 +745,43 @@ class MonthClosureService
 				'canonical_hash' => $contributor->canonicalHash($userId, $period),
 			];
 		}
+		// NN-12: payroll evidence is non-optional — a month without the
+		// working-time-contract block is not finalizable.
+		if (!isset($contributors[WorkingTimeContractClosureContributor::CONTRIBUTOR_ID])) {
+			throw new \RuntimeException('Month closure refused: working-time contract contributor unavailable.');
+		}
 		if ($contributors !== []) {
 			$payload['contributors'] = $contributors;
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * `contract_diverged` for the closure view: does the live contract
+	 * context still match what was sealed? Compare is over assignment
+	 * windows + calc-relevant model inputs only (R-16) — cosmetic model
+	 * edits never raise the badge. Only meaningful for finalized months.
+	 */
+	public function contractContextDiverged(string $userId, int $year, int $month): bool
+	{
+		$row = $this->closureMapper->findByUserAndMonthOptional($userId, $year, $month);
+		if ($row === null || $row->getStatus() !== MonthClosure::STATUS_FINALIZED || $row->getCanonicalPayload() === null) {
+			return false;
+		}
+		$data = json_decode($row->getCanonicalPayload(), true);
+		$sealedHash = $data['contributors'][WorkingTimeContractClosureContributor::CONTRIBUTOR_ID]['snapshot']['contract_context_hash'] ?? null;
+		if (!is_string($sealedHash) || $sealedHash === '') {
+			// Sealed before the contract contributor existed → cannot prove
+			// identity, so no badge (avoid false positives on old closures).
+			return false;
+		}
+		foreach ($this->contributorRegistry->all() as $contributor) {
+			if ($contributor instanceof WorkingTimeContractClosureContributor) {
+				return $contributor->diverged($userId, sprintf('%04d-%02d', $year, $month), $sealedHash);
+			}
+		}
+		return false;
 	}
 
 	public function getSnapshotReportArray(string $userId, int $year, int $month): ?array

@@ -43,16 +43,27 @@ final class ScheduledWorkdayCounter
 	public function scheduleForUser(string $userId): ?WeekdaySchedule
 	{
 		try {
-			$assignment = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($assignment === null) {
-				return null;
-			}
-			$model = $this->workingTimeModelMapper->find($assignment->getWorkingTimeModelId());
-
-			return $model?->getWeekdaySchedule();
+			return $this->assignmentResolver()->resolveStrict($userId, new \DateTime())->schedule;
 		} catch (\Throwable) {
 			return null;
 		}
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	/**
@@ -76,7 +87,25 @@ final class ScheduledWorkdayCounter
 	 */
 	public function daysForUser(string $userId, \DateTime $start, \DateTime $end): float
 	{
-		return $this->daysForSchedule($this->scheduleForUser($userId), $userId, $start, $end);
+		if ($end < $start) {
+			[$start, $end] = [$end, $start];
+		}
+		// Per-segment strict resolution: each assignment window counts with
+		// its own schedule; unassigned-gap days (strict policy) have no
+		// contract and count 0. on_demand keeps the legacy Mon–Fri count.
+		try {
+			$segments = $this->assignmentResolver()->resolveRange($userId, $start, $end);
+		} catch (\Throwable) {
+			return $this->daysForSchedule($this->scheduleForUser($userId), $userId, $start, $end);
+		}
+		$total = 0.0;
+		foreach ($segments as $seg) {
+			if ($seg->contract->basis === \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::BASIS_UNASSIGNED_GAP) {
+				continue;
+			}
+			$total += $this->daysForSchedule($seg->contract->schedule, $userId, $seg->start, $seg->end);
+		}
+		return $total;
 	}
 
 	/**
@@ -127,7 +156,6 @@ final class ScheduledWorkdayCounter
 		if ($end < $start) {
 			[$start, $end] = [$end, $start];
 		}
-		$schedule = $this->scheduleForUser($userId);
 		$startY = (int)$start->format('Y');
 		$endY = (int)$end->format('Y');
 		$out = [];
@@ -136,7 +164,7 @@ final class ScheduledWorkdayCounter
 			$segEnd = new \DateTime($y . '-12-31');
 			if ($segStart < $start) { $segStart = clone $start; }
 			if ($segEnd > $end) { $segEnd = clone $end; }
-			$out[$y] = $this->daysForSchedule($schedule, $userId, $segStart, $segEnd);
+			$out[$y] = $this->daysForUser($userId, $segStart, $segEnd);
 		}
 		return $out;
 	}

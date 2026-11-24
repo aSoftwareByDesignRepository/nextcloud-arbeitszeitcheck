@@ -45,6 +45,11 @@ class MonthClosurePremiumSnapshotTest extends TestCase
 		$payouts = $this->createMock(OvertimePayoutMapper::class);
 		$payouts->method('findByUserAndMonth')->willReturn(null);
 
+		$config = $this->createMock(IConfig::class);
+		// WorkforceSuiteConfig defaults must shine through — notably
+		// working_time_contract_evidence_enabled (always-on, NN-12).
+		$config->method('getAppValue')->willReturnArgument(2);
+
 		return new MonthClosureService(
 			$this->createMock(MonthClosureMapper::class),
 			$this->createMock(MonthClosureRevisionMapper::class),
@@ -53,7 +58,7 @@ class MonthClosurePremiumSnapshotTest extends TestCase
 			$absences,
 			$this->createMock(AuditLogMapper::class),
 			$this->createMock(IDBConnection::class),
-			$this->createMock(IConfig::class),
+			$config,
 			$this->createMock(IUserManager::class),
 			$this->createMock(LoggerInterface::class),
 			$this->createMock(PermissionService::class),
@@ -62,7 +67,26 @@ class MonthClosurePremiumSnapshotTest extends TestCase
 			null,
 			null,
 			$premium,
+			$this->contractContributorRegistry(),
+			new \OCA\ArbeitszeitCheck\Service\WorkforceSuiteConfig($config),
 		);
+	}
+
+	/**
+	 * Registry containing the mandatory working-time-contract contributor
+	 * (NN-12): a canonical payload without it must refuse to seal.
+	 */
+	private function contractContributorRegistry(): \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry
+	{
+		$assignments = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class);
+		$models = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class);
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register(new \OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor(
+			new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver($assignments, $models),
+			$assignments,
+			$models,
+		));
+		return $registry;
 	}
 
 	public function testBuildCanonicalPayloadEmbedsPremiumWhenEnabled(): void

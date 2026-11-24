@@ -72,7 +72,7 @@ class VacationEntitlementEngineTest extends TestCase {
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturn('1');
 
-		return new VacationEntitlementEngine(
+		$engine = new VacationEntitlementEngine(
 			$policyMapper,
 			$ruleSetMapper,
 			$moduleMapper,
@@ -86,6 +86,15 @@ class VacationEntitlementEngineTest extends TestCase {
 			$teamMemberMapper,
 			$config,
 		);
+		// Bind the resolver to this test's mocks — the lazy Server::get
+		// fallback inside VacationEntitlementEngine would otherwise bind
+		// the live dev database.
+		$prop = new \ReflectionProperty(VacationEntitlementEngine::class, 'lazyAssignmentResolver');
+		$prop->setValue($engine, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$userModelMapper,
+			$workingTimeModelMapper,
+		));
+		return $engine;
 	}
 
 	public function testManualFixedReturnsConfiguredDays(): void {
@@ -252,7 +261,8 @@ class VacationEntitlementEngineTest extends TestCase {
 
 		$userModelAssignment = new UserWorkingTimeModel();
 		$userModelAssignment->setWorkingTimeModelId(7);
-		$userModelMapper->method('findByUserAndDate')->willReturn($userModelAssignment);
+		$userModelAssignment->setStartDate(new \DateTime('2000-01-01'));
+		$userModelMapper->method('findByUser')->willReturn([$userModelAssignment]);
 
 		$workingTimeModel = new WorkingTimeModel();
 		$workingTimeModel->setWorkDaysPerWeek(4.0);
@@ -287,7 +297,8 @@ class VacationEntitlementEngineTest extends TestCase {
 
 		$userModelAssignment = new UserWorkingTimeModel();
 		$userModelAssignment->setWorkingTimeModelId(7);
-		$userModelMapper->method('findByUserAndDate')->willReturn($userModelAssignment);
+		$userModelAssignment->setStartDate(new \DateTime('2000-01-01'));
+		$userModelMapper->method('findByUser')->willReturn([$userModelAssignment]);
 
 		$workingTimeModel = new WorkingTimeModel();
 		$workingTimeModel->setType(WorkingTimeModel::TYPE_ON_DEMAND);
@@ -337,7 +348,8 @@ class VacationEntitlementEngineTest extends TestCase {
 
 		$userModelAssignment = new UserWorkingTimeModel();
 		$userModelAssignment->setWorkingTimeModelId(7);
-		$userModelMapper->method('findByUserAndDate')->willReturn($userModelAssignment);
+		$userModelAssignment->setStartDate(new \DateTime('2000-01-01'));
+		$userModelMapper->method('findByUser')->willReturn([$userModelAssignment]);
 
 		$workingTimeModel = new WorkingTimeModel();
 		$workingTimeModel->setType(WorkingTimeModel::TYPE_ON_DEMAND);
@@ -657,5 +669,53 @@ class VacationEntitlementEngineTest extends TestCase {
 		$this->assertSame(12, $result['ruleSetId']);
 		$this->assertArrayNotHasKey('degraded', $result['trace']);
 		$this->assertSame(30.0, $result['days']); // default base formula, no modules
+	}
+
+	/**
+	 * Regression: legacy entitlement must read vacationDaysPerYear off the
+	 * assignment covering the *as-of* date — not the row current at run
+	 * time. A mid-year vacation-days change must not retro-apply.
+	 */
+	public function testLegacyFallbackUsesVacationDaysOfCoveringWindow(): void {
+		$policyMapper = $this->createMock(UserVacationPolicyAssignmentMapper::class);
+		$policyMapper->method('findCurrentByUser')->willReturn(null);
+		$userModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$workingTimeModelMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$userSettingsMapper = $this->createMock(UserSettingsMapper::class);
+
+		$mkRow = static function (int $id, int $days, string $start, ?string $end): UserWorkingTimeModel {
+			$r = new UserWorkingTimeModel();
+			$r->setId($id);
+			$r->setUserId('u1');
+			$r->setWorkingTimeModelId(9);
+			$r->setVacationDaysPerYear($days);
+			$r->setStartDate(new \DateTime($start));
+			if ($end !== null) {
+				$r->setEndDate(new \DateTime($end));
+			}
+			return $r;
+		};
+		$userModelMapper->method('findByUser')->willReturn([
+			$mkRow(1, 20, '2026-01-01', '2026-06-30'),
+			$mkRow(2, 30, '2026-07-01', null),
+		]);
+
+		$model = new WorkingTimeModel();
+		$model->setId(9);
+		$model->setName('Vollzeit');
+		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);
+		$model->setWeeklyHours(40.0);
+		$model->setDailyHours(8.0);
+		$model->setWorkDaysPerWeek(5.0);
+		$workingTimeModelMapper->method('find')->with(9)->willReturn($model);
+		$workingTimeModelMapper->method('findAll')->willReturn([$model]);
+
+		$engine = $this->makeEngine($policyMapper, $this->createMock(TariffRuleSetMapper::class), $this->createMock(TariffRuleModuleMapper::class), $userModelMapper, $workingTimeModelMapper, $userSettingsMapper);
+
+		$march = $engine->computeForDate('u1', new \DateTimeImmutable('2026-03-15'));
+		$this->assertSame(20.0, $march['days']);
+
+		$august = $engine->computeForDate('u1', new \DateTimeImmutable('2026-08-15'));
+		$this->assertSame(30.0, $august['days']);
 	}
 }

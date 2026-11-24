@@ -167,10 +167,30 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturnCallback(fn () => $this->allowedByAccessGroups);
 	}
 
+	/**
+	 * Registry containing the mandatory working-time-contract contributor
+	 * (NN-12: payroll evidence is always-on; a closure without it must
+	 * refuse). Real contributor over unstubbed mappers — empty rows are a
+	 * valid contract state.
+	 */
+	private function contractContributorRegistry(): \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry
+	{
+		$assignments = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class);
+		$models = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class);
+		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry->register(new \OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor(
+			new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver($assignments, $models),
+			$assignments,
+			$models,
+		));
+		return $registry;
+	}
+
 	private function svc(
 		?\OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry $contributorRegistry = null,
 	): MonthClosureService
 	{
+		$contributorRegistry = $contributorRegistry ?? $this->contractContributorRegistry();
 		return new MonthClosureService(
 			$this->closureMapper,
 			$this->revisionMapper,
@@ -492,14 +512,17 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$contributor->expects($this->never())->method('snapshot');
 		$contributor->expects($this->never())->method('contributions');
 		$contributor->expects($this->never())->method('canonicalHash');
-		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry = $this->contractContributorRegistry();
 		$registry->register($contributor);
 
 		$result = $this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
 
 		$this->assertSame(MonthClosure::STATUS_FINALIZED, $result->getStatus());
 		$payload = json_decode((string)$this->inserted[0]->getCanonicalPayload(), true);
-		$this->assertArrayNotHasKey('contributors', $payload);
+		// Only the always-on contract contributor seals — the flag-off
+		// domain contributes nothing.
+		$this->assertArrayNotHasKey('test_domain', $payload['contributors'] ?? []);
+		$this->assertArrayHasKey('working_time_contract', $payload['contributors'] ?? []);
 	}
 
 	public function testEnabledContributorBlocksFinalize(): void
@@ -510,7 +533,7 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$contributor->method('id')->willReturn('test_domain');
 		$contributor->method('featureFlag')->willReturn('business_trips_enabled');
 		$contributor->method('blockers')->willReturn(['TRIP_UNREVIEWED']);
-		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry = $this->contractContributorRegistry();
 		$registry->register($contributor);
 
 		$this->expectException(\RuntimeException::class);
@@ -529,7 +552,7 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$contributor->method('snapshot')->willReturn(['trips' => 2]);
 		$contributor->method('contributions')->willReturn([['id' => 'bt:1']]);
 		$contributor->method('canonicalHash')->willReturn(str_repeat('b', 64));
-		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry = $this->contractContributorRegistry();
 		$registry->register($contributor);
 
 		$this->svc($registry)->finalizeMonth('alice', 'alice', self::PAST_Y, self::PAST_M);
@@ -554,7 +577,7 @@ final class MonthClosureServiceDeepTest extends TestCase
 		$contributor = $this->createMock(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributor::class);
 		$contributor->method('id')->willReturn('test_domain');
 		$contributor->method('featureFlag')->willReturn('not_a_real_flag');
-		$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
+		$registry = $this->contractContributorRegistry();
 		$registry->register($contributor);
 
 		$this->expectException(\InvalidArgumentException::class);

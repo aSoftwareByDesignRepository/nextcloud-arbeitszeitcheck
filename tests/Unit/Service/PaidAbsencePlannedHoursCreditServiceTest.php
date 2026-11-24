@@ -52,14 +52,29 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 	private function service(): PaidAbsencePlannedHoursCreditService
 	{
-		return new PaidAbsencePlannedHoursCreditService(
+		return $this->bindResolver(new PaidAbsencePlannedHoursCreditService(
 			$this->config,
 			$this->absenceMapper,
 			$this->userModelMapper,
 			$this->modelMapper,
 			$this->holidayService,
 			$this->rotation,
-		);
+		));
+	}
+
+	/**
+	 * Bind the assignment resolver to this test's mocked mappers — the
+	 * lazy Server::get fallback inside the service would otherwise bind
+	 * the live dev database.
+	 */
+	private function bindResolver(PaidAbsencePlannedHoursCreditService $service): PaidAbsencePlannedHoursCreditService
+	{
+		$prop = new \ReflectionProperty(PaidAbsencePlannedHoursCreditService::class, 'lazyAssignmentResolver');
+		$prop->setValue($service, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userModelMapper,
+			$this->modelMapper,
+		));
+		return $service;
 	}
 
 	/**
@@ -160,7 +175,8 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 		$schedule = WeekdaySchedule::fromValidated(WeekdaySchedule::banssPreset());
 		$userModel = new UserWorkingTimeModel();
 		$userModel->setWorkingTimeModelId(7);
-		$this->userModelMapper->method('findCurrentByUser')->willReturn($userModel);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
+		$this->userModelMapper->method('findByUser')->willReturn([$userModel]);
 
 		$model = new WorkingTimeModel();
 		$model->setId(7);
@@ -359,14 +375,14 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 			$mapper = $this->createMock(AbsenceMapper::class);
 			$mapper->method('findByUserAndDateRange')->willReturn([$absence]);
-			$service = new PaidAbsencePlannedHoursCreditService(
+			$service = $this->bindResolver(new PaidAbsencePlannedHoursCreditService(
 				$this->config,
 				$mapper,
 				$this->userModelMapper,
 				$this->modelMapper,
 				$this->holidayService,
 				$this->rotation,
-			);
+			));
 
 			$result = $service->creditHoursForRange(
 				'alice',
@@ -410,27 +426,28 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 		// Model A: 8h/day through Wed; model B: 4h/day from Thu. The assignment
 		// in force *today* is B — a current-only resolver would mis-credit Wed.
+		// Effective-dated rows: A covers <= 2026-09-09, B starts 2026-09-10.
 		$assignA = new UserWorkingTimeModel();
 		$assignA->setWorkingTimeModelId(11);
+		$assignA->setStartDate(new \DateTime('2000-01-01'));
+		$assignA->setEndDate(new \DateTime('2026-09-09'));
 		$assignB = new UserWorkingTimeModel();
 		$assignB->setWorkingTimeModelId(12);
-		$this->userModelMapper->method('findByUserAndDate')->willReturnCallback(
-			static function (string $uid, \DateTime $date) use ($assignA, $assignB) {
-				return $date->format('Y-m-d') <= '2026-09-09' ? $assignA : $assignB;
-			}
-		);
-		$this->userModelMapper->method('findCurrentByUser')->willReturn($assignB);
+		$assignB->setStartDate(new \DateTime('2026-09-10'));
+		$this->userModelMapper->method('findByUser')->willReturn([$assignA, $assignB]);
 
 		$modelA = new WorkingTimeModel();
 		$modelA->setId(11);
 		$modelA->setName('Full');
 		$modelA->setType(WorkingTimeModel::TYPE_FULL_TIME);
 		$modelA->setDailyHours(8.0);
+		$modelA->setWeeklyHours(40.0);
 		$modelB = new WorkingTimeModel();
 		$modelB->setId(12);
 		$modelB->setName('Part');
 		$modelB->setType(WorkingTimeModel::TYPE_PART_TIME);
 		$modelB->setDailyHours(4.0);
+		$modelB->setWeeklyHours(20.0);
 		$this->modelMapper->method('find')->willReturnCallback(
 			static function (int $id) use ($modelA, $modelB) {
 				return $id === 11 ? $modelA : $modelB;
@@ -849,8 +866,8 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 		$userModel = new UserWorkingTimeModel();
 		$userModel->setWorkingTimeModelId(9);
-		$this->userModelMapper->method('findByUserAndDate')->willReturn($userModel);
-		$this->userModelMapper->method('findCurrentByUser')->willReturn($userModel);
+		$userModel->setStartDate(new \DateTime('2000-01-01'));
+		$this->userModelMapper->method('findByUser')->willReturn([$userModel]);
 
 		$model = new WorkingTimeModel();
 		$model->setType(WorkingTimeModel::TYPE_FULL_TIME);

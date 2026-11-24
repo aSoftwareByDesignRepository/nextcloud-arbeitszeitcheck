@@ -23,6 +23,9 @@ final class WorkforceSuiteConfig
 		'business_trip_credit_enabled' => false,
 		'legacy_home_absence_create_enabled' => true,
 		'legacy_trip_absence_create_enabled' => true,
+		// Payroll evidence: always on — a missing contributor block must
+		// prevent finalization (NN-12), so nothing may toggle this off.
+		'working_time_contract_evidence_enabled' => true,
 	];
 
 	private const STATES = [

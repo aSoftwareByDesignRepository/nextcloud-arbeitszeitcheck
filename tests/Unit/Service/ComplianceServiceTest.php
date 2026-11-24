@@ -85,7 +85,7 @@ class ComplianceServiceTest extends TestCase
 		$config = $config ?? $this->config;
 		$userSettingsMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class);
 		$userSettingsMapper->method('findUserIdsWithNonEmptySetting')->willReturn([]);
-		return new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
+		$resolver = new \OCA\ArbeitszeitCheck\Support\BreakPolicyResolver(
 			$config,
 			new \OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory($config, $userSettingsMapper),
 			$userSettingsMapper,
@@ -95,6 +95,24 @@ class ComplianceServiceTest extends TestCase
 			$this->timeZoneService,
 			$this->l10n,
 		);
+		$this->bindAssignmentResolver($resolver);
+		return $resolver;
+	}
+
+	/**
+	 * Bind the assignment resolver inside a service to this test's mocked
+	 * mappers — the lazy Server::get fallback would otherwise resolve the
+	 * REAL container resolver bound to the live dev database.
+	 *
+	 * @param object $service any service exposing private lazyAssignmentResolver
+	 */
+	private function bindAssignmentResolver(object $service): void
+	{
+		$prop = new \ReflectionProperty($service, 'lazyAssignmentResolver');
+		$prop->setValue($service, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		));
 	}
 
 	private function inertAbsenceMapper(): \OCA\ArbeitszeitCheck\Db\AbsenceMapper
@@ -167,6 +185,7 @@ class ComplianceServiceTest extends TestCase
 			$this->inertPolicyResolver(),
 			$this->inertAbsenceMapper(),
 		);
+		$this->bindAssignmentResolver($this->service);
 	}
 
 	public function testRunDailyComplianceCheckIteratesAndRecordsViolations(): void
@@ -875,8 +894,8 @@ class ComplianceServiceTest extends TestCase
 
 		$assignment = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(9);
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($assignment);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 
 		$model = new \OCA\ArbeitszeitCheck\Db\WorkingTimeModel();
 		$model->setBreakRulesArray(['allow_sunday_work' => true]);
@@ -2129,7 +2148,8 @@ class ComplianceServiceTest extends TestCase
 			$model->setBreakRules(json_encode($modelBreakRules));
 			$assignment = new UserWorkingTimeModel();
 			$assignment->setWorkingTimeModelId(7);
-			$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+			$assignment->setStartDate(new \DateTime('2000-01-01'));
+			$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 			$this->workingTimeModelMapper->method('find')->willReturn($model);
 		}
 
@@ -2148,8 +2168,9 @@ class ComplianceServiceTest extends TestCase
 			$tzService,
 			$this->l10n,
 		);
+		$this->bindAssignmentResolver($resolver);
 
-		return new ComplianceService(
+		$service = new ComplianceService(
 			$this->timeEntryMapper,
 			$this->violationMapper,
 			$this->workingTimeModelMapper,
@@ -2166,6 +2187,8 @@ class ComplianceServiceTest extends TestCase
 			$resolver,
 			$this->createMock(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
 		);
+		$this->bindAssignmentResolver($service);
+		return $service;
 	}
 
 	private function completedEntry(int $id, string $start, string $end, array $breaks = []): TimeEntry

@@ -812,20 +812,17 @@ class PaidAbsencePlannedHoursCreditService
 	{
 		$dailyHours = 8.0;
 		try {
-			$userModel = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $this->asDay($date))
-				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($userModel === null) {
-				return [null, $dailyHours, false];
+			// Strict money-path resolution: covering row → its contract;
+			// no covering row + rows exist → gap policy (strict: Soll 0).
+			$contract = $this->assignmentResolver()->resolveStrict($userId, $this->asDay($date));
+			if ($contract->basis === WorkingTimeModelAssignmentResolver::BASIS_ON_DEMAND
+				|| $contract->basis === WorkingTimeModelAssignmentResolver::BASIS_UNASSIGNED_GAP) {
+				return [$contract->schedule, 0.0, true];
 			}
-			$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
-			if ($model->isOnDemand()) {
-				return [$model->getWeekdaySchedule(), 0.0, true];
+			if ($contract->schedule !== null) {
+				return [$contract->schedule, $contract->schedule->averageDailyNetHours(), false];
 			}
-			$schedule = $model->getWeekdaySchedule();
-			if ($schedule !== null) {
-				return [$schedule, $schedule->averageDailyNetHours(), false];
-			}
-			$modelDaily = (float)$model->getDailyHours();
+			$modelDaily = $contract->dailyHours;
 			if (is_finite($modelDaily) && $modelDaily > 0.0 && $modelDaily <= 24.0) {
 				$dailyHours = $modelDaily;
 			} else {
@@ -834,19 +831,34 @@ class PaidAbsencePlannedHoursCreditService
 				// would credit fantasy hours per absence day. Derive the
 				// day Soll from the weekly contract — the same basis the
 				// required-hours formula uses — before the 8 h default.
-				$modelWeekly = (float)$model->getWeeklyHours();
+				$modelWeekly = $contract->weeklyHours;
 				$derived = is_finite($modelWeekly) ? $modelWeekly / 5.0 : 0.0;
 				if ($derived > 0.0 && $derived <= 24.0) {
 					$dailyHours = $derived;
 				}
 			}
-		} catch (DoesNotExistException) {
-			// defaults
 		} catch (\Throwable) {
 			// defaults
 		}
 
 		return [null, $dailyHours, false];
+	}
+
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	private function asDay(\DateTimeInterface $d): \DateTime

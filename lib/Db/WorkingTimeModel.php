@@ -42,6 +42,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setCreatedAt(\DateTime $createdAt)
  * @method \DateTime getUpdatedAt()
  * @method void setUpdatedAt(\DateTime $updatedAt)
+ * @method int|null getSupersededByModelId()
+ * @method void setSupersededByModelId(?int $supersededByModelId)
  */
 class WorkingTimeModel extends Entity
 {
@@ -88,6 +90,9 @@ class WorkingTimeModel extends Entity
     /** @var \DateTime */
     protected $updatedAt;
 
+    /** @var int|null id of the successor revision that replaced this model (MH-14); null = current */
+    protected $supersededByModelId;
+
     /**
      * WorkingTimeModel constructor
      */
@@ -105,6 +110,7 @@ class WorkingTimeModel extends Entity
         $this->addType('userId', 'string');
         $this->addType('createdAt', 'datetime');
         $this->addType('updatedAt', 'datetime');
+        $this->addType('supersededByModelId', 'integer');
     }
 
     /**
@@ -123,6 +129,16 @@ class WorkingTimeModel extends Entity
     public function isOnDemand(): bool
     {
         return $this->type === self::TYPE_ON_DEMAND;
+    }
+
+    /**
+     * A superseded model is a frozen revision kept only so historical
+     * assignments/segments keep resolving — it must never appear in
+     * assignment pickers (R-12/M-03).
+     */
+    public function isSuperseded(): bool
+    {
+        return $this->getSupersededByModelId() !== null;
     }
 
     /**

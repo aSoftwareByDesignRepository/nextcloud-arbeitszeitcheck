@@ -31,6 +31,7 @@ class OvertimeService
 	private UserOvertimeSettingsService $overtimeSettingsService;
 	private ?DutyRotationSollProvider $dutyRotationSollProvider;
 	private ?PaidAbsencePlannedHoursCreditService $paidAbsenceCreditService;
+	private ?WorkingTimeModelAssignmentResolver $assignmentResolver;
 
 	public function __construct(
 		TimeEntryMapper $timeEntryMapper,
@@ -41,6 +42,7 @@ class OvertimeService
 		UserOvertimeSettingsService $overtimeSettingsService,
 		?DutyRotationSollProvider $dutyRotationSollProvider = null,
 		?PaidAbsencePlannedHoursCreditService $paidAbsenceCreditService = null,
+		?WorkingTimeModelAssignmentResolver $assignmentResolver = null,
 	) {
 		$this->timeEntryMapper = $timeEntryMapper;
 		$this->workingTimeModelMapper = $workingTimeModelMapper;
@@ -50,6 +52,19 @@ class OvertimeService
 		$this->overtimeSettingsService = $overtimeSettingsService;
 		$this->dutyRotationSollProvider = $dutyRotationSollProvider;
 		$this->paidAbsenceCreditService = $paidAbsenceCreditService;
+		$this->assignmentResolver = $assignmentResolver;
+	}
+
+	/**
+	 * The single resolution authority (lazily resolved so legacy manual
+	 * constructions in tests keep working; DI always injects it).
+	 */
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->assignmentResolver === null) {
+			$this->assignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+		}
+		return $this->assignmentResolver;
 	}
 
 	/**
@@ -73,7 +88,6 @@ class OvertimeService
 		$opening = $this->overtimeSettingsService->getOpeningBalanceHours($userId, $yearOfStart);
 		$trackingFrom = $this->overtimeSettingsService->getTrackingFrom($userId);
 
-		[$dailyHours, $weeklyHours, $schedule, $requiredHoursBasis] = $this->resolveContractHours($userId);
 		$rotationWeekLabel = null;
 
 		$periodStart = clone $startDate;
@@ -87,6 +101,15 @@ class OvertimeService
 		$periodStartDay->setTime(0, 0, 0);
 		$periodEndDay = clone $endDate;
 		$periodEndDay->setTime(0, 0, 0);
+
+		// Scalar summary fields mirror the contract covering period_end (R-07) —
+		// a mid-period model change shows the *current* contract's numbers,
+		// while soll_segments carry the full history.
+		$endContract = $this->assignmentResolver()->resolveStrict($userId, $periodEndDay);
+		$dailyHours = $endContract->dailyHours;
+		$weeklyHours = $endContract->weeklyHours;
+		$schedule = $endContract->schedule;
+		$requiredHoursBasis = $endContract->basis;
 
 		$rotationHours = null;
 		if ($periodStartDay <= $periodEndDay) {
@@ -128,6 +151,7 @@ class OvertimeService
 				'implied_daily_hours' => $impliedDailyHours,
 				'required_hours_basis' => $requiredHoursBasis,
 				'rotation_week_label' => $rotationWeekLabel,
+				'soll_segments' => [],
 				'working_days' => 0.0,
 				'effective_tracking_from' => $trackingFrom !== null ? $trackingFrom->format('Y-m-d') : null,
 				'opening_balance_hours' => round($opening, 2),
@@ -155,17 +179,23 @@ class OvertimeService
 			}
 		}
 
-		$suspensionReduction = $this->suspensionReductionHours($userId, $periodStart, $endDate);
-		$requiredHours = $this->calculateRequiredHours(
-			$userId,
-			$periodStart,
-			$endDate,
-			$dailyHours,
-			$weeklyHours,
-			$schedule,
-			$rotationHours,
-			$suspensionReduction,
-		);
+		$sollSegments = [];
+		// Segmented Soll: every assignment window in the range contributes its
+		// own contract — a mid-period model change no longer stretches today's
+		// model retroactively over the whole range (the core feature).
+		if ($rotationHours !== null) {
+			$suspensionReduction = $this->suspensionReductionHours($userId, $periodStart, $endDate);
+			$requiredHours = max(0.0, $rotationHours - $suspensionReduction);
+		} else {
+			[$requiredHours, $resolvedSegments, $sollSegments, $suspensionReduction] = $this->segmentedRequiredHours(
+				$userId,
+				$periodStartDay,
+				$periodEndDay
+			);
+			$requiredHoursBasis = count($resolvedSegments) === 1
+				? $resolvedSegments[0]->contract->basis
+				: WorkingTimeModelAssignmentResolver::BASIS_SEGMENTED;
+		}
 		// Overtime tracking "Stichtag": do not apply the full daily/weekly target to the
 		// anchor calendar day itself. Otherwise a new employee sees a full day of
 		// undertime at login before any work is recorded (confusing UX). From the next
@@ -181,17 +211,13 @@ class OvertimeService
 				$anchorEnd = clone $anchor;
 				$anchorEnd->setTime(23, 59, 59);
 				$anchorRotation = $this->tryRotationRequiredHours($userId, $anchor, $anchorEnd);
-				$anchorReduction = $this->suspensionReductionHours($userId, $anchor, $anchorEnd);
-				$requiredHours -= $this->calculateRequiredHours(
-					$userId,
-					$anchor,
-					$anchorEnd,
-					$dailyHours,
-					$weeklyHours,
-					$schedule,
-					$anchorRotation,
-					$anchorReduction,
-				);
+				if ($anchorRotation !== null) {
+					$anchorReduction = $this->suspensionReductionHours($userId, $anchor, $anchorEnd);
+					$requiredHours -= max(0.0, $anchorRotation - $anchorReduction);
+				} else {
+					[$anchorSoll] = $this->segmentedRequiredHours($userId, $anchor, $anchorEnd);
+					$requiredHours -= $anchorSoll;
+				}
 				if ($requiredHours < 0) {
 					$requiredHours = 0.0;
 				}
@@ -233,6 +259,7 @@ class OvertimeService
 			'implied_daily_hours' => $impliedDailyHours,
 			'required_hours_basis' => $requiredHoursBasis,
 			'rotation_week_label' => $rotationWeekLabel,
+			'soll_segments' => $sollSegments,
 			'working_days' => $this->countWorkingDays($userId, $periodStart, $endDate),
 			'effective_tracking_from' => $trackingFrom !== null ? $trackingFrom->format('Y-m-d') : null,
 			'opening_balance_hours' => round($opening, 2),
@@ -339,40 +366,54 @@ class OvertimeService
 		return $this->getCumulativeWorkDelta($userId, $effectiveStart, $beforeDate);
 	}
 
-	private function calculateRequiredHours(
-		string $userId,
-		\DateTime $startDate,
-		\DateTime $endDate,
-		float $dailyHours,
-		float $weeklyHours,
-		?\OCA\ArbeitszeitCheck\Support\WeekdaySchedule $schedule = null,
-		?float $precomputedRotationHours = null,
-		?float $precomputedSuspensionReduction = null,
-	): float {
-		// G2 on: Duty rotation Soll first; null → legacy weekday/weekly contract.
-		$rotationHours = $precomputedRotationHours;
-		if ($rotationHours === null) {
-			$rotationHours = $this->tryRotationRequiredHours($userId, $startDate, $endDate);
+	/**
+	 * Segment-wise Soll for a range: each contiguous contract window
+	 * contributes its own required hours, and suspension absences reduce the
+	 * segment they fall into (never leaking into a neighbouring window or an
+	 * unassigned gap, whose Soll is already 0).
+	 *
+	 * @return array{0: float, 1: list<\OCA\ArbeitszeitCheck\Support\AssignmentSegment>, 2: list<array<string, mixed>>, 3: float}
+	 *   [total required hours, resolved segments, wire-shaped soll_segments,
+	 *   total suspension reduction]
+	 */
+	private function segmentedRequiredHours(string $userId, \DateTime $startDay, \DateTime $endDay): array
+	{
+		$segments = $this->assignmentResolver()->resolveRange($userId, $startDay, $endDay);
+		$total = 0.0;
+		$reduction = 0.0;
+		$wire = [];
+		foreach ($segments as $seg) {
+			$contract = $seg->contract;
+			if ($contract->schedule !== null) {
+				$base = $contract->schedule->requiredHoursForDateRange(
+					$seg->start,
+					$seg->end,
+					fn (\DateTime $day): float => $this->holidayCalendarService->getHolidayWeightForUser($userId, $day),
+				);
+			} elseif ($contract->weeklyHours > 0.0) {
+				$workingDays = $this->countWorkingDays($userId, $seg->start, $seg->end);
+				$base = ($workingDays / 5.0) * $contract->weeklyHours;
+			} else {
+				// on_demand / unassigned_gap: contractually no Soll.
+				$base = 0.0;
+			}
+			$segReduction = $this->suspensionReductionHours($userId, $seg->start, $seg->end);
+			$reduction += $segReduction;
+			$segSoll = max(0.0, $base - $segReduction);
+			$total += $segSoll;
+			$model = $contract->model;
+			$wire[] = [
+				'start' => $seg->start->format('Y-m-d'),
+				'end' => $seg->end->format('Y-m-d'),
+				'model_id' => $model?->getId(),
+				'model_name' => $model !== null
+					? ($model->isPersonal() ? $this->l10n->t('Individual contract') : $model->getName())
+					: null,
+				'basis' => $contract->basis,
+				'hours' => round($segSoll, 2),
+			];
 		}
-		if ($rotationHours !== null) {
-			$base = $rotationHours;
-		} elseif ($schedule !== null) {
-			$base = $schedule->requiredHoursForDateRange(
-				$startDate,
-				$endDate,
-				fn (\DateTime $day): float => $this->holidayCalendarService->getHolidayWeightForUser($userId, $day),
-			);
-		} else {
-			$workingDays = $this->countWorkingDays($userId, $startDate, $endDate);
-			$base = ($workingDays / 5.0) * $weeklyHours;
-		}
-
-		// Suspension absences (unpaid / parental leave) remove the day's Soll:
-		// the contract is dormant — the day must neither earn nor lose balance.
-		$reduction = $precomputedSuspensionReduction
-			?? $this->suspensionReductionHours($userId, $startDate, $endDate);
-
-		return max(0.0, $base - $reduction);
+		return [$total, $segments, $wire, $reduction];
 	}
 
 	/**
@@ -393,9 +434,6 @@ class OvertimeService
 			return 0.0;
 		}
 	}
-
-	/** @var bool|null memoized "org has any org-level model" probe */
-	private ?bool $orgHasWorkingTimeModels = null;
 
 	private function tryRotationRequiredHours(string $userId, \DateTime $startDate, \DateTime $endDate): ?float
 	{
@@ -420,57 +458,10 @@ class OvertimeService
 	 */
 	private function resolveContractHours(string $userId): array
 	{
-		$dailyHours = 8.0;
-		$weeklyHours = 40.0;
-		$schedule = null;
-		$basis = 'weekly_contract';
-
-		$userModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-		if ($userModel === null && $this->orgHasWorkingTimeModels()) {
-			// E-02 residual: this organisation configures working time models
-			// but never assigned one to this user — the 40h fallback is an
-			// assumption, not a contract. The computed numbers stay identical
-			// (legacy safe), but the basis flags the estimate so surfaces can
-			// show "no model assigned" instead of pretending a contract exists.
-			// Orgs that never created a model keep 'weekly_contract' — flagging
-			// every user there would be noise for a feature they never enabled.
-			$basis = 'degraded';
-		}
-		if ($userModel) {
-			try {
-				$model = $this->workingTimeModelMapper->find($userModel->getWorkingTimeModelId());
-				if ($model->isOnDemand()) {
-					// On-demand (Arbeit auf Abruf): no contractual Soll — only
-					// actually worked time counts. Never substitute the legacy
-					// 8.0/40.0 defaults and never feed a stored schedule into
-					// required-hours math: Soll is exactly 0.
-					return [0.0, 0.0, null, 'on_demand'];
-				}
-				$schedule = $model->getWeekdaySchedule();
-				if ($schedule !== null) {
-					$dailyHours = $schedule->averageDailyNetHours();
-					$weeklyHours = $schedule->weeklyNetHours();
-					$basis = 'weekday_schedule';
-				} else {
-					$dailyHours = $model->getDailyHours();
-					$weeklyHours = $model->getWeeklyHours();
-					if ($dailyHours <= 0.0 || $weeklyHours <= 0.0) {
-						// Legacy rows may carry a stored 0 contract (pre-MH-02
-						// writes): Soll would silently collapse to 0 exactly
-						// like on_demand (EC-12) — mark the basis degraded so
-						// corrupt data stays distinguishable from intent.
-						$basis = 'degraded';
-					}
-				}
-			} catch (\Throwable $e) {
-				// Assigned but model row missing/gone: keep the legacy default
-				// hours but mark the resolution degraded so downstream can tell
-				// "no contract loaded" apart from a real weekly contract.
-				$basis = 'degraded';
-			}
-		}
-
-		return [$dailyHours, $weeklyHours, $schedule, $basis];
+		// "Current contract" == strict resolution at today: covering row → its
+		// contract; org-gap-policy branch applies to non-covering days.
+		$contract = $this->assignmentResolver()->resolveStrict($userId, new \DateTime());
+		return [$contract->dailyHours, $contract->weeklyHours, $contract->schedule, $contract->basis];
 	}
 
 	/**
@@ -557,18 +548,6 @@ class OvertimeService
 	 * model configured. Memoized per request — one cheap EXISTS-style query
 	 * total, not per user.
 	 */
-	private function orgHasWorkingTimeModels(): bool
-	{
-		if ($this->orgHasWorkingTimeModels === null) {
-			try {
-				$this->orgHasWorkingTimeModels = $this->workingTimeModelMapper->findAll(1) !== [];
-			} catch (\Throwable) {
-				$this->orgHasWorkingTimeModels = false;
-			}
-		}
-		return $this->orgHasWorkingTimeModels;
-	}
-
 	public function getOvertimeBalance(string $userId): float
 	{
 		$now = new \DateTime();

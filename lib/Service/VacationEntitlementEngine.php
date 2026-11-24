@@ -571,49 +571,44 @@ class VacationEntitlementEngine {
 		$referenceWeekDays = 5.0;
 		$workDaysPerWeek = 5.0;
 		$degraded = null;
-		$modelAssignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, new \DateTime($asOfDate->format('Y-m-d')));
-		if ($modelAssignment !== null) {
-			try {
-				$workingTimeModel = $this->workingTimeModelMapper->find($modelAssignment->getWorkingTimeModelId());
-				if ($workingTimeModel->isOnDemand()) {
-					// On-demand models carry workDaysPerWeek=0 by contract —
-					// there is no fixed weekday basis to pro-rate against.
-					// Silently computing 30*(0/5)=0 would deny the statutory
-					// minimum a Minijobber is still owed, while pretending a
-					// precise answer exists is just as wrong: the pro-rated
-					// entitlement must come from actual worked days, which
-					// this layer cannot see. Keep the 1-day/week floor and
-					// flag the trace so admin UIs surface it instead of
-					// showing a silently wrong number (BQ-03).
-					$degraded = 'on_demand_model';
-					\OCP\Log\logger('arbeitszeitcheck')->warning(
-						sprintf(
-							'VacationEntitlementEngine: on-demand working time model #%d for user %s has no fixed work days — vacation entitlement falls back to the %d-day/week minimum until pro-rating on actual worked days is implemented.',
-							(int)$workingTimeModel->getId(),
-							$userId,
-							1,
-						),
-						['app' => 'arbeitszeitcheck']
-					);
-				}
-				$workDaysPerWeek = max(1.0, min(7.0, round((float)$workingTimeModel->getWorkDaysPerWeek(), 2)));
-			} catch (\Throwable) {
-				// EC-04: model deleted but the user still has an assignment
-				// row referencing it. Falling back to the 5-day reference
-				// would silently change a part-timer's entitlement, so we
-				// flag this in the trace and log a warning. Admin UIs can
-				// surface the flag instead of pretending nothing happened.
-				$degraded = 'model_lookup_failed';
+		$contract = $this->contractAt($userId, $asOfDate);
+		$workingTimeModel = $contract?->model;
+		if ($contract !== null && $contract->assignmentId !== null && $workingTimeModel === null) {
+			// EC-04: assignment row exists but the model row is gone.
+			$degraded = 'model_lookup_failed';
+			\OCP\Log\logger('arbeitszeitcheck')->warning(
+				sprintf(
+					'VacationEntitlementEngine: working time model for assignment #%d not found for user %s — falling back to %d work days/week (EC-04).',
+					(int)$contract->assignmentId,
+					$userId,
+					(int)$workDaysPerWeek,
+				),
+				['app' => 'arbeitszeitcheck']
+			);
+		}
+		if ($workingTimeModel !== null) {
+			if ($workingTimeModel->isOnDemand()) {
+				// On-demand models carry workDaysPerWeek=0 by contract —
+				// there is no fixed weekday basis to pro-rate against.
+				// Silently computing 30*(0/5)=0 would deny the statutory
+				// minimum a Minijobber is still owed, while pretending a
+				// precise answer exists is just as wrong: the pro-rated
+				// entitlement must come from actual worked days, which
+				// this layer cannot see. Keep the 1-day/week floor and
+				// flag the trace so admin UIs surface it instead of
+				// showing a silently wrong number (BQ-03).
+				$degraded = 'on_demand_model';
 				\OCP\Log\logger('arbeitszeitcheck')->warning(
 					sprintf(
-						'VacationEntitlementEngine: working time model #%d not found for user %s — falling back to %d work days/week (EC-04).',
-						(int)$modelAssignment->getWorkingTimeModelId(),
+						'VacationEntitlementEngine: on-demand working time model #%d for user %s has no fixed work days — vacation entitlement falls back to the %d-day/week minimum until pro-rating on actual worked days is implemented.',
+						(int)$workingTimeModel->getId(),
 						$userId,
-						(int)$workDaysPerWeek,
+						1,
 					),
 					['app' => 'arbeitszeitcheck']
 				);
 			}
+			$workDaysPerWeek = max(1.0, min(7.0, round((float)$workingTimeModel->getWorkDaysPerWeek(), 2)));
 		}
 		$days = $this->roundDays($referenceDays * ($workDaysPerWeek / $referenceWeekDays));
 		$trace = [
@@ -692,33 +687,28 @@ class VacationEntitlementEngine {
 		}
 
 		if ($workDaysPerWeek <= 0.0) {
-			$modelAssignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, new \DateTime($asOfDate->format('Y-m-d')));
-			if ($modelAssignment !== null) {
-				try {
-					$workingTimeModel = $this->workingTimeModelMapper->find($modelAssignment->getWorkingTimeModelId());
-					if ($workingTimeModel->isOnDemand()) {
-						// Same E-06-class interim as resolveSimpleModel: an
-						// on-demand model carries workDaysPerWeek=0 by contract,
-						// so the max(1.0) floor below would silently mint
-						// ~6 days. Keep the floor (statutory minimum is still
-						// owed — BQ-03 pending) but flag the trace so admin
-						// surfaces can show it instead of a silently wrong
-						// number.
-						$degraded = 'on_demand_model';
-						\OCP\Log\logger('arbeitszeitcheck')->warning(
-							sprintf(
-								'VacationEntitlementEngine: tariff mode for user %s resolved work days from on-demand working time model #%d — keeping the %d-day/week floor until pro-rating on actual worked days is implemented (BQ-03).',
-								$userId,
-								(int)$workingTimeModel->getId(),
-								1,
-							),
-							['app' => 'arbeitszeitcheck']
-						);
-					}
-					$workDaysPerWeek = (float)$workingTimeModel->getWorkDaysPerWeek();
-				} catch (\Throwable) {
-					$workDaysPerWeek = 5.0;
+			$workingTimeModel = $this->contractAt($userId, $asOfDate)?->model;
+			if ($workingTimeModel !== null) {
+				if ($workingTimeModel->isOnDemand()) {
+					// Same E-06-class interim as resolveSimpleModel: an
+					// on-demand model carries workDaysPerWeek=0 by contract,
+					// so the max(1.0) floor below would silently mint
+					// ~6 days. Keep the floor (statutory minimum is still
+					// owed — BQ-03 pending) but flag the trace so admin
+					// surfaces can show it instead of a silently wrong
+					// number.
+					$degraded = 'on_demand_model';
+					\OCP\Log\logger('arbeitszeitcheck')->warning(
+						sprintf(
+							'VacationEntitlementEngine: tariff mode for user %s resolved work days from on-demand working time model #%d — keeping the %d-day/week floor until pro-rating on actual worked days is implemented (BQ-03).',
+							$userId,
+							(int)$workingTimeModel->getId(),
+							1,
+						),
+						['app' => 'arbeitszeitcheck']
+					);
 				}
+				$workDaysPerWeek = (float)$workingTimeModel->getWorkDaysPerWeek();
 			}
 		}
 
@@ -909,11 +899,11 @@ class VacationEntitlementEngine {
 	 */
 	private function resolveModelLayer(string $userId, \DateTimeImmutable $asOfDate): ?array
 	{
-		$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, new \DateTime($asOfDate->format('Y-m-d')));
-		if ($assignment === null) {
+		$contract = $this->contractAt($userId, $asOfDate);
+		$modelId = $contract?->model !== null ? (int)$contract->model->getId() : null;
+		if ($modelId === null) {
 			return null;
 		}
-		$modelId = (int)$assignment->getWorkingTimeModelId();
 		$default = $this->modelDefaultMapper->findActiveByModelAndDate($modelId, $asOfDate);
 		if ($default === null) {
 			return null;
@@ -1049,7 +1039,7 @@ class VacationEntitlementEngine {
 	 */
 	private function legacyFallback(string $userId, \DateTimeImmutable $asOfDate): array
 	{
-		$days = $this->resolveLegacyManualEntitlement($userId);
+		$days = $this->resolveLegacyManualEntitlement($userId, $asOfDate);
 		return [
 			'days' => $this->roundDays((float)$days),
 			'source' => 'manual',
@@ -1066,12 +1056,44 @@ class VacationEntitlementEngine {
 		return $this->vacationUnitService?->isHoursMode() === true ? 4000.0 : 366.0;
 	}
 
-	private function resolveLegacyManualEntitlement(string $userId): float {
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
+	}
+
+	/**
+	 * Strict contract resolution at a date — the money path. Fail-open to
+	 * null so callers keep their existing "no model" fallback.
+	 */
+	private function contractAt(string $userId, \DateTimeImmutable $asOfDate): ?\OCA\ArbeitszeitCheck\Support\ResolvedWorkingTimeContract
+	{
+		try {
+			return $this->assignmentResolver()->resolveStrict($userId, new \DateTime($asOfDate->format('Y-m-d')));
+		} catch (\Throwable) {
+			return null;
+		}
+	}
+
+	private function resolveLegacyManualEntitlement(string $userId, \DateTimeImmutable $asOfDate): float {
 		$ceiling = $this->entitlementCeiling();
-		$currentModel = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-		if ($currentModel !== null && $currentModel->getVacationDaysPerYear() !== null) {
-			$raw = (float)$currentModel->getVacationDaysPerYear();
-			return max(0.0, min($ceiling, $raw));
+		// The assignment covering the as-of date carries the vacation days —
+		// not whatever row happens to be current at run time, which would
+		// retro-apply a mid-year change to earlier dates.
+		$assignmentDays = $this->contractAt($userId, $asOfDate)?->vacationDaysPerYear;
+		if ($assignmentDays !== null) {
+			return max(0.0, min($ceiling, $assignmentDays));
 		}
 		$fromSettings = $this->userSettingsMapper->getFloatSetting(
 			$userId,

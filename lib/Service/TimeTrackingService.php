@@ -2590,10 +2590,16 @@ class TimeTrackingService
 	private function resolveBreakFallbackPolicyForUser(string $userId): array
 	{
 		$defaultMode = 'flex';
-		$assignment = $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-		if ($assignment !== null) {
+		$model = null;
+		try {
+			// Lenient assist resolution: the auto-break fallback mirrors the
+			// contract active today, falling back to it on uncovered days.
+			$model = $this->assignmentResolver()->resolveLenient($userId, new \DateTime())->model;
+		} catch (\Throwable) {
+			$model = null;
+		}
+		if ($model !== null) {
 			try {
-				$model = $this->workingTimeModelMapper->find($assignment->getWorkingTimeModelId());
 				$mode = $model->getType() === \OCA\ArbeitszeitCheck\Db\WorkingTimeModel::TYPE_SHIFT_WORK ? 'strict_shift' : 'flex';
 				$rules = $model->getBreakRulesArray() ?? [];
 				$threshold = null;
@@ -2632,6 +2638,23 @@ class TimeTrackingService
 			'window_start_hour' => max(0, min(23, (int)$this->config->getAppValue('arbeitszeitcheck', 'break_auto_fallback_flex_window_start', '11'))),
 			'window_end_hour' => max(1, min(24, (int)$this->config->getAppValue('arbeitszeitcheck', 'break_auto_fallback_flex_window_end', '16'))),
 		];
+	}
+
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	private function archiveBreakToJson(TimeEntry $entry, \DateTime $start, \DateTime $end): void

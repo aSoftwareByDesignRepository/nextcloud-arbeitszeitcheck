@@ -772,7 +772,13 @@
         let modelOptions = `<option value="">${noModelLabel}</option>`;
         models.forEach(model => {
             const selected = user.workingTimeModel && user.workingTimeModel.id === model.id ? 'selected' : '';
-            modelOptions += `<option value="${Utils.escapeHtml(String(model.id))}" ${selected}>${Utils.escapeHtml(model.name)}</option>`;
+            // Superseded revisions stay selectable only while they are the
+            // current assignment — the picker never offers them for a new
+            // assignment (R-12), but the running window must keep showing it.
+            const superseded = model.superseded === true || model.assignable === false;
+            const disabled = superseded && !selected ? ' disabled' : '';
+            const label = superseded ? `${model.name} (${t('supersededModel', 'replaced version')})` : model.name;
+            modelOptions += `<option value="${Utils.escapeHtml(String(model.id))}" ${selected}${disabled}>${Utils.escapeHtml(label)}</option>`;
         });
 
         // A personal model never appears in the global <select> — while
@@ -1110,6 +1116,18 @@
                     </div>
                 </details>
 
+                <details class="user-edit-section user-edit-section--assignments" id="user-edit-assignments" open>
+                    <summary class="user-edit-section__summary" id="user-edit-assignments-heading">
+                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('assignmentsSectionTitle', 'Work schedule periods'))}</span>
+                    </summary>
+                    <div class="user-edit-section__body">
+                        <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideAssignments', 'Each row is one period with its own work schedule. Add a new period when the contract changes — past periods stay untouched so reports for old months keep their original numbers.'))}</p>
+                        <div id="assignments-manager" class="assignments-manager" aria-live="polite"></div>
+                        <div id="assignments-finalized-warning" class="assignments-manager__warning" role="status" hidden></div>
+                        <button type="button" id="assignment-add-btn" class="btn btn--secondary assignments-manager__add">${Utils.escapeHtml(t('addAssignmentPeriod', 'Add period'))}</button>
+                    </div>
+                </details>
+
                 <details class="user-edit-section user-edit-section--history" id="assignment-history">
                     <summary class="user-edit-section__summary" id="user-edit-history-heading">
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('historySectionTitle', 'Work schedule history'))}</span>
@@ -1410,6 +1428,7 @@
         bindDirtyTracking(form);
         clearDirty();
         loadAssignmentHistory(user.userId);
+        initAssignmentsManager(user, models);
 
         const backLink = root.querySelector('[data-action="back-to-list"]');
         if (backLink) {
@@ -1497,6 +1516,453 @@
                 contentEl.innerHTML = '<p class="history-panel__empty">' + Utils.escapeHtml(auMsg('errorLoadingHistory', 'Error loading assignment history')) + '</p>';
             }
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Effective-dated assignment manager (POST/PATCH/DELETE
+    // /api/admin/users/{uid}/working-time-assignments)
+    // ------------------------------------------------------------------
+
+    function initAssignmentsManager(user, models) {
+        const container = document.getElementById('assignments-manager');
+        const addBtn = document.getElementById('assignment-add-btn');
+        if (!container || !addBtn || !user || !user.userId) {
+            return;
+        }
+        const t = (key, english) => auMsg(key, english);
+        const userId = user.userId;
+        const apiBase = '/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/working-time-assignments';
+        const assignableModels = (models || []).filter(m => m.assignable !== false && m.superseded !== true);
+        let assignments = Array.isArray(user.workingTimeModelAssignments) ? user.workingTimeModelAssignments.slice() : [];
+        let dialog = null;
+
+        const fmtDate = (iso) => {
+            if (!iso) return t('openEnded', 'open');
+            const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
+        };
+        const isoFromInput = (val) => {
+            const v = String(val || '').trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+            const m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
+        };
+
+        function statusBadge(a) {
+            if (a.is_current) {
+                return '<span class="badge badge--success">' + Utils.escapeHtml(t('active', 'Active')) + '</span>';
+            }
+            if (a.is_future) {
+                return '<span class="badge badge--secondary">' + Utils.escapeHtml(t('planned', 'Planned')) + '</span>';
+            }
+            return '<span class="badge badge--secondary">' + Utils.escapeHtml(t('ended', 'Ended')) + '</span>';
+        }
+
+        function render() {
+            const workScheduleHdr = Utils.escapeHtml(t('workSchedule', 'Work schedule'));
+            const fromHdr = Utils.escapeHtml(t('validFrom', 'Valid from'));
+            const toHdr = Utils.escapeHtml(t('validTo', 'Valid to'));
+            const vacationHdr = Utils.escapeHtml(t('vacationDaysPerYear', 'Vacation Days Per Year'));
+            const statusHdr = Utils.escapeHtml(t('status', 'Status'));
+            const actionsHdr = Utils.escapeHtml(t('actions', 'Actions'));
+            if (assignments.length === 0) {
+                container.innerHTML = '<p class="assignments-manager__empty">' + Utils.escapeHtml(t('noAssignmentsYet', 'No work schedule periods yet. Add the first one.')) + '</p>';
+                return;
+            }
+            const td = (label, html) => Utils.responsiveTd ? Utils.responsiveTd(label, html) : '<td>' + html + '</td>';
+            const rows = assignments.map(a => {
+                const actions =
+                    '<button type="button" class="btn btn--secondary btn--small" data-assignment-edit="' + a.id + '">' + Utils.escapeHtml(t('edit', 'Edit')) + '</button> ' +
+                    (a.deletable
+                        ? '<button type="button" class="btn btn--secondary btn--small assignments-manager__delete" data-assignment-delete="' + a.id + '">' + Utils.escapeHtml(t('delete', 'Delete')) + '</button>'
+                        : (a.is_current ? '<button type="button" class="btn btn--secondary btn--small" data-assignment-end="' + a.id + '">' + Utils.escapeHtml(t('endAssignment', 'End')) + '</button>' : ''));
+                return '<tr>'
+                    + td(workScheduleHdr, Utils.escapeHtml(a.model_name || '—'))
+                    + td(fromHdr, Utils.escapeHtml(fmtDate(a.start_date)))
+                    + td(toHdr, Utils.escapeHtml(fmtDate(a.end_date)))
+                    + td(vacationHdr, Utils.escapeHtml(a.vacation_days_per_year == null ? '—' : String(a.vacation_days_per_year)))
+                    + td(statusHdr, statusBadge(a))
+                    + td(actionsHdr, actions)
+                    + '</tr>';
+            }).join('');
+            container.innerHTML = '<div class="table-container" role="region" aria-label="' + Utils.escapeHtml(t('assignmentsSectionTitle', 'Work schedule periods')) + '">'
+                + '<table class="table table--hover azc-table--responsive" role="table">'
+                + '<thead><tr><th scope="col">' + workScheduleHdr + '</th><th scope="col">' + fromHdr + '</th><th scope="col">' + toHdr + '</th><th scope="col">' + vacationHdr + '</th><th scope="col">' + statusHdr + '</th><th scope="col">' + actionsHdr + '</th></tr></thead>'
+                + '<tbody>' + rows + '</tbody></table></div>';
+
+            container.querySelectorAll('[data-assignment-edit]').forEach(btn => {
+                btn.addEventListener('click', () => openDialog(assignments.find(a => String(a.id) === btn.getAttribute('data-assignment-edit')) || null));
+            });
+            container.querySelectorAll('[data-assignment-delete]').forEach(btn => {
+                btn.addEventListener('click', () => confirmDelete(assignments.find(a => String(a.id) === btn.getAttribute('data-assignment-delete')) || null));
+            });
+            container.querySelectorAll('[data-assignment-end]').forEach(btn => {
+                btn.addEventListener('click', () => endAssignment(assignments.find(a => String(a.id) === btn.getAttribute('data-assignment-end')) || null));
+            });
+        }
+
+        function showFinalizedWarning(list) {
+            const el = document.getElementById('assignments-finalized-warning');
+            if (!el) return;
+            if (Array.isArray(list) && list.length > 0) {
+                el.hidden = false;
+                el.innerHTML = '<p class="form-help form-help--note"><strong>' + Utils.escapeHtml(t('finalizedMonthsAffectedTitle', 'Sealed months affected')) + ':</strong> '
+                    + Utils.escapeHtml(t('finalizedMonthsAffected', 'This change touches already sealed months') + ' (' + list.join(', ') + '). ' + t('finalizedMonthsAffectedHint', 'The sealed report keeps its original numbers as the legal record; the month view marks the difference.')) + '</p>';
+            } else {
+                el.hidden = true;
+                el.innerHTML = '';
+            }
+        }
+
+        function ensureDialog() {
+            if (dialog && document.body.contains(dialog)) {
+                return dialog;
+            }
+            dialog = document.createElement('dialog');
+            dialog.id = 'assignment-dialog';
+            dialog.className = 'azc-dialog assignments-dialog';
+            dialog.setAttribute('aria-labelledby', 'assignment-dialog-title');
+            const modelOpts = assignableModels.map(m =>
+                '<option value="' + Utils.escapeHtml(String(m.id)) + '">' + Utils.escapeHtml(m.name) + '</option>').join('');
+            dialog.innerHTML = ''
+                + '<form method="dialog" class="assignments-dialog__form" id="assignment-dialog-form" novalidate>'
+                + '<h2 id="assignment-dialog-title" class="assignments-dialog__title"></h2>'
+                + '<p class="assignments-dialog__teacher form-help" id="assignment-dialog-teacher">' + Utils.escapeHtml(t('assignmentTeacherLine', 'The previous assignment ends automatically the day before.')) + '</p>'
+                + '<div class="assignments-dialog__error" id="assignment-dialog-error" role="alert" hidden></div>'
+                + '<div class="assignments-dialog__conflicts" id="assignment-dialog-conflicts" hidden></div>'
+                + '<p class="assignments-dialog__preview" id="assignment-dialog-preview" role="status" hidden></p>'
+                + '<div class="form-group">'
+                + '  <label class="form-label" for="assignment-model">' + Utils.escapeHtml(t('workSchedule', 'Work schedule')) + '</label>'
+                + '  <select id="assignment-model" class="form-select" required>'
+                +      modelOpts
+                + '    <option value="__custom__">' + Utils.escapeHtml(t('individualContractOption', 'Individual contract')) + '</option>'
+                + '  </select>'
+                + '</div>'
+                + '<div id="assignment-custom-fields" class="assignments-dialog__custom" hidden>'
+                + '  <div class="form-group"><label class="form-label" for="assignment-custom-weekly">' + Utils.escapeHtml(t('customWeeklyHours', 'Weekly hours')) + '</label>'
+                + '    <input type="number" id="assignment-custom-weekly" class="form-input" min="0.5" max="80" step="0.25" inputmode="decimal"></div>'
+                + '  <div class="form-group"><label class="form-label" for="assignment-custom-daily">' + Utils.escapeHtml(t('customDailyHours', 'Daily hours')) + '</label>'
+                + '    <input type="number" id="assignment-custom-daily" class="form-input" min="0.5" max="24" step="0.25" inputmode="decimal"></div>'
+                + '  <div class="form-group"><label class="form-label" for="assignment-custom-days">' + Utils.escapeHtml(t('customWorkDaysPerWeek', 'Working days per week')) + '</label>'
+                + '    <input type="number" id="assignment-custom-days" class="form-input" min="1" max="7" step="0.5" inputmode="numeric"></div>'
+                + '</div>'
+                + '<div class="form-group"><label class="form-label" for="assignment-start">' + Utils.escapeHtml(t('startDate', 'Start Date')) + '</label>'
+                + '  <input type="date" id="assignment-start" class="form-input" required></div>'
+                + '<details class="assignments-dialog__more" id="assignment-more">'
+                + '  <summary class="assignments-dialog__more-summary">' + Utils.escapeHtml(t('moreOptions', 'More options')) + '</summary>'
+                + '<div class="form-group"><label class="form-label" for="assignment-end">' + Utils.escapeHtml(t('endDateOptional', 'End Date (Optional)')) + '</label>'
+                + '  <input type="date" id="assignment-end" class="form-input">'
+                + '  <p class="form-help">' + Utils.escapeHtml(t('endDateHelp', 'Leave empty if the assignment has no end date')) + '</p></div>'
+                + '<div class="form-group"><label class="form-label" for="assignment-vacation">' + Utils.escapeHtml(t('vacationDaysPerYear', 'Vacation Days Per Year')) + '</label>'
+                + '  <input type="number" id="assignment-vacation" class="form-input" min="0" max="365" step="1" inputmode="numeric">'
+                + '  <p class="form-help">' + Utils.escapeHtml(t('vacationDaysHint', 'Applies only to this period — a change mid-year is pro-rated by day.')) + '</p></div>'
+                + '</details>'
+                + '<div class="assignments-dialog__actions">'
+                + '  <button type="button" class="btn btn--secondary" id="assignment-dialog-cancel">' + Utils.escapeHtml(t('cancel', 'Cancel')) + '</button>'
+                + '  <button type="submit" class="btn btn--primary" id="assignment-dialog-save">' + Utils.escapeHtml(t('save', 'Save')) + '</button>'
+                + '</div>'
+                + '</form>';
+            document.body.appendChild(dialog);
+
+            dialog.querySelector('#assignment-model').addEventListener('change', function () {
+                const custom = this.value === '__custom__';
+                dialog.querySelector('#assignment-custom-fields').hidden = !custom;
+                updatePreview();
+            });
+            dialog.querySelector('#assignment-start').addEventListener('input', function () {
+                clearFieldError(this);
+                updatePreview();
+            });
+            dialog.querySelector('#assignment-end').addEventListener('input', function () {
+                updatePreview();
+            });
+            dialog.querySelector('#assignment-dialog-cancel').addEventListener('click', function () {
+                dialog.close();
+            });
+            dialog.querySelector('#assignment-dialog-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+                submitDialog();
+            });
+            return dialog;
+        }
+
+        let editingId = null;
+
+        function openDialog(assignment) {
+            editingId = assignment ? assignment.id : null;
+            const dlg = ensureDialog();
+            dlg.querySelector('#assignment-dialog-title').textContent = assignment
+                ? t('editAssignmentPeriod', 'Edit work schedule period')
+                : t('addAssignmentPeriod', 'Add period');
+            const err = dlg.querySelector('#assignment-dialog-error');
+            err.hidden = true;
+            err.textContent = '';
+            dlg.querySelector('#assignment-dialog-conflicts').hidden = true;
+            dlg.querySelector('#assignment-dialog-conflicts').innerHTML = '';
+            const modelSel = dlg.querySelector('#assignment-model');
+            const isCustom = !!(assignment && assignment.model_is_personal);
+            modelSel.value = isCustom
+                ? '__custom__'
+                : (assignment && assignment.model_id != null ? String(assignment.model_id) : (assignableModels[0] ? String(assignableModels[0].id) : '__custom__'));
+            // A superseded/personal model currently assigned must remain
+            // selectable so the edit dialog shows the truth.
+            if (assignment && !isCustom && modelSel.value !== String(assignment.model_id)) {
+                const opt = document.createElement('option');
+                opt.value = String(assignment.model_id);
+                opt.textContent = assignment.model_name || String(assignment.model_id);
+                opt.selected = true;
+                modelSel.appendChild(opt);
+                modelSel.value = String(assignment.model_id);
+            }
+            dlg.querySelector('#assignment-custom-fields').hidden = !isCustom;
+            // New windows default to tomorrow — the common "model change
+            // effective next day" case; editing keeps the row's own dates.
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const defaultStart = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
+            dlg.querySelector('#assignment-start').value = assignment ? (assignment.start_date || '') : defaultStart;
+            dlg.querySelector('#assignment-end').value = assignment ? (assignment.end_date || '') : '';
+            dlg.querySelector('#assignment-vacation').value = assignment && assignment.vacation_days_per_year != null ? assignment.vacation_days_per_year : '';
+            dlg.querySelector('#assignment-more').open = !!(assignment && (assignment.end_date || assignment.vacation_days_per_year != null));
+            // The auto-end teacher line describes the create flow; editing a
+            // window never touches its neighbours.
+            dlg.querySelector('#assignment-dialog-teacher').hidden = !!assignment;
+            clearFieldError(dlg.querySelector('#assignment-start'));
+            updatePreview();
+            if (typeof dlg.showModal === 'function') {
+                dlg.showModal();
+            }
+        }
+
+        function clearFieldError(input) {
+            if (!input) return;
+            input.removeAttribute('aria-invalid');
+            const described = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+            input.setAttribute('aria-describedby', described.filter(id => id !== 'assignment-start-error').join(' '));
+            if (!input.getAttribute('aria-describedby')) input.removeAttribute('aria-describedby');
+            const err = dialog && dialog.querySelector('#assignment-start-error');
+            if (err) err.remove();
+        }
+
+        function markFieldError(input, msg) {
+            clearFieldError(input);
+            input.setAttribute('aria-invalid', 'true');
+            const err = document.createElement('p');
+            err.id = 'assignment-start-error';
+            err.className = 'field-error';
+            err.setAttribute('data-field-error', 'assignment-start');
+            err.textContent = msg;
+            input.insertAdjacentElement('afterend', err);
+            const described = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+            input.setAttribute('aria-describedby', described.concat('assignment-start-error').join(' '));
+        }
+
+        // Live consequence preview (MH-11): which existing window the new
+        // start date would end, and what begins — matching the server's
+        // auto-end rule so the preview never promises an end the server
+        // would refuse.
+        function autoEndedPredecessor(startIso, endIso) {
+            const prevDay = (() => { const d = new Date(startIso + 'T00:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+            let winner = null;
+            for (const a of assignments) {
+                if (editingId !== null && String(a.id) === String(editingId)) continue;
+                const s = a.start_date || '';
+                const e = a.end_date || null;
+                const overlaps = s !== '' && (!endIso || s <= endIso) && (!e || e >= startIso);
+                if (!overlaps || s >= startIso) continue;
+                if (!winner || s > winner.start_date) winner = a;
+            }
+            // A predecessor whose tail extends past the new end is not
+            // auto-ended — the server answers 409 instead.
+            if (winner && endIso && winner.end_date && winner.end_date > endIso) return null;
+            return winner;
+        }
+
+        function updatePreview() {
+            const dlg = dialog;
+            if (!dlg) return;
+            const el = dlg.querySelector('#assignment-dialog-preview');
+            if (!el) return;
+            const startIso = isoFromInput(dlg.querySelector('#assignment-start').value);
+            const endIso = isoFromInput(dlg.querySelector('#assignment-end').value);
+            const modelSel = dlg.querySelector('#assignment-model');
+            const modelName = modelSel.value === '__custom__'
+                ? t('individualContract', 'Individual contract')
+                : (modelSel.selectedOptions[0] ? modelSel.selectedOptions[0].textContent : '');
+            if (!startIso) { el.hidden = true; el.textContent = ''; return; }
+            const pred = editingId === null ? autoEndedPredecessor(startIso, endIso) : null;
+            const parts = [];
+            if (pred) {
+                const d = new Date(startIso + 'T00:00:00'); d.setDate(d.getDate() - 1);
+                const prevFmt = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+                parts.push(t('previewEnds', '{name} ends {date}').replace('{name}', pred.model_name || '—').replace('{date}', prevFmt));
+            }
+            parts.push(t('previewBegins', '{name} begins {date}').replace('{name}', modelName || '—').replace('{date}', fmtDate(startIso)));
+            el.hidden = false;
+            el.textContent = parts.join(' · ');
+        }
+
+        function submitDialog() {
+            const dlg = dialog;
+            const startIso = isoFromInput(dlg.querySelector('#assignment-start').value);
+            const endIso = isoFromInput(dlg.querySelector('#assignment-end').value);
+            const errEl = dlg.querySelector('#assignment-dialog-error');
+            const conflictsEl = dlg.querySelector('#assignment-dialog-conflicts');
+
+            const fail = (msg) => {
+                errEl.hidden = false;
+                errEl.textContent = msg;
+                errEl.focus && errEl.focus();
+            };
+            if (!startIso) {
+                markFieldError(dlg.querySelector('#assignment-start'), t('assignmentStartRequired', 'Please enter a valid start date.'));
+                fail(t('assignmentStartRequired', 'Please enter a valid start date.'));
+                return;
+            }
+            if (dlg.querySelector('#assignment-end').value && !endIso) {
+                fail(t('assignmentEndInvalid', 'Please enter a valid end date or leave it empty.'));
+                return;
+            }
+            if (endIso && endIso < startIso) {
+                fail(t('assignmentEndBeforeStart', 'The end date must not be before the start date.'));
+                return;
+            }
+
+            const modelSel = dlg.querySelector('#assignment-model').value;
+            const payload = { startDate: startIso };
+            if (endIso) payload.endDate = endIso;
+            const vacation = dlg.querySelector('#assignment-vacation').value;
+            if (String(vacation).trim() !== '') {
+                payload.vacationDaysPerYear = parseInt(vacation, 10);
+            }
+            if (modelSel === '__custom__') {
+                const weekly = parseLocalizedDecimal(dlg.querySelector('#assignment-custom-weekly').value);
+                const daily = parseLocalizedDecimal(dlg.querySelector('#assignment-custom-daily').value);
+                const days = parseLocalizedDecimal(dlg.querySelector('#assignment-custom-days').value);
+                if (!weekly || !daily || !days) {
+                    fail(t('assignmentCustomIncomplete', 'Please fill in weekly hours, daily hours and working days for the individual contract.'));
+                    return;
+                }
+                payload.customModel = { enabled: true, weeklyHours: weekly, dailyHours: daily, workDaysPerWeek: days };
+            } else {
+                payload.modelId = parseInt(modelSel, 10);
+            }
+
+            const saveBtn = dlg.querySelector('#assignment-dialog-save');
+            saveBtn.disabled = true;
+            const url = editingId === null ? apiBase : apiBase + '/' + encodeURIComponent(editingId);
+            Utils.ajax(buildApiUrl(url), {
+                method: editingId === null ? 'POST' : 'PATCH',
+                data: payload,
+                onSuccess: function (data) {
+                    saveBtn.disabled = false;
+                    if (data && data.success && data.assignment) {
+                        upsertAssignment(data.assignment);
+                        showFinalizedWarning(data.finalized_months_affected || []);
+                        dlg.close();
+                        return;
+                    }
+                    fail((data && data.error) || t('genericError', 'Something went wrong. Please try again.'));
+                },
+                onError: function (error) {
+                    saveBtn.disabled = false;
+                    const body = error && error.data && typeof error.data === 'object' ? error.data : null;
+                    fail((body && body.error) || (error && error.error) || t('genericError', 'Something went wrong. Please try again.'));
+                    const collisions = body && (body.conflicts || body.conflicting_assignments);
+                    if (body && body.code === 'ASSIGNMENT_OVERLAP') {
+                        markFieldError(dlg.querySelector('#assignment-start'), (body && body.error) || t('assignmentOverlapError', 'This period overlaps an existing assignment.'));
+                        if (Array.isArray(collisions)) {
+                            conflictsEl.hidden = false;
+                            conflictsEl.innerHTML = '<p class="form-help"><strong>' + Utils.escapeHtml(t('overlappingWindows', 'Overlapping periods')) + ':</strong></p><ul>'
+                                + collisions.map(c => '<li>' + Utils.escapeHtml((c.model_name || '—') + ': ' + fmtDate(c.start_date) + ' → ' + fmtDate(c.end_date))
+                                    + ' <button type="button" class="btn btn--secondary btn--small" data-conflict-edit="' + c.id + '">' + Utils.escapeHtml(t('edit', 'Edit')) + '</button></li>').join('')
+                                + '</ul>';
+                            conflictsEl.querySelectorAll('[data-conflict-edit]').forEach(btn => {
+                                btn.addEventListener('click', () => {
+                                    const target = assignments.find(a => String(a.id) === btn.getAttribute('data-conflict-edit'));
+                                    if (target) openDialog(target);
+                                });
+                            });
+                        }
+                    }
+                },
+            });
+        }
+
+        function upsertAssignment(row) {
+            const idx = assignments.findIndex(a => a.id === row.id);
+            if (idx >= 0) assignments[idx] = row; else assignments.push(row);
+            assignments.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')) || ((b.id || 0) - (a.id || 0)));
+            render();
+        }
+
+        function todayIso() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        // "End" sets the window's end to today — the only allowed way to
+        // retire a row that already took effect (it stays as history).
+        function endAssignment(assignment) {
+            if (!assignment) return;
+            Utils.ajax(buildApiUrl(apiBase + '/' + encodeURIComponent(assignment.id)), {
+                method: 'PATCH',
+                data: { endDate: todayIso() },
+                onSuccess: function (data) {
+                    if (data && data.success && data.assignment) {
+                        upsertAssignment(data.assignment);
+                        showFinalizedWarning(data.finalized_months_affected || []);
+                        return;
+                    }
+                    showFinalizedWarning([]);
+                },
+                onError: function (error) {
+                    const body = error && error.data && typeof error.data === 'object' ? error.data : null;
+                    const msg = (body && body.error) || (error && error.error) || t('genericError', 'Something went wrong. Please try again.');
+                    const el = document.getElementById('assignments-finalized-warning');
+                    if (el) {
+                        el.hidden = false;
+                        el.innerHTML = '<p class="form-help form-help--error">' + Utils.escapeHtml(msg) + '</p>';
+                    }
+                },
+            });
+        }
+
+        async function confirmDelete(assignment) {
+            if (!assignment) return;
+            const result = await Utils.confirmDestructiveAction({
+                title: t('deleteAssignmentTitle', 'Delete work schedule period?'),
+                message: t('confirmDeleteAssignment', 'Delete this planned work schedule period? This cannot be undone.'),
+                confirmLabel: t('delete', 'Delete'),
+                cancelLabel: t('cancel', 'Cancel'),
+                variant: 'danger',
+            });
+            if (!result || result.confirmed !== true) return;
+            Utils.ajax(buildApiUrl(apiBase + '/' + encodeURIComponent(assignment.id)), {
+                method: 'DELETE',
+                onSuccess: function (data) {
+                    if (data && data.success) {
+                        assignments = assignments.filter(a => a.id !== assignment.id);
+                        showFinalizedWarning(data.finalized_months_affected || []);
+                        render();
+                    }
+                },
+                onError: function (error) {
+                    const body = error && error.data && typeof error.data === 'object' ? error.data : null;
+                    const msg = (body && body.error) || (error && error.error) || t('genericError', 'Something went wrong. Please try again.');
+                    const el = document.getElementById('assignments-finalized-warning');
+                    if (el) {
+                        el.hidden = false;
+                        el.innerHTML = '<p class="form-help form-help--error">' + Utils.escapeHtml(msg) + '</p>';
+                    }
+                },
+            });
+        }
+
+        addBtn.addEventListener('click', function () {
+            openDialog(null);
+        });
+        render();
     }
 
     function getOrganizationTimeCapture(user) {

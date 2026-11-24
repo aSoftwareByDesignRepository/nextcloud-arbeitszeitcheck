@@ -1424,6 +1424,10 @@ if ($mode === 'list') {
                             include __DIR__ . '/common/month-closure-lock.php';
                             ?>
                         </div>
+                        <p id="month-closure-contract-diverged" class="month-closure-contract-diverged form-help form-help--note" role="status" aria-live="polite" hidden>
+                            <span class="badge badge--warning"><?php p($l->t('Contract changed')); ?></span>
+                            <?php p($l->t('The work schedule assignment changed after this month was sealed. The sealed report keeps its original numbers as the legal record; reopen and re-finalize for an updated report.')); ?>
+                        </p>
                         <p id="month-closure-feedback" class="month-closure-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
                     </div>
                 </section>

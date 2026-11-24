@@ -82,6 +82,7 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		?LaborLawProfileFactory $laborLawProfileFactory = null,
 		?UserEmploymentSettingsService $employmentSettingsService = null,
 		?\OCP\Lock\ILockingProvider $lockingProvider = null,
+		?\OCA\ArbeitszeitCheck\Service\UserProfileLockGuard $lockGuard = null,
 	): AdminUserProfileUpdateService {
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
@@ -106,6 +107,8 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			null,
 			null,
 			$lockingProvider,
+			null,
+			$lockGuard,
 		);
 	}
 
@@ -411,11 +414,13 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 
 	/**
 	 * Source contract: assignmentMatches must never early-return before carryover.
+	 * The assignment write lives in UserWorkingTimeAssignmentService (single
+	 * writer) since the effective-dated assignment feature landed.
 	 */
 	public function testApplyWorkingTimeModelSourceDoesNotEarlyReturnBeforeSideEffects(): void
 	{
 		$src = (string)file_get_contents(
-			dirname(__DIR__, 3) . '/lib/Service/AdminUserProfileUpdateService.php'
+			dirname(__DIR__, 3) . '/lib/Service/UserWorkingTimeAssignmentService.php'
 		);
 		$needle = 'workingTimeModelAssignmentMatches($currentModel, $effectiveModelId, $vacationDaysPerYear, $startDate, $endDate))';
 		$pos = strpos($src, $needle);
@@ -423,7 +428,10 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		$window = substr($src, $pos, 280);
 		$this->assertStringContainsString('$updated = $currentModel;', $window);
 		$this->assertStringNotContainsString("'unchanged' => true", $window);
-		$this->assertDoesNotMatchRegularExpression('/\)\s*\{\s*return\s*\[/', $window);
+		// Any early return inside the unchanged/update branch skips the row
+		// update and audit — whatever its shape (`return […]` or
+		// `return $currentModel;`).
+		$this->assertStringNotContainsString('return', $window);
 	}
 
 	public function testApplyOvertimeSettingsReturnsWrittenOpeningBalanceYear(): void
@@ -1381,11 +1389,17 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			}
 		);
 
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+		// Bind the shared lock guard to the mocked provider — the lazy
+		// Server::get fallback inside the service would otherwise resolve
+		// the real container guard and the mock would never see acquires.
 		$service = $this->serviceWithUserSettingsMapper(
 			$this->createMock(UserSettingsMapper::class),
 			null,
 			null,
-			$lp
+			$lp,
+			new \OCA\ArbeitszeitCheck\Service\UserProfileLockGuard($lp, $l10n)
 		);
 		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
 		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
@@ -1441,11 +1455,17 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 			}
 		);
 
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(fn ($s) => $s);
+		// Bind the shared lock guard to the mocked provider — without it the
+		// lazy Server::get fallback would use the real container provider
+		// and this reentrancy check would pass vacuously.
 		$service = $this->serviceWithUserSettingsMapper(
 			$this->createMock(UserSettingsMapper::class),
 			null,
 			null,
-			$lp
+			$lp,
+			new \OCA\ArbeitszeitCheck\Service\UserProfileLockGuard($lp, $l10n)
 		);
 		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
 		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);

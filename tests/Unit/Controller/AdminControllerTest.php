@@ -1905,6 +1905,34 @@ class AdminControllerTest extends TestCase
 		$this->assertArrayHasKey('availableWorkingTimeModels', $data['user']);
 	}
 
+	/**
+	 * Mount-path payload contract: admin-user-detail.js mounts the
+	 * effective-dated assignments manager from user.workingTimeModelAssignments.
+	 * If getUser ever drops this key the manager renders an empty table on
+	 * every page load while sibling payloads (buildAdminUserApiPayload) still
+	 * carry it — a silent UI regression. Keep this key shipped.
+	 */
+	public function testGetUserShipsAssignmentsListForManagerMount(): void
+	{
+		$userId = 'user1';
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($userId);
+		$user->method('getDisplayName')->willReturn('User One');
+		$user->method('getEMailAddress')->willReturn('user1@example.com');
+		$user->method('isEnabled')->willReturn(true);
+
+		$this->userManager->method('get')->with($userId)->willReturn($user);
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->workingTimeModelMapper->method('findAll')->willReturn([]);
+
+		$response = $this->controller->getUser($userId);
+		$data = $response->getData();
+
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('workingTimeModelAssignments', $data['user']);
+		$this->assertIsArray($data['user']['workingTimeModelAssignments']);
+	}
+
 	public function testGetUserLoadsCarryoverForRequestedYear(): void
 	{
 		$userId = 'user1';
@@ -2553,7 +2581,14 @@ class AdminControllerTest extends TestCase
 		]);
 		$this->workingTimeModelMapper->method('find')->willReturn($source);
 		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([new \stdClass()]);
-		$this->workingTimeModelMapper->expects($this->never())->method('update');
+		// MH-14: the only write to the source row is the superseded_by pin —
+		// its calc inputs (break rules incl. schedule) stay byte-identical.
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(static function (WorkingTimeModel $m): bool {
+				return $m->getId() === 1 && (int)$m->getSupersededByModelId() === 77;
+			}))
+			->willReturnArgument(0);
 		$inserted = null;
 		$this->workingTimeModelMapper->expects($this->once())
 			->method('insert')
@@ -2572,8 +2607,8 @@ class AdminControllerTest extends TestCase
 		$this->assertSame(2, $rules['weekday_schedule']['version'] ?? null);
 		$this->assertFalse($inserted->getIsDefault());
 		$this->assertStringContainsString('(new)', $inserted->getName());
-		// The source entity must be byte-identical — conversion never rewrites
-		// the model that stays assigned to employees.
+		// The source entity must be calc-identical — conversion never rewrites
+		// the contract inputs of the model that stays assigned to employees.
 		$this->assertSame($sourceRulesBefore, $source->getBreakRulesArray());
 		$this->assertSame(1, $source->getId());
 	}

@@ -33,6 +33,25 @@ class UserWorkingTimeModelMapper extends QBMapper
 	}
 
 	/**
+	 * Find assignment row by ID
+	 *
+	 * @param int $id
+	 * @return UserWorkingTimeModel
+	 * @throws DoesNotExistException
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
+	 */
+	public function find(int $id): UserWorkingTimeModel
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->setMaxResults(1);
+
+		return $this->findEntity($qb);
+	}
+
+	/**
 	 * Find current working time model for a user
 	 *
 	 * @param string $userId
@@ -198,6 +217,62 @@ class UserWorkingTimeModelMapper extends QBMapper
 		}
 		$result->closeCursor();
 		return $ids;
+	}
+
+	/**
+	 * All assignment rows in the table — full inventory scan for the
+	 * upgrade delta report / malformed-row finder (MH-18/MH-19). Not for
+	 * per-request hot paths.
+	 *
+	 * @return UserWorkingTimeModel[]
+	 */
+	public function findAllRows(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->orderBy('user_id', 'ASC')
+			->addOrderBy('start_date', 'ASC');
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Distinct user_ids having at least one assignment row.
+	 *
+	 * @return list<string>
+	 */
+	public function findUserIdsWithRows(): array
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('user_id')
+			->from($this->getTableName());
+		$result = $qb->executeQuery();
+		$ids = [];
+		while ($row = $result->fetch()) {
+			$ids[] = (string)$row['user_id'];
+		}
+		$result->closeCursor();
+		return $ids;
+	}
+
+	/**
+	 * True when the model has at least one assignment whose window already
+	 * started (start <= today), including ended ones — such a row pins the
+	 * model's calc inputs for past dates, so MH-14 forces a successor for
+	 * calc-relevant edits. Future-only assignments pin nothing yet.
+	 */
+	public function hasNonFutureAssignment(int $workingTimeModelId, string $today): bool
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('working_time_model_id', $qb->createNamedParameter($workingTimeModelId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('start_date', $qb->createNamedParameter($today, IQueryBuilder::PARAM_STR)))
+			->setMaxResults(1);
+		$result = $qb->executeQuery();
+		$found = $result->fetch() !== false;
+		$result->closeCursor();
+		return $found;
 	}
 
 	public function countUserIdsEffectiveAt(int $workingTimeModelId, string $date): int

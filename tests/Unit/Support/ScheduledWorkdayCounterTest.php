@@ -25,10 +25,22 @@ class ScheduledWorkdayCounterTest extends TestCase
 	private WorkingTimeModelMapper&MockObject $modelMapper;
 	private HolidayService&MockObject $holidayService;
 	private ScheduledWorkdayCounter $counter;
+	private \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver $resolver;
+	/** @var list<UserWorkingTimeModel> */
+	private array $userRows = [];
+	private ?\Throwable $userRowsThrowable = null;
 
 	protected function setUp(): void
 	{
 		$this->userModelMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		// Single callback stub — re-stubbing method() twice keeps the FIRST
+		// matcher, so tests drive the rows through this mutable fixture.
+		$this->userModelMapper->method('findByUser')->willReturnCallback(function () {
+			if ($this->userRowsThrowable !== null) {
+				throw $this->userRowsThrowable;
+			}
+			return $this->userRows;
+		});
 		$this->modelMapper = $this->createMock(WorkingTimeModelMapper::class);
 		$this->holidayService = $this->createMock(HolidayService::class);
 		$this->counter = new ScheduledWorkdayCounter(
@@ -36,6 +48,14 @@ class ScheduledWorkdayCounterTest extends TestCase
 			$this->modelMapper,
 			$this->holidayService
 		);
+		// Bind the resolver to the mocked mappers — the lazy Server::get
+		// fallback would otherwise bind the live dev database.
+		$this->resolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userModelMapper,
+			$this->modelMapper,
+		);
+		$prop = new \ReflectionProperty(ScheduledWorkdayCounter::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->counter, $this->resolver);
 	}
 
 	/** @param array<string,bool> $work map mon..sun → work */
@@ -56,9 +76,8 @@ class ScheduledWorkdayCounterTest extends TestCase
 	{
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setWorkingTimeModelId(7);
-		$this->userModelMapper->method('findCurrentByUser')->willReturn(
-			$model === null ? null : $assignment
-		);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userRows = $model === null ? [] : [$assignment];
 		if ($model === null) {
 			$this->modelMapper->method('find')->willThrowException(new \RuntimeException('n/a'));
 		} else {
@@ -165,8 +184,7 @@ class ScheduledWorkdayCounterTest extends TestCase
 
 	public function testModelLookupFailureFallsBackSafely(): void
 	{
-		$this->userModelMapper->method('findCurrentByUser')
-			->willThrowException(new \RuntimeException('db gone'));
+		$this->userRowsThrowable = new \RuntimeException('db gone');
 		$this->holidayService->expects($this->once())
 			->method('computeWorkingDaysForUser')
 			->willReturn(5.0);
@@ -203,6 +221,9 @@ class ScheduledWorkdayCounterTest extends TestCase
 		$this->withModel($this->modelWithSchedule(['mon' => true]));
 		$this->assertSame('weekday_schedule', $this->counter->basisForUser('u1'));
 
+		// The resolver memoizes assignments per user — drop the cache before
+		// re-stubbing the user's rows for the second half of the assertion.
+		$this->resolver->invalidateUser('u1');
 		$this->withModel(null);
 		$this->assertSame('weekdays_mon_fri', $this->counter->basisForUser('u1'));
 	}

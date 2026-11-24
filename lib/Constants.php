@@ -643,6 +643,21 @@ final class Constants
 	public const CONFIG_LEAVE_SOLL_EFFECTS_DEFAULT = '1';
 
 	/**
+	 * Org gap policy for effective-dated working-time-model assignments.
+	 * 'strict'  → a gap (no covering row) = unassigned, 0h Soll
+	 * 'lenient' → a gap falls back to today's assignment (default, BC)
+	 *
+	 * @see \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver
+	 */
+	public const CONFIG_ASSIGNMENTS_GAP_POLICY = 'assignments_gap_policy';
+
+	/** Default for {@see CONFIG_ASSIGNMENTS_GAP_POLICY}. */
+	public const CONFIG_ASSIGNMENTS_GAP_POLICY_DEFAULT = 'lenient';
+
+	/** Allowed values for {@see CONFIG_ASSIGNMENTS_GAP_POLICY}. */
+	public const ASSIGNMENTS_GAP_POLICIES = ['strict', 'lenient'];
+
+	/**
 	 * Manager emails for pending approvals (Kraft): absences / vacation requests.
 	 * Requires app teams with managers. Default on.
 	 */

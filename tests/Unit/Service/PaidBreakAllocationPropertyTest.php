@@ -62,6 +62,9 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 	private array $writes = [];
 
 	private PaidBreakAllocator $allocator;
+	private BreakPolicyResolver $breakResolver;
+	private UserWorkingTimeModelMapper $userWtmMapper;
+	private WorkingTimeModelMapper $wtmMapper;
 
 	protected function setUp(): void
 	{
@@ -82,12 +85,12 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setUserId('u1');
 		$assignment->setWorkingTimeModelId(7);
-		$userWtmMapper = $this->createMock(UserWorkingTimeModelMapper::class);
-		$userWtmMapper->method('findCurrentByUser')->willReturn($assignment);
-		$userWtmMapper->method('findByUserAndDate')->willReturn($assignment);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWtmMapper = $this->createMock(UserWorkingTimeModelMapper::class);
+		$this->userWtmMapper->method('findByUser')->willReturn([$assignment]);
 
-		$wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
-		$wtmMapper->method('find')->willReturnCallback(function (): WorkingTimeModel {
+		$this->wtmMapper = $this->createMock(WorkingTimeModelMapper::class);
+		$this->wtmMapper->method('find')->willReturnCallback(function (): WorkingTimeModel {
 			$model = new WorkingTimeModel();
 			$model->setId(7);
 			$model->setBreakRules(json_encode($this->modelBreakRules));
@@ -114,16 +117,18 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $text, array $params = []): string => $text);
 
-		$resolver = new BreakPolicyResolver(
+		$this->breakResolver = new BreakPolicyResolver(
 			$config,
 			new LaborLawProfileFactory($config, $userSettingsMapper),
 			$userSettingsMapper,
-			$userWtmMapper,
-			$wtmMapper,
+			$this->userWtmMapper,
+			$this->wtmMapper,
 			$timeEntryMapper,
 			$timeZoneService,
 			$l10n,
 		);
+		$resolver = $this->breakResolver;
+		$this->freshAssignmentResolver();
 
 		$monthClosure = $this->createMock(MonthClosureService::class);
 		$monthClosure->method('isMonthFinalized')->willReturn(false);
@@ -135,6 +140,22 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 			$monthClosure,
 			new NullLogger(),
 		);
+	}
+
+	/**
+	 * (Re)bind the assignment resolver to this test's mocked mappers — the
+	 * lazy Server::get fallback inside BreakPolicyResolver would otherwise
+	 * bind the live dev database. Rebuilt per generated fixture because the
+	 * resolver memoizes models per instance while modelBreakRules changes
+	 * between seeds.
+	 */
+	private function freshAssignmentResolver(): void
+	{
+		$prop = new \ReflectionProperty(BreakPolicyResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->breakResolver, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWtmMapper,
+			$this->wtmMapper,
+		));
 	}
 
 	/**
@@ -197,6 +218,7 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 	/** Deterministic pseudo-random day shapes (mt_srand → reproducible). */
 	private function generate(int $seed): void
 	{
+		$this->freshAssignmentResolver();
 		mt_srand($seed);
 		$this->entries = [];
 		$this->writes = [];
@@ -341,6 +363,7 @@ final class PaidBreakAllocationPropertyTest extends TestCase
 		]));
 		$this->entries = [$entry];
 
+		$this->freshAssignmentResolver();
 		$this->allocator->recomputeSpan(
 			'u1',
 			new \DateTime(self::DAY_START, $tz),

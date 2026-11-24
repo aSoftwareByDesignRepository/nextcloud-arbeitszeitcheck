@@ -991,3 +991,129 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   height: 1.25rem;
   flex-shrink: 0;
 }
+
+/* Effective-dated assignment manager */
+.assignments-manager__empty {
+  margin: 0;
+  padding: var(--space-2, 0.5rem) 0;
+  color: var(--color-text-maxcontrast);
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+.assignments-manager .table-container {
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.assignments-manager__add {
+  margin-top: var(--space-3, 0.75rem);
+}
+
+.assignments-manager__warning {
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.assignments-dialog {
+  max-width: min(34rem, 95vw);
+  border: 0;
+  border-radius: var(--border-radius-large, 10px);
+  padding: var(--space-4, 1rem);
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+}
+
+.assignments-dialog::backdrop {
+  background: color-mix(in srgb, var(--color-main-text) 40%, transparent);
+}
+
+.assignments-dialog__title {
+  margin: 0 0 var(--space-3, 0.75rem);
+  font-size: var(--arbeitszeitcheck-font-size-lg, 1.125rem);
+  font-weight: 600;
+}
+
+.assignments-dialog__teacher {
+  margin: calc(-1 * var(--space-2, 0.5rem)) 0 var(--space-3, 0.75rem);
+}
+
+.assignments-dialog__preview {
+  margin: 0 0 var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--border-radius, 6px);
+  background: color-mix(in srgb, var(--color-primary-element) 8%, var(--color-main-background));
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+.assignments-dialog__more {
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.assignments-dialog__more-summary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--color-text-maxcontrast);
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+.assignments-dialog__error {
+  margin-bottom: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--border-radius, 6px);
+  background: var(--color-error-hover);
+  color: var(--color-error);
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+.assignments-dialog__conflicts {
+  margin-bottom: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius, 6px);
+  font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
+}
+
+.assignments-dialog__conflicts ul {
+  margin: var(--space-1, 0.25rem) 0 0;
+  padding-inline-start: var(--space-4, 1rem);
+}
+
+.assignments-dialog__custom {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: var(--space-3, 0.75rem);
+  padding: var(--space-3, 0.75rem);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--border-radius, 6px);
+}
+
+.assignments-dialog__custom .form-group {
+  margin-bottom: 0;
+}
+
+.assignments-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-4, 1rem);
+}
+
+.assignments-dialog__actions .btn {
+  min-height: 44px;
+  min-width: 6rem;
+}
+
+@media (max-width: 480px) {
+  .assignments-dialog__custom {
+    grid-template-columns: 1fr;
+  }
+
+  .assignments-dialog__actions {
+    flex-direction: column;
+  }
+
+  .assignments-dialog__actions .btn {
+    width: 100%;
+  }
+}

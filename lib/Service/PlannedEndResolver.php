@@ -119,25 +119,38 @@ final class PlannedEndResolver
 	private function effectiveModel(string $userId, \DateTime $dayStart, array &$modelCache): ?\OCA\ArbeitszeitCheck\Db\WorkingTimeModel
 	{
 		try {
-			$assignment = $this->userWorkingTimeModelMapper->findByUserAndDate($userId, $dayStart)
-				?? $this->userWorkingTimeModelMapper->findCurrentByUser($userId);
-			if ($assignment === null) {
+			// Lenient assist resolution: uncovered days fall back to the
+			// assignment active today — a suggestion must never guess, but it
+			// also must not collapse just because a window ended.
+			$model = $this->assignmentResolver()->resolveLenient($userId, $dayStart)->model;
+			if ($model === null) {
 				return null;
 			}
-			$modelId = (int)$assignment->getWorkingTimeModelId();
+			$modelId = (int)$model->getId();
 			if (array_key_exists($modelId, $modelCache)) {
 				return $modelCache[$modelId];
 			}
-			try {
-				return $modelCache[$modelId] = $this->workingTimeModelMapper->find($modelId);
-			} catch (DoesNotExistException) {
-				// Assignment points at a deleted model — cache the miss so
-				// every co-assignee skips without another lookup.
-				return $modelCache[$modelId] = null;
-			}
+			return $modelCache[$modelId] = $model;
 		} catch (\Throwable) {
 			return null;
 		}
+	}
+
+	private ?WorkingTimeModelAssignmentResolver $lazyAssignmentResolver = null;
+
+	private function assignmentResolver(): WorkingTimeModelAssignmentResolver
+	{
+		if ($this->lazyAssignmentResolver === null) {
+			try {
+				$this->lazyAssignmentResolver = \OCP\Server::get(WorkingTimeModelAssignmentResolver::class);
+			} catch (\Throwable) {
+				$this->lazyAssignmentResolver = new WorkingTimeModelAssignmentResolver(
+					$this->userWorkingTimeModelMapper,
+					$this->workingTimeModelMapper
+				);
+			}
+		}
+		return $this->lazyAssignmentResolver;
 	}
 
 	private function hasApprovedAbsence(string $userId, \DateTime $day): bool

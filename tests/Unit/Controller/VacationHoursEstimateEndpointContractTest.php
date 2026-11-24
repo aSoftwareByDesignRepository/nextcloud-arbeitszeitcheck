@@ -71,7 +71,12 @@ class VacationHoursEstimateEndpointContractTest extends TestCase
 		$src = file_get_contents(dirname(__DIR__, 3) . '/lib/Service/VacationHoursDebitService.php');
 		$this->assertNotFalse($src);
 		$this->assertStringNotContainsString('$workingDays > 0.009 ? $workingDays : 1.0', $src);
-		$this->assertStringContainsString('$safeDays = max(0.0, $workingDays)', $src);
+		// Per-segment equivalent of the old $safeDays clamp — never invent a
+		// working day for weekend/holiday-only ranges.
+		$this->assertStringContainsString(
+			'$wd = max(0.0, $this->holidayService->computeWorkingDaysForUser(',
+			$src
+		);
 	}
 
 	public function testWidgetDefaultsToUnawareClient(): void

@@ -125,6 +125,17 @@ class AutoClockOutJobTest extends TestCase
 			$breakPolicyResolver,
 			$this->timeZoneService
 		);
+		// Bind the assignment resolvers to this test's mocked mappers — the
+		// lazy Server::get fallback inside both resolvers would otherwise
+		// bind the live dev database.
+		$assignmentResolver = new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$this->workingTimeModelMapper,
+		);
+		$prop = new \ReflectionProperty(PlannedEndResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($resolver, $assignmentResolver);
+		$prop = new \ReflectionProperty(BreakPolicyResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($breakPolicyResolver, $assignmentResolver);
 
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $s, array $p = []) => $s . ' ' . implode(' ', $p));
@@ -200,8 +211,10 @@ class AutoClockOutJobTest extends TestCase
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setUserId('u');
 		$assignment->setWorkingTimeModelId(7);
-		$this->userWorkingTimeModelMapper->method('findByUserAndDate')->willReturn($assignment);
-		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+		// Effective from far past so the row covers every resolved date
+		// (resolver semantics, not findCurrentByUser/findByUserAndDate).
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 		$this->workingTimeModelMapper->method('find')->willReturn($model);
 		$this->holidayService->method('isHolidayForUser')->willReturn(false);
 		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([]);

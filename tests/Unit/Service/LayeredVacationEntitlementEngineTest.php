@@ -95,6 +95,14 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 			$teamMemberMapper,
 			$config,
 		);
+		// Bind the resolver to this test's mocks — the lazy Server::get
+		// fallback inside VacationEntitlementEngine would otherwise bind
+		// the live dev database.
+		$prop = new \ReflectionProperty(VacationEntitlementEngine::class, 'lazyAssignmentResolver');
+		$prop->setValue($engine, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$userModelMapper,
+			$workingTimeModelMapper,
+		));
 		return [$engine, [
 			'policy' => $policyMapper,
 			'ruleSet' => $ruleSetMapper,
@@ -217,7 +225,8 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 
 		$asn = new UserWorkingTimeModel();
 		$asn->setWorkingTimeModelId(7);
-		$mocks['userModel']->method('findByUserAndDate')->willReturn($asn);
+		$asn->setStartDate(new \DateTime('2000-01-01'));
+		$mocks['userModel']->method('findByUser')->willReturn([$asn]);
 		$mocks['modelDefault']->method('findActiveByModelAndDate')->willReturn($this->makeModelDefault(7, 25.0));
 
 		$result = $engine->computeForDate('u1', new \DateTimeImmutable('2026-06-01'));
@@ -233,7 +242,11 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 
 		$asn = new UserWorkingTimeModel();
 		$asn->setWorkingTimeModelId(7);
-		$mocks['userModel']->method('findByUserAndDate')->willReturn($asn);
+		$asn->setStartDate(new \DateTime('2000-01-01'));
+		$mocks['userModel']->method('findByUser')->willReturn([$asn]);
+		$model = new WorkingTimeModel();
+		$model->setId(7);
+		$mocks['workingTimeModel']->method('find')->willReturn($model);
 		$mocks['modelDefault']->method('findActiveByModelAndDate')->willReturn($this->makeModelDefault(7, 26.5));
 
 		$mocks['org']->method('findActiveByDate')->willReturn($this->makeOrgDefault(20.0));
@@ -614,7 +627,11 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 		[$engine, $mocks] = $this->makeEngine();
 		$asn = new UserWorkingTimeModel();
 		$asn->setWorkingTimeModelId(9);
-		$mocks['userModel']->method('findByUserAndDate')->willReturn($asn);
+		$asn->setStartDate(new \DateTime('2000-01-01'));
+		$mocks['userModel']->method('findByUser')->willReturn([$asn]);
+		$model = new WorkingTimeModel();
+		$model->setId(9);
+		$mocks['workingTimeModel']->method('find')->willReturn($model);
 		$mocks['modelDefault']->method('findActiveByModelAndDate')->willReturn($this->makeModelDefault(9, 23.0));
 		$result = $engine->computeForDate('u1', new \DateTimeImmutable('2026-06-01'));
 		$this->assertSame(9, $result['trace']['winner']['working_time_model_id']);
@@ -702,8 +719,10 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 		$mocks['policy']->method('findCurrentByUser')->willReturn($policy);
 
 		$asn = new UserWorkingTimeModel();
+		$asn->setId(501);
 		$asn->setWorkingTimeModelId(99);
-		$mocks['userModel']->method('findByUserAndDate')->willReturn($asn);
+		$asn->setStartDate(new \DateTime('2000-01-01'));
+		$mocks['userModel']->method('findByUser')->willReturn([$asn]);
 		$mocks['workingTimeModel']
 			->method('find')
 			->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('gone'));
@@ -912,8 +931,10 @@ class LayeredVacationEntitlementEngineTest extends TestCase
 		$assignment = new UserWorkingTimeModel();
 		$assignment->setUserId('u1');
 		$assignment->setWorkingTimeModelId(7);
-		$mocks['userModel']->method('findByUserAndDate')->willReturn($assignment);
+		$assignment->setStartDate(new \DateTime('2000-01-01'));
+		$mocks['userModel']->method('findByUser')->willReturn([$assignment]);
 		$model = new WorkingTimeModel();
+		$model->setId(7);
 		$model->setWorkDaysPerWeek(3.0);
 		$mocks['workingTimeModel']->method('find')->willReturn($model);
 

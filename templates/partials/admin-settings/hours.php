@@ -97,6 +97,38 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                     </p>
                 </div>
 
+                <?php $azcGapPolicy = (string)($settings['assignmentsGapPolicy'] ?? 'lenient'); ?>
+                <div class="form-group">
+                    <fieldset class="azc-gap-policy" aria-describedby="assignmentsGapPolicy-help">
+                        <legend class="form-label"><?php p($l->t('Days without a work schedule period')); ?></legend>
+                        <div class="azc-choice-cards">
+                            <label class="form-radio azc-choice-card">
+                                <input type="radio"
+                                       name="assignmentsGapPolicy"
+                                       value="lenient"
+                                       <?php echo $azcGapPolicy === 'lenient' ? 'checked' : ''; ?>>
+                                <span class="azc-choice-card__copy">
+                                    <span class="azc-choice-card__title"><?php p($l->t('Lenient (fallback)')); ?></span>
+                                    <span class="azc-choice-card__hint"><?php p($l->t('Days outside all periods use the closest assignment or the legacy fallback — today’s behaviour, keeps existing balances unchanged.')); ?></span>
+                                </span>
+                            </label>
+                            <label class="form-radio azc-choice-card">
+                                <input type="radio"
+                                       name="assignmentsGapPolicy"
+                                       value="strict"
+                                       <?php echo $azcGapPolicy === 'strict' ? 'checked' : ''; ?>>
+                                <span class="azc-choice-card__copy">
+                                    <span class="azc-choice-card__title"><?php p($l->t('Strict (zero target)')); ?></span>
+                                    <span class="azc-choice-card__hint"><?php p($l->t('Days between assignment periods count 0 required hours — recommended once every employee has complete periods.')); ?></span>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <p id="assignmentsGapPolicy-help" class="form-help">
+                        <?php p($l->t('Applies to all employees from the moment you save — balances for gap days are recalculated. Strict is recommended; lenient is the default for existing installations.')); ?>
+                    </p>
+                </div>
+
                 <div class="form-group">
                     <label for="timePickerMinuteStep" class="form-label">
                         <?php p($l->t('Time picker minute step')); ?>

@@ -14,6 +14,8 @@ use OCA\ArbeitszeitCheck\Db\TeamMember;
 use OCA\ArbeitszeitCheck\Db\TeamMemberMapper;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
+use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Exception\SpecialEntitlementException;
 use OCA\ArbeitszeitCheck\Service\PolicyCohortResolver;
 use OCA\ArbeitszeitCheck\Service\SpecialEntitlementResolver;
@@ -58,12 +60,21 @@ final class SpecialEntitlementResolverTest extends TestCase
 		});
 
 		$userModels = $this->createMock(UserWorkingTimeModelMapper::class);
-		$userModels->method('findByUserAndDate')->willReturnCallback(function (): ?UserWorkingTimeModel {
+		$userModels->method('findByUser')->willReturnCallback(function (): array {
 			if ($this->modelId === null) {
-				return null;
+				return [];
 			}
 			$model = new UserWorkingTimeModel();
 			$model->setWorkingTimeModelId($this->modelId);
+			// Effective from far past so the row covers every as-of date the
+			// suite resolves against (resolver semantics, not findCurrentByUser).
+			$model->setStartDate(new \DateTime('2000-01-01'));
+			return [$model];
+		});
+		$workingTimeModels = $this->createMock(WorkingTimeModelMapper::class);
+		$workingTimeModels->method('find')->willReturnCallback(function (int $id): WorkingTimeModel {
+			$model = new WorkingTimeModel();
+			$model->setId($id);
 			return $model;
 		});
 
@@ -123,6 +134,14 @@ final class SpecialEntitlementResolverTest extends TestCase
 			new PolicyCohortResolver($config, $memberships),
 			$employment,
 		);
+		// Bind the resolver to this test's mocked mappers — the lazy
+		// Server::get fallback inside SpecialEntitlementResolver would
+		// otherwise bind the live dev database.
+		$prop = new \ReflectionProperty(SpecialEntitlementResolver::class, 'lazyAssignmentResolver');
+		$prop->setValue($this->resolver, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$userModels,
+			$workingTimeModels,
+		));
 	}
 
 	private function type(string $periodType = SpecialEntitlementType::PERIOD_CALENDAR_YEAR): SpecialEntitlementType

@@ -232,12 +232,19 @@ class MonthClosureController extends Controller
 				};
 			}
 
+			// contract_diverged (BQ-02): sealed contract context no longer
+			// matches live resolution → visible badge, sealed = Rechtsstand.
+			$contractDiverged = $isFinalized
+				? $this->monthClosureService->contractContextDiverged($userId, $year, $month)
+				: false;
+
 			return new JSONResponse([
 				'success' => true,
 				'featureEnabled' => $featureEnabled,
 				'year' => $year,
 				'month' => $month,
 				'status' => $row ? $row->getStatus() : null,
+				'contractDiverged' => $contractDiverged,
 				'version' => $row ? $row->getVersion() : null,
 				'snapshotHash' => $row ? $row->getSnapshotHash() : null,
 				'finalizedAt' => $row && $row->getFinalizedAt() ? $row->getFinalizedAt()->format(\DateTimeInterface::ATOM) : null,

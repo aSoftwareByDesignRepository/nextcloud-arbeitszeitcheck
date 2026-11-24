@@ -3618,9 +3618,7 @@ class AbsenceServiceTest extends TestCase
 	private function realScheduleCounter(?array $work): \OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter
 	{
 		$modelMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class);
-		if ($work === null) {
-			$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
-		} else {
+		if ($work !== null) {
 			$days = [];
 			foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $d) {
 				$days[$d] = ($work[$d] ?? false)
@@ -3633,14 +3631,29 @@ class AbsenceServiceTest extends TestCase
 			]);
 			$assignment = new \OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel();
 			$assignment->setWorkingTimeModelId(7);
-			$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn($assignment);
+			// Effective from far past so the row covers every resolved date
+			// (resolver semantics, not findCurrentByUser).
+			$assignment->setStartDate(new \DateTime('2000-01-01'));
+			$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
 			$modelMapper->method('find')->with(7)->willReturn($model);
 		}
-		return new \OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter(
+		$counter = new \OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter(
 			$this->userWorkingTimeModelMapper,
 			$modelMapper,
 			$this->holidayCalendarService
 		);
+		// Bind the resolver to this test's mocks — the lazy Server::get
+		// fallback inside ScheduledWorkdayCounter would otherwise bind the
+		// live dev database.
+		$prop = new \ReflectionProperty(
+			\OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter::class,
+			'lazyAssignmentResolver'
+		);
+		$prop->setValue($counter, new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+			$this->userWorkingTimeModelMapper,
+			$modelMapper,
+		));
+		return $counter;
 	}
 
 	public function testManagerShortenAbsenceHappyPathRecomputesDaysAuditsAndNotifies(): void

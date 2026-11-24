@@ -29,6 +29,7 @@ use OCA\ArbeitszeitCheck\Repair\CleanDanglingTariffRuleSetRefs;
 use OCA\ArbeitszeitCheck\Repair\ClearStuckKioskEnrollmentLocks;
 use OCA\ArbeitszeitCheck\Repair\RecomputeAbsenceDaysSchedule;
 use OCA\ArbeitszeitCheck\Repair\RepairOrphanedPausedEntries;
+use OCA\ArbeitszeitCheck\Repair\ReportAssignmentStateAfterUpgrade;
 use OCA\ArbeitszeitCheck\Repair\SeedWorkLocationCatalog;
 use OCA\ArbeitszeitCheck\Repair\UninstallDropTables;
 use OCA\ArbeitszeitCheck\Listener\LoadSidebarScripts;
@@ -290,6 +291,41 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitMigrationService::class),
 				$c->query(\OCP\Lock\ILockingProvider::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\AbsenceService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\UserProfileLockGuard::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureGuard::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\UserProfileLockGuard::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Service\UserProfileLockGuard(
+				$c->query(\OCP\Lock\ILockingProvider::class),
+				$c->query(\OCP\IL10N::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver(
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+				$c->query(\OCP\IConfig::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService(
+				$c->query(\OCP\IUserManager::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+				$c->query(\OCP\IL10N::class),
+				$c->query(IDBConnection::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\UserProfileLockGuard::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\MonthClosureGuard::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\VacationUnitService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory::class),
 			);
 		});
 
@@ -440,10 +476,16 @@ class Application extends App implements IBootstrap {
 			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementReservationMapper::class),
 			$c->query(\OCA\ArbeitszeitCheck\Db\SpecialEntitlementLedgerEntryMapper::class),
 		));
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor::class, fn ($c): \OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor => new \OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor(
+			$c->query(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+			$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+		));
 		$context->registerService(\OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry::class, function ($c): \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry {
 			$registry = new \OCA\ArbeitszeitCheck\Policy\MonthClosureContributorRegistry();
 			$registry->register($c->query(\OCA\ArbeitszeitCheck\Service\SpecialEntitlementMonthClosureContributor::class));
 			$registry->register($c->query(\OCA\ArbeitszeitCheck\Service\BusinessTripMonthClosureContributor::class));
+			$registry->register($c->query(\OCA\ArbeitszeitCheck\Service\WorkingTimeContractClosureContributor::class));
 			return $registry;
 		});
 		$context->registerService(\OCA\ArbeitszeitCheck\Db\PolicyCohortMapper::class, fn ($c): \OCA\ArbeitszeitCheck\Db\PolicyCohortMapper => new \OCA\ArbeitszeitCheck\Db\PolicyCohortMapper($c->query(\OCP\IDBConnection::class)));
@@ -727,6 +769,37 @@ class Application extends App implements IBootstrap {
 			return new HealCorruptDailyHours(
 				$c->query(IDBConnection::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			);
+		});
+
+		$context->registerService(ReportAssignmentStateAfterUpgrade::class, function ($c): ReportAssignmentStateAfterUpgrade {
+			return new ReportAssignmentStateAfterUpgrade(
+				$c->query(IDBConnection::class),
+				$c->query(AbsenceService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AuditLogMapper::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\AssignmentDeltaReportService::class, function ($c): \OCA\ArbeitszeitCheck\Service\AssignmentDeltaReportService {
+			return new \OCA\ArbeitszeitCheck\Service\AssignmentDeltaReportService(
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\HolidayService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\CalculationProofExportService::class, function ($c): \OCA\ArbeitszeitCheck\Service\CalculationProofExportService {
+			return new \OCA\ArbeitszeitCheck\Service\CalculationProofExportService(
+				$c->query(\OCA\ArbeitszeitCheck\Service\OvertimeService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\AbsenceMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\HolidayService::class),
+				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\IL10N::class),
 			);
 		});
 
@@ -1181,6 +1254,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Service\UserOvertimeSettingsService::class),
 				$c->query(\OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider::class),
 				$c->query(PaidAbsencePlannedHoursCreditService::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\WorkingTimeModelAssignmentResolver::class),
 			);
 		});
 

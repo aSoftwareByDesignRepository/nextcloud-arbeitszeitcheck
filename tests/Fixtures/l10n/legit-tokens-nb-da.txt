@@ -394,6 +394,7 @@ forhåndskontroller
 forhåndsvise
 forhåndsvisning
 forhåndsvisningen
+forhåndsvist
 forklar
 forklaring
 forklaringen

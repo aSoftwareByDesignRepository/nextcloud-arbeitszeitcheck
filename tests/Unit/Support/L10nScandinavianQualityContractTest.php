@@ -370,6 +370,9 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// da/sv spelling (same word both languages).
 		'Eftermiddag', 'Eftermiddag (halv dag)', 'Förmiddag', 'Förmiddag (halv dag)',
 		'eftermiddag', 'förmiddag',
+		// 2026-11-25: 'Årlig' — year-end scope label ('Annual'), legit shared
+		// da/sv spelling (same word both languages).
+		'Årlig',
 	];
 
 	/**

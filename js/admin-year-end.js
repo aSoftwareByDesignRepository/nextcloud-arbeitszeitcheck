@@ -31,6 +31,45 @@
 	};
 	const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+	// Wire constants (YearEndResetService ERROR_*/STATE_*/ORIGIN_*) → localized
+	// labels. The API keeps the raw codes (data-status, error_code fields);
+	// only human-visible text is mapped. Unknown/future codes fall back to a
+	// generic localized label and never render the machine token verbatim.
+	const codeLabel = (code, fallback) => ({
+		NEXT_OPENING_NONZERO: t('An opening balance already exists for the new year.'),
+		PERIOD_FINALIZED: t('The last month of the closing year is already finalized.'),
+		CUTOFF_UNRESOLVED: t('An unfinished session or absence crosses the year boundary.'),
+		SOURCE_CHANGED: t('The data changed since the preview — run a new preview.'),
+		REVISION_CONFLICT: t('The data changed — run a new preview.'),
+		POLICY_CHANGED: t('The policy changed — run a new preview.'),
+		POLICY_INVALID: t('The policy configuration is invalid.'),
+		PREVIEW_EXPIRED: t('The preview expired — run it again.'),
+		OPERATION_CONFLICT: t('Another year-end run is already in progress.'),
+		REASON_REQUIRED: t('A reason is required.'),
+		FEATURE_DISABLED: t('Year-end reset is disabled'),
+		NOT_FOUND: t('Not found'),
+		INTERNAL: t('Internal error'),
+	}[code] || fallback);
+	const runStateLabel = (state) => ({
+		previewed: t('Previewed'),
+		selecting: t('Selecting'),
+		ready: t('Ready'),
+		executing: t('Running'),
+		completed: t('Completed'),
+		failed: t('Failed'),
+	}[state] || t('Unknown'));
+	const itemStateLabel = (state) => ({
+		pending: t('Pending'),
+		in_progress: t('Ongoing'),
+		done: t('Done'),
+		skipped: t('Skipped'),
+		failed: t('Failed'),
+	}[state] || t('Unknown'));
+	const originLabel = (origin) => ({
+		manual: t('Manual'),
+		annual: t('Annual'),
+	}[origin] || t('Unknown'));
+
 	// ---- user list ----
 	const usersData = JSON.parse(document.getElementById('azc-ye-users-data').textContent || '[]');
 	const usersSel = document.getElementById('azc-ye-users');
@@ -89,7 +128,7 @@
 		targets.forEach((r) => {
 			const tr = document.createElement('tr');
 			const status = r.blocked
-				? '<span class="azc-status-chip" data-status="blocked">' + esc(r.blocked) + '</span>'
+				? '<span class="azc-status-chip" data-status="blocked">' + esc(codeLabel(r.blocked, t('Blocked'))) + '</span>'
 				: (r.delta_centi_hours === 0
 					? '<span class="azc-status-chip" data-status="no_op">' + esc(t('No change')) + '</span>'
 					: '<span class="azc-status-chip" data-status="pending">' + esc(t('Will reset')) + '</span>');
@@ -140,7 +179,7 @@
 	function renderRun(run) {
 		runCard.hidden = false;
 		const c = run.counts || {};
-		runSummary.textContent = t('Run') + ' #' + run.id + ' — ' + run.state +
+		runSummary.textContent = t('Run') + ' #' + run.id + ' — ' + runStateLabel(run.state) +
 			' (' + (c.done || 0) + ' ' + t('done') + ', ' + (c.failed || 0) + ' ' + t('failed') +
 			', ' + (c.skipped || 0) + ' ' + t('skipped') + ')';
 		runBody.innerHTML = '';
@@ -149,8 +188,8 @@
 			const review = r.review_state === 'needs_review' ? ' · ' + esc(t('needs review')) : '';
 			tr.innerHTML =
 				'<td data-cell="' + esc(t('Employee')) + '">' + esc(userName(r.user_id)) + '</td>' +
-				'<td data-cell="' + esc(t('State')) + '"><span class="azc-status-chip" data-status="' + esc(r.state) + '">' + esc(r.state) + review + '</span></td>' +
-				'<td data-cell="' + esc(t('Detail')) + '">' + esc(r.error_code || fmtHours(r.delta_centi_hours)) + '</td>';
+				'<td data-cell="' + esc(t('State')) + '"><span class="azc-status-chip" data-status="' + esc(r.state) + '">' + esc(itemStateLabel(r.state)) + review + '</span></td>' +
+				'<td data-cell="' + esc(t('Detail')) + '">' + esc(r.error_code ? codeLabel(r.error_code, t('Error')) : fmtHours(r.delta_centi_hours)) + '</td>';
 			runBody.appendChild(tr);
 		});
 		runCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -185,8 +224,8 @@
 				tr.innerHTML =
 					'<td data-cell="' + esc(t('Run')) + '">#' + esc(String(r.id)) + '</td>' +
 					'<td data-cell="' + esc(t('Closing year')) + '">' + esc(String(r.closing_year)) + '</td>' +
-					'<td data-cell="' + esc(t('Origin')) + '">' + esc(r.origin) + '</td>' +
-					'<td data-cell="' + esc(t('State')) + '"><span class="azc-status-chip" data-status="' + esc(r.state) + '">' + esc(r.state) + '</span></td>' +
+					'<td data-cell="' + esc(t('Origin')) + '">' + esc(originLabel(r.origin)) + '</td>' +
+					'<td data-cell="' + esc(t('State')) + '"><span class="azc-status-chip" data-status="' + esc(r.state) + '">' + esc(runStateLabel(r.state)) + '</span></td>' +
 					'<td data-cell="' + esc(t('Started')) + '">' + esc(r.created_at || '—') + '</td>';
 				histBody.appendChild(tr);
 			});

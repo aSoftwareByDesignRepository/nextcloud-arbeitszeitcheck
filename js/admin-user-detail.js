@@ -1702,11 +1702,9 @@
                 modelSel.value = String(assignment.model_id);
             }
             dlg.querySelector('#assignment-custom-fields').hidden = !isCustom;
-            // New windows default to tomorrow — the common "model change
-            // effective next day" case; editing keeps the row's own dates.
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const defaultStart = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
+            // New windows default to the next calendar day in the same
+            // zone as the rest of this form. Editing keeps the row's dates.
+            const defaultStart = plusOneCalendarDay(todayYmd());
             dlg.querySelector('#assignment-start').value = assignment ? (assignment.start_date || '') : defaultStart;
             dlg.querySelector('#assignment-end').value = assignment ? (assignment.end_date || '') : '';
             dlg.querySelector('#assignment-vacation').value = assignment && assignment.vacation_days_per_year != null ? assignment.vacation_days_per_year : '';
@@ -1884,8 +1882,20 @@
         }
 
         function todayIso() {
-            const d = new Date();
-            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            // Same calendar day as the rest of this form. A raw Date()
+            // uses the browser zone and can end a period on the wrong day.
+            return todayYmd();
+        }
+
+        function plusOneCalendarDay(ymd) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+            if (!m) {
+                return ymd;
+            }
+            const utc = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1));
+            return utc.getUTCFullYear() + '-'
+                + String(utc.getUTCMonth() + 1).padStart(2, '0') + '-'
+                + String(utc.getUTCDate()).padStart(2, '0');
         }
 
         // End is only useful while the period still runs past today.

@@ -198,6 +198,7 @@ class AdminUserDetailLayoutContractTest extends TestCase
 		);
 		$this->assertStringContainsString('function canEndPeriod(assignment)', $js);
 		$this->assertStringContainsString("end === '' || end > todayIso()", $js);
+		$this->assertMatchesRegularExpression('/function todayIso\(\) \{[^}]*return todayYmd\(\);/', $js);
 		$this->assertStringContainsString('canEndPeriod(a)', $js);
 		$this->assertStringContainsString(
 			"\$l->t('This period now ends on %s. It still applies today.', ['%s'])",

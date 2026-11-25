@@ -243,8 +243,18 @@ class AdminUserProfileUpdateService
 	{
 		$this->assertUserExists($userId);
 
-		$workingTimeModel = is_array($payload['workingTimeModel'] ?? null) ? $payload['workingTimeModel'] : [];
-		$vacationPolicy = is_array($payload['vacationPolicy'] ?? null) ? $payload['vacationPolicy'] : [];
+		// The profile form does not own assignment or policy windows. Dates
+		// belong to Arbeitszeitmodell-Zeiträume. Dropping them here, before
+		// preflight, means a stale client that still posts Gültig von cannot
+		// move the current period or fail the save on a date this form no
+		// longer edits. An existing vacation policy keeps its stored window.
+		$workingTimeModel = $this->withoutAssignmentWindow(
+			is_array($payload['workingTimeModel'] ?? null) ? $payload['workingTimeModel'] : []
+		);
+		$vacationPolicy = $this->preserveVacationPolicyWindow(
+			$userId,
+			is_array($payload['vacationPolicy'] ?? null) ? $payload['vacationPolicy'] : []
+		);
 		$timeCapture = is_array($payload['timeCapture'] ?? null) ? $payload['timeCapture'] : [];
 		$overtime = is_array($payload['overtime'] ?? null) ? $payload['overtime'] : [];
 		$employment = is_array($payload['employment'] ?? null) ? $payload['employment'] : [];
@@ -327,6 +337,7 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyWorkingTimeModel(string $userId, array $params, string $performedBy): array
 	{
+		$params = $this->withoutAssignmentWindow($params);
 		$result = $this->withUserProfileLock(
 			$userId,
 			fn (): array => $this->withSharedModelCatalogLock(
@@ -512,6 +523,7 @@ class AdminUserProfileUpdateService
 	 */
 	public function applyVacationPolicy(string $userId, array $params, string $performedBy): array
 	{
+		$params = $this->preserveVacationPolicyWindow($userId, $params);
 		$result = $this->withUserProfileLock($userId, fn (): array => $this->applyVacationPolicyLocked($userId, $params, $performedBy));
 		if (!$this->withinCompositeProfileUpdate) {
 			$this->absenceService?->invalidateVacationStatsCache($userId);
@@ -1155,6 +1167,84 @@ class AdminUserProfileUpdateService
 			$policy->setUpdatedAt(new \DateTime());
 			$this->userVacationPolicyAssignmentMapper->update($policy);
 		}
+	}
+
+	/**
+	 * Profile save must not rewrite the current assignment's start or end.
+	 * Those dates are edited only through the assignment timeline API.
+	 * Omitting them makes {@see UserWorkingTimeAssignmentService::applyLegacyAssignmentPayload}
+	 * keep the stored window (and use today only when creating the first row).
+	 *
+	 * @param array<string, mixed> $params
+	 * @return array<string, mixed>
+	 */
+	private function withoutAssignmentWindow(array $params): array
+	{
+		unset($params['startDate'], $params['endDate']);
+
+		return $params;
+	}
+
+	/**
+	 * Keep the stored vacation-policy window when this save addresses an
+	 * existing row. A drifted effectiveFrom would close that row and insert
+	 * another one; a null effectiveTo would clear its end. A first policy
+	 * (no id, and no row covering an omitted date) still uses the submitted
+	 * dates, defaulting to today when effectiveFrom is absent.
+	 *
+	 * @param array<string, mixed> $params
+	 * @return array<string, mixed>
+	 */
+	private function preserveVacationPolicyWindow(string $userId, array $params): array
+	{
+		if ($params === []) {
+			return $params;
+		}
+
+		$row = $this->vacationPolicyRowForProfileWindow($userId, $params);
+		if ($row === null) {
+			return $params;
+		}
+
+		$from = $row->getEffectiveFrom();
+		if ($from !== null) {
+			$params['effectiveFrom'] = $from->format('Y-m-d');
+		}
+		$to = $row->getEffectiveTo();
+		$params['effectiveTo'] = $to !== null ? $to->format('Y-m-d') : null;
+
+		return $params;
+	}
+
+	/**
+	 * @param array<string, mixed> $params
+	 */
+	private function vacationPolicyRowForProfileWindow(string $userId, array $params): ?UserVacationPolicyAssignment
+	{
+		$policyId = isset($params['policyId']) && $params['policyId'] !== null && $params['policyId'] !== ''
+			? (int)$params['policyId']
+			: 0;
+		if ($policyId > 0) {
+			try {
+				$found = $this->userVacationPolicyAssignmentMapper->find($policyId);
+			} catch (DoesNotExistException) {
+				return null;
+			}
+			if (!$found instanceof UserVacationPolicyAssignment || $found->getUserId() !== $userId) {
+				return null;
+			}
+
+			return $found;
+		}
+
+		$rawFrom = $params['effectiveFrom'] ?? null;
+		if ($rawFrom !== null && $rawFrom !== '') {
+			// Explicit date and no row id: caller is opening a new policy
+			// period. Do not pull the current row over that date.
+			return null;
+		}
+
+		return $this->userVacationPolicyAssignmentMapper->findCurrentByUser($userId, new \DateTime('today'));
 	}
 
 	private function workingTimeModelAssignmentMatches(

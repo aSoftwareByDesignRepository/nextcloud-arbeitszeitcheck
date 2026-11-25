@@ -39,6 +39,9 @@ class AssignmentWriteServiceTest extends TestCase
 	/** @var list<array{action: string, entityId: ?int, oldValues: mixed, newValues: mixed}> */
 	private array $auditEvents = [];
 
+	/** @var array<string, string> uid => display name for removal lines */
+	private array $displayNames = [];
+
 	protected function setUp(): void
 	{
 		parent::setUp();
@@ -50,8 +53,17 @@ class AssignmentWriteServiceTest extends TestCase
 		$this->db = $this->createMock(IDBConnection::class);
 
 		$this->userManager->method('get')->willReturnCallback(
-			fn (string $uid): ?IUser => $uid === 'missing' ? null : $this->createMock(IUser::class)
+			function (string $uid): ?IUser {
+				if ($uid === 'missing') {
+					return null;
+				}
+				$user = $this->createMock(IUser::class);
+				$user->method('getUID')->willReturn($uid);
+				$user->method('getDisplayName')->willReturn($this->displayNames[$uid] ?? '');
+				return $user;
+			}
 		);
+		$this->models->method('findPersonalByUser')->willReturn([]);
 		$this->l10n->method('t')->willReturnArgument(0);
 
 		// Simulated table: findByUser/find/insert/update/delete all hit $store.
@@ -101,7 +113,20 @@ class AssignmentWriteServiceTest extends TestCase
 					'oldValues' => $oldValues,
 					'newValues' => $newValues,
 				];
-				return new \OCA\ArbeitszeitCheck\Db\AuditLog();
+				$log = new \OCA\ArbeitszeitCheck\Db\AuditLog();
+				$log->setId(count($this->auditEvents));
+				$log->setUserId($uid);
+				$log->setAction($action);
+				$log->setEntityType($entity);
+				if ($entityId !== null) {
+					$log->setEntityId($entityId);
+				}
+				$log->setOldValues(is_array($oldValues) ? (string)json_encode($oldValues) : null);
+				$log->setPerformedBy($performedBy);
+				$log->setCreatedAt(new \DateTime('2026-11-25 12:00:00'));
+				$log->setIpAddress('203.0.113.9');
+				$log->setUserAgent('secret-agent');
+				return $log;
 			}
 		);
 
@@ -454,6 +479,23 @@ class AssignmentWriteServiceTest extends TestCase
 		$this->assertTrue($result['deleted']);
 		$this->assertArrayNotHasKey(2, $this->store);
 		$this->assertContains('user_working_time_model_deleted', $this->auditActions());
+		$this->assertSame('2999-01-01', $result['removed']['start_date']);
+		$this->assertNull($result['removed']['end_date']);
+		$this->assertSame('Model 9', $result['removed']['model_name']);
+		$this->assertSame('admin', $result['removed']['removed_by']);
+		$this->assertSame(
+			['id', 'model_name', 'start_date', 'end_date', 'vacation_days_per_year', 'removed_at', 'removed_by'],
+			array_keys($result['removed'])
+		);
+		$deletedAudit = null;
+		foreach ($this->auditEvents as $event) {
+			if ($event['action'] === 'user_working_time_model_deleted') {
+				$deletedAudit = $event;
+			}
+		}
+		$this->assertIsArray($deletedAudit);
+		$this->assertSame('Model 9', $deletedAudit['oldValues']['modelName']);
+		$this->assertFalse($deletedAudit['oldValues']['modelIsPersonal']);
 	}
 
 	// ---------------- legacy single-row payload (R-05/E-03) ----------------
@@ -585,5 +627,172 @@ class AssignmentWriteServiceTest extends TestCase
 		} catch (AdminUserProfileUpdateException $e) {
 			$this->assertSame(UserWorkingTimeAssignmentService::ERROR_VALIDATION, $e->errorCode);
 		}
+	}
+
+	public function testListRemovedDropsOtherUsersActionsEntitiesAndGarbage(): void
+	{
+		$this->useModels([9 => $this->model(9)]);
+		$this->audit->method('findByUserAction')->willReturn([
+			$this->removedLog(1, 'u1', 'user_working_time_model_deleted', '2026-11-01 09:00:00', [
+				'startDate' => '2999-04-01',
+				'endDate' => '2999-04-30',
+				'modelName' => 'Office',
+				'vacationDaysPerYear' => 20,
+			]),
+			$this->removedLog(2, 'other', 'user_working_time_model_deleted', '2026-11-02 09:00:00', [
+				'startDate' => '2999-05-01',
+				'modelName' => 'Foreign employee',
+			]),
+			$this->removedLog(3, 'u1', 'user_working_time_model_updated', '2026-11-03 09:00:00', [
+				'startDate' => '2999-06-01',
+				'modelName' => 'Not a deletion',
+			]),
+			$this->removedLog(4, 'u1', 'user_working_time_model_deleted', '2026-11-04 09:00:00', [
+				'startDate' => '2999-07-01',
+				'modelName' => 'Wrong entity',
+			], 'admin', 'working_time_model'),
+			$this->removedLog(5, 'u1', 'user_working_time_model_deleted', '2026-11-05 09:00:00', [
+				'startDate' => 'not-a-date',
+				'modelName' => 'Bad date',
+			]),
+			$this->brokenLog(6),
+		]);
+
+		$result = $this->service->listRemovedForUser('u1');
+
+		$this->assertFalse($result['truncated']);
+		$this->assertCount(1, $result['entries']);
+		$entry = $result['entries'][0];
+		$this->assertSame('Office', $entry['model_name']);
+		$this->assertSame('2999-04-01', $entry['start_date']);
+		$this->assertSame('2999-04-30', $entry['end_date']);
+		$this->assertSame(20.0, $entry['vacation_days_per_year']);
+		$this->assertSame(
+			['id', 'model_name', 'start_date', 'end_date', 'vacation_days_per_year', 'removed_at', 'removed_by'],
+			array_keys($entry)
+		);
+		$this->assertStringNotContainsString('Foreign employee', json_encode($result));
+		$this->assertStringNotContainsString('203.0.113.9', json_encode($result));
+		$this->assertStringNotContainsString('secret-agent', json_encode($result));
+	}
+
+	public function testListRemovedResolvesPersonalLookupAndDeletedNames(): void
+	{
+		$this->useModels([9 => $this->model(9)]);
+		$this->audit->method('findByUserAction')->willReturn([
+			$this->removedLog(1, 'u1', 'user_working_time_model_deleted', '2026-11-01 09:00:00', [
+				'startDate' => '2999-01-01',
+				'modelName' => 'Office',
+				'modelIsPersonal' => true,
+			]),
+			$this->removedLog(2, 'u1', 'user_working_time_model_deleted', '2026-11-02 09:00:00', [
+				'startDate' => '2999-02-01',
+				'workingTimeModelId' => 9,
+			]),
+			$this->removedLog(3, 'u1', 'user_working_time_model_deleted', '2026-11-03 09:00:00', [
+				'startDate' => '2999-03-01',
+				'workingTimeModelId' => 404,
+			]),
+		]);
+
+		$names = array_column($this->service->listRemovedForUser('u1')['entries'], 'model_name');
+
+		$this->assertSame(['Deleted model', 'Model 9', 'Individual contract'], $names);
+	}
+
+	public function testListRemovedCapsAtFiftyNewestFirst(): void
+	{
+		$logs = [];
+		for ($i = 1; $i <= 51; $i++) {
+			$logs[] = $this->removedLog($i, 'u1', 'user_working_time_model_deleted', sprintf('2026-01-%02d 08:00:00', min($i, 28)), [
+				'startDate' => '2999-01-01',
+				'modelName' => 'Row ' . $i,
+			]);
+		}
+		$logs[] = $this->removedLog(9000, 'u1', 'user_working_time_model_deleted', '2099-01-01 08:00:00', [
+			'startDate' => '2999-12-01',
+			'modelName' => 'Newest',
+		]);
+		$this->audit->method('findByUserAction')->willReturn($logs);
+
+		$result = $this->service->listRemovedForUser('u1');
+
+		$this->assertTrue($result['truncated']);
+		$this->assertCount(50, $result['entries']);
+		$this->assertSame(9000, $result['entries'][0]['id']);
+		$this->assertSame('Newest', $result['entries'][0]['model_name']);
+		$this->assertNotContains(1, array_column($result['entries'], 'id'));
+	}
+
+	public function testListRemovedUsesDisplayNameThenUserId(): void
+	{
+		$this->displayNames['ada'] = 'Ada Admin';
+		$this->audit->method('findByUserAction')->willReturn([
+			$this->removedLog(1, 'u1', 'user_working_time_model_deleted', '2026-11-02 09:00:00', [
+				'startDate' => '2999-02-01',
+				'modelName' => 'Named',
+			], 'ada'),
+			$this->removedLog(2, 'u1', 'user_working_time_model_deleted', '2026-11-01 09:00:00', [
+				'startDate' => '2999-01-01',
+				'modelName' => 'Plain',
+			], 'plain'),
+		]);
+
+		$by = array_column($this->service->listRemovedForUser('u1')['entries'], 'removed_by');
+
+		$this->assertSame(['Ada Admin', 'plain'], $by);
+	}
+
+	public function testRemovedAuditQueryFiltersUserActionAndEntity(): void
+	{
+		$src = (string)file_get_contents(dirname(__DIR__, 3) . '/lib/Db/AuditLogMapper.php');
+		$start = strpos($src, 'function findByUserAction');
+		$end = strpos($src, 'function findByEntity');
+		$this->assertNotFalse($start);
+		$this->assertNotFalse($end);
+		$body = substr($src, (int)$start, (int)$end - (int)$start);
+		$this->assertStringContainsString("eq('user_id'", $body);
+		$this->assertStringContainsString("eq('action'", $body);
+		$this->assertStringContainsString("eq('entity_type'", $body);
+		$this->assertStringContainsString('setMaxResults($limit)', $body);
+		$this->assertStringContainsString("orderBy('created_at', 'DESC')", $body);
+	}
+
+	/**
+	 * @param array<string, mixed> $old
+	 */
+	private function removedLog(
+		int $id,
+		string $userId,
+		string $action,
+		string $when,
+		array $old,
+		string $actor = 'admin',
+		string $entityType = 'user_working_time_model'
+	): \OCA\ArbeitszeitCheck\Db\AuditLog {
+		$log = new \OCA\ArbeitszeitCheck\Db\AuditLog();
+		$log->setId($id);
+		$log->setUserId($userId);
+		$log->setAction($action);
+		$log->setEntityType($entityType);
+		$log->setOldValues((string)json_encode($old));
+		$log->setPerformedBy($actor);
+		$log->setCreatedAt(new \DateTime($when));
+		$log->setIpAddress('203.0.113.9');
+		$log->setUserAgent('secret-agent');
+		return $log;
+	}
+
+	private function brokenLog(int $id): \OCA\ArbeitszeitCheck\Db\AuditLog
+	{
+		$log = new \OCA\ArbeitszeitCheck\Db\AuditLog();
+		$log->setId($id);
+		$log->setUserId('u1');
+		$log->setAction('user_working_time_model_deleted');
+		$log->setEntityType('user_working_time_model');
+		$log->setOldValues('{not json');
+		$log->setPerformedBy('admin');
+		$log->setCreatedAt(new \DateTime('2026-11-06 09:00:00'));
+		return $log;
 	}
 }

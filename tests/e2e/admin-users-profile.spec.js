@@ -14,18 +14,14 @@ test.describe('Admin employees — atomic profile save', () => {
 		const user = body.user
 		expect(user).toBeTruthy()
 
-		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || '2025-03-27'
+		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || null
+		const endDate = user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null
 		const policy = user.vacationPolicy || {}
 		const vacationMode = policy.vacationMode || 'inherit'
 		const inheritLowerLayers = vacationMode === 'inherit' || !!policy.inheritLowerLayers
 		const manualDays = inheritLowerLayers ? null : (policy.manualDays ?? 30)
 		const policyId = policy.id ?? null
-		const policyEffectiveFrom = policy.effectiveFrom || startDate
-		const loadedStart = startDate
-		const effectiveFrom =
-			policyId && policyEffectiveFrom && loadedStart && startDate === loadedStart
-				? policyEffectiveFrom
-				: startDate
+		const effectiveFrom = policy.effectiveFrom || new Date().toISOString().slice(0, 10)
 
 		const payload = {
 			workingTimeModel: {
@@ -33,8 +29,6 @@ test.describe('Admin employees — atomic profile save', () => {
 				vacationDaysPerYear: user.vacationDaysPerYear ?? 28,
 				vacationCarryoverDays: user.vacationCarryoverDays ?? 0,
 				vacationCarryoverYear: user.vacationCarryoverYear ?? new Date().getFullYear(),
-				startDate,
-				endDate: user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null,
 				germanState: user.germanState || 'NW',
 			},
 			vacationPolicy: {
@@ -45,7 +39,7 @@ test.describe('Admin employees — atomic profile save', () => {
 				tariffRuleSetId: policy.tariffRuleSetId ?? null,
 				overrideReason: policy.overrideReason ?? '',
 				effectiveFrom,
-				effectiveTo: user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null,
+				effectiveTo: policy.effectiveTo ?? null,
 			},
 			timeCapture: (() => {
 				const preferences = user.timeCapture?.preferences || user.timeCapture || {}
@@ -68,6 +62,13 @@ test.describe('Admin employees — atomic profile save', () => {
 		})
 		expect(result.success).toBe(true)
 		expect(result.userWorkingTimeModel !== undefined || result.policyId !== undefined).toBeTruthy()
+
+		const after = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(after.success).toBe(true)
+		expect(after.user.workingTimeModelStartDate || after.user.userWorkingTimeModel?.startDate || null).toBe(startDate)
+		expect(after.user.workingTimeModelEndDate || after.user.userWorkingTimeModel?.endDate || null).toBe(endDate)
+		expect(after.user.vacationPolicy?.effectiveFrom || null).toBe(policy.effectiveFrom || null)
+		expect(after.user.vacationPolicy?.effectiveTo || null).toBe(policy.effectiveTo || null)
 	})
 
 	test('carryover-only profile update persists without model change', async ({ page }) => {
@@ -79,9 +80,11 @@ test.describe('Admin employees — atomic profile save', () => {
 		const user = body.user
 		expect(user).toBeTruthy()
 
-		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || '2025-03-27'
+		const startDate = user.workingTimeModelStartDate || user.userWorkingTimeModel?.startDate || null
+		const endDate = user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null
 		const year = user.vacationCarryoverYear ?? new Date().getFullYear()
 		const marker = 3.25
+		const policy = user.vacationPolicy || {}
 
 		const payload = {
 			workingTimeModel: {
@@ -89,17 +92,17 @@ test.describe('Admin employees — atomic profile save', () => {
 				vacationDaysPerYear: user.vacationDaysPerYear ?? 28,
 				vacationCarryoverDays: marker,
 				vacationCarryoverYear: year,
-				startDate,
-				endDate: user.workingTimeModelEndDate || user.userWorkingTimeModel?.endDate || null,
 				germanState: user.germanState || 'NW',
 			},
 			vacationPolicy: {
-				policyId: user.vacationPolicy?.id ?? null,
-				vacationMode: user.vacationPolicy?.vacationMode || 'inherit',
-				inheritLowerLayers: true,
-				manualDays: null,
-				effectiveFrom: startDate,
-				effectiveTo: null,
+				policyId: policy.id ?? null,
+				vacationMode: policy.vacationMode || 'inherit',
+				inheritLowerLayers: (policy.vacationMode || 'inherit') === 'inherit' || !!policy.inheritLowerLayers,
+				manualDays: (policy.vacationMode || 'inherit') === 'inherit' ? null : (policy.manualDays ?? null),
+				tariffRuleSetId: policy.tariffRuleSetId ?? null,
+				overrideReason: policy.overrideReason ?? '',
+				effectiveFrom: policy.effectiveFrom || new Date().toISOString().slice(0, 10),
+				effectiveTo: policy.effectiveTo ?? null,
 			},
 			timeCapture: {
 				clockStampingEnabled: true,
@@ -118,6 +121,12 @@ test.describe('Admin employees — atomic profile save', () => {
 			data: payload,
 		})
 		expect(put.success).toBe(true)
+
+		const windowCheck = await api(page, 'GET', `/apps/arbeitszeitcheck/api/admin/users/${userId}`)
+		expect(windowCheck.user.workingTimeModelStartDate || windowCheck.user.userWorkingTimeModel?.startDate || null).toBe(startDate)
+		expect(windowCheck.user.workingTimeModelEndDate || windowCheck.user.userWorkingTimeModel?.endDate || null).toBe(endDate)
+		expect(windowCheck.user.vacationPolicy?.effectiveFrom || null).toBe(policy.effectiveFrom || null)
+		expect(windowCheck.user.vacationPolicy?.effectiveTo || null).toBe(policy.effectiveTo || null)
 
 		const reloaded = await api(
 			page,
@@ -166,7 +175,7 @@ test.describe('Admin employees — atomic profile save', () => {
 		const startDate =
 			before.user.workingTimeModelStartDate ||
 			before.user.userWorkingTimeModel?.startDate ||
-			'2025-03-27'
+			null
 
 		// Restore target must be a *global* model — the user may still carry a
 		// personal one from an earlier run, which is a different id space.
@@ -195,7 +204,6 @@ test.describe('Admin employees — atomic profile save', () => {
 		const enable = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/users/${userId}/profile`, {
 			data: {
 				workingTimeModel: {
-					startDate,
 					germanState: before.user.germanState || 'NW',
 					customModel: {
 						enabled: 'true',
@@ -215,6 +223,7 @@ test.describe('Admin employees — atomic profile save', () => {
 		const personalId = after.user.workingTimeModel.id
 		expect(personalId).not.toBe(globalId)
 		expect(after.user.workingTimeModel.weekdaySchedule?.days?.mon?.work).toBe(true)
+		expect(after.user.workingTimeModelStartDate || after.user.userWorkingTimeModel?.startDate || null).toBe(startDate)
 
 		// Isolation: the personal model must not leak into the org model list.
 		const models = await api(page, 'GET', '/apps/arbeitszeitcheck/api/admin/working-time-models')
@@ -233,7 +242,6 @@ test.describe('Admin employees — atomic profile save', () => {
 			data: {
 				workingTimeModel: {
 					workingTimeModelId: globalId,
-					startDate,
 					germanState: before.user.germanState || 'NW',
 					customModel: { enabled: 'false' },
 				},
@@ -245,5 +253,6 @@ test.describe('Admin employees — atomic profile save', () => {
 		expect(restored.success).toBe(true)
 		expect(restored.user.workingTimeModel?.isPersonal).toBe(false)
 		expect(Number(restored.user.workingTimeModel?.id)).toBe(Number(globalId))
+		expect(restored.user.workingTimeModelStartDate || restored.user.userWorkingTimeModel?.startDate || null).toBe(startDate)
 	})
 })

@@ -707,12 +707,10 @@
     function renderEditForm(user, models, ruleSets) {
         const t = (key, english) => auMsg(key, english);
         const modelLabel = t('workingTimeModel', 'Working Time Model');
-        const vacationDaysLabel = t('vacationDaysPerYear', 'Vacation Days Per Year');
+        const vacationDaysLabel = t('vacationDaysPerYearOrganisationDefault', 'Vacation days per year (organisation default)');
         const policyModeLabel = t('vacationModeSimpleLabel', 'How should annual vacation be calculated?');
         const carryoverLabel = t('vacationCarryoverLabel', 'Vacation carryover (opening balance)');
         const carryoverYearLabel = t('vacationCarryoverYearLabel', 'Year for carryover balance');
-        const startDateLabel = t('startDate', 'Start Date');
-        const endDateLabel = t('endDateOptional', 'End Date (Optional)');
         const noModelLabel = t('noModel', 'No Model Assigned');
         const germanStateLabel = t('germanStateLabel', 'Region for public holidays');
         const germanStateHelp = t('germanStateHelp', 'Select the region whose holiday calendar applies to this person. If not set, the instance default region is used.');
@@ -731,10 +729,6 @@
         const overtimeTrackingVal = (overtimeTrackingFrom && convertISOToEuropean(overtimeTrackingFrom)) || '';
         const overtimeOpening = user.overtimeOpeningBalanceHours != null ? String(user.overtimeOpeningBalanceHours) : '0';
         const overtimeOpeningYear = user.overtimeOpeningBalanceYear != null ? String(user.overtimeOpeningBalanceYear) : String(new Date().getFullYear());
-        const startIso = user.workingTimeModelStartDate ?? user.userWorkingTimeModel?.startDate ?? null;
-        const endIso = user.workingTimeModelEndDate ?? user.userWorkingTimeModel?.endDate ?? null;
-        const startVal = (startIso && convertISOToEuropean(startIso)) || '';
-        const endVal = (endIso && convertISOToEuropean(endIso)) || '';
         const employmentStartIso = user.employmentStart ?? null;
         const employmentEndIso = user.employmentEnd ?? null;
         const employmentStartVal = (employmentStartIso && convertISOToEuropean(employmentStartIso)) || '';
@@ -757,6 +751,9 @@
         // anything. The controller already accepts either representation
         // (sentinel mode or the boolean column) and persists both in sync.
         const currentMode = (inheritLowerLayers || rawMode === 'inherit') ? 'inherit' : rawMode;
+        const showManualDays = currentMode === 'manual_fixed' || currentMode === 'manual_exception';
+        const showTariffRule = currentMode === 'tariff_rule_based';
+        const showOverrideReason = currentMode === 'manual_exception';
         const manualDays = policy.manualDays != null ? String(policy.manualDays) : '';
         const ruleSetId = policy.tariffRuleSetId != null ? String(policy.tariffRuleSetId) : '';
         const overrideReason = policy.overrideReason || '';
@@ -851,26 +848,25 @@
 
         const policyId = policy.id != null ? String(policy.id) : '';
         const policyEffectiveFromIso = policy.effectiveFrom || '';
+        const policyEffectiveToIso = policy.effectiveTo || '';
 
         const listUrl = detailCfg.employeesListUrl || buildApiUrl('/apps/arbeitszeitcheck/admin/users');
         const formContent = `
             <form id="edit-user-form" class="form admin-user-detail__form" novalidate>
                 <input type="hidden" id="user-id" name="userId" value="${Utils.escapeHtml(user.userId)}">
                 <input type="hidden" id="user-vacation-policy-id" name="vacationPolicyId" value="${Utils.escapeHtml(policyId)}">
-                <input type="hidden" id="user-loaded-wtm-start" name="loadedWtmStart" value="${Utils.escapeHtml(startIso || '')}">
                 <input type="hidden" id="user-policy-effective-from" name="policyEffectiveFrom" value="${Utils.escapeHtml(policyEffectiveFromIso)}">
+                <input type="hidden" id="user-policy-effective-to" name="policyEffectiveTo" value="${Utils.escapeHtml(policyEffectiveToIso)}">
                 <details class="user-edit-section" id="user-edit-assignment" open>
                     <summary class="user-edit-section__summary" id="user-edit-assignment-heading">
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('workSchedule', 'Work schedule'))}</span>
                     </summary>
                     <div class="user-edit-section__body">
-                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideWorkSchedule', 'Pick the work schedule and the region used for public holidays.'))}</p>
                 <div class="form-group">
                     <label for="user-model" class="form-label">${modelLabel}</label>
-                    <select id="user-model" name="workingTimeModelId" class="form-select" aria-describedby="user-model-help">
+                    <select id="user-model" name="workingTimeModelId" class="form-select">
                         ${modelOptions}
                     </select>
-                    <p id="user-model-help" class="form-help">${t('selectWorkScheduleHelp', 'Select a work schedule to assign to this employee')}</p>
                 </div>
                 <div class="form-group user-custom-model">
                     <label class="user-custom-model__toggle" for="user-custom-model-enabled">
@@ -914,12 +910,23 @@
                 </div>
                     </div>
                 </details>
+                <details class="user-edit-section user-edit-section--assignments" id="user-edit-assignments" open>
+                    <summary class="user-edit-section__summary" id="user-edit-assignments-heading">
+                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('assignmentsSectionTitle', 'Work schedule periods'))}</span>
+                    </summary>
+                    <div class="user-edit-section__body">
+                        <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideAssignments', 'Each row is one period with its own work schedule. Add a new period when the contract changes — past periods stay untouched so reports for old months keep their original numbers.'))}</p>
+                        <div id="assignments-manager" class="assignments-manager" aria-live="polite"></div>
+                        <div id="assignments-finalized-warning" class="assignments-manager__warning" role="status" hidden></div>
+                        <button type="button" id="assignment-add-btn" class="btn btn--secondary assignments-manager__add">${Utils.escapeHtml(t('addAssignmentPeriod', 'Add period'))}</button>
+                        <div id="assignments-removed" class="assignments-removed" hidden></div>
+                    </div>
+                </details>
                 <details class="user-edit-section user-edit-section--capture" id="user-edit-capture" open>
                     <summary class="user-edit-section__summary" id="user-edit-capture-heading">
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('timeRecordingMethods', 'Time recording'))}</span>
                     </summary>
                     <div class="user-edit-section__body">
-                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideTimeRecording', 'Choose whether this person may clock in/out and/or enter time manually. At least one method must stay on.'))}</p>
                     <p id="user-edit-capture-intro" class="form-help user-edit-capture__intro">${Utils.escapeHtml(t('timeRecordingMethodsIntro', 'Choose how this employee may record working time. At least one method must stay enabled.'))}</p>
                     ${(orgClockDisabled || orgManualDisabled) ? `<p id="user-edit-capture-org-note" class="form-help form-help--note user-edit-capture__org-note">${Utils.escapeHtml(t('timeRecordingOrgRestrictionNote', 'Greyed-out options are disabled organisation-wide in Global settings. You can only restrict this person further.'))}</p>` : ''}
                     <div class="user-edit-capture__grid" role="group" aria-labelledby="user-edit-capture-heading" aria-describedby="user-edit-capture-intro user-edit-capture-error${orgClockDisabled || orgManualDisabled ? ' user-edit-capture-org-note' : ''}">
@@ -941,16 +948,42 @@
                     <p id="user-edit-capture-error" class="form-error user-edit-capture__error" role="alert" hidden></p>
                     </div>
                 </details>
+                <details class="user-edit-section" id="user-edit-employment" open>
+                    <summary class="user-edit-section__summary" id="user-edit-employment-heading">
+                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('employmentPeriod', 'Employment period (for pro-rata vacation)'))}</span>
+                    </summary>
+                    <div class="user-edit-section__body">
+                    <p id="user-edit-employment-intro" class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideEmployment', 'Hire and leaving dates used to reduce vacation in partial years. Leave empty for a full-year entitlement.'))}</p>
+                <div class="form-group">
+                    <label for="user-employment-start" class="form-label">${Utils.escapeHtml(t('employmentStart', 'Employment start date (Eintrittsdatum)'))}</label>
+                    <input type="text" id="user-employment-start" name="employmentStart" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${employmentStartVal}" autocomplete="off" aria-describedby="user-employment-start-help">
+                    <p id="user-employment-start-help" class="form-help">${Utils.escapeHtml(t('employmentStartHelp', 'First day of employment. Vacation for the year of hire is prorated from this date.'))} ${Utils.escapeHtml(t('formatDdmmyyyy', 'Format: dd.mm.yyyy'))}</p>
+                </div>
+                    <div class="form-group">
+                    <label for="user-employment-end" class="form-label">${Utils.escapeHtml(t('employmentEnd', 'Employment end date (Austrittsdatum)'))}</label>
+                    <input type="text" id="user-employment-end" name="employmentEnd" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${employmentEndVal}" autocomplete="off" aria-describedby="user-employment-end-help">
+                    <p id="user-employment-end-help" class="form-help">${Utils.escapeHtml(t('employmentEndHelp', 'Last day of employment. Leave empty for ongoing employment. Vacation for the year of leaving is prorated up to this date.'))}</p>
+                </div>
+                <div class="form-group">
+                    <label for="user-work-location-default" class="form-label">${Utils.escapeHtml(t('workLocationDefaultLabel', 'Default work location'))}</label>
+                    <select id="user-work-location-default" name="workLocationDefault" class="form-select" aria-describedby="user-work-location-default-help">
+                        <option value="" ${!user.workLocationDefault ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationDefaultInherit', 'Organisation default (Office)'))}</option>
+                        <option value="office" ${user.workLocationDefault === 'office' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationOffice', 'Office'))}</option>
+                        <option value="home" ${user.workLocationDefault === 'home' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationHome', 'Home office'))}</option>
+                        <option value="external" ${user.workLocationDefault === 'external' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationExternal', 'External appointment'))}</option>
+                    </select>
+                    <p id="user-work-location-default-help" class="form-help">${Utils.escapeHtml(t('workLocationDefaultHelp', 'Preselected for this person\'s new time entries and stamps; they can still mark each entry individually.'))}</p>
+                </div>
+                    </div>
+                </details>
                 <details class="user-edit-section" id="user-edit-vacation" open>
                     <summary class="user-edit-section__summary" id="user-edit-vacation-heading">
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('vacationDays', 'Vacation days'))}</span>
                     </summary>
                     <div class="user-edit-section__body">
-                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideVacation', 'Set how annual vacation is calculated, then check the preview before saving.'))}</p>
                 <div class="form-group">
                     <label for="user-vacation-days" class="form-label">${vacationDaysLabel}</label>
-                    <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" min="0" max="365" value="${vacation}" aria-describedby="user-vacation-help">
-                    <p id="user-vacation-help" class="form-help">${t('vacationDaysHelp', 'Number of vacation days per year (standard in Germany: 25 days)')}</p>
+                    <input type="number" id="user-vacation-days" name="vacationDaysPerYear" class="form-input" min="0" max="365" value="${vacation}">
                 </div>
                 <div class="form-group">
                     <label for="user-vacation-mode" class="form-label">${policyModeLabel}</label>
@@ -963,21 +996,21 @@
                     </select>
                     <p id="user-vacation-mode-help" class="form-help">${t('vacationModeHelpSimpleInherit', 'Inherit follows the deepest team policy, then the work-schedule default, then the organisation default. Fixed/automatic/tariff/exception set an individual rule for this employee.')}</p>
                 </div>
-                <div class="form-group">
+                <div class="form-group"${showManualDays ? '' : ' hidden'}>
                     <label for="user-manual-days" class="form-label">${t('manualDays', 'Manual annual days')}</label>
-                    <input type="text" id="user-manual-days" name="manualDays" class="form-input" inputmode="decimal" pattern="^[0-9]+([\\.,][0-9]{1,2})?$" value="${Utils.escapeHtml(manualDays)}">
+                    <input type="text" id="user-manual-days" name="manualDays" class="form-input" inputmode="decimal" pattern="^[0-9]+([\\.,][0-9]{1,2})?$" value="${Utils.escapeHtml(manualDays)}"${showManualDays ? '' : ' disabled'}>
                     <p class="form-help">${t('manualDaysHelp', 'Example: 30 or 24.5 days per year')}</p>
                 </div>
-                <div class="form-group">
+                <div class="form-group"${showTariffRule ? '' : ' hidden'}>
                     <label for="user-tariff-rule-set-id" class="form-label">${t('tariffRuleSetLabel', 'Tariff rule set')}</label>
-                    <select id="user-tariff-rule-set-id" name="tariffRuleSetId" class="form-select">
+                    <select id="user-tariff-rule-set-id" name="tariffRuleSetId" class="form-select"${showTariffRule ? '' : ' disabled'}>
                         ${tariffRuleSetOptions}
                     </select>
                     <p class="form-help">${t('tariffRuleSetHelp', 'Choose the active tariff rule set that should apply to this person.')}</p>
                 </div>
-                <div class="form-group">
+                <div class="form-group"${showOverrideReason ? '' : ' hidden'}>
                     <label for="user-override-reason" class="form-label">${t('overrideReason', 'Override reason')}</label>
-                    <textarea id="user-override-reason" name="overrideReason" class="form-textarea" rows="2">${Utils.escapeHtml(overrideReason)}</textarea>
+                    <textarea id="user-override-reason" name="overrideReason" class="form-textarea" rows="2"${showOverrideReason ? '' : ' disabled'}>${Utils.escapeHtml(overrideReason)}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">${t('effectiveEntitlement', 'Effective entitlement preview')}</label>
@@ -1056,52 +1089,6 @@
                 </div>
                     </div>
                 </details>
-                <details class="user-edit-section" id="user-edit-validity" open>
-                    <summary class="user-edit-section__summary" id="user-edit-validity-heading">
-                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('validFrom', 'Valid from'))}</span>
-                    </summary>
-                    <div class="user-edit-section__body">
-                    <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideValidity', 'When this work-schedule assignment starts and (optionally) ends.'))}</p>
-                <div class="form-group">
-                    <label for="user-start-date" class="form-label">${startDateLabel}</label>
-                    <input type="text" id="user-start-date" name="startDate" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${startVal}" autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="user-end-date" class="form-label">${endDateLabel}</label>
-                    <input type="text" id="user-end-date" name="endDate" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${endVal}" autocomplete="off">
-                    <p class="form-help">${t('endDateHelp', 'Leave empty if the assignment has no end date')}</p>
-                </div>
-                    </div>
-                </details>
-                <details class="user-edit-section" id="user-edit-employment" open>
-                    <summary class="user-edit-section__summary" id="user-edit-employment-heading">
-                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('employmentPeriod', 'Employment period (for pro-rata vacation)'))}</span>
-                    </summary>
-                    <div class="user-edit-section__body">
-                    <p id="user-edit-employment-intro" class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideEmployment', 'Hire and leaving dates used to reduce vacation in partial years. Leave empty for a full-year entitlement.'))}</p>
-                    <p class="form-help form-help--block">${Utils.escapeHtml(t('employmentPeriodIntro', 'Set the hire date (and leaving date, if any). When the employment does not cover the whole calendar year, the annual vacation entitlement is reduced proportionally. Leave both empty for the full annual entitlement.'))}</p>
-                <div class="form-group">
-                    <label for="user-employment-start" class="form-label">${Utils.escapeHtml(t('employmentStart', 'Employment start date (Eintrittsdatum)'))}</label>
-                    <input type="text" id="user-employment-start" name="employmentStart" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${employmentStartVal}" autocomplete="off" aria-describedby="user-employment-start-help">
-                    <p id="user-employment-start-help" class="form-help">${Utils.escapeHtml(t('employmentStartHelp', 'First day of employment. Vacation for the year of hire is prorated from this date.'))} ${Utils.escapeHtml(t('formatDdmmyyyy', 'Format: dd.mm.yyyy'))}</p>
-                </div>
-                    <div class="form-group">
-                    <label for="user-employment-end" class="form-label">${Utils.escapeHtml(t('employmentEnd', 'Employment end date (Austrittsdatum)'))}</label>
-                    <input type="text" id="user-employment-end" name="employmentEnd" class="form-input datepicker-input" placeholder="${datePlaceholder}" pattern="\\d{2}\\.\\d{2}\\.\\d{4}" maxlength="10" value="${employmentEndVal}" autocomplete="off" aria-describedby="user-employment-end-help">
-                    <p id="user-employment-end-help" class="form-help">${Utils.escapeHtml(t('employmentEndHelp', 'Last day of employment. Leave empty for ongoing employment. Vacation for the year of leaving is prorated up to this date.'))}</p>
-                </div>
-                <div class="form-group">
-                    <label for="user-work-location-default" class="form-label">${Utils.escapeHtml(t('workLocationDefaultLabel', 'Default work location'))}</label>
-                    <select id="user-work-location-default" name="workLocationDefault" class="form-select" aria-describedby="user-work-location-default-help">
-                        <option value="" ${!user.workLocationDefault ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationDefaultInherit', 'Organisation default (Office)'))}</option>
-                        <option value="office" ${user.workLocationDefault === 'office' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationOffice', 'Office'))}</option>
-                        <option value="home" ${user.workLocationDefault === 'home' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationHome', 'Home office'))}</option>
-                        <option value="external" ${user.workLocationDefault === 'external' ? 'selected' : ''}>${Utils.escapeHtml(t('workLocationExternal', 'External appointment'))}</option>
-                    </select>
-                    <p id="user-work-location-default-help" class="form-help">${Utils.escapeHtml(t('workLocationDefaultHelp', 'Preselected for this person\'s new time entries and stamps; they can still mark each entry individually.'))}</p>
-                </div>
-                    </div>
-                </details>
                 <details class="user-edit-section" id="user-edit-datev" open>
                     <summary class="user-edit-section__summary" id="user-edit-datev-heading">
                         <span class="user-edit-section__heading">${Utils.escapeHtml(t('datevPersonal', 'DATEV Personalnummer'))}</span>
@@ -1113,30 +1100,6 @@
                     <input type="text" id="user-datev-personalnummer" name="datevPersonalnummer" class="form-input" inputmode="numeric" pattern="[0-9]{0,8}" maxlength="8" value="${Utils.escapeHtml(String(user.datevPersonalnummer || ''))}" autocomplete="off" aria-describedby="user-datev-personalnummer-help user-edit-datev-intro">
                     <p id="user-datev-personalnummer-help" class="form-help">${Utils.escapeHtml(t('datevPersonalnummerHelp', 'Up to 8 digits. Required for DATEV export of this employee.'))}</p>
                 </div>
-                    </div>
-                </details>
-
-                <details class="user-edit-section user-edit-section--assignments" id="user-edit-assignments" open>
-                    <summary class="user-edit-section__summary" id="user-edit-assignments-heading">
-                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('assignmentsSectionTitle', 'Work schedule periods'))}</span>
-                    </summary>
-                    <div class="user-edit-section__body">
-                        <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideAssignments', 'Each row is one period with its own work schedule. Add a new period when the contract changes — past periods stay untouched so reports for old months keep their original numbers.'))}</p>
-                        <div id="assignments-manager" class="assignments-manager" aria-live="polite"></div>
-                        <div id="assignments-finalized-warning" class="assignments-manager__warning" role="status" hidden></div>
-                        <button type="button" id="assignment-add-btn" class="btn btn--secondary assignments-manager__add">${Utils.escapeHtml(t('addAssignmentPeriod', 'Add period'))}</button>
-                    </div>
-                </details>
-
-                <details class="user-edit-section user-edit-section--history" id="assignment-history">
-                    <summary class="user-edit-section__summary" id="user-edit-history-heading">
-                        <span class="user-edit-section__heading">${Utils.escapeHtml(t('historySectionTitle', 'Work schedule history'))}</span>
-                    </summary>
-                    <div class="user-edit-section__body">
-                        <p class="user-edit-section__guide form-help form-help--block">${Utils.escapeHtml(t('sectionGuideHistory', 'Read-only list of past and current work-schedule assignments.'))}</p>
-                        <div id="assignment-history-content" class="history-panel" aria-live="polite">
-                            <p class="history-panel__loading">${Utils.escapeHtml(auMsg('loadingEllipsis', 'Loading…'))}</p>
-                        </div>
                     </div>
                 </details>
 
@@ -1161,7 +1124,7 @@
 
         const dp = window.ArbeitszeitCheckDatepicker;
         if (dp && dp.initializeDatepicker) {
-            ['user-start-date', 'user-end-date', 'user-overtime-tracking-from', 'user-employment-start', 'user-employment-end'].forEach((id) => {
+            ['user-overtime-tracking-from', 'user-employment-start', 'user-employment-end'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) {
                     dp.initializeDatepicker(el, {});
@@ -1286,7 +1249,6 @@
         const overrideReasonEl = document.getElementById('user-override-reason');
         const modelEl = document.getElementById('user-model');
         const previewEl = document.getElementById('user-entitlement-preview');
-        const startDateEl = document.getElementById('user-start-date');
         const employmentStartEl = document.getElementById('user-employment-start');
         const employmentEndEl = document.getElementById('user-employment-end');
         let previewTimer = null;
@@ -1327,8 +1289,7 @@
 
             const payload = {
                 userId: user.userId,
-                asOfDate: (startDateEl?.value && previewToISO(startDateEl.value))
-                    || (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')),
+                asOfDate: (window.ArbeitszeitCheckTime ? window.ArbeitszeitCheckTime.todayYmd() : new Date().toLocaleDateString('sv-SE')),
                 employment: readEmploymentDraftFromForm(),
                 draftPolicy: {
                     vacationMode: mode,
@@ -1389,24 +1350,25 @@
             previewTimer = setTimeout(computeLocalPreview, 220);
         };
 
+        const setVacationModeField = function(el, visible) {
+            if (!el) {
+                return;
+            }
+            const group = el.closest('.form-group');
+            if (group) {
+                group.hidden = !visible;
+            }
+            el.disabled = !visible;
+        };
         const toggleVacationModeFields = function() {
-            const mode = String(vacationModeEl?.value || 'manual_fixed');
-            const isInherit = mode === 'inherit';
-            const isManual = !isInherit && (mode === 'manual_fixed' || mode === 'manual_exception');
-            const isTariff = !isInherit && mode === 'tariff_rule_based';
-            if (manualDaysEl) {
-                manualDaysEl.disabled = !isManual;
-                manualDaysEl.closest('.form-group')?.classList.toggle('is-disabled', !isManual);
-            }
-            if (tariffRuleSetEl) {
-                tariffRuleSetEl.disabled = !isTariff;
-                tariffRuleSetEl.closest('.form-group')?.classList.toggle('is-disabled', !isTariff);
-            }
+            const mode = String(vacationModeEl?.value || 'inherit');
+            const isManual = mode === 'manual_fixed' || mode === 'manual_exception';
+            const needsReason = mode === 'manual_exception';
+            setVacationModeField(manualDaysEl, isManual);
+            setVacationModeField(tariffRuleSetEl, mode === 'tariff_rule_based');
+            setVacationModeField(overrideReasonEl, needsReason);
             if (overrideReasonEl) {
-                const needsReason = !isInherit && mode === 'manual_exception';
-                overrideReasonEl.disabled = !needsReason;
                 overrideReasonEl.required = needsReason;
-                overrideReasonEl.closest('.form-group')?.classList.toggle('is-disabled', !needsReason);
             }
             triggerPreview();
         };
@@ -1414,7 +1376,7 @@
             vacationModeEl.addEventListener('change', toggleVacationModeFields);
             toggleVacationModeFields();
         }
-        [manualDaysEl, tariffRuleSetEl, overrideReasonEl, modelEl, startDateEl, employmentStartEl, employmentEndEl].forEach((el) => {
+        [manualDaysEl, tariffRuleSetEl, overrideReasonEl, modelEl, employmentStartEl, employmentEndEl].forEach((el) => {
             if (!el) {
                 return;
             }
@@ -1427,7 +1389,6 @@
 
         bindDirtyTracking(form);
         clearDirty();
-        loadAssignmentHistory(user.userId);
         initAssignmentsManager(user, models);
 
         const backLink = root.querySelector('[data-action="back-to-list"]');
@@ -1448,74 +1409,18 @@
             });
         }
 
-        if (window.location.hash === '#assignment-history') {
-            const hist = document.getElementById('assignment-history');
-            if (hist) {
-                hist.open = true;
-                hist.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Old employee-list and bookmark links opened the dropped history section.
+        if (window.location.hash === '#assignment-history' || window.location.hash === '#user-edit-assignments') {
+            const section = document.getElementById('user-edit-assignments');
+            if (section) {
+                section.open = true;
+                const removedBlock = document.getElementById('assignments-removed');
+                const target = window.location.hash === '#assignment-history' && removedBlock && !removedBlock.hidden
+                    ? removedBlock
+                    : section;
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
-    }
-
-    function loadAssignmentHistory(userId) {
-        const contentEl = document.getElementById('assignment-history-content');
-        if (!contentEl) {
-            return;
-        }
-        const t = (key, english) => auMsg(key, english);
-        Utils.ajax(buildApiUrl('/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/working-time-model/history'), {
-            method: 'GET',
-            onSuccess: function(data) {
-                if (data.success && Array.isArray(data.history) && data.history.length > 0) {
-                    const formatDate = (iso) => {
-                        if (!iso) return '–';
-                        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                        return m ? m[3] + '.' + m[2] + '.' + m[1] : iso;
-                    };
-                    const workScheduleHdr = Utils.escapeHtml(t('workSchedule', 'Work schedule'));
-                    const vacationDaysHdr = Utils.escapeHtml(t('vacationDaysCol', 'Vacation days'));
-                    const validFromHdr = Utils.escapeHtml(t('validFrom', 'Valid from'));
-                    const validToHdr = Utils.escapeHtml(t('validTo', 'Valid to'));
-                    const statusHdr = Utils.escapeHtml(t('status', 'Status'));
-                    const ongoingVal = Utils.escapeHtml(t('ongoing', 'ongoing'));
-                    const activeVal = Utils.escapeHtml(t('active', 'Active'));
-                    const endedVal = Utils.escapeHtml(t('ended', 'Ended'));
-                    const rows = data.history.map(item => {
-                        const model = Utils.escapeHtml(item.modelName);
-                        const vacation = String(item.vacationDaysPerYear);
-                        const from = formatDate(item.startDate);
-                        const to = formatDate(item.endDate) || ongoingVal;
-                        const status = item.isActive
-                            ? '<span class="badge badge--success">' + activeVal + '</span>'
-                            : '<span class="badge badge--secondary">' + endedVal + '</span>';
-                        const td = (label, html) => Utils.responsiveTd
-                            ? Utils.responsiveTd(label, html)
-                            : '<td>' + html + '</td>';
-                        return '<tr>'
-                            + td(workScheduleHdr, model)
-                            + td(vacationDaysHdr, vacation)
-                            + td(validFromHdr, from)
-                            + td(validToHdr, to)
-                            + td(statusHdr, status)
-                            + '</tr>';
-                    }).join('');
-                    contentEl.innerHTML = '<div class="table-container" role="region" aria-label="' + Utils.escapeHtml(t('assignmentHistory', 'Assignment history')) + '">' +
-                        '<table class="table table--hover azc-table--responsive history-panel__table" role="table" aria-label="' + Utils.escapeHtml(t('assignmentHistory', 'Assignment history')) + '">' +
-                        '<thead><tr>' +
-                        '<th scope="col">' + workScheduleHdr + '</th>' +
-                        '<th scope="col">' + vacationDaysHdr + '</th>' +
-                        '<th scope="col">' + validFromHdr + '</th>' +
-                        '<th scope="col">' + validToHdr + '</th>' +
-                        '<th scope="col">' + statusHdr + '</th>' +
-                        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-                } else {
-                    contentEl.innerHTML = '<p class="history-panel__empty">' + Utils.escapeHtml(t('noAssignmentHistory', 'No assignment history')) + '</p>';
-                }
-            },
-            onError: function() {
-                contentEl.innerHTML = '<p class="history-panel__empty">' + Utils.escapeHtml(auMsg('errorLoadingHistory', 'Error loading assignment history')) + '</p>';
-            }
-        });
     }
 
     // ------------------------------------------------------------------
@@ -1534,6 +1439,11 @@
         const apiBase = '/apps/arbeitszeitcheck/api/admin/users/' + encodeURIComponent(userId) + '/working-time-assignments';
         const assignableModels = (models || []).filter(m => m.assignable !== false && m.superseded !== true);
         let assignments = Array.isArray(user.workingTimeModelAssignments) ? user.workingTimeModelAssignments.slice() : [];
+        const removedPayload = user.removedWorkSchedulePeriods && typeof user.removedWorkSchedulePeriods === 'object'
+            ? user.removedWorkSchedulePeriods
+            : {};
+        let removed = Array.isArray(removedPayload.entries) ? removedPayload.entries.slice() : [];
+        let removedTruncated = removedPayload.truncated === true;
         let dialog = null;
 
         const fmtDate = (iso) => {
@@ -1559,6 +1469,7 @@
         }
 
         function render() {
+            renderRemoved();
             const workScheduleHdr = Utils.escapeHtml(t('workSchedule', 'Work schedule'));
             const fromHdr = Utils.escapeHtml(t('validFrom', 'Valid from'));
             const toHdr = Utils.escapeHtml(t('validTo', 'Valid to'));
@@ -1575,7 +1486,7 @@
                     '<button type="button" class="btn btn--secondary btn--small" data-assignment-edit="' + a.id + '">' + Utils.escapeHtml(t('edit', 'Edit')) + '</button> ' +
                     (a.deletable
                         ? '<button type="button" class="btn btn--secondary btn--small assignments-manager__delete" data-assignment-delete="' + a.id + '">' + Utils.escapeHtml(t('delete', 'Delete')) + '</button>'
-                        : (a.is_current ? '<button type="button" class="btn btn--secondary btn--small" data-assignment-end="' + a.id + '">' + Utils.escapeHtml(t('endAssignment', 'End')) + '</button>' : ''));
+                        : (canEndPeriod(a) ? '<button type="button" class="btn btn--secondary btn--small" data-assignment-end="' + a.id + '">' + Utils.escapeHtml(t('endAssignment', 'End')) + '</button>' : ''));
                 return '<tr>'
                     + td(workScheduleHdr, Utils.escapeHtml(a.model_name || '—'))
                     + td(fromHdr, Utils.escapeHtml(fmtDate(a.start_date)))
@@ -1599,6 +1510,77 @@
             container.querySelectorAll('[data-assignment-end]').forEach(btn => {
                 btn.addEventListener('click', () => endAssignment(assignments.find(a => String(a.id) === btn.getAttribute('data-assignment-end')) || null));
             });
+        }
+
+        function formatRemovedStamp(raw) {
+            const m = String(raw || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+            if (!m) {
+                return '';
+            }
+            const date = m[3] + '.' + m[2] + '.' + m[1];
+            return m[4] ? date + ', ' + m[4] + ':' + m[5] : date;
+        }
+
+        function renderRemoved() {
+            const host = document.getElementById('assignments-removed');
+            if (!host) {
+                return;
+            }
+            if (removed.length === 0) {
+                host.hidden = true;
+                host.innerHTML = '';
+                return;
+            }
+            host.hidden = false;
+            const title = Utils.escapeHtml(t('removedPeriodsTitle', 'Removed periods'));
+            const help = Utils.escapeHtml(t('removedPeriodsHelp', 'These planned periods were deleted before they started. They never applied.'));
+            const workScheduleHdr = Utils.escapeHtml(t('workSchedule', 'Work schedule'));
+            const fromHdr = Utils.escapeHtml(t('validFrom', 'Valid from'));
+            const toHdr = Utils.escapeHtml(t('validTo', 'Valid to'));
+            const vacationHdr = Utils.escapeHtml(t('vacationDaysPerYear', 'Vacation Days Per Year'));
+            const removedHdr = Utils.escapeHtml(t('removedBadge', 'Removed'));
+            const badge = '<span class="badge badge--secondary">' + removedHdr + '</span>';
+            const td = (label, html) => Utils.responsiveTd ? Utils.responsiveTd(label, html) : '<td>' + html + '</td>';
+            const rows = removed.map(row => {
+                const who = String(row.removed_by || '').trim();
+                const when = formatRemovedStamp(row.removed_at);
+                let removedCell = badge;
+                if (who !== '' && when !== '') {
+                    const line = t('removedByOn', 'Removed by %s on %s').replace('%s', who).replace('%s', when);
+                    removedCell += ' ' + Utils.escapeHtml(line);
+                }
+                const days = row.vacation_days_per_year == null ? '—' : String(row.vacation_days_per_year);
+                return '<tr>'
+                    + td(workScheduleHdr, Utils.escapeHtml(row.model_name || '—'))
+                    + td(fromHdr, Utils.escapeHtml(fmtDate(row.start_date)))
+                    + td(toHdr, Utils.escapeHtml(fmtDate(row.end_date)))
+                    + td(vacationHdr, Utils.escapeHtml(days))
+                    + td(removedHdr, removedCell)
+                    + '</tr>';
+            }).join('');
+            let note = '';
+            if (removedTruncated) {
+                note = '<p class="assignments-removed__note">' + Utils.escapeHtml(t('removedPeriodsTruncated', 'Showing the 50 most recent removals.')) + '</p>';
+            }
+            host.innerHTML = '<p id="assignments-removed-title" class="assignments-removed__title">' + title + '</p>'
+                + '<p class="assignments-removed__help">' + help + '</p>'
+                + note
+                + '<div class="table-container" role="region" aria-labelledby="assignments-removed-title">'
+                + '<table class="table table--hover azc-table--responsive" role="table">'
+                + '<thead><tr><th scope="col">' + workScheduleHdr + '</th><th scope="col">' + fromHdr + '</th><th scope="col">' + toHdr + '</th><th scope="col">' + vacationHdr + '</th><th scope="col">' + removedHdr + '</th></tr></thead>'
+                + '<tbody>' + rows + '</tbody></table></div>';
+        }
+
+        function rememberRemoved(entry) {
+            if (!entry || typeof entry !== 'object') {
+                return;
+            }
+            removed = removed.filter(row => String(row.id) !== String(entry.id));
+            removed.unshift(entry);
+            if (removed.length > 50) {
+                removed = removed.slice(0, 50);
+                removedTruncated = true;
+            }
         }
 
         function showFinalizedWarning(list) {
@@ -1895,7 +1877,7 @@
         }
 
         function upsertAssignment(row) {
-            const idx = assignments.findIndex(a => a.id === row.id);
+            const idx = assignments.findIndex(a => String(a.id) === String(row.id));
             if (idx >= 0) assignments[idx] = row; else assignments.push(row);
             assignments.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')) || ((b.id || 0) - (a.id || 0)));
             render();
@@ -1906,10 +1888,44 @@
             return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         }
 
+        // End is only useful while the period still runs past today.
+        // A row that already ends today stays active for the rest of the day;
+        // sending today's date again changes nothing.
+        function canEndPeriod(assignment) {
+            if (!assignment || !assignment.is_current || assignment.deletable) {
+                return false;
+            }
+            const end = assignment.end_date ? String(assignment.end_date) : '';
+            return end === '' || end > todayIso();
+        }
+
+        function showEndedNote(assignment) {
+            const el = document.getElementById('assignments-finalized-warning');
+            if (!el) {
+                return;
+            }
+            const when = fmtDate((assignment && assignment.end_date) || todayIso());
+            const line = '<p class="form-help">' + Utils.escapeHtml(
+                t('assignmentEndedToday', 'This period now ends on %s. It still applies today.').replace('%s', when)
+            ) + '</p>';
+            if (el.hidden || el.innerHTML === '') {
+                el.hidden = false;
+                el.innerHTML = line;
+                return;
+            }
+            el.insertAdjacentHTML('beforeend', line);
+        }
+
         // "End" sets the window's end to today — the only allowed way to
         // retire a row that already took effect (it stays as history).
         function endAssignment(assignment) {
-            if (!assignment) return;
+            if (!canEndPeriod(assignment)) {
+                return;
+            }
+            const btn = container.querySelector('[data-assignment-end="' + assignment.id + '"]');
+            if (btn) {
+                btn.disabled = true;
+            }
             Utils.ajax(buildApiUrl(apiBase + '/' + encodeURIComponent(assignment.id)), {
                 method: 'PATCH',
                 data: { endDate: todayIso() },
@@ -1917,9 +1933,11 @@
                     if (data && data.success && data.assignment) {
                         upsertAssignment(data.assignment);
                         showFinalizedWarning(data.finalized_months_affected || []);
+                        showEndedNote(data.assignment);
                         return;
                     }
                     showFinalizedWarning([]);
+                    render();
                 },
                 onError: function (error) {
                     const body = error && error.data && typeof error.data === 'object' ? error.data : null;
@@ -1929,6 +1947,7 @@
                         el.hidden = false;
                         el.innerHTML = '<p class="form-help form-help--error">' + Utils.escapeHtml(msg) + '</p>';
                     }
+                    render();
                 },
             });
         }
@@ -1948,6 +1967,19 @@
                 onSuccess: function (data) {
                     if (data && data.success) {
                         assignments = assignments.filter(a => a.id !== assignment.id);
+                        if (data.removed && typeof data.removed === 'object') {
+                            rememberRemoved(data.removed);
+                        } else {
+                            rememberRemoved({
+                                id: 'local-' + assignment.id,
+                                model_name: assignment.model_name,
+                                start_date: assignment.start_date,
+                                end_date: assignment.end_date,
+                                vacation_days_per_year: assignment.vacation_days_per_year,
+                                removed_at: null,
+                                removed_by: '',
+                            });
+                        }
                         showFinalizedWarning(data.finalized_months_affected || []);
                         render();
                     }
@@ -2079,6 +2111,10 @@
         if (!group) {
             return field;
         }
+        if (group.hidden) {
+            group.hidden = false;
+            field.disabled = false;
+        }
         const fieldId = field.id || ('azc-field-' + Math.random().toString(36).slice(2));
         if (!field.id) {
             field.id = fieldId;
@@ -2110,10 +2146,6 @@
         tariffRuleSetId: '#user-tariff-rule-set-id',
         overrideReason: '#user-override-reason',
         vacationMode: '#user-vacation-mode',
-        effectiveFrom: '#user-start-date',
-        effectiveTo: '#user-end-date',
-        startDate: '#user-start-date',
-        endDate: '#user-end-date',
         trackingFrom: '#user-overtime-tracking-from',
         openingBalanceYear: '#user-overtime-opening-year',
         openingBalanceHours: '#user-overtime-opening',
@@ -2257,10 +2289,9 @@
             }
         }
 
-        // 6. Assignment validity window: strict ISO after dd.mm.yyyy conversion (never
-        // send unconverted German dates to the API — see issue #15 / CHANGELOG 1.3.13).
-        const startEl = form.querySelector('#user-start-date');
-        const endEl = form.querySelector('#user-end-date');
+        // 6. Optional dates: strict ISO after dd.mm.yyyy conversion (never send
+        // unconverted German dates to the API — see issue #15 / CHANGELOG 1.3.13).
+        // Assignment start/end are not on this form; the timeline edits those.
         const toISO = resolveToISO();
         const isIso = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
         const assertValidOptionalDate = (field, raw) => {
@@ -2275,15 +2306,8 @@
                 );
             }
         };
-        assertValidOptionalDate(startEl, startEl?.value);
-        assertValidOptionalDate(endEl, endEl?.value);
         const trackingEl = form.querySelector('#user-overtime-tracking-from');
         assertValidOptionalDate(trackingEl, trackingEl?.value);
-        const startIso = toISO(String(startEl?.value || '').trim());
-        const endIso = toISO(String(endEl?.value || '').trim());
-        if (isIso(startIso) && isIso(endIso) && endIso < startIso) {
-            markInvalid(endEl, auMsg('endDateAfterStart', 'The end date must be on or after the start date.'));
-        }
 
         // 7. Employment period: valid optional dates and start <= end.
         const empStartEl = form.querySelector('#user-employment-start');
@@ -2430,8 +2454,6 @@
                 ? parseLocalizedDecimal(formData.get('vacationCarryoverDays'))
                 : undefined,
             vacationCarryoverYear: formData.get('vacationCarryoverYear') ? parseInt(String(formData.get('vacationCarryoverYear')), 10) : undefined,
-            startDate: toISO(formData.get('startDate') || '') || null,
-            endDate: toISO(formData.get('endDate') || '') || null,
             germanState: (formData.get('germanState') || '').toString(),
             laborLawCountry: (formData.get('laborLawCountry') || '').toString()
         };
@@ -2443,16 +2465,12 @@
         const policyId = policyIdRaw && String(policyIdRaw).trim() !== ''
             ? parseInt(String(policyIdRaw), 10)
             : null;
-        const loadedWtmStart = String(formData.get('loadedWtmStart') || '').trim();
         const policyEffectiveFrom = String(formData.get('policyEffectiveFrom') || '').trim();
-        const newStartIso = workingTimeModel.startDate || '';
-        // Keep the existing policy row when the assignment start date did not change.
-        // Using only the work-schedule start date would spawn duplicate policy rows on
-        // every no-op save (effective_from drift vs. the row being edited).
-        let vacationEffectiveFrom = newStartIso || todayYmd();
-        if (policyId && policyEffectiveFrom && loadedWtmStart && newStartIso === loadedWtmStart) {
-            vacationEffectiveFrom = policyEffectiveFrom;
-        }
+        const policyEffectiveTo = String(formData.get('policyEffectiveTo') || '').trim();
+        // The policy window is not the assignment window. Sending today, or
+        // null for the end, would close the stored row and insert another.
+        // The server pins these again when policyId addresses an existing row.
+        const vacationEffectiveFrom = policyEffectiveFrom || todayYmd();
         const vacationPolicy = {
             policyId: policyId,
             vacationMode: mode,
@@ -2463,7 +2481,7 @@
                 : null,
             overrideReason: (!isInherit && mode === 'manual_exception') ? (formData.get('overrideReason') || '').toString() : '',
             effectiveFrom: vacationEffectiveFrom,
-            effectiveTo: workingTimeModel.endDate || null
+            effectiveTo: policyEffectiveTo || null
         };
 
         const timeCapture = readTimeCapturePayload(form);

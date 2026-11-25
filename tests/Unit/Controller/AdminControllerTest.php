@@ -3536,6 +3536,49 @@ class AdminControllerTest extends TestCase
 		$this->assertSame('manual', $data['source']);
 	}
 
+	public function testSimulateVacationPolicyPreviewsManualExceptionWithoutReason(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'userId' => 'alice',
+			'asOfDate' => '2026-04-20',
+			'draftPolicy' => [
+				'vacationMode' => Constants::VACATION_MODE_MANUAL_EXCEPTION,
+				'manualDays' => 30,
+				'overrideReason' => '',
+			],
+		]);
+		$user = $this->createMock(IUser::class);
+		$this->userManager->method('get')->with('alice')->willReturn($user);
+
+		$this->vacationEntitlementEngine->expects($this->once())
+			->method('computeForPolicy')
+			->with(
+				'alice',
+				$this->callback(function ($policy) {
+					return $policy->getVacationMode() === Constants::VACATION_MODE_MANUAL_EXCEPTION
+						&& $policy->getManualDays() === 30.0
+						&& trim((string)$policy->getOverrideReason()) === '';
+				}),
+				$this->isInstanceOf(\DateTimeInterface::class)
+			)
+			->willReturn([
+				'days' => 30.0,
+				'source' => 'manual_exception',
+				'ruleSetId' => null,
+				'trace' => ['formula' => 'manual'],
+			]);
+		$this->vacationEntitlementEngine->method('roundDays')
+			->willReturnCallback(static fn (float $v) => round($v, 2));
+
+		$response = $this->controller->simulateVacationPolicy();
+		$data = $response->getData();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue($data['success']);
+		$this->assertSame(30.0, $data['effectiveEntitlementDays']);
+		$this->assertSame('manual_exception', $data['source']);
+	}
+
 	public function testSimulateVacationPolicyAppliesDraftEmploymentProration(): void
 	{
 		$this->request->method('getParams')->willReturn([

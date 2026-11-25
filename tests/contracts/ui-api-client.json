@@ -981,7 +981,7 @@
   {
    "id": "absence-duration-minutes",
    "param": "duration_mode / duration_minutes",
-   "description": "Hour-mode absence request (§9.1): server accepts duration_mode='hours' + duration_minutes (1-1440, same-day, no day-shape fields) only for policy-enabled built-in types, and only when the client sends X-AZC-Absence-Contract: 2. Web renders the minutes field for hourly types; mobile collects minutes gated on workforcePolicy.hourlyAbsenceTypes and auto-attaches the contract header.",
+   "description": "Hour-mode absence request (§9.1): server accepts duration_mode='hours' + duration_minutes (1-1440, same-day, no day-shape fields) only for policy-enabled built-in types, and only when the client sends X-AZC-Absence-Contract: 2. Web renders the minutes field for hourly types — reachability is bound by the initHourlyModeField needle (r82 defect: the wiring sat inside the vacation-hours early return and died when hourly was on but vacation-hours off) plus the executable leg in tests/e2e/absence-hourly-mode.spec.js (hourly on / vacation-hours off -> group unhidden, inputs enabled, FormData carries duration_minutes, row persists durationMode='hours'); mobile collects minutes gated on workforcePolicy.hourlyAbsenceTypes and auto-attaches the contract header.",
    "errorCodes": [
     "ABSENCE_CONTRACT_VERSION",
     "HOURLY_SINGLE_DATE_REQUIRED",
@@ -1024,7 +1024,20 @@
      "needles": [
       "name=\"duration_minutes\"",
       "data-hourly-types",
-      "hourGroup.dataset.hourlyTypes"
+      "hourGroup.dataset.hourlyTypes",
+      "initHourlyModeField",
+      "body.set('duration_mode'",
+      "body.set('duration_minutes'",
+      "headers['X-AZC-Absence-Contract'] = '2'"
+     ]
+    },
+    {
+     "file": "tests/e2e/absence-hourly-mode.spec.js",
+     "needles": [
+      "#absence-hour-mode-group",
+      "data-hours-mode",
+      "durationMode",
+      "toBeEnabled"
      ]
     }
    ],

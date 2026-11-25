@@ -563,6 +563,7 @@ if ($mode === 'list') {
                                max="1440"
                                step="1"
                                inputmode="numeric"
+                               value="<?php p($absence && $absence->getDurationMode() === 'hours' && $absence->getDurationMinutes() !== null ? (string)$absence->getDurationMinutes() : ''); ?>"
                                aria-describedby="absence-hour-mode-help"
                                disabled>
                         <input type="hidden" id="absence-duration-mode" name="duration_mode" value="hours" disabled>
@@ -2123,8 +2124,24 @@ if ($mode === 'list') {
                 typeSelect.addEventListener('change', syncHoursVisibility);
             }
 
-            // Hour mode (SPEC optional-workforce §9.2): policy-enabled types
-            // switch the form to single-day + integer minutes.
+            if (startDateInput) {
+                startDateInput.addEventListener('change', applyAutoRangeIfNeeded);
+                startDateInput.addEventListener('blur', applyAutoRangeIfNeeded);
+            }
+            if (endDateInput) {
+                endDateInput.addEventListener('change', applyAutoRangeIfNeeded);
+                endDateInput.addEventListener('blur', applyAutoRangeIfNeeded);
+            }
+            syncHoursVisibility();
+        })();
+
+        // Hour mode (SPEC optional-workforce §9.2): policy-enabled types
+        // switch the form to single-day + integer minutes. Deliberately
+        // independent of the vacation-hours feature — the previous wiring
+        // lived inside initVacationHoursField's hours-mode early return,
+        // which left the control permanently dead for orgs that enable
+        // hourly absence types without vacation hours.
+        (function initHourlyModeField() {
             const hourGroup = document.getElementById('absence-hour-mode-group');
             const minutesInput = document.getElementById('absence-duration-minutes');
             const modeInput = document.getElementById('absence-duration-mode');
@@ -2150,21 +2167,12 @@ if ($mode === 'list') {
             }
             if (startDateInput) {
                 startDateInput.addEventListener('change', function () {
-                    if (!hourGroup.hidden && endDateInput) {
+                    if (hourGroup && !hourGroup.hidden && endDateInput) {
                         endDateInput.value = startDateInput.value;
                     }
                 });
             }
             syncHourMode();
-            if (startDateInput) {
-                startDateInput.addEventListener('change', applyAutoRangeIfNeeded);
-                startDateInput.addEventListener('blur', applyAutoRangeIfNeeded);
-            }
-            if (endDateInput) {
-                endDateInput.addEventListener('change', applyAutoRangeIfNeeded);
-                endDateInput.addEventListener('blur', applyAutoRangeIfNeeded);
-            }
-            syncHoursVisibility();
         })();
 
         // Validate end date is not before start date
@@ -2405,9 +2413,22 @@ if ($mode === 'list') {
                 const requestToken = (window.ArbeitszeitCheck && window.ArbeitszeitCheck.getRequestToken && window.ArbeitszeitCheck.getRequestToken()) || (typeof OC !== 'undefined' && OC.requestToken) || '';
                 if (requestToken) body.set('requesttoken', requestToken);
 
+                // Hour mode (SPEC optional-workforce §9.2): the server only
+                // accepts duration_mode/duration_minutes under the
+                // X-AZC-Absence-Contract: 2 handshake — attach both together,
+                // exactly like the companion client does.
+                const durationModeEl = document.getElementById('absence-duration-mode');
+                const durationMinutesEl = document.getElementById('absence-duration-minutes');
+                const headers = { 'Content-Type': 'application/x-www-form-urlencoded', 'requesttoken': requestToken };
+                if (durationModeEl && !durationModeEl.disabled && durationMinutesEl && !durationMinutesEl.disabled) {
+                    body.set('duration_mode', durationModeEl.value || 'hours');
+                    body.set('duration_minutes', String(durationMinutesEl.value || ''));
+                    headers['X-AZC-Absence-Contract'] = '2';
+                }
+
                 fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'requesttoken': requestToken },
+                    headers: headers,
                     body: body.toString(),
                     redirect: 'follow',
                     credentials: 'same-origin'

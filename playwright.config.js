@@ -153,6 +153,10 @@ const STATEFUL_SPECS = [
   // stamps entries on dedicated users — parallel specs observe the flipped
   // global config and job side-effects mid-assert.
   /atlas-auto-clock-out\.spec\.js/,
+  // Flips the global workforce_policy_json + vacation_unit and creates an
+  // absence on the shared employee — parallel specs observe the flipped
+  // policy mid-assert and the row hits the per-account change lock.
+  /absence-hourly-mode\.spec\.js/,
 ]
 
 export default defineConfig({

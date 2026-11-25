@@ -17,7 +17,14 @@ test.describe('IDOR + role-boundary probes as e2e_employee', () => {
 	})
 
 	test('control: own absence is readable', async ({ page }) => {
-		const r = await page.request.get(`${BASE}/api/absences/4818`, { headers })
+		// Resolve a real own absence at runtime — a hardcoded id rots the
+		// moment fixture data is reset, and a 404 here silently masks the
+		// regression the negative probes are anchored against.
+		const list = await page.request.get(`${BASE}/api/absences`, { headers })
+		expect(list.status()).toBe(200)
+		const own = (await list.json()).absences ?? []
+		expect(own.length, 'e2e_employee must own at least one absence').toBeGreaterThan(0)
+		const r = await page.request.get(`${BASE}/api/absences/${own[0].id}`, { headers })
 		expect(r.status()).toBe(200)
 	})
 

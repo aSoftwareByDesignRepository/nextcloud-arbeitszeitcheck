@@ -5264,7 +5264,7 @@
 	"The individual weekday schedule is invalid" : "Индивидуальное расписание по будням недопустимо",
 	"The last day of your absence" : "Последний день вашего отсутствия",
 	"The last day to include in the report. Click the calendar icon to pick a date. Example: If you want a report for January, select January 31st." : "Последний день для включения в отчет. Нажмите на иконку календаря, чтобы выбрать дату. Пример: Если вам нужен отчет за январь, выберите 31 января.",
-	"The last month of the closing year is already finalized." : "Последний месяц закрываемого года уже завершён.",
+	"The last month of the closing year is already finalized." : "Заключительный месяц закрываемого года уже завершён.",
 	"The list was shortened — more than 10,000 accounts exist. Refine your search to find a specific person." : "Список был сокращен — существует более 10 000 учётных записей. Уточните свой поиск, чтобы найти конкретного человека.",
 	"The maximum daily working hours have been reached." : "Достигнут максимальный дневной рабочий день.",
 	"The maximum duration must be a whole number between 1 and %d days." : "Максимальная продолжительность должна составлять целое число от 1 до %d дней.",

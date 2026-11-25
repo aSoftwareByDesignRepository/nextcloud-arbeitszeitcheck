@@ -1901,18 +1901,13 @@
             render();
         }
 
-        function todayIso() {
-            const d = new Date();
-            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        }
-
         // "End" sets the window's end to today — the only allowed way to
         // retire a row that already took effect (it stays as history).
         function endAssignment(assignment) {
             if (!assignment) return;
             Utils.ajax(buildApiUrl(apiBase + '/' + encodeURIComponent(assignment.id)), {
                 method: 'PATCH',
-                data: { endDate: todayIso() },
+                data: { endDate: todayYmd() },
                 onSuccess: function (data) {
                     if (data && data.success && data.assignment) {
                         upsertAssignment(data.assignment);

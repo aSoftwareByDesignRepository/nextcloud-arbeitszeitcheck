@@ -461,6 +461,9 @@ final class TransferManifest extends AbstractTransferManifest
 			// by the financial revision engine on the target.
 			'at_balance_epoch' => ['class' => 'internal'],
 			'at_balance_rev' => ['class' => 'internal'],
+			// Dropped by Version1066 but still created by Version1065 on the
+			// upgrade path — present on pre-upgrade installs, never transferred.
+			'at_workforce_delivery' => ['class' => 'internal'],
 		]);
 	}
 }

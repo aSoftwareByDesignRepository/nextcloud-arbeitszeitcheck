@@ -157,6 +157,14 @@ const STATEFUL_SPECS = [
   // absence on the shared employee — parallel specs observe the flipped
   // policy mid-assert and the row hits the per-account change lock.
   /absence-hourly-mode\.spec\.js/,
+  // Flips the GLOBAL workforce_policy_json yearEnd.manualEnabled flag via
+  // occ config:app:set — every parallel spec observes the flipped org
+  // policy mid-assert (same class as absence-hourly-mode).
+  /atlas-year-end-reset\.spec\.js/,
+  // POSTs/DELETEs assignment rows on the shared e2e_employee fixture via
+  // /api/admin — the admin user detail page renders that assignment list,
+  // so a parallel spec loading it observes the phantom row mid-assert.
+  /assignments-manager\.spec\.js/,
 ]
 
 export default defineConfig({

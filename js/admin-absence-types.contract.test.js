@@ -27,7 +27,10 @@ describe('entitlement-linked type visibility', () => {
 	it('service flags linked types in list and detail summaries', () => {
 		expect(service).toContain("'entitlementLinked'")
 		expect(service).toContain('specialEntitlementTypes?->findAll()')
-		expect(service).toContain('specialEntitlementTypes?->findByAbsenceTypeCode(')
+		// The link lookup is wrapped by isEntitlementLinked() (missing-table
+		// tolerant) — pin both the guard and the mapper call it wraps.
+		expect(service).toContain('isEntitlementLinked(')
+		expect(service).toContain('specialEntitlementTypes->findByAbsenceTypeCode(')
 	})
 
 	it('list hides toggle/delete for linked types and links the entitlement admin', () => {

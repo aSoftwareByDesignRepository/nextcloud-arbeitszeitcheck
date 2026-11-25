@@ -165,6 +165,25 @@ const STATEFUL_SPECS = [
   // /api/admin — the admin user detail page renders that assignment list,
   // so a parallel spec loading it observes the phantom row mid-assert.
   /assignments-manager\.spec\.js/,
+  // Submits/approves trips on shared fixtures through /api/manager — the
+  // per-account change lock serializes writers, so a parallel spec holding
+  // it makes trip submits fail "423 Another change is in progress" on both
+  // attempts (observed 2026-11-25; the lint's admin-only surface list does
+  // not flag manager-scope writes).
+  /manager-business-trips-concurrency\.spec\.js/,
+  // Same shared-fixture trip-submit lock class as the concurrency spec —
+  // overlay approve failed toBeHidden and the retry died on 423 (observed
+  // 2026-11-25).
+  /manager-business-trips-review\.spec\.js/,
+  // Queue probes submit trips on the same shared fixture — 423 lock
+  // collision recovered by retry in the 2026-11-25 run; serialized with
+  // its sibling specs for class completeness.
+  /manager-business-trips-queue\.spec\.js/,
+  // seedEndedVacation scans bounded date windows on the shared employee
+  // for a free gap — parallel absence writers exhaust every candidate
+  // window ("no free ended vacation seed window found", observed
+  // 2026-11-25; same saturation class as concurrent-absence-decision).
+  /absence-cancel-request\.spec\.js/,
 ]
 
 export default defineConfig({

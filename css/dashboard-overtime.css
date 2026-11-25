@@ -102,6 +102,16 @@
 	gap: 0.75rem 1rem;
 }
 
+/* Status badges carry a full line inside this card — the shared .badge pill
+   is nowrap by contract, so a long localized label (e.g. pt_BR
+   "Vermelho – alto tempo de inatividade") must wrap instead of overflowing
+   the card on narrow viewports (observed pt_BR/dashboard@375px). */
+#app-content.azc-app .dashboard-overtime-card .badge,
+#content.app-arbeitszeitcheck .dashboard-overtime-card .badge {
+	white-space: normal;
+	overflow-wrap: break-word;
+}
+
 .dashboard-overtime-card__traffic-label {
 	font-weight: 600;
 	width: 100%;

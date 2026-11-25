@@ -90,7 +90,12 @@ class YearEndResetServiceTest extends TestCase
 	private function policy(bool $manual = true): WorkforcePolicy
 	{
 		return WorkforcePolicy::fromArray([
-			'yearEnd' => ['manualEnabled' => $manual, 'timezone' => 'UTC'],
+			'yearEnd' => [
+				'manualEnabled' => $manual,
+				'resetPositive' => true,
+				'waiveNegative' => true,
+				'timezone' => 'UTC',
+			],
 		], 'UTC');
 	}
 
@@ -169,7 +174,7 @@ class YearEndResetServiceTest extends TestCase
 		$this->enableManual(3);
 		$this->userManager->method('userExists')->with('u1')->willReturn(true);
 		$this->revisionService->method('sourceRevision')->willReturn('u1.p0.c0.h0.m0');
-		$this->adjustmentService->method('getCurrentEffectiveBalance')->with('u1')->willReturn(5.0);
+		$this->adjustmentService->method('getCurrentEffectiveBalance')->with('u1', $this->anything())->willReturn(5.0);
 		$this->adjustmentMapper->method('findByUserAndYear')->willReturn([]);
 		$this->monthClosureService->method('isMonthFinalized')->willReturn(false);
 		$this->timeEntryMapper->method('findOpenEntryByUser')->willReturn(null);

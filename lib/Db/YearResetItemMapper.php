@@ -15,6 +15,7 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
 /** @extends QBMapper<YearResetItem> */
+	// unique-conflict:ok — writes are lease-CAS updates keyed by id+lease_token and inserts funnelled through YearEndResetService::saveItem, which catches REASON_UNIQUE and adopts the winner row.
 class YearResetItemMapper extends QBMapper
 {
 	public function __construct(IDBConnection $db)

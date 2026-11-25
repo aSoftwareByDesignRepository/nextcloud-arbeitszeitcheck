@@ -34,6 +34,7 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IUserManager;
 use OCP\Lock\ILockingProvider;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; definition/policy writes target tables without a colliding unique index.
 final class WorkLocationAdminService
 {
 	public const ERR_CODE_EXISTS = 'WORK_LOCATION_CODE_EXISTS';

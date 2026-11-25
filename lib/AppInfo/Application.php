@@ -1552,6 +1552,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IUserManager::class),
 				$c->query(\OCP\IGroupManager::class),
 				$c->query(\Psr\Log\LoggerInterface::class),
+				$c->query(\OCA\ArbeitszeitCheck\Service\TimeZoneService::class),
+				$c->query(IDBConnection::class),
 			);
 		});
 		$context->registerService(\OCA\ArbeitszeitCheck\ConfigTransfer\TransferPendingStore::class, fn ($c) => new \OCA\ArbeitszeitCheck\ConfigTransfer\TransferPendingStore($c->query(IRootFolder::class), $c->query(\OCP\IConfig::class), 'arbeitszeitcheck'));

@@ -13,6 +13,9 @@ use OCP\AppFramework\Db\QBMapper;
 use OCP\IDBConnection;
 
 /** @extends QBMapper<BalanceRevision> */
+	// unique-conflict:ok — bump()'s update sites only increment the non-key
+	// `revision` counter on the unique-keyed row; the first-write insert
+	// carries a REASON_UNIQUE check and falls back to the retry update.
 class BalanceRevisionMapper extends QBMapper
 {
 	public function __construct(IDBConnection $db)
@@ -42,7 +45,12 @@ class BalanceRevisionMapper extends QBMapper
 				$row->setRevision(1);
 				$this->insert($row);
 				return 1;
-			} catch (\Exception) {
+			} catch (\OCP\DB\Exception $e) {
+				// Only a (user,year) collision means "concurrent first write
+				// won" — any other failure must surface, not retry blindly.
+				if ($e->getReason() !== \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
 				$qb2 = $this->db->getQueryBuilder();
 				$qb2->update($this->getTableName())
 					->set('revision', $qb2->createFunction('revision + 1'))

@@ -14,6 +14,7 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
 /** @extends QBMapper<YearResetRef> */
+	// unique-conflict:ok — linkItem/markOutcome update non-key columns on rows addressed by the (run_id,user_id) unique key; ref inserts run inside YearEndResetService transactions with REASON_UNIQUE handling.
 class YearResetRefMapper extends QBMapper
 {
 	public function __construct(IDBConnection $db)

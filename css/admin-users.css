@@ -1061,7 +1061,7 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
   border-radius: var(--border-radius, 6px);
   background: var(--color-error-hover);
-  color: var(--color-error);
+  color: var(--azc-danger-ink);
   font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
 }
 

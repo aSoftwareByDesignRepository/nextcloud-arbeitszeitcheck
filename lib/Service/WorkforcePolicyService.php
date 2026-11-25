@@ -166,6 +166,29 @@ class WorkforcePolicyService
 	}
 
 	/**
+	 * Fail-closed optimistic lock: the request's workforcePolicyRevision
+	 * token must equal the stored revision or the write aborts with 409.
+	 * Controllers call this before any sibling writes; save() re-checks
+	 * inside its own path so the compare stays atomic with the write.
+	 *
+	 * @param array<string,mixed> $params
+	 */
+	public function assertRevision(array $params): void
+	{
+		$expectedRaw = $params['workforcePolicyRevision'] ?? null;
+		$expected = is_int($expectedRaw) ? $expectedRaw
+			: (is_string($expectedRaw) && preg_match('/^\d+$/', trim($expectedRaw)) === 1 ? (int)trim($expectedRaw) : null);
+		if ($expected === null || $expected !== $this->revision()) {
+			throw new AdminUserProfileUpdateException(
+				$this->l10n->t('The company policy changed. Review the action again.'),
+				409,
+				['workforcePolicyRevision' => $this->l10n->t('Reload the settings before saving.')],
+				self::ERROR_REVISION_CONFLICT,
+			);
+		}
+	}
+
+	/**
 	 * Validate + persist a policy save. Requires the CURRENT revision —
 	 * missing or stale revisions are a 409, never a silent overwrite of
 	 * another admin's change (AC-02/03).
@@ -179,17 +202,7 @@ class WorkforcePolicyService
 		$current = $this->get();
 		$currentRevision = $this->revision();
 
-		$expectedRaw = $params['workforcePolicyRevision'] ?? null;
-		$expected = is_int($expectedRaw) ? $expectedRaw
-			: (is_string($expectedRaw) && preg_match('/^\d+$/', trim($expectedRaw)) === 1 ? (int)trim($expectedRaw) : null);
-		if ($expected === null || $expected !== $currentRevision) {
-			throw new AdminUserProfileUpdateException(
-				$this->l10n->t('The company policy changed. Review the action again.'),
-				409,
-				['workforcePolicyRevision' => $this->l10n->t('Reload the settings before saving.')],
-				self::ERROR_REVISION_CONFLICT,
-			);
-		}
+		$this->assertRevision($params);
 
 		$errors = [];
 		$bool = fn (string $key, bool $fallback = false): bool => array_key_exists($key, $params)

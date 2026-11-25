@@ -19,6 +19,7 @@ use OCP\Lock\ILockingProvider;
  * they leave `draft`; every change creates a new version row with a
  * sha256 config hash.
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; rule-set writes target a table without a colliding unique index.
 final class BusinessTripRuleCatalog
 {
 	public function __construct(

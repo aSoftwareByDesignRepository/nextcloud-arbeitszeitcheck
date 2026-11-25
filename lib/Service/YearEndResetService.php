@@ -126,6 +126,10 @@ class YearEndResetService
 		$userIds = $this->assertSelection($userIds);
 
 		$policy = $this->policyService->get();
+		if (($resetPositive && !$policy->yearEndResetPositive)
+			|| ($waiveNegative && !$policy->yearEndWaiveNegative)) {
+			throw $this->error(self::ERROR_POLICY_INVALID, 'Requested scope exceeds the enabled year-end policy');
+		}
 		$now = new \DateTime('now');
 		$expires = (clone $now)->modify('+' . self::PREVIEW_TTL_SECONDS . ' seconds');
 
@@ -137,12 +141,20 @@ class YearEndResetService
 			);
 		}
 
+		// The snapshot must bind the exact scope the preview showed the
+		// operator — processItem re-derives actions from these flags, so
+		// storing the raw policy (not the request scope) would let execute
+		// silently diverge from the predicted outcome.
+		$policySnapshot = $policy->toArray();
+		$policySnapshot['yearEnd']['resetPositive'] = $resetPositive;
+		$policySnapshot['yearEnd']['waiveNegative'] = $waiveNegative;
+
 		$run = new YearResetRun();
 		$run->setOperationKey($this->newOperationKey());
 		$run->setClosingYear($closingYear);
 		$run->setOrigin(YearResetRun::ORIGIN_MANUAL);
 		$run->setPolicyRevision($this->policyService->revision());
-		$run->setPolicySnapshot(json_encode($policy->toArray(), JSON_THROW_ON_ERROR));
+		$run->setPolicySnapshot(json_encode($policySnapshot, JSON_THROW_ON_ERROR));
 		$run->setSelectionSnapshot(json_encode($userIds, JSON_THROW_ON_ERROR));
 		$run->setActorUid($actor);
 		$run->setReason($reason);
@@ -152,17 +164,29 @@ class YearEndResetService
 		$run->setPreviewExpiresAt($expires);
 		$run->setCreatedAt($now);
 		$run->setUpdatedAt($now);
-		$run = $this->runMapper->insert($run);
+		$this->db->beginTransaction();
+		try {
+			$run = $this->runMapper->insert($run);
 
-		foreach ($targets as $t) {
-			$ref = new YearResetRef();
-			$ref->setRunId($run->getId());
-			$ref->setUserId($t['user_id']);
-			$ref->setPreviewSourceRevision($t['source_revision']);
-			$ref->setOutcome(self::OUTCOME_PENDING);
-			$ref->setPreviewResult(json_encode($t, JSON_THROW_ON_ERROR));
-			$ref->setItemId(null);
-			$this->refMapper->insert($ref);
+			foreach ($targets as $t) {
+				$ref = new YearResetRef();
+				$ref->setRunId($run->getId());
+				$ref->setUserId($t['user_id']);
+				$ref->setPreviewSourceRevision($t['source_revision']);
+				$ref->setOutcome(self::OUTCOME_PENDING);
+				$ref->setPreviewResult(json_encode($t, JSON_THROW_ON_ERROR));
+				$ref->setItemId(null);
+				$ref->setCreatedAt($now);
+				$ref->setUpdatedAt($now);
+				$this->refMapper->insert($ref);
+			}
+			$this->db->commit();
+		} catch (\Throwable $e) {
+			$this->db->rollBack();
+			if ($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $this->error(self::ERROR_OPERATION_CONFLICT, 'A year-end run already holds this operation key');
+			}
+			throw $e;
 		}
 
 		return [
@@ -185,7 +209,12 @@ class YearEndResetService
 		bool $waiveNegative,
 	): array {
 		$sourceRevision = $this->revisionService->sourceRevision($userId, $closingYear);
-		$before = $this->adjustmentService->getCurrentEffectiveBalance($userId);
+		// Anchor at the closing boundary: the reset zeroes the balance carried
+		// into closingYear+1, not whatever the Saldo happens to be today.
+		// processItem anchors its compensating adjustment at the same instant,
+		// so preview delta and executed delta can only match this way.
+		$boundary = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
+		$before = $this->adjustmentService->getCurrentEffectiveBalance($userId, $boundary);
 		$beforeCents = (int)round($before * 100);
 
 		$blocked = $this->blockedReason($userId, $closingYear);
@@ -306,6 +335,9 @@ class YearEndResetService
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
+			if ($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Another year-end run already holds this operation key');
+			}
 			throw $e;
 		}
 
@@ -432,6 +464,9 @@ class YearEndResetService
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->db->rollBack();
+			if ($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Another year-end run already holds this operation key');
+			}
 			throw $e;
 		}
 
@@ -506,7 +541,12 @@ class YearEndResetService
 
 		try {
 			$this->db->beginTransaction();
-			$before = $this->adjustmentService->getCurrentEffectiveBalance($userId);
+			// Same anchor as the preview: the compensating write cancels the
+			// balance carried into closingYear+1 — measured at the boundary,
+			// never at request time. createAdjustment re-anchors internally at
+			// $effective, so anything else breaks the zero reconciliation.
+			$boundary = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
+			$before = $this->adjustmentService->getCurrentEffectiveBalance($userId, $boundary);
 			$beforeCents = (int)round($before * 100);
 
 			$reasonCode = null;
@@ -572,6 +612,7 @@ class YearEndResetService
 			]);
 			$this->refMapper->markOutcome($run->getId(), $userId, self::OUTCOME_SUCCESS);
 		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('year-end processItem failed: ' . $e::class . ' ' . $e->getMessage(), ['exception' => $e]);
 			if ($this->db->inTransaction()) {
 				$this->db->rollBack();
 			}
@@ -600,7 +641,15 @@ class YearEndResetService
 		$run->setState($failed > 0 ? YearResetRun::STATE_FAILED : YearResetRun::STATE_COMPLETED);
 		$run->setSelectionCompleteAt(new \DateTime('now'));
 		$run->setUpdatedAt(new \DateTime('now'));
-		$this->runMapper->update($run);
+		try {
+			$this->runMapper->update($run);
+		} catch (\Throwable $e) {
+			if ($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				// A concurrent tick finalized the run first — its state wins.
+				return;
+			}
+			throw $e;
+		}
 		$this->auditRun($run, 'year_end_run_finished', $counts, $run->getActorUid());
 	}
 
@@ -720,7 +769,15 @@ class YearEndResetService
 		$run->setRevision(1);
 		$run->setCreatedAt($now);
 		$run->setUpdatedAt($now);
-		$run = $this->runMapper->insert($run);
+		try {
+			$run = $this->runMapper->insert($run);
+		} catch (\Throwable $e) {
+			if ($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				// A concurrent tick created the annual run first — adopt it.
+				return $this->runMapper->findActiveRun(YearResetRun::ORIGIN_ANNUAL, $closingYear);
+			}
+			throw $e;
+		}
 
 		foreach ($userIds as $uid) {
 			$item = $this->itemMapper->findByUserAndYear($uid, $closingYear);
@@ -857,12 +914,39 @@ class YearEndResetService
 
 	private function saveItem(YearResetItem $item): void
 	{
-		if ($item->getId() === null) {
-			$this->itemMapper->insert($item);
-		} else {
-			$this->itemMapper->update($item);
+		try {
+			if ($item->getId() === null) {
+				$this->itemMapper->insert($item);
+			} else {
+				$this->itemMapper->update($item);
+			}
+		} catch (\Throwable $e) {
+			if (!($e instanceof \OCP\DB\Exception && $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) || $item->getId() !== null) {
+				throw $e;
+			}
+			// at_yr_item_uq (user_id, closing_year): a concurrent run won the
+			// first write between findByUserAndYear and this insert — adopt
+			// its row and apply the caller's mutations onto it.
+			$winner = $this->itemMapper->findByUserAndYear($item->getUserId(), $item->getClosingYear());
+			if ($winner === null) {
+				throw $e;
+			}
+			$item->setId($winner->getId());
+			$item->setRevision($winner->getRevision());
+			$item->setCreatedAt($winner->getCreatedAt());
+			try {
+				$this->itemMapper->update($item);
+			} catch (\OCP\DB\Exception $updateError) {
+				// The adopted row cannot collide on (user_id, closing_year) —
+				// a violation means a third writer raced the adoption.
+				if ($updateError->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					throw $e;
+				}
+				throw $updateError;
+			}
 		}
 	}
+
 
 	private function error(string $code, string $message): BusinessRuleException
 	{

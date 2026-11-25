@@ -32,21 +32,21 @@
 .azc-year-end .azc-status-chip[data-status="done"],
 .azc-year-end .azc-status-chip[data-status="completed"],
 .azc-year-end .azc-status-chip[data-status="success"] {
-	background: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
+	background: var(--azc-tint-success);
 }
 .azc-year-end .azc-status-chip[data-status="done"]::before,
 .azc-year-end .azc-status-chip[data-status="completed"]::before,
 .azc-year-end .azc-status-chip[data-status="success"]::before {
-	background: var(--color-success);
+	background: var(--color-element-success, var(--color-success));
 }
 
 .azc-year-end .azc-status-chip[data-status="failed"],
 .azc-year-end .azc-status-chip[data-status="blocked"] {
-	background: var(--color-element-error, color-mix(in srgb, var(--color-error) 15%, var(--color-main-background)));
+	background: var(--azc-tint-danger);
 }
 .azc-year-end .azc-status-chip[data-status="failed"]::before,
 .azc-year-end .azc-status-chip[data-status="blocked"]::before {
-	background: var(--color-error);
+	background: var(--azc-danger-ink);
 }
 
 .azc-year-end .azc-status-chip[data-status="executing"],

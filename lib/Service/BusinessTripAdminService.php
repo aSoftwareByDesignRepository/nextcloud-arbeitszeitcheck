@@ -26,6 +26,7 @@ use Psr\Log\LoggerInterface;
  * effective-dated scope assignments, and user trip profiles (only the
  * normal-commute minutes — never addresses or routes).
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; assignments/profiles writes target tables without a colliding unique index.
 final class BusinessTripAdminService
 {
 	public function __construct(

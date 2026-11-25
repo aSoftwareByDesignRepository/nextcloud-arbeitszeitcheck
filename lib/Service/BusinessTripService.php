@@ -45,6 +45,7 @@ use OCP\Lock\ILockingProvider;
  * - Trips never create work minutes; approved trips may only post the
  *   separate, explicitly bounded top-up ledger entries.
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; request_key races on at_business_trip carry their own REASON_UNIQUE catch; segment/link/day-calc writes target tables without a colliding unique index.
 final class BusinessTripService
 {
 	/** @var array<string,list<string>> allowed state transitions */
@@ -146,9 +147,11 @@ final class BusinessTripService
 				return $this->trips->insert($trip);
 			} catch (\OCP\DB\Exception $e) {
 				// Unique request_key race — the concurrent create won; return it.
-				$winner = $this->trips->findByRequestKey($namespaced);
-				if ($winner !== null) {
-					return $winner;
+				if ($e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+					$winner = $this->trips->findByRequestKey($namespaced);
+					if ($winner !== null) {
+						return $winner;
+					}
 				}
 				throw $e;
 			}

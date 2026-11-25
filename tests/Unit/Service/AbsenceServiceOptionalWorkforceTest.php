@@ -138,7 +138,6 @@ class AbsenceServiceOptionalWorkforceTest extends TestCase
 	private function injectLazy(string $property, object $mock): void
 	{
 		$prop = new \ReflectionProperty(AbsenceService::class, $property);
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $mock);
 	}
 

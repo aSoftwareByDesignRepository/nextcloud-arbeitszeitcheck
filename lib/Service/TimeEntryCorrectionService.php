@@ -21,6 +21,7 @@ use OCP\IL10N;
 /**
  * Shared correction proposal apply/validate/approve/reject logic.
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; time-entry writes target a table without a colliding unique index.
 class TimeEntryCorrectionService
 {
 	public function __construct(

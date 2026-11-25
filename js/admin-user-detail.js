@@ -1679,6 +1679,11 @@
             dialog.querySelector('#assignment-dialog-cancel').addEventListener('click', function () {
                 dialog.close();
             });
+            // NC notifications preventDefault Escape at document level, which
+            // suppresses the native dialog cancel — close explicitly.
+            dialog.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dialog.close(); }
+            });
             dialog.querySelector('#assignment-dialog-form').addEventListener('submit', function (e) {
                 e.preventDefault();
                 submitDialog();

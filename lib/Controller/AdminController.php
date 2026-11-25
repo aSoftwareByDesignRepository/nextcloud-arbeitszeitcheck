@@ -3634,6 +3634,42 @@ class AdminController extends Controller
 			$complianceScopeOk = $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_ALL
 				|| $scope === \OCA\ArbeitszeitCheck\Service\AdminSettingsSectionCatalog::SECTION_COMPLIANCE;
 
+			// Workforce revision CAS must compare BEFORE any write: a stale
+			// token aborts the whole save here instead of half-committing
+			// earlier sections and then failing inside the service.
+			$workforceKeys = [
+				'pastCorrectionEnabled', 'employeeCorrectionRequestsEnabled',
+				'scopedManagerCorrectionApprovalEnabled', 'hourlyAbsenceTypes',
+				'hourlyUnpaidLeaveEnabled', 'hourlyOvertimeCompEnabled',
+				'yearEndManualEnabled', 'yearEndAnnualEnabled',
+				'yearEndResetPositive', 'yearEndWaiveNegative',
+				'yearEndTargetGroupIds', 'workforcePolicyRevision',
+			];
+			$hasWorkforceWrite = false;
+			foreach ($workforceKeys as $wk) {
+				if (array_key_exists($wk, $params)) {
+					$hasWorkforceWrite = true;
+					break;
+				}
+			}
+			if ($hasWorkforceWrite) {
+				// Fail-closed CAS: compare the client's revision token against
+				// the stored revision here, before any sibling write — a
+				// missing/stale token aborts the whole save with 409 instead
+				// of half-committing earlier sections. save() re-checks.
+				$revisionToken = $params['workforcePolicyRevision'] ?? null;
+				if ($revisionToken === null
+					|| !is_numeric($revisionToken)
+					|| (int)$revisionToken !== $this->workforcePolicyService()->revision()) {
+					throw new AdminUserProfileUpdateException(
+						$this->l10n->t('The company policy changed. Review the action again.'),
+						409,
+						['workforcePolicyRevision' => $this->l10n->t('Reload the settings before saving.')],
+						\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService::ERROR_REVISION_CONFLICT,
+					);
+				}
+			}
+
 			// List of allowed admin settings keys
 			$allowedKeys = [
 				'autoComplianceCheck' => 'auto_compliance_check',
@@ -4543,21 +4579,6 @@ class AdminController extends Controller
 			// Optional workforce policy (SPEC §9.1): any submitted workforce
 			// key routes the whole section through the service — strict
 			// boolean parse, dependency rules and revision CAS live there.
-			$workforceKeys = [
-				'pastCorrectionEnabled', 'employeeCorrectionRequestsEnabled',
-				'scopedManagerCorrectionApprovalEnabled', 'hourlyAbsenceTypes',
-				'hourlyUnpaidLeaveEnabled', 'hourlyOvertimeCompEnabled',
-				'yearEndManualEnabled', 'yearEndAnnualEnabled',
-				'yearEndResetPositive', 'yearEndWaiveNegative',
-				'yearEndTargetGroupIds', 'workforcePolicyRevision',
-			];
-			$hasWorkforceWrite = false;
-			foreach ($workforceKeys as $wk) {
-				if (array_key_exists($wk, $params)) {
-					$hasWorkforceWrite = true;
-					break;
-				}
-			}
 			if ($hasWorkforceWrite) {
 				$this->workforcePolicyService()->save($params, $this->getPerformedBy());
 			}
@@ -9837,7 +9858,7 @@ class AdminController extends Controller
 	#[NoCSRFRequired]
 	public function yearEndPage(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('admin-year-end', 'admin-year-end', ['common/datepicker']);
+		$this->registerFrontEndAssets('admin-year-end', 'admin-year-end');
 		$policy = $this->workforcePolicyService()->get();
 		$users = [];
 		foreach ($this->userManager->search('', 500) as $u) {

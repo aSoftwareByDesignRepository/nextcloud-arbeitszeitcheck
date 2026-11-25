@@ -31,6 +31,7 @@ use OCP\IL10N;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; absence-type writes target a table without a colliding unique index.
 class CustomAbsenceTypeService
 {
 	use TTransactional;

@@ -50,6 +50,7 @@ use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
 use OCP\DB\Exception as DbException;
 use Psr\Log\LoggerInterface;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; the time-entry update touches no unique-indexed column.
 class PaidBreakAllocator
 {
 	/**

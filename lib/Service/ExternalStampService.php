@@ -29,6 +29,7 @@ use Psr\Log\LoggerInterface;
  * repeating the same decision returns the stored outcome; contradicting a
  * stored decision is a 409.
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; stamps/time_entry writes target tables without a colliding unique index.
 class ExternalStampService
 {
 	/** Producer apps that may write through the facade. */

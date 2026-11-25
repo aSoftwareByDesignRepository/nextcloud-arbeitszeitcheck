@@ -25,7 +25,6 @@ namespace OCA\ArbeitszeitCheck\ConfigTransfer;
 
 use OCA\ArbeitszeitCheck\Service\UpgradeBackupService;
 use OCP\App\IAppManager;
-use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\Files\IRootFolder;
 use OCP\IAppConfig;
 use OCP\IConfig;
@@ -418,16 +417,6 @@ final class TransferService
 			} catch (\Throwable $e) {
 				$this->db->rollBack();
 				throw $e;
-			}
-
-			// R-06: at_user_models restores bypass the single-writer guards
-			// by design (bulk upsert). Post-write integrity validation runs
-			// on the committed data — findings land in the receipt, data
-			// stays (resolver tiebreak keeps calculation defined), and each
-			// restored user gets an `assignments_restored` audit event.
-			$integrity = $this->validateRestoredAssignments($plan, $actor);
-			if ($integrity !== null) {
-				$receipt['assignment_integrity'] = $integrity;
 			}
 
 			$receipt['result'] = 'applied';
@@ -1561,121 +1550,6 @@ final class TransferService
 	 *
 	 * @param array<string,mixed> $details
 	 */
-	/**
-	 * R-06 — post-restore integrity check for at_user_models. The bulk
-	 * upsert intentionally bypasses the single-writer guards; instead the
-	 * committed rows are scanned per restored user and overlaps/malformed
-	 * rows are reported (never silently accepted, never rolled back).
-	 *
-	 * @param array<string,mixed> $plan
-	 * @return array<string,mixed>|null findings block for the receipt, or
-	 *         null when the file contained no assignment rows at all
-	 */
-	private function validateRestoredAssignments(array $plan, string $actor): ?array
-	{
-		$tp = $plan['tablePlan']['at_user_models'] ?? null;
-		if ($tp === null || ($tp['rows'] ?? []) === [] || !$this->db->tableExists('at_user_models')) {
-			return null;
-		}
-
-		// Users whose assignment table the restore actually wrote to.
-		$userIds = [];
-		foreach ($tp['rows'] as $rowPlan) {
-			if (($rowPlan['action'] ?? 'skip') === 'skip') {
-				continue;
-			}
-			$uid = $rowPlan['row']['user_id'] ?? null;
-			if (is_string($uid) && $uid !== '') {
-				$userIds[$uid] = true;
-			}
-		}
-		if ($userIds === []) {
-			return null;
-		}
-
-		$modelIds = [];
-		if ($this->db->tableExists('at_models')) {
-			$qb = $this->db->getQueryBuilder();
-			$qb->select('id')->from('at_models');
-			$rs = $qb->executeQuery();
-			while ($r = $rs->fetch()) {
-				$modelIds[(int)$r['id']] = true;
-			}
-			$rs->closeCursor();
-		}
-
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('id', 'user_id', 'working_time_model_id', 'start_date', 'end_date')
-			->from('at_user_models')
-			->where($qb->expr()->in('user_id', $qb->createNamedParameter(array_keys($userIds), IQueryBuilder::PARAM_STR_ARRAY)))
-			->orderBy('user_id', 'ASC')
-			->addOrderBy('start_date', 'ASC');
-		$rs = $qb->executeQuery();
-		$byUser = [];
-		while ($r = $rs->fetch()) {
-			$byUser[(string)$r['user_id']][] = $r;
-		}
-		$rs->closeCursor();
-
-		$findings = [];
-		$malformedCount = 0;
-		$overlapCount = 0;
-		foreach ($byUser as $uid => $rows) {
-			$malformed = [];
-			$overlaps = 0;
-			$prevEnd = null;
-			$prevId = null;
-			foreach ($rows as $row) {
-				$id = (int)$row['id'];
-				$start = $row['start_date'];
-				$end = $row['end_date'];
-				if ($start === null || $start === '') {
-					$malformed[] = ['id' => $id, 'reason' => 'start_null'];
-					continue;
-				}
-				if ($end !== null && $end !== '' && $end < $start) {
-					$malformed[] = ['id' => $id, 'reason' => 'end_before_start'];
-				}
-				if (!isset($modelIds[(int)$row['working_time_model_id']])) {
-					$malformed[] = ['id' => $id, 'reason' => 'dangling_model_id'];
-				}
-				if ($prevEnd === null) {
-					$overlaps++;
-				} elseif ($start <= $prevEnd) {
-					$overlaps++;
-					$prevId = $prevId === null ? $id : $prevId;
-				}
-				$prevEnd = ($end === null || $end === '') ? null : $end;
-				if ($prevEnd === null) {
-					$prevId = $id;
-				}
-			}
-			$malformedCount += count($malformed);
-			$overlapCount += $overlaps;
-			$findings[] = [
-				'user_id' => $uid,
-				'row_count' => count($rows),
-				'malformed' => $malformed !== [] ? $malformed : null,
-				'overlapping_windows' => $overlaps > 0 ? $overlaps : null,
-			];
-			$this->auditSafely('assignments_restored', $actor, [
-				'user_id' => $uid,
-				'row_count' => count($rows),
-				'malformed' => count($malformed),
-				'overlapping_windows' => $overlaps,
-			]);
-		}
-
-		return [
-			'users' => $findings,
-			'totals' => [
-				'users' => count($findings),
-				'malformed_rows' => $malformedCount,
-				'overlapping_windows' => $overlapCount,
-			],
-		];
-	}
-
 	private function auditSafely(string $action, string $actor, array $details): void
 	{
 		try {

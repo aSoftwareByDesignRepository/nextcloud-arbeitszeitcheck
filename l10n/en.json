@@ -6965,7 +6965,13 @@
         "≈ %1$s compensatory days available": "≈ %1$s compensatory days available",
         "≈ %n compensatory day available": "≈ %n compensatory day available",
         "≈ %n compensatory days available": "≈ %n compensatory days available",
-        "Correction request declined.": "Correction request declined."
+        "Correction request declined.": "Correction request declined.",
+        "Assignment changed across sealed months": "Assignment changed across sealed months",
+        "Unassigned-day Soll policy changed": "Unassigned-day Soll policy changed",
+        "Working time model assignment changed (previous period ended)": "Working time model assignment changed (previous period ended)",
+        "Working time model assignment deleted": "Working time model assignment deleted",
+        "Working time model assignments restored": "Working time model assignments restored",
+        "done": "done"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

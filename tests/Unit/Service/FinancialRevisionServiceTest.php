@@ -36,7 +36,6 @@ class FinancialRevisionServiceTest extends TestCase
 		$this->service = new FinancialRevisionService($this->balanceRevisionMapper, $this->db);
 		$this->itemMapper = $this->createMock(YearResetItemMapper::class);
 		$prop = new \ReflectionProperty(FinancialRevisionService::class, 'itemMapper');
-		$prop->setAccessible(true);
 		$prop->setValue($this->service, $this->itemMapper);
 	}
 

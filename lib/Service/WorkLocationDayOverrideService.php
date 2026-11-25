@@ -25,6 +25,7 @@ use OCA\ArbeitszeitCheck\Exception\WorkLocationDayConflictException;
 use OCA\ArbeitszeitCheck\Service\DbLockGuard;
 use OCP\DB\Exception as DbException;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; override writes target a table without a colliding unique index.
 final class WorkLocationDayOverrideService
 {
 	public const SOURCE_WEB = 'web';

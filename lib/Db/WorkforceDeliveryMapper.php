@@ -14,6 +14,7 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
 /** @extends QBMapper<WorkforceDelivery> */
+	// unique-conflict:ok — read-only mapper today — no code path writes at_workforce_delivery; a future writer must handle at_wfd_uq conflicts.
 class WorkforceDeliveryMapper extends QBMapper
 {
 	public function __construct(IDBConnection $db)

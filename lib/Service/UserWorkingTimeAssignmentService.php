@@ -44,6 +44,7 @@ use OCP\IUserManager;
  *  - model scoping: personal models must belong to the target user;
  *    missing/foreign → uniform 404 (no existence oracle).
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; user-model/model writes target tables without a colliding unique index.
 final class UserWorkingTimeAssignmentService
 {
 	use TTransactional;

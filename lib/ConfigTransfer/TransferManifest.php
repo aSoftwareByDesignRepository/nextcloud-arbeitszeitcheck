@@ -133,6 +133,11 @@ final class TransferManifest extends AbstractTransferManifest
 			'vacation_hours_per_day' => 'plain',
 			'layered_entitlements_enabled' => 'plain',
 
+			// ── workforce / assignments policy (feature landing 300097c) ──
+			'assignments_gap_policy' => ['class' => 'plain', 'section' => 'hours'],
+			'workforce_policy_json' => ['class' => 'plain', 'section' => 'workforce'],
+			'workforce_policy_revision' => ['class' => 'plain', 'section' => 'workforce'],
+
 			// ── feature flags / integrations ──
 			'use_app_teams' => 'plain',
 			'work_location_catalog_enabled' => ['class' => 'plain', 'section' => 'work-locations'],
@@ -194,6 +199,12 @@ final class TransferManifest extends AbstractTransferManifest
 			// Same artifact class: AUTO_CLOCK_OUT_SCOPE_TODAY constant is
 			// read as the getAppValue default in AutoClockOutJob, never a key.
 			'today' => 'internal',
+			// Same artifact class: Constants::GAP_POLICY_LENIENT ('lenient')
+			// is read as the getAppValueString default for
+			// assignments_gap_policy, never a key of its own.
+			'lenient' => 'internal',
+			// NC core per-app install bookkeeping — never transferred.
+			'installed_version' => 'internal',
 			// '["vacation"]' (CONFIG_HALF_DAY_ENABLED_TYPES_DEFAULT) is the
 			// same class of artifact — the JSON literal is read as the
 			// getAppValue default — but it cannot be expressed as an entry
@@ -440,6 +451,19 @@ final class TransferManifest extends AbstractTransferManifest
 			// re-audited on the target, not cloned.
 			'at_audit' => ['class' => 'log'],
 			'at_vacation_rollover_log' => ['class' => 'log'],
+			// Year-end reset process state: preview handles, operation keys,
+			// lease tokens and per-item execution snapshots are instance-
+			// bound — a half-executed run can never move between installs.
+			'at_year_reset_run' => ['class' => 'internal'],
+			'at_year_reset_ref' => ['class' => 'internal'],
+			'at_year_reset_item' => ['class' => 'internal'],
+			// Balance revision/epoch bookkeeping — CAS counters recomputed
+			// by the financial revision engine on the target.
+			'at_balance_epoch' => ['class' => 'internal'],
+			'at_balance_rev' => ['class' => 'internal'],
+			// Workforce notification delivery ledger — instance-bound
+			// delivery state; currently scaffolding with no writers.
+			'at_workforce_delivery' => ['class' => 'internal'],
 		]);
 	}
 }

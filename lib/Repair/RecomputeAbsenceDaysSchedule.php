@@ -29,6 +29,7 @@ use OCP\Lock\ILockingProvider;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL (at_audit_op_uq cannot collide); the absence update touches no unique-indexed column.
 class RecomputeAbsenceDaysSchedule implements IRepairStep
 {
 	private const BATCH = 500;

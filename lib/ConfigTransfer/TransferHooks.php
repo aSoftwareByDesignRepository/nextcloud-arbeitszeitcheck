@@ -126,6 +126,8 @@ final class TransferHooks implements ConfigTransferHooks
 		private readonly IUserManager $userManager,
 		private readonly IGroupManager $groupManager,
 		private readonly LoggerInterface $logger,
+		private readonly \OCA\ArbeitszeitCheck\Service\TimeZoneService $timeZoneService,
+		private readonly \OCP\IDBConnection $db,
 	) {
 	}
 
@@ -225,6 +227,12 @@ final class TransferHooks implements ConfigTransferHooks
 				? $value
 				: throw new \InvalidArgumentException('INVALID_VACATION_UNIT'),
 			'vacation_hours_per_day' => $this->rejectFloatRange($value, 0.25, 24.0),
+			// ── workforce / assignments policy ──
+			'assignments_gap_policy' => in_array($value, Constants::ASSIGNMENTS_GAP_POLICIES, true)
+				? $value
+				: throw new \InvalidArgumentException('INVALID_GAP_POLICY'),
+			'workforce_policy_json' => $this->normalizeWorkforcePolicyJson($value),
+			'workforce_policy_revision' => $this->digitsOnly($value),
 			// ── misc JSON payloads ──
 			'company_holidays' => $this->normalizeCompanyHolidays($value),
 			default => strlen($value) <= 65536
@@ -387,6 +395,118 @@ final class TransferHooks implements ConfigTransferHooks
 			$this->logger->warning('arbeitszeitcheck: config transfer audit event failed', [
 				'app' => 'arbeitszeitcheck',
 				'action' => $action,
+				'exception' => $e,
+			]);
+		}
+
+		// R-06: at_user_models restores bypass the single-writer guards by
+		// design (bulk upsert). Post-commit integrity validation runs on the
+		// committed data — findings land in the audit trail, data stays
+		// (resolver tiebreak keeps calculation defined). Scoped to the whole
+		// table: the import audit event carries no per-user plan.
+		if ($action === 'import' && ($details['result'] ?? '') === 'applied') {
+			$this->auditRestoredAssignments($actorId);
+		}
+	}
+
+	/**
+	 * Post-import integrity scan over at_user_models. Emits one
+	 * `assignments_restored` audit event per user with findings and a summary
+	 * event; never throws (audit must never fail the transfer).
+	 */
+	private function auditRestoredAssignments(string $actor): void
+	{
+		try {
+			if (!$this->db->tableExists('at_user_models')) {
+				return;
+			}
+			$modelIds = [];
+			if ($this->db->tableExists('at_models')) {
+				$qb = $this->db->getQueryBuilder();
+				$qb->select('id')->from('at_models');
+				$rs = $qb->executeQuery();
+				while ($r = $rs->fetch()) {
+					$modelIds[(int)$r['id']] = true;
+				}
+				$rs->closeCursor();
+			}
+
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id', 'user_id', 'working_time_model_id', 'start_date', 'end_date')
+				->from('at_user_models')
+				->orderBy('user_id', 'ASC')
+				->addOrderBy('start_date', 'ASC');
+			$rs = $qb->executeQuery();
+			$byUser = [];
+			while ($r = $rs->fetch()) {
+				$byUser[(string)$r['user_id']][] = $r;
+			}
+			$rs->closeCursor();
+
+			$usersWithFindings = 0;
+			$malformedCount = 0;
+			$overlapCount = 0;
+			foreach ($byUser as $uid => $rows) {
+				$malformed = [];
+				$overlaps = 0;
+				$prevEnd = null;
+				foreach ($rows as $row) {
+					$id = (int)$row['id'];
+					$start = $row['start_date'];
+					$end = $row['end_date'];
+					if ($start === null || $start === '') {
+						$malformed[] = ['id' => $id, 'reason' => 'start_null'];
+						continue;
+					}
+					if ($end !== null && $end !== '' && $end < $start) {
+						$malformed[] = ['id' => $id, 'reason' => 'end_before_start'];
+					}
+					if (!isset($modelIds[(int)$row['working_time_model_id']])) {
+						$malformed[] = ['id' => $id, 'reason' => 'dangling_model_id'];
+					}
+					if ($prevEnd === null || $start <= $prevEnd) {
+						$overlaps++;
+					}
+					$prevEnd = ($end === null || $end === '') ? null : $end;
+				}
+				$malformedCount += count($malformed);
+				$overlapCount += $overlaps;
+				if ($malformed === [] && $overlaps <= 1) {
+					continue;
+				}
+				$usersWithFindings++;
+				$this->auditLog->logAction(
+					$actor,
+					'config_transfer_assignments_restored',
+					'config_transfer',
+					null,
+					null,
+					[
+						'user_id' => $uid,
+						'row_count' => count($rows),
+						'malformed' => count($malformed),
+						'overlapping_windows' => $overlaps,
+					],
+					$actor,
+				);
+			}
+			$this->auditLog->logAction(
+				$actor,
+				'config_transfer_assignments_scan',
+				'config_transfer',
+				null,
+				null,
+				[
+					'users_scanned' => count($byUser),
+					'users_with_findings' => $usersWithFindings,
+					'malformed_rows' => $malformedCount,
+					'overlapping_windows' => $overlapCount,
+				],
+				$actor,
+			);
+		} catch (\Throwable $e) {
+			$this->logger->warning('arbeitszeitcheck: post-import assignment integrity scan failed', [
+				'app' => 'arbeitszeitcheck',
 				'exception' => $e,
 			]);
 		}
@@ -688,5 +808,20 @@ final class TransferHooks implements ConfigTransferHooks
 			throw new \InvalidArgumentException('INVALID_VERSION');
 		}
 		return $v;
+	}
+
+	private function normalizeWorkforcePolicyJson(string $value): string
+	{
+		$decoded = json_decode($value, true, 64, JSON_THROW_ON_ERROR);
+		if (!is_array($decoded)) {
+			throw new \InvalidArgumentException('INVALID_POLICY_JSON');
+		}
+		// WorkforcePolicyService::save parity — the canonical shape is the
+		// value object's round-trip, not the raw payload.
+		$policy = \OCA\ArbeitszeitCheck\Support\WorkforcePolicy::fromArray(
+			$decoded,
+			$this->timeZoneService->storageTimeZoneName(),
+		);
+		return json_encode($policy->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 	}
 }

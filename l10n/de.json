@@ -4334,7 +4334,7 @@
         "Remove this window": "Dieses Fenster entfernen",
         "Remove worked portion": "Gearbeiteten Abschnitt entfernen",
         "Removed statutory holidays are restored automatically while auto-restore is enabled in settings.": "Entfernte gesetzliche Feiertage werden automatisch wiederhergestellt, solange die automatische Wiederherstellung in den Einstellungen aktiv ist.",
-        "Removes this completed absence record — e.g. when it was booked under the wrong type. The change is audited.": "Entfernt diesen abgeschlossenen Abwesenheitseintrag — z. B. wenn er unter dem falschen Typ gebucht wurde. Die Änderung wird protokolliert.",
+        "Removes this completed absence record — e.g. when it was booked under the wrong type. The change is audited.": "Entfernt diesen abgeschlossenen Abwesenheitseintrag — z. B. wenn er unter der falschen Art gebucht wurde. Die Änderung wird protokolliert.",
         "Reopen a finalized month (admin)": "Finalisierten Monat wieder öffnen (Admin)",
         "Reopen month": "Monat wieder öffnen",
         "Reopen this finalized month? The employee will be able to edit times again until the month is finalized once more.": "Diesen finalisierten Monat wirklich wieder öffnen? Danach kann die Person Zeiten wieder bearbeiten, bis der Monat erneut finalisiert wird.",
@@ -6965,7 +6965,13 @@
         "≈ %1$s compensatory days available": "≈ %1$s Ausgleichstage verfügbar",
         "≈ %n compensatory day available": "≈ %n Abbummeltag verfügbar",
         "≈ %n compensatory days available": "≈ %n Abbummeltage verfügbar",
-        "Correction request declined.": "Korrekturantrag abgelehnt."
+        "Correction request declined.": "Korrekturantrag abgelehnt.",
+        "Assignment changed across sealed months": "Zuordnung über versiegelte Monate hinweg geändert",
+        "Unassigned-day Soll policy changed": "Soll-Regel für nicht zugeordnete Tage geändert",
+        "Working time model assignment changed (previous period ended)": "Arbeitszeitmodell-Zuordnung geändert (vorheriger Zeitraum beendet)",
+        "Working time model assignment deleted": "Arbeitszeitmodell-Zuordnung gelöscht",
+        "Working time model assignments restored": "Arbeitszeitmodell-Zuordnungen wiederhergestellt",
+        "done": "abgeschlossen"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

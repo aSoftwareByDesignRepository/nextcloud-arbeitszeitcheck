@@ -78,7 +78,18 @@ class AuditLogMapper extends QBMapper
 			$log->setUserAgent($_SERVER['HTTP_USER_AGENT']);
 		}
 
-		return $this->insert($log);
+		try {
+			return $this->insert($log);
+		} catch (\OCP\DB\Exception $e) {
+			// at_audit_op_uq: a keyed write that loses the race is the
+			// already-persisted receipt — return it instead of surfacing a
+			// raw DB error to the caller's retry path.
+			if ($operationKey !== null
+				&& $e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				return $this->findByOperationKey($operationKey);
+			}
+			throw $e;
+		}
 	}
 
 	/**

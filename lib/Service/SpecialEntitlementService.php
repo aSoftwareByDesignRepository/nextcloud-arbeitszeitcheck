@@ -32,6 +32,7 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDBConnection;
 use OCP\Lock\ILockingProvider;
 
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; reservation/period/ledger writes target tables without a colliding unique index.
 final class SpecialEntitlementService
 {
 	private const EPSILON = 0.0000001;

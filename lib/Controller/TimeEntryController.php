@@ -59,6 +59,7 @@ use OCP\IL10N;
 /**
  * TimeEntryController
  */
+	// unique-conflict:ok — audit writes via logAction pass operation_key=NULL; time-entry writes target a table without a colliding unique index.
 class TimeEntryController extends Controller
 {
 	use \OCP\AppFramework\Db\TTransactional;

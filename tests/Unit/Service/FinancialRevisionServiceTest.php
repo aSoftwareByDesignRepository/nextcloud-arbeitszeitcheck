@@ -150,6 +150,44 @@ class FinancialRevisionServiceTest extends TestCase
 		$this->assertSame('u3.p5.c6.h7.m8', $this->service->sourceRevision('u1', 2025));
 	}
 
+	/** Stub the epoch UPDATE path so executeStatement throws a DbException. */
+	private function stubEpochUpdateThrows(): void
+	{
+		$expr = $this->createMock(IExpressionBuilder::class);
+		$expr->method('eq')->willReturn('x = y');
+		$qb = $this->createMock(IQueryBuilder::class);
+		$qb->method('update')->willReturnSelf();
+		$qb->method('set')->willReturnSelf();
+		$qb->method('where')->willReturnSelf();
+		$qb->method('expr')->willReturn($expr);
+		$qb->method('createFunction')->willReturn('rev+1');
+		$qb->method('createNamedParameter')->willReturn('?');
+		$qb->method('executeStatement')->willThrowException(
+			new \OCP\DB\Exception('Base table or view not found')
+		);
+		$this->db->method('getQueryBuilder')->willReturn($qb);
+	}
+
+	public function testBumpEpochMissingTableDegradesToZero(): void
+	{
+		// Schema drift (customer bug: absence-type delete 500ed because
+		// at_balance_epoch was absent): the bump must degrade to a logged
+		// no-op — never propagate and roll back the business write.
+		$this->stubEpochUpdateThrows();
+		$this->db->method('tableExists')->with('at_balance_epoch')->willReturn(false);
+		$this->assertSame(0, $this->service->bumpEpoch(FinancialRevisionService::EPOCH_ABSENCE_CATALOG));
+	}
+
+	public function testBumpEpochOtherDbErrorStillThrows(): void
+	{
+		// A real DB error on an existing table must NOT be swallowed —
+		// silent loss of the epoch would break needs_review detection.
+		$this->stubEpochUpdateThrows();
+		$this->db->method('tableExists')->with('at_balance_epoch')->willReturn(true);
+		$this->expectException(\OCP\DB\Exception::class);
+		$this->service->bumpEpoch(FinancialRevisionService::EPOCH_ABSENCE_CATALOG);
+	}
+
 	public function testIsStaleDetectsTokenDrift(): void
 	{
 		$this->stubEpochQuery([0, 0, 0, 0, 0, 0, 0, 0]);

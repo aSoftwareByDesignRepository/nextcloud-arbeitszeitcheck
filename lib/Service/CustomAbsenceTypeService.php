@@ -84,6 +84,26 @@ class CustomAbsenceTypeService
 	}
 
 	/**
+	 * Special-entitlement link check, tolerant of a missing `at_se_type`
+	 * table (feature shipped later / upgrade pending): no table can hold
+	 * links, so the type is unlinked. Any other DB error propagates.
+	 */
+	private function isEntitlementLinked(string $code): bool
+	{
+		if ($this->specialEntitlementTypes === null) {
+			return false;
+		}
+		try {
+			return $this->specialEntitlementTypes->findByAbsenceTypeCode($code) !== null;
+		} catch (DbException $e) {
+			if (!$this->db->tableExists('at_se_type')) {
+				return false;
+			}
+			throw $e;
+		}
+	}
+
+	/**
 	 * All custom types (incl. inactive) with usage counts for the admin list.
 	 *
 	 * @return list<array<string,mixed>>
@@ -94,7 +114,18 @@ class CustomAbsenceTypeService
 		// types, so the admin list must know which rows those are (a delete
 		// button that can only fail is a dead end).
 		$linkedCodes = [];
-		foreach ($this->specialEntitlementTypes?->findAll() ?? [] as $seType) {
+		try {
+			$seTypes = $this->specialEntitlementTypes?->findAll() ?? [];
+		} catch (DbException $e) {
+			// Missing at_se_type (upgrade pending) — treat as "no links",
+			// anything else is a real failure worth surfacing.
+			if (!$this->db->tableExists('at_se_type')) {
+				$seTypes = [];
+			} else {
+				throw $e;
+			}
+		}
+		foreach ($seTypes as $seType) {
 			$linkedCodes[$seType->getAbsenceTypeCode()] = true;
 		}
 
@@ -116,7 +147,7 @@ class CustomAbsenceTypeService
 		$row = $this->mapper->find($id);
 		$summary = $row->getSummary($locale);
 		$summary['absenceCount'] = $this->mapper->countAbsenceUsage($row->getCode());
-		$summary['entitlementLinked'] = $this->specialEntitlementTypes?->findByAbsenceTypeCode($row->getCode()) !== null;
+		$summary['entitlementLinked'] = $this->isEntitlementLinked($row->getCode());
 		return $summary;
 	}
 
@@ -162,9 +193,18 @@ class CustomAbsenceTypeService
 			}, $this->db);
 		} catch (LockedException $e) {
 			return $this->catalogBusy();
-		} catch (CustomAbsenceTypeCodeTakenException | DbException $e) {
+		} catch (CustomAbsenceTypeCodeTakenException $e) {
 			// Unique-index race: another request created the same code first.
 			return ['data' => null, 'errors' => ['code' => $this->l10n->t('This identifier is already in use. Please choose a different one.')], 'code' => 409];
+		} catch (DbException $e) {
+			if ($e->getReason() === DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				return ['data' => null, 'errors' => ['code' => $this->l10n->t('This identifier is already in use. Please choose a different one.')], 'code' => 409];
+			}
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Custom absence type create failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return $this->catalogWriteFailed('saved');
 		}
 
 		AbsenceTypeCatalog::resetCustomTypeCache();
@@ -200,7 +240,7 @@ class CustomAbsenceTypeService
 				// entitlement link can never interleave.
 				if (array_key_exists('active', $params)
 					&& (bool)$type->getActive() !== (bool)($oldValues['active'] ?? true)
-					&& $this->specialEntitlementTypes?->findByAbsenceTypeCode($type->getCode()) !== null) {
+					&& $this->isEntitlementLinked($type->getCode())) {
 					return 'entitlement_linked';
 				}
 				$updated = $this->mapper->update($type);
@@ -217,6 +257,12 @@ class CustomAbsenceTypeService
 			}, $this->db);
 		} catch (LockedException $e) {
 			return $this->catalogBusy();
+		} catch (DbException $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Custom absence type update failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return $this->catalogWriteFailed('updated');
 		}
 
 		if ($updated === 'entitlement_linked') {
@@ -245,7 +291,7 @@ class CustomAbsenceTypeService
 				// entitlement's lifecycle: deleting/deactivating it here would
 				// leave a dangling absence_type_code. Manage it via the
 				// entitlement admin instead.
-				if ($this->specialEntitlementTypes?->findByAbsenceTypeCode($type->getCode()) !== null) {
+				if ($this->isEntitlementLinked($type->getCode())) {
 					return ['mode' => 'entitlement_linked'];
 				}
 
@@ -270,6 +316,12 @@ class CustomAbsenceTypeService
 			return ['data' => null, 'errors' => [], 'code' => 404];
 		} catch (LockedException $e) {
 			return $this->catalogBusy();
+		} catch (DbException $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error(
+				'Custom absence type delete failed: ' . $e->getMessage(),
+				['exception' => $e]
+			);
+			return $this->catalogWriteFailed('deleted');
 		}
 
 		AbsenceTypeCatalog::resetCustomTypeCache();
@@ -289,6 +341,25 @@ class CustomAbsenceTypeService
 			'errors' => [],
 			'code' => 409,
 			'error' => $this->l10n->t('Another change to the absence type catalog is in progress. Please wait a moment and try again.'),
+		];
+	}
+
+	/**
+	 * Controlled failure for a DB error inside the catalog transaction —
+	 * logged server-side, surfaced as a retryable message instead of an
+	 * uncaught 500 with no actionable context.
+	 *
+	 * @return array{data: ?array<string,mixed>, errors: array<string,string>, code: int, error: string}
+	 */
+	private function catalogWriteFailed(string $verb): array
+	{
+		return [
+			'data' => null,
+			'errors' => [],
+			'code' => 500,
+			'error' => $verb === 'deleted'
+				? $this->l10n->t('The absence type could not be deleted. Please try again — if the problem persists, report the error.')
+				: $this->l10n->t('The absence type could not be saved. Please try again — if the problem persists, report the error.'),
 		];
 	}
 

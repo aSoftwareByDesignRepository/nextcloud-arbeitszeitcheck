@@ -116,6 +116,8 @@ $azcSettingsShowCardChrome = !empty($azcSettingsShowCardChrome) || !empty($rende
                 </div>
                 <?php endif; ?>
                 <div id="azc-break-policy-editor" data-storage-tz="<?php p($bpTz); ?>">
+                    <input type="hidden" id="breakPolicyRevision" name="breakPolicyRevision"
+                        value="<?php p((string)($bp['revision'] ?? '0')); ?>">
                     <div class="form-group">
                         <div class="form-checkbox">
                             <input type="checkbox" id="breakPolicyEnforced" name="breakPolicyEnforced"

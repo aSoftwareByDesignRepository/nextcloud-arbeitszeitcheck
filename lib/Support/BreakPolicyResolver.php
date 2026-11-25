@@ -1863,6 +1863,14 @@ final class BreakPolicyResolver
 		$policy = $this->orgConfig();
 		return [
 			'policy' => $policy,
+			// Stored document revision — the admin form sends it back as
+			// breakPolicyRevision so a stale page can never silently
+			// overwrite a newer save (CAS at the write boundary).
+			'revision' => (int)$this->config->getAppValue(
+				'arbeitszeitcheck',
+				Constants::CONFIG_BREAK_POLICY_VERSION,
+				'0'
+			),
 			'warnings' => $this->policyWarnings($policy),
 			'malformed' => $this->orgConfigMalformed,
 			'storageTimezone' => $this->timeZoneService->storageTimeZoneName(),

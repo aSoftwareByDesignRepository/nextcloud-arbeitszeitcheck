@@ -313,7 +313,8 @@
         const editor = form.querySelector('#azc-break-policy-editor');
         if (!editor) {
             ['breakPolicyEnforced', 'breakPolicyMinBreakMinutes', 'breakPolicyPaidCapMinutes', 'breakPolicyTiers',
-                'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm', 'breakPolicyDeductionMode'].forEach(function(k) {
+                'breakPolicyWindows', 'presenceExemptions', 'breakPolicyConfirm', 'breakPolicyDeductionMode',
+                'breakPolicyRevision'].forEach(function(k) {
                 delete formData[k];
             });
             return false;
@@ -349,6 +350,11 @@
         const confirmBox = document.getElementById('azc-policy-confirm');
         const confirmInput = document.getElementById('breakPolicyConfirm');
         formData.breakPolicyConfirm = !!(confirmBox && !confirmBox.hidden && confirmInput && confirmInput.checked);
+        // Optimistic lock: send the document revision this page rendered —
+        // the server rejects with POLICY_CONFLICT when another save landed
+        // in between instead of silently reverting it.
+        const revisionInput = document.getElementById('breakPolicyRevision');
+        formData.breakPolicyRevision = revisionInput ? revisionInput.value : '';
         return true;
     }
 
@@ -1286,7 +1292,24 @@
         const handleFailurePayload = function(data) {
             const msg = (data && data.error) || window.ArbeitszeitCheck?.l10n?.failedToSaveSettings || (window.t ? window.t('arbeitszeitcheck', 'Failed to save settings') : 'Failed to save settings');
             if (data && data.code === 'CONFIRM_REQUIRED' && showBreakPolicyConfirm(data.warnings, data.error)) {
+                // The save was REJECTED — nothing persisted. Say so plainly
+                // (toast, not only the inline box) and bring the confirm
+                // box into view: the radio still shows the selection, so
+                // without this it looks saved until the next page load.
+                Messaging.showError(msg);
                 setLiveMessage(liveRegion, msg, 'error');
+                const cBox = document.getElementById('azc-policy-confirm');
+                if (cBox && typeof cBox.scrollIntoView === 'function') {
+                    cBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
+                return;
+            }
+            if (data && data.code === 'POLICY_CONFLICT') {
+                // Stale revision — another save (this or another admin)
+                // landed first. Reloading is the only honest way forward.
+                const conflictMsg = msg || (window.t ? window.t('arbeitszeitcheck', 'The break rules were changed in the meantime. Reload the page and save again.') : 'Reload and save again.');
+                Messaging.showError(conflictMsg);
+                setLiveMessage(liveRegion, conflictMsg, 'error');
                 return;
             }
             if (data && data.fields && typeof data.fields === 'object') {
@@ -1327,6 +1350,13 @@
                     const confirmInput = document.getElementById('breakPolicyConfirm');
                     if (confirmBox) { confirmBox.hidden = true; }
                     if (confirmInput) { confirmInput.checked = false; }
+                    // Advance the CAS token so the next save from this page
+                    // carries the fresh revision, not the rendered one.
+                    const revInput = document.getElementById('breakPolicyRevision');
+                    if (revInput && data.settings && data.settings.breakPolicy
+                        && data.settings.breakPolicy.revision !== undefined) {
+                        revInput.value = String(data.settings.breakPolicy.revision);
+                    }
                 } else {
                     handleFailurePayload(data);
                 }

@@ -4926,6 +4926,7 @@ class AdminController extends Controller
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_TIERS,
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_WINDOWS,
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_EXEMPTIONS,
+			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_PAID_CAP,
 			\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE,
 		] as $field) {
 			if (array_key_exists($field, $params)) {
@@ -5002,6 +5003,23 @@ class AdminController extends Controller
 	) {
 		$store->ensureRowsExist();
 		[$rawBase, $oldVersion] = $store->lockAndRead();
+
+		// Optimistic-lock CAS: the form echoes back the revision it rendered
+		// (breakPolicyRevision). A stale tab/parallel admin holding an older
+		// revision must never silently overwrite the newer document — same
+		// guard scheduleBaseRevision applies to working-time models. Absent
+		// token = legacy client → allowed (backward compatible).
+		$baseRevision = $params['breakPolicyRevision'] ?? null;
+		if ($baseRevision !== null && $baseRevision !== ''
+			&& (int)$baseRevision !== $oldVersion) {
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('The break rules were changed in the meantime. Reload the page and save again.'),
+				'code' => 'POLICY_CONFLICT',
+				'fields' => [\OCA\Arbeitszeitcheck\Support\BreakPolicyResolver::FIELD_DEDUCTION_MODE => 'POLICY_CONFLICT'],
+			], Http::STATUS_CONFLICT);
+		}
+
 		$current = $resolver->policyFromStoredDocument($rawBase);
 
 		$decodeList = function (string $key, array $currentList) use ($params): ?array {
@@ -5106,7 +5124,7 @@ class AdminController extends Controller
 		$oldJson = (string)json_encode($current, JSON_UNESCAPED_UNICODE);
 		$newJson = (string)json_encode($normalized, JSON_UNESCAPED_UNICODE);
 		if ($newJson === $oldJson) {
-			return ['doc' => $normalized, 'written' => false];
+			return ['doc' => $normalized + ['revision' => $oldVersion], 'written' => false];
 		}
 
 		$store->write($newJson, $oldVersion + 1);
@@ -5142,7 +5160,11 @@ class AdminController extends Controller
 			}
 		}
 
-		return ['doc' => $normalized, 'written' => true, 'recompute_model_ids' => $recomputeModelIds];
+		return [
+			'doc' => $normalized + ['revision' => $oldVersion + 1],
+			'written' => true,
+			'recompute_model_ids' => $recomputeModelIds,
+		];
 	}
 
 	private ?\OCA\ArbeitszeitCheck\Support\BreakPolicyResolver $breakPolicyResolver = null;
@@ -5185,6 +5207,7 @@ class AdminController extends Controller
 					'windows' => [],
 					'presence_exemptions' => [],
 				],
+				'revision' => 0,
 				'warnings' => [],
 				'malformed' => false,
 				'storageTimezone' => 'Europe/Berlin',
@@ -5202,6 +5225,7 @@ class AdminController extends Controller
 					'windows' => [],
 					'presence_exemptions' => [],
 				],
+				'revision' => 0,
 				'warnings' => [],
 				'malformed' => false,
 				'storageTimezone' => 'Europe/Berlin',

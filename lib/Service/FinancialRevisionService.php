@@ -113,8 +113,29 @@ class FinancialRevisionService
 	/**
 	 * Bump a shared epoch for global financial inputs. Serialized by the
 	 * row's primary key; the increment is atomic at statement level.
+	 *
+	 * A missing `at_balance_epoch` table (upgrade not yet applied / schema
+	 * drift) must never roll back the caller's business write — the epoch
+	 * is bookkeeping, the write is the product. Degrade to a logged no-op;
+	 * the EnsureSchema repair recreates the table on the next run.
 	 */
 	public function bumpEpoch(string $domain): int
+	{
+		try {
+			return $this->doBumpEpoch($domain);
+		} catch (\OCP\DB\Exception $e) {
+			if (!$this->db->tableExists('at_balance_epoch')) {
+				\OCP\Log\logger('arbeitszeitcheck')->warning(
+					'at_balance_epoch missing — epoch bump skipped for domain ' . $domain . ' (schema not yet upgraded)',
+					['exception' => $e]
+				);
+				return 0;
+			}
+			throw $e;
+		}
+	}
+
+	private function doBumpEpoch(string $domain): int
 	{
 		$qb = $this->db->getQueryBuilder();
 		$qb->update('at_balance_epoch')
@@ -139,13 +160,21 @@ class FinancialRevisionService
 
 	public function epoch(string $domain): int
 	{
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('revision')->from('at_balance_epoch')
-			->where($qb->expr()->eq('domain', $qb->createNamedParameter($domain)));
-		$res = $qb->executeQuery();
-		$row = $res->fetch();
-		$res->closeCursor();
-		return $row === false ? 0 : (int)$row['revision'];
+		try {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('revision')->from('at_balance_epoch')
+				->where($qb->expr()->eq('domain', $qb->createNamedParameter($domain)));
+			$res = $qb->executeQuery();
+			$row = $res->fetch();
+			$res->closeCursor();
+			return $row === false ? 0 : (int)$row['revision'];
+		} catch (\OCP\DB\Exception $e) {
+			// Missing table = pre-upgrade schema: epoch is 0, never a 500.
+			if (!$this->db->tableExists('at_balance_epoch')) {
+				return 0;
+			}
+			throw $e;
+		}
 	}
 
 	/**

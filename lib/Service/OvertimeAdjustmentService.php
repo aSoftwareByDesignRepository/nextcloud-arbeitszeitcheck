@@ -34,6 +34,9 @@ class OvertimeAdjustmentService
 	) {
 	}
 
+	/** @var array<string, int> in-process depth of held ledger locks (ILockingProvider is not re-entrant). */
+	private array $balanceLockDepth = [];
+
 	/**
 	 * Current display balance (bank-aware + adjustments), same as traffic-light YTD.
 	 */
@@ -212,13 +215,42 @@ class OvertimeAdjustmentService
 	 * @param callable():T $callback
 	 * @return T
 	 */
+	/**
+	 * Public handle for orchestrators that must hold the per-user ledger lock
+	 * across a WIDER unit than one adjustment (e.g.
+	 * YearEndResetService::processItem holds it across its whole transaction,
+	 * so a rival writer cannot interleave between the reset's ledger insert
+	 * and that transaction's commit — the before/after chain would otherwise
+	 * become self-contradicting). Re-entrant per service instance.
+	 *
+	 * @template T
+	 * @param callable():T $callback
+	 * @return T
+	 */
+	public function withBalanceLock(string $userId, callable $callback): mixed
+	{
+		return $this->withOvertimeBalanceLock($userId, $callback);
+	}
+
 	private function withOvertimeBalanceLock(string $userId, callable $callback): mixed
 	{
 		$key = DbLockKeys::overtimeBalance($userId);
+		if (($this->balanceLockDepth[$key] ?? 0) > 0) {
+			// Re-entrant call: the outer acquire is the authoritative hold —
+			// the provider itself is not re-entrant.
+			$this->balanceLockDepth[$key]++;
+			try {
+				return $callback();
+			} finally {
+				$this->balanceLockDepth[$key]--;
+			}
+		}
 		DbLockGuard::acquire($this->lockingProvider, $key, ILockingProvider::LOCK_EXCLUSIVE, 'Overtime ledger mutation for user ' . $userId);
+		$this->balanceLockDepth[$key] = 1;
 		try {
 			return $callback();
 		} finally {
+			unset($this->balanceLockDepth[$key]);
 			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
 		}
 	}

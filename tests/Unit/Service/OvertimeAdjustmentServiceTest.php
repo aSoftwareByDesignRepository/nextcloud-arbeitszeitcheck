@@ -120,6 +120,44 @@ class OvertimeAdjustmentServiceTest extends TestCase
 		$this->assertSame(0.0, $result['balance_after']);
 	}
 
+	public function testWithBalanceLockIsReentrantAndAcquiresOnce(): void
+	{
+		$mapper = $this->createMock(OvertimeAdjustmentMapper::class);
+		$mapper->expects($this->once())
+			->method('insertAdjustment')
+			->willReturnCallback(static function (OvertimeAdjustment $entity): OvertimeAdjustment {
+				$entity->setId(9);
+				return $entity;
+			});
+
+		$bank = $this->createMock(OvertimeBankService::class);
+		$bank->method('getBankStatus')->willReturn(['effective_balance' => 5.0]);
+
+		$users = $this->createMock(IUserManager::class);
+		$users->method('get')->willReturn($this->createMock(IUser::class));
+
+		// One outer acquire + release only: the inner createAdjustment hold
+		// must be a no-op, not a second provider acquire that would throw
+		// LockedException on the non-reentrant provider.
+		$locking = $this->createMock(\OCP\Lock\ILockingProvider::class);
+		$locking->expects($this->once())->method('acquireLock');
+		$locking->expects($this->once())->method('releaseLock');
+
+		$svc = new OvertimeAdjustmentService(
+			$mapper,
+			$bank,
+			$this->createMock(AuditLogMapper::class),
+			$users,
+			$locking,
+			$this->dbMock(),
+		);
+
+		$result = $svc->withBalanceLock('alice', fn () => $svc->createAdjustment(
+			'alice', -5.0, OvertimeAdjustment::REASON_PERIOD_NULLUNG, 'ye', 'admin',
+		));
+		$this->assertSame(0.0, $result['balance_after']);
+	}
+
 	public function testCreateAdjustmentRejectsInvalidRange(): void
 	{
 		$users = $this->createMock(IUserManager::class);

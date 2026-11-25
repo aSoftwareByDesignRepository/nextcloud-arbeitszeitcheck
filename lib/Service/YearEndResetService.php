@@ -298,6 +298,22 @@ class YearEndResetService
 		int $expectedPolicyRevision,
 	): array {
 		$this->assertManualEnabled();
+		if (!preg_match('/^[0-9a-fA-F-]{32,36}$/', $operationId)) {
+			throw $this->error(self::ERROR_POLICY_INVALID, 'operationId must be a UUID');
+		}
+		// Durable replay receipt: the operation key outlives the single-use
+		// preview handle (consumed below), so a retried execute MUST consult
+		// it first — otherwise every client retry hits a dead-handle 410.
+		// A foreign actor's key gets the same uniform denial as a dead handle.
+		try {
+			$receipt = $this->runMapper->findByOperationKey(strtolower($operationId));
+			if ($receipt->getActorUid() !== $actor) {
+				throw $this->error(self::ERROR_PREVIEW_EXPIRED, 'Preview is no longer valid');
+			}
+			return $this->runStatus($receipt->getId());
+		} catch (DoesNotExistException) {
+			// fresh operation — continue with the preview handle
+		}
 		$run = $this->lookupPreviewRun($previewHandle);
 		if ($run->getActorUid() !== $actor) {
 			throw $this->error(self::ERROR_PREVIEW_EXPIRED, 'Preview is no longer valid');
@@ -305,9 +321,6 @@ class YearEndResetService
 		$now = new \DateTime('now');
 		if ($run->getPreviewExpiresAt() === null || $run->getPreviewExpiresAt() <= $now) {
 			throw $this->error(self::ERROR_PREVIEW_EXPIRED, 'Preview expired');
-		}
-		if (!preg_match('/^[0-9a-fA-F-]{32,36}$/', $operationId)) {
-			throw $this->error(self::ERROR_POLICY_INVALID, 'operationId must be a UUID');
 		}
 		$this->assertPolicyRevision($expectedPolicyRevision, self::ERROR_POLICY_CHANGED);
 
@@ -409,6 +422,23 @@ class YearEndResetService
 		int $expectedPolicyRevision,
 	): array {
 		$this->assertManualEnabled();
+		// Same durable replay receipt as execute(): a retried resume hits the
+		// consumed preview handle otherwise (the op key lives on the resumed
+		// run). A key bound to a different run is a real conflict.
+		if (preg_match('/^[0-9a-fA-F-]{32,36}$/', $operationId)) {
+			try {
+				$receipt = $this->runMapper->findByOperationKey(strtolower($operationId));
+				if ($receipt->getActorUid() !== $actor) {
+					throw $this->error(self::ERROR_PREVIEW_EXPIRED, 'Preview is no longer valid');
+				}
+				if ($receipt->getId() !== $runId) {
+					throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Another year-end run already holds this operation key');
+				}
+				return $this->runStatus($receipt->getId());
+			} catch (DoesNotExistException) {
+				// fresh operation — continue with the preview handle
+			}
+		}
 		$run = $this->findRunOr404($runId);
 		if (!in_array($run->getState(), [YearResetRun::STATE_FAILED, YearResetRun::STATE_COMPLETED, YearResetRun::STATE_EXECUTING], true)) {
 			throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Run is not resumable');
@@ -540,74 +570,94 @@ class YearEndResetService
 		$waiveNegative = (bool)($ye['waiveNegative'] ?? false);
 
 		try {
-			$this->db->beginTransaction();
-			// Same anchor as the preview: the compensating write cancels the
-			// balance carried into closingYear+1 — measured at the boundary,
-			// never at request time. createAdjustment re-anchors internally at
-			// $effective, so anything else breaks the zero reconciliation.
-			$boundary = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
-			$before = $this->adjustmentService->getCurrentEffectiveBalance($userId, $boundary);
-			$beforeCents = (int)round($before * 100);
+			// The per-user ledger lock spans the WHOLE unit (read → adjust →
+			// revision bump → commit): releasing it before commit would let a
+			// rival adjustment interleave and make the before/after ledger
+			// chain self-contradicting (§15.3 already-held lock). The lock is
+			// re-entrant, so createAdjustment's inner hold is a no-op here.
+			$outcome = $this->adjustmentService->withBalanceLock($userId, function () use ($userId, $closingYear, $run, $resetPositive, $waiveNegative): array {
+				$this->db->beginTransaction();
+				// Same anchor as the preview: the compensating write cancels the
+				// balance carried into closingYear+1 — measured at the boundary,
+				// never at request time. createAdjustment re-anchors internally at
+				// $effective, so anything else breaks the zero reconciliation.
+				$boundary = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
+				$before = $this->adjustmentService->getCurrentEffectiveBalance($userId, $boundary);
+				$beforeCents = (int)round($before * 100);
 
-			$reasonCode = null;
-			if ($beforeCents > 0 && $resetPositive) {
-				$reasonCode = OvertimeAdjustment::REASON_PERIOD_NULLUNG;
-			} elseif ($beforeCents < 0 && $waiveNegative) {
-				$reasonCode = OvertimeAdjustment::REASON_UNDERTIME_WAIVER;
-			}
+				$reasonCode = null;
+				if ($beforeCents > 0 && $resetPositive) {
+					$reasonCode = OvertimeAdjustment::REASON_PERIOD_NULLUNG;
+				} elseif ($beforeCents < 0 && $waiveNegative) {
+					$reasonCode = OvertimeAdjustment::REASON_UNDERTIME_WAIVER;
+				}
 
-			if ($reasonCode === null) {
-				// Zero balance or sign not selected: truthful no-op, still inside
-				// the transaction so the snapshot commit is atomic with the read.
-				$newSource = $this->revisionService->bumpForWrite($userId, [$closingYear]);
+				if ($reasonCode === null) {
+					// Zero balance or sign not selected: truthful no-op, still
+					// inside the transaction so the snapshot commit is atomic
+					// with the read.
+					$this->revisionService->bumpForWrite($userId, [$closingYear]);
+					$token = $this->revisionService->sourceRevision($userId, $closingYear);
+					$this->db->commit();
+					return ['kind' => 'noop', 'before' => $beforeCents, 'token' => $token];
+				}
+
+				$effective = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
+				$note = sprintf(
+					'Year-end reset %d (run #%d): %s',
+					$closingYear,
+					$run->getId(),
+					(string)($run->getReason() ?? '')
+				);
+				$result = $this->adjustmentService->createAdjustment(
+					$userId,
+					round(-$before, 2),
+					$reasonCode,
+					mb_substr($note, 0, 500),
+					$run->getActorUid(),
+					$effective,
+				);
+
+				// Canonical-result reconciliation at ledger precision: the
+				// reported after-balance must land at zero within centi-hour
+				// epsilon.
+				$afterCents = (int)round($result['balance_after'] * 100);
+				if (abs($afterCents) > self::CENTI_EPSILON) {
+					throw new \RuntimeException('Post-reset balance did not reconcile to zero');
+				}
+
+				// The reset is itself a financial write: bump BEFORE the
+				// snapshot so the stored token is the post-reset authority —
+				// never self-flagging.
+				$this->revisionService->bumpForWrite($userId, [$closingYear]);
+				$newToken = $this->revisionService->sourceRevision($userId, $closingYear);
 				$this->db->commit();
+				return [
+					'kind' => 'reset',
+					'before' => $beforeCents,
+					'delta' => -$beforeCents,
+					'adjustment_id' => (int)($result['adjustment']['id'] ?? 0),
+					'token' => $newToken,
+				];
+			});
+
+			if ($outcome['kind'] === 'noop') {
 				$this->itemMapper->finishItem($item, $leaseToken, YearResetItem::STATE_DONE, [
-					'before_centi_hours' => $beforeCents,
+					'before_centi_hours' => $outcome['before'],
 					'delta_centi_hours' => 0,
 					'adjustment_id' => null,
-					'source_revision' => $this->revisionService->sourceRevision($userId, $closingYear),
+					'source_revision' => $outcome['token'],
 					'review_state' => YearResetItem::REVIEW_CLEAR,
 				]);
 				$this->refMapper->markOutcome($run->getId(), $userId, self::OUTCOME_NOOP);
 				return;
 			}
 
-			$effective = new \DateTime(sprintf('%04d-01-01', $closingYear + 1));
-			$note = sprintf(
-				'Year-end reset %d (run #%d): %s',
-				$closingYear,
-				$run->getId(),
-				(string)($run->getReason() ?? '')
-			);
-			$result = $this->adjustmentService->createAdjustment(
-				$userId,
-				round(-$before, 2),
-				$reasonCode,
-				mb_substr($note, 0, 500),
-				$run->getActorUid(),
-				$effective,
-			);
-
-			// Canonical-result reconciliation at ledger precision: the reported
-			// after-balance must land at zero within centi-hour epsilon.
-			$afterCents = (int)round($result['balance_after'] * 100);
-			if (abs($afterCents) > self::CENTI_EPSILON) {
-				throw new \RuntimeException('Post-reset balance did not reconcile to zero');
-			}
-
-			// The reset is itself a financial write: bump BEFORE the snapshot so
-			// the stored token is the post-reset authority — never self-flagging.
-			$this->revisionService->bumpForWrite($userId, [$closingYear]);
-			$newToken = $this->revisionService->sourceRevision($userId, $closingYear);
-			$adjustmentId = (int)($result['adjustment']['id'] ?? 0);
-			$deltaCents = -$beforeCents;
-			$this->db->commit();
-
 			$this->itemMapper->finishItem($item, $leaseToken, YearResetItem::STATE_DONE, [
-				'before_centi_hours' => $beforeCents,
-				'delta_centi_hours' => $deltaCents,
-				'adjustment_id' => $adjustmentId > 0 ? $adjustmentId : null,
-				'source_revision' => $newToken,
+				'before_centi_hours' => $outcome['before'],
+				'delta_centi_hours' => $outcome['delta'],
+				'adjustment_id' => $outcome['adjustment_id'] > 0 ? $outcome['adjustment_id'] : null,
+				'source_revision' => $outcome['token'],
 				'review_state' => YearResetItem::REVIEW_CLEAR,
 			]);
 			$this->refMapper->markOutcome($run->getId(), $userId, self::OUTCOME_SUCCESS);
@@ -727,6 +777,34 @@ class YearEndResetService
 			];
 		}
 		return ['items' => $rows, 'total' => $this->runMapper->countAll()];
+	}
+
+	// ------------------------------------------------------------------ purge
+
+	/**
+	 * §16.9 retention: drop expired, never-consumed preview runs together
+	 * with their per-target snapshot refs. A previewed run whose handle
+	 * expired can never execute (execute() re-checks preview_expires_at),
+	 * so this deletes no reachable work — only the financial snapshot the
+	 * preview captured.
+	 */
+	public function purgeExpiredPreviews(?\DateTimeInterface $now = null): int
+	{
+		$now = $now ?? new \DateTime('now');
+		$purged = 0;
+		foreach ($this->runMapper->findExpiredPreviews($now) as $run) {
+			$this->db->beginTransaction();
+			try {
+				$this->refMapper->deleteByRun($run->getId());
+				$this->runMapper->delete($run);
+				$this->db->commit();
+				$purged++;
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
+			}
+		}
+		return $purged;
 	}
 
 	// ------------------------------------------------------------------ annual

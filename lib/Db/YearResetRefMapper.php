@@ -53,4 +53,17 @@ class YearResetRefMapper extends QBMapper
 			->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
 		$qb->executeStatement();
 	}
+
+	/**
+	 * Drop every ref of one run — used by expired-preview purge (§16.9).
+	 * Only called for runs still in state previewed, which never bound
+	 * items, so no item rows need touching.
+	 */
+	public function deleteByRun(int $runId): void
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('run_id', $qb->createNamedParameter($runId)));
+		$qb->executeStatement();
+	}
 }

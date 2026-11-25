@@ -69,7 +69,6 @@ final class SchemaTableCatalog
 		'at_user_ot_year_bal',
 		'at_balance_epoch',
 		'at_balance_rev',
-		'at_workforce_delivery',
 		'at_year_reset_item',
 		'at_year_reset_ref',
 		'at_year_reset_run',
@@ -90,5 +89,6 @@ final class SchemaTableCatalog
 	/** @var list<string> tables dropped intentionally by later migrations */
 	public const DROPPED_LEGACY_TABLES = [
 		'at_absence_calendar',
+		'at_workforce_delivery',
 	];
 }

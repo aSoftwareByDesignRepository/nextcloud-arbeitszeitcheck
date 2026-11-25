@@ -461,9 +461,6 @@ final class TransferManifest extends AbstractTransferManifest
 			// by the financial revision engine on the target.
 			'at_balance_epoch' => ['class' => 'internal'],
 			'at_balance_rev' => ['class' => 'internal'],
-			// Workforce notification delivery ledger — instance-bound
-			// delivery state; currently scaffolding with no writers.
-			'at_workforce_delivery' => ['class' => 'internal'],
 		]);
 	}
 }

@@ -62,6 +62,9 @@ class YearEndAnnualJob extends TimedJob
 			foreach ($this->runMapper->findExecuting() as $run) {
 				$this->yearEndService->runTick($run->getId());
 			}
+			// §16.9: expired never-consumed previews hold financial snapshots —
+			// purge them with their refs on the same cadence.
+			$this->yearEndService->purgeExpiredPreviews();
 		} catch (\Throwable $e) {
 			$this->logger->error('ArbeitszeitCheck: year-end job failed', [
 				'app' => 'arbeitszeitcheck',

@@ -56,6 +56,10 @@ class YearEndResetServiceTest extends TestCase
 		parent::setUp();
 		$this->db = $this->createMock(IDBConnection::class);
 		$this->runMapper = $this->createMock(YearResetRunMapper::class);
+		// execute() consults the durable operation key first; default to
+		// "fresh operation" so tests exercise the preview-handle path.
+		$this->runMapper->method('findByOperationKey')
+			->willThrowException(new DoesNotExistException('none'));
 		$this->itemMapper = $this->createMock(YearResetItemMapper::class);
 		$this->refMapper = $this->createMock(YearResetRefMapper::class);
 		$this->adjustmentService = $this->createMock(OvertimeAdjustmentService::class);
@@ -68,7 +72,11 @@ class YearEndResetServiceTest extends TestCase
 		$groupManager = $this->createMock(IGroupManager::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->auditLogMapper = $this->createMock(AuditLogMapper::class);
+		$this->makeService($groupManager);
+	}
 
+	private function makeService($groupManager = null): void
+	{
 		$this->service = new YearEndResetService(
 			$this->db,
 			$this->runMapper,
@@ -81,7 +89,7 @@ class YearEndResetServiceTest extends TestCase
 			$this->absenceMapper,
 			$this->timeEntryMapper,
 			$this->monthClosureService,
-			$groupManager,
+			$groupManager ?? $this->createMock(IGroupManager::class),
 			$this->userManager,
 			$this->auditLogMapper,
 		);
@@ -355,6 +363,91 @@ class YearEndResetServiceTest extends TestCase
 		$this->runMapper->method('findByPreviewKeyHash')->willReturn($run);
 		$this->assertErrorCode(YearEndResetService::ERROR_POLICY_CHANGED, fn () =>
 			$this->service->execute('admin', str_repeat('a', 64), '123e4567-e89b-42d3-a456-426614174000', 4));
+	}
+
+	public function testExecuteOperationKeyReplayReturnsReceipt(): void
+	{
+		$this->enableManual();
+		$opId = '123e4567-e89b-42d3-a456-426614174000';
+		$run = new YearResetRun();
+		$run->setId(9);
+		$run->setActorUid('admin');
+		$run->setClosingYear(2025);
+		$run->setState(YearResetRun::STATE_COMPLETED);
+		$run->setOperationKey($opId);
+
+		$this->runMapper = $this->createMock(YearResetRunMapper::class);
+		$this->makeService();
+		$this->runMapper->method('findByOperationKey')->with($opId)->willReturn($run);
+		$this->runMapper->method('findById')->with(9)->willReturn($run);
+		// The dead handle must never be consulted once the receipt resolves.
+		$this->runMapper->expects($this->never())->method('findByPreviewKeyHash');
+		$this->itemMapper->method('findByRun')->willReturn([]);
+		$this->refMapper->method('findByRun')->willReturn([]);
+		$this->itemMapper->method('countByState')->willReturn(['done' => 1]);
+
+		$status = $this->service->execute('admin', 'a'.str_repeat('0', 63), $opId, 3);
+		$this->assertSame(9, $status['id']);
+		$this->assertSame('completed', $status['state']);
+	}
+
+	public function testExecuteOperationKeyOfForeignActorDenied(): void
+	{
+		$this->enableManual();
+		$opId = '123e4567-e89b-42d3-a456-426614174000';
+		$run = new YearResetRun();
+		$run->setId(9);
+		$run->setActorUid('other-admin');
+		$run->setOperationKey($opId);
+
+		$this->runMapper = $this->createMock(YearResetRunMapper::class);
+		$this->makeService();
+		$this->runMapper->method('findByOperationKey')->willReturn($run);
+		$this->assertErrorCode(YearEndResetService::ERROR_PREVIEW_EXPIRED, fn () =>
+			$this->service->execute('admin', str_repeat('a', 64), $opId, 3));
+	}
+
+	// ----------------------------------------------------------------- purge
+
+	public function testPurgeDeletesExpiredPreviewRunsWithRefs(): void
+	{
+		$expired = new YearResetRun();
+		$expired->setId(7);
+		$expired->setState(YearResetRun::STATE_PREVIEWED);
+		$expired->setPreviewExpiresAt(new \DateTime('-1 hour'));
+
+		$this->runMapper->method('findExpiredPreviews')->willReturn([$expired]);
+		$this->db->expects($this->once())->method('beginTransaction');
+		$this->db->expects($this->once())->method('commit');
+		$this->db->expects($this->never())->method('rollBack');
+		$this->refMapper->expects($this->once())->method('deleteByRun')->with(7);
+		$this->runMapper->expects($this->once())->method('delete')->with($expired);
+
+		$this->assertSame(1, $this->service->purgeExpiredPreviews());
+	}
+
+	public function testPurgeRefDeleteFailureRollsBackAndKeepsRun(): void
+	{
+		$expired = new YearResetRun();
+		$expired->setId(8);
+		$expired->setState(YearResetRun::STATE_PREVIEWED);
+		$expired->setPreviewExpiresAt(new \DateTime('-1 hour'));
+
+		$this->runMapper->method('findExpiredPreviews')->willReturn([$expired]);
+		$this->refMapper->method('deleteByRun')->willThrowException(new \RuntimeException('db gone'));
+		$this->db->expects($this->once())->method('rollBack');
+		$this->db->expects($this->never())->method('commit');
+		$this->runMapper->expects($this->never())->method('delete');
+
+		$this->expectException(\RuntimeException::class);
+		$this->service->purgeExpiredPreviews();
+	}
+
+	public function testPurgeNothingExpiredIsNoOp(): void
+	{
+		$this->runMapper->method('findExpiredPreviews')->willReturn([]);
+		$this->db->expects($this->never())->method('beginTransaction');
+		$this->assertSame(0, $this->service->purgeExpiredPreviews());
 	}
 
 	// ---------------------------------------------------------------- status

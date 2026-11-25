@@ -47,11 +47,16 @@ function occ(args) {
 }
 
 function occConfigGet(key) {
-	return occ(['config:app:get', 'arbeitszeitcheck', key])
-		.split('\n')
-		.map((l) => l.trim())
-		.filter((l) => l !== '')
-		.pop() ?? ''
+	// config:app:get exits 1 on an unset key — that is "empty", not an error.
+	try {
+		return occ(['config:app:get', 'arbeitszeitcheck', key])
+			.split('\n')
+			.map((l) => l.trim())
+			.filter((l) => l !== '')
+			.pop() ?? ''
+	} catch {
+		return ''
+	}
 }
 
 function occConfigSet(key, value) {

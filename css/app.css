@@ -50,6 +50,21 @@
 	white-space: nowrap;
 }
 
+/* Class-level hide used by JS state toggles (e.g. empty state vs. table wrap).
+   Defined globally here: several page styles carry local copies, but pages that
+   load only app.css need the rule to actually hide the element. */
+.visually-hidden {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	margin: -1px !important;
+	padding: 0 !important;
+	border: 0 !important;
+	overflow: hidden !important;
+	clip-path: inset(50%) !important;
+	white-space: nowrap !important;
+}
+
 /* ── App shell ─────────────────────────────────────────────── */
 /* Sidebar alignment: see navigation.css (canonical); keep minimal guard here too */
 #content.app-arbeitszeitcheck #app-navigation .nav-menu a,

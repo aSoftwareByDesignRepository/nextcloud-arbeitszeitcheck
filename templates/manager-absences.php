@@ -147,7 +147,7 @@ $maxManagerListDateRangeDays = (int)($_['maxManagerListDateRangeDays'] ?? Consta
 					<p class="azc-empty-state__text"><?php p($l->t('Choose a date range to load absences.')); ?></p>
 				</div>
 
-				<div id="employee-absences-table-wrap" class="table-container visually-hidden" aria-live="polite">
+				<div id="employee-absences-table-wrap" class="table-container visually-hidden" aria-live="polite" role="region" aria-label="<?php p($l->t('Employee absences')); ?>">
 					<table id="employee-absences-table" class="table table--hover azc-table--responsive manager-scope-page__results-table" aria-label="<?php p($l->t('Employee absences')); ?>">
 						<thead>
 							<tr>

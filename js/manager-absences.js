@@ -191,11 +191,13 @@
 		if (showTable) {
 			emptyEl.classList.add('visually-hidden');
 			tableWrap.classList.remove('visually-hidden');
+			tableWrap.setAttribute('tabindex', '0');
 			return;
 		}
 
 		emptyEl.classList.remove('visually-hidden');
 		tableWrap.classList.add('visually-hidden');
+		tableWrap.removeAttribute('tabindex');
 		const pagerNav = document.getElementById('employee-absences-pager');
 		if (pagerNav) {
 			pagerNav.hidden = true;

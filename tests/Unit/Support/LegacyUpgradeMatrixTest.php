@@ -22,7 +22,7 @@ final class LegacyUpgradeMatrixTest extends TestCase
 
 		self::assertSame(['mysql', 'pgsql'], $matrix['databases']);
 		self::assertSame(['nextcloud:32', 'nextcloud:35'], $matrix['serverImages']);
-		self::assertSame(['v1.8.0'], $matrix['sourceTags']);
+		self::assertSame(['v1.12.2'], $matrix['sourceTags']);
 	}
 
 	public function testRejectsDuplicateTags(): void

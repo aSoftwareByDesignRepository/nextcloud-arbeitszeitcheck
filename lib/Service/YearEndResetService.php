@@ -335,12 +335,18 @@ class YearEndResetService
 
 		$this->db->beginTransaction();
 		try {
+			// Atomic claim: a concurrent execute on the same preview must not
+			// overwrite this claim's operation key (its replay receipt would
+			// be orphaned). Losers get OPERATION_CONFLICT and can retry with
+			// their own key to reach the winner's receipt.
+			if (!$this->runMapper->claimPreviewForExecution($run->getId(), strtolower($operationId), $now)) {
+				throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Preview was already consumed');
+			}
 			$run->setOperationKey(strtolower($operationId));
 			$run->setState(YearResetRun::STATE_EXECUTING);
 			$run->setPreviewKeyHash(null); // handle consumed — single use
 			$run->setPreviewExpiresAt(null);
 			$run->setUpdatedAt($now);
-			$this->runMapper->update($run);
 
 			foreach ($refs as $ref) {
 				$this->bindItemToRun($run, $ref);
@@ -462,11 +468,15 @@ class YearEndResetService
 		$requeued = 0;
 		$this->db->beginTransaction();
 		try {
+			// Atomic consume: concurrent resumes on the same preview race the
+			// guarded UPDATE; the loser must not overwrite the winner's work.
+			if (!$this->runMapper->claimPreviewConsume($previewRun->getId(), new \DateTime('now'))) {
+				throw $this->error(self::ERROR_OPERATION_CONFLICT, 'Preview already consumed');
+			}
 			$previewRun->setState(YearResetRun::STATE_FAILED); // consumed as resume authority
 			$previewRun->setPreviewKeyHash(null);
 			$previewRun->setPreviewExpiresAt(null);
 			$previewRun->setUpdatedAt(new \DateTime('now'));
-			$this->runMapper->update($previewRun);
 
 			foreach ($refs as $ref) {
 				$item = $this->itemMapper->findByUserAndYear($ref->getUserId(), $run->getClosingYear());
@@ -795,8 +805,15 @@ class YearEndResetService
 		foreach ($this->runMapper->findExpiredPreviews($now) as $run) {
 			$this->db->beginTransaction();
 			try {
+				// State-guarded: a concurrent execute/resume claim flips the
+				// run out of previewed state; deleting it then would orphan
+				// the executing run and its item linkage. Losers keep refs —
+				// they carry execution outcomes.
+				if (!$this->runMapper->deleteIfPreviewed($run->getId())) {
+					$this->db->rollBack();
+					continue;
+				}
 				$this->refMapper->deleteByRun($run->getId());
-				$this->runMapper->delete($run);
 				$this->db->commit();
 				$purged++;
 			} catch (\Throwable $e) {

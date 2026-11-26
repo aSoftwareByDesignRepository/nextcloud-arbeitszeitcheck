@@ -106,4 +106,55 @@ class YearResetRunMapper extends QBMapper
 		$qb->selectAlias($qb->func()->count('id'), 'cnt')->from($this->getTableName());
 		return (int)$qb->executeQuery()->fetchOne();
 	}
+
+	/**
+	 * Atomically claim a previewed run for execute(): flips to executing and
+	 * stamps the durable operation key in one guarded UPDATE. Returns false
+	 * when the row is no longer previewed — i.e. a concurrent claim already
+	 * consumed it — instead of overwriting that claim's operation key.
+	 */
+	public function claimPreviewForExecution(int $runId, string $operationKey, \DateTime $now): bool
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('operation_key', $qb->createNamedParameter($operationKey))
+			->set('state', $qb->createNamedParameter(YearResetRun::STATE_EXECUTING))
+			->set('preview_key_hash', $qb->createNamedParameter(null))
+			->set('preview_expires_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_DATE))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_DATE))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($runId)))
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(YearResetRun::STATE_PREVIEWED)));
+		return $qb->executeStatement() === 1;
+	}
+
+	/**
+	 * State-guarded preview purge: deletes only while the row is still in
+	 * previewed state. Returns false when a concurrent execute/resume claim
+	 * consumed it — refs must then be kept (they track execution outcomes).
+	 */
+	public function deleteIfPreviewed(int $runId): bool
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($runId)))
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(YearResetRun::STATE_PREVIEWED)));
+		return $qb->executeStatement() === 1;
+	}
+
+	/**
+	 * Atomically consume a previewed run as resume authority (state → failed).
+	 * Returns false when a concurrent resume already consumed it.
+	 */
+	public function claimPreviewConsume(int $runId, \DateTime $now): bool
+	{
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('state', $qb->createNamedParameter(YearResetRun::STATE_FAILED))
+			->set('preview_key_hash', $qb->createNamedParameter(null))
+			->set('preview_expires_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_DATE))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_DATE))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($runId)))
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(YearResetRun::STATE_PREVIEWED)));
+		return $qb->executeStatement() === 1;
+	}
 }

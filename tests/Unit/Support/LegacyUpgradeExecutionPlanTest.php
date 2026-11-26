@@ -27,7 +27,7 @@ final class LegacyUpgradeExecutionPlanTest extends TestCase
 		$this->assertCount(23, $plan['manifestCategories']);
 		$this->assertSame(1, $plan['schemaFamilyCount']);
 		$this->assertSame(1, $plan['runtimeProfileCount']);
-		$this->assertSame(array_fill(0, 4, 'v1.8.0'), array_column($plan['jobs'], 'sourceTag'));
+		$this->assertSame(array_fill(0, 4, 'v1.12.2'), array_column($plan['jobs'], 'sourceTag'));
 		$this->assertSame(['mysql', 'pgsql', 'mysql', 'pgsql'], array_column($plan['jobs'], 'database'));
 		$this->assertSame(['nextcloud:32', 'nextcloud:32', 'nextcloud:35', 'nextcloud:35'], array_column($plan['jobs'], 'serverImage'));
 		$this->assertSame(['days', 'hours'], $plan['jobs'][0]['captureVariants']);

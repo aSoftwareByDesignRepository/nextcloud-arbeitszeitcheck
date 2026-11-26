@@ -11,7 +11,9 @@
       "sourceMax": "35",
       "serverVersion": "35",
       "serverImage": "nextcloud:35",
-      "tags": ["v1.8.0"]
+      "tags": [
+        "v1.12.2"
+      ]
     }
   ]
 }

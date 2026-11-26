@@ -286,17 +286,33 @@ final class LegacyUpgradeJobRunner
 
 	private function upgrade(): void
 	{
+		// The post-migration initializer never overwrites an existing install
+		// state — a source tag that already ships the workforce suite keeps the
+		// 'fresh' it wrote at its own install; a pre-suite source gets the
+		// legacy-safe 'upgraded_legacy'. The expectation is the pre-upgrade
+		// value, not a constant per source tag.
+		$installStateBefore = $this->appConfigValue('workforce_suite_install_state');
 		$this->occ(['upgrade']);
 		$this->occ(['app:enable', 'arbeitszeitcheck']);
-		$this->verifyWorkforceSuiteUpgradeDefaults();
+		$this->verifyWorkforceSuiteUpgradeDefaults($installStateBefore);
 		$this->provisionLicenseFixture();
 		$this->result['upgrade'] = json_decode($this->occ(['status', '--output=json']), true, 512, JSON_THROW_ON_ERROR);
 	}
 
-	private function verifyWorkforceSuiteUpgradeDefaults(): void
+	private function appConfigValue(string $key): string
+	{
+		return $this->dbQueryScalar(sprintf(
+			'SELECT configvalue FROM %s WHERE appid = %s AND configkey = %s',
+			$this->sqlIdentifier('oc_appconfig'),
+			$this->sqlString('arbeitszeitcheck'),
+			$this->sqlString($key),
+		));
+	}
+
+	private function verifyWorkforceSuiteUpgradeDefaults(string $installStateBefore): void
 	{
 		$expected = [
-			'workforce_suite_install_state' => 'upgraded_legacy',
+			'workforce_suite_install_state' => $installStateBefore !== '' ? $installStateBefore : 'upgraded_legacy',
 			'policy_cohorts_enabled' => '0',
 			'work_location_catalog_enabled' => '0',
 			'special_entitlements_enabled' => '0',
@@ -1101,6 +1117,7 @@ final class LegacyUpgradeJobRunner
 			'currentSessionDuration' => true, 'current_session_duration' => true,
 			'sessionStartFormatted' => true, 'session_start_formatted' => true,
 			'workingTodayHours' => true, 'working_today_hours' => true,
+			'workingTodayPaidHours' => true, 'working_today_paid_hours' => true,
 			'sessionHoursOnCalendarToday' => true, 'session_hours_on_calendar_today' => true,
 		];
 		foreach ($value as $key => $item) {

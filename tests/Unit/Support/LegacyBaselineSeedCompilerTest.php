@@ -98,7 +98,7 @@ final class LegacyBaselineSeedCompilerTest extends TestCase
 	public function testCompilesHistoricallyReachableStatesForProductionSourceSchema(): void
 	{
 		$scenario = self::scenario();
-		$capabilities = self::schemaMap()->capabilitiesForTag('v1.8.0');
+		$capabilities = self::schemaMap()->capabilitiesForTag('v1.12.2');
 		$compiled = LegacyBaselineSeedCompiler::compile($scenario, self::plan($scenario), $capabilities);
 		$targets = array_unique(array_column($compiled['operations'], 'target'));
 		$this->assertContains('external.nextcloud_users', $targets);
@@ -108,14 +108,14 @@ final class LegacyBaselineSeedCompilerTest extends TestCase
 		$this->assertContains('at_month_closure', $targets);
 		$this->assertContains('at_tariff_rule_sets', $targets);
 		$this->assertContains('at_mob_stamp_idem', $targets);
-		$this->assertNotContains('at_custom_absence', $targets);
+		$this->assertContains('at_custom_absence', $targets);
 		$models = self::operationsFor($compiled['operations'], 'at_models', 'insert');
 		$this->assertArrayHasKey('work_days_per_week', $models[0]['data']);
 		$entries = self::operationsFor($compiled['operations'], 'at_entries', 'insert');
 		$this->assertArrayHasKey('breaks', $entries[0]['data']);
-		$this->assertArrayNotHasKey('work_location', $entries[0]['data']);
+		$this->assertArrayHasKey('work_location', $entries[0]['data']);
 		$absences = self::operationsFor($compiled['operations'], 'at_absences', 'insert');
-		$this->assertNotContains('custom_bereavement', array_column(array_column($absences, 'data'), 'type'));
+		$this->assertContains('custom_bereavement', array_column(array_column($absences, 'data'), 'type'));
 		$this->assertContains('duration_hours', array_keys($absences[0]['data']));
 		$substitutions = self::operationsFor($compiled['operations'], 'at_absences', 'update');
 		$this->assertSame(['substitution:vacation_days_approved', 'substitution:vacation_hours_pending'], array_column($substitutions, 'key'));

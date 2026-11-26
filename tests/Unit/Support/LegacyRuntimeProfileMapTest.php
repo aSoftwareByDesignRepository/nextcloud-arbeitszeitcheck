@@ -16,7 +16,7 @@ final class LegacyRuntimeProfileMapTest extends TestCase
 	public function testMapsCurrentProductionSourceToCompatibleServerImage(): void
 	{
 		$map = self::map();
-		$this->assertSame('nextcloud:35', $map->profileForTag('v1.8.0')['serverImage']);
+		$this->assertSame('nextcloud:35', $map->profileForTag('v1.12.2')['serverImage']);
 		$this->assertCount(1, $map->profiles());
 	}
 
@@ -38,7 +38,7 @@ final class LegacyRuntimeProfileMapTest extends TestCase
 	public function testRejectsDuplicateTag(): void
 	{
 		$data = self::data();
-		$data['profiles'][0]['tags'][] = 'v1.8.0';
+		$data['profiles'][0]['tags'][] = 'v1.12.2';
 		$this->expectMapFailure($data, 'missing or duplicate source tag');
 	}
 

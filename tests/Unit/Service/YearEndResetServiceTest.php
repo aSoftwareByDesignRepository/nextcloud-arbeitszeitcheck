@@ -60,6 +60,10 @@ class YearEndResetServiceTest extends TestCase
 		// "fresh operation" so tests exercise the preview-handle path.
 		$this->runMapper->method('findByOperationKey')
 			->willThrowException(new DoesNotExistException('none'));
+		// Atomic preview claims succeed by default; tests asserting the lost
+		// race override these to return false.
+		$this->runMapper->method('claimPreviewForExecution')->willReturn(true);
+		$this->runMapper->method('claimPreviewConsume')->willReturn(true);
 		$this->itemMapper = $this->createMock(YearResetItemMapper::class);
 		$this->refMapper = $this->createMock(YearResetRefMapper::class);
 		$this->adjustmentService = $this->createMock(OvertimeAdjustmentService::class);
@@ -407,6 +411,58 @@ class YearEndResetServiceTest extends TestCase
 			$this->service->execute('admin', str_repeat('a', 64), $opId, 3));
 	}
 
+	public function testExecuteLostClaimRaceIsConflictNotOverwrite(): void
+	{
+		// A concurrent execute already consumed the preview — the claim must
+		// fail atomically instead of overwriting the winner's operation key.
+		$this->enableManual();
+		$run = new YearResetRun();
+		$run->setId(11);
+		$run->setActorUid('admin');
+		$run->setState(YearResetRun::STATE_PREVIEWED);
+		$run->setPreviewExpiresAt(new \DateTime('+10 minutes'));
+
+		$this->runMapper = $this->createMock(YearResetRunMapper::class);
+		$this->makeService();
+		$this->runMapper->method('findByOperationKey')
+			->willThrowException(new DoesNotExistException('none'));
+		$this->runMapper->method('findByPreviewKeyHash')->willReturn($run);
+		$this->runMapper->method('claimPreviewForExecution')->willReturn(false);
+		$this->runMapper->expects($this->never())->method('update');
+
+		$this->assertErrorCode(YearEndResetService::ERROR_OPERATION_CONFLICT, fn () =>
+			$this->service->execute('admin', str_repeat('a', 64), '123e4567-e89b-42d3-a456-426614174000', 3));
+	}
+
+	public function testResumeLostClaimRaceIsConflictNotOverwrite(): void
+	{
+		$this->enableManual();
+		$run = new YearResetRun();
+		$run->setId(9);
+		$run->setActorUid('admin');
+		$run->setClosingYear(2025);
+		$run->setState(YearResetRun::STATE_FAILED);
+		$preview = new YearResetRun();
+		$preview->setId(12);
+		$preview->setActorUid('admin');
+		$preview->setClosingYear(2025);
+		$preview->setState(YearResetRun::STATE_PREVIEWED);
+		$preview->setPreviewExpiresAt(new \DateTime('+10 minutes'));
+
+		$this->runMapper = $this->createMock(YearResetRunMapper::class);
+		$this->makeService();
+		$this->runMapper->method('findByOperationKey')
+			->willThrowException(new DoesNotExistException('none'));
+		$this->runMapper->method('findById')->with(9)->willReturn($run);
+		$this->runMapper->method('findByPreviewKeyHash')->willReturn($preview);
+		$this->runMapper->method('claimPreviewConsume')->willReturn(false);
+		$this->runMapper->expects($this->never())->method('update');
+		$this->refMapper->method('findByRun')->willReturn([]);
+
+		$this->assertErrorCode(YearEndResetService::ERROR_OPERATION_CONFLICT, fn () =>
+			$this->service->resume('admin', 9, str_repeat('b', 64), '123e4567-e89b-42d3-a456-426614174000', 3));
+	}
+
 	// ----------------------------------------------------------------- purge
 
 	public function testPurgeDeletesExpiredPreviewRunsWithRefs(): void
@@ -420,10 +476,30 @@ class YearEndResetServiceTest extends TestCase
 		$this->db->expects($this->once())->method('beginTransaction');
 		$this->db->expects($this->once())->method('commit');
 		$this->db->expects($this->never())->method('rollBack');
+		$this->runMapper->expects($this->once())->method('deleteIfPreviewed')->with(7)->willReturn(true);
 		$this->refMapper->expects($this->once())->method('deleteByRun')->with(7);
-		$this->runMapper->expects($this->once())->method('delete')->with($expired);
+		$this->runMapper->expects($this->never())->method('delete');
 
 		$this->assertSame(1, $this->service->purgeExpiredPreviews());
+	}
+
+	public function testPurgeSkipsRunClaimedConcurrently(): void
+	{
+		// execute() claimed the preview between the find and the delete —
+		// the guarded delete loses and refs must survive (they now carry
+		// execution outcomes).
+		$claimed = new YearResetRun();
+		$claimed->setId(9);
+		$claimed->setState(YearResetRun::STATE_PREVIEWED);
+		$claimed->setPreviewExpiresAt(new \DateTime('-1 hour'));
+
+		$this->runMapper->method('findExpiredPreviews')->willReturn([$claimed]);
+		$this->runMapper->method('deleteIfPreviewed')->with(9)->willReturn(false);
+		$this->refMapper->expects($this->never())->method('deleteByRun');
+		$this->runMapper->expects($this->never())->method('delete');
+		$this->db->expects($this->once())->method('rollBack');
+
+		$this->assertSame(0, $this->service->purgeExpiredPreviews());
 	}
 
 	public function testPurgeRefDeleteFailureRollsBackAndKeepsRun(): void
@@ -434,6 +510,7 @@ class YearEndResetServiceTest extends TestCase
 		$expired->setPreviewExpiresAt(new \DateTime('-1 hour'));
 
 		$this->runMapper->method('findExpiredPreviews')->willReturn([$expired]);
+		$this->runMapper->method('deleteIfPreviewed')->willReturn(true);
 		$this->refMapper->method('deleteByRun')->willThrowException(new \RuntimeException('db gone'));
 		$this->db->expects($this->once())->method('rollBack');
 		$this->db->expects($this->never())->method('commit');

@@ -17,10 +17,10 @@ final class LegacySchemaFamilyMapTest extends TestCase
 	{
 		$map = self::map();
 		$this->assertCount(1, $map->families());
-		$this->assertSame(1046, $map->familyForTag('v1.8.0')['maxMigration']);
-		$this->assertTrue($map->capabilitiesForTag('v1.8.0')['monthClosures']);
-		$this->assertTrue($map->capabilitiesForTag('v1.8.0')['mobileKioskIdempotency']);
-		$this->assertFalse($map->capabilitiesForTag('v1.8.0')['workLocation']);
+		$this->assertSame(1063, $map->familyForTag('v1.12.2')['maxMigration']);
+		$this->assertTrue($map->capabilitiesForTag('v1.12.2')['monthClosures']);
+		$this->assertTrue($map->capabilitiesForTag('v1.12.2')['mobileKioskIdempotency']);
+		$this->assertTrue($map->capabilitiesForTag('v1.12.2')['workLocation']);
 	}
 
 	public function testCapabilityThresholdsAreInclusiveAtBoundary(): void
@@ -31,8 +31,8 @@ final class LegacySchemaFamilyMapTest extends TestCase
 		$data = [
 			'format' => 1,
 			'families' => [[
-				'key' => 'v1.8.0-boundary',
-				'tags' => ['v1.8.0'],
+				'key' => 'v1.12.2-boundary',
+				'tags' => ['v1.12.2'],
 				'migrationVersions' => range(1000, 1014),
 				'minMigration' => 1000,
 				'maxMigration' => 1014,
@@ -42,7 +42,7 @@ final class LegacySchemaFamilyMapTest extends TestCase
 		file_put_contents($path, json_encode($data));
 		try {
 			$map = LegacySchemaFamilyMap::load($path, LegacyUpgradeMatrix::load(self::MATRIX));
-			$caps = $map->capabilitiesForTag('v1.8.0');
+			$caps = $map->capabilitiesForTag('v1.12.2');
 			$this->assertTrue($caps['monthClosures'], 'maxMigration 1014 includes monthClosures');
 			$this->assertTrue($caps['teams'], 'maxMigration 1014 includes teams');
 			$this->assertFalse($caps['localDatetimeStorage'], 'maxMigration 1014 predates 1015');
@@ -72,7 +72,7 @@ final class LegacySchemaFamilyMapTest extends TestCase
 	public function testRejectsDuplicateTagAcrossFamilies(): void
 	{
 		$data = self::data();
-		$data['families'][0]['tags'][] = 'v1.8.0';
+		$data['families'][0]['tags'][] = 'v1.12.2';
 		$this->expectMapFailure($data, 'missing or duplicate source tag');
 	}
 

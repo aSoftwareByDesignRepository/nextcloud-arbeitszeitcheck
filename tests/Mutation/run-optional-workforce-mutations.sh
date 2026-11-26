@@ -196,6 +196,18 @@ kill_or_die operation_id_check_inverted "$YEAREND_SVC" \
 	"if (!preg_match('/^[0-9a-fA-F-]{32,36}$/', \$operationId)) {" \
 	"if (preg_match('/^[0-9a-fA-F-]{32,36}$/', \$operationId)) {"
 
+kill_or_die execute_claim_guard_inverted "$YEAREND_SVC" \
+	'if (!$this->runMapper->claimPreviewForExecution(' \
+	'if ($this->runMapper->claimPreviewForExecution('
+
+kill_or_die resume_claim_guard_inverted "$YEAREND_SVC" \
+	'if (!$this->runMapper->claimPreviewConsume(' \
+	'if ($this->runMapper->claimPreviewConsume('
+
+kill_or_die purge_claim_guard_inverted "$YEAREND_SVC" \
+	'if (!$this->runMapper->deleteIfPreviewed(' \
+	'if ($this->runMapper->deleteIfPreviewed('
+
 # --- WorkforcePolicy (capabilities truth table) -------------------------------
 
 kill_or_die subgate_parent_drop "$POLICY_VO" \

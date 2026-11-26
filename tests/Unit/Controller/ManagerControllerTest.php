@@ -2289,6 +2289,7 @@ class ManagerControllerTest extends TestCase
 		$this->canAccessManagerDashboard = true;
 		$this->teamResolver->method('useAppTeams')->willReturn(true);
 		$this->teamManagerMapper->method('getTeamIdsForManager')->with('mgr')->willReturn([10, 11]);
+		$this->teamMapper->method('getParentMap')->willReturn([10 => null, 11 => null]);
 
 		$team = new \OCA\ArbeitszeitCheck\Db\Team();
 		$team->setId(10);

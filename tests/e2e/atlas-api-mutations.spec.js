@@ -728,7 +728,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 		await api(page, 'PUT', `${APP}/api/admin/kiosk/users/${encodeURIComponent(EMP)}/allowed`, { data: { kioskAllowed: true } })
 
 		let terminalId = null
-		const rfidUid = `RFID-${UNIQ}`.toUpperCase()
+		const rfidUid = `RFID-${UNIQ}-C0DE`.toUpperCase()
 		try {
 			const term = await api(page, 'POST', `${APP}/api/admin/kiosk/terminals`, {
 				data: { label: `atlas-mut-${UNIQ}` },
@@ -844,7 +844,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			// enrollment scan: admin opens enrollment, device scans a fresh UID.
 			// Enrollment target must be kiosk-allowed.
 			await api(page, 'PUT', `${APP}/api/admin/kiosk/users/${encodeURIComponent(SUB)}/allowed`, { data: { kioskAllowed: true } })
-			const scanUid = `RFID-ENROLL-${UNIQ}`.toUpperCase()
+			const scanUid = `RFID-ENROLL-${UNIQ}-C0DE`.toUpperCase()
 			await api(page, 'POST', `${APP}/api/admin/kiosk/enrollment/start`, {
 				data: { terminalId, userId: SUB },
 			})
@@ -860,7 +860,7 @@ test.describe('ATLAS durable-mutation sweep', () => {
 			// credentials import — bulk write re-read via credentials list
 			// (endpoint contract: CSV payload `uid,userId,label`, header optional)
 			const imp = await apiAllowFailure(page, 'POST', `${APP}/api/admin/kiosk/credentials/import`, {
-				data: { csv: `uid,userId,label\nRFID-IMP-${UNIQ.toUpperCase()},${SUB},imp ${UNIQ}` },
+				data: { csv: `uid,userId,label\nRFID-IMP-${UNIQ.toUpperCase()}-C0DE,${SUB},imp ${UNIQ}` },
 			})
 			expect(imp.ok, `credentials import failed: ${JSON.stringify(imp.json)}`).toBe(true)
 			const creds2 = await api(page, 'GET', `${APP}/api/admin/kiosk/credentials?userId=${encodeURIComponent(SUB)}`)

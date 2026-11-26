@@ -1042,7 +1042,8 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCP\ICacheFactory::class),
 				$c->query(\OCP\IL10N::class),
-				$c->query(\Psr\Log\LoggerInterface::class)
+				$c->query(\Psr\Log\LoggerInterface::class),
+				$c->query(\OCP\Lock\ILockingProvider::class)
 			);
 		});
 
@@ -1052,6 +1053,7 @@ class Application extends App implements IBootstrap {
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidaySuppressionMapper::class),
 				$c->query(HolidayService::class),
 				$c->query(\OCP\IConfig::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
 			);
 		});
 

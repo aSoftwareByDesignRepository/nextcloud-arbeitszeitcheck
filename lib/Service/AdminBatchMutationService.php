@@ -17,6 +17,12 @@ use Psr\Log\LoggerInterface;
 /**
  * Thin batch façades over proven single-user writers (teams + profile + L3 vacation).
  * Partial success only — never all-or-nothing across the batch.
+ *
+ * catalog-lock:ok — team add paths are idempotent unique-inserts
+ * (TeamMemberMapper::addMember/TeamManagerMapper::addManager swallow
+ * REASON_UNIQUE_CONSTRAINT_VIOLATION); profile/policy writes route through
+ * AdminUserProfileUpdateService which holds DbLockKeys::userProfile($uid)
+ * exclusive locks. No named catalog lock needed here.
  */
 class AdminBatchMutationService
 {

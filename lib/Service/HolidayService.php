@@ -24,6 +24,7 @@ use OCA\ArbeitszeitCheck\Support\RegionRegistry;
 use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\IL10N;
+use OCP\Lock\ILockingProvider;
 use Psr\Log\LoggerInterface;
 
 // unique-conflict:ok — the only mapper-mediated write site the class gate
@@ -41,6 +42,7 @@ class HolidayService
 		ICacheFactory $cacheFactory,
 		private readonly IL10N $l10n,
 		private readonly LoggerInterface $logger,
+		private readonly ?ILockingProvider $lockingProvider = null,
 	) {
 		$this->cache = $cacheFactory->createDistributed('arbeitszeitcheck_holidays');
 	}
@@ -341,23 +343,37 @@ class HolidayService
 		}
 		$this->reconciledStateYears[$memoKey] = true;
 
-		$statutoryAutoReseed = $this->isStatutoryAutoReseedEnabled();
+		// Named catalog lock (catalog_mutation_outside_named_lock heal): the
+		// empty-check→seed and suppression-clear→insert windows must serialise
+		// against HolidayAdminService delete→suppress so a manually deleted
+		// statutory day cannot resurrect mid-sequence.
+		$lock = DbLockKeys::policyCatalog('holiday');
+		if ($this->lockingProvider !== null) {
+			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Holiday catalog reconcile');
+		}
+		try {
+			$statutoryAutoReseed = $this->isStatutoryAutoReseedEnabled();
 
-		if ($statutoryAutoReseed) {
-			// Auto-restore is on: statutory opt-outs are void. Seed ignores
-			// suppressions and clears any stale opt-out so that toggling the
-			// policy OFF→ON reliably brings previously deleted statutory days
-			// back (matches the documented "deleted rows reappear" contract).
-			$this->seedStatutoryHolidaysForStateAndYear($state, $year, false);
-			$this->clearDistributedCacheForStateYear($state, $year);
-		} else {
-			// Auto-restore is off: a fully emptied year stays empty because every
-			// statutory delete records a per-date suppression (and migration 1034
-			// converted the legacy "initialized" flag into suppressions), so the
-			// seeder below re-inserts nothing for opted-out dates.
-			if (!$this->holidayMapper->hasStatutoryHolidaysForStateAndYear($state, $year)) {
-				$this->seedStatutoryHolidaysForStateAndYear($state, $year, true);
+			if ($statutoryAutoReseed) {
+				// Auto-restore is on: statutory opt-outs are void. Seed ignores
+				// suppressions and clears any stale opt-out so that toggling the
+				// policy OFF→ON reliably brings previously deleted statutory days
+				// back (matches the documented "deleted rows reappear" contract).
+				$this->seedStatutoryHolidaysForStateAndYear($state, $year, false);
 				$this->clearDistributedCacheForStateYear($state, $year);
+			} else {
+				// Auto-restore is off: a fully emptied year stays empty because every
+				// statutory delete records a per-date suppression (and migration 1034
+				// converted the legacy "initialized" flag into suppressions), so the
+				// seeder below re-inserts nothing for opted-out dates.
+				if (!$this->holidayMapper->hasStatutoryHolidaysForStateAndYear($state, $year)) {
+					$this->seedStatutoryHolidaysForStateAndYear($state, $year, true);
+					$this->clearDistributedCacheForStateYear($state, $year);
+				}
+			}
+		} finally {
+			if ($this->lockingProvider !== null) {
+				$this->lockingProvider->releaseLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
 			}
 		}
 	}

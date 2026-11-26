@@ -18,6 +18,8 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Resolves admin employee directory pages: scan → access filter → optional active_today → sort → slice.
+ *
+ * catalog-lock:ok — read-only service; exposes no mutators.
  */
 final class AdminEmployeeDirectoryService
 {

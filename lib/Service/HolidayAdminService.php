@@ -17,6 +17,8 @@ use OCA\ArbeitszeitCheck\Db\HolidaySuppressionMapper;
 use OCA\ArbeitszeitCheck\Support\HolidayCatalogResolver;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 
 class HolidayAdminService
 {
@@ -25,6 +27,7 @@ class HolidayAdminService
 		private readonly HolidaySuppressionMapper $suppressionMapper,
 		private readonly HolidayService $holidayCalendarService,
 		private readonly IConfig $config,
+		private readonly ?ILockingProvider $lockingProvider = null,
 	) {
 	}
 
@@ -42,34 +45,52 @@ class HolidayAdminService
 			return ['success' => false, 'error' => 'invalid_id'];
 		}
 
-		try {
-			$existing = $this->holidayMapper->findById($id);
-		} catch (DoesNotExistException) {
-			return ['success' => true];
-		}
-
-		$state = $existing->getState();
-		$date = $existing->getDate();
-		$year = $date !== null ? (int)$date->format('Y') : null;
-		$dateYmd = $date !== null ? $date->format('Y-m-d') : null;
-		$scope = $existing->getScope();
-
-		$this->holidayMapper->deleteById($id);
-
-		if ($state !== '' && $year !== null) {
-			$this->holidayCalendarService->clearCacheForStateYear($state, $year);
-			if ($scope === Holiday::SCOPE_STATUTORY && $dateYmd !== null && !$this->isStatutoryAutoReseedEnabled()) {
-				// The per-date suppression alone keeps the day deleted; the legacy
-				// "initialized state/years" flag was retired in migration 1034.
-				$this->suppressionMapper->addSuppression($state, $dateYmd, $suppressedBy);
+		// Named catalog lock: find→delete→suppress must serialise against the
+		// reconcile seeder (HolidayService holds the same key) and concurrent
+		// admin deletes — otherwise a seeded row can resurrect between the
+		// delete and the suppression write.
+		$lock = DbLockKeys::policyCatalog('holiday');
+		if ($this->lockingProvider !== null) {
+			try {
+				DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Holiday catalog mutation');
+			} catch (LockedException) {
+				return ['success' => false, 'error' => 'locked'];
 			}
 		}
+		try {
+			try {
+				$existing = $this->holidayMapper->findById($id);
+			} catch (DoesNotExistException) {
+				return ['success' => true];
+			}
 
-		return [
-			'success' => true,
-			'state' => $state,
-			'year' => $year,
-		];
+			$state = $existing->getState();
+			$date = $existing->getDate();
+			$year = $date !== null ? (int)$date->format('Y') : null;
+			$dateYmd = $date !== null ? $date->format('Y-m-d') : null;
+			$scope = $existing->getScope();
+
+			$this->holidayMapper->deleteById($id);
+
+			if ($state !== '' && $year !== null) {
+				$this->holidayCalendarService->clearCacheForStateYear($state, $year);
+				if ($scope === Holiday::SCOPE_STATUTORY && $dateYmd !== null && !$this->isStatutoryAutoReseedEnabled()) {
+					// The per-date suppression alone keeps the day deleted; the legacy
+					// "initialized state/years" flag was retired in migration 1034.
+					$this->suppressionMapper->addSuppression($state, $dateYmd, $suppressedBy);
+				}
+			}
+
+			return [
+				'success' => true,
+				'state' => $state,
+				'year' => $year,
+			];
+		} finally {
+			if ($this->lockingProvider !== null) {
+				$this->lockingProvider->releaseLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
+			}
+		}
 	}
 
 	/**
@@ -77,7 +98,19 @@ class HolidayAdminService
 	 */
 	public function onStatutoryHolidaySaved(string $state, string $dateYmd): void
 	{
-		$this->suppressionMapper->removeSuppression($state, $dateYmd);
+		// Same named catalog lock as deleteStateHolidayById — suppression writes
+		// serialise against the reconcile seeder.
+		$lock = DbLockKeys::policyCatalog('holiday');
+		if ($this->lockingProvider === null) {
+			$this->suppressionMapper->removeSuppression($state, $dateYmd);
+			return;
+		}
+		DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Holiday catalog mutation');
+		try {
+			$this->suppressionMapper->removeSuppression($state, $dateYmd);
+		} finally {
+			$this->lockingProvider->releaseLock($lock, ILockingProvider::LOCK_EXCLUSIVE);
+		}
 	}
 
 	/**

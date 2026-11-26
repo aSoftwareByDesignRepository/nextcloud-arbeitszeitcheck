@@ -14,7 +14,15 @@ use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
-/** @extends QBMapper<YearResetRun> */
+/**
+ * unique-conflict:ok — claimPreviewForExecution/claimPreviewConsume write
+ * unique-indexed columns (at_yr_run_op_uq, at_yr_run_pv_uq) only inside
+ * YearEndResetService::execute()/resume() transactions whose catch maps
+ * REASON_UNIQUE_CONSTRAINT_VIOLATION to ERROR_OPERATION_CONFLICT
+ * (converge-to-winner, never a raw 500).
+ *
+ * @extends QBMapper<YearResetRun>
+ */
 class YearResetRunMapper extends QBMapper
 {
 	public function __construct(IDBConnection $db)

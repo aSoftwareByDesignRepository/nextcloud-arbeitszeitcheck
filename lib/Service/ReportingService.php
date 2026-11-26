@@ -75,11 +75,43 @@ class ReportingService
 	 */
 	public function workLocationReport(iterable $entries, ?\DateTimeInterface $openAsOf = null): array
 	{
-		return $this->workLocationAggregator->aggregate(
+		$report = $this->workLocationAggregator->aggregate(
 			$entries,
 			$this->timeZoneService->storageTimeZone(),
 			$openAsOf
 		);
+		// Localized reporting-category labels (GH #52): the raw `category` code
+		// stays for machine consumers; UIs render `category_label`/`label`.
+		foreach ($report['byCode'] as $code => $row) {
+			if (is_array($row) && isset($row['category']) && is_string($row['category'])) {
+				$report['byCode'][$code]['category_label'] = $this->workLocationCategoryLabel($row['category']);
+			}
+		}
+		foreach ($report['byCategory'] as $category => $row) {
+			if (is_array($row)) {
+				$report['byCategory'][$category]['label'] = $this->workLocationCategoryLabel((string)$category);
+			}
+		}
+		return $report;
+	}
+
+	/**
+	 * Localized label for a work-location reporting category (catalog
+	 * `reporting_category` values plus the `unrecorded` bucket). Unknown
+	 * values fall back to the raw code.
+	 */
+	private function workLocationCategoryLabel(string $category): string
+	{
+		return match ($category) {
+			'office' => $this->l10n->t('Office'),
+			'home' => $this->l10n->t('Home office'),
+			'external' => $this->l10n->t('External'),
+			'mobile' => $this->l10n->t('Mobile'),
+			'travel' => $this->l10n->t('Travel'),
+			'other' => $this->l10n->t('Other'),
+			\OCA\ArbeitszeitCheck\Service\WorkLocationReportAggregator::UNRECORDED => $this->l10n->t('Not recorded'),
+			default => $category,
+		};
 	}
 
 	/**
@@ -624,10 +656,12 @@ class ReportingService
 			$userAbsences[$uid]['absences'][] = [
 				'id' => $absence->getId(),
 				'type' => $type,
+				'type_label' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($this->l10n, $type),
 				'start_date' => $startDateRow ? $startDateRow->format('Y-m-d') : null,
 				'end_date' => $endDateRow ? $endDateRow->format('Y-m-d') : null,
 				'days' => $days,
 				'status' => $status,
+				'status_label' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::statusLabel($this->l10n, $status),
 				// FA-3 (additive): payroll "UV" attribution — carryover
 				// finances the earliest working days (see uv_dates).
 				'carryover_amount' => $attr['carryover_amount'] ?? null,
@@ -659,6 +693,20 @@ class ReportingService
 		// Summary maps stay alphabetically keyed for stable JSON (counts only).
 		ksort($report['absences_by_type'], SORT_STRING);
 		ksort($report['absences_by_status'], SORT_STRING);
+
+		// Localized label maps keyed by the raw codes used in the summary maps —
+		// reports and exports render these; clients without them fall back to
+		// the code (additive, backward compatible).
+		$typeLabels = [];
+		foreach (array_keys($report['absences_by_type']) as $typeCode) {
+			$typeLabels[(string)$typeCode] = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($this->l10n, (string)$typeCode);
+		}
+		$statusLabels = [];
+		foreach (array_keys($report['absences_by_status']) as $statusCode) {
+			$statusLabels[(string)$statusCode] = \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::statusLabel($this->l10n, (string)$statusCode);
+		}
+		$report['absence_type_labels'] = $typeLabels;
+		$report['absence_status_labels'] = $statusLabels;
 
 		$report['users'] = array_values($userAbsences);
 		$report['total_days'] = $totalDays;
@@ -784,7 +832,7 @@ class ReportingService
 		foreach ($entries as $entry) {
 			if ($entry->getStatus() === TimeEntry::STATUS_COMPLETED) {
 				// Reports are payroll-facing: paid basis (net + paid-break snapshot).
-				$totalHours += $entry->getPaidDurationHours() ?? 0.0;
+				$totalHours += $entry->getCountedPaidDurationHours() ?? 0.0;
 				$breakHours += $entry->getBreakDurationHours();
 			}
 		}
@@ -860,7 +908,7 @@ class ReportingService
 			$entryDate = (clone $startTime)->setTime(0, 0, 0);
 			if ($this->holidayCalendarService->isHolidayForUser($userId, $entryDate)) {
 				// Payroll report — paid basis (net + paid-break snapshot).
-				$hours = $entry->getPaidDurationHours();
+				$hours = $entry->getCountedPaidDurationHours();
 				if ($hours !== null) {
 					$holidayWorkHours += $hours;
 				}

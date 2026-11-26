@@ -183,6 +183,11 @@ class ReportController extends Controller
 				'error' => $denyMessage !== '' ? $this->l10n->t($denyMessage) : $this->l10n->t('Access denied'),
 			];
 		}
+		if ($e instanceof \OCA\ArbeitszeitCheck\Exception\TeamScopeNotFoundException) {
+			// Uniform 404 for team-scope violations (C-R8/NN-1): foreign and
+			// nonexistent team ids are indistinguishable on the wire.
+			return ['status' => Http::STATUS_NOT_FOUND, 'error' => $this->l10n->t('Team not found')];
+		}
 		if ($e instanceof BusinessRuleException) {
 			return ['status' => Http::STATUS_BAD_REQUEST, 'error' => $this->l10n->t($e->getMessage())];
 		}
@@ -579,6 +584,16 @@ class ReportController extends Controller
 				);
 				if (!$resolution['ok']) {
 					$this->permissionService->logPermissionDenied($currentUserId, 'view_report', 'report', $resolution['code'] ?? 'scope');
+					if ($resolution['code'] === \OCA\ArbeitszeitCheck\Service\OversightScopeService::ERR_DENIED
+						&& $teamId !== null && trim($teamId) !== '') {
+						// Team selector violated the managed subtree — uniform
+						// 404 so foreign and nonexistent teams stay
+						// indistinguishable (C-R8/NN-1), same as team().
+						throw new \OCA\ArbeitszeitCheck\Exception\TeamScopeNotFoundException();
+					}
+					if ($resolution['code'] !== \OCA\ArbeitszeitCheck\Service\OversightScopeService::ERR_DENIED) {
+						throw new BusinessRuleException('Invalid scope parameters.');
+					}
 					throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
 				}
 				if ($resolution['userIds'] !== null) {
@@ -855,29 +870,20 @@ class ReportController extends Controller
 	 * @return list<string>
 	 */
 	private function resolveTeamMemberIdsFromTeamId(string $currentUserId, int $teamId): array {
-		if ($this->permissionService->isAdmin($currentUserId)) {
-			$members = $this->teamMemberMapper->findByTeamId($teamId);
-			$ids = [];
-			foreach ($members as $m) {
-				$ids[] = $m->getUserId();
-			}
-			return $ids;
+		// C-R2/C-R3/C-R8: single authority — the scope service resolves team
+		// members recursively (parent includes all descendants) and validates
+		// the id against the caller's managed subtree. Foreign or nonexistent
+		// teams collapse into one uniform 404 (NN-1: no existence oracle,
+		// no BOLA) — matching the defence-in-depth member filter inside
+		// resolveTeamScope() which intersects with the managed uid set.
+		$resolution = $this->oversightScope()->resolveRequestedScope(
+			$currentUserId, null, null, (string)$teamId, null
+		);
+		if (!$resolution['ok'] || $resolution['userIds'] === null) {
+			$this->permissionService->logPermissionDenied($currentUserId, 'view_team_report', 'team', (string)$teamId);
+			throw new \OCA\ArbeitszeitCheck\Exception\TeamScopeNotFoundException();
 		}
-
-		if ($this->permissionService->canAccessManagerDashboard($currentUserId)) {
-			$managedTeamIds = $this->teamManagerMapper->getTeamIdsForManager($currentUserId);
-			if (!in_array($teamId, $managedTeamIds, true)) {
-				throw new AccessDeniedException('Access denied. You can only view reports for teams you manage.');
-			}
-			$members = $this->teamMemberMapper->findByTeamId($teamId);
-			$ids = [];
-			foreach ($members as $m) {
-				$ids[] = $m->getUserId();
-			}
-			return $ids;
-		}
-
-		throw new AccessDeniedException('Access denied. You can only view reports for yourself or your team members.');
+		return $resolution['userIds'];
 	}
 
 	/**

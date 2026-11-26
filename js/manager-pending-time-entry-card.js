@@ -185,8 +185,11 @@
 					+ escapeHtml(duration) + ' ' + escapeHtml(t('hours', 'hours')) + '</dd></div>'
 				);
 			}
-			if (summary.paidDurationHours != null && summary.paidDurationHours !== summary.durationHours) {
-				const paidDuration = formatDurationHours(summary.paidDurationHours);
+			const paidBasis = summary.counted_paid_duration_hours != null
+				? summary.counted_paid_duration_hours
+				: summary.paidDurationHours;
+			if (paidBasis != null && paidBasis !== summary.durationHours) {
+				const paidDuration = formatDurationHours(paidBasis);
 				if (paidDuration !== '') {
 					facts.push(
 						'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('Paid duration', 'Paid duration')) + '</dt><dd>'
@@ -198,6 +201,12 @@
 				facts.push(
 					'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('Paid break', 'Paid break')) + '</dt><dd>'
 					+ escapeHtml(String(Math.round(Number(summary.paidBreakSeconds) / 60))) + ' ' + escapeHtml(t('min', 'min')) + '</dd></div>'
+				);
+			}
+			if (summary.clamped === true && summary.counted_start) {
+				facts.push(
+					'<div class="pending-approval-card__fact"><dt>' + escapeHtml(t('Counted from', 'Counted from')) + '</dt><dd>'
+					+ escapeHtml(formatClockDisplay(summary.counted_start, deps)) + '</dd></div>'
 				);
 			}
 			facts.push(

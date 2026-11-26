@@ -461,6 +461,25 @@
 		}
 		if (hasHr) {
 			bindDependentBlock(form.querySelector('#hrNotificationsEnabled'), 'hr-notification-settings');
+			// A-R6: collapsed "custom types" group in the HR matrix — one toggle
+			// reveals all custom rows (progressive disclosure, no tree widget).
+			const customToggle = form.querySelector('.admin-notifications-matrix__custom-toggle-btn');
+			if (customToggle) {
+				customToggle.addEventListener('click', () => {
+					const rows = form.querySelectorAll('.admin-notifications-matrix__custom-row');
+					const expanded = customToggle.getAttribute('aria-expanded') === 'true';
+					rows.forEach((row) => {
+						row.hidden = expanded;
+					});
+					customToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+					const label = expanded
+						? customToggle.getAttribute('data-label-show')
+						: customToggle.getAttribute('data-label-hide');
+					if (label) {
+						customToggle.textContent = label;
+					}
+				});
+			}
 		}
 		if (hasTraffic) {
 			bindDependentBlock(form.querySelector('#overtimeTrafficLightEnabled'), 'overtime-trafficlight-settings');

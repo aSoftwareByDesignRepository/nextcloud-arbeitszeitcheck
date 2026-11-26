@@ -299,7 +299,7 @@ class TimeEntryExportTransformer
 		$totalDurationSeconds = $endTs - $startTs;
 		$totalDurationHours = $entry->getTotalDurationHours();
 		// Export rows carry tariff/payroll hours (net + paid-break snapshot).
-		$totalWorkingHours = $entry->getPaidDurationHours();
+		$totalWorkingHours = $entry->getCountedPaidDurationHours();
 		$totalBreakHours = $entry->getBreakDurationHours();
 
 		if ($totalDurationHours === null || $totalDurationHours <= 0) {
@@ -343,6 +343,8 @@ class TimeEntryExportTransformer
 				'policy_applied' => $entry->getPolicyApplied() ?? '',
 				'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
 				'project_id' => $entry->getProjectCheckProjectId() ?? '',
+				'counted_clamped' => $entry->isCountedClamped() ? 'Yes' : 'No',
+				'counted_start' => $this->countedStartForExport($entry, $segStart, $segEnd),
 			] + $this->accountingExportAddon($entry);
 		}
 
@@ -397,7 +399,7 @@ class TimeEntryExportTransformer
 			'break_duration_hours' => $entry->getBreakDurationHours(),
 			// Paid basis for payroll compatibility (net + paid break) — the
 			// two explicit columns beside it remove the ambiguity (TH-06).
-			'working_hours' => $entry->getPaidDurationHours(),
+			'working_hours' => $entry->getCountedPaidDurationHours(),
 			'net_working_hours' => $entry->getWorkingDurationHours(),
 			'paid_break_hours' => $entry->getPaidBreakHours(),
 			'description' => $entry->getDescription() ?? '',
@@ -409,7 +411,28 @@ class TimeEntryExportTransformer
 			'policy_applied' => $entry->getPolicyApplied() ?? '',
 			'is_manual_entry' => $entry->getIsManualEntry() ? 'Yes' : 'No',
 			'project_id' => $entry->getProjectCheckProjectId() ?? '',
+			'counted_clamped' => $entry->isCountedClamped() ? 'Yes' : 'No',
+			'counted_start' => $this->countedStartForExport($entry, $startTime, $endTime ?? $startTime),
 		] + $this->accountingExportAddon($entry);
+	}
+
+	/**
+	 * 'H:i:s' of the counted work start when the clamp (spec B) moved it
+	 * into the exported [$segStart, $segEnd] segment — empty otherwise, so
+	 * multi-day rows only carry the value on the segment it belongs to.
+	 */
+	private function countedStartForExport(TimeEntry $entry, \DateTime $segStart, \DateTime $segEnd): string
+	{
+		$counted = $entry->getCountedStartTimestamp();
+		if ($counted === null || !$entry->isCountedClamped()) {
+			return '';
+		}
+		if ($counted < $segStart->getTimestamp() || $counted > $segEnd->getTimestamp()) {
+			return '';
+		}
+		return (new \DateTime('@' . $counted))
+			->setTimezone(new \DateTimeZone($this->timezone))
+			->format('H:i:s');
 	}
 
 	/**

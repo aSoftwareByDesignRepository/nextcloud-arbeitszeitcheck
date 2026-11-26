@@ -1055,8 +1055,10 @@ if ($mode === 'list') {
                                                 p(round($workingHours, 2)); ?> h
                                             <?php } else {
                                                 $workingHours = $entry->getWorkingDurationHours() ?? 0;
-                                                // Paid (tariff) basis is the payroll figure: net + paid break.
-                                                $paidHours = $entry->getPaidDurationHours() ?? $workingHours;
+                                                // Paid (tariff) basis is the payroll figure: counted net +
+                                                // paid break (spec B — the earliest-counted-start clamp
+                                                // layers onto accounting only; the raw stamp stays above).
+                                                $paidHours = $entry->getCountedPaidDurationHours() ?? $workingHours;
                                                 // Also limit completed entries to max for display (should already be enforced)
                                                 $maxWorkingHours = 10.0;
                                                 $paidHours = min($paidHours, $maxWorkingHours);
@@ -1064,6 +1066,14 @@ if ($mode === 'list') {
                                                 <?php $paidBreakMin = (int)round($entry->getPaidBreakSeconds() / 60); ?>
                                                 <?php if ($paidBreakMin > 0): ?>
                                                     <div class="text-muted"><?php p($l->t('Net: %1$.2f h · paid break: %2$d min', [round($workingHours, 2), $paidBreakMin])); ?></div>
+                                                <?php endif; ?>
+                                                <?php $countedStartTs = $entry->getCountedStartTimestamp(); ?>
+                                                <?php if ($countedStartTs !== null && $entry->isCountedClamped()): ?>
+                                                    <div class="text-muted"><?php
+                                                        $countedStartDisp = (new \DateTimeImmutable('@' . $countedStartTs))
+                                                            ->setTimezone($arbeitszeitCheckUserDisplayTz);
+                                                        p($l->t('Counted from %1$s', [$countedStartDisp->format('H:i')]));
+                                                    ?></div>
                                                 <?php endif; ?>
                                             <?php } ?>
                                             <?php if ($azcAcc !== null): ?>

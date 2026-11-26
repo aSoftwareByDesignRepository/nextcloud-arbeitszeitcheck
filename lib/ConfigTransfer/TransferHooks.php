@@ -707,14 +707,10 @@ final class TransferHooks implements ConfigTransferHooks
 		if (!is_array($input)) {
 			$input = [];
 		}
-		$matrix = [];
-		foreach (Constants::ABSENCE_TYPES as $absenceType) {
-			$matrix[$absenceType] = [];
-			$typeInput = (isset($input[$absenceType]) && is_array($input[$absenceType])) ? $input[$absenceType] : [];
-			foreach (Constants::HR_NOTIFICATION_EVENTS as $eventKey) {
-				$matrix[$absenceType][$eventKey] = $this->toBool($typeInput[$eventKey] ?? false);
-			}
-		}
+		// A-R5: custom_* rows must survive the transfer — the shared
+		// normalizer keeps every catalog type (incl. inactive for retention)
+		// and drops unknown/injected codes fail-closed.
+		$matrix = AbsenceTypeCatalog::normalizeEventMatrix($input, Constants::HR_NOTIFICATION_EVENTS);
 		return json_encode($matrix, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 	}
 

@@ -78,6 +78,25 @@ final class BreakPolicyResolver
 	public const DEDUCTION_CAP_OVERHANG = 'cap_overhang';
 	public const DEDUCTION_MODES = [self::DEDUCTION_STRICT, self::DEDUCTION_CAP_OVERHANG];
 
+	// Counted-start clamp (spec B): `clamp` = counted time always starts at
+	// the threshold; `clamp_unless_approved` = manager-created or
+	// manager-approved entries keep their raw start.
+	public const EARLY_START_MODE_CLAMP = 'clamp';
+	public const EARLY_START_MODE_CLAMP_UNLESS_APPROVED = 'clamp_unless_approved';
+	public const EARLY_START_MODES = [
+		self::EARLY_START_MODE_CLAMP,
+		self::EARLY_START_MODE_CLAMP_UNLESS_APPROVED,
+	];
+	public const EARLY_START_ANCHOR_CALENDAR_DAY = 'calendar_day';
+	/** Phase 2 anchor — requires a shift source that does not exist yet. */
+	public const EARLY_START_ANCHOR_SHIFT_START = 'shift_start';
+	public const EARLY_START_ANCHORS = [
+		self::EARLY_START_ANCHOR_CALENDAR_DAY,
+	];
+
+	/** Scan ceiling when a configured threshold hits a DST gap (B-R6). */
+	private const DST_GAP_SCAN_MINUTES = 180;
+
 	private const TIME_PATTERN = '/^([01]\d|2[0-3]):[0-5]\d$/';
 	private const DATE_PATTERN = '/^\d{4}-\d{2}-\d{2}$/';
 
@@ -309,6 +328,10 @@ final class BreakPolicyResolver
 			'paid_break_cap_minutes' => null,
 			// Model-level deduction-mode override; null = inherit org mode.
 			'deduction_mode' => null,
+			// Counted-start clamp (spec B); null/defaults = disabled.
+			'earliest_counted_start' => null,
+			'early_start_mode' => self::EARLY_START_MODE_CLAMP,
+			'early_start_anchor' => self::EARLY_START_ANCHOR_CALENDAR_DAY,
 		];
 	}
 
@@ -384,6 +407,30 @@ final class BreakPolicyResolver
 			} elseif (is_string($modeRaw) && in_array($modeRaw, self::DEDUCTION_MODES, true)) {
 				$rules['deduction_mode'] = $modeRaw;
 			}
+		}
+
+		// Counted-start clamp (spec B): tolerant decode — a corrupt fragment
+		// degrades to "no clamp" (raw semantics), never to an invented time.
+		if (array_key_exists('earliest_counted_start', $raw)) {
+			$startRaw = $raw['earliest_counted_start'];
+			$rules['earliest_counted_start'] = is_string($startRaw)
+				&& preg_match(self::TIME_PATTERN, $startRaw) === 1
+				? $startRaw
+				: null;
+		}
+		if (array_key_exists('early_start_mode', $raw)) {
+			$modeRaw = $raw['early_start_mode'];
+			$rules['early_start_mode'] = is_string($modeRaw)
+				&& in_array($modeRaw, self::EARLY_START_MODES, true)
+				? $modeRaw
+				: self::EARLY_START_MODE_CLAMP;
+		}
+		if (array_key_exists('early_start_anchor', $raw)) {
+			$anchorRaw = $raw['early_start_anchor'];
+			$rules['early_start_anchor'] = is_string($anchorRaw)
+				&& in_array($anchorRaw, self::EARLY_START_ANCHORS, true)
+				? $anchorRaw
+				: self::EARLY_START_ANCHOR_CALENDAR_DAY;
 		}
 
 		return $rules;
@@ -490,6 +537,41 @@ final class BreakPolicyResolver
 				$normalized['deduction_mode'] = $modeRaw;
 			} else {
 				$errors['deduction_mode'] = 'VALIDATION_VALUE';
+			}
+		}
+
+		// Counted-start clamp (spec B): strict write-boundary validation.
+		// `null`/`''` clears each key (normalized null → caller unsets).
+		if (array_key_exists('earliest_counted_start', $rules)) {
+			$startRaw = $rules['earliest_counted_start'];
+			if ($startRaw === null || $startRaw === '') {
+				$normalized['earliest_counted_start'] = null;
+			} elseif (is_string($startRaw) && preg_match(self::TIME_PATTERN, $startRaw) === 1) {
+				$normalized['earliest_counted_start'] = $startRaw;
+			} else {
+				$errors['earliest_counted_start'] = 'VALIDATION_VALUE';
+			}
+		}
+		if (array_key_exists('early_start_mode', $rules)) {
+			$modeRaw = $rules['early_start_mode'];
+			if ($modeRaw === null || $modeRaw === '') {
+				$normalized['early_start_mode'] = null;
+			} elseif (is_string($modeRaw) && in_array($modeRaw, self::EARLY_START_MODES, true)) {
+				$normalized['early_start_mode'] = $modeRaw;
+			} else {
+				$errors['early_start_mode'] = 'VALIDATION_VALUE';
+			}
+		}
+		if (array_key_exists('early_start_anchor', $rules)) {
+			$anchorRaw = $rules['early_start_anchor'];
+			if ($anchorRaw === null || $anchorRaw === '') {
+				$normalized['early_start_anchor'] = null;
+			} elseif (is_string($anchorRaw) && in_array($anchorRaw, self::EARLY_START_ANCHORS, true)) {
+				$normalized['early_start_anchor'] = $anchorRaw;
+			} else {
+				// 'shift_start' stays rejected until Phase 2 lands a shift
+				// source — an unknown anchor must never persist silently.
+				$errors['early_start_anchor'] = 'VALIDATION_VALUE';
 			}
 		}
 
@@ -936,6 +1018,112 @@ final class BreakPolicyResolver
 			return null;
 		}
 		return $dt->getTimestamp();
+	}
+
+	// ------------------------------------------------------------------ //
+	// Counted-start clamp (spec B)                                       //
+	// ------------------------------------------------------------------ //
+
+	/**
+	 * Resolve the counted-work-start threshold for an entry: the configured
+	 * `earliest_counted_start` on the entry's local day, when the model has
+	 * one and the raw start precedes it. Returns null when no clamp applies
+	 * (no config, start already at/after the threshold, exempt approved
+	 * entry, or unresolvable threshold).
+	 *
+	 * NEVER mutates the stored stamp (NN-2): callers layer the result onto
+	 * the accounting view only — display, reports, exports, overtime.
+	 */
+	public function countedStartForEntry(TimeEntry $entry): ?int
+	{
+		$start = $entry->getStartTime();
+		if ($start === null) {
+			return null;
+		}
+		$rules = $this->modelRulesForUser($entry->getUserId());
+		$hhmm = $rules['earliest_counted_start'];
+		if (!is_string($hhmm) || preg_match(self::TIME_PATTERN, $hhmm) !== 1) {
+			return null;
+		}
+		if (($rules['early_start_mode'] ?? self::EARLY_START_MODE_CLAMP) === self::EARLY_START_MODE_CLAMP_UNLESS_APPROVED
+			&& $entry->isApproved()) {
+			return null;
+		}
+		// 'shift_start' anchor is Phase 2 (no shift source exists yet) — any
+		// configured anchor resolves against the calendar day until then.
+		$tz = $this->timeZoneService->storageTimeZone();
+		$local = (new \DateTimeImmutable('@' . $start->getTimestamp()))->setTimezone($tz);
+		$threshold = $this->localTimeToTsOrNext($local->format('Y-m-d'), $hhmm, $tz);
+		if ($threshold === null || $threshold <= $start->getTimestamp()) {
+			return null;
+		}
+		return $threshold;
+	}
+
+	/**
+	 * Net counted seconds inside the clamped window: (end − threshold) minus
+	 * recorded breaks and frozen split exclusions clipped to the window.
+	 * Returns null when no clamp applies so callers keep raw semantics.
+	 */
+	public function countedNetSeconds(TimeEntry $entry): ?int
+	{
+		$threshold = $this->countedStartForEntry($entry);
+		if ($threshold === null) {
+			return null;
+		}
+		$end = $entry->getEndTime();
+		if ($end === null) {
+			return 0;
+		}
+		$endTs = $end->getTimestamp();
+		if ($endTs <= $threshold) {
+			return 0;
+		}
+		$nonWork = [];
+		foreach ($this->entryBreakIntervals($entry, $threshold, $endTs) as $piece) {
+			$nonWork[] = [$piece['start'], $piece['end']];
+		}
+		$excluded = $this->splitResultEpochPairs($entry, 'excluded');
+		if ($excluded !== null) {
+			foreach ($excluded as [$s, $e]) {
+				$nonWork[] = [max($s, $threshold), min($e, $endTs)];
+			}
+			$sum = SplitServiceAccounting::totalSeconds(
+				SplitServiceAccounting::intersect($nonWork, [[$threshold, $endTs]])
+			);
+		} else {
+			// No frozen split result: mirror getDurationHours — full breaks
+			// inside the window plus the stored excluded seconds.
+			$sum = SplitServiceAccounting::totalSeconds(
+				SplitServiceAccounting::intersect($nonWork, [[$threshold, $endTs]])
+			) + $entry->getExcludedWorkSeconds();
+		}
+		return max(0, ($endTs - $threshold) - $sum);
+	}
+
+	/**
+	 * Like {@see localTimeToTs} but for the counted-start threshold (B-R6):
+	 * a configured wall-clock time that does not exist on $day (DST
+	 * spring-forward) resolves to the first valid local time at-or-after it.
+	 */
+	private function localTimeToTsOrNext(string $day, string $hhmm, \DateTimeZone $tz): ?int
+	{
+		$ts = $this->localTimeToTs($day, $hhmm, $tz);
+		if ($ts !== null) {
+			return $ts;
+		}
+		$minutes = $this->timeToMinutes($hhmm);
+		for ($delta = 1; $delta <= self::DST_GAP_SCAN_MINUTES; $delta++) {
+			$next = $minutes + $delta;
+			if ($next > 1439) {
+				return null;
+			}
+			$cand = $this->localTimeToTs($day, sprintf('%02d:%02d', intdiv($next, 60), $next % 60), $tz);
+			if ($cand !== null) {
+				return $cand;
+			}
+		}
+		return null;
 	}
 
 	private function timeToMinutes(string $hhmm): int

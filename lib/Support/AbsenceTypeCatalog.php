@@ -197,6 +197,52 @@ final class AbsenceTypeCatalog
 	}
 
 	/**
+	 * Codes of custom types that are currently active (creatable) — used by
+	 * admin matrices that render one row per *active* custom type while the
+	 * stored config keeps rows for deactivated ones (reversible off-switch).
+	 *
+	 * @return list<string>
+	 */
+	public static function activeCustomTypeCodes(): array
+	{
+		$codes = [];
+		foreach (self::customTypes() as $code => $row) {
+			if ((bool)$row->getActive()) {
+				$codes[] = $code;
+			}
+		}
+		return $codes;
+	}
+
+	/**
+	 * Normalizes an event matrix (`{type: {event: bool}}`) against the known
+	 * type universe: every built-in plus every catalog custom row — including
+	 * deactivated ones — gets a row; unknown/injected codes are dropped
+	 * fail-closed. When `$stored` is given, types missing from `$input` keep
+	 * their stored row (hidden/inactive custom rows must survive a save —
+	 * retention contract, spec C-R9); explicit `false` values still clear.
+	 *
+	 * @param array<string, mixed> $input
+	 * @param list<string> $eventKeys
+	 * @param array<string, mixed>|null $stored currently persisted matrix
+	 * @return array<string, array<string, bool>>
+	 */
+	public static function normalizeEventMatrix(array $input, array $eventKeys, ?array $stored = null): array
+	{
+		$out = [];
+		foreach (self::all() as $type) {
+			$typeInput = (isset($input[$type]) && is_array($input[$type]))
+				? $input[$type]
+				: (($stored !== null && isset($stored[$type]) && is_array($stored[$type])) ? $stored[$type] : []);
+			foreach ($eventKeys as $eventKey) {
+				$v = $typeInput[$eventKey] ?? false;
+				$out[$type][$eventKey] = $v === true || $v === 1 || $v === '1' || $v === 'true';
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Fail-closed whitelist of absence types that may be converted into a
 	 * sick-leave record (FA-2a). Built-ins only — custom types piggyback on
 	 * {@see isConvertibleToSick()}. Sick-family types are the conversion
@@ -245,6 +291,24 @@ final class AbsenceTypeCatalog
 	public static function labelForUser(IL10N $l, string $type): string
 	{
 		return self::labels($l, self::userLocale())[$type] ?? $type;
+	}
+
+	/**
+	 * Localized label for an absence workflow status (single authority — same
+	 * map the month-closure PDF uses; reports and exports must not diverge).
+	 * Unknown/legacy values fall back to the raw code.
+	 */
+	public static function statusLabel(IL10N $l, string $status): string
+	{
+		return match ($status) {
+			Absence::STATUS_PENDING => $l->t('Pending'),
+			Absence::STATUS_SUBSTITUTE_PENDING => $l->t('Substitute pending'),
+			Absence::STATUS_SUBSTITUTE_DECLINED => $l->t('Substitute declined'),
+			Absence::STATUS_APPROVED => $l->t('Approved'),
+			Absence::STATUS_REJECTED => $l->t('Rejected'),
+			Absence::STATUS_CANCELLED => $l->t('Cancelled'),
+			default => $status,
+		};
 	}
 
 	/**
@@ -443,7 +507,7 @@ final class AbsenceTypeCatalog
 	/**
 	 * @return array<string, CustomAbsenceType> code => row, all custom types incl. inactive.
 	 */
-	private static function customTypes(): array
+	public static function customTypes(): array
 	{
 		if (self::$customLoaded) {
 			return self::$customCache ?? [];

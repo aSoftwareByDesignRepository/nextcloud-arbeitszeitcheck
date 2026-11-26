@@ -488,11 +488,13 @@ class ExportController extends Controller
 					$row = [
 						'id' => $absence->getId(),
 						'type' => $absence->getType(),
+						'type_label' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::label($this->l10n, $absence->getType()),
 						'start_date' => $startDateRow ? $startDateRow->format('Y-m-d') : '',
 						'end_date' => $endDateRow ? $endDateRow->format('Y-m-d') : '',
 						'days' => $absence->getDays(),
 						'reason' => $absence->getReason() ?? '',
 						'status' => $absence->getStatus(),
+						'status_label' => \OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::statusLabel($this->l10n, $absence->getStatus()),
 						'approver_comment' => $absence->getApproverComment() ?? '',
 						'approved_at' => $absence->getApprovedAt() ? $absence->getApprovedAt()->format('Y-m-d H:i:s') : '',
 						'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : '',
@@ -597,7 +599,10 @@ class ExportController extends Controller
 				$type = (string)($row['type'] ?? '');
 				if ($type !== $currentType) {
 					$currentType = $type;
-					fputcsv($fp, ['# ' . $this->l10n->t('Absence type') . ': ' . ($type !== '' ? $type : $this->l10n->t('(none)'))]);
+					// Section headers carry the localized label (GH #52); the
+					// raw code stays in the `type` column for machines.
+					$typeLabel = (string)($row['type_label'] ?? '') !== '' ? (string)$row['type_label'] : $type;
+					fputcsv($fp, ['# ' . $this->l10n->t('Absence type') . ': ' . ($typeLabel !== '' ? $typeLabel : $this->l10n->t('(none)'))]);
 					fputcsv($fp, $headers);
 				}
 				$sanitizedRow = array_map(

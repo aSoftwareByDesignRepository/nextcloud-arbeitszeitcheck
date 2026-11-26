@@ -40,7 +40,10 @@ final class UpgradeBackupIntegrationTest extends TestCase
 			self::markTestSkipped('ArbeitszeitCheck tables not present in this instance.');
 		}
 
-		$before = $this->countRows('at_entries');
+		// Concurrent writers (live cron jobs) can insert rows while this test
+		// runs, so the invariant is "every snapshotted row returns", not an
+		// exact table count.
+		$idsBefore = $this->entryIds();
 
 		$result = $this->backupService->createSnapshot('integration-test');
 		$snapshotId = $result['id'];
@@ -55,10 +58,12 @@ final class UpgradeBackupIntegrationTest extends TestCase
 		$this->db->getQueryBuilder()
 			->delete('at_entries')
 			->executeStatement();
-		self::assertSame(0, $this->countRows('at_entries'));
+		self::assertSame([], array_values(array_intersect($idsBefore, $this->entryIds())));
 
 		$this->backupService->restoreSnapshot($snapshotId, false);
-		self::assertSame($before, $this->countRows('at_entries'));
+		$idsAfter = $this->entryIds();
+		self::assertSame([], array_values(array_diff($idsBefore, $idsAfter)), 'restore must bring back every snapshotted row');
+		self::assertGreaterThanOrEqual(count($idsBefore), count($idsAfter));
 	}
 
 	public function testRestoreSkipsGeneratedColumns(): void
@@ -87,17 +92,17 @@ final class UpgradeBackupIntegrationTest extends TestCase
 			->setValue('updated_at', $qb->createNamedParameter('2026-10-13 08:00:00'))
 			->executeStatement();
 
-		$before = $this->countRows('at_entries');
+		$idsBefore = $this->entryIds();
 		$result = $this->backupService->createSnapshot('integration-test-generated-column');
 		$snapshotId = $result['id'];
 
 		$this->db->getQueryBuilder()
 			->delete('at_entries')
 			->executeStatement();
-		self::assertSame(0, $this->countRows('at_entries'));
+		self::assertSame([], array_values(array_intersect($idsBefore, $this->entryIds())));
 
 		$this->backupService->restoreSnapshot($snapshotId, false);
-		self::assertSame($before, $this->countRows('at_entries'));
+		self::assertSame([], array_values(array_diff($idsBefore, $this->entryIds())), 'restore must bring back every snapshotted row');
 
 		$this->db->getQueryBuilder()
 			->delete('at_entries')
@@ -112,15 +117,14 @@ final class UpgradeBackupIntegrationTest extends TestCase
 		$this->backupService->restoreSnapshot('../evil', false);
 	}
 
-	private function countRows(string $table): int
+	/** @return list<int> current primary keys in at_entries. */
+	private function entryIds(): array
 	{
 		$qb = $this->db->getQueryBuilder();
-		$qb->select($qb->func()->count('*', 'cnt'))
-			->from($table);
+		$qb->select('id')->from('at_entries');
 		$result = $qb->executeQuery();
-		$count = (int)$result->fetchOne();
+		$ids = array_map('intval', $result->fetchAll(\PDO::FETCH_COLUMN));
 		$result->closeCursor();
-
-		return $count;
+		return $ids;
 	}
 }

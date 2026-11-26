@@ -837,6 +837,25 @@
             delete base.breaks_count_as_work;
             delete base.paid_break_cap_minutes;
         }
+        // Counted-start clamp (spec B): empty = off — delete the keys so an
+        // explicit clear persists. Set → write all three keys; the anchor is
+        // fixed to calendar_day until Phase 2 lands a shift source.
+        const earliestCountedRaw = String(form.querySelector('#wtm-model-earliest-counted-start')?.value || '').trim();
+        if (earliestCountedRaw === '') {
+            delete base.earliest_counted_start;
+            delete base.early_start_mode;
+            delete base.early_start_anchor;
+        } else if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(earliestCountedRaw)) {
+            return {
+                error: wtmMsg('earliestCountedStartInvalid', 'Earliest counted start must be a clock time (HH:MM) or empty.'),
+                field: 'earliestCountedStart'
+            };
+        } else {
+            base.earliest_counted_start = earliestCountedRaw;
+            base.early_start_mode = form.querySelector('#wtm-model-early-start-mode')?.value === 'clamp_unless_approved'
+                ? 'clamp_unless_approved' : 'clamp';
+            base.early_start_anchor = 'calendar_day';
+        }
         // Model break tiers + countable floor (resolver merges max(law, org,
         // model)). Empty editor rows clear the keys — never send the raw
         // stored document back unedited.
@@ -1000,11 +1019,48 @@
             showBreakTierError(form, breakRules.error);
         } else if (breakRules && breakRules.field === 'paidBreakCap') {
             showPaidBreakError(form, breakRules.error);
+        } else if (breakRules && breakRules.field === 'earliestCountedStart') {
+            showEarliestCountedError(form, breakRules.error);
         } else if (breakRules && breakRules.field === 'splitService') {
             showSplitServiceError(form, breakRules.error);
         } else {
             showPresenceError(form, breakRules.error);
         }
+    }
+
+    /** Inline, announced error on the earliest-counted-start field. */
+    function showEarliestCountedError(form, message) {
+        const err = form && form.querySelector('#wtm-model-earliest-counted-start-error');
+        const input = form && form.querySelector('#wtm-model-earliest-counted-start');
+        if (err && input) {
+            err.textContent = message;
+            err.hidden = false;
+            input.setAttribute('aria-invalid', 'true');
+            input.focus();
+        } else {
+            Messaging.showError(message);
+        }
+    }
+
+    /** Show/hide the mode select + DST hint with the configured value. */
+    function bindEarlyStartControls(form) {
+        const input = form && form.querySelector('#wtm-model-earliest-counted-start');
+        const modeGroup = form && form.querySelector('#wtm-model-early-start-mode-group');
+        const warning = form && form.querySelector('#wtm-model-early-start-dst-warning');
+        if (!input || !modeGroup || !warning) {
+            return;
+        }
+        input.addEventListener('input', function() {
+            const err = form.querySelector('#wtm-model-earliest-counted-start-error');
+            if (err) {
+                err.textContent = '';
+                err.hidden = true;
+            }
+            input.removeAttribute('aria-invalid');
+            const hasValue = String(input.value || '').trim() !== '';
+            modeGroup.hidden = !hasValue;
+            warning.hidden = !hasValue;
+        });
     }
 
     /**
@@ -1229,6 +1285,33 @@
             'paidBreakCapHelp',
             'Leave empty to pay all recorded break time. 0 pays none. Maximum 480.'
         );
+        const existingEarliestCountedStart = (isEdit && model.breakRules
+            && typeof model.breakRules.earliest_counted_start === 'string'
+            && /^([01]\d|2[0-3]):[0-5]\d$/.test(model.breakRules.earliest_counted_start))
+            ? model.breakRules.earliest_counted_start
+            : '';
+        const existingEarlyStartMode = (isEdit && model.breakRules
+            && model.breakRules.early_start_mode === 'clamp_unless_approved')
+            ? 'clamp_unless_approved' : 'clamp';
+        const earliestCountedLabel = wtmMsg('earliestCountedStart', 'Earliest counted work start (optional)');
+        const earliestCountedHelp = wtmMsg(
+            'earliestCountedStartHelp',
+            'Time stamped before this clock time does not count toward paid hours in reports, overtime and exports. The recorded start time itself stays unchanged.'
+        );
+        const earlyStartModeLabel = wtmMsg('earlyStartMode', 'When to apply this limit');
+        const earlyStartModeClamp = wtmMsg('earlyStartModeClamp', 'Apply to every entry');
+        const earlyStartModeUnlessApproved = wtmMsg(
+            'earlyStartModeUnlessApproved',
+            'Skip entries created or approved by a manager'
+        );
+        const earlyStartModeHelp = wtmMsg(
+            'earlyStartModeHelp',
+            'Manager-created or manager-approved entries can keep their recorded start when they document an early shift on purpose.'
+        );
+        const earlyStartDstWarning = wtmMsg(
+            'earlyStartDstWarning',
+            'On days when this local clock time does not exist (daylight-saving switch), the next valid clock time applies automatically.'
+        );
 
         host.hidden = false;
         host.setAttribute('data-mode', isEdit ? 'edit' : 'create');
@@ -1321,6 +1404,28 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="wtm-model-earliest-counted-start" class="form-label">${Utils.escapeHtml(earliestCountedLabel)}</label>
+                    <input type="time" id="wtm-model-earliest-counted-start" name="earliestCountedStart" class="form-input wtm-time-input"
+                           value="${Utils.escapeHtml(existingEarliestCountedStart)}"
+                           aria-describedby="wtm-model-earliest-counted-start-help wtm-model-earliest-counted-start-error">
+                    <p id="wtm-model-earliest-counted-start-help" class="form-help">${Utils.escapeHtml(earliestCountedHelp)}</p>
+                    <p id="wtm-model-earliest-counted-start-error" class="field-error" role="alert" hidden></p>
+                </div>
+                <div class="form-group" id="wtm-model-early-start-mode-group"${existingEarliestCountedStart === '' ? ' hidden' : ''}>
+                    <label for="wtm-model-early-start-mode" class="form-label">${Utils.escapeHtml(earlyStartModeLabel)}</label>
+                    <select id="wtm-model-early-start-mode" name="earlyStartMode" class="form-select"
+                            aria-describedby="wtm-model-early-start-mode-help">
+                        <option value="clamp"${existingEarlyStartMode === 'clamp' ? ' selected' : ''}>${Utils.escapeHtml(earlyStartModeClamp)}</option>
+                        <option value="clamp_unless_approved"${existingEarlyStartMode === 'clamp_unless_approved' ? ' selected' : ''}>${Utils.escapeHtml(earlyStartModeUnlessApproved)}</option>
+                    </select>
+                    <p id="wtm-model-early-start-mode-help" class="form-help">${Utils.escapeHtml(earlyStartModeHelp)}</p>
+                </div>
+                <div class="azc-callout azc-callout--warning" id="wtm-model-early-start-dst-warning" role="note"${existingEarliestCountedStart === '' ? ' hidden' : ''}>
+                    <div class="azc-callout__body">
+                        <p class="azc-callout__text">${Utils.escapeHtml(earlyStartDstWarning)}</p>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="wtm-model-description" class="form-label">${Utils.escapeHtml(descriptionLabel)}</label>
                     <textarea id="wtm-model-description" name="description" class="form-textarea" rows="3">${descVal}</textarea>
                 </div>
@@ -1353,6 +1458,7 @@
             bindBreakTiersFieldset(form.querySelector('.wtm-break-tiers'));
             bindUeHelper(form.querySelector('.wtm-ue-helper'), form);
             bindPaidBreakControls(form);
+            bindEarlyStartControls(form);
             bindOnDemandTypeSync(form);
             bindPaidBreakImpact(
                 form,

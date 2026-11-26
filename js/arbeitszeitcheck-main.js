@@ -2849,9 +2849,14 @@
             const paidBreakMin = entry.paidBreakMinutes != null
                 ? Number(entry.paidBreakMinutes)
                 : (entry.paidBreakSeconds != null ? Number(entry.paidBreakSeconds) / 60 : 0);
-            const paidDurationHours = (entry.paidDurationHours != null && !isNaN(entry.paidDurationHours))
-                ? Number(entry.paidDurationHours)
-                : workingDurationHours;
+            // Counted basis wins when the server emits it (spec B): the
+            // counted-start clamp is accounting-only; the raw stamp stays in
+            // the start/end line below.
+            const paidDurationHours = (entry.counted_paid_duration_hours != null && !isNaN(entry.counted_paid_duration_hours))
+                ? Number(entry.counted_paid_duration_hours)
+                : (entry.paidDurationHours != null && !isNaN(entry.paidDurationHours))
+                    ? Number(entry.paidDurationHours)
+                    : workingDurationHours;
 
             const status = entry.status || 'completed';
 
@@ -2877,6 +2882,16 @@
                 const breakMinutes = Math.floor((breakDurationHours - breakHours) * 60);
                 const breakLabel = this.config.l10n?.breakTime || mainT('Break Time') || 'Break';
                 durationStr += ` (${breakLabel}: ${breakHours}h ${breakMinutes}m)`;
+            }
+
+            // Counted-start hint (spec B): clamped entries announce the
+            // counted start; the recorded stamp stays in the time line.
+            if (entry.clamped === true && entry.counted_start) {
+                const countedDate = parseApiInstant(entry.counted_start);
+                if (countedDate) {
+                    const countedLabel = this.config.l10n?.countedFrom || mainT('Counted from') || 'Counted from';
+                    durationStr += ` (${countedLabel}: ${formatDisplayTime(countedDate)})`;
+                }
             }
 
             // Translate status

@@ -968,7 +968,7 @@ class TimeEntryController extends Controller
 					$breakMin = (int)round(($entry->getBreakDurationHours() ?? 0.0) * 60);
 					$breakPart = $this->l10n->t('break %d min', [$breakMin]);
 					// Printable/export line shows tariff hours (paid basis).
-					$workHours = (float)($entry->getPaidDurationHours() ?? 0.0);
+					$workHours = (float)($entry->getCountedPaidDurationHours() ?? 0.0);
 					$hoursPart = number_format($workHours, 2, ',', '') . ' h';
 					$statusPart = $statusLabels[$entry->getStatus()] ?? $entry->getStatus();
 					$desc = trim((string)($entry->getDescription() ?? ''));
@@ -1137,7 +1137,7 @@ class TimeEntryController extends Controller
 							return $entry->getStartTime() && $entry->getStartTime()->format('Y-m') === date('Y-m');
 						})),
 						'total_hours' => array_reduce($entries, static function ($sum, $entry) {
-							return $sum + ($entry->getPaidDurationHours() ?? 0.0);
+							return $sum + ($entry->getCountedPaidDurationHours() ?? 0.0);
 						}, 0.0),
 					],
 					'error' => $this->l10n->t('Manual time entries are not enabled for your account. Please contact your administrator.'),

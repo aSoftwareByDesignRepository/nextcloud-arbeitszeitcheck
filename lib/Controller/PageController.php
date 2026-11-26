@@ -731,7 +731,7 @@ class PageController extends Controller
 					})),
 					'total_hours' => array_reduce($allEntries, function($sum, $entry) {
 						// KPI card — tariff basis (net + paid-break snapshot).
-						return $sum + ($entry->getPaidDurationHours() ?? 0.0);
+						return $sum + ($entry->getCountedPaidDurationHours() ?? 0.0);
 					}, 0)
 				],
 				'maxDailyHours' => $maxDailyHours,

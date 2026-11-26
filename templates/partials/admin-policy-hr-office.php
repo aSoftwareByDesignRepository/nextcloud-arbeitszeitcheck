@@ -68,10 +68,22 @@ declare(strict_types=1);
 								</tr>
 							</thead>
 							<tbody>
-								<?php foreach ($absenceTypes as $type): ?>
-									<?php $typeKey = (string)($type['key'] ?? ''); ?>
-									<tr>
-										<th scope="row"><?php p($type['label'] ?? $typeKey); ?></th>
+								<?php
+								$builtinTypes = array_values(array_filter($absenceTypes, static fn ($t) => empty($t['custom'])));
+								$customTypes = array_values(array_filter($absenceTypes, static fn ($t) => !empty($t['custom'])));
+								// A-R6: more than a handful of custom rows collapse behind one toggle
+								// (progressive disclosure — the matrix stays scannable).
+								$customCollapsed = count($customTypes) > 6;
+								$renderMatrixRow = function (array $type, bool $hidden = false) use ($eventTypes, $settings, $l): void {
+									$typeKey = (string)($type['key'] ?? '');
+									?>
+									<tr<?php if ($hidden) { ?> class="admin-notifications-matrix__custom-row" hidden<?php } ?>>
+										<th scope="row">
+											<?php p($type['label'] ?? $typeKey); ?>
+											<?php if (!empty($type['custom'])): ?>
+												<span class="azc-badge azc-badge--neutral admin-notifications-matrix__custom-badge"><?php p($l->t('Custom type')); ?></span>
+											<?php endif; ?>
+										</th>
 										<?php foreach ($eventTypes as $event): ?>
 											<?php
 											$eventKey = (string)($event['key'] ?? '');
@@ -89,7 +101,28 @@ declare(strict_types=1);
 											</td>
 										<?php endforeach; ?>
 									</tr>
-								<?php endforeach; ?>
+									<?php
+								};
+								foreach ($builtinTypes as $type) {
+									$renderMatrixRow($type);
+								}
+								if ($customCollapsed): ?>
+									<tr class="admin-notifications-matrix__custom-toggle">
+										<td colspan="<?php p(count($eventTypes) + 1); ?>">
+											<button type="button"
+												class="azc-btn azc-btn--secondary admin-notifications-matrix__custom-toggle-btn"
+												aria-expanded="false"
+												data-label-show="<?php p($l->t('Show %d custom absence types', [count($customTypes)])); ?>"
+												data-label-hide="<?php p($l->t('Hide custom absence types')); ?>">
+												<?php p($l->t('Show %d custom absence types', [count($customTypes)])); ?>
+											</button>
+										</td>
+									</tr>
+								<?php endif;
+								foreach ($customTypes as $type) {
+									$renderMatrixRow($type, $customCollapsed);
+								}
+								?>
 							</tbody>
 						</table>
 					</div>

@@ -740,7 +740,8 @@ class ReportControllerTest extends TestCase
 	}
 
 	/**
-	 * Test team report rejects teamId outside manager scope.
+	 * Test team report rejects teamId outside manager scope (uniform 404 —
+	 * foreign and nonexistent teams must be indistinguishable, C-R8).
 	 */
 	public function testTeamReportWithTeamIdDeniedWhenNotManaged(): void
 	{
@@ -755,29 +756,28 @@ class ReportControllerTest extends TestCase
 			->method('getTeamIdsForManager')
 			->with($userId)
 			->willReturn([10, 11]);
+		$this->teamMapper->method('getIdsWithDescendants')
+			->willReturnMap([[10, [10]], [11, [11, 12]]]);
 		$this->reportingService->expects($this->never())->method('generateTeamReport');
 
 		$response = $this->controller->team('2024-01-01', '2024-01-31', null, '99');
 		$data = $response->getData();
 
 		$this->assertFalse($data['success']);
-		$this->assertEquals(Http::STATUS_FORBIDDEN, $response->getStatus());
-		$this->assertStringContainsString('Access denied', $data['error']);
+		$this->assertEquals(Http::STATUS_NOT_FOUND, $response->getStatus());
+		$this->assertStringContainsString('Team not found', $data['error']);
 	}
 
 	/**
-	 * Test team report resolves teamId members for managed team.
+	 * Test team report resolves teamId members for managed team —
+	 * recursively across descendants, intersected with the managed uid set
+	 * (C-R3/C-R8 defence in depth).
 	 */
 	public function testTeamReportWithTeamIdUsesTeamMembersWhenManaged(): void
 	{
 		$userId = 'manager1';
 		$user = $this->createMock(IUser::class);
 		$user->method('getUID')->willReturn($userId);
-
-		$memberA = new TeamMember();
-		$memberA->setUserId('userA');
-		$memberB = new TeamMember();
-		$memberB->setUserId('userB');
 
 		$this->userSession->method('getUser')->willReturn($user);
 
@@ -786,10 +786,28 @@ class ReportControllerTest extends TestCase
 			->method('getTeamIdsForManager')
 			->with($userId)
 			->willReturn([10, 11]);
+		// Team 11 has the descendant 12 — members of both must aggregate.
+		$this->teamMapper->method('getIdsWithDescendants')
+			->willReturnMap([[10, [10]], [11, [11, 12]]]);
 		$this->teamMemberMapper->expects($this->once())
-			->method('findByTeamId')
-			->with(11)
-			->willReturn([$memberA, $memberB]);
+			->method('getMemberUserIdsByTeamIds')
+			->with([11, 12])
+			->willReturn(['userA', 'userB', 'userForeign']);
+		// Existing users only (deleted accounts never resolve).
+		$this->userManager->method('get')
+			->willReturnCallback(function ($uid) {
+				if (!in_array($uid, ['userA', 'userB', 'userForeign'], true)) {
+					return null;
+				}
+				$u = $this->createMock(IUser::class);
+				$u->method('getUID')->willReturn($uid);
+				return $u;
+			});
+		// Defence in depth: uids outside the managed set are dropped even if
+		// member resolution returned them.
+		$this->teamResolver->method('getTeamMemberIds')
+			->with($userId)
+			->willReturn(['userA', 'userB']);
 
 		$reportData = [
 			'start_date' => '2024-01-01',
@@ -1200,11 +1218,17 @@ class ReportControllerTest extends TestCase
 		$this->paramOverrides = ['teamId' => '11'];
 		$this->permissionService->method('canAccessManagerDashboard')->willReturn(true);
 		$this->teamManagerMapper->method('getTeamIdsForManager')->with('manager1')->willReturn([10, 11]);
-		$memberA = new TeamMember();
-		$memberA->setUserId('userA');
-		$memberB = new TeamMember();
-		$memberB->setUserId('userB');
-		$this->teamMemberMapper->method('findByTeamId')->with(11)->willReturn([$memberA, $memberB]);
+		$this->teamMapper->method('getIdsWithDescendants')
+			->willReturnMap([[10, [10]], [11, [11, 12]]]);
+		$this->teamMemberMapper->method('getMemberUserIdsByTeamIds')
+			->with([11, 12])
+			->willReturn(['userA', 'userB']);
+		$this->userManager->method('get')->willReturnCallback(function ($uid) {
+			$u = $this->createMock(IUser::class);
+			$u->method('getUID')->willReturn($uid);
+			return $u;
+		});
+		$this->teamResolver->method('getTeamMemberIds')->with('manager1')->willReturn(['userA', 'userB']);
 
 		$this->premiumSurchargeService->expects($this->once())
 			->method('buildPeriodReport')
@@ -1415,9 +1439,9 @@ class ReportControllerTest extends TestCase
 		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
 
 		// Foreign team 99 collapses to the same generic denial as a
-		// nonexistent team — no existence oracle.
+		// nonexistent team — uniform 404, no existence oracle (C-R8).
 		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, '99');
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
 	}
 
@@ -1431,7 +1455,8 @@ class ReportControllerTest extends TestCase
 		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
 
 		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, 'abc');
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		// Non-numeric team id is a malformed selector → 400, not a denial.
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 	}
 
 	public function testAbsenceReportAmbiguousSelectorsRejected(): void
@@ -1458,7 +1483,8 @@ class ReportControllerTest extends TestCase
 		$this->reportingService->expects($this->never())->method('generateAbsenceReport');
 
 		$response = $this->controller->absence('2026-01-01', '2026-01-31', null, null, null, null, 'bogus_scope');
-		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		// Unknown scope enum is a malformed selector → 400, not a denial.
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 	}
 
 	public function testAbsenceReportLegacyEmptyUserIdStillMeansOrgScope(): void

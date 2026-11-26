@@ -68,6 +68,7 @@ class ReportingServiceTest extends TestCase
 		$this->overtimeService = $this->createMock(OvertimeService::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n->method('t')->willReturnCallback(static fn (string $msg): string => $msg);
 		$this->holidayCalendarService = $this->createMock(HolidayService::class);
 		$this->permissionService = $this->createMock(PermissionService::class);
 		$this->permissionService->method('isUserAllowedByAccessGroups')->willReturn(true);
@@ -575,6 +576,21 @@ class ReportingServiceTest extends TestCase
 		$rows = $report['users'][0]['absences'];
 		$this->assertSame(Absence::TYPE_VACATION, $rows[0]['type']);
 		$this->assertSame(Absence::TYPE_SICK_LEAVE, $rows[1]['type']);
+
+		// D: localized labels — rows carry type_label/status_label, the report
+		// carries label maps keyed by the raw codes for chart legends. The
+		// values must be the *catalog* labels, not the raw codes (the l10n
+		// mock passes msgids through, so 'Vacation' vs raw 'vacation').
+		$this->assertSame('Vacation', $rows[0]['type_label']);
+		$this->assertSame('Approved', $rows[0]['status_label']);
+		$this->assertSame('Sick Leave', $rows[1]['type_label']);
+		$this->assertSame('Vacation', $report['absence_type_labels'][Absence::TYPE_VACATION]);
+		$this->assertSame('Approved', $report['absence_status_labels'][Absence::STATUS_APPROVED]);
+		$this->assertArrayHasKey('absence_type_labels', $report);
+		$this->assertArrayHasKey('absence_status_labels', $report);
+		$this->assertArrayHasKey(Absence::TYPE_VACATION, $report['absence_type_labels']);
+		$this->assertArrayHasKey(Absence::TYPE_SICK_LEAVE, $report['absence_type_labels']);
+		$this->assertArrayHasKey(Absence::STATUS_APPROVED, $report['absence_status_labels']);
 	}
 
 	public function testGenerateAbsenceReportSortByType(): void

@@ -235,20 +235,46 @@ class ManagerController extends Controller
 				]);
 			}
 
-			// Build lightweight team DTOs, including hierarchical path for clarity in the UI.
+			// C-R4: report the managed subtree — managed roots plus every
+			// descendant team, nested so selects can indent each level. A
+			// manager's team scope already covers descendants (see
+			// OversightScopeService::resolveTeamScope), so hiding them would
+			// make part of the manager's scope unselectable.
+			$managedSet = array_fill_keys(array_map('intval', $managedTeamIds), true);
+			$parentMap = $this->teamMapper->getParentMap();
+			$childrenMap = [];
+			foreach ($parentMap as $id => $parentId) {
+				if ($parentId !== null) {
+					$childrenMap[$parentId][] = (int)$id;
+				}
+			}
+
 			$teams = [];
+			$emitted = [];
 			foreach ($managedTeamIds as $teamId) {
-				try {
-					$team = $this->teamMapper->find($teamId);
-				} catch (\Throwable $e) {
+				$teamId = (int)$teamId;
+				// Skip managed ids that sit inside another managed subtree —
+				// they appear as descendants of that root instead of twice.
+				$isNested = false;
+				$cursor = $parentMap[$teamId] ?? null;
+				$guard = 0;
+				while ($cursor !== null && $guard++ <= 64) {
+					if (isset($managedSet[$cursor])) {
+						$isNested = true;
+						break;
+					}
+					$cursor = $parentMap[$cursor] ?? null;
+				}
+				if ($isNested || isset($emitted[$teamId])) {
 					continue;
 				}
-
-				$teams[] = [
-					'id' => $team->getId(),
-					'name' => $team->getName(),
-					'parentId' => $team->getParentId(),
-				];
+				$node = $this->buildManagedTeamNode($teamId, $parentMap, $childrenMap, 0, [$teamId => true]);
+				if ($node !== null) {
+					$teams[] = $node;
+					foreach ($this->flattenManagedTeamNodeIds($node) as $id) {
+						$emitted[$id] = true;
+					}
+				}
 			}
 
 			return new JSONResponse([
@@ -265,6 +291,59 @@ class ManagerController extends Controller
 				'error' => $this->l10n->t('An internal error occurred. Please contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Nested DTO for one managed root: `{id, name, parentId, children}` —
+	 * the same shape the admin teams tree uses, so scope selects flatten
+	 * both identically. Cycle-guarded and depth-capped (C-R7/FM-C1).
+	 *
+	 * @param array<int, int|null> $parentMap
+	 * @param array<int, list<int>> $childrenMap
+	 * @param array<int, bool> $seen
+	 * @return array{id: int, name: string, parentId: int|null, children: list<array>}|null
+	 */
+	private function buildManagedTeamNode(int $teamId, array $parentMap, array $childrenMap, int $depth, array $seen): ?array
+	{
+		if ($depth > \OCA\ArbeitszeitCheck\Constants::TEAM_HIERARCHY_MAX_DEPTH || !array_key_exists($teamId, $parentMap)) {
+			return null;
+		}
+		try {
+			$team = $this->teamMapper->find($teamId);
+		} catch (\Throwable $e) {
+			return null;
+		}
+		$node = [
+			'id' => $team->getId(),
+			'name' => $team->getName(),
+			'parentId' => $team->getParentId(),
+			'children' => [],
+		];
+		foreach ($childrenMap[$teamId] ?? [] as $childId) {
+			if (isset($seen[$childId])) {
+				continue;
+			}
+			$child = $this->buildManagedTeamNode($childId, $parentMap, $childrenMap, $depth + 1, $seen + [$childId => true]);
+			if ($child !== null) {
+				$node['children'][] = $child;
+			}
+		}
+		return $node;
+	}
+
+	/**
+	 * @param array{children?: list<array>} $node
+	 * @return list<int>
+	 */
+	private function flattenManagedTeamNodeIds(array $node): array
+	{
+		$ids = [(int)($node['id'] ?? 0)];
+		foreach (($node['children'] ?? []) as $child) {
+			foreach ($this->flattenManagedTeamNodeIds($child) as $id) {
+				$ids[] = $id;
+			}
+		}
+		return $ids;
 	}
 
 	/**

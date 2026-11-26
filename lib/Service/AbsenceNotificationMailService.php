@@ -371,20 +371,17 @@ class AbsenceNotificationMailService
 	 */
 	private function normalizeHrMatrix(array $input): array
 	{
-		$out = [];
-		foreach (Constants::ABSENCE_TYPES as $absenceType) {
-			$out[$absenceType] = [];
-			$inType = (isset($input[$absenceType]) && is_array($input[$absenceType])) ? $input[$absenceType] : [];
-			foreach (Constants::HR_NOTIFICATION_EVENTS as $eventKey) {
-				$out[$absenceType][$eventKey] = $this->toBool($inType[$eventKey] ?? false);
-			}
-		}
-		return $out;
+		return AbsenceTypeCatalog::normalizeEventMatrix($input, Constants::HR_NOTIFICATION_EVENTS);
 	}
 
 	private function shouldSendHrEvent(array $matrix, string $absenceType, string $eventKey): bool
 	{
-		return isset($matrix[$absenceType], $matrix[$absenceType][$eventKey]) && $matrix[$absenceType][$eventKey] === true;
+		if (!isset($matrix[$absenceType], $matrix[$absenceType][$eventKey]) || $matrix[$absenceType][$eventKey] !== true) {
+			return false;
+		}
+		// A-R3/A-R4 fail-closed: a deactivated custom type keeps its stored
+		// matrix rows but never sends; unknown codes are not in the matrix.
+		return !AbsenceTypeCatalog::isCustom($absenceType) || AbsenceTypeCatalog::isCreatable($absenceType);
 	}
 
 	private function toBool(mixed $value): bool

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace OCA\ArbeitszeitCheck\Db;
 
 use OCA\ArbeitszeitCheck\Support\BreakCountable;
+use OCA\ArbeitszeitCheck\Support\BreakPolicyResolver;
 use OCA\ArbeitszeitCheck\Support\LaborLawProfileFactory;
 use OCP\AppFramework\Db\Entity;
 
@@ -751,6 +752,82 @@ class TimeEntry extends Entity
 	}
 
 	/**
+	 * Epoch of the counted work start (spec B): the raw start, or the
+	 * model's `earliest_counted_start` threshold when the clamp applies.
+	 * NEVER mutates {@see startTime} (NN-2) — the stored stamp stays
+	 * authoritative for statutory checks and audit. Degrades to the raw
+	 * stamp when the policy resolver is unavailable.
+	 */
+	public function getCountedStartTimestamp(): ?int
+	{
+		$start = $this->getStartTime();
+		if ($start === null) {
+			return null;
+		}
+		try {
+			$resolver = \OCP\Server::get(BreakPolicyResolver::class);
+			$threshold = $resolver->countedStartForEntry($this);
+			if ($threshold !== null) {
+				return $threshold;
+			}
+		} catch (\Throwable) {
+			// Unit tests / early bootstrap — fall back to the raw stamp.
+		}
+		return $start->getTimestamp();
+	}
+
+	/**
+	 * Whether the counted-start clamp actually moved the counted start
+	 * later than the recorded stamp.
+	 */
+	public function isCountedClamped(): bool
+	{
+		$start = $this->getStartTime();
+		$counted = $this->getCountedStartTimestamp();
+		return $start !== null && $counted !== null && $counted > $start->getTimestamp();
+	}
+
+	/**
+	 * Net counted working duration in hours — like {@see getDurationHours()}
+	 * but evaluated on the counted window (spec B). Payroll/reporting only;
+	 * statutory checks keep using {@see getDurationHours()}.
+	 *
+	 * @return float|null null while the entry has no end time
+	 */
+	public function getCountedDurationHours(): ?float
+	{
+		if ($this->getEndTime() === null) {
+			return null;
+		}
+		try {
+			$resolver = \OCP\Server::get(BreakPolicyResolver::class);
+			$net = $resolver->countedNetSeconds($this);
+			if ($net !== null) {
+				return $net / 3600;
+			}
+		} catch (\Throwable) {
+			// Resolver unavailable — raw semantics.
+		}
+		return $this->getDurationHours();
+	}
+
+	/**
+	 * Paid (tariff) counted duration in hours: counted net plus the
+	 * snapshotted paid-break portion — the betriebliche Verrechnung basis
+	 * for overtime, soll comparison, reports and exports (spec B).
+	 *
+	 * @return float|null null while the entry has no end time
+	 */
+	public function getCountedPaidDurationHours(): ?float
+	{
+		$net = $this->getCountedDurationHours();
+		if ($net === null) {
+			return null;
+		}
+		return $net + $this->getPaidBreakHours();
+	}
+
+	/**
 	 * Check if this entry is currently active
 	 *
 	 * @return bool
@@ -939,6 +1016,16 @@ class TimeEntry extends Entity
 	 */
 	public function isLockedForEmployeeEdit(): bool
 	{
+		return $this->isApproved();
+	}
+
+	/**
+	 * Whether a manager approval stamp exists — manager-created entries are
+	 * born approved, so this covers both "approved" and "manager-created"
+	 * (spec B clamp_unless_approved semantics).
+	 */
+	public function isApproved(): bool
+	{
 		return $this->approvedByUserId !== null || $this->approvedAt !== null;
 	}
 
@@ -1091,6 +1178,16 @@ class TimeEntry extends Entity
 			'paidBreakMinutes' => (int)round($this->getPaidBreakSeconds() / 60),
 			'paidBreakHours' => $this->getPaidBreakHours(),
 			'paidDurationHours' => $this->getPaidDurationHours(),
+			// Counted-start clamp (spec B): raw stamps above stay untouched;
+			// these are the accounting view for reports/exports/display.
+			'counted_start' => $this->getCountedStartTimestamp() !== null
+				? (new \DateTimeImmutable('@' . $this->getCountedStartTimestamp()))
+					->setTimezone($startTime->getTimezone())
+					->format('c')
+				: null,
+			'clamped' => $this->isCountedClamped(),
+			'counted_duration_hours' => $this->getCountedDurationHours(),
+			'counted_paid_duration_hours' => $this->getCountedPaidDurationHours(),
 			/** Effective countable break floor for this entry's user (DE/CH: 15, AT: 10). */
 			'minBreakMinutes' => $this->resolveCountableMinBreakMinutes(),
 			'description' => $this->getDescription(),

@@ -212,7 +212,7 @@ class VerifyAbsenceSollCommand extends Command
 					continue;
 				}
 				$key = $entry->getStartTime()->format('Y-m-d');
-				$byDay[$key] = ($byDay[$key] ?? 0.0) + (float)($entry->getPaidDurationHours() ?? 0.0);
+				$byDay[$key] = ($byDay[$key] ?? 0.0) + (float)($entry->getCountedPaidDurationHours() ?? 0.0);
 			}
 		} catch (\Throwable) {
 			// Audit stays read-only and best-effort.

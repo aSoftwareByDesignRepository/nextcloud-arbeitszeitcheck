@@ -489,6 +489,22 @@ class AdminController extends Controller
 		'break_policy',
 		'auto_fallback_minutes',
 		'deduction_mode',
+		'earliest_counted_start',
+		'early_start_mode',
+		'early_start_anchor',
+	];
+
+	/**
+	 * Optional per-model clamp of the counted work start (spec B). Stored
+	 * inside `break_rules` — balance-relevant, so immutable under a v2
+	 * assignment like `deduction_mode` (B-R7) and preserve-on-absent at the
+	 * write boundary (B-R8): an old client that never sends them must not
+	 * wipe a configured clamp with a full-document replace.
+	 */
+	private const EARLY_START_KEYS = [
+		'earliest_counted_start',
+		'early_start_mode',
+		'early_start_anchor',
 	];
 
 	/** Serialized size ceiling for the whole break_rules document. */
@@ -719,6 +735,9 @@ class AdminController extends Controller
 		'break_policy',
 		'auto_fallback_minutes',
 		'deduction_mode',
+		'earliest_counted_start',
+		'early_start_mode',
+		'early_start_anchor',
 	];
 
 	private function guardWorkingTimeModelScheduleTransition(
@@ -1047,6 +1066,19 @@ class AdminController extends Controller
 			], Http::STATUS_BAD_REQUEST);
 		}
 
+		// Preserve-on-absent (B-R8): breakRules replaces the whole document,
+		// so a client that never sends the early-start keys would silently
+		// clear a configured clamp. Keys explicitly sent as null/'' are a
+		// deliberate clear — remember them so the post-validation restore
+		// below does not resurrect them.
+		$earlyStartExplicitClear = [];
+		foreach (self::EARLY_START_KEYS as $earlyKey) {
+			if (array_key_exists($earlyKey, $breakRules)
+				&& ($breakRules[$earlyKey] === null || $breakRules[$earlyKey] === '')) {
+				$earlyStartExplicitClear[$earlyKey] = true;
+			}
+		}
+
 		// Near-miss key guard: a case/separator variant of a known key
 		// (`breaksCountAsWork`, `paidBreakCapMinutes`, …) silently bypasses the
 		// typed validation below and persists verbatim — the flag then never
@@ -1127,6 +1159,19 @@ class AdminController extends Controller
 				} else {
 					$breakRules[$ruleKey] = $ruleValue;
 				}
+			}
+		}
+
+		// Preserve-on-absent restore (B-R8): keys the client never sent keep
+		// their stored value — validated-at-write, so they skip revalidation
+		// here (a Phase-2 value must not brick unrelated edits). Keys the
+		// client explicitly cleared via null/'' stay cleared.
+		$storedEarlyRules = is_array($model->getBreakRulesArray()) ? $model->getBreakRulesArray() : [];
+		foreach (self::EARLY_START_KEYS as $earlyKey) {
+			if (!array_key_exists($earlyKey, $breakRules)
+				&& !isset($earlyStartExplicitClear[$earlyKey])
+				&& array_key_exists($earlyKey, $storedEarlyRules)) {
+				$breakRules[$earlyKey] = $storedEarlyRules[$earlyKey];
 			}
 		}
 
@@ -5301,20 +5346,23 @@ class AdminController extends Controller
 	 */
 	private function normalizeNotificationMatrix(mixed $rawMatrix): array
 	{
-		$matrix = [];
 		$input = is_array($rawMatrix) ? $rawMatrix : (is_string($rawMatrix) ? json_decode($rawMatrix, true) : []);
 		if (!is_array($input)) {
 			$input = [];
 		}
-		foreach (Constants::ABSENCE_TYPES as $absenceType) {
-			$matrix[$absenceType] = [];
-			$typeInput = (isset($input[$absenceType]) && is_array($input[$absenceType])) ? $input[$absenceType] : [];
-			foreach (Constants::HR_NOTIFICATION_EVENTS as $eventKey) {
-				$matrix[$absenceType][$eventKey] = $this->toBool($typeInput[$eventKey] ?? false);
-			}
-		}
-
-		return $matrix;
+		// Preserve-on-absent (A-R4/C-R9): custom-type rows hidden in the UI
+		// (deactivated) are not resubmitted — they keep their stored flags so
+		// a reactivated type regains its matrix config. Unknown codes are
+		// dropped fail-closed inside the shared normalizer.
+		$stored = json_decode(
+			$this->appConfig->getAppValueString(Constants::CONFIG_HR_NOTIFICATION_MATRIX_V1, '[]'),
+			true
+		);
+		return AbsenceTypeCatalog::normalizeEventMatrix(
+			$input,
+			Constants::HR_NOTIFICATION_EVENTS,
+			is_array($stored) ? $stored : null
+		);
 	}
 
 	/**
@@ -5512,7 +5560,13 @@ class AdminController extends Controller
 	{
 		$out = [];
 		foreach (AbsenceTypeCatalog::labels($this->l10n) as $key => $label) {
-			$out[] = ['key' => $key, 'label' => $label];
+			$isCustom = AbsenceTypeCatalog::isCustom($key);
+			// A-R1/A-R4: the matrix renders one row per *active* custom type;
+			// deactivated rows stay stored but are hidden (reversible switch).
+			if ($isCustom && !AbsenceTypeCatalog::isCreatable($key)) {
+				continue;
+			}
+			$out[] = ['key' => $key, 'label' => $label, 'custom' => $isCustom];
 		}
 		return $out;
 	}

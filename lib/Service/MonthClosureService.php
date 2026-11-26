@@ -679,7 +679,7 @@ class MonthClosureService
 			$accounting = $e->getAccountingResult();
 			if ($accounting !== null) {
 				$row['accounting'] = $accounting;
-				$row['net_hours'] = $e->getDurationHours();
+				$row['net_hours'] = $e->getCountedDurationHours();
 			}
 			return $row;
 		}, $entries);

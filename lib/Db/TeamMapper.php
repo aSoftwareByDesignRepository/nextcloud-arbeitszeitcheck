@@ -131,14 +131,21 @@ class TeamMapper extends QBMapper
 	/**
 	 * All team IDs that are the given team or any descendant (recursive).
 	 *
+	 * Defence in depth (FM-C1/C-R7): a visited set guards against `parent_id`
+	 * cycles (write validation already rejects them, but a corrupted tree
+	 * must not loop a report request forever) and the walk is capped at
+	 * {@see \OCA\ArbeitszeitCheck\Constants::TEAM_HIERARCHY_MAX_DEPTH}.
+	 *
 	 * @return int[]
 	 */
 	public function getIdsWithDescendants(int $teamId): array
 	{
-		$ids = [$teamId];
+		$seen = [$teamId => true];
 		$toProcess = [$teamId];
+		$depth = 0;
 		$tableName = $this->getTableName();
-		while (!empty($toProcess)) {
+		while (!empty($toProcess) && $depth < \OCA\ArbeitszeitCheck\Constants::TEAM_HIERARCHY_MAX_DEPTH) {
+			$depth++;
 			$parentIds = $toProcess;
 			$toProcess = [];
 			foreach (array_chunk($parentIds, \OCA\ArbeitszeitCheck\Constants::BATCH_CHUNK_SIZE) as $chunk) {
@@ -150,12 +157,14 @@ class TeamMapper extends QBMapper
 				$result = $qb->executeQuery();
 				while ($row = $result->fetch()) {
 					$id = (int) $row['id'];
-					$ids[] = $id;
-					$toProcess[] = $id;
+					if (!isset($seen[$id])) {
+						$seen[$id] = true;
+						$toProcess[] = $id;
+					}
 				}
 				$result->closeCursor();
 			}
 		}
-		return array_values(array_unique($ids));
+		return array_map('intval', array_keys($seen));
 	}
 }

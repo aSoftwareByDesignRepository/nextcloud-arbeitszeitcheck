@@ -153,6 +153,26 @@
 			}
 		}
 
+		// Flatten the nested team tree into indented <option>s (C-R1/C-R6):
+		// same '— ' per level the admin parent-select uses — a parent team
+		// means "including all sub-teams" (recursive member resolution).
+		function appendTeamOptions(select, nodes, depth) {
+			(nodes || []).forEach((team) => {
+				const opt = document.createElement('option');
+				opt.value = String(team.id);
+				let indent = '';
+				for (let i = 0; i < depth; i++) {
+					indent += '— ';
+				}
+				opt.textContent = indent + (team.name || `#${team.id}`);
+				opt.dataset.depth = String(depth);
+				select.appendChild(opt);
+				if (Array.isArray(team.children) && team.children.length) {
+					appendTeamOptions(select, team.children, depth + 1);
+				}
+			});
+		}
+
 		// Load admin teams for selection (only once)
 		function loadAdminTeamsIfNeeded() {
 			if (!A.isAdmin) {
@@ -175,12 +195,7 @@
 					}
 					// Mark that we tried loading; even if empty we avoid repeated fetches
 					select.dataset.loaded = 'true';
-					data.teams.forEach((team) => {
-						const opt = document.createElement('option');
-						opt.value = String(team.id);
-						opt.textContent = team.name || `#${team.id}`;
-						select.appendChild(opt);
-					});
+					appendTeamOptions(select, data.teams, 0);
 				})
 				.catch(() => {
 					// Fail silently – scope selection still works with organization-wide reports
@@ -217,12 +232,7 @@
 						group.classList.add('reports-scope-option-visible');
 					}
 					if (scopeRadio) scopeRadio.disabled = false;
-					data.teams.forEach((team) => {
-						const opt = document.createElement('option');
-						opt.value = String(team.id);
-						opt.textContent = team.name || `#${team.id}`;
-						select.appendChild(opt);
-					});
+					appendTeamOptions(select, data.teams, 0);
 				})
 				.catch(() => {
 					// Fail silently – manager can still use aggregated team scope
@@ -588,7 +598,7 @@
 						const wlRow = report.workLocation.byCode[wlCode] || {};
 						const wlMinutes = typeof wlRow.netMinutes === 'number' ? wlRow.netMinutes : 0;
 						html += `<tr><td data-label="${esc(L.workLocation || 'Work location')}">${esc(wlRow.label || wlCode)}</td>`
-							+ `<td data-label="${esc(L.workLocationCategory || 'Category')}">${esc(wlRow.category || '-')}</td>`
+							+ `<td data-label="${esc(L.workLocationCategory || 'Category')}">${esc(wlRow.category_label || wlRow.category || '-')}</td>`
 							+ `<td data-label="${esc(L.days || 'Days')}">${esc(wlRow.days != null ? wlRow.days : 0)}</td>`
 							+ `<td data-label="${esc(L.workLocationNetHours || 'Net hours')}">${esc((wlMinutes / 60).toFixed(2))}</td></tr>`;
 					});
@@ -615,23 +625,25 @@
 				html += `<p class="report-meta"><strong>${L.totalDays || 'Total days'}:</strong> ${esc(report.total_days != null ? report.total_days : '')}</p>`;
 
 				if (report.absences_by_type && typeof report.absences_by_type === 'object') {
+					const typeLabels = report.absence_type_labels || {};
 					const rows = Object.entries(report.absences_by_type)
 						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
 					html += `<h4 class="report-subhead">${esc(L.absencesByType || 'Absences by type')}</h4>`;
 					html += `<div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${esc(L.type || 'Type')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
 					rows.forEach(([k, v]) => {
-						html += `<tr>${reportTd(L.type || 'Type', esc(k))}${reportTd(L.count || 'Count', esc(v))}</tr>`;
+						html += `<tr>${reportTd(L.type || 'Type', esc(typeLabels[k] || k))}${reportTd(L.count || 'Count', esc(v))}</tr>`;
 					});
 					html += '</tbody></table></div>';
 				}
 
 				if (report.absences_by_status && typeof report.absences_by_status === 'object') {
+					const statusLabels = report.absence_status_labels || {};
 					const rows = Object.entries(report.absences_by_status)
 						.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
 					html += `<h4 class="report-subhead">${esc(L.absencesByStatus || 'Absences by status')}</h4>`;
 					html += `<div class="table-container" role="region"><table class="table table--hover azc-table--responsive report-table"><thead><tr><th>${esc(L.status || 'Status')}</th><th>${esc(L.count || 'Count')}</th></tr></thead><tbody>`;
 					rows.forEach(([k, v]) => {
-						html += `<tr>${reportTd(L.status || 'Status', esc(k))}${reportTd(L.count || 'Count', esc(v))}</tr>`;
+						html += `<tr>${reportTd(L.status || 'Status', esc(statusLabels[k] || k))}${reportTd(L.count || 'Count', esc(v))}</tr>`;
 					});
 					html += '</tbody></table></div>';
 				}
@@ -643,11 +655,11 @@
 						(u.absences || []).forEach((a) => {
 							allAbsences.push({
 								user_name: u.display_name || u.user_id || '-',
-								type: a.type || '-',
+								type: a.type_label || a.type || '-',
 								start: a.start_date || '',
 								end: a.end_date || '',
 								days: a.days != null ? a.days : '',
-								status: a.status || '-',
+								status: a.status_label || a.status || '-',
 							});
 						});
 					});

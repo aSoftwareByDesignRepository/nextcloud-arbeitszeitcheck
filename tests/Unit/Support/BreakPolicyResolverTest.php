@@ -1444,4 +1444,151 @@ class BreakPolicyResolverTest extends TestCase
 			$plan['start']->getTimestamp()
 		);
 	}
+	// ------------------------------------------------------------------
+	// Counted-start clamp (spec B)
+	// ------------------------------------------------------------------
+
+	private function countedEntry(string $start, ?string $end, ?array $breaks = null): TimeEntry
+	{
+		$tz = new \DateTimeZone('Europe/Berlin');
+		$e = new TimeEntry();
+		$e->setUserId('u1');
+		$e->setStartTime(new \DateTime($start, $tz));
+		if ($end !== null) {
+			$e->setEndTime(new \DateTime($end, $tz));
+			$e->setStatus(TimeEntry::STATUS_COMPLETED);
+		}
+		if ($breaks !== null) {
+			$tzIso = new \DateTimeZone('Europe/Berlin');
+			$e->setBreaks(json_encode(array_map(
+				static fn (array $b) => [
+					'start' => (new \DateTime($b[0], $tzIso))->format(\DateTime::ATOM),
+					'end' => (new \DateTime($b[1], $tzIso))->format(\DateTime::ATOM),
+				],
+				$breaks
+			)));
+		}
+		return $e;
+	}
+
+	public function testCountedStartNullWithoutModelConfig(): void
+	{
+		$entry = $this->countedEntry('2026-06-15 06:30', '2026-06-15 17:00');
+		$this->assertNull($this->resolver->countedStartForEntry($entry));
+		$this->assertNull($this->resolver->countedNetSeconds($entry));
+	}
+
+	public function testCountedStartClampsEarlyStartToThreshold(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:30', '2026-06-15 17:00');
+		$expected = (new \DateTime('2026-06-15 08:00', new \DateTimeZone('Europe/Berlin')))->getTimestamp();
+		$this->assertSame($expected, $this->resolver->countedStartForEntry($entry));
+	}
+
+	public function testCountedStartNullWhenStartAtOrAfterThreshold(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 09:15', '2026-06-15 17:00');
+		$this->assertNull($this->resolver->countedStartForEntry($entry));
+	}
+
+	public function testCountedStartClampUnlessApprovedSkipsApprovedEntry(): void
+	{
+		$this->assignModel([
+			'earliest_counted_start' => '08:00',
+			'early_start_mode' => BreakPolicyResolver::EARLY_START_MODE_CLAMP_UNLESS_APPROVED,
+		]);
+		$approved = $this->countedEntry('2026-06-15 06:30', '2026-06-15 17:00');
+		$approved->setApprovedByUserId('manager1');
+		$approved->setApprovedAt(new \DateTime('2026-06-16 09:00'));
+		$this->assertNull($this->resolver->countedStartForEntry($approved));
+
+		$plain = $this->countedEntry('2026-06-15 06:30', '2026-06-15 17:00');
+		$expected = (new \DateTime('2026-06-15 08:00', new \DateTimeZone('Europe/Berlin')))->getTimestamp();
+		$this->assertSame($expected, $this->resolver->countedStartForEntry($plain));
+	}
+
+	public function testCountedStartDstGapRollsToNextValidLocalTime(): void
+	{
+		// 2026-03-29: Europe/Berlin springs forward 02:00→03:00 — the
+		// configured 02:30 does not exist; B-R6 wants the next valid time.
+		$this->assignModel(['earliest_counted_start' => '02:30']);
+		$entry = $this->countedEntry('2026-03-29 01:30', '2026-03-29 09:00');
+		$expected = (new \DateTime('2026-03-29 03:00', new \DateTimeZone('Europe/Berlin')))->getTimestamp();
+		$this->assertSame($expected, $this->resolver->countedStartForEntry($entry));
+	}
+
+	public function testCountedNetSecondsIgnoresBreaksBeforeThreshold(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		// Break 06:30–07:00 is inside the clamped-away span and must NOT be
+		// deducted again; 12:00–12:30 lands inside the counted window.
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00', [
+			['2026-06-15 06:30', '2026-06-15 07:00'],
+			['2026-06-15 12:00', '2026-06-15 12:30'],
+		]);
+		// counted window 08:00–18:00 = 36000 s, minus 1800 s in-window break.
+		$this->assertSame(34200, $this->resolver->countedNetSeconds($entry));
+	}
+
+	public function testCountedNetSecondsZeroWhenEntryEndsBeforeThreshold(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 07:00');
+		$this->assertSame(0, $this->resolver->countedNetSeconds($entry));
+	}
+
+	// --- write-boundary validation ------------------------------------
+
+	public function testValidateModelBreakRulesAcceptsEarlyStartKeys(): void
+	{
+		$checked = $this->resolver->validateModelBreakRules([
+			'earliest_counted_start' => '07:30',
+			'early_start_mode' => 'clamp_unless_approved',
+			'early_start_anchor' => 'calendar_day',
+		]);
+		$this->assertSame([], $checked['errors']);
+		$this->assertSame('07:30', $checked['normalized']['earliest_counted_start']);
+		$this->assertSame('clamp_unless_approved', $checked['normalized']['early_start_mode']);
+		$this->assertSame('calendar_day', $checked['normalized']['early_start_anchor']);
+	}
+
+	public function testValidateModelBreakRulesRejectsMalformedEarlyStart(): void
+	{
+		foreach (['25:00', '7:30', 'ab:cd', 730, true] as $bad) {
+			$checked = $this->resolver->validateModelBreakRules(['earliest_counted_start' => $bad]);
+			$this->assertArrayHasKey('earliest_counted_start', $checked['errors'], 'rejects ' . var_export($bad, true));
+		}
+		foreach ([['early_start_mode', 'always'], ['early_start_mode', 'clamp,clamp'], ['early_start_anchor', 'shift_start'], ['early_start_anchor', 'midnight']] as [$key, $bad]) {
+			$checked = $this->resolver->validateModelBreakRules([$key => $bad]);
+			$this->assertArrayHasKey($key, $checked['errors'], 'rejects ' . $key . '=' . $bad);
+		}
+	}
+
+	public function testValidateModelBreakRulesNullClearsEarlyStartKeys(): void
+	{
+		$checked = $this->resolver->validateModelBreakRules([
+			'earliest_counted_start' => null,
+			'early_start_mode' => '',
+			'early_start_anchor' => null,
+		]);
+		$this->assertSame([], $checked['errors']);
+		$this->assertNull($checked['normalized']['earliest_counted_start']);
+		$this->assertNull($checked['normalized']['early_start_mode']);
+		$this->assertNull($checked['normalized']['early_start_anchor']);
+	}
+
+	public function testNormalizeModelRulesToleratesCorruptEarlyStart(): void
+	{
+		$rules = $this->resolver->normalizeModelRules([
+			'earliest_counted_start' => '99:99',
+			'early_start_mode' => 'bogus',
+			'early_start_anchor' => 'bogus',
+		]);
+		$this->assertNull($rules['earliest_counted_start']);
+		$this->assertSame('clamp', $rules['early_start_mode']);
+		$this->assertSame('calendar_day', $rules['early_start_anchor']);
+	}
 }
+

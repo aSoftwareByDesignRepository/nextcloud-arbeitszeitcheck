@@ -6,7 +6,7 @@
   {
    "id": "manual-time-entry-justification",
    "param": "justification",
-   "description": "Four-eyes manual create: server requires ≥10 chars; web+mobile must collect and submit.",
+   "description": "Four-eyes manual create: server requires \u226510 chars; web+mobile must collect and submit.",
    "errorCodes": [
     "justification_too_short"
    ],
@@ -64,7 +64,7 @@
   {
    "id": "time-entry-correction-justification",
    "param": "justification",
-   "description": "Employee correction requests require ≥10 character justification on web and mobile.",
+   "description": "Employee correction requests require \u226510 character justification on web and mobile.",
    "errorCodes": [
     "justification_required",
     "justification_too_short"
@@ -115,7 +115,7 @@
   {
    "id": "manager-correction-reason",
    "param": "reason",
-   "description": "Manager direct correction requires ≥10 character audit reason (web manager UI).",
+   "description": "Manager direct correction requires \u226510 character audit reason (web manager UI).",
    "errorCodes": [],
    "server": [
     {
@@ -273,7 +273,7 @@
     }
    ],
    "mobile": null,
-   "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec §7.3/§7.4."
+   "mobileNote": "Companion is read-only for entitlements (accounts + history via GET); admin mutations are web-only per spec \u00a77.3/\u00a77.4."
   },
   {
    "id": "manager-absence-shorten-reason",
@@ -343,7 +343,7 @@
   },
   {
    "id": "absence-estimate-days",
-   "param": "start/end (self) — userId/startDate/endDate (manager)",
+   "param": "start/end (self) \u2014 userId/startDate/endDate (manager)",
    "description": "FA-PREVIEW/DC-02+DC-06b: server-side schedule-aware day estimate; web and mobile previews display only, never count client-side (NN-03).",
    "errorCodes": [],
    "server": [
@@ -405,8 +405,8 @@
   },
   {
    "id": "absence-day-fraction",
-   "param": "day_fraction (self + API) — dayFraction (manager API)",
-   "description": "AZC-HALF-DAY-NON-VACATION: opt-in half-day for enabled absence types. Server validates the org allowlist (HALF_DAY_TYPE_NOT_ENABLED), single-day range (HALF_DAY_RANGE_FORBIDDEN / VAC_HALF_DAY_RANGE_FORBIDDEN) and recomputes days = schedule weight x fraction — client day values are never trusted (SEC-02).",
+   "param": "day_fraction (self + API) \u2014 dayFraction (manager API)",
+   "description": "AZC-HALF-DAY-NON-VACATION: opt-in half-day for enabled absence types. Server validates the org allowlist (HALF_DAY_TYPE_NOT_ENABLED), single-day range (HALF_DAY_RANGE_FORBIDDEN / VAC_HALF_DAY_RANGE_FORBIDDEN) and recomputes days = schedule weight x fraction \u2014 client day values are never trusted (SEC-02).",
    "errorCodes": [
     "HALF_DAY_TYPE_NOT_ENABLED",
     "HALF_DAY_RANGE_FORBIDDEN",
@@ -686,7 +686,7 @@
   },
   {
    "id": "overtime-breakdown-drilldown",
-   "param": "userId (optional scope) — period/start/end (optional range)",
+   "param": "userId (optional scope) \u2014 period/start/end (optional range)",
    "description": "GET /api/overtime/breakdown: per-absence overtime-credit drill-down. Same endpoint feeds the web dashboard dialog and the companion breakdown sheet; optional userId is honored only inside the actor's oversight scope (uniform 404 otherwise).",
    "errorCodes": [
     "NOT_FOUND",
@@ -816,7 +816,7 @@
   {
    "id": "auto-clock-out-ended-reason-marker",
    "param": "endedReason ('auto_planned_end')",
-   "description": "Marker shown on entries the system closed at the planned end. Serialized via TimeEntry::getSummary(); both web lists and the companion detail screen render a readable badge — never the raw reason key.",
+   "description": "Marker shown on entries the system closed at the planned end. Serialized via TimeEntry::getSummary(); both web lists and the companion detail screen render a readable badge \u2014 never the raw reason key.",
    "server": [
     {
      "file": "lib/Db/TimeEntry.php",
@@ -885,7 +885,7 @@
   {
    "id": "assignments-gap-policy",
    "param": "assignmentsGapPolicy",
-   "description": "Org flag (BQ-01): how days outside all assignment periods resolve their Soll - 'lenient' (legacy fallback, default) | 'strict' (zero target, unassigned_gap basis). POST validates the enum, GET exposes it to clients (settings parity, contract rule §4). Admin-only surface: the companion has no admin settings screen, so mobile is null.",
+   "description": "Org flag (BQ-01): how days outside all assignment periods resolve their Soll - 'lenient' (legacy fallback, default) | 'strict' (zero target, unassigned_gap basis). POST validates the enum, GET exposes it to clients (settings parity, contract rule \u00a74). Admin-only surface: the companion has no admin settings screen, so mobile is null.",
    "errorCodes": [
     "invalid_assignments_gap_policy"
    ],
@@ -981,7 +981,7 @@
   {
    "id": "absence-duration-minutes",
    "param": "duration_mode / duration_minutes",
-   "description": "Hour-mode absence request (§9.1): server accepts duration_mode='hours' + duration_minutes (1-1440, same-day, no day-shape fields) only for policy-enabled built-in types, and only when the client sends X-AZC-Absence-Contract: 2. Web renders the minutes field for hourly types — reachability is bound by the initHourlyModeField needle (r82 defect: the wiring sat inside the vacation-hours early return and died when hourly was on but vacation-hours off) plus the executable leg in tests/e2e/absence-hourly-mode.spec.js (hourly on / vacation-hours off -> group unhidden, inputs enabled, FormData carries duration_minutes, row persists durationMode='hours'); mobile collects minutes gated on workforcePolicy.hourlyAbsenceTypes and auto-attaches the contract header.",
+   "description": "Hour-mode absence request (\u00a79.1): server accepts duration_mode='hours' + duration_minutes (1-1440, same-day, no day-shape fields) only for policy-enabled built-in types, and only when the client sends X-AZC-Absence-Contract: 2. Web renders the minutes field for hourly types \u2014 reachability is bound by the initHourlyModeField needle (r82 defect: the wiring sat inside the vacation-hours early return and died when hourly was on but vacation-hours off) plus the executable leg in tests/e2e/absence-hourly-mode.spec.js (hourly on / vacation-hours off -> group unhidden, inputs enabled, FormData carries duration_minutes, row persists durationMode='hours'); mobile collects minutes gated on workforcePolicy.hourlyAbsenceTypes and auto-attaches the contract header.",
    "errorCodes": [
     "ABSENCE_CONTRACT_VERSION",
     "HOURLY_SINGLE_DATE_REQUIRED",
@@ -1064,7 +1064,7 @@
   {
    "id": "absence-correction-request",
    "param": "reason / expectedUpdatedAt / operation_key",
-   "description": "Completed-absence correction request + withdraw (§9.4): owner files POST /api/absences/{id}/correction-request (and .../withdraw) with mandatory reason, CAS token and §15.9 operation key. Web uses the shared cancel-request dialog (kind=correction attaches operation_key); mobile sends Crypto.randomUUID() as operationKey.",
+   "description": "Completed-absence correction request + withdraw (\u00a79.4): owner files POST /api/absences/{id}/correction-request (and .../withdraw) with mandatory reason, CAS token and \u00a715.9 operation key. Web uses the shared cancel-request dialog (kind=correction attaches operation_key); mobile sends Crypto.randomUUID() as operationKey.",
    "errorCodes": [
     "reason_required",
     "revision_stale",
@@ -1138,7 +1138,7 @@
   {
    "id": "absence-correction-manager",
    "param": "expectedUpdatedAt / operation_key / reason|comment",
-   "description": "Manager correction surface (§9.4): decide an open correction request (correction-request/approve|decline, optional comment) or direct-correct a completed absence (/correct, mandatory reason). Both carry CAS + §15.9 operation key; self-approval/self-correction rejected server-side (AC-37). Web manager-absences table renders decide buttons on canDecideCorrectionRequest and a correct action on canManagerCorrect; mobile mirrors both on the employee-absence detail card.",
+   "description": "Manager correction surface (\u00a79.4): decide an open correction request (correction-request/approve|decline, optional comment) or direct-correct a completed absence (/correct, mandatory reason). Both carry CAS + \u00a715.9 operation key; self-approval/self-correction rejected server-side (AC-37). Web manager-absences table renders decide buttons on canDecideCorrectionRequest and a correct action on canManagerCorrect; mobile mirrors both on the employee-absence detail card.",
    "errorCodes": [
     "reason_required",
     "revision_stale",
@@ -1228,7 +1228,7 @@
   {
    "id": "admin-year-end-runs",
    "param": "closingYear / userIds / resetPositive / waiveNegative / reason / expectedPolicyRevision / previewId / operationId",
-   "description": "Guided year-end overtime reset (§9.5/§9.6): preview→execute→resume run workflow under /api/admin/year-end-runs. Execute requires previewId + reason (>=10) + expectedPolicyRevision CAS + idempotent operationId; resetPositive/waiveNegative pick the scope per policy. Admin-only surface — mobile is null.",
+   "description": "Guided year-end overtime reset (\u00a79.5/\u00a79.6): preview\u2192execute\u2192resume run workflow under /api/admin/year-end-runs. Execute requires previewId + reason (>=10) + expectedPolicyRevision CAS + idempotent operationId; resetPositive/waiveNegative pick the scope per policy. Admin-only surface \u2014 mobile is null.",
    "errorCodes": [
     "feature_disabled",
     "revision_stale",
@@ -1291,6 +1291,119 @@
     }
    ],
    "mobile": null
+  },
+  {
+   "id": "model-earliest-counted-start",
+   "param": "breakRules.earliest_counted_start / breakRules.early_start_mode / breakRules.early_start_anchor",
+   "description": "Optional per-model clamp of the counted work start (customer-requests spec B). Write boundary validates the enum whitelists (mode clamp|clamp_unless_approved, anchor calendar_day \u2014 shift_start is Phase 2 and rejected) and preserves stored values when a client omits the keys (B-R8). The accounting layer emits counted_start/clamped/counted_*_duration_hours in entry summaries; raw startTime is never rewritten (NN-2). Manager time-entry review and the companion show the counted basis with a clamped hint.",
+   "errorCodes": [
+    "VALIDATION_VALUE"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "earliest_counted_start",
+      "early_start_mode",
+      "early_start_anchor",
+      "EARLY_START_KEYS"
+     ]
+    },
+    {
+     "file": "lib/Support/BreakPolicyResolver.php",
+     "needles": [
+      "earliest_counted_start",
+      "early_start_mode",
+      "early_start_anchor",
+      "countedStartForEntry",
+      "countedNetSeconds"
+     ]
+    },
+    {
+     "file": "lib/Db/TimeEntry.php",
+     "needles": [
+      "getCountedStartTimestamp",
+      "isCountedClamped",
+      "getCountedPaidDurationHours",
+      "counted_start",
+      "clamped",
+      "counted_paid_duration_hours"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/working-time-models.js",
+     "needles": [
+      "wtm-model-earliest-counted-start",
+      "wtm-model-early-start-mode",
+      "earliest_counted_start",
+      "early_start_mode",
+      "early_start_anchor",
+      "wtm-model-early-start-dst-warning"
+     ]
+    },
+    {
+     "file": "templates/working-time-models.php",
+     "needles": [
+      "earliestCountedStart",
+      "earlyStartMode",
+      "earlyStartDstWarning",
+      "earliestCountedStartInvalid"
+     ]
+    },
+    {
+     "file": "js/arbeitszeitcheck-main.js",
+     "needles": [
+      "counted_paid_duration_hours",
+      "counted_start",
+      "clamped"
+     ]
+    },
+    {
+     "file": "js/manager-time-entries.js",
+     "needles": [
+      "counted_paid_duration_hours",
+      "counted_start",
+      "clamped"
+     ]
+    },
+    {
+     "file": "templates/time-entries.php",
+     "needles": [
+      "getCountedPaidDurationHours",
+      "isCountedClamped",
+      "Counted from"
+     ]
+    }
+   ],
+   "mobile": [
+    {
+     "file": "src/types.ts",
+     "needles": [
+      "counted_start",
+      "clamped",
+      "counted_paid_duration_hours",
+      "counted_duration_hours"
+     ]
+    },
+    {
+     "file": "src/screens/TimeEntriesScreen.tsx",
+     "needles": [
+      "counted_paid_duration_hours",
+      "counted_start",
+      "clamped"
+     ]
+    },
+    {
+     "file": "src/screens/TimeEntryDetailScreen.tsx",
+     "needles": [
+      "counted_paid_duration_hours",
+      "counted_start",
+      "clamped"
+     ]
+    }
+   ]
   }
  ]
 }

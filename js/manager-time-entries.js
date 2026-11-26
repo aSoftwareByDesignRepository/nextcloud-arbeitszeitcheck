@@ -414,7 +414,13 @@
 				td(t('Start', 'Start'), escapeHtml(formatDateTime(entry.startTime, 'time'))),
 				td(t('End', 'End'), escapeHtml(formatDateTime(entry.endTime, 'time'))),
 				td(t('Working Hours', 'Working Hours'), escapeHtml(
-					formatHours(entry.paidDurationHours != null ? entry.paidDurationHours : entry.workingDurationHours)
+					// Counted basis wins when the server emits it (spec B) —
+					// the clamp is accounting-only; the raw stamp stays in the
+					// Start column.
+					formatHours(entry.counted_paid_duration_hours != null ? entry.counted_paid_duration_hours : (entry.paidDurationHours != null ? entry.paidDurationHours : entry.workingDurationHours))
+					+ (entry.clamped === true && entry.counted_start
+						? ` (${t('counted from', 'counted from')} ${formatDateTime(entry.counted_start, 'time')})`
+						: '')
 					+ (Number(entry.paidBreakSeconds || 0) >= 30
 						? ` (${t('net', 'net')} ${formatHours(entry.workingDurationHours)} · ${t('paid break', 'paid break')} ${Math.round(Number(entry.paidBreakSeconds) / 60)}m)`
 						: '')

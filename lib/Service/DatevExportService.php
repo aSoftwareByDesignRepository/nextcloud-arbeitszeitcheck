@@ -103,7 +103,7 @@ class DatevExportService
 				continue; // Skip incomplete entries
 			}
 
-			$workingHours = $entry->getPaidDurationHours();
+			$workingHours = $entry->getCountedPaidDurationHours();
 			if ($workingHours <= 0) {
 				continue; // Skip entries with no working time
 			}
@@ -192,7 +192,7 @@ class DatevExportService
 					continue;
 				}
 
-				$workingHours = $entry->getPaidDurationHours();
+				$workingHours = $entry->getCountedPaidDurationHours();
 				if ($workingHours <= 0) {
 					continue;
 				}

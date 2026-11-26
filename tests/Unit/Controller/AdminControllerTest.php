@@ -2466,6 +2466,95 @@ class AdminControllerTest extends TestCase
 		$this->assertTrue($response->getData()['success']);
 	}
 
+	/**
+	 * B-R8: an old client that never sends the early-start keys must not
+	 * clear a configured clamp with the whole-document replace.
+	 */
+	public function testUpdateWorkingTimeModelPreservesEarlyStartKeysWhenAbsent(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$model->setBreakRulesArray([
+			'weekday_schedule' => self::v1ScheduleDoc(),
+			'earliest_counted_start' => '08:00',
+			'early_start_mode' => 'clamp',
+			'early_start_anchor' => 'calendar_day',
+		]);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => ['weekday_schedule' => self::v1ScheduleDoc(), 'break_policy' => 'flex'],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf(self::v1ScheduleDoc()),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(function (WorkingTimeModel $m): bool {
+				$rules = $m->getBreakRulesArray();
+				return ($rules['earliest_counted_start'] ?? null) === '08:00'
+					&& ($rules['early_start_mode'] ?? null) === 'clamp'
+					&& ($rules['early_start_anchor'] ?? null) === 'calendar_day';
+			}))
+			->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	/**
+	 * B-R8 inverse: an explicit null is a deliberate clear — the stored
+	 * clamp must not be resurrected by the preserve-on-absent merge.
+	 */
+	public function testUpdateWorkingTimeModelExplicitNullClearsEarlyStart(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$model->setBreakRulesArray([
+			'weekday_schedule' => self::v1ScheduleDoc(),
+			'earliest_counted_start' => '08:00',
+		]);
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => [
+				'weekday_schedule' => self::v1ScheduleDoc(),
+				'earliest_counted_start' => null,
+			],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf(self::v1ScheduleDoc()),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->userWorkingTimeModelMapper->method('findByWorkingTimeModel')->willReturn([]);
+		$this->workingTimeModelMapper->expects($this->once())
+			->method('update')
+			->with($this->callback(function (WorkingTimeModel $m): bool {
+				return !array_key_exists('earliest_counted_start', $m->getBreakRulesArray());
+			}))
+			->willReturnArgument(0);
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertTrue($response->getData()['success']);
+	}
+
+	/**
+	 * Write boundary: malformed early-start values reject instead of
+	 * silently persisting (enum whitelist, spec B).
+	 */
+	public function testUpdateWorkingTimeModelRejectsInvalidEarlyStartMode(): void
+	{
+		$model = $this->storedModelWithSchedule(self::v1ScheduleDoc());
+		$this->request->method('getParams')->willReturn([
+			'name' => 'Stored',
+			'breakRules' => [
+				'weekday_schedule' => self::v1ScheduleDoc(),
+				'early_start_mode' => 'always',
+			],
+			'scheduleBaseRevision' => \OCA\ArbeitszeitCheck\Support\WeekdaySchedule::revisionOf(self::v1ScheduleDoc()),
+		]);
+		$this->workingTimeModelMapper->method('find')->willReturn($model);
+		$this->workingTimeModelMapper->expects($this->never())->method('update');
+
+		$response = $this->controller->updateWorkingTimeModel(1);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse($response->getData()['success']);
+	}
+
 	public function testUpdateWorkingTimeModelClearOnAssignedV2RequiresSuccessor(): void
 	{
 		// Explicit null + fresh revision is unambiguous intent, but clearing

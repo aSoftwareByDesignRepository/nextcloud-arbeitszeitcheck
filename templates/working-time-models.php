@@ -248,6 +248,14 @@ $models = $_['models'] ?? [];
     window.ArbeitszeitCheck.l10n.deleteModelTitle = <?php echo json_encode($l->t('Delete working time model'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.delete = <?php echo json_encode($l->t('Delete'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.ArbeitszeitCheck.l10n.thisWorkSchedule = <?php echo json_encode($l->t('this work schedule'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earliestCountedStart = <?php echo json_encode($l->t('Earliest counted work start (optional)'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earliestCountedStartHelp = <?php echo json_encode($l->t('Time stamped before this clock time does not count toward paid hours in reports, overtime and exports. The recorded start time itself stays unchanged.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earlyStartMode = <?php echo json_encode($l->t('When to apply this limit'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earlyStartModeClamp = <?php echo json_encode($l->t('Apply to every entry'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earlyStartModeUnlessApproved = <?php echo json_encode($l->t('Skip entries created or approved by a manager'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earlyStartModeHelp = <?php echo json_encode($l->t('Manager-created or manager-approved entries can keep their recorded start when they document an early shift on purpose.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earlyStartDstWarning = <?php echo json_encode($l->t('On days when this local clock time does not exist (daylight-saving switch), the next valid clock time applies automatically.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.ArbeitszeitCheck.l10n.earliestCountedStartInvalid = <?php echo json_encode($l->t('Earliest counted start must be a clock time (HH:MM) or empty.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 </script>
 
 </div><!-- /.azc-page-stack -->

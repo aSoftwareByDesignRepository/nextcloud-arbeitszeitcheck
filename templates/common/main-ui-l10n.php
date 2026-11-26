@@ -114,6 +114,7 @@ $mainUiStringIds = [
 	'Split requested by an approved correction',
 	'Counted as one continuous day by an approved correction',
 	'Clock-out after the cut-off time — day split at the scheduled interruption',
+	'Counted from',
 ];
 
 $mainUiStrings = [];

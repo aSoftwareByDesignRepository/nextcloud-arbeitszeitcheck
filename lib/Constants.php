@@ -224,6 +224,13 @@ final class Constants
 	 */
 	public const BATCH_CHUNK_SIZE = 500;
 
+	/**
+	 * Depth cap for recursive team-tree walks (FM-C1/C-R7). Write-side
+	 * validation already rejects parent cycles; this bounds the read side
+	 * against corrupted trees so a report request can never loop forever.
+	 */
+	public const TEAM_HIERARCHY_MAX_DEPTH = 10;
+
 	/** App config: when "1", employees may finalize months (revision-safe snapshot + lock). Default off. */
 	public const CONFIG_MONTH_CLOSURE_ENABLED = 'month_closure_enabled';
 

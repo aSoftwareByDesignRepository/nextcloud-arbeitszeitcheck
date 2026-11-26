@@ -71,6 +71,38 @@ final class CustomAbsenceTypeIntegrationTest extends TestCase
 		parent::tearDown();
 	}
 
+	public function testNotificationMatrixIncludesCustomTypesAndDropsBogus(): void
+	{
+		$r = $this->service->create(['label' => 'Matrixtyp'], 'it-admin');
+		self::assertSame(201, $r['code'], json_encode($r));
+		$this->createdTypeIds[] = (int)$r['data']['id'];
+		$code = (string)$r['data']['code'];
+		AbsenceTypeCatalog::resetCustomTypeCache();
+
+		$events = \OCA\ArbeitszeitCheck\Constants::HR_NOTIFICATION_EVENTS;
+		$matrix = AbsenceTypeCatalog::normalizeEventMatrix(
+			[
+				$code => [$events[0] => true],
+				'custom_injected_bogus' => [$events[0] => true],
+				'vacation' => [$events[0] => '1'],
+			],
+			$events
+		);
+		self::assertArrayHasKey($code, $matrix, 'active custom type must appear in the HR matrix');
+		self::assertTrue($matrix[$code][$events[0]]);
+		self::assertArrayNotHasKey('custom_injected_bogus', $matrix, 'fail-closed: unknown custom_* codes drop');
+		self::assertTrue($matrix['vacation'][$events[0]], 'built-in coercion keeps working');
+
+		// A-R3: deactivate — the stored row is retained in the matrix output but
+		// the send gate (isCreatable) closes.
+		$this->service->update((int)$r['data']['id'], ['active' => 'false'], 'it-admin');
+		AbsenceTypeCatalog::resetCustomTypeCache();
+		$stored = [$code => [$events[0] => true]];
+		$matrix2 = AbsenceTypeCatalog::normalizeEventMatrix([], $events, $stored);
+		self::assertTrue($matrix2[$code][$events[0]], 'inactive custom type keeps its stored matrix rows');
+		self::assertFalse(AbsenceTypeCatalog::isCreatable($code), 'deactivated type must not send or accept new requests');
+	}
+
 	/** createSchema() returns storage-level (prefixed) names — match by suffix. */
 	private function prefixedTable(\Doctrine\DBAL\Schema\Schema $schema, string $appName): string
 	{

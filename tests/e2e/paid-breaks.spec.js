@@ -97,18 +97,32 @@ test.describe('Paid breaks (TVöD §6)', () => {
 				data: { workingTimeModelId: modelId, startDate: '1993-01-01' },
 			})
 
-			// Impact baseline: the 1993 window covers the employee's seeded
-			// history — assert the delta, not an absolute count.
+			// Impact baseline: the stored assignment window (a profile PUT
+			// keeps window dates — only the timeline API may move them)
+			// covers the employee's seeded history — assert the delta, not
+			// an absolute count.
 			const impactBefore = await api(adminPage, 'GET', `/apps/arbeitszeitcheck/api/admin/working-time-models/${modelId}/paid-break-impact`)
 			expect(impactBefore.success).toBe(true)
 			const baselineEntries = Number(impactBefore.data?.affected_entry_count ?? 0)
 
 			// -- 3) Employee records a day: 9h wall, 1h break ----------------
 			await login(employeePage, credsFromEnv('EMPLOYEE'))
-			const base = addDays('1993-03-01', stamp % 250)
+			// The verification entry must start inside the stored window so
+			// the impact preview counts it and the fresh model covers the
+			// day. Spread the base across the window's first ~1000 days,
+			// then scan forward for a free slot.
+			const winStart = origAssignment?.startDate ?? new Date().toISOString().slice(0, 10)
+			const winEnd = origAssignment?.endDate ?? null
+			const winDays = winEnd !== null
+				? Math.max(1, Math.floor((Date.parse(`${winEnd}T00:00:00Z`) - Date.parse(`${winStart}T00:00:00Z`)) / 86400000) - 41)
+				: 30000
+			const base = addDays(winStart, stamp % Math.min(winDays, 1000))
 			let created = null
 			for (let i = 0; i < 40 && !created; i++) {
 				const date = addDays(base, i)
+				if (winEnd !== null && date > winEnd) {
+					continue
+				}
 				const res = await apiAllowFailure(employeePage, 'POST', '/apps/arbeitszeitcheck/api/time-entries', {
 					data: {
 						date,

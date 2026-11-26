@@ -9958,7 +9958,7 @@ class AdminController extends Controller
 	#[NoCSRFRequired]
 	public function yearEndPage(): TemplateResponse
 	{
-		$this->registerFrontEndAssets('admin-year-end', 'admin-year-end');
+		$this->registerFrontEndAssets('admin-year-end', 'admin-year-end', ['common/view-components']);
 		$policy = $this->workforcePolicyService()->get();
 		$users = [];
 		foreach ($this->userManager->search('', 500) as $u) {
